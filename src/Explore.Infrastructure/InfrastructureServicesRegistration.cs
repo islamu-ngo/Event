@@ -245,6 +245,8 @@ public static class InfrastructureServicesRegistration
         // Config resolved per-tenant from cascading settings engine (SystemSetting → TenantSetting)
         // Instance admin can lock settings to enforce SaaS-wide SMTP or let tenants override
         services.AddScoped<ISmtpConfigResolver, SmtpConfigResolver>();
+        services.AddScoped<EmailDeliveryCapabilityResolver>();
+        services.AddScoped<IEmailDeliveryCapabilityResolver>(provider => provider.GetRequiredService<EmailDeliveryCapabilityResolver>());
         services.AddScoped<SmtpEmailService>();
         services.AddScoped<IEmailService>(provider => provider.GetRequiredService<SmtpEmailService>());
         services.AddScoped<IEmailConnectionTester>(provider => provider.GetRequiredService<SmtpEmailService>());

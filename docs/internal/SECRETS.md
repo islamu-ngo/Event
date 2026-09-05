@@ -163,6 +163,20 @@ Runtime and migrator processes receive only their role-specific database credent
 The checked-in Compose topology is single-replica; a multi-replica split deployment
 must additionally set `Hosting:ReplicaCount` and provide one shared `SETUP_SECRET`.
 
+### SMTP Transport Ownership
+
+Delivery requires explicit `email.delivery_enabled=true` governance; SMTP credentials
+do not enable it. Disabled transports resolve no credentials. Instance-hosted SMTP uses
+instance bindings; tenant-owned hosts use exact tenant bindings through the existing
+binding repository and `ResolveTenantBindingAsync`, never the tenant-to-instance fallback.
+The materialized credential scope is checked again before constructing the transport.
+Username and password must either both be absent (anonymous SMTP) or both be present.
+Authority failures yield degraded capability and do not permit anonymous fallback.
+
+Only bounded state, enabled intent, and ownership scope enter `EmailDeliveryCapability`.
+No extra SMTP credential cache sits above the selected secret authority. The shared
+resolver's documented freshness and coordinated-restart requirements below still apply.
+
 ### Runtime resolution outcomes and bounded freshness
 
 Runtime bindings return one of five value-free outcomes. `Resolved` is the only

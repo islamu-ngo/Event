@@ -151,6 +151,7 @@ public static class GovernanceSettingKeys
 
     public static class Email
     {
+        public const string DeliveryEnabled = "email.delivery_enabled";
         public const string SmtpHost = "email.smtp_host";
         public const string SmtpPort = "email.smtp_port";
         public const string SmtpSecurity = "email.smtp_security";

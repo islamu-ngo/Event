@@ -664,6 +664,33 @@ The value must be an absolute `http` or `https` URL. Public deployments should u
 
 Payment Checkout requires HTTPS with no user info, query, or fragment. A normalized application subpath is supported, for example `https://events.example.org/events`; runtime normalization adds one trailing slash and preserves `/events` in Stripe callbacks and BFF navigation. Missing or invalid configuration defers new Checkout dispatch with `checkout_return_origin_invalid`; it does not block free-order finalization or payment reconciliation.
 
+### Explicit Outbound Email Capability
+
+`email.delivery_enabled` is an instance-to-tenant governance boolean, default `false`.
+SMTP coordinates or credentials alone never enable delivery. The computed capability
+reports `Disabled`, `Unconfigured`, `Misconfigured`, `Available`, or `Degraded` without
+hostnames, sender addresses, binding identifiers, or secrets. `Available` means local
+configuration and credential resolution succeeded; it does not prove server acceptance.
+
+`EmailDeliveryPolicy` owns pure state and credential-scope rules. The Infrastructure
+`EmailDeliveryCapabilityResolver` uses the existing hierarchical settings resolver and
+selected secret authority. The SMTP adapter builds a fresh transport configuration on
+each resolution; it no longer caches plaintext SMTP configurations. Existing settings
+and secret-authority cache lifetimes still apply across replicas.
+
+`governance.lock_tenant_smtp=true` selects instance transport policy. When delegation
+is unlocked, a tenant-owned host requires a tenant-owned sender and tenant-only credential
+bindings. Missing tenant credential bindings permit anonymous SMTP; instance credentials
+are never inherited by that host. A tenant can enable its own complete transport while
+instance delivery is disabled, but cannot enable the disabled instance fallback. An
+instance-owned host uses instance credentials only. Individual settings locks still apply;
+specialized instance SMTP saves preserve them inside the existing ordered mutation locks.
+
+Callers of `IEmailDeliveryCapabilityResolver` pass `null` for instance policy, including
+future Local credential gates. Tenant notification capability does not grant authentication
+or change trusted Keycloak/ATProto verification facts. Provider-owned authentication email
+remains separate from Event delivery policy.
+
 ### Keycloak Identity Lifecycle Email Configuration
 
 Identity lifecycle email for Keycloak-backed accounts is account-authority owned. The logical ownership settings are:

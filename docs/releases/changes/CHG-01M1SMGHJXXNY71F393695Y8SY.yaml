@@ -1,0 +1,34 @@
+# ABOUTME: Records explicit default-off email and coherent SMTP credential ownership.
+# ABOUTME: Declares operator configuration and security impacts without changing identity-provider authority.
+Change-Id: CHG-01M1SMGHJXXNY71F393695Y8SY
+Title: make email an explicit scoped capability
+Type: feat
+Scope: notifications
+Summary: Default outbound delivery off and resolve coherent tenant transport ownership without exposing credentials or coupling external authentication to SMTP.
+Group: email-optional-self-hosting
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: Outbound email requires explicit delivery enablement; no legacy auto-enable mode is retained.
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: Tenant-owned SMTP hosts cannot inherit instance credentials; specialized SMTP saves preserve setting locks.
+  Migration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+    Detail: This capability uses existing settings and secret binding storage without a schema change.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: email.delivery_enabled defaults false and tenant SMTP delegation retains explicit instance governance.
+  OpenAPI:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+    Detail: The capability is an internal application port; this slice adds no HTTP endpoint or generated contract.
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: Configure transport ownership and explicitly enable delivery; SMTP variables alone do not enable sending.

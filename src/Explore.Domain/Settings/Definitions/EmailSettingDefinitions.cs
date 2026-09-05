@@ -5,6 +5,14 @@ namespace Explore.Domain.Settings.Definitions;
 
 public static class EmailSettingDefinitions
 {
+    public static readonly SettingDefinition DeliveryEnabled = new(
+        Key: "email.delivery_enabled",
+        ValueType: SettingValueType.Boolean,
+        DefaultValue: "false",
+        Category: "Email",
+        Description: "Explicitly enable outbound email using the effective transport owner",
+        MaxScope: SettingScope.Tenant);
+
     public static readonly SettingDefinition SmtpHost = new(
         Key: "email.smtp_host",
         ValueType: SettingValueType.String,
@@ -64,7 +72,7 @@ public static class EmailSettingDefinitions
 
     public static IReadOnlyList<SettingDefinition> All =>
     [
-        SmtpHost, SmtpPort, SmtpSecurity,
+        DeliveryEnabled, SmtpHost, SmtpPort, SmtpSecurity,
         FromAddress, FromName, SmtpTimeoutSeconds, SmtpSkipCertValidation
     ];
 }

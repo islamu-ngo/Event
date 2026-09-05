@@ -12,6 +12,7 @@ using Explore.Domain.Constants;
 /// </summary>
 public class EmailSettingGroup : ISettingGroup
 {
+    public bool DeliveryEnabled { get; private set; }
     public string? SmtpHost { get; private set; }
     public int SmtpPort { get; private set; } = 587;
     public string SmtpSecurity { get; private set; } = "StartTls";
@@ -22,6 +23,7 @@ public class EmailSettingGroup : ISettingGroup
 
     public static IEnumerable<string> SettingKeys =>
     [
+        GovernanceSettingKeys.Email.DeliveryEnabled,
         GovernanceSettingKeys.Email.SmtpHost,
         GovernanceSettingKeys.Email.SmtpPort,
         GovernanceSettingKeys.Email.SmtpSecurity,
@@ -33,6 +35,8 @@ public class EmailSettingGroup : ISettingGroup
 
     public void Populate(IReadOnlyDictionary<string, ResolvedSetting> settings)
     {
+        if (settings.TryGetValue(GovernanceSettingKeys.Email.DeliveryEnabled, out var enabled))
+            DeliveryEnabled = SettingValueSerializer.Deserialize(enabled.Value, false);
         if (settings.TryGetValue(GovernanceSettingKeys.Email.SmtpHost, out var host))
             SmtpHost = SettingValueSerializer.DeserializeString(host.Value);
         if (settings.TryGetValue(GovernanceSettingKeys.Email.SmtpPort, out var port))

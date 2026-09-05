@@ -144,15 +144,29 @@ onboarding and switching behavior.
 
 ## 6. Email (SMTP & Outbox)
 
+Outbound email defaults off. Set the governance setting `email.delivery_enabled=true`
+only when you intend to send mail; supplying SMTP environment variables does not enable
+delivery. This is an application setting, not an environment-variable alias. A disabled
+transport keeps its configuration and does not connect to SMTP.
+
+Instance SMTP is shared only while instance delivery is enabled. If tenant SMTP
+delegation is unlocked, a tenant may enable its own host and sender with tenant-scoped
+credentials even when instance delivery is off. Tenant hosts never receive instance
+credentials. Both credentials may be omitted for a deliberately unauthenticated relay.
+Missing or invalid configuration is reported separately from intentional disablement.
+
 | Variable | Status | Default | Description |
 |---|---|---|---|
-| `EMAIL_SMTP_HOST` | **Baseline** | `mailpit` | Outgoing SMTP server hostname (`mailpit` in local Compose). |
-| `EMAIL_SMTP_PORT` | **Baseline** | `1025` | SMTP port (`587` for STARTTLS, `465` for SSL, `1025` for Mailpit). |
-| `EMAIL_FROM_ADDRESS` | **Baseline** | `noreply@example.org` | Default sender email address. |
-| `EMAIL_FROM_NAME` | **Baseline** | `ISLAMU Event` | Default sender display name. |
-| `SMTP_USERNAME` | **Baseline (Secret)** | None | SMTP authentication username. |
-| `SMTP_PASSWORD` | **Baseline (Secret)** | None | SMTP authentication password. |
-| `EMAIL_SMTP_SECURITY` | **Baseline** | `None` | Security mode: `None`, `Auto`, `SslOnConnect`, `StartTls`, `StartTlsWhenAvailable`. |
+| `MAIL_SMTP_HOST` | Optional | None | Deployment SMTP hostname; Development seed initializes `email.smtp_host` if absent. |
+| `MAIL_SMTP_PORT` | Optional | None | Deployment SMTP port; Development seed initializes `email.smtp_port` if absent. |
+| `MAIL_SMTP_FROM_ADDRESS` | Optional | None | Deployment sender; Development seed initializes `email.from_address` if absent. |
+| `MAIL_SMTP_FROM_NAME` | Optional | None | Deployment sender label; Development seed initializes `email.from_name` if absent. |
+| `MAIL_SMTP_USERNAME` | Optional secret | None | Instance SMTP authentication username in the selected authority. |
+| `MAIL_SMTP_PASSWORD` | Optional secret | None | Instance SMTP authentication password in the selected authority. |
+
+Set connection security through `email.smtp_security` (`StartTls` by default;
+`None`, `SslOnConnect`, and `Auto` are also supported). Keycloak and other account
+providers retain their own verification and recovery delivery configuration.
 
 ---
 

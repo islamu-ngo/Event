@@ -41,12 +41,21 @@ public sealed class CaseInsensitiveRepositoryQueriesSqliteTests
                 CreatedAt = DateTime.UtcNow
             };
             var user = CreateUser("privacy");
+            var provider = new AuthenticationProvider
+            {
+                Id = (int)"KeYcLoAk".ParseAuthenticationProviderKind(),
+                MasterCode = "keycloak",
+                FullName = "Keycloak"
+            };
             var login = new UserExternalLogin { Id = Guid.CreateVersion7(),
-            UserId = user.Id,
-            User = user,
-            AuthenticationProviderId = (int)"KeYcLoAk".ParseAuthenticationProviderKind(), AuthenticationProvider = null!, ProviderKey = "sqlite-keycloak-subject",
-            CreatedAt = DateTime.UtcNow };
-            context.AddRange(status, tenant, user, login);
+                UserId = user.Id,
+                User = user,
+                AuthenticationProviderId = provider.Id,
+                AuthenticationProvider = provider,
+                ProviderKey = "sqlite-keycloak-subject",
+                CreatedAt = DateTime.UtcNow
+            };
+            context.AddRange(status, tenant, user, provider, login);
             await context.SaveChangesAsync();
 
             var repository = new UserLocationPrivacyErasureRepository(context);

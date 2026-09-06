@@ -105,7 +105,8 @@ public sealed class LocalIdentityPersistenceInvariantTests
                     : null,
             })
             .Build();
-        var options = new DbContextOptionsBuilder<ExternalIdentityDbContext>();
+        // External topology probes require independent provider-specific migration services.
+        var options = new DbContextOptionsBuilder<ExternalIdentityDbContext>().EnableServiceProviderCaching(false);
         IdentityDatabaseProviderComposition.Configure(
             options,
             configuration,

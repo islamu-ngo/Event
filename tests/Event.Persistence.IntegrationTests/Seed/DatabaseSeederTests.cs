@@ -412,7 +412,7 @@ public class DatabaseSeederTests(PostgreSqlContainerFixture fixture)
 
         var orderId = Guid.Parse("018e4e5c-7f00-7001-8000-000000010001");
         var registrationId = Guid.Parse("018e4e5c-7f00-7001-8000-000000010002");
-        var consentId = Guid.Parse("018e4e5c-7f00-7001-8000-000000010003");
+        Guid consentId;
 
         await using (var context = fixture.CreateDbContext())
         {
@@ -487,6 +487,7 @@ public class DatabaseSeederTests(PostgreSqlContainerFixture fixture)
                 SeedIds.DefaultTenantId, ContactShareConsentSubjectTypeEnum.User, SeedIds.RegularUserId,
                 recipientActorId, ConsentPurposeCodes.OrganizerFutureCommunications, "user@example.test",
                 "Share my email with the organizer.", "v1", now);
+            consentId = consent.Id;
             context.Set<EventContactShareConsent>().Add(consent);
             await context.SaveChangesAsync();
         }

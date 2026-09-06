@@ -12,6 +12,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 
 namespace Explore.Blazor.IntegrationTests.Fixtures;
 
@@ -31,25 +32,31 @@ public class SecurityBlazorBffWebApplicationFactory : WebApplicationFactory<Prog
     public SecurityBlazorBffWebApplicationFactory(
         string keycloakAuthority,
         string keycloakMetadataAddress,
-        string keycloakClientId = "islamu-event-blazor",
-        string keycloakClientSecret = "test-blazor-secret")
+        string keycloakClientId,
+        string keycloakClientSecret)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(keycloakClientSecret);
         _keycloakAuthority = keycloakAuthority;
         _keycloakMetadataAddress = keycloakMetadataAddress;
         _keycloakClientId = keycloakClientId;
         _keycloakClientSecret = keycloakClientSecret;
     }
 
+    protected override IHost CreateHost(IHostBuilder builder)
+    {
+        builder.ConfigureHostConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?> { ["SecretProvider:Provider"] = "Environment" }));
+        return base.CreateHost(builder);
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.UseEnvironment("Development");
-        builder.UseSetting("ConnectionStrings:cache", "localhost:6379,abortConnect=false,connectTimeout=100");
+        builder.UseEnvironment("Testing");
 
         builder.ConfigureAppConfiguration((_, config) =>
         {
             var testConfig = new Dictionary<string, string?>
             {
-                ["ConnectionStrings:cache"] = "localhost:6379,abortConnect=false,connectTimeout=100",
                 ["Keycloak:Authority"] = _keycloakAuthority,
                 ["Keycloak:Realm"] = "ISLAMU",
                 ["Keycloak:ClientId"] = _keycloakClientId,
@@ -61,8 +68,6 @@ public class SecurityBlazorBffWebApplicationFactory : WebApplicationFactory<Prog
                 ["ExploreApi:BaseUrl"] = "http://localhost:9999/",
                 ["S3Settings:Region"] = "us-east-1",
                 ["S3Settings:BucketName"] = "test-bucket",
-                ["S3Settings:AccessKeyId"] = "test-key",
-                ["S3Settings:SecretAccessKey"] = "test-secret",
                 ["S3Settings:Endpoint"] = "https://s3.example.com",
             };
 

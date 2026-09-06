@@ -207,7 +207,6 @@
       "enabled": true,
       "consentRequired": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "test-blazor-secret",
       "publicClient": false,
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": true,
@@ -271,13 +270,6 @@
       "lastName": "Admin",
       "enabled": true,
       "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "test-admin-password",
-          "temporary": false
-        }
-      ],
       "realmRoles": ["default-roles-islamu"]
     },
     {
@@ -287,13 +279,6 @@
       "lastName": "User",
       "enabled": true,
       "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "test-user-password",
-          "temporary": false
-        }
-      ],
       "realmRoles": ["default-roles-islamu"]
     },
     {
@@ -303,13 +288,6 @@
       "lastName": "TenantAdmin",
       "enabled": true,
       "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "test-tenant-admin-password",
-          "temporary": false
-        }
-      ],
       "realmRoles": ["default-roles-islamu"]
     },
     {
@@ -319,13 +297,6 @@
       "lastName": "Issuer",
       "enabled": true,
       "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "test-wrong-issuer-password",
-          "temporary": false
-        }
-      ],
       "realmRoles": ["default-roles-islamu"]
     }
   ]

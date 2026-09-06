@@ -32,8 +32,10 @@ public class BffSecurityTests : IAsyncDisposable
     {
         _keycloak = keycloak;
         _factory = new SecurityBlazorBffWebApplicationFactory(
-            keycloak.Authority,
-            keycloak.MetadataAddress);
+            keycloakAuthority: keycloak.Authority,
+            keycloakMetadataAddress: keycloak.MetadataAddress,
+            keycloakClientId: BffKeycloakFixture.TestClientId,
+            keycloakClientSecret: keycloak.ClientSecret);
         _client = _factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false,
@@ -139,7 +141,7 @@ public class BffSecurityTests : IAsyncDisposable
         using var credentials = new FormUrlEncodedContent(
         [
             new KeyValuePair<string, string>("username", "test-user"),
-            new KeyValuePair<string, string>("password", "test-user-password"),
+            new KeyValuePair<string, string>("password", _keycloak.TestUserPassword),
             new KeyValuePair<string, string>("credentialId", string.Empty),
             new KeyValuePair<string, string>("login", "Sign In")
         ]);

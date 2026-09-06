@@ -1069,7 +1069,7 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
     private sealed record TestTenantContext(Guid TenantId) : ITenantContext;
 }
 [Category("EventLocationPrivacy")]
-[ClassDataSource<ExternalDatabasePrivacyErasurePostgreSqlFixture>(Shared = SharedType.PerClass)]
+[ClassDataSource<ExternalDatabasePrivacyErasurePostgreSqlFixture>(Shared = SharedType.None)]
 [NotInParallel("PersistenceDb")]
 public sealed class ExternalDatabasePrivacyErasureAuthorityTests(
     ExternalDatabasePrivacyErasurePostgreSqlFixture fixture)
@@ -1704,6 +1704,7 @@ public sealed class ExternalDatabasePrivacyErasurePostgreSqlFixture : IAsyncInit
             FullName = "Private",
         });
         await context.SaveChangesAsync();
+        await LookupTableSeeder.SeedAuthenticationProvidersAsync(context, CancellationToken.None);
         await LookupTableSeeder.SeedLocationPrivacyLookupsAsync(context, CancellationToken.None);
         await LookupTableSeeder.SeedLocationAddressGovernanceLookupsAsync(context, CancellationToken.None);
         await LookupTableSeeder.SeedEventAuthorityLookupsAsync(context, CancellationToken.None);

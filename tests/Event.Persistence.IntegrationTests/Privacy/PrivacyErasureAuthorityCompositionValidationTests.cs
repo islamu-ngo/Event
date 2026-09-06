@@ -83,6 +83,8 @@ public sealed class PrivacyErasureAuthorityCompositionValidationTests(
             configuration,
             skipDbContextRegistration: true,
             skipLookupCacheInitializer: true);
+        services.ConfigureDbContext<CoLocatedPrivacyErasureAuthorityDbContext>(options =>
+            options.EnableServiceProviderCaching(false));
 
         await using ServiceProvider provider = services.BuildServiceProvider(
             new ServiceProviderOptions { ValidateScopes = true });
@@ -109,7 +111,8 @@ public sealed class PrivacyErasureAuthorityCompositionValidationTests(
         await fixture.ResetAsync();
 
         const string schema = "custom_event";
-        var migratorOptions = new DbContextOptionsBuilder<CoLocatedPrivacyErasureAuthorityDbContext>();
+        var migratorOptions = new DbContextOptionsBuilder<CoLocatedPrivacyErasureAuthorityDbContext>()
+            .EnableServiceProviderCaching(false);
         PrimaryDatabaseProviderComposition.ConfigureCoLocatedPrivacyErasureAuthority(
             migratorOptions,
             CreatePostgresOptions(fixture.ConnectionString, PrimaryDatabaseRole.Migrator, schema));
@@ -123,7 +126,8 @@ public sealed class PrivacyErasureAuthorityCompositionValidationTests(
             await migrationRunner.MigrateAsync(migration);
         }
 
-        var runtimeOptions = new DbContextOptionsBuilder<CoLocatedPrivacyErasureAuthorityDbContext>();
+        var runtimeOptions = new DbContextOptionsBuilder<CoLocatedPrivacyErasureAuthorityDbContext>()
+            .EnableServiceProviderCaching(false);
         PrimaryDatabaseProviderComposition.ConfigureCoLocatedPrivacyErasureAuthority(
             runtimeOptions,
             CreatePostgresOptions(fixture.ConnectionString, PrimaryDatabaseRole.Runtime, schema));

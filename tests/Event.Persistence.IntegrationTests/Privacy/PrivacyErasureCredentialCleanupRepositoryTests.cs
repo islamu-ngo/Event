@@ -35,7 +35,7 @@ public sealed class PrivacyErasureCredentialCleanupRepositoryTests(PostgreSqlCon
             utcNow.AddDays(2));
 
         await using var context = fixture.CreateDbContext();
-        context.AddRange(expiredIntent, activeIntent, expiredSaga, activeSaga, expiredWork, activeWork);
+        context.AddRange(expiredSaga, activeSaga, expiredWork, activeWork);
         await context.SaveChangesAsync();
 
         var stateRepository = new PrivacyErasureStateRepository(context);

@@ -11,6 +11,7 @@ using Explore.Persistence.Privacy.ErasureAuthority.Repositories;
 using Explore.Secrets.Database;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -210,7 +211,9 @@ public sealed class PrivacyErasureAuthorityModelTests
                 .UseNpgsql("Host=localhost;Database=model_only;Username=unused;Password=unused")
                 .UseSnakeCaseNamingConvention()
                 .Options);
-        var coLocatedOptions = new DbContextOptionsBuilder<CoLocatedPrivacyErasureAuthorityDbContext>();
+        var coLocatedOptions = new DbContextOptionsBuilder<CoLocatedPrivacyErasureAuthorityDbContext>()
+            .EnableServiceProviderCaching(false)
+            .ConfigureWarnings(warnings => warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning));
         PrimaryDatabaseProviderComposition.ConfigureCoLocatedPrivacyErasureAuthority(
             coLocatedOptions,
             new PrimaryDatabaseConnectionOptions
@@ -268,7 +271,9 @@ public sealed class PrivacyErasureAuthorityModelTests
                 Database = "model-only.db"
             });
 
-        var coLocatedOptions = new DbContextOptionsBuilder<CoLocatedPrivacyErasureAuthorityDbContext>();
+        var coLocatedOptions = new DbContextOptionsBuilder<CoLocatedPrivacyErasureAuthorityDbContext>()
+            .EnableServiceProviderCaching(false)
+            .ConfigureWarnings(warnings => warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning));
         PrimaryDatabaseProviderComposition.ConfigureCoLocatedPrivacyErasureAuthority(
             coLocatedOptions,
             new PrimaryDatabaseConnectionOptions

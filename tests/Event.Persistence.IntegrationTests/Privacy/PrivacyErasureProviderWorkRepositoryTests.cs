@@ -29,8 +29,6 @@ public sealed class PrivacyErasureProviderWorkRepositoryTests(PostgreSqlContaine
 
         await using var context = fixture.CreateDbContext();
         context.AddRange(
-            primaryIntent,
-            unrelatedIntent,
             primarySaga,
             unrelatedSaga,
             completedWork,

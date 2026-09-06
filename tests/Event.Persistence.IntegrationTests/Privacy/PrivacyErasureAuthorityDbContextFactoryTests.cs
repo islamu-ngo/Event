@@ -52,7 +52,9 @@ public sealed class PrivacyErasureAuthorityDbContextFactoryTests
 
         OptionsValidationException exception = Assert.Throws<OptionsValidationException>(() =>
             new PrivacyErasureAuthorityDbContextFactory().CreateDbContext(
-                ["--connection", $"Host=127.0.0.1;Database=raw;Username=raw;Password={secret}"]));
+                ["--SecretProvider:Provider", "Environment",
+                 "--PrivacyErasureAuthorityDatabase:Provider", "Unsupported",
+                 "--connection", $"Host=127.0.0.1;Database=raw;Username=raw;Password={secret}"]));
 
         await Assert.That(exception.Message).DoesNotContain(secret);
         await Assert.That(exception.OptionsName)

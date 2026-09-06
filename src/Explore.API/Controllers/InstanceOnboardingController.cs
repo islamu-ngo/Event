@@ -170,7 +170,7 @@ public class InstanceOnboardingController : EventControllerBase
             Username = User.GetUsername(),
             AuthProvider = authProvider,
             AuthProviderId = User.GetProviderId(providerSubject, authProvider),
-            EmailVerified = User.GetEmailVerified(authProvider, email ?? string.Empty)
+            EmailVerified = User.GetEmailVerified()
         };
 
         var response = await _mediator.Send(command, cancellationToken);

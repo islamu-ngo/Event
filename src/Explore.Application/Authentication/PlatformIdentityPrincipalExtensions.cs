@@ -133,11 +133,11 @@ public static class PlatformIdentityPrincipalExtensions
 
         string email = GetClaimValue(identity, "email", ClaimTypes.Email) ?? string.Empty;
         return new ProviderIdentity(
-            subject,
-            provider,
-            accountKey,
-            email,
-            GetEmailVerified(identity, provider, email));
+            Subject: subject,
+            Provider: provider,
+            AccountKey: accountKey,
+            Email: email,
+            EmailVerified: GetEmailVerified(identity));
     }
 
     /// <summary>
@@ -267,27 +267,14 @@ public static class PlatformIdentityPrincipalExtensions
     }
 
     /// <summary>
-    /// Honors an explicit <c>email_verified</c> claim, otherwise defaults per provider: the OIDC providers
-    /// verify addresses themselves, while ATProto carries no email guarantee and must stay unverified.
+    /// Returns true only when the principal carries an explicit, parseable true <c>email_verified</c> claim.
     /// </summary>
-    public static bool GetEmailVerified(this ClaimsPrincipal principal, string provider, string email) =>
-        GetEmailVerified(RequirePrincipal(principal), provider, email);
+    public static bool GetEmailVerified(this ClaimsPrincipal principal) =>
+        GetEmailVerified(RequirePrincipal(principal));
 
-    private static bool GetEmailVerified(ClaimsIdentity? identity, string provider, string email)
-    {
-        if (bool.TryParse(identity?.FindFirst("email_verified")?.Value, out var emailVerified))
-        {
-            return emailVerified;
-        }
-
-        return provider switch
-        {
-            "keycloak" => true,
-            "google" => true,
-            "atproto" => false,
-            _ => !string.IsNullOrWhiteSpace(email),
-        };
-    }
+    private static bool GetEmailVerified(ClaimsIdentity? identity) =>
+        bool.TryParse(identity?.FindFirst("email_verified")?.Value, out var emailVerified)
+            && emailVerified;
 
     private static ClaimsIdentity? RequirePrincipal(ClaimsPrincipal principal)
     {

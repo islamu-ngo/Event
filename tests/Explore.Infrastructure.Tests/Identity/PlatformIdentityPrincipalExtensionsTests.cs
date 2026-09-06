@@ -17,6 +17,76 @@ public sealed class PlatformIdentityPrincipalExtensionsTests
     private const string InternalUserId = "44444444-4444-4444-8444-444444444444";
 
     [Test]
+    [Arguments("keycloak", null)]
+    [Arguments("keycloak", "verified")]
+    [Arguments("google", null)]
+    [Arguments("google", "verified")]
+    [Arguments("local", null)]
+    [Arguments("local", "verified")]
+    [Arguments("unknown", null)]
+    [Arguments("unknown", "verified")]
+    public async Task ProviderNameAndEmailCannotReplaceMissingOrMalformedVerificationEvidence(
+        string provider,
+        string? verificationClaim)
+    {
+        const string email = "provider@example.test";
+        List<Claim> claims =
+        [
+            new("sub", SubUserId),
+            new("auth_provider", provider),
+            new("email", email)
+        ];
+        if (verificationClaim is not null)
+        {
+            claims.Add(new Claim("email_verified", verificationClaim));
+        }
+
+        ClaimsPrincipal principal = Principal("Bearer", claims.ToArray());
+
+        await Assert.That(principal.GetEmailVerified()).IsFalse();
+    }
+
+    [Test]
+    [Arguments("keycloak", true)]
+    [Arguments("keycloak", false)]
+    [Arguments("google", true)]
+    [Arguments("google", false)]
+    [Arguments("local", true)]
+    [Arguments("local", false)]
+    [Arguments("unknown", true)]
+    [Arguments("unknown", false)]
+    public async Task ExplicitVerificationEvidenceIsPreservedForAuthenticatedProvider(
+        string provider,
+        bool verified)
+    {
+        const string email = "provider@example.test";
+        ClaimsPrincipal principal = Principal(
+            "Bearer",
+            new Claim("sub", SubUserId),
+            new Claim("auth_provider", provider),
+            new Claim("email", email),
+            new Claim("email_verified", verified.ToString()));
+
+        await Assert.That(principal.GetEmailVerified()).IsEqualTo(verified);
+    }
+
+    [Test]
+    [Arguments("keycloak")]
+    [Arguments("google")]
+    [Arguments("local")]
+    [Arguments("unknown")]
+    public async Task MissingAmbientIdentityCannotImplyEmailVerification(string provider)
+    {
+        ClaimsPrincipal principal = Principal(
+            null,
+            new Claim("auth_provider", provider),
+            new Claim("email", "provider@example.test"),
+            new Claim("email_verified", bool.TrueString));
+
+        await Assert.That(principal.GetEmailVerified()).IsFalse();
+    }
+
+    [Test]
     [Arguments("local")]
     [Arguments("keycloak")]
     [Arguments("atproto")]

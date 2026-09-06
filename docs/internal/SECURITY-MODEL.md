@@ -217,6 +217,21 @@ Current security gates:
 - Dev mode: accepts self-signed certificates, suppresses HTTPS metadata requirement.
 - Detailed JWT event logging on: `OnMessageReceived`, `OnAuthenticationFailed`, and `OnChallenge`.
 
+### Provider email verification evidence
+
+`PlatformIdentityPrincipalExtensions.GetEmailVerified()` accepts verification
+only from a parseable, explicitly true `email_verified` claim on the selected
+authenticated ambient identity. Missing, malformed, or false claims remain
+unverified. Neither a provider name nor a nonempty email address proves mailbox
+ownership; unauthenticated or purpose-bound identities cannot supply ambient
+verification authority. `GetProviderIdentity` and instance onboarding use this
+same reader, with no provider-specific default or compatibility overload.
+
+This is separate from authentication: a valid Keycloak/Google identity may remain
+unverified, and AT Protocol bootstrap/JIT retains its dedicated DID-verification
+path without inventing an email claim. Event email-delivery settings never
+manufacture provider verification or transfer provider-owned recovery to Local.
+
 ### ATProto bootstrap and first-party session schemes
 
 The `MultiAuth` policy selector preserves the Keycloak and API-key branches and adds two purpose-separated ATProto schemes:

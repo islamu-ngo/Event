@@ -87,6 +87,19 @@ Existing sessions continue under the provider that issued them until normal
 expiry. Changing the primary provider controls new sign-in admission; it does
 not reinterpret an existing cookie as a different authority.
 
+## Email Verification Is Explicit
+
+A successful provider sign-in does not by itself verify an email address.
+ISLAMU Event records provider verification only when the authenticated identity
+explicitly supplies `email_verified=true`. Missing, malformed, and false claims
+remain unverified, including for Keycloak and Google. Configure the provider's
+claim mapping if applications need its verified-mailbox evidence; do not replace
+missing evidence with a blanket verified default.
+
+AT Protocol identities without an email address remain valid passwordless
+identities. Event's outbound-email setting does not change provider verification
+or take over the provider's recovery workflow.
+
 ## Switching Providers Safely
 
 Use **Administration -> Instance Settings -> Authentication and Authorization

@@ -493,18 +493,18 @@ public sealed class SemanticValueConstraintMigrationTests(
 
             INSERT INTO islamu_event.locations
                 (id, full_name, country, city, tenant_id, location_kind_id,
-                 location_privacy_state_id, created_at, concurrency_stamp)
+                 location_privacy_state_id, created_at, concurrency_stamp, display_sort_key, display_sort_key_version)
             VALUES
                 (@paired_location_id, 'Paired coordinate fixture', 'Synthetic', 'Synthetic',
-                 @tenant_id, 2, 2, TIMESTAMPTZ '2026-08-25 00:00:00+00', @concurrency_stamp),
+                 @tenant_id, 2, 2, TIMESTAMPTZ '2026-08-25 00:00:00+00', @concurrency_stamp, 'PAIRED COORDINATE FIXTURE', 2),
                 (@null_location_id, 'Null coordinate fixture', 'Synthetic', 'Synthetic',
-                 @tenant_id, 2, 2, TIMESTAMPTZ '2026-08-25 00:00:00+00', @concurrency_stamp);
+                 @tenant_id, 2, 2, TIMESTAMPTZ '2026-08-25 00:00:00+00', @concurrency_stamp, 'NULL COORDINATE FIXTURE', 2);
 
             INSERT INTO islamu_event.location_pii
-                (location_id, address, postcode, latitude, longitude)
+                (location_id, address, postcode, latitude, longitude, address_substring_key, address_substring_key_version)
             VALUES
-                (@paired_location_id, @paired_address, @paired_postcode, 51.0504, 13.7373),
-                (@null_location_id, @null_address, @null_postcode, NULL, NULL);
+                (@paired_location_id, @paired_address, @paired_postcode, 51.0504, 13.7373, 'SYNTHETIC-PAIRED-ADDRESS', 2),
+                (@null_location_id, @null_address, @null_postcode, NULL, NULL, 'SYNTHETIC-NULL-ADDRESS', 2);
 
             INSERT INTO islamu_event.event_agenda_items
                 (id, event_id, title, start_time, end_time, local_start_date, local_end_date,

@@ -154,6 +154,28 @@ public class UpdateLocationCommandHandler : IRequestHandler<UpdateLocationComman
             protectedSelection = unprotectResult.Selection;
         }
 
+        // Validate the complete write before changing any tracked aggregate state.
+        try
+        {
+            _ = LocationTextNormalization.Normalize(protectedSelection?.DisplayName
+                ?? request.UpdateLocationDto.FullName?.Value ?? location.FullName);
+            if (protectedSelection is { } selected)
+            {
+                _ = LocationTextNormalization.Normalize(selected.Address);
+                ArgumentException.ThrowIfNullOrWhiteSpace(selected.Postcode);
+                _ = GeoCoordinate.Create(selected.Latitude, selected.Longitude);
+            }
+            else if (manualBundle is { } proposed)
+            {
+                _ = LocationTextNormalization.Normalize(proposed.Address);
+                ArgumentException.ThrowIfNullOrWhiteSpace(proposed.Postcode);
+            }
+        }
+        catch (ArgumentException)
+        {
+            return Failure(FailureCodes.AddressSelectionInvalid);
+        }
+
         cancellationToken.ThrowIfCancellationRequested();
         ApplyFullName(location, request.UpdateLocationDto.FullName);
         ApplyCountry(location, request.UpdateLocationDto.Country);

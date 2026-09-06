@@ -2921,6 +2921,8 @@ Table "event_location_privacy_backfill_reversal" {
 Table "locations" {
   "id" uuid [pk, not null, note: 'uuidv7 app-side']
   "full_name" varchar(500) [not null]
+  "display_sort_key" varchar(2000) [not null, note: 'Complete NFC-invariant-uppercase-NFC Unicode text; provider binary collation; SQL Server nvarchar']
+  "display_sort_key_version" smallint [not null, note: 'Current normalization revision 2 only; no legacy default']
   "country" varchar(500) [not null]
   "city" varchar(500) [not null]
   "tenant_id" uuid [not null]
@@ -2984,6 +2986,8 @@ Table "location_rooms" {
 Table "location_pii" {
   "location_id" uuid [pk, not null, note: 'shared PK with locations']
   "address" varchar(500) [not null]
+  "address_substring_key" varchar(2000) [not null, note: 'Removable derived PII; complete normalized Unicode literal-substring text, never truncated']
+  "address_substring_key_version" smallint [not null, note: 'Current normalization revision 2 only; unsupported revisions fail closed in suggestions']
   "postcode" varchar(500) [not null]
   "latitude" doubleprecision
   "longitude" doubleprecision

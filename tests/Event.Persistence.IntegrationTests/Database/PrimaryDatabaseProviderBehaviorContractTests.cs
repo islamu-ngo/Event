@@ -2,7 +2,9 @@
 // ABOUTME: Covers runtime persistence semantics and Data Protection key survival across provider recreation.
 
 using System.Data.Common;
-using System.Reflection;
+using System.Diagnostics;
+using System.Text.Json;
+using System.Xml.Linq;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
@@ -114,20 +116,31 @@ public sealed class PrimaryDatabaseProviderBehaviorContractTests
         PrimaryDatabaseProviderBehaviorFixture fixture)
     {
         await fixture.PrepareAsync();
-        Guid tenantId = Guid.Parse("00000000-0000-0000-0000-000000009001");
-        Guid actorId = Guid.Parse("00000000-0000-0000-0000-000000009002");
-        Guid userId = Guid.Parse("00000000-0000-0000-0000-000000009003");
-        Guid prefixId = Guid.Parse("00000000-0000-0000-0000-000000009101");
-        Guid longerPrefixId = Guid.Parse("00000000-0000-0000-0000-000000009102");
-        Guid bmpId = Guid.Parse("00000000-0000-0000-0000-000000009103");
-        Guid tieFirstId = Guid.Parse("00000000-0000-0000-0000-000000009104");
-        Guid tieSecondId = Guid.Parse("00000000-0000-0000-0000-000000009105");
-        Guid boundaryCanaryId = Guid.Parse("00000000-0000-0000-0000-000000009106");
-        Guid boundaryExactId = Guid.Parse("00000000-0000-0000-0000-000000009107");
-        Guid legacyId = Guid.Parse("00000000-0000-0000-0000-000000009108");
-        Guid maximumId = Guid.Parse("00000000-0000-0000-0000-000000009109");
+        Guid tenantId = Guid.CreateVersion7();
+        Guid actorId = Guid.CreateVersion7();
+        Guid userId = Guid.CreateVersion7();
+        Guid prefixId = Guid.CreateVersion7();
+        Guid longerPrefixId = Guid.CreateVersion7();
+        Guid bmpId = Guid.CreateVersion7();
+        Guid tieFirstId = Guid.CreateVersion7();
+        Guid tieSecondId = Guid.CreateVersion7();
+        Guid boundaryCanaryId = Guid.CreateVersion7();
+        Guid boundaryExactId = Guid.CreateVersion7();
+        Guid legacyId = Guid.CreateVersion7();
+        Guid maximumId = Guid.CreateVersion7();
+        Guid expansionId = Guid.CreateVersion7();
+        Guid suffixId = Guid.CreateVersion7();
+        Guid arabicId = Guid.CreateVersion7();
+        Guid greekId = Guid.CreateVersion7();
+        Guid supplementaryId = Guid.CreateVersion7();
+        Guid literalId = Guid.CreateVersion7();
+        Guid wildcardCanaryId = Guid.CreateVersion7();
+        Guid sharpSId = Guid.CreateVersion7();
+        Guid dottedIId = Guid.CreateVersion7();
+        Guid emojiId = Guid.CreateVersion7();
+        Guid trailingSpaceId = Guid.CreateVersion7();
 
-        var tenant = NewTenant("b2-unicode-provider-contract");
+        var tenant = NewTenant($"unicode-{tenantId:N}");
         tenant.Id = tenantId;
         Location[] locations =
         [
@@ -139,13 +152,20 @@ public sealed class PrimaryDatabaseProviderBehaviorContractTests
             AddressLocation(boundaryCanaryId, tenantId, actorId, "Boundary A", "AB"),
             AddressLocation(boundaryExactId, tenantId, actorId, "Boundary B", char.ConvertFromUtf32(0x100004) + " exact"),
             AddressLocation(legacyId, tenantId, actorId, "Legacy", "Legacy café address", tenantApproved: false),
-            AddressLocation(maximumId, tenantId, actorId, new string('\uE000', 500), new string('\uE000', 500))
+            AddressLocation(maximumId, tenantId, actorId, new string('\uE000', 500), new string('\uE000', 500)),
+            AddressLocation(expansionId, tenantId, actorId, "Expanded", new string('\u0344', 500)),
+            AddressLocation(suffixId, tenantId, actorId, "Suffix", new string('a', 493) + " suffix"),
+            AddressLocation(arabicId, tenantId, actorId, "Arabic", "مَسْجِد\u200C\u200D عناوين"),
+            AddressLocation(greekId, tenantId, actorId, "Greek", "ςσ οδός"),
+            AddressLocation(supplementaryId, tenantId, actorId, "😀", "\U00010428 road Café 😀 %_\\ North"),
+            AddressLocation(literalId, tenantId, actorId, "Literals", "bracket [x] backslash \\ path"),
+            AddressLocation(wildcardCanaryId, tenantId, actorId, "Canary", "bracket x backslash / path"),
+            AddressLocation(sharpSId, tenantId, actorId, "German", "Straße"),
+            AddressLocation(dottedIId, tenantId, actorId, "Turkish", "İstanbul"),
+            AddressLocation(emojiId, tenantId, actorId, "Emoji", "👩🏽\u200D💻\uFE0F road"),
+            AddressLocation(trailingSpaceId, tenantId, actorId, "Tie ", "Café tie corpus ")
         ];
         Location legacy = locations.Single(location => location.Id == legacyId);
-        SetDerivedKey(legacy, nameof(Location.DisplaySortKey), string.Empty);
-        SetDerivedKey(legacy, nameof(Location.DisplaySortKeyVersion), (short)0);
-        SetDerivedKey(legacy.Pii!, nameof(LocationPii.AddressSubstringKey), string.Empty);
-        SetDerivedKey(legacy.Pii!, nameof(LocationPii.AddressSubstringKeyVersion), (short)0);
 
         await using (var seed = fixture.CreateSystemContext())
         {
@@ -154,30 +174,67 @@ public sealed class PrimaryDatabaseProviderBehaviorContractTests
             await seed.SaveChangesAsync();
         }
         Location maximum = locations.Single(location => location.Id == maximumId);
-        await Assert.That(maximum.DisplaySortKey.Length).IsEqualTo(3_500);
-        await Assert.That(maximum.Pii!.AddressSubstringKey.Length).IsEqualTo(3_500);
+        await Assert.That(maximum.DisplaySortKey.Length).IsEqualTo(500);
+        await Assert.That(maximum.Pii!.AddressSubstringKey.Length).IsEqualTo(500);
 
         var capture = new SelectCaptureInterceptor();
         await using var context = fixture.CreateTenantContext(tenantId, capture);
         var query = new LocalAddressSuggestionQuery(context);
-        async Task<Guid[]> Search(string text) => (await query.SearchAsync(
-            new LocalAddressSuggestionCriteria(tenantId, actorId, userId, null, text, 20),
+        async Task<Guid[]> Search(string text, int limit = 20) => (await query.SearchAsync(
+            new LocalAddressSuggestionCriteria(tenantId, actorId, userId, null, text, limit),
             CancellationToken.None)).Select(result => result.LocationId).ToArray();
 
         Guid[] composed = await Search("café 😀");
-        await Assert.That(composed).IsEquivalentTo([prefixId, longerPrefixId, bmpId], CollectionOrdering.Matching);
+        await capture.RecordQueryPlanAsync(context, fixture.Provider, composed.Length);
+        Guid[] expectedProviderOrder = fixture.Provider == PrimaryDatabaseProvider.SqlServer
+            ? [prefixId, longerPrefixId, supplementaryId, bmpId]
+            : [prefixId, longerPrefixId, bmpId, supplementaryId];
+        await Assert.That(composed).IsEquivalentTo(expectedProviderOrder, CollectionOrdering.Matching);
+        await Assert.That(await Search("café 😀", 2))
+            .IsEquivalentTo(expectedProviderOrder.Take(2), CollectionOrdering.Matching);
         await Assert.That(await Search("CAFE\u0301 😀")).IsEquivalentTo(composed, CollectionOrdering.Matching);
         await Assert.That(await Search("%_")).IsEquivalentTo(composed, CollectionOrdering.Matching);
         await Assert.That(await Search("😀 %")).IsEquivalentTo(composed, CollectionOrdering.Matching);
         await Assert.That(await Search(char.ConvertFromUtf32(0x100004)))
             .IsEquivalentTo([boundaryExactId], CollectionOrdering.Matching);
-        await Assert.That(await Search("café tie"))
-            .IsEquivalentTo([tieFirstId, tieSecondId], CollectionOrdering.Matching);
+        Guid[] ties = await Search("café tie");
+        await Assert.That(ties).IsEquivalentTo([tieFirstId, tieSecondId, trailingSpaceId]);
+        await Assert.That(await Search("café tie")).IsEquivalentTo(ties, CollectionOrdering.Matching);
+        await Assert.That(await Search("café tie", 2)).IsEquivalentTo(ties.Take(2), CollectionOrdering.Matching);
+        await Assert.That(await Search("suffix")).IsEquivalentTo([suffixId]);
+        await Assert.That(await Search("\u0344\u0344")).IsEquivalentTo([expansionId]);
+        await Assert.That(await Search("مَسْجِد\u200C\u200D")).IsEquivalentTo([arabicId]);
+        await Assert.That(await Search("مسجد")).IsEmpty();
+        await Assert.That(await Search("ΣΣ")).IsEquivalentTo([greekId]);
+        await Assert.That(await Search("\U00010400")).IsEquivalentTo([supplementaryId]);
+        await Assert.That(await Search("[x]")).IsEquivalentTo([literalId]);
+        await Assert.That(await Search("\\ path")).IsEquivalentTo([literalId]);
+        await Assert.That(await Search("straße")).IsEquivalentTo([sharpSId]);
+        await Assert.That(await Search("STRASSE")).IsEmpty();
+        await Assert.That(await Search("İSTANBUL")).IsEquivalentTo([dottedIId]);
+        await Assert.That(await Search("ISTANBUL")).IsEmpty();
+        await Assert.That(await Search("👩🏽\u200D💻\uFE0F")).IsEquivalentTo([emojiId]);
+        await Assert.That(await Search(new string('\uE000', 2))).IsEquivalentTo([maximumId]);
+        await Assert.That(await Search("CAFE ")).IsEmpty();
+
+        foreach (string invalid in new[] { "a\0b", "a\uD800b", "a\uFDD0b", "a\U0010FFFFb" })
+        {
+            int commandsBefore = capture.Commands.Count;
+            await Assert.That(() => Search(invalid)).Throws<ArgumentException>();
+            await Assert.That(capture.Commands.Count).IsEqualTo(commandsBefore);
+        }
+
+        await SetRevisionChecksEnabledAsync(context, enabled: false);
+        await context.Locations.Where(location => location.Id == legacyId)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(location => location.DisplaySortKeyVersion, (short)999));
+        await context.LocationPii.Where(pii => pii.LocationId == legacyId)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(pii => pii.AddressSubstringKeyVersion, (short)999));
         await Assert.That(await Search("legacy café")).IsEmpty();
 
         legacy = await context.Locations.SingleAsync(location => location.Id == legacyId);
         legacy.PromoteAddressToTenantApproved(actorId, DateTime.UnixEpoch.AddDays(10));
         await context.SaveChangesAsync();
+        await SetRevisionChecksEnabledAsync(context, enabled: true);
         await Assert.That(await Search("legacy café"))
             .IsEquivalentTo([legacyId], CollectionOrdering.Matching);
 
@@ -193,7 +250,82 @@ public sealed class PrimaryDatabaseProviderBehaviorContractTests
             await Assert.That(projection).DoesNotContain("address_substring_key");
             await Assert.That(projection).DoesNotContain("display_sort_key");
         }
-        await Assert.That(suggestionCommands).Count().IsEqualTo(8);
+        await Assert.That(suggestionCommands).IsNotEmpty();
+        await AssertErasedAddressCannotBeRecreatedAsync(fixture, tenantId, actorId);
+        await Repositories.LocationUnicodeWriteAtomicityTests.AssertRejectedWritesAsync(fixture, tenantId, actorId);
+        await Repositories.LocalAddressSuggestionQueryTests.AssertProviderAuthorityMatrixAsync(fixture);
+    }
+
+    private static async Task AssertErasedAddressCannotBeRecreatedAsync(
+        PrimaryDatabaseProviderBehaviorFixture fixture, Guid tenantId, Guid actorId)
+    {
+        Guid ownerId = Guid.CreateVersion7();
+        Location home = AddressLocation(Guid.CreateVersion7(), tenantId, actorId,
+            "Private café", "Erasure café sentinel", tenantApproved: false);
+        home.ClassifyAsPrivateHome(ownerId);
+        await using (ExploreDbContext seed = fixture.CreateSystemContext())
+        {
+            seed.Users.Add(new User { Id = ownerId, Pii = null!, CreatedAt = DateTime.UnixEpoch, ConcurrencyStamp = Guid.CreateVersion7() });
+            seed.Locations.Add(home);
+            await seed.SaveChangesAsync();
+        }
+
+        await using ExploreDbContext staleContext = fixture.CreateTenantContext(tenantId);
+        var staleRepository = new LocationRepository(staleContext);
+        Location stale = (await staleRepository.GetById(home.Id, CancellationToken.None))!;
+        DateTime erasedAt = new(2026, 9, 6, 10, 0, 0, DateTimeKind.Utc);
+        await using (ExploreDbContext eraser = fixture.CreateTenantContext(tenantId))
+        {
+            Location current = await eraser.Locations.SingleAsync(location => location.Id == home.Id);
+            current.EraseOwnedPii(erasedAt, LocationPrivacyErasureReasonEnum.OwnerErasureRequest);
+            await eraser.SaveChangesAsync();
+        }
+
+        stale.SetManualAddress("Resurrection café sentinel", "2000");
+        await Assert.That(() => staleRepository.Update(stale, CancellationToken.None))
+            .Throws<Explore.Application.Exceptions.ConcurrencyConflictException>();
+
+        await using ExploreDbContext verify = fixture.CreateTenantContext(tenantId);
+        var repository = new LocationRepository(verify);
+        Location erased = (await repository.GetById(home.Id, CancellationToken.None))!;
+        erased.EraseOwnedPii(erasedAt, LocationPrivacyErasureReasonEnum.OwnerErasureRequest);
+        await Assert.That(() => erased.PromoteAddressToTenantApproved(actorId, erasedAt))
+            .Throws<InvalidOperationException>();
+        await Assert.That(() => erased.SetManualAddress("Erasure café sentinel", "1000"))
+            .Throws<InvalidOperationException>();
+        await Assert.That(erased.Pii).IsNull();
+        await Assert.That(erased.DisplaySortKey).IsEqualTo("PRIVATE VENUE");
+        await Assert.That(await new LocalAddressSuggestionQuery(verify).SearchAsync(
+            new LocalAddressSuggestionCriteria(tenantId, actorId, ownerId, null, "sentinel", 20), CancellationToken.None))
+            .IsEmpty();
+    }
+
+    private static async Task SetRevisionChecksEnabledAsync(ExploreDbContext context, bool enabled)
+    {
+        await context.Database.OpenConnectionAsync();
+        if (context.Database.IsSqlite())
+        {
+            await context.Database.ExecuteSqlRawAsync(enabled
+                ? "PRAGMA ignore_check_constraints = OFF"
+                : "PRAGMA ignore_check_constraints = ON");
+            return;
+        }
+
+        var model = context.GetService<Microsoft.EntityFrameworkCore.Metadata.IDesignTimeModel>().Model;
+        var sql = context.GetService<Microsoft.EntityFrameworkCore.Storage.ISqlGenerationHelper>();
+        foreach (Type entity in new[] { typeof(Location), typeof(LocationPii) })
+        {
+            var type = model.FindEntityType(entity)!;
+            var check = type.GetCheckConstraints().Single(constraint =>
+                constraint.Name is "ck_locations_display_sort_key_version" or "ck_location_pii_address_substring_key_version");
+            string table = sql.DelimitIdentifier(type.GetTableName()!, type.GetSchema());
+            string name = sql.DelimitIdentifier(check.Name);
+            bool mariaDb = context.Database.IsMySql()
+                && context.Database.GetDbConnection().ServerVersion.Contains("MariaDB", StringComparison.OrdinalIgnoreCase);
+            string operation = enabled ? $"ADD CONSTRAINT {name} CHECK ({check.Sql})"
+                : context.Database.IsMySql() && !mariaDb ? $"DROP CHECK {name}" : $"DROP CONSTRAINT {name}";
+            await context.Database.ExecuteSqlRawAsync($"ALTER TABLE {table} {operation}");
+        }
     }
 
     private static async Task VerifyProjectionLockContentionAsync(
@@ -489,9 +621,6 @@ public sealed class PrimaryDatabaseProviderBehaviorContractTests
         return location;
     }
 
-    private static void SetDerivedKey(object target, string propertyName, object value) =>
-        target.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public)!.SetValue(target, value);
-
     private static LocationRoom NewRoom(Tenant tenant, Location location, string name, int sortOrder) => new()
     {
         Id = Guid.CreateVersion7(),
@@ -540,6 +669,8 @@ public sealed class PrimaryDatabaseProviderBehaviorContractTests
     private sealed class SelectCaptureInterceptor : DbCommandInterceptor
     {
         public List<string> Commands { get; } = [];
+        private string? _query;
+        private (string Name, System.Data.DbType Type, int Size, object Value)[] _parameters = [];
 
         public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
             DbCommand command,
@@ -548,7 +679,105 @@ public sealed class PrimaryDatabaseProviderBehaviorContractTests
             CancellationToken cancellationToken = default)
         {
             Commands.Add(command.CommandText);
+            if (_query is null && command.CommandText.Contains("address_substring_key", StringComparison.Ordinal))
+            {
+                _query = command.CommandText;
+                _parameters = command.Parameters.Cast<DbParameter>()
+                    .Select(parameter => (parameter.ParameterName, parameter.DbType, parameter.Size, parameter.Value!)).ToArray();
+            }
             return ValueTask.FromResult(result);
+        }
+
+        internal async Task RecordQueryPlanAsync(ExploreDbContext context, PrimaryDatabaseProvider provider, int matchingRows)
+        {
+            await context.Database.OpenConnectionAsync();
+            await using DbCommand command = context.Database.GetDbConnection().CreateCommand();
+            command.CommandText = _query ?? throw new InvalidOperationException("No actual suggestion query was captured.");
+            foreach (var captured in _parameters)
+            {
+                DbParameter parameter = command.CreateParameter();
+                parameter.ParameterName = captured.Name;
+                parameter.DbType = captured.Type;
+                parameter.Size = captured.Size;
+                parameter.Value = captured.Value;
+                command.Parameters.Add(parameter);
+            }
+            var timer = Stopwatch.StartNew();
+            await using (DbDataReader measurement = await command.ExecuteReaderAsync())
+            {
+                while (await measurement.ReadAsync()) { }
+            }
+            timer.Stop();
+
+            var operators = new List<string>();
+            await using DbCommand mode = context.Database.GetDbConnection().CreateCommand();
+            if (provider == PrimaryDatabaseProvider.SqlServer)
+            {
+                mode.CommandText = "SET STATISTICS XML ON";
+                await mode.ExecuteNonQueryAsync();
+            }
+            try
+            {
+                command.CommandText = provider switch
+                {
+                    PrimaryDatabaseProvider.SqlServer => _query!,
+                    PrimaryDatabaseProvider.Sqlite => "EXPLAIN QUERY PLAN " + _query,
+                    PrimaryDatabaseProvider.PostgreSql => "EXPLAIN (FORMAT JSON) " + _query,
+                    _ => "EXPLAIN FORMAT=JSON " + _query
+                };
+                await using DbDataReader plan = await command.ExecuteReaderAsync();
+                do
+                {
+                    while (await plan.ReadAsync())
+                    {
+                        if (provider == PrimaryDatabaseProvider.Sqlite)
+                        {
+                            operators.Add(plan.GetString(3).Split(' ')[0]);
+                        }
+                        else if (provider == PrimaryDatabaseProvider.SqlServer)
+                        {
+                            if (plan.FieldCount == 1 && plan.GetName(0).Contains("Showplan", StringComparison.OrdinalIgnoreCase))
+                                operators.AddRange(XDocument.Parse(plan.GetString(0)).Descendants()
+                                    .Attributes("PhysicalOp").Select(attribute => attribute.Value));
+                        }
+                        else
+                        {
+                            using JsonDocument json = JsonDocument.Parse(plan.GetString(0));
+                            CollectOperators(json.RootElement, operators);
+                        }
+                    }
+                }
+                while (await plan.NextResultAsync());
+            }
+            finally
+            {
+                if (provider == PrimaryDatabaseProvider.SqlServer)
+                {
+                    mode.CommandText = "SET STATISTICS XML OFF";
+                    await mode.ExecuteNonQueryAsync();
+                }
+            }
+            await Assert.That(operators).IsNotEmpty();
+            Console.WriteLine(FormattableString.Invariant(
+                $"UnicodeQueryProbe provider={provider} authorized-matches={matchingRows} warm-query-ms={timer.Elapsed.TotalMilliseconds:F3} operators={string.Join(',', operators)}"));
+        }
+
+        private static void CollectOperators(JsonElement element, List<string> operators)
+        {
+            if (element.ValueKind == JsonValueKind.Object)
+            {
+                foreach (JsonProperty property in element.EnumerateObject())
+                {
+                    if (property.Name is "Node Type" or "access_type")
+                        operators.Add(property.Value.GetString()!);
+                    else
+                        CollectOperators(property.Value, operators);
+                }
+            }
+            else if (element.ValueKind == JsonValueKind.Array)
+            {
+                foreach (JsonElement item in element.EnumerateArray()) CollectOperators(item, operators);
+            }
         }
     }
 }

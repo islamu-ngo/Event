@@ -491,33 +491,28 @@ See [WEBHOOKS.md](WEBHOOKS.md) and [INTEGRATIONS.md](INTEGRATIONS.md) for provid
 
 ## Location Address Governance Migration Topology
 
-PostgreSQL retains its incremental application history. Its address-governance migration adds the
-source and visibility lookups and conservatively classifies retained pre-governance rows as
-`UnknownLegacy` / `Quarantined` with empty version-0 derived keys and no organization scope. Those rows
-remain excluded from local suggestions until an authorized operator reviews and promotes an exact row.
-Promotion never infers provider/manual provenance, creator, organization, address, or coordinates.
+Address governance belongs to the current application initial, not an incremental
+legacy backfill. Four application migration assemblies cover five engines, with
+MySQL and MariaDB sharing their catalog. Each initial represents the complete
+current model; it neither reinterprets older rows nor supplies a version-0 search
+compatibility path. Promotion never infers provider/manual provenance, creator,
+organization, address, or coordinates.
 
-All five application providers are development-only rebaselines with no
-historical upgrade compatibility. Each single initial migration represents the
-complete current model; it does not backfill or reinterpret older rows.
-
-| Provider | Migration head | History contract |
-|---|---|---|
-| PostgreSQL | `20260828035010_InitialApplication` | Development rebaseline; database recreation required |
-| SQLite | `20260828040252_InitialApplication` | Development rebaseline; database recreation required |
-| SQL Server | `20260828040310_InitialApplication` | Development rebaseline; database recreation required |
-| MariaDB | `20260828040320_InitialApplication` | Development rebaseline; database recreation required |
-| MySQL | `20260828040329_InitialApplication` | Development rebaseline; database recreation required |
+The exact generated heads and lifecycle checks are maintained once in
+[Development Application Migration Rebaseline](#development-application-migration-rebaseline).
 
 A deployment applies only its selected provider assembly through `Event.MigrationService`; never apply
 multiple provider chains to one database or hand-edit a migration, designer, or snapshot.
 
 ### Mandatory development reset
 
-Every existing application development database must be discarded and
-recreated from its new `InitialApplication` migration. Do not point a rebaselined assembly at an old
-database or synthesize migration-history rows. Run `Event.MigrationService` twice against the recreated
-database and require both runs to exit zero; the second run is the idempotency check.
+Select an explicitly disposable application catalog, or preserve a matching backup,
+before recreating it from the selected regenerated initial. Identify and preserve
+independent Identity, Data Protection and privacy-authority histories first; sharing
+a server, schema topology or file does not authorize deleting those authorities.
+Do not point a rebaselined assembly at an old database or synthesize migration-history
+rows. Run `Event.MigrationService` twice against the recreated application target and
+require both runs to exit zero; the second run is the idempotency check.
 
 Do not delete an entire shared server volume when only the application
 database requires recreation. If an unapplied development migration is wrong,
@@ -767,8 +762,9 @@ SQLITE_DESIGN_TIME_ENV=(
 
 #### Remove the current generated histories
 
-`dotnet ef migrations remove --force` removes only the latest migration and
-updates its snapshot. The clean development baseline has one `Init` migration
+`dotnet ef migrations remove --force` can roll back an applied migration and
+therefore is not an artifact-only deletion command. Use plain `migrations remove`
+against a verified empty disposable target for an unapplied initial. The clean development baseline has one `Init` migration
 per catalog, so run each command once. A dedicated provider project must be its
 own startup project while its existing snapshot is removed; otherwise EF can
 load the context but fail to discover that provider's snapshot. Stop
@@ -779,26 +775,26 @@ Application catalogs:
 
 ```bash
 env Database__Provider=PostgreSql \
-  dotnet ef migrations remove --force \
+  dotnet ef migrations remove \
   --context ExploreDbContext \
   --project "$PERSISTENCE" \
   --startup-project "$PERSISTENCE"
 
 env "${SQLITE_DESIGN_TIME_ENV[@]}" \
-  dotnet ef migrations remove --force \
+  dotnet ef migrations remove \
   --context ExploreDbContext \
   --project "$APP_SQLITE" \
   --startup-project "$APP_SQLITE"
 
 env Database__Provider=SqlServer Database__Port=1433 \
-  dotnet ef migrations remove --force \
+  dotnet ef migrations remove \
   --context ExploreDbContext \
   --project "$APP_SQLSERVER" \
   --startup-project "$APP_SQLSERVER"
 
 env Database__Provider=MySql Database__Port=3306 \
   Database__ServerFlavor=MySql Database__ServerVersion=8.4 \
-  dotnet ef migrations remove --force \
+  dotnet ef migrations remove \
   --context ExploreDbContext \
   --project "$APP_MYSQL" \
   --startup-project "$APP_MYSQL"
@@ -1455,11 +1451,9 @@ Operator sequence:
 ### Development Application Migration Rebaseline
 
 All development application-provider chains are rebaselined at PostgreSQL
-`20260828035010_InitialApplication`, SQLite
-`20260828040252_InitialApplication`, SQL Server
-`20260828040310_InitialApplication`, MariaDB
-`20260828040320_InitialApplication`, and MySQL
-`20260828040329_InitialApplication`. Existing development application
+`20260906173823_Init`, SQLite `20260906173858_Init`, SQL Server
+`20260906173913_Init`, and the shared MySQL/MariaDB catalog
+`20260906173951_Init`. Existing development application
 databases must be recreated; incremental upgrade from the former development
 chains is intentionally unsupported. Data Protection and retained
 privacy-erasure authority keep their independent histories and must not be
@@ -1486,6 +1480,41 @@ unapplied development initial. Never repair a generated migration or model
 snapshot manually. Recreate only the disposable application database selected
 for the development lane—do not delete Data Protection or retained-authority
 catalogs as collateral recovery.
+
+### Location Unicode Runtime Compatibility
+
+Location search now stores complete Unicode NFC → invariant uppercase → NFC values
+(revision 2), replacing scalar-token text. SQL Server uses `nvarchar(2000)`;
+MySQL/MariaDB use `utf8mb4` binary collation. The original name/address limit is
+500 UTF-16 code units; derived output is bounded separately at 2,000. Invalid
+input fails before mutation, including SQLite writes. See [DOMAIN.md](DOMAIN.md#location-unicode-search-text)
+for matching and privacy semantics.
+
+For this pre-release migration rebaseline, stop application writers and select a
+disposable application catalog or take a matching backup before recreating it.
+Never delete a shared database volume. Preserve the independent Identity,
+Data Protection, and retained privacy-authority histories; identify their topology
+before resetting an application schema/file. Run `Event.MigrationService` twice
+against the new application target, require exit 0 both times, verify the selected
+application migration ID and no pending model changes, and complete the five-engine
+Unicode/authority/erasure corpus before allowing readers or writers to resume.
+
+For later SDK/runtime, ICU, NLS, operating-system, or globalization-profile upgrades:
+
+1. Pin the candidate runtime and deployment globalization profile. Compare focused
+   Unicode semantics and authorized match membership against the currently deployed
+   profile; a passing build or unchanged revision number is insufficient.
+2. Stop all old-profile readers and writers. Run an explicitly authorized current-key
+   rebuild through the aggregate lifecycle, or recreate a disposable development
+   application catalog. There is no automatic rebuild endpoint or rolling mixed-profile
+   writer support. Never repair erased PII, bypass authority, or export raw derived keys.
+3. Re-run the focused corpus and provider-local repeat/limited ordering checks before
+   reopening traffic. Record profile, generated migration IDs, result counts, and
+   query-plan/timing observations without text parameters or connection strings.
+
+Recovery requires the matching binary/profile plus its matching backup, or recreation
+of the selected disposable application catalog. Reverting a commit alone cannot
+restore deleted data or a previous normalization profile.
 
 ### Promotion Code Operations
 

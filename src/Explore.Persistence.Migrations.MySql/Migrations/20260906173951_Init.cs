@@ -9285,9 +9285,9 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                     id = table.Column<Guid>(type: "char(36)", nullable: false, collation: "ascii_general_ci"),
                     full_name = table.Column<string>(type: "varchar(500)", maxLength: 500, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    display_sort_key = table.Column<string>(type: "varchar(14000)", maxLength: 14000, nullable: false, defaultValue: "", collation: "ascii_bin")
-                        .Annotation("MySql:CharSet", "ascii"),
-                    display_sort_key_version = table.Column<short>(type: "smallint", nullable: false, defaultValue: (short)0),
+                    display_sort_key = table.Column<string>(type: "varchar(2000)", maxLength: 2000, nullable: false, collation: "utf8mb4_bin")
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    display_sort_key_version = table.Column<short>(type: "smallint", nullable: false),
                     country = table.Column<string>(type: "varchar(500)", maxLength: 500, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     city = table.Column<string>(type: "varchar(500)", maxLength: 500, nullable: false)
@@ -9314,12 +9314,11 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                     table.PrimaryKey("pk_ie_locations", x => x.id);
                     table.UniqueConstraint("ak_locations_tenant_id_id", x => new { x.tenant_id, x.id });
                     table.CheckConstraint("ck_locations_address_visibility_scope", "(address_visibility_id = 1 AND address_organization_id IS NULL) OR (address_visibility_id = 2 AND created_by IS NOT NULL AND address_organization_id IS NULL) OR (address_visibility_id = 3 AND created_by IS NOT NULL AND address_organization_id IS NOT NULL) OR address_visibility_id = 4");
-                    table.CheckConstraint("ck_locations_display_sort_key_version", "(display_sort_key_version = 0 AND display_sort_key = '') OR (display_sort_key_version = 1 AND display_sort_key <> '' AND length(display_sort_key) % 7 = 0)");
+                    table.CheckConstraint("ck_locations_display_sort_key_version", "display_sort_key_version = 2 AND display_sort_key <> ''");
                     table.CheckConstraint("ck_locations_erased_address_quarantined", "location_privacy_state_id <> 3 OR (address_visibility_id = 1 AND address_organization_id IS NULL)");
                     table.CheckConstraint("ck_locations_erasure_state", "(location_privacy_state_id = 3 AND owner_user_id IS NULL AND pii_erased_at_utc IS NOT NULL AND pii_erasure_reason IS NOT NULL) OR (location_privacy_state_id <> 3 AND pii_erased_at_utc IS NULL AND pii_erasure_reason IS NULL)");
                     table.CheckConstraint("ck_locations_owner_private_home", "owner_user_id IS NULL OR location_kind_id = 5");
                     table.CheckConstraint("ck_locations_private_home_address_visibility", "location_kind_id <> 5 OR address_visibility_id <> 4");
-                    table.CheckConstraint("ck_locations_tenant_approved_display_sort_key", "address_visibility_id <> 4 OR display_sort_key_version = 1");
                     table.ForeignKey(
                         name: "fk_ie_locations_ie_location_address_visibilities_addres_794ab160",
                         column: x => x.address_visibility_id,
@@ -10835,16 +10834,16 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     postcode = table.Column<string>(type: "varchar(500)", maxLength: 500, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    address_substring_key = table.Column<string>(type: "varchar(14000)", maxLength: 14000, nullable: false, defaultValue: "", collation: "ascii_bin")
-                        .Annotation("MySql:CharSet", "ascii"),
-                    address_substring_key_version = table.Column<short>(type: "smallint", nullable: false, defaultValue: (short)0),
+                    address_substring_key = table.Column<string>(type: "varchar(2000)", maxLength: 2000, nullable: false, collation: "utf8mb4_bin")
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    address_substring_key_version = table.Column<short>(type: "smallint", nullable: false),
                     latitude = table.Column<double>(type: "double", nullable: true),
                     longitude = table.Column<double>(type: "double", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_ie_location_pii", x => x.location_id);
-                    table.CheckConstraint("ck_location_pii_address_substring_key_version", "(address_substring_key_version = 0 AND address_substring_key = '') OR (address_substring_key_version = 1 AND address_substring_key <> '' AND length(address_substring_key) % 7 = 0)");
+                    table.CheckConstraint("ck_location_pii_address_substring_key_version", "address_substring_key_version = 2 AND address_substring_key <> ''");
                     table.CheckConstraint("ck_location_pii_coordinate_shape", "(latitude IS NULL AND longitude IS NULL)\nOR (latitude IS NOT NULL AND longitude IS NOT NULL\n    AND latitude BETWEEN -90 AND 90\n    AND longitude BETWEEN -180 AND 180)");
                     table.ForeignKey(
                         name: "fk_location_pii_locations_location_id",

@@ -17,15 +17,15 @@ public sealed class LocationDerivedKeyLifecycleTests
         Location location = NewLocation();
 
         location.SetManualAddress("Cafe\u0301 North", "1000");
-        await AssertCurrentKeys(location, "U000043U000041U000046U0000C9U000020U00004EU00004FU000052U000054U000048");
+        await AssertCurrentKeys(location, "CAFÉ NORTH");
 
         location.SetProviderAddress("Hall 😀", "2000", GeoCoordinate.Create(50.8503, 4.3517));
-        await AssertCurrentKeys(location, "U000048U000041U00004CU00004CU000020U01F600");
+        await AssertCurrentKeys(location, "HALL 😀");
 
         location.FullName = "École 😀";
         await Assert.That(location.DisplaySortKey)
-            .IsEqualTo("U0000C9U000043U00004FU00004CU000045U000020U01F600");
-        await Assert.That(location.DisplaySortKeyVersion).IsEqualTo(LocationDisplaySortKeyV1.Version);
+            .IsEqualTo("ÉCOLE 😀");
+        await Assert.That(location.DisplaySortKeyVersion).IsEqualTo(LocationTextNormalization.CurrentRevision);
     }
 
     [Test]
@@ -40,8 +40,8 @@ public sealed class LocationDerivedKeyLifecycleTests
         bool changed = location.SetManualAddress("Exact address", "1000");
 
         await Assert.That(changed).IsTrue();
-        await Assert.That(location.Pii!.AddressSubstringKeyVersion).IsEqualTo(LocationAddressSubstringKeyV1.Version);
-        await Assert.That(location.Pii.AddressSubstringKey).IsEqualTo(LocationAddressSubstringKeyV1.Create("Exact address"));
+        await Assert.That(location.Pii!.AddressSubstringKeyVersion).IsEqualTo(LocationTextNormalization.CurrentRevision);
+        await Assert.That(location.Pii.AddressSubstringKey).IsEqualTo("EXACT ADDRESS");
         await Assert.That(location.ConcurrencyStamp).IsEqualTo(stamp);
         await Assert.That(location.AddressVisibility).IsEqualTo(LocationAddressVisibilityEnum.Quarantined);
     }
@@ -59,8 +59,8 @@ public sealed class LocationDerivedKeyLifecycleTests
         await Assert.That(location.Pii).IsNull();
         await Assert.That(location.FullName).IsEqualTo(Location.ErasedPrivateVenueLabel);
         await Assert.That(location.DisplaySortKey)
-            .IsEqualTo(LocationDisplaySortKeyV1.Create(Location.ErasedPrivateVenueLabel));
-        await Assert.That(location.DisplaySortKeyVersion).IsEqualTo(LocationDisplaySortKeyV1.Version);
+            .IsEqualTo("PRIVATE VENUE");
+        await Assert.That(location.DisplaySortKeyVersion).IsEqualTo(LocationTextNormalization.CurrentRevision);
     }
 
     [Test]
@@ -75,8 +75,8 @@ public sealed class LocationDerivedKeyLifecycleTests
 
         await Assert.That(changed).IsTrue();
         await Assert.That(location.AddressVisibility).IsEqualTo(LocationAddressVisibilityEnum.TenantApproved);
-        await Assert.That(location.DisplaySortKeyVersion).IsEqualTo(LocationDisplaySortKeyV1.Version);
-        await Assert.That(location.Pii!.AddressSubstringKeyVersion).IsEqualTo(LocationAddressSubstringKeyV1.Version);
+        await Assert.That(location.DisplaySortKeyVersion).IsEqualTo(LocationTextNormalization.CurrentRevision);
+        await Assert.That(location.Pii!.AddressSubstringKeyVersion).IsEqualTo(LocationTextNormalization.CurrentRevision);
         await Assert.That(location.UpdatedBy).IsEqualTo(actorId);
         await Assert.That(location.UpdatedAt).IsEqualTo(ChangedAtUtc);
         await Assert.That(location.ConcurrencyStamp).IsNotEqualTo(beforeStamp);
@@ -122,8 +122,8 @@ public sealed class LocationDerivedKeyLifecycleTests
 
         await Assert.That(staleChanged).IsTrue();
         await Assert.That(stale.ConcurrencyStamp).IsNotEqualTo(staleStamp);
-        await Assert.That(stale.DisplaySortKeyVersion).IsEqualTo(LocationDisplaySortKeyV1.Version);
-        await Assert.That(stale.Pii!.AddressSubstringKeyVersion).IsEqualTo(LocationAddressSubstringKeyV1.Version);
+        await Assert.That(stale.DisplaySortKeyVersion).IsEqualTo(LocationTextNormalization.CurrentRevision);
+        await Assert.That(stale.Pii!.AddressSubstringKeyVersion).IsEqualTo(LocationTextNormalization.CurrentRevision);
     }
 
     [Test]
@@ -150,16 +150,16 @@ public sealed class LocationDerivedKeyLifecycleTests
             LocationAddressVisibilityEnum.TenantApproved,
             organizationId);
         LocationPii pii = location.Pii!;
-        string expectedDisplayKey = LocationDisplaySortKeyV1.Create(location.FullName);
-        string expectedAddressKey = LocationAddressSubstringKeyV1.Create(pii.Address);
+        const string expectedDisplayKey = "VENUE";
+        const string expectedAddressKey = "MATRIX ADDRESS";
         SetPrivateProperty(location, nameof(Location.DisplaySortKeyVersion),
-            displayVersionCurrent ? LocationDisplaySortKeyV1.Version : (short)0);
+            displayVersionCurrent ? LocationTextNormalization.CurrentRevision : (short)0);
         SetPrivateProperty(location, nameof(Location.DisplaySortKey),
-            displayValueCurrent ? expectedDisplayKey : "U000058");
+            displayValueCurrent ? expectedDisplayKey : "STALE NAME");
         SetPrivateProperty(pii, nameof(LocationPii.AddressSubstringKeyVersion),
-            addressVersionCurrent ? LocationAddressSubstringKeyV1.Version : (short)0);
+            addressVersionCurrent ? LocationTextNormalization.CurrentRevision : (short)0);
         SetPrivateProperty(pii, nameof(LocationPii.AddressSubstringKey),
-            addressValueCurrent ? expectedAddressKey : "U000059");
+            addressValueCurrent ? expectedAddressKey : "STALE ADDRESS");
         bool expectedChanged = !(displayVersionCurrent && displayValueCurrent
             && addressVersionCurrent && addressValueCurrent);
         Guid beforeStamp = location.ConcurrencyStamp;
@@ -172,10 +172,10 @@ public sealed class LocationDerivedKeyLifecycleTests
         await Assert.That(changed).IsEqualTo(expectedChanged);
         await Assert.That(location.HasCurrentDerivedKeys()).IsTrue();
         await Assert.That(location.DisplaySortKey).IsEqualTo(expectedDisplayKey);
-        await Assert.That(location.DisplaySortKeyVersion).IsEqualTo(LocationDisplaySortKeyV1.Version);
+        await Assert.That(location.DisplaySortKeyVersion).IsEqualTo(LocationTextNormalization.CurrentRevision);
         await Assert.That(location.Pii).IsSameReferenceAs(pii);
         await Assert.That(pii.AddressSubstringKey).IsEqualTo(expectedAddressKey);
-        await Assert.That(pii.AddressSubstringKeyVersion).IsEqualTo(LocationAddressSubstringKeyV1.Version);
+        await Assert.That(pii.AddressSubstringKeyVersion).IsEqualTo(LocationTextNormalization.CurrentRevision);
         await Assert.That(location.Address).IsEqualTo("Matrix address");
         await Assert.That(location.Postcode).IsEqualTo("1000");
         await Assert.That(location.AddressSource).IsEqualTo(LocationAddressSourceEnum.Manual);
@@ -197,11 +197,11 @@ public sealed class LocationDerivedKeyLifecycleTests
         bool valueCurrent)
     {
         LocationPii pii = LocationPii.Create("Key address", "1000", null);
-        string expectedKey = LocationAddressSubstringKeyV1.Create(pii.Address);
+        const string expectedKey = "KEY ADDRESS";
         SetPrivateProperty(pii, nameof(LocationPii.AddressSubstringKeyVersion),
-            versionCurrent ? LocationAddressSubstringKeyV1.Version : (short)0);
+            versionCurrent ? LocationTextNormalization.CurrentRevision : (short)0);
         SetPrivateProperty(pii, nameof(LocationPii.AddressSubstringKey),
-            valueCurrent ? expectedKey : "U000058");
+            valueCurrent ? expectedKey : "STALE ADDRESS");
         bool expectedChanged = !(versionCurrent && valueCurrent);
 
         await Assert.That(pii.HasCurrentAddressSubstringKey(expectedKey)).IsEqualTo(!expectedChanged);
@@ -210,7 +210,7 @@ public sealed class LocationDerivedKeyLifecycleTests
         await Assert.That(changed).IsEqualTo(expectedChanged);
         await Assert.That(pii.HasCurrentAddressSubstringKey(expectedKey)).IsTrue();
         await Assert.That(pii.AddressSubstringKey).IsEqualTo(expectedKey);
-        await Assert.That(pii.AddressSubstringKeyVersion).IsEqualTo(LocationAddressSubstringKeyV1.Version);
+        await Assert.That(pii.AddressSubstringKeyVersion).IsEqualTo(LocationTextNormalization.CurrentRevision);
     }
 
     [Test]
@@ -228,9 +228,9 @@ public sealed class LocationDerivedKeyLifecycleTests
         await Assert.That(location.AddressVisibility).IsEqualTo(LocationAddressVisibilityEnum.TenantApproved);
         await Assert.That(location.HasCurrentDerivedKeys()).IsTrue();
         await Assert.That(location.DisplaySortKey)
-            .IsEqualTo(LocationDisplaySortKeyV1.Create(location.FullName));
+            .IsEqualTo("VENUE");
         await Assert.That(location.Pii!.AddressSubstringKey)
-            .IsEqualTo(LocationAddressSubstringKeyV1.Create(location.Pii.Address));
+            .IsEqualTo("LEGACY ADDRESS");
     }
 
     [Test]
@@ -288,8 +288,8 @@ public sealed class LocationDerivedKeyLifecycleTests
     private static async Task AssertCurrentKeys(Location location, string expectedAddressKey)
     {
         await Assert.That(location.Pii!.AddressSubstringKey).IsEqualTo(expectedAddressKey);
-        await Assert.That(location.Pii.AddressSubstringKeyVersion).IsEqualTo(LocationAddressSubstringKeyV1.Version);
-        await Assert.That(location.DisplaySortKeyVersion).IsEqualTo(LocationDisplaySortKeyV1.Version);
+        await Assert.That(location.Pii.AddressSubstringKeyVersion).IsEqualTo(LocationTextNormalization.CurrentRevision);
+        await Assert.That(location.DisplaySortKeyVersion).IsEqualTo(LocationTextNormalization.CurrentRevision);
     }
 
     private static void SetPrivateProperty(object target, string propertyName, object value) =>

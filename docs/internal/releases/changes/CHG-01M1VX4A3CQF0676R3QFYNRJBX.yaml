@@ -1,0 +1,33 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M1VX4A3CQF0676R3QFYNRJBX
+Title: "Preserve complete Unicode location search text"
+Type: refactor
+Scope: discovery
+Summary: "Location search stores complete validated Unicode values with tenant-safe literal matching and a coordinated development migration reset."
+Group: unicode-location-search
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md
+    Disposition: documented
+    Detail: Old development application migration histories and scalar-token search values are replaced. Recreate only the selected disposable application catalog or restore a matching backup and binaries.
+  Security:
+    Reference: docs/internal/DOMAIN.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Reject malformed Unicode before mutation and preserve tenant authority, removable address PII, erasure fencing, and unsupported-revision query rejection.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: Four EF-generated application initial catalogs cover PostgreSQL, SQLite, SQL Server, MySQL, and MariaDB. Independent Identity, Data Protection, and privacy-authority histories are preserved.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md
+    Disposition: documented
+    Detail: Runtime and globalization upgrades require a focused compatibility comparison and a stopped-traffic current-key rebuild or disposable reset. Mixed normalizer profiles and universal cross-provider sorting are unsupported.

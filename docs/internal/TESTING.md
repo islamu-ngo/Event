@@ -278,6 +278,56 @@ Architecture tests also prove each non-PostgreSQL application/Data Protection
 migration project owns generated migrations and the expected provider package.
 Generated files are never patched to make a matrix lane pass.
 
+### Unicode Location Search Provider Corpus
+
+After the production migration service has completed twice on a disposable target,
+run the structured-provider entrypoint with that target's authorized `Database:Runtime`
+environment. Repeat for PostgreSQL, SQLite, SQL Server, MariaDB, and MySQL:
+
+```bash
+dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj \
+  --configuration Release \
+  --treenode-filter '/*/*/PrimaryDatabaseProviderBehaviorContractTests/MigratedProviderExecutesUnicodeAddressSuggestionContract'
+```
+
+The corpus checks complete 500-unit text and normalization expansion, canonical/script
+semantics, literal wildcard characters, SQL membership and limit, provider-local ordering,
+unsupported revisions, tenant/membership/governance canaries, a two-context stale write
+after committed erasure, and four rejected handler PATCH scenarios using real repositories,
+settings, and protected provider selections. Only the external Cerbos authorization boundary
+is substituted. Invalid-input diagnostics reveal neither original nor derived address text.
+
+Unsupported-revision probes temporarily remove only the two derived-key checks on the
+disposable database (SQLite uses its connection-scoped check setting), write an unsupported
+revision, assert no suggestion, repair through authorized promotion, and restore the checks.
+This is test-only deliberate corruption, never a production fallback or reset procedure.
+Seed identities are run-scoped so the structured corpus can repeat without resetting data.
+
+Initial verification on 2026-09-06 used PostgreSQL 18, SQLite, SQL Server 2022 CU26,
+MariaDB 11.4.7, and MySQL 8.4.6. All five completed the corpus with zero skips; elapsed
+whole-corpus times were approximately 23–25 seconds, including seeding and concurrency
+checks. These are local functional observations, not query latency benchmarks or claims
+about the distinct CI engine versions above. Query-plan observations must report the
+candidate-row scale and distinguish bounded output from substring scan work.
+
+The exact first suggestion command and its typed parameters are replayed by the
+existing test interceptor for one warm measurement and a native query plan. Plan
+output keeps only operator names, provider, elapsed time, and matching-row count;
+SQL text, parameter values, and raw XML/JSON plans are never printed. On the initial
+small synthetic corpus (20 location rows before privacy/write canaries, four matches):
+
+| Engine | Warm query, milliseconds | Observed operators |
+| --- | ---: | --- |
+| SQLite | 0.346 | SEARCH, USE temporary ordering |
+| PostgreSQL | 2.826 | Limit, Sort, Hash Join, Seq Scan |
+| SQL Server | 4.939 | Top, Sort, Nested Loops, Index Scan, Clustered Index Seek |
+| MySQL | 0.926 | ref, eq_ref |
+| MariaDB | 0.878 | ref, eq_ref |
+
+These single local observations establish translated execution shape, not production
+capacity. SQL Server collects its actual plan through `STATISTICS XML`; the other
+engines use EXPLAIN. The substring predicate is not a promised B-tree seek.
+
 ### Privacy-erasure authority and restore lane
 
 `EmbeddedPrivacyErasureRecoveryTests` uses a dedicated temporary local file,

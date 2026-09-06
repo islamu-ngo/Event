@@ -23,6 +23,7 @@ namespace Event.Persistence.IntegrationTests.Repositories;
 [NotInParallel("PersistenceDb")]
 public sealed class LocalAddressSuggestionQueryTests(PostgreSqlContainerFixture fixture)
 {
+    private static readonly string RunPrefix = Guid.CreateVersion7().ToString("N")[..24];
     private const string CriteriaName = "Explore.Application.Contracts.Persistence.LocalAddressSuggestionCriteria";
     private const string ResultName = "Explore.Application.Contracts.Persistence.LocalAddressSuggestion";
     private const string InterfaceName = "Explore.Application.Contracts.Persistence.ILocalAddressSuggestionQuery";
@@ -304,7 +305,8 @@ public sealed class LocalAddressSuggestionQueryTests(PostgreSqlContainerFixture 
         await Assert.That(sql).DoesNotContain("organization_pii");
         await Assert.That(sql.ToUpperInvariant().Split("EXISTS").Length - 1).IsEqualTo(1);
         await Assert.That(sql).Contains("ORDER BY");
-        await Assert.That(sql).Contains("LIMIT");
+        await Assert.That(sql.Contains("LIMIT", StringComparison.OrdinalIgnoreCase)
+            || sql.Contains("TOP", StringComparison.OrdinalIgnoreCase)).IsTrue();
         await Assert.That(context.ChangeTracker.Entries()).IsEmpty();
 
         interceptor.SelectCommands.Clear();
@@ -380,15 +382,10 @@ public sealed class LocalAddressSuggestionQueryTests(PostgreSqlContainerFixture 
                 ActorId,
                 LocationAddressSourceEnum.Manual,
                 location.Id == UnicodeLegacyId
-                    ? LocationAddressVisibilityEnum.CreatorPrivate
+                    ? LocationAddressVisibilityEnum.Quarantined
                     : LocationAddressVisibilityEnum.TenantApproved,
                 null);
         }
-        Location legacy = locations.Single(location => location.Id == UnicodeLegacyId);
-        SetPrivateProperty(legacy, nameof(Explore.Domain.Location.DisplaySortKey), string.Empty);
-        SetPrivateProperty(legacy, nameof(Explore.Domain.Location.DisplaySortKeyVersion), (short)0);
-        SetPrivateProperty(legacy.Pii!, nameof(LocationPii.AddressSubstringKey), string.Empty);
-        SetPrivateProperty(legacy.Pii!, nameof(LocationPii.AddressSubstringKeyVersion), (short)0);
         context.AddRange(locations);
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
@@ -439,6 +436,17 @@ public sealed class LocalAddressSuggestionQueryTests(PostgreSqlContainerFixture 
             .IsEquivalentTo([UnicodeLegacyId], CollectionOrdering.Matching);
     }
 
+    internal static async Task AssertProviderAuthorityMatrixAsync(PrimaryDatabaseProviderBehaviorFixture fixture)
+    {
+        await using (ExploreDbContext seed = fixture.CreateSystemContext())
+        {
+            await SeedMatrixAsync(seed);
+        }
+        var capture = new SelectCaptureInterceptor();
+        await using ExploreDbContext context = fixture.CreateTenantContext(TenantId, capture);
+        await AssertMatrixAsync(context, capture);
+    }
+
     private static void SetPrivateProperty(object target, string propertyName, object value) =>
         target.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public)!.SetValue(target, value);
 
@@ -477,7 +485,7 @@ public sealed class LocalAddressSuggestionQueryTests(PostgreSqlContainerFixture 
             Pii = new UserPii
             {
                 UserId = ActorId,
-                Email = "address-owner@example.invalid",
+                Email = $"address-owner-{RunPrefix}@example.invalid",
                 FirstName = "Address",
                 LastName = "Owner"
             },
@@ -491,7 +499,7 @@ public sealed class LocalAddressSuggestionQueryTests(PostgreSqlContainerFixture 
             Pii = new UserPii
             {
                 UserId = UserId,
-                Email = "address-member@example.invalid",
+                Email = $"address-member-{RunPrefix}@example.invalid",
                 FirstName = "Address",
                 LastName = "Member"
             },
@@ -653,7 +661,7 @@ public sealed class LocalAddressSuggestionQueryTests(PostgreSqlContainerFixture 
     {
         Id = id,
         FullName = "Synthetic matrix tenant",
-        Slug = slug,
+        Slug = $"{slug}-{RunPrefix}",
         TenantStatusId = status.Id,
         TenantStatus = status,
         CreatedAt = DateTime.UnixEpoch
@@ -810,7 +818,7 @@ public sealed class LocalAddressSuggestionQueryTests(PostgreSqlContainerFixture 
     private static Type RequiredDomainType(string name) => typeof(Location).Assembly.GetType(name, throwOnError: false)
         ?? throw new InvalidOperationException($"Domain contract {name} is missing.");
 
-    private static Guid Id(int suffix) => Guid.Parse($"019b0000-0001-7000-8000-{suffix:000000000000}");
+    private static Guid Id(int suffix) => Guid.ParseExact($"{RunPrefix}{suffix:X8}", "N");
 
     private static string DatabasePath(string suffix) => Path.Combine(Path.GetTempPath(), $"local-address-{suffix}.db");
 

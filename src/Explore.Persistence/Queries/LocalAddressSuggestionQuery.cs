@@ -48,8 +48,8 @@ public sealed class LocalAddressSuggestionQuery(ExploreDbContext dbContext)
                     !member.OrganizationTenant.IsSuspended &&
                     !member.OrganizationTenant.Organization.IsDeleted))
             .Where(location =>
-                location.Pii!.AddressSubstringKeyVersion == LocationAddressSubstringKeyV1.Version &&
-                location.DisplaySortKeyVersion == LocationDisplaySortKeyV1.Version &&
+                location.Pii!.AddressSubstringKeyVersion == LocationTextNormalization.CurrentRevision &&
+                location.DisplaySortKeyVersion == LocationTextNormalization.CurrentRevision &&
                 location.Pii.AddressSubstringKey.Contains(searchKey))
             .OrderBy(location => location.DisplaySortKey)
             .ThenBy(location => location.Id)
@@ -115,6 +115,6 @@ public sealed class LocalAddressSuggestionQuery(ExploreDbContext dbContext)
                 "Local address suggestion result limit is outside the supported range.");
         }
 
-        return LocationAddressSubstringKeyV1.Create(searchText);
+        return LocationTextNormalization.Normalize(searchText);
     }
 }

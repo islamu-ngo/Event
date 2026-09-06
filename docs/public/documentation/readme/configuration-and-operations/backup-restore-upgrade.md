@@ -153,6 +153,31 @@ Because the project is pre-1.0 and in active development, breaking schema change
 
 ---
 
+## Location Search Upgrade and Runtime Changes
+
+The Unicode location-search upgrade replaces the development application's old
+encoded search fields. Existing pre-release application databases require recreation
+from the matching release; an incremental upgrade of the retired history is unsupported.
+Stop writers, take a matching backup or confirm that the exact application target is
+disposable, and identify the separate Identity, Data Protection, and retained privacy
+authority stores before resetting anything. Preserve those independent histories and
+never remove a shared database volume as a reset shortcut. Run the migration service
+twice and require successful completion both times before starting the application.
+
+Search retains complete accepted names and addresses (up to 500 UTF-16 code units).
+Canonically equivalent accents match, while accents, Arabic marks, joiners, and emoji
+details remain significant. Search treats percent signs, underscores, backslashes,
+and brackets literally. It does not promise transliteration, accent-free search,
+German full case folding, Turkish linguistic casing, or identical sorting between
+database engines. Suggestions remain restricted to authorized tenant addresses.
+
+When changing .NET, the operating system, ICU/NLS, or globalization settings, test the
+release's Unicode corpus with the new profile while traffic is stopped. Normalized
+stored text can change even when the schema revision does not. Coordinate a supported
+current-key rebuild or disposable application reset before restarting all readers and
+writers on the same profile; mixed old/new normalizer operation is unsupported.
+Rollback needs matching binaries and a matching backup, not only a code revert.
+
 ## Related Guides & Next Steps
 
 * **[Privacy Erasure & Anti-Resurrection](../security-and-identity/privacy-erasure.md)** — Understand why primary database restores must replay against the erasure authority.

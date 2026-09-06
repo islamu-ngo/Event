@@ -18,14 +18,13 @@ public class LocationConfiguration : IEntityTypeConfiguration<Location>
         builder.Property(e => e.Id).HasValueGenerator<GuidVersion7ValueGenerator>();
         builder.HasAlternateKey(e => new { e.TenantId, e.Id });
 
-        builder.Property(e => e.FullName).HasMaxLength(500).IsRequired();
+        builder.Property(e => e.FullName).HasMaxLength(LocationTextNormalization.MaximumSourceLength).IsRequired();
         builder.Property(e => e.DisplaySortKey)
-            .HasMaxLength(LocationDisplaySortKeyV1.MaximumLength)
-            .HasDefaultValue(string.Empty)
+            .HasMaxLength(LocationTextNormalization.MaximumKeyLength)
+            .IsUnicode()
             .IsRequired()
-            .UsePortableOrdinalAscii();
+            .UseLocationUnicodeCollation();
         builder.Property(e => e.DisplaySortKeyVersion)
-            .HasDefaultValue((short)0)
             .IsRequired();
         builder.Property(e => e.Country).HasMaxLength(500).IsRequired();
         builder.Property(e => e.City).HasMaxLength(500).IsRequired();
@@ -107,11 +106,7 @@ public class LocationConfiguration : IEntityTypeConfiguration<Location>
                 "location_privacy_state_id <> 3 OR (address_visibility_id = 1 AND address_organization_id IS NULL)");
             table.HasCheckConstraint(
                 "ck_locations_display_sort_key_version",
-                "(display_sort_key_version = 0 AND display_sort_key = '') OR " +
-                "(display_sort_key_version = 1 AND display_sort_key <> '' AND length(display_sort_key) % 7 = 0)");
-            table.HasCheckConstraint(
-                "ck_locations_tenant_approved_display_sort_key",
-                "address_visibility_id <> 4 OR display_sort_key_version = 1");
+                $"display_sort_key_version = {LocationTextNormalization.CurrentRevision} AND display_sort_key <> ''");
         });
 
         // ===== Performance Indexes =====

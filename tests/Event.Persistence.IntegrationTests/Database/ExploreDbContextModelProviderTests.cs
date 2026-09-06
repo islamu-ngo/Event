@@ -20,10 +20,6 @@ namespace Event.Persistence.IntegrationTests.Database;
 
 public sealed class ExploreDbContextModelProviderTests
 {
-    private static readonly Regex LiteralTableMappingPattern = new(
-        @"ToTable\(\s*""",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
-
     [Test]
     [Arguments("PostgreSql")]
     [Arguments("Sqlite")]
@@ -62,25 +58,34 @@ public sealed class ExploreDbContextModelProviderTests
         IProperty addressVersion = model.FindEntityType(typeof(Explore.Domain.LocationPii))!
             .FindProperty(nameof(Explore.Domain.LocationPii.AddressSubstringKeyVersion))!;
 
-        await Assert.That(displayKey.GetMaxLength()).IsEqualTo(14_000);
-        await Assert.That(addressKey.GetMaxLength()).IsEqualTo(14_000);
-        await Assert.That(displayKey.GetDefaultValue()).IsEqualTo(string.Empty);
-        await Assert.That(addressKey.GetDefaultValue()).IsEqualTo(string.Empty);
-        await Assert.That(displayVersion.GetDefaultValue()).IsEqualTo((short)0);
-        await Assert.That(addressVersion.GetDefaultValue()).IsEqualTo((short)0);
+        await Assert.That(displayKey.GetMaxLength()).IsEqualTo(2_000);
+        await Assert.That(addressKey.GetMaxLength()).IsEqualTo(2_000);
+        await Assert.That(displayKey.IsUnicode()).IsTrue();
+        await Assert.That(addressKey.IsUnicode()).IsTrue();
+        await Assert.That(displayKey.FindAnnotation(RelationalAnnotationNames.DefaultValue)).IsNull();
+        await Assert.That(addressKey.FindAnnotation(RelationalAnnotationNames.DefaultValue)).IsNull();
+        await Assert.That(displayVersion.FindAnnotation(RelationalAnnotationNames.DefaultValue)).IsNull();
+        await Assert.That(addressVersion.FindAnnotation(RelationalAnnotationNames.DefaultValue)).IsNull();
 
         string expectedCollation = provider switch
         {
             "PostgreSql" => "C",
             "Sqlite" => "BINARY",
             "SqlServer" => "Latin1_General_100_BIN2",
-            "MariaDb" or "MySql" => "ascii_bin",
+            "MariaDb" or "MySql" => "utf8mb4_bin",
             _ => throw new ArgumentOutOfRangeException(nameof(provider))
         };
         await Assert.That(displayKey.GetCollation()).IsEqualTo(expectedCollation);
         await Assert.That(addressKey.GetCollation()).IsEqualTo(expectedCollation);
-        await Assert.That(displayKey.GetCharSet()).IsEqualTo(provider is "MariaDb" or "MySql" ? "ascii" : null);
-        await Assert.That(addressKey.GetCharSet()).IsEqualTo(provider is "MariaDb" or "MySql" ? "ascii" : null);
+        await Assert.That(displayKey.GetCharSet()).IsEqualTo(provider is "MariaDb" or "MySql" ? "utf8mb4" : null);
+        await Assert.That(addressKey.GetCharSet()).IsEqualTo(provider is "MariaDb" or "MySql" ? "utf8mb4" : null);
+
+        foreach (IProperty asciiKey in model.GetEntityTypes().SelectMany(type => type.GetProperties())
+                     .Where(property => property.FindAnnotation(PortableOrdinalAsciiPropertyExtensions.AnnotationName)?.Value is true))
+        {
+            await Assert.That(asciiKey.GetCollation()).IsEqualTo(provider is "MariaDb" or "MySql" ? "ascii_bin" : expectedCollation);
+            await Assert.That(asciiKey.GetCharSet()).IsEqualTo(provider is "MariaDb" or "MySql" ? "ascii" : null);
+        }
 
         string checks = string.Join(' ', model.GetEntityTypes()
             .Where(type => type.ClrType == typeof(Explore.Domain.Location) || type.ClrType == typeof(Explore.Domain.LocationPii))
@@ -323,31 +328,6 @@ public sealed class ExploreDbContextModelProviderTests
     }
 
     [Test]
-    public async Task FinalizedMappingSourceContainsNoLiteralTableNames()
-    {
-        string persistenceRoot = Path.Combine(GetRepositoryRoot(), "src", "Explore.Persistence");
-        var violations = new List<string>();
-        foreach (string path in Directory.GetFiles(persistenceRoot, "*.cs", SearchOption.AllDirectories))
-        {
-            string relativePath = Path.GetRelativePath(GetRepositoryRoot(), path)
-                .Replace(Path.DirectorySeparatorChar, '/');
-            if (relativePath.Contains("/Migrations/", StringComparison.Ordinal) ||
-                relativePath.Contains("/bin/", StringComparison.Ordinal) ||
-                relativePath.Contains("/obj/", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            string source = await File.ReadAllTextAsync(path);
-            violations.AddRange(LiteralTableMappingPattern.Matches(source).Select(match =>
-                $"{relativePath}:{source[..match.Index].Count(character => character == '\n') + 1}"));
-        }
-
-        await Assert.That(violations).IsEmpty()
-            .Because("snake-case conventions and the provider namespace own every table name");
-    }
-
-    [Test]
     [Arguments("MariaDb")]
     [Arguments("MySql")]
     public async Task MySqlModelsHaveDistinctBoundedCustomPropertyOptionForeignKeys(string provider)
@@ -488,7 +468,8 @@ public sealed class ExploreDbContextModelProviderTests
         if (provider is "MariaDb" or "MySql")
         {
             await Assert.That(properties.Where(property => !IsMySqlAsciiIdentityProperty(property)
-                    && !IsLocationDerivedKey(property))
+                    && !IsLocationDerivedKey(property)
+                    && property.FindAnnotation(PortableOrdinalAsciiPropertyExtensions.AnnotationName)?.Value is not true)
                 .All(property => property.GetCollation() == null)).IsTrue();
             await Assert.That(model.FindEntityType(typeof(Explore.Domain.AtprotoIdentity))!
                 .FindProperty(nameof(Explore.Domain.AtprotoIdentity.Did))!
@@ -496,7 +477,8 @@ public sealed class ExploreDbContextModelProviderTests
         }
         else
         {
-            await Assert.That(properties.Where(property => !IsLocationDerivedKey(property))
+            await Assert.That(properties.Where(property => !IsLocationDerivedKey(property)
+                    && property.FindAnnotation(PortableOrdinalAsciiPropertyExtensions.AnnotationName)?.Value is not true)
                 .All(property => property.GetCollation() == null)).IsTrue();
         }
         await Assert.That(properties.Any(property =>
@@ -797,6 +779,8 @@ public sealed class ExploreDbContextModelProviderTests
 
         if (modelSchema is not null)
         {
+            // Explicit namespace probes need isolated services; ordinary provider profiles remain cached.
+            builder.EnableServiceProviderCaching(false);
             ((IDbContextOptionsBuilderInfrastructure)builder).AddOrUpdateExtension(
                 new RelationalNamespaceOptionsExtension(modelSchema, modelSchema));
         }

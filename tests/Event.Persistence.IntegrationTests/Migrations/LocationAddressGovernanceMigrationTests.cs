@@ -1,4 +1,4 @@
-// ABOUTME: Verifies PostgreSQL retained address-governance upgrade and current five-provider schema parity.
+// ABOUTME: Verifies current PostgreSQL address-governance constraints and five-provider schema parity.
 // ABOUTME: Pins the four development-only rebaselines while proving lookup IDs, FKs, defaults, and checks.
 
 #nullable enable
@@ -121,18 +121,18 @@ public sealed class LocationAddressGovernanceMigrationTests(PostgreSqlContainerF
         await Assert.That(visibility.IsNullable).IsFalse();
         await Assert.That(visibility.GetDefaultValue()).IsEqualTo(1);
         await Assert.That(organization.IsNullable).IsTrue();
-        await Assert.That(displayKey.GetDefaultValue()).IsEqualTo(string.Empty);
-        await Assert.That(displayVersion.GetDefaultValue()).IsEqualTo((short)0);
-        await Assert.That(addressKey.GetDefaultValue()).IsEqualTo(string.Empty);
-        await Assert.That(addressVersion.GetDefaultValue()).IsEqualTo((short)0);
-        await Assert.That(displayKey.GetMaxLength()).IsEqualTo(14_000);
-        await Assert.That(addressKey.GetMaxLength()).IsEqualTo(14_000);
+        await Assert.That(displayKey.FindAnnotation(RelationalAnnotationNames.DefaultValue)).IsNull();
+        await Assert.That(displayVersion.FindAnnotation(RelationalAnnotationNames.DefaultValue)).IsNull();
+        await Assert.That(addressKey.FindAnnotation(RelationalAnnotationNames.DefaultValue)).IsNull();
+        await Assert.That(addressVersion.FindAnnotation(RelationalAnnotationNames.DefaultValue)).IsNull();
+        await Assert.That(displayKey.GetMaxLength()).IsEqualTo(2_000);
+        await Assert.That(addressKey.GetMaxLength()).IsEqualTo(2_000);
         string expectedCollation = provider switch
         {
             "PostgreSql" => "C",
             "Sqlite" => "BINARY",
             "SqlServer" => "Latin1_General_100_BIN2",
-            "MariaDb" or "MySql" => "ascii_bin",
+            "MariaDb" or "MySql" => "utf8mb4_bin",
             _ => throw new ArgumentOutOfRangeException(nameof(provider), provider, null),
         };
         await Assert.That(displayKey.GetCollation()).IsEqualTo(expectedCollation);
@@ -177,7 +177,7 @@ public sealed class LocationAddressGovernanceMigrationTests(PostgreSqlContainerF
             await using ExploreDbContext context = CreateApplicationContext(database);
             await context.Database.MigrateAsync();
             await LookupTableSeeder.SeedAsync(context);
-            await InsertLegacyGraphAsync(context);
+            await InsertCurrentGraphAsync(context);
 
             await AssertObservableStateAsync(context);
             await SeedOrganizationsAsync(context);
@@ -262,7 +262,7 @@ public sealed class LocationAddressGovernanceMigrationTests(PostgreSqlContainerF
         }
     }
 
-    private static async Task InsertLegacyGraphAsync(ExploreDbContext context)
+    private static async Task InsertCurrentGraphAsync(ExploreDbContext context)
     {
         string prefix = context.Database.IsSqlite() ? "ie_" : string.Empty;
         string schema = context.Database.IsNpgsql() ? "islamu_event." : string.Empty;
@@ -286,13 +286,13 @@ public sealed class LocationAddressGovernanceMigrationTests(PostgreSqlContainerF
             $"INSERT INTO {privacyStates} (id, master_code, full_name) SELECT {{0}}, {{1}}, {{2}} WHERE NOT EXISTS (SELECT 1 FROM {privacyStates} WHERE id={{0}})",
             (int)LocationPrivacyStateEnum.Active, "ACTIVE", "Active");
         await context.Database.ExecuteSqlRawAsync(
-            $"INSERT INTO {locations} (id, full_name, country, city, tenant_id, location_kind_id, location_privacy_state_id, created_at, concurrency_stamp) VALUES ({{0}}, {{1}}, {{2}}, {{3}}, {{4}}, {{5}}, {{6}}, {{7}}, {{8}})",
-            LocationId, "Synthetic legacy location", "BE", "Brussels", TenantId,
+            $"INSERT INTO {locations} (id, full_name, country, city, tenant_id, location_kind_id, location_privacy_state_id, created_at, concurrency_stamp, display_sort_key, display_sort_key_version) VALUES ({{0}}, {{1}}, {{2}}, {{3}}, {{4}}, {{5}}, {{6}}, {{7}}, {{8}}, {{9}}, {{10}})",
+            LocationId, "Synthetic location", "BE", "Brussels", TenantId,
             (int)LocationKindEnum.Unclassified, (int)LocationPrivacyStateEnum.Active,
-            DateTime.UnixEpoch, Id(20));
+            DateTime.UnixEpoch, Id(20), "SYNTHETIC LOCATION", (short)2);
         await context.Database.ExecuteSqlRawAsync(
-            $"INSERT INTO {pii} (location_id, address, postcode) VALUES ({{0}}, {{1}}, {{2}})",
-            LocationId, "Synthetic legacy address", "0000");
+            $"INSERT INTO {pii} (location_id, address, postcode, address_substring_key, address_substring_key_version) VALUES ({{0}}, {{1}}, {{2}}, {{3}}, {{4}})",
+            LocationId, "Synthetic address", "0000", "SYNTHETIC ADDRESS", (short)2);
         context.ChangeTracker.Clear();
     }
 
@@ -324,10 +324,10 @@ public sealed class LocationAddressGovernanceMigrationTests(PostgreSqlContainerF
         await Assert.That(reader.GetInt32(0)).IsEqualTo(1);
         await Assert.That(reader.GetInt32(1)).IsEqualTo(1);
         await Assert.That(reader.IsDBNull(2)).IsTrue();
-        await Assert.That(reader.GetString(3)).IsEqualTo(string.Empty);
-        await Assert.That(reader.GetInt16(4)).IsEqualTo((short)0);
-        await Assert.That(reader.GetString(5)).IsEqualTo(string.Empty);
-        await Assert.That(reader.GetInt16(6)).IsEqualTo((short)0);
+        await Assert.That(reader.GetString(3)).IsEqualTo("SYNTHETIC LOCATION");
+        await Assert.That(reader.GetInt16(4)).IsEqualTo((short)2);
+        await Assert.That(reader.GetString(5)).IsEqualTo("SYNTHETIC ADDRESS");
+        await Assert.That(reader.GetInt16(6)).IsEqualTo((short)2);
     }
 
     private static async Task<IReadOnlyList<string>> ReadLookupAsync(ExploreDbContext context, string table)
@@ -379,7 +379,9 @@ public sealed class LocationAddressGovernanceMigrationTests(PostgreSqlContainerF
         await ExecuteAsync(connection, $"UPDATE {table} SET address_visibility_id=2, created_by=@actor, address_organization_id=NULL WHERE id=@id", false);
         await ExecuteAsync(connection, $"UPDATE {table} SET address_visibility_id=3, created_by=@actor, address_organization_id=@organization WHERE id=@id", false, OrganizationId);
         await ExecuteAsync(connection, $"UPDATE {table} SET address_visibility_id=3, created_by=NULL, address_organization_id=@organization WHERE id=@id", true, OrganizationId);
-        await ExecuteAsync(connection, $"UPDATE {table} SET display_sort_key='U000041', display_sort_key_version=1, address_visibility_id=4, created_by=@actor, address_organization_id=@organization WHERE id=@id", false, OrganizationId);
+        await ExecuteAsync(connection, $"UPDATE {table} SET address_visibility_id=4, created_by=@actor, address_organization_id=@organization WHERE id=@id", false, OrganizationId);
+        await ExecuteAsync(connection, $"UPDATE {table} SET display_sort_key_version=0 WHERE id=@id", true);
+        await ExecuteAsync(connection, $"UPDATE {table} SET display_sort_key_version=1 WHERE id=@id", true);
         await ExecuteAsync(connection, $"UPDATE {table} SET address_visibility_id=4, created_by=@actor, address_organization_id=NULL WHERE id=@id", false);
         await ExecuteAsync(connection, $"UPDATE {table} SET address_visibility_id=2, created_by=@actor, address_organization_id=@organization WHERE id=@id", true, OrganizationId);
         await ExecuteAsync(connection, $"UPDATE {table} SET address_visibility_id=3, created_by=@actor, address_organization_id=NULL WHERE id=@id", true);

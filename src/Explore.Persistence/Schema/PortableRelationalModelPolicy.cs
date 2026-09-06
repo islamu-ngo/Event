@@ -168,7 +168,11 @@ internal static partial class PortableRelationalModelPolicy
             }
 
             var configuredCollation = property.GetCollation();
-            if (property.FindAnnotation(PortableOrdinalAsciiPropertyExtensions.AnnotationName)?.Value is true)
+            if (property.FindAnnotation(LocationUnicodePropertyExtensions.AnnotationName)?.Value is true)
+            {
+                ConfigureLocationUnicode(property, providerName);
+            }
+            else if (property.FindAnnotation(PortableOrdinalAsciiPropertyExtensions.AnnotationName)?.Value is true)
             {
                 ConfigurePortableOrdinalAscii(property, providerName);
             }
@@ -235,6 +239,23 @@ internal static partial class PortableRelationalModelPolicy
             {
                 property.SetDefaultValueSql(NormalizeTimestampDefault(defaultSql, providerName));
             }
+        }
+    }
+
+    private static void ConfigureLocationUnicode(IMutableProperty property, string providerName)
+    {
+        property.SetIsUnicode(true);
+        property.SetCollation(providerName switch
+        {
+            PostgreSqlProvider => "C",
+            SqliteProvider => "BINARY",
+            SqlServerProvider => "Latin1_General_100_BIN2",
+            MySqlProvider => "utf8mb4_bin",
+            _ => throw new InvalidOperationException("Location Unicode text requires a supported relational provider.")
+        });
+        if (providerName == MySqlProvider)
+        {
+            property.SetCharSet("utf8mb4");
         }
     }
 

@@ -16173,18 +16173,15 @@ namespace Explore.Persistence.Migrations
 
                     b.Property<string>("DisplaySortKey")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(14000)
-                        .HasColumnType("character varying(14000)")
-                        .HasDefaultValue("")
+                        .HasMaxLength(2000)
+                        .IsUnicode(true)
+                        .HasColumnType("character varying(2000)")
                         .HasColumnName("display_sort_key")
                         .UseCollation("C")
-                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
+                        .HasAnnotation("Explore:LocationUnicode", true);
 
                     b.Property<short>("DisplaySortKeyVersion")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("smallint")
-                        .HasDefaultValue((short)0)
                         .HasColumnName("display_sort_key_version");
 
                     b.Property<string>("FullName")
@@ -16274,7 +16271,7 @@ namespace Explore.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_locations_address_visibility_scope", "(address_visibility_id = 1 AND address_organization_id IS NULL) OR (address_visibility_id = 2 AND created_by IS NOT NULL AND address_organization_id IS NULL) OR (address_visibility_id = 3 AND created_by IS NOT NULL AND address_organization_id IS NOT NULL) OR address_visibility_id = 4");
 
-                            t.HasCheckConstraint("ck_locations_display_sort_key_version", "(display_sort_key_version = 0 AND display_sort_key = '') OR (display_sort_key_version = 1 AND display_sort_key <> '' AND length(display_sort_key) % 7 = 0)");
+                            t.HasCheckConstraint("ck_locations_display_sort_key_version", "display_sort_key_version = 2 AND display_sort_key <> ''");
 
                             t.HasCheckConstraint("ck_locations_erased_address_quarantined", "location_privacy_state_id <> 3 OR (address_visibility_id = 1 AND address_organization_id IS NULL)");
 
@@ -16283,8 +16280,6 @@ namespace Explore.Persistence.Migrations
                             t.HasCheckConstraint("ck_locations_owner_private_home", "owner_user_id IS NULL OR location_kind_id = 5");
 
                             t.HasCheckConstraint("ck_locations_private_home_address_visibility", "location_kind_id <> 5 OR address_visibility_id <> 4");
-
-                            t.HasCheckConstraint("ck_locations_tenant_approved_display_sort_key", "address_visibility_id <> 4 OR display_sort_key_version = 1");
                         });
                 });
 
@@ -16434,18 +16429,15 @@ namespace Explore.Persistence.Migrations
 
                     b.Property<string>("AddressSubstringKey")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(14000)
-                        .HasColumnType("character varying(14000)")
-                        .HasDefaultValue("")
+                        .HasMaxLength(2000)
+                        .IsUnicode(true)
+                        .HasColumnType("character varying(2000)")
                         .HasColumnName("address_substring_key")
                         .UseCollation("C")
-                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
+                        .HasAnnotation("Explore:LocationUnicode", true);
 
                     b.Property<short>("AddressSubstringKeyVersion")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("smallint")
-                        .HasDefaultValue((short)0)
                         .HasColumnName("address_substring_key_version");
 
                     b.Property<double?>("Latitude")
@@ -16467,7 +16459,7 @@ namespace Explore.Persistence.Migrations
 
                     b.ToTable("location_pii", "islamu_event", t =>
                         {
-                            t.HasCheckConstraint("ck_location_pii_address_substring_key_version", "(address_substring_key_version = 0 AND address_substring_key = '') OR (address_substring_key_version = 1 AND address_substring_key <> '' AND length(address_substring_key) % 7 = 0)");
+                            t.HasCheckConstraint("ck_location_pii_address_substring_key_version", "address_substring_key_version = 2 AND address_substring_key <> ''");
 
                             t.HasCheckConstraint("ck_location_pii_coordinate_shape", "(latitude IS NULL AND longitude IS NULL)\nOR (latitude IS NOT NULL AND longitude IS NOT NULL\n    AND latitude BETWEEN -90 AND 90\n    AND longitude BETWEEN -180 AND 180)");
                         });

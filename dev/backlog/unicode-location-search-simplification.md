@@ -3,17 +3,17 @@
 
 # Unicode Location Search Simplification
 
-Last Updated: 2026-09-06 Europe/Brussels
+Last Updated: 2026-09-07 Europe/Brussels
 
 ## 1. Ownership And Delivery
 
 - Owner: active Unicode implementation workstream, with independent privacy/security and persistence reviews.
-- Status: implemented and checkpointed locally on `develop` in scoped Conventional Commits; the user-authorized upstream merge and combined-schema regeneration are in progress. Pre-merge five-provider proof, scoped reviews and repaired Architecture passed, but integrated verification and final delivery remain incomplete. Nothing has been published or approved as fully verified. The sections below preserve the original accepted design and intake evidence; they are not a claim that every delivery gate passed.
+- Status: implemented and committed on `develop`; user-authorized upstream merge and combined-schema regeneration are complete. Final local build/project gates and five-engine Unicode/migration proof pass. Delivery remains incomplete because release-history validation, required CI and a separately discovered secret-binding provider defect need disposition. Nothing has been pushed or approved as fully delivered. The design and historical evidence below are not a claim that every delivery gate passed.
 - Parent: `dev/active/prevent-ci-failures-and-unicode-simplification/`; this backlog item is the permanent source-free handoff when that ignored working memory is removed.
 - Repository evidence: `3f9b796b4a0aea6fff40baaaf88e07add663e863`, 2026-09-06.
 - Intents: `add-ef-migration` (security), `update-repository-query` (domain state), focused `test-suite-rationalization`; protect Tier 2 privacy lifecycle invariants.
 - Admission: revalidated in the [Unicode I-VSD report](../../islamic-value-sensitive-design/i-vsd-unicode-location-search-simplification.md), current / plan-aligned for the original design digest `1c30d905825826910a8f563db9916be3855478b4978233b09f3375b97792fb78`. Status-only edits do not change that reviewed design or inherit final approval from the parent report.
-- Read before implementation: migration/persistence/domain/privacy rules, `DOMAIN.md`, `PRIVACY_ERASURE.md`, `TESTING.md` multi-provider contracts, `OPERATIONS.md` location migration/reset section, and governed release documentation. Older migration IDs were an intake finding; the local runbook has been updated. Actual generated artifacts remain authoritative, and upstream integration requires combined-model regeneration and another documentation reconciliation.
+- Read before implementation: migration/persistence/domain/privacy rules, `DOMAIN.md`, `PRIVACY_ERASURE.md`, `TESTING.md` multi-provider contracts, `OPERATIONS.md` location migration/reset section, and governed release documentation. Older migration IDs were an intake finding; the runbook now identifies the combined generated initials. Actual generated artifacts remain authoritative.
 - User independently authorized full implementation directly on develop. Exact phase-owned commit packets and final delivery remain gated; no remote publication authority is inferred. Active execution evidence resides in `dev/active/unicode-location-search-simplification/` and `.omo/evidence/20260906-unicode-location-search-simplification/`; neither ignored directory substitutes for committed operator documentation.
 
 ### Pre-Merge Execution Evidence — 2026-09-06
@@ -24,7 +24,13 @@ Do not mark this backlog delivered: pre-merge Architecture is577passed/0failed/1
 
 ### Integration Disposition — 2026-09-07
 
-Preserve upstream relational ATProto storage and local Unicode semantics in one EF-generated initial per application migration assembly. Independent migration authorities stay unchanged. Fresh, empty task-owned generation catalogs were verified before native EF removal; no existing proof or developer database was reset. Reuse the upstream canonical test-options helper and its strict diagnostic regression. The initial merged Persistence compilation passes with zero errors; this is not migration or runtime certification. Exact final generated IDs belong in the canonical operations runbook after generation. Immutable prior release fragments remain present; a new combined-rebaseline fragment records the corrected deployment contract.
+The reviewed merge preserves upstream relational ATProto storage and local Unicode semantics in one natively EF-generated initial per application migration assembly. Independent migration authorities remain unchanged. Fresh empty generation catalogs were verified; no existing proof or developer database was reset. The canonical test-options helper and strict24-profile regression replace the temporary local logging exceptions. Final heads are PostgreSQL20260906223112,SQLite20260906223113,SQLServer20260906223115 and MySQL/MariaDB20260906223116; the operations runbook names them. Immutable prior release fragments remain; CHG-01M1WCQT4AHAR321R883PWPW4G records the combined rebaseline.
+
+Final merged verification: Release240warnings/0errors; Domain1134/1134; Application2066/2066; Architecture578passed/1existing skip; standalone14/14; Persistence1608passed/0failed/5structured-environment skips,33m17.822s,native exit0. Four pending-model checks, strict production MigrationService clean/repeat10/10, five-engine generated lifecycle20/20 and final Unicode/runtime20/20 pass. Every final corpus process was observed loading .NET10.0.10 and ICU78.3. This certifies the observed profile, not arbitrary future runtime tables or production capacity.
+
+Four Persistence skips are covered by the explicit Unicode/runtime20/20. The fifth, existing SecretBindingProviderContractTests, separately passes PostgreSQL/SQLite/SQLServer but fails MySQL/MariaDB: an instance-only filtered unique index is enforced globally and rejects same-key bindings belonging to distinct tenants. No fixture weakening or security-model/migration repair was made; obtain separate scope alignment. The actual nonempty release range also fails on already-published historical commit metadata; do not rewrite published history or invent a baseline. Required CI/publication authority remains open.
+
+Independent requirement audit supports UNI-01–11 functional coverage and required documentation presence. The derived2000 overflow guard is implemented, but no accepted500-unit input producing more than2000 derived units was demonstrated; expansion tests reach1000. Do not claim dynamic coverage of an unobserved runtime branch. Future globalization upgrades remain governed by the documented stopped-traffic comparison/rebuild/reset contract.
 
 ## 2. Verified Problem
 

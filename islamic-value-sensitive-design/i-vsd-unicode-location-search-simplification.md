@@ -3,7 +3,7 @@
 
 # Unicode Location Search Simplification — I-VSD Planning Report
 
-Last Updated: 2026-09-06
+Last Updated: 2026-09-07
 
 ## Review Metadata
 
@@ -54,7 +54,9 @@ Trust requires preserving deletion and authorization. Truthfulness requires dist
 
 At planning admission, all new runtime behavior was unverified. Subsequent scoped evidence now covers five-provider corpus/DDL/migration-service behavior, rejection atomicity, concurrent erasure/stale writer, secret-safe query diagnostics and actual-command plans/timings. Independent privacy and persistence reviews approve that scope with no confirmed defects. This remains a planning disposition, not whole-workstream completion or certification.
 
-Outstanding execution gates are combined-model generation and integrated verification after the user-authorized upstream merge, final release validation and CI at the implementation commit. Local Unicode work and bounded repairs are checkpointed; pre-merge Architecture passes, while the last full Persistence run still has four failures and is not superseded by focused passes. Upstream's canonical test-isolation policy replaces the temporary local diagnostic exceptions. The user approved separate repairs, standard EF-generated headers and checkpoint-then-merge sequencing; generated files remain tool-owned. These integration/status changes preserve the Unicode responsibility mappings and do not confer final execution approval. Local clean/reset/repeat tests do not certify an arbitrary retained-data upgrade or a changed ICU runtime. No stakeholder consultation or scholarly audit is implied.
+The authorized merge and four combined application catalogs are complete. Final merged Release, Domain, Application, Architecture and standalone gates pass; full Persistence has1608passed/0failed/5structured-environment skips. Explicit five-engine Unicode/runtime20/20, generated lifecycle20/20, production-service clean/repeat10/10 and four pending-model checks pass. Every final corpus process was observed loading .NET10.0.10 and ICU78.3. The canonical test-isolation policy replaces temporary local logging exceptions; generated files remain tool-owned.
+
+Remaining delivery gaps are governed release validation and required CI, plus explicit disposition of a separate existing SecretBinding contract: three engines pass, MySQL/MariaDB fail because a physically global uniqueness constraint rejects same-key bindings for different tenants. This fifth structured skip is not covered by Unicode20/20. No repair or stakeholder-responsibility expansion is approved by this status update. Already-published invalid release metadata must not be rewritten or silently bypassed. These status-only corrections preserve the reviewed Unicode design and IVSD mappings; they do not confer final execution approval. Local clean/reset/repeat tests do not certify arbitrary retained-data upgrades, future ICU profiles, stakeholder outcomes or scholarly review.
 
 ## Escalation Needed
 

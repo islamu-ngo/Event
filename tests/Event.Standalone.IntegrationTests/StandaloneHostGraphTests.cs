@@ -249,7 +249,7 @@ public sealed class StandaloneHostGraphTests
             .CreateClient(nameof(IEventTypeClient));
 
         await Assert.That(registrations).IsNotEmpty();
-        await Assert.That(resolvedClients).Count().IsEqualTo(registrations.Length);
+        await Assert.That(resolvedClients).Count().IsEqualTo(registrations.Count);
         await Assert.That(resolvedClients.Zip(registrations)
             .All(pair => pair.Second.ImplementationType.IsInstanceOfType(pair.First))).IsTrue();
         await Assert.That(configuredHttpClient.BaseAddress).IsEqualTo(InProcessEventApiDispatcher.InternalBaseAddress);

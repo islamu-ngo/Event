@@ -7,6 +7,7 @@ using System.Text.Json;
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Authentication;
+using Explore.API.Extensions;
 using Explore.API.Hateoas;
 using Explore.API.Models;
 using Explore.Application.Constants;
@@ -34,7 +35,7 @@ public sealed class AtprotoSessionController(
 {
     [HttpPost("session", Name = RouteNames.BootstrapAtprotoSession)]
     [Authorize(AuthenticationSchemes = ApiAuthenticationSchemeNames.AtprotoBootstrap)]
-    [EnableRateLimiting("write")]
+    [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
     [RequestSizeLimit(160 * 1024)]
     [EndpointSummary("Bootstrap ATProto platform session")]
     [EndpointDescription("Server-private BFF bridge; excluded from public API discovery and generated clients.")]
@@ -136,7 +137,7 @@ public sealed class AtprotoSessionController(
 
     [HttpGet("session/current", Name = RouteNames.GetCurrentAtprotoSession)]
     [Authorize(AuthenticationSchemes = ApiAuthenticationSchemeNames.AtprotoSession)]
-    [EnableRateLimiting("authenticated")]
+    [EnableRateLimiting(RateLimitingExtensions.AuthenticatedPolicy)]
     [EndpointSummary("Get current ATProto OAuth session")]
     [EndpointDescription("Server-private BFF operation; requires the session bearer and a single-use bridge assertion.")]
     [ProducesResponseType<AtprotoCurrentSessionBridgeResponse>(StatusCodes.Status200OK)]
@@ -169,7 +170,7 @@ public sealed class AtprotoSessionController(
 
     [HttpPost("session/current", Name = RouteNames.RefreshCurrentAtprotoSession)]
     [Authorize(AuthenticationSchemes = ApiAuthenticationSchemeNames.AtprotoSession)]
-    [EnableRateLimiting("write")]
+    [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
     [EndpointSummary("Refresh current ATProto OAuth session")]
     [EndpointDescription("Server-private BFF operation; persists rotated OAuth state before returning a replacement session token.")]
     [ProducesResponseType<BffAtprotoSessionRefreshResponse>(StatusCodes.Status200OK)]
@@ -193,7 +194,7 @@ public sealed class AtprotoSessionController(
 
     [HttpDelete("session/current", Name = RouteNames.DeleteCurrentAtprotoSession)]
     [Authorize(AuthenticationSchemes = ApiAuthenticationSchemeNames.AtprotoSession)]
-    [EnableRateLimiting("write")]
+    [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
     [EndpointSummary("Delete current ATProto OAuth session")]
     [EndpointDescription("Server-private idempotent BFF operation; requires the session bearer and a single-use bridge assertion.")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

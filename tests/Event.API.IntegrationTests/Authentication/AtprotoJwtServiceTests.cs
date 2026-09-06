@@ -301,7 +301,7 @@ public sealed class AtprotoJwtServiceTests
             .Cast<AuthorizeAttribute>().Single().AuthenticationSchemes)
             .IsEqualTo(ApiAuthenticationSchemeNames.AtprotoBootstrap);
         await Assert.That(method.GetCustomAttributes(typeof(EnableRateLimitingAttribute), true)
-            .Cast<EnableRateLimitingAttribute>().Single().PolicyName).IsEqualTo("write");
+            .Cast<EnableRateLimitingAttribute>().Single().PolicyName).IsEqualTo(RateLimitingExtensions.WritePolicy);
         await Assert.That(method.GetCustomAttributes(typeof(RequestSizeLimitAttribute), true)).HasSingleItem();
         await Assert.That(method.GetCustomAttributes(typeof(HttpPostAttribute), true)
             .Cast<HttpPostAttribute>().Single().Name).IsEqualTo("BootstrapAtprotoSession");
@@ -328,7 +328,7 @@ public sealed class AtprotoJwtServiceTests
         await Assert.That(refreshCurrent.GetCustomAttributes(typeof(HttpPostAttribute), true)
             .Cast<HttpPostAttribute>().Single().Name).IsEqualTo("RefreshCurrentAtprotoSession");
         await Assert.That(refreshCurrent.GetCustomAttributes(typeof(EnableRateLimitingAttribute), true)
-            .Cast<EnableRateLimitingAttribute>().Single().PolicyName).IsEqualTo("write");
+            .Cast<EnableRateLimitingAttribute>().Single().PolicyName).IsEqualTo(RateLimitingExtensions.WritePolicy);
     }
 
     private static AtprotoJwtService CreateService(TestKeyMaterial keys)

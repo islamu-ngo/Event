@@ -1,12 +1,12 @@
 ---
 name: implement-tasks
-description: "Load when executing, running, or implementing an approved task plan from `dev/active/<task>/`; orchestrates phase execution, canonical worktree isolation (`git worktree` in `.worktrees/` + plan `mv`), Red/Green/Refactor task loops, semantic phase commits, pre-PR rebase conflict protection, and PR lifecycle teardown."
+description: "Load when executing, running, or implementing an approved task plan from `dev/active/<task>/`; orchestrates phase execution, canonical worktree isolation (`git worktree` in `.worktrees/` + plan `mv`), Red/Green/Refactor task loops, semantic phase commits, pre-PR rebase conflict protection, PR creation with pre-flight Release Impact, and parked worktree lifecycle."
 type: workflow
 enforcement: suggest
 priority: high
 ---
 <!-- ABOUTME: Workflow skill for executing approved implementation tasks from dev/active/<task>/. -->
-<!-- ABOUTME: Guides isolated worktree execution (.worktrees/<task>), plan mv, semantic phase commits, pre-PR rebase, and PR teardown. -->
+<!-- ABOUTME: Guides isolated worktree execution (.worktrees/<task>), plan mv, semantic phase commits, pre-PR rebase, and parked worktree lifecycle. -->
 
 ## Must-Read Docs
 - [../../../AGENTS.md](../../../AGENTS.md)
@@ -54,14 +54,35 @@ priority: high
    ```
    - If clean: proceed to push.
    - If merge conflicts occur: resolve conflicts inside `.worktrees/<task-name>`, run project verification tests, and complete the rebase (`git rebase --continue`).
-9. **Pull Request Lifecycle & Worktree Disposal**:
-   - Push branch to origin: `git push -u origin feat/<task-name> --force-with-lease`
-   - Open Pull Request for CI/CD and review: `gh pr create --base develop --fill`
-   - Teardown: From the root workspace (or once PR is submitted):
+9. **Pull Request Creation & Parked Worktree Protocol**:
+   - **Push Branch**: `git push -u origin feat/<task-name> --force-with-lease`
+   - **Pre-Flight PR Release Impact Generation (Zero CI Failures)**:
+     Never use a bare `gh pr create --fill` that omits metadata. PR descriptions MUST contain the `## Release Impact` checklist mandated by `.ci/scripts/validate-release-impact-pr.cs`. Inspect changed files against category rules:
+     - `security` (auth, cerbos, keycloak, cla, secrets): `- [x] Security/auth impact documented`
+     - `migration` (migrations, seed data): `- [x] Migration/data/rollback impact documented`
+     - `configuration` (config, secrets, appsettings, compose, Dockerfile): `- [x] Configuration/secrets/deployment impact documented`
+     - `openapi` (openapi schemas, api changelog, api controllers): `- [x] OpenAPI/client contract impact documented`
+     - `operator` (self-hosting, operations, deployment, release checklist): `- [x] Operator/self-hosting/release-note impact documented`
+     - If none apply: `- [x] Not applicable`
+     Always provide a non-empty `Details:` section explaining the impact, release-note location, or why no release note is needed.
+     Submit the PR using:
+     ```bash
+     gh pr create --base develop --title "<type>(<scope>): <title>" --body "<body-with-release-impact>"
+     ```
+   - **Park the Worktree (DO NOT DELETE)**:
+     Never delete `.worktrees/<task-name>` upon PR creation. The worktree must remain parked and intact so that any subsequent bot reviews (Copilot, CodeQL) or CI check failures can be resolved immediately in-place with zero setup overhead.
+   - **Halt and Await User Direction**:
+     Immediately after PR creation, the agent must halt its execution and deliver a self-contained status brief:
+     1. PR URL and branch name.
+     2. Confirmation that the worktree remains parked at `.worktrees/<task-name>`.
+     3. Notification that CI checks and automated bot reviewers (GitHub Copilot, CodeQL, SonarCloud) are running.
+     4. Clear instruction to the user: inform the agent if there are any review comments, bot suggestions, or failing checks to address; OR confirm if everything is good/merged so the agent can delete the worktree.
+   - **Worktree Teardown (Only Upon Explicit User Confirmation)**:
+     Only when the user confirms that the PR is approved/merged or explicitly instructs to clean up, remove the worktree from the root workspace:
      ```bash
      git worktree remove .worktrees/<task-name>
      ```
-   - Ephemeral plan files in `dev/active/<task-name>` vanish cleanly with the worktree.
+     Ephemeral plan files in `dev/active/<task-name>` vanish cleanly with the worktree.
 
 ## Workflow
 
@@ -85,10 +106,16 @@ priority: high
 5. Pre-PR Rebase Gate:
    git fetch origin develop && git rebase origin/develop
    dotnet test (verify regression-free rebase)
-6. PR Creation & Teardown:
-   git push -u origin feat/<task> --force-with-lease
-   gh pr create --base develop --fill
-   (from root) git worktree remove .worktrees/<task>
+6. PR Creation & Parked Worktree Handoff:
+   a. git push -u origin feat/<task> --force-with-lease
+   b. Inspect changed files and construct PR body with mandatory `## Release Impact` checklist
+   c. gh pr create --base develop --title "..." --body "..."
+   d. PARK the worktree (.worktrees/<task>) — DO NOT remove it!
+   e. Stop and report to user with PR URL, parked worktree status, and request user direction:
+      - Notify agent if there are any review/bot comments to address
+      - OR confirm everything is good to delete the worktree
+7. Worktree Teardown (Deferred — Only Upon User Confirmation):
+   (from root workspace) git worktree remove .worktrees/<task>
 ```
 
 ## Verification Hooks

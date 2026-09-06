@@ -1,0 +1,34 @@
+# ABOUTME: Records removal of public Local signup and instance-controlled verified sign-in.
+# ABOUTME: Documents API and operator changes without transferring external-provider authority.
+Change-Id: CHG-01M1SMGHY9GGFEYD7206MY4A46
+Title: require verified Local sign-in and close public signup
+Type: feat
+Scope: access
+Summary: Keep Local account enrollment administrator-controlled and enforce instance email verification policy without changing external-provider authentication.
+Group: email-optional-self-hosting
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: Public Local registration API and BFF routes and their request and response contracts are removed without aliases.
+  Security:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented
+    Detail: Enabled instance intent blocks unverified Local issuance; unreadable or malformed intent fails closed without changing verification facts or external-provider authority.
+  Migration:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: not-applicable
+    Detail: Existing Identity and system setting storage are reused without a database schema change.
+  Configuration:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented
+    Detail: Local issuance reads the existing instance email.delivery_enabled intent, not SMTP readiness or tenant overrides.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: RegisterLocalIdentity and its registration request and response schemas are retired from the generated API and client contracts.
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: Public self-registration is unavailable; enabling instance email requires verified Local accounts even during SMTP outages, while disabled delivery does not verify addresses.

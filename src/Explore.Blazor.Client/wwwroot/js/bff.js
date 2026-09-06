@@ -160,13 +160,18 @@ export async function fetchJson(url) {
 /**
  * Submit Local Identity credentials from the browser so the BFF Set-Cookie
  * response is applied to the browser cookie jar rather than a server self-call.
- * @param {string} url - Local login or registration endpoint.
+ * @param {string} url - Local login endpoint.
  * @param {object} body - Typed Local Identity request body.
- * @returns {Promise<object|null>} The bounded success response, or null.
+ * @returns {Promise<object|null>} Safe navigation, the allowlisted verification code, or null.
  */
 export async function authenticateLocal(url, body) {
     const result = await _bffMutate('POST', url, body);
-    return result.ok ? result.data : null;
+    if (result.ok) {
+        return result.data;
+    }
+    return result.status === 401 && result.data?.code === 'email_verification_required'
+        ? { errorCode: 'email_verification_required' }
+        : null;
 }
 
 /** @private Shared mutation helper. Reads XSRF token from cookie if present. */

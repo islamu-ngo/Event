@@ -9,12 +9,4 @@ internal sealed record LocalBffLoginRequest(
     bool IsPersistent,
     string ReturnUrl);
 
-internal sealed record LocalBffRegistrationRequest(
-    string Email,
-    string Password,
-    string FirstName,
-    string LastName,
-    bool IsPersistent,
-    string ReturnUrl);
-
-internal sealed record LocalBffAuthenticationResponse(string RedirectUrl);
+internal sealed record LocalBffAuthenticationResponse(string? RedirectUrl, string? ErrorCode = null);

@@ -31,12 +31,16 @@ The browser communicates strictly with `Explore.Blazor` over HTTPS regardless of
 
 * The client never stores raw JWT access tokens in browser `localStorage` or `sessionStorage` (mitigating XSS token theft).
 * Authentication state is tracked via an encrypted `SameSite=Lax` session cookie managed by the BFF.
-* Local login and registration post through antiforgery-protected BFF endpoints. The BFF stores the returned bearer token only in server-side authentication properties.
+* Local login posts through an antiforgery-protected BFF endpoint. The BFF stores the returned bearer token only in server-side authentication properties. Public Local registration is not available.
 * The API validates Local and Keycloak tokens with isolated bearer schemes. A token signed or issued for one authority cannot authenticate through the other.
 
 ### Local Identity
 
-Local Identity provides email/password registration and sign-in without an external identity container. Passwords are hashed by ASP.NET Core Identity and failed attempts use bounded lockout. New email addresses remain unverified until an email-verification workflow is configured; the platform never treats registration alone as proof of email ownership.
+Local Identity provides email/password sign-in without an external identity container. Passwords are hashed by ASP.NET Core Identity and failed attempts use bounded lockout. Public self-registration is closed: the former API and BFF registration routes have been removed, with no replacement public signup endpoint.
+
+When instance email delivery is enabled, Local sign-in requires an already-verified email address. Missing SMTP configuration or a delivery outage does not bypass that requirement. Tenant email settings cannot override the instance sign-in policy. When instance delivery is disabled, unverified Local accounts may sign in, but their addresses remain unverified; disabling delivery never proves mailbox ownership. An invalid or unreadable instance policy blocks unverified sign-in until the configuration is repaired.
+
+Event's delivery setting does not control Keycloak or AT Protocol verification, password recovery, or sign-in. Those remain owned by the selected identity provider. This Local sign-in policy does not itself provide account provisioning, email verification, or password recovery.
 
 Configure:
 
@@ -100,12 +104,13 @@ Optional or primary [AT Protocol Authentication](../federation-and-open-protocol
 
 ## Acceptance Testing Checklist
 
-1. Verify Local registration and sign-in issue only an HttpOnly BFF cookie to the browser.
+1. Verify Local sign-in issues only an HttpOnly BFF cookie to the browser and the former public registration routes cannot create accounts.
 2. Confirm invalid Local credentials return generic guidance and repeated failures lock the account.
 3. For Keycloak, verify login redirects back to the Blazor application and refresh works.
 4. Switch providers and confirm new-login discovery changes while an existing session remains usable.
 5. Verify logout invalidates the local BFF cookie and invokes provider logout when applicable.
 6. Verify an invalid API key returns `401 Unauthorized` with ProblemDetails.
+7. Enable instance email delivery and confirm unverified Local sign-in is refused, even without SMTP. Disable delivery and confirm successful sign-in does not mark the address verified.
 
 ---
 

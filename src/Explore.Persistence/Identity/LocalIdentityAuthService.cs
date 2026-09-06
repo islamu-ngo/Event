@@ -1,9 +1,12 @@
-// ABOUTME: Implements Local Identity registration, credential verification, and brute-force lockout.
+// ABOUTME: Implements Local Identity credential verification, issuance policy, and brute-force lockout.
 // ABOUTME: Uses ASP.NET Core Identity stores and exposes tokens only after secret-backed issuance succeeds.
 
 using System.Security.Cryptography;
+using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Authentication.Local.Models;
+using Explore.Domain.Constants;
 using Microsoft.AspNetCore.Identity;
 
 namespace Explore.Persistence.Identity;
@@ -12,18 +15,18 @@ internal sealed class LocalIdentityAuthService : ILocalIdentityAuthService
 {
     private readonly UserManager<LocalIdentityUser> _userManager;
     private readonly ILocalJwtTokenGenerator _tokenGenerator;
-    private readonly TimeProvider _timeProvider;
+    private readonly ISystemSettingRepository _systemSettings;
     private readonly LocalIdentityUser _dummyUser;
     private readonly string _dummyPasswordHash;
 
     public LocalIdentityAuthService(
         UserManager<LocalIdentityUser> userManager,
         ILocalJwtTokenGenerator tokenGenerator,
-        TimeProvider timeProvider)
+        ISystemSettingRepository systemSettings)
     {
         _userManager = userManager;
         _tokenGenerator = tokenGenerator;
-        _timeProvider = timeProvider;
+        _systemSettings = systemSettings;
         _dummyUser = new LocalIdentityUser();
         _dummyPasswordHash = userManager.PasswordHasher.HashPassword(
             _dummyUser,
@@ -78,55 +81,29 @@ internal sealed class LocalIdentityAuthService : ILocalIdentityAuthService
             return LocalAuthResponseDto.Failed("authentication_failed");
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!user.EmailConfirmed)
+        {
+            try
+            {
+                var intent = await _systemSettings.GetByKey(
+                    GovernanceSettingKeys.Email.DeliveryEnabled,
+                    cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (intent is not null && JsonSerializer.Deserialize<bool>(intent.Value))
+                {
+                    return LocalAuthResponseDto.Failed("email_verification_required");
+                }
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return LocalAuthResponseDto.Failed("authentication_failed");
+            }
+        }
+
         return await CreateAuthenticatedResponseAsync(user, cancellationToken)
             .ConfigureAwait(false);
-    }
-
-    public async Task<LocalRegistrationResponseDto> RegisterAsync(
-        LocalRegistrationRequestDto request,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-        cancellationToken.ThrowIfCancellationRequested();
-        string email = NormalizeEmail(request.Email);
-        DateTime createdAt = _timeProvider.GetUtcNow().UtcDateTime;
-        var user = new LocalIdentityUser
-        {
-            UserName = email,
-            Email = email,
-            FirstName = request.FirstName.Trim(),
-            LastName = request.LastName.Trim(),
-            EmailConfirmed = false,
-            LockoutEnabled = true,
-            CreatedAt = createdAt
-        };
-
-        IdentityResult creation = await _userManager
-            .CreateAsync(user, request.Password)
-            .ConfigureAwait(false);
-        if (!creation.Succeeded)
-        {
-            return LocalRegistrationResponseDto.Failed("registration_failed");
-        }
-
-        try
-        {
-            LocalAuthResponseDto authentication = await CreateAuthenticatedResponseAsync(
-                user,
-                cancellationToken).ConfigureAwait(false);
-            return LocalRegistrationResponseDto.Registered(authentication);
-        }
-        catch
-        {
-            IdentityResult rollback = await _userManager.DeleteAsync(user).ConfigureAwait(false);
-            if (!rollback.Succeeded)
-            {
-                throw new InvalidOperationException(
-                    "Local Identity registration token issuance and credential rollback both failed.");
-            }
-
-            throw;
-        }
     }
 
     public Task RequestPasswordResetAsync(
@@ -168,22 +145,22 @@ internal sealed class LocalIdentityAuthService : ILocalIdentityAuthService
         cancellationToken.ThrowIfCancellationRequested();
         LocalIssuedToken issued = await _tokenGenerator.GenerateAsync(
             new LocalJwtTokenSubject(
-                user.Id,
-                email,
-                user.FirstName,
-                user.LastName,
-                user.EmailConfirmed,
-                roles),
+                userId: user.Id,
+                email: email,
+                firstName: user.FirstName,
+                lastName: user.LastName,
+                emailVerified: user.EmailConfirmed,
+                roles: roles),
             cancellationToken).ConfigureAwait(false);
         return LocalAuthResponseDto.Authenticated(
-            user.Id,
-            email,
-            user.FirstName,
-            user.LastName,
-            user.EmailConfirmed,
-            roles,
-            issued.Token,
-            issued.ExpiresAt);
+            userId: user.Id,
+            email: email,
+            firstName: user.FirstName,
+            lastName: user.LastName,
+            emailVerified: user.EmailConfirmed,
+            roles: roles,
+            token: issued.Token,
+            expiresAt: issued.ExpiresAt);
     }
 
     private static string NormalizeEmail(string email) =>

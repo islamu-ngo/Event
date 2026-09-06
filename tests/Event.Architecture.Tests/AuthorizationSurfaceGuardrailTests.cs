@@ -58,7 +58,6 @@ public sealed class AuthorizationSurfaceGuardrailTests
         "Explore.Application.Features.Authentication.Atproto.Requests.Commands.RefreshAtprotoSessionCommand",
         "Explore.Application.Features.Authentication.Atproto.Requests.Commands.RevokeAtprotoSessionCommand",
         "Explore.Application.Features.Authentication.Local.Requests.Commands.LocalLoginCommand",
-        "Explore.Application.Features.Authentication.Local.Requests.Commands.LocalRegisterCommand",
         "Explore.Application.Features.CategoryTypeCategories.Requests.Commands.CreateCategoryTypeCategoriesCommand",
         "Explore.Application.Features.CategoryTypeCategories.Requests.Commands.DeleteCategoryTypeCategoriesCommand",
         "Explore.Application.Features.CategoryTypeCategories.Requests.Commands.UpdateCategoryTypeCategoriesCommand",

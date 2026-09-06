@@ -13,6 +13,7 @@
 6. Switching the primary provider changes only new-login admission. Existing sessions retain their originating validation and refresh scheme until normal expiry.
 7. Administrator bootstrap and provider switching match the normalized `(provider_kind, provider_account_key)` identity. Email is never sufficient unless the provider supplied a verified-email claim.
 8. `UserExternalLogin` is instance-global identity authority. Tenant participation exists only through `TenantUser`; a provider binding never derives authorization from a tenant ID.
+9. Public Local enrollment is closed. Instance email-delivery intent governs unverified Local token issuance, independently of SMTP availability and tenant overrides. It never changes provider-owned verification facts.
 
 ## Clean Architecture Flow
 
@@ -20,10 +21,10 @@ Local HTTP requests enter through `LocalAuthController` or the antiforgery-prote
 
 ```text
 Browser
-  -> POST /bff/auth/local/login or /register
+  -> POST /bff/auth/local/login
   -> generated Explore API client
-  -> POST /api/auth/local/login or /register
-  -> LocalLoginCommand / LocalRegisterCommand
+  -> POST /api/auth/local/login
+  -> LocalLoginCommand
   -> ILocalIdentityAuthService
   -> ASP.NET Core Identity stores
   -> LocalJwtTokenGenerator
@@ -31,7 +32,7 @@ Browser
   -> HttpOnly BFF cookie
 ```
 
-Application handlers manually instantiate FluentValidation validators, require Local Identity to be the active primary provider, and synchronize the platform `User` aggregate before returning a token. Synchronization failure withholds the token. Registration rolls back the Identity user if token issuance fails.
+Application handlers manually instantiate FluentValidation validators, require Local Identity to be the active primary provider, and synchronize the platform `User` aggregate before returning a token. Synchronization failure withholds the token. The public registration API/BFF routes and their command, DTOs, validator and service method are removed without compatibility aliases.
 
 `LocalIdentityAuthService` owns password hashing, normalized-email uniqueness, UUIDv7 credential identities, failed-access counters, dummy verification for unknown accounts, and lockout. The Domain `User` remains the platform profile/authorization aggregate; `LocalIdentityUser` remains a credential record. Repositories continue returning Domain entities, not authentication DTOs.
 
@@ -45,7 +46,11 @@ Application handlers manually instantiate FluentValidation validators, require L
 * issues short-lived tokens with `sub`, `auth_provider=local`, `email_verified`, approved profile claims, and role claims;
 * fails closed for missing, malformed, or undersized keys.
 
-Registration does not imply email verification. `email_verified=false` remains authoritative until a later verification workflow proves ownership.
+After valid password and lockout checks, `LocalIdentityAuthService` reads uncached instance `email.delivery_enabled` through `ISystemSettingRepository` for unverified credentials. Missing intent uses the disabled default; strict JSON `false` permits issuance without changing `EmailConfirmed` or the resulting `email_verified=false` claim. Strict JSON `true` refuses issuance with `email_verification_required`/401, even if SMTP is missing or unhealthy. Malformed intent or a repository failure returns bounded `authentication_failed`/503; cancellation propagates. Tenant settings and transport/secret resolution do not participate in this decision. Already-verified credentials do not need the intent read.
+
+The BFF exposes only the allowlisted verification-required reason to the login UI; other provider error bodies remain hidden. This issuance gate does not itself revoke existing sessions or implement recovery, verification delivery, or administrative enrollment. Those require their dedicated credential-lifecycle boundaries. Keycloak and AT Protocol retain their own authentication and verification authority regardless of Event email-delivery intent.
+
+Local login carries `SuppressIdempotencyResponseStorage` and `PrivateNoStore` metadata. Every request must evaluate current admission policy, even when a client repeats an `Idempotency-Key`; the generic middleware must neither persist a token-bearing response nor replay a prior success. Browser cache headers alone do not disable application-level idempotency storage.
 
 ## Persistence Topologies
 
@@ -143,7 +148,7 @@ They require dedicated token-purpose, notification, recovery, replay-protection,
 Required focused coverage includes:
 
 * Local contract and command-handler tests;
-* real SQLite password hashing, registration, lockout, and JWT verification;
+* real SQLite password hashing, lockout, strict instance admission policy, and JWT verification;
 * provider dispatcher cache/fail-closed tests;
 * API cross-issuer and cross-signature isolation;
 * BFF antiforgery, HttpOnly cookie, and token non-disclosure tests;
@@ -152,7 +157,8 @@ Required focused coverage includes:
 * passwordless AT Protocol JIT, duplicate-login convergence, and zero Local credential rows;
 * AT Protocol-only BFF provider discovery and focused handle entry;
 * direct-database administrator recovery by exact linked DID;
-* Local login, registration, onboarding, and responsive component tests;
+* native Local HTTP login and retired-registration no-write checks, tenant-override isolation, and committed-policy freshness;
+* rendered Local login without signup, bounded verification guidance, onboarding, and responsive component tests;
 * external Identity migrations for all four providers with no pending model changes.
 
 See [Operations](OPERATIONS.md#local-identity-operations) for commands and operational checks.

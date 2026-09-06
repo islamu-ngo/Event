@@ -1,5 +1,5 @@
 // ABOUTME: Verifies Local Identity HTTP endpoints expose successful sessions and RFC 7807 failures.
-// ABOUTME: Proves credential failures remain generic while registration validation stays a bad request.
+// ABOUTME: Proves credential failures remain generic at the remaining Local login boundary.
 
 using System.Security.Cryptography;
 using Explore.API.Controllers;
@@ -62,31 +62,6 @@ public sealed class LocalAuthControllerTests
             .IsEqualTo(StatusCodes.Status401Unauthorized);
         await Assert.That(problem?.Extensions["code"]).IsEqualTo("invalid_credentials");
         await Assert.That(problem?.Detail).DoesNotContain("admin@example.test");
-    }
-
-    [Test]
-    public async Task InvalidRegistrationReturnsValidationProblem()
-    {
-        var sender = Substitute.For<ISender>();
-        sender.Send(
-                Arg.Any<LocalRegisterCommand>(),
-                Arg.Any<CancellationToken>())
-            .Returns(LocalRegistrationResponseDto.Failed("invalid_request"));
-        LocalAuthController controller = CreateController(sender);
-
-        ActionResult<LocalRegistrationResponseDto> result = await controller.Register(
-            new LocalRegistrationRequestDto(
-                "invalid",
-                string.Empty,
-                string.Empty,
-                string.Empty),
-            CancellationToken.None);
-
-        var problemResult = result.Result as ObjectResult;
-        var problem = problemResult?.Value as ProblemDetails;
-        await Assert.That(problemResult?.StatusCode)
-            .IsEqualTo(StatusCodes.Status400BadRequest);
-        await Assert.That(problem?.Extensions["code"]).IsEqualTo("invalid_request");
     }
 
     private static LocalAuthController CreateController(ISender sender) =>

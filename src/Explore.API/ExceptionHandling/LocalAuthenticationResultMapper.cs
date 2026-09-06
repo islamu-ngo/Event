@@ -16,11 +16,11 @@ internal static class LocalAuthenticationResultMapper
                 "Invalid authentication request",
                 ApiProblemTypes.BadRequest,
                 "The submitted authentication request is invalid."),
-            ["registration_failed"] = new(
-                StatusCodes.Status400BadRequest,
-                "Registration failed",
-                ApiProblemTypes.BadRequest,
-                "The local account could not be registered."),
+            ["email_verification_required"] = new(
+                StatusCode: StatusCodes.Status401Unauthorized,
+                Title: "Email verification required",
+                Type: ApiProblemTypes.Unauthorized,
+                Detail: "Verify the local account email address before signing in."),
             ["invalid_credentials"] = new(
                 StatusCodes.Status401Unauthorized,
                 "Authentication failed",
@@ -60,13 +60,6 @@ internal static class LocalAuthenticationResultMapper
         response.Success
             ? controller.Ok(response)
             : MapFailure<LocalAuthResponseDto>(controller, response.FailureCode);
-
-    internal static ActionResult<LocalRegistrationResponseDto> Map(
-        ControllerBase controller,
-        LocalRegistrationResponseDto response) =>
-        response.Success
-            ? controller.Ok(response)
-            : MapFailure<LocalRegistrationResponseDto>(controller, response.FailureCode);
 
     private static ActionResult<T> MapFailure<T>(
         ControllerBase controller,

@@ -1,4 +1,4 @@
-// ABOUTME: Verifies local login and registration handlers reject bad input and synchronize normalized identities.
+// ABOUTME: Verifies local login rejects bad input and synchronizes normalized identities only after authorization.
 // ABOUTME: Proves credentials never reach the service after validation failure and tokens remain hidden after sync failure.
 
 using Explore.Application.Authentication;
@@ -105,110 +105,72 @@ public sealed class LocalAuthenticationCommandHandlerTests
     }
 
     [Test]
-    public async Task SuccessfulRegistrationSynchronizesNormalizedLocalAccount()
+    [Arguments("email_verification_required")]
+    [Arguments("authentication_failed")]
+    public async Task DeniedIssuanceNeverAttemptsDomainSynchronization(string failureCode)
     {
         var authService = Substitute.For<ILocalIdentityAuthService>();
         var sender = Substitute.For<ISender>();
-        LocalRegistrationResponseDto registered =
-            LocalRegistrationResponseDto.Registered(CreateAuthenticatedResponse());
-        authService.RegisterAsync(
-                Arg.Any<LocalRegistrationRequestDto>(),
+        authService.AuthenticateAsync(
+                Arg.Any<LocalAuthRequestDto>(),
                 Arg.Any<CancellationToken>())
-            .Returns(registered);
-        sender.Send(
-                Arg.Any<SyncUserCommand>(),
-                Arg.Any<CancellationToken>())
-            .Returns(BaseCommandResponse.Success(UserId));
-        var handler = new LocalRegisterCommandHandler(
+            .Returns(LocalAuthResponseDto.Failed(failureCode));
+        sender.Send(Arg.Any<SyncUserCommand>(), Arg.Any<CancellationToken>())
+            .Returns<Task<BaseCommandResponse<Guid>>>(_ =>
+                throw new InvalidOperationException("Denied issuance must not synchronize a domain user."));
+        var handler = new LocalLoginCommandHandler(
             authService,
             CreateActiveDispatcher(),
             sender);
 
-        LocalRegistrationResponseDto result = await handler.Handle(
-            new LocalRegisterCommand(CreateRegistrationRequest()),
-            CancellationToken.None);
-
-        await Assert.That(result).IsEqualTo(registered);
-        await sender.Received().Send(
-            Arg.Is<SyncUserCommand>(command =>
-                command != null
-                && command.AccountKey.ProviderKind == AuthenticationProviderKind.Local
-                && command.AccountKey.Value == UserId.ToString("D")
-                && command.UserDto.Id == UserId
-                && command.UserDto.EmailVerified == true),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Test]
-    public async Task FailedRegistrationNeverAttemptsDomainSynchronization()
-    {
-        var authService = Substitute.For<ILocalIdentityAuthService>();
-        var sender = Substitute.For<ISender>();
-        authService.RegisterAsync(
-                Arg.Any<LocalRegistrationRequestDto>(),
-                Arg.Any<CancellationToken>())
-            .Returns(LocalRegistrationResponseDto.Failed("registration_failed"));
-        var handler = new LocalRegisterCommandHandler(
-            authService,
-            CreateActiveDispatcher(),
-            sender);
-
-        LocalRegistrationResponseDto result = await handler.Handle(
-            new LocalRegisterCommand(CreateRegistrationRequest()),
+        LocalAuthResponseDto result = await handler.Handle(
+            new LocalLoginCommand(new LocalAuthRequestDto(Email: "admin@example.test", Password: CreateValidPassword())),
             CancellationToken.None);
 
         await Assert.That(result.Success).IsFalse();
-        await Assert.That(result.FailureCode).IsEqualTo("registration_failed");
-        await sender.DidNotReceiveWithAnyArgs()
-            .Send(default(SyncUserCommand)!, default);
+        await Assert.That(result.FailureCode).IsEqualTo(failureCode);
+        await Assert.That(result.Token).IsNull();
     }
 
     [Test]
-    public async Task SynchronizationFailureDoesNotExposeNewlyIssuedRegistrationToken()
+    public async Task SynchronizationFailureDoesNotExposeNewlyIssuedLoginToken()
     {
         var authService = Substitute.For<ILocalIdentityAuthService>();
         var sender = Substitute.For<ISender>();
-        authService.RegisterAsync(
-                Arg.Any<LocalRegistrationRequestDto>(),
+        authService.AuthenticateAsync(
+                Arg.Any<LocalAuthRequestDto>(),
                 Arg.Any<CancellationToken>())
-            .Returns(LocalRegistrationResponseDto.Registered(CreateAuthenticatedResponse()));
+            .Returns(CreateAuthenticatedResponse());
         sender.Send(
                 Arg.Any<SyncUserCommand>(),
                 Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Validation<Guid>(
                 ["Domain synchronization failed."],
                 "Domain synchronization failed."));
-        var handler = new LocalRegisterCommandHandler(
+        var handler = new LocalLoginCommandHandler(
             authService,
             CreateActiveDispatcher(),
             sender);
 
-        LocalRegistrationResponseDto result = await handler.Handle(
-            new LocalRegisterCommand(CreateRegistrationRequest()),
+        LocalAuthResponseDto result = await handler.Handle(
+            new LocalLoginCommand(new LocalAuthRequestDto(Email: "admin@example.test", Password: CreateValidPassword())),
             CancellationToken.None);
 
         await Assert.That(result.Success).IsFalse();
         await Assert.That(result.FailureCode).IsEqualTo("user_sync_failed");
-        await Assert.That(result.Authentication).IsNull();
+        await Assert.That(result.Token).IsNull();
     }
-
-    private static LocalRegistrationRequestDto CreateRegistrationRequest() =>
-        new(
-            "admin@example.test",
-            CreateValidPassword(),
-            "Site",
-            "Administrator");
 
     private static LocalAuthResponseDto CreateAuthenticatedResponse() =>
         LocalAuthResponseDto.Authenticated(
-            UserId,
-            "admin@example.test",
-            "Site",
-            "Administrator",
-            true,
-            ["Admin"],
-            Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),
-            ExpiresAt);
+            userId: UserId,
+            email: "admin@example.test",
+            firstName: "Site",
+            lastName: "Administrator",
+            emailVerified: true,
+            roles: ["Admin"],
+            token: Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),
+            expiresAt: ExpiresAt);
 
     private static string CreateValidPassword() =>
         Convert.ToBase64String(RandomNumberGenerator.GetBytes(24));

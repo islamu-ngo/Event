@@ -81,15 +81,17 @@ public sealed class AtprotoSoleProviderInvariantTests(
             new LocalAuthRequestDto(email, password));
         HttpResponseMessage registration = await fixture.Client.PostAsJsonAsync(
             "/api/auth/local/register",
-            new LocalRegistrationRequestDto(
-                email,
-                password,
-                "Test",
-                "Administrator"));
+            new
+            {
+                Email = email,
+                Password = password,
+                FirstName = "Test",
+                LastName = "Administrator"
+            });
 
         await Assert.That(login.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
         await Assert.That(registration.StatusCode)
-            .IsEqualTo(HttpStatusCode.Conflict);
+            .IsEqualTo(HttpStatusCode.NotFound);
 
         await using AsyncServiceScope scope =
             fixture.Factory.Services.CreateAsyncScope();

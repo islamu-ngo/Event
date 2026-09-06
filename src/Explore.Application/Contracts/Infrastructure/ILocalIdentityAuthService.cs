@@ -11,10 +11,6 @@ public interface ILocalIdentityAuthService
         LocalAuthRequestDto request,
         CancellationToken cancellationToken);
 
-    Task<LocalRegistrationResponseDto> RegisterAsync(
-        LocalRegistrationRequestDto request,
-        CancellationToken cancellationToken);
-
     Task RequestPasswordResetAsync(string email, CancellationToken cancellationToken);
 
     Task ResetPasswordAsync(

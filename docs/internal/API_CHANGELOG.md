@@ -3,6 +3,20 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 # API Changelog
 
+## 2026-09-06
+
+- **Breaking: public Local registration is removed.** `POST /api/auth/local/register`
+  (`RegisterLocalIdentity`) and `POST /bff/auth/local/register` no longer create
+  credentials. The registration command and request/response contracts are retired;
+  there is no compatibility alias. Local login remains available.
+- **Security: instance email intent gates unverified Local login.** After valid
+  credentials, enabled intent returns `email_verification_required`/401 without
+  issuing a token. Missing/disabled intent preserves unverified state; malformed
+  or unreadable intent returns `authentication_failed`/503. SMTP availability and
+  tenant overrides cannot bypass this gate. External-provider authority is unchanged.
+  Local login responses are private/no-store and excluded from generic idempotency
+  response storage and replay, so a repeated key cannot reuse an earlier success.
+
 ## 2026-09-01
 
 - **Additive: instance bootstrap status reports typed onboarding state.** The

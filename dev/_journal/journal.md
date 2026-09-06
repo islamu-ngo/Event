@@ -1622,3 +1622,58 @@ uninitializable.
 - [ ] Stays in journal only (one-off debugging lesson)
 
 ---
+
+[2026-09-06 Europe/Brussels] — SQLite lock fixtures need transaction interceptors
+
+**Context**: While adding real Local-admission security tests, an existing Identity fixture began using `SystemSettingRepository` and its relational mutation lock.
+
+**Symptom / Observation**: The runner reached its test-execution banner but never produced a result summary. The verified test process remained alive until explicitly terminated. Registering the missing interceptor made the corrected run finish in fourteen seconds with all sixteen results: ten expected policy failures and six passing controls, not a product Green result.
+
+**Root Cause**: `UseSqlite` alone does not install the repository's lock-lifecycle integration. `RelationalNamedLock` tracks SQLite process semaphores against the EF transaction; `SqliteNamedLockTransactionInterceptor` releases them on commit, rollback, failure, or connection cleanup. The fixture omitted that interceptor, so completing a transaction did not release the lock and subsequent settings operations waited indefinitely, including operations using another fixture connection.
+
+**Resolution**: Added the existing interceptor to the manual Identity fixture, used `SqliteConnectionStringBuilder`, and bounded its operations with a cancellation token. New full-host fixtures reuse `PrimaryDatabaseProviderComposition.ConfigureApplication`, which installs the production interceptors. The corrected `dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --treenode-filter "/*/*/*LocalIdentityAuthServiceTests/*"` completed normally; its deliberate admission-policy failures remain Red until implementation. The earlier terminated run supplies no passing-test evidence regardless of its driver's exit code.
+
+**Why This Matters for Future Work**: Extending a database fixture to exercise repositories can introduce transaction-lifecycle dependencies that its earlier direct Identity operations did not need. Reuse production provider composition or explicitly retain its interceptors; separate SQLite databases do not repair a leaked process lock. Require an actual test summary and use bounded verification commands.
+
+**References**:
+- `src/Explore.Persistence/Database/PrimaryDatabaseProviderComposition.cs:31`
+- `src/Explore.Persistence/Database/ProviderPrimitives/RelationalNamedLock.cs:46`
+- `src/Explore.Persistence/Database/ProviderPrimitives/SqliteNamedLockTransactionInterceptor.cs:10`
+- `tests/Event.Persistence.IntegrationTests/Identity/LocalIdentityAuthServiceTests.cs:327`
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/internal/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for a path-scoped rule
+- [x] Candidate for skill update: `dotnet-efcore-guidelines`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [ ] Stays in journal only (one-off debugging lesson)
+
+---
+
+[2026-09-06 Europe/Brussels] — Login policy must bypass generic idempotency replay
+
+**Context**: Security review of instance-controlled Local sign-in traced the complete HTTP middleware path, beyond the new credential-service policy guard.
+
+**Symptom / Observation**: A native HTTP regression signed in an unverified account while instance delivery intent was false, enabled intent, and repeated the exact credentials and idempotency key. The response was still 200 instead of 401. A separate regression found a durable relational idempotency record for a successful login response. Both failures occurred while the other ten Local HTTP checks passed.
+
+**Root Cause**: Generic `IdempotencyMiddleware` handles completed records before executing the controller or MediatR handler. A correct uncached check inside the credential service therefore cannot govern a middleware replay. The same generic response storage persists token-bearing login responses; browser cache headers alone do not affect that storage.
+
+**Resolution**: Local login reuses `SuppressIdempotencyResponseStorage` and `PrivateNoStore` endpoint metadata, requiring a fresh admission decision and excluding the response from generic persistence/replay. The real middleware and relational-store regressions now pass with the full twelve-case class: `dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --treenode-filter "/*/*/*LocalAdmissionPolicyHttpTests/*"` (12 passed, zero skipped). No new cache or idempotency abstraction was introduced.
+
+**Why This Matters for Future Work**: For credential, one-time-secret, and dynamically authorized endpoints, trace middleware short-circuits as well as handler logic. Response confidentiality and current authorization must hold before replay can occur; HTTP no-store and application-level response-storage suppression are separate controls.
+
+**References**:
+- `src/Explore.API/Controllers/LocalAuthController.cs:26`
+- `src/Explore.API/Middleware/IdempotencyMiddleware.cs:67`
+- `src/Explore.API/Middleware/IdempotencyMiddleware.cs:180`
+- `tests/Event.API.IntegrationTests/Features/LocalAdmissionPolicyHttpTests.cs:190`
+- `docs/internal/AUTHENTICATION.md`
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/internal/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for a path-scoped rule
+- [x] Candidate for skill update: `auth-patterns`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [ ] Stays in journal only (one-off debugging lesson)
+
+---

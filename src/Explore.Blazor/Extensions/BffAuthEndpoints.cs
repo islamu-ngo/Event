@@ -67,11 +67,6 @@ public static class BffAuthEndpoints
             .RequireRateLimiting(RateLimitingExtensions.LocalAuthenticationPolicy)
             .ExcludeFromDescription();
 
-        app.MapPost("/bff/auth/local/register", HandleLocalRegistrationAsync)
-            .ValidateAntiforgery()
-            .RequireRateLimiting(RateLimitingExtensions.LocalAuthenticationPolicy)
-            .ExcludeFromDescription();
-
         app.MapPost("/bff/auth/refresh-schemes", HandleRefreshSchemesAsync)
             .ValidateAntiforgery()
             .ExcludeFromDescription();
@@ -757,59 +752,16 @@ public static class BffAuthEndpoints
                 request.ReturnUrl,
                 initialStatus);
         }
-        catch (ApiException exception)
+        catch (ApiException<ProblemDetails> exception) when (
+            exception.StatusCode == StatusCodes.Status401Unauthorized
+            && exception.Result.AdditionalProperties.TryGetValue("code", out var code)
+            && string.Equals(code?.ToString(), "email_verification_required", StringComparison.Ordinal))
         {
-            return LocalAuthenticationFailure(exception.StatusCode);
-        }
-    }
-
-    private static async Task<IResult> HandleLocalRegistrationAsync(
-        HttpContext ctx,
-        LocalBffRegistrationRequest request,
-        ILocalAuthClient client,
-        IDynamicAuthSchemeManager schemeManager,
-        CancellationToken cancellationToken)
-    {
-        if (!string.Equals(
-                schemeManager.GetActivePrimaryProvider(),
-                "local",
-                StringComparison.Ordinal))
-        {
-            return LocalAuthenticationFailure(
-                StatusCodes.Status409Conflict);
-        }
-
-        var initialStatus = await ctx.RequestServices
-            .GetRequiredService<IBffOnboardingStatusProvider>()
-            .GetStatusAsync(cancellationToken);
-        if (!AllowsLocalAuthentication(initialStatus))
-        {
-            return LocalAuthenticationFailure(StatusCodes.Status409Conflict);
-        }
-
-        try
-        {
-            LocalRegistrationResponseDto response =
-                await client.RegisterLocalIdentityAsync(
-                    new LocalRegistrationRequestDto
-                    {
-                        Email = request.Email,
-                        Password = request.Password,
-                        FirstName = request.FirstName,
-                        LastName = request.LastName
-                    },
-                    cancellationToken: cancellationToken);
-            if (response.Success != true || response.Authentication is null)
-            {
-                return LocalAuthenticationFailure(StatusCodes.Status400BadRequest);
-            }
-
-            return await CompleteLocalSignInAsync(
-                ctx,
-                response.Authentication,
-                request.IsPersistent,
-                request.ReturnUrl,
-                initialStatus);
+            return Results.Problem(
+                title: "Email verification required",
+                detail: "Verify your email address before signing in.",
+                statusCode: StatusCodes.Status401Unauthorized,
+                extensions: new Dictionary<string, object?> { ["code"] = "email_verification_required" });
         }
         catch (ApiException exception)
         {

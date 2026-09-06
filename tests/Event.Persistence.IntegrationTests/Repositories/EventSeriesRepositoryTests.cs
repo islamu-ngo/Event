@@ -127,6 +127,10 @@ public sealed class EventSeriesRepositoryTests
         deletedTicket.IsDeleted = true;
         publishedCatalog.AddTicketType(deletedTicket, capacityPool: null);
         publishedCatalog.AddEntitlement(deletedTicket, TicketTypeEntitlement.CreateForEvent(deletedTicket.Id, tenantId, eventId, 1));
+        publishedCatalog.UpdateCommercialDisclosures(
+            "Merchant disclosure",
+            "Refund policy disclosure",
+            "Support contact disclosure");
         publishedCatalog.Publish();
 
         EventTicketCatalogVersion draftCatalog = EventTicketCatalogVersion.Create(tenantId, eventId, "USD", 1);

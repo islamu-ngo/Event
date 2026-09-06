@@ -25,18 +25,8 @@ public sealed class EventLifecycleStatusMaterializationTests(ProjectionTestConta
         Guid sessionId;
         await using (var seedContext = fixture.CreateDbContext())
         {
-            seedContext.EventStatuses.Add(new EventStatus
-            {
-                Id = (int)EventStatusEnum.Published,
-                MasterCode = "PUBLISHED",
-                FullName = "Published"
-            });
-            seedContext.EventSessionStatuses.Add(new EventSessionStatus
-            {
-                Id = (int)EventSessionStatusEnum.Published,
-                MasterCode = "PUBLISHED",
-                FullName = "Published"
-            });
+            await Assert.That(await seedContext.EventStatuses.FindAsync((int)EventStatusEnum.Published)).IsNotNull();
+            await Assert.That(await seedContext.EventSessionStatuses.FindAsync((int)EventSessionStatusEnum.Published)).IsNotNull();
             var tenant = new Tenant
             {
                 FullName = "Lifecycle materialization tenant",

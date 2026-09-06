@@ -510,7 +510,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
     }
 
     private static DbContextOptions<ExploreDbContext> CreateOptions(string databasePath) =>
-        new DbContextOptionsBuilder<ExploreDbContext>()
+        TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite($"Data Source={databasePath}")
             .UseSnakeCaseNamingConvention()
             .Options;

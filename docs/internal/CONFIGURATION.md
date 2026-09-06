@@ -1106,11 +1106,9 @@ AT Protocol login is enabled by the instance governance setting `auth.atproto_lo
 |---|---|---|
 | `Atproto:PublicUrl` | empty | Exact browser-facing HTTPS origin used for the URL `client_id` and callback. Paths, credentials, queries, fragments, Unicode host spelling, and trailing-dot aliases are rejected. |
 | `Atproto:CallbackPath` | `/signin-atproto` | Root-relative OAuth callback path published in client metadata. |
-| `Atproto:AllowDevelopmentLoopback` | `false` | Allows exact loopback origins only in the Development environment. It has no effect in production. |
-| `Atproto:UseSingleNodeMemoryStore` | `false` | Development-only state/handoff fallback. Production and multi-replica deployments require the configured distributed cache. |
-| `Atproto:StateLifetimeSeconds` | `300` | One-time protected OAuth state lifetime; runtime clamps it to 30–600 seconds. |
-| `Atproto:HandoffLifetimeSeconds` | `60` | One-time cross-tenant-host handoff lifetime; runtime clamps it to 30–300 seconds. |
-| `Atproto:TenantOrigins` | empty | Bounded canonical tenant origins with their tenant ID and slug. Each origin must pass the same HTTPS/loopback policy as the public URL. |
+| `Atproto:AllowDevelopmentLoopback` | `false` | Allows exact loopback targets only in Development transport policy. Browser login still requires HTTPS, including localhost, for its host-only proof cookie. |
+| `Atproto:StateLifetimeSeconds` | `300` | SDK state lifetime, clamped to 30–600 seconds; storage additionally caps expiry at the browser-proof deadline minus the two-minute handoff budget. |
+| `Atproto:TenantOrigins` | empty | Explicit HTTPS login origins with tenant ID and slug; recovered state must still match the current configured mapping. |
 | `Atproto:ClientName` | empty | Optional display name in client metadata. |
 | `Atproto:ClientUri` | empty | Optional canonical HTTPS client homepage in client metadata. Invalid values are omitted. |
 | `Atproto:LogoUri` | empty | Optional canonical HTTPS logo URL in client metadata. Invalid values are omitted. |
@@ -1121,6 +1119,10 @@ AT Protocol login is enabled by the instance governance setting `auth.atproto_lo
 | `RateLimiting:AtprotoAuthentication:WindowSeconds` | `60` | ATProto authentication rate-limit window; runtime clamps it to 1–3600 seconds. |
 
 The governance value `auth.atproto_public_url` records the administrator-facing provider URL, but it does not replace the static runtime authority `Atproto:PublicUrl`; keep them consistent. `ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS` maps to `Atproto:OAuthClientPrivateJwks` in the BFF and must come from server-side secret configuration. Durable session encryption and first-party API session signing use `ATPROTO_SESSION_ENCRYPTION_KEYRING` and `ATPROTO_SESSION_JWT_PRIVATE_JWKS`, documented in [SECRETS.md](SECRETS.md#atproto-oauth-session-envelopes).
+
+Transient OAuth state and handoffs always use the primary database through the private BFF/API bridge. `Atproto:UseSingleNodeMemoryStore` and `Atproto:HandoffLifetimeSeconds` are removed, without aliases. Handoffs have a fixed two-minute maximum, capped by the fifteen-minute browser-proof deadline. The proof cookie is reused without sliding or per-flow deletion; near expiry, a new challenge returns `429` with a bounded `Retry-After` rather than rotating it under active flows.
+
+BFF Data Protection is a separate prerequisite. With no cache connection configured, preserve its native key directory; replicas must share that persistent directory and the existing `islamu-event` application discriminator. An explicitly configured cache connection still selects Redis key persistence, so an entirely Redis-free deployment must remove that selection too. Do not silently relocate keys. Restart in-flight logins after this cutover or any loss of their proof, protection keys, or required signing key.
 
 The `atproto-authentication` readiness check is deliberately local and passive. When enabled, it validates the public URL/callback, the BFF OAuth signing ring, and that the OAuth state/session adapter services are registered; it does not test Redis connectivity, parse the Infrastructure encryption ring or API session-JWT ring, contact a PDS, or perform OAuth discovery. Those dependencies fail through their own health checks or at the bounded operation that uses them. Readiness exposes only `enabled` and a bounded failure code; logs, metrics, health JSON, and support output must not contain handles, DIDs, endpoint queries, tokens, JWK values, or provider response bodies.
 

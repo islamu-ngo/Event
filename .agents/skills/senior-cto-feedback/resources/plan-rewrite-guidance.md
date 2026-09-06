@@ -190,20 +190,17 @@ Last Updated: YYYY-MM-DD Europe/Brussels
 ### Phase N Commit(s) — immediately after verification
 *(Note: If Phase N is large or touches dozens/hundreds of files across multiple concerns, sequence multiple atomic commit contracts instead of one monolithic umbrella commit).*
 #### Planned Commit Contract [or Contract 1 of N for multi-commit phases]
-- Default title: `type(scope): benefit-led phase outcome`
-- Default description: Exact phase motivation and data/control-flow description.
-- Changelog treatment: exact classification
-- Required trailers: exact lines or `None`
-- Commit paths: exact ordered wholly-owned files for this specific atomic commit
-- Pre-commit inspection commands: exact status/unstaged/staged commands
-- Staging command: exact `git add -- ...`
-- Commit command: exact path-limited `git commit --only ...`
-- Post-commit verification command: exact committed-file-list command
-- Message override: Not overridden
+- **Type & Scope:** `type(scope)`
+- **Title:** `benefit-led phase outcome`
+- **Description:** Exact phase motivation and data/control-flow description.
+- **Changelog treatment:** Public feature/fix | Change fragment `CHG-YYYY-NNNN` | `Changelog: skip`
+- **Required trailers:** Exact terminal trailer lines, or `None`
+- **Commit paths:** Exact ordered list of wholly phase-owned files for this commit.
+- **Message override:** Not overridden
 <!-- Repeat Planned Commit Contract block for Contract 2, 3, etc. if phase is large -->
 #### Commit Tasks
-- Use the self-sufficient planned contract without loading `conventional-commit`, commit exact phase-owned paths related to the plan, verify the file list, and record the hash. If multiple atomic commits are planned, execute each in sequence.
-- Load `conventional-commit` only when a permitted override replaces the default contract.
+- Stage exact phase-owned paths using `git add -- <paths>` and execute commit using the declarative contract on `feat/<task-name>`. Confirm clean git status before proceeding.
+- Load `conventional-commit` only when a permitted material divergence override replaces the default contract.
 ## Remaining / Deferred Work
 ```
 
@@ -213,12 +210,12 @@ Rewrite rules:
 - every risky boundary should have observable acceptance criteria in its owning implementation task;
 - each phase should name exactly one Release build and at most one fastest relevant non-browser project test at the end;
 - each phase should list exact phase-owned paths and place its commit task(s) immediately after verification;
-- each phase commit should contain exact metadata, commit paths, inspection/staging/path-limited commit commands, and verification validated through `conventional-commit`; completed workstreams contain no placeholders;
+- each phase commit should contain declarative metadata: type, scope, title, description, changelog treatment, trailers, and commit paths;
 - if a phase is large (touching dozens or hundreds of files) or spans multiple separable concerns, mandate an ordered sequence of atomic commit contracts rather than one monolithic umbrella commit;
-- each commit must stage and commit ONLY changes directly belonging to the implementation plan, strictly isolating them with path-limited commands and excluding unrelated working-tree modifications;
-- the implementing agent should use that self-sufficient contract unchanged without loading `conventional-commit`, work on a task branch/worktree when parallelism is needed, and exclude every unrelated dirty or pre-staged path;
-- overrides should be rare and are the only execution path that loads `conventional-commit`; every replacement repeats the complete metadata/path/command packet before committing;
-- phase-attributable failures block commit; proven unrelated failures are recorded with exact external evidence while the phase-owned verification lane remains green;
+- commits stage and commit ONLY changes directly belonging to the implementation plan on the dedicated task branch (`feat/<task-name>`);
+- the implementing agent executes that self-sufficient contract without reloading `conventional-commit`;
+- overrides should be rare and are the only execution path that loads `conventional-commit`;
+- phase-attributable failures block commit and must be resolved before phase completion;
 - no task should start the app/browser or use Playwright, Chrome DevTools MCP, E2E, Aspire/Docker startup, live-service smoke, or a manual runtime walkthrough;
 - delete stale tasks created for a direction you are now rejecting.
 
@@ -296,7 +293,7 @@ When rewriting a flawed workstream where tasks put tests after implementation (c
   - **Files:** `tests/Event.Application.UnitTests/Orders/CreateOrderCommandTests.cs` (new)
   - **Description:** Author failing specification tests asserting domain invariants (positive integer currency, state machine initialization, capacity check) and fail-closed error responses (ProblemDetails RFC 7807) before writing handler logic.
   - **Acceptance:**
-    - [ ] Tests fail on missing command handler with expected missing type/behavior.
+    - [ ] Stub type/handler compiles cleanly, and tests fail at runtime with expected invariant/assertion failure.
     - [ ] Concurrency and invalid-input invariant test cases covered.
 - [ ] **2.2 (Green Phase): Implement Order Aggregate & CreateOrderCommandHandler**
   - **Layer:** Domain / Application

@@ -49,7 +49,10 @@ public sealed class RegistrationPaymentContractTests
     {
         string[] requiredProperties =
         [
-            "IsOfficialInstance",
+            "OrganizerMerchant",
+            "TenantDirectoryOperator",
+            "InstanceOperator",
+            "PaymentOperations",
             "DeliveryStartsAtUtc",
             "DeliveryEndsAtUtc",
             "CurrencyMinorUnitDigits",
@@ -70,6 +73,10 @@ public sealed class RegistrationPaymentContractTests
         {
             await Assert.That(property.GetCustomAttribute<RequiredMemberAttribute>()).IsNotNull();
         }
+
+        PropertyInfo officialInstance = typeof(PaidOrderAcceptanceInstanceOperatorDto)
+            .GetProperty(nameof(PaidOrderAcceptanceInstanceOperatorDto.IsOfficialInstance))!;
+        await Assert.That(officialInstance.GetCustomAttribute<RequiredMemberAttribute>()).IsNotNull();
     }
 
     [Test]

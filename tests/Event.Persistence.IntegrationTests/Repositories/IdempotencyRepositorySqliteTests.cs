@@ -116,7 +116,7 @@ public sealed class IdempotencyRepositorySqliteTests
             ForeignKeys = true,
             Pooling = true
         }.ToString();
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>()
+        var builder = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connectionString)
             .UseSnakeCaseNamingConvention()
             .AddInterceptors(

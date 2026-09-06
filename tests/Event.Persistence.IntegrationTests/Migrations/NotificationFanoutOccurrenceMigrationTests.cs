@@ -47,7 +47,6 @@ public sealed class NotificationFanoutOccurrenceMigrationTests(
             await Assert.That(ReadPendingModelOperations(context)).IsEmpty();
             await AssertSchemaAsync(
                 schema,
-                expected: true,
                 occurrenceForeignKey.GetConstraintName()
                     ?? throw new InvalidOperationException("Fanout occurrence foreign key has no database name."),
                 recipientIdentity.GetDatabaseName()
@@ -63,15 +62,13 @@ public sealed class NotificationFanoutOccurrenceMigrationTests(
 
     private ExploreDbContext CreateDbContext()
     {
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>()
+        var builder = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString)
             .UseSnakeCaseNamingConvention()
             .ConfigureWarnings(warnings =>
             {
                 warnings.Ignore(RelationalEventId.PendingModelChangesWarning);
-                warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning);
             });
-        builder.EnableServiceProviderCaching(false);
         return new ExploreDbContext(builder.Options);
     }
 
@@ -109,30 +106,22 @@ public sealed class NotificationFanoutOccurrenceMigrationTests(
 
     private async Task AssertSchemaAsync(
         string schema,
-        bool expected,
         string occurrenceForeignKeyName,
         string recipientIdentityIndexName)
     {
         await using var connection = new NpgsqlConnection(fixture.ConnectionString);
         await connection.OpenAsync();
 
-        await Assert.That(await ExistsAsync(connection, """
-            SELECT EXISTS (
-                SELECT 1 FROM information_schema.tables
-                WHERE table_schema = @schema AND table_name = 'notification_fanout_occurrences')
-            """, schema, string.Empty, string.Empty)).IsEqualTo(expected);
-        await Assert.That(await ExistsAsync(connection, """
-            SELECT EXISTS (
-                SELECT 1 FROM information_schema.columns
-                WHERE table_schema = @schema AND table_name = 'notification_intents'
-                  AND column_name = 'fanout_occurrence_id')
-            """, schema, string.Empty, string.Empty)).IsEqualTo(expected);
-
-        if (!expected)
-        {
-            return;
-        }
-
+        await Assert.That(await NotificationMigrationSchemaContract.HasTableAsync(
+            connection, schema, "notification_fanout_occurrences")).IsTrue();
+        await Assert.That(await NotificationMigrationSchemaContract.HasColumnAsync(
+            connection, schema, "notification_intents", "fanout_occurrence_id")).IsTrue();
+        await Assert.That(await NotificationMigrationSchemaContract.HasForeignKeyAsync(
+            connection, schema, "notification_intents", ["tenant_id", "fanout_occurrence_id"],
+            "notification_fanout_occurrences", ["tenant_id", "id"])).IsTrue();
+        await Assert.That(await NotificationMigrationSchemaContract.HasUniqueIndexAsync(
+            connection, schema, "notification_intents",
+            ["tenant_id", "fanout_occurrence_id", "recipient_user_id"])).IsTrue();
         await Assert.That(await ExistsAsync(connection, """
             SELECT EXISTS (
                 SELECT 1 FROM pg_constraint

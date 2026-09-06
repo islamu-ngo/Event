@@ -14,12 +14,9 @@ public sealed class LookupRelationshipUniquenessMigrationTests
     [Test]
     public async Task Model_DeclaresTenantQualifiedRelationshipIndexesAsUnique()
     {
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>()
+        var builder = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql("Host=localhost;Database=lookup_relationship_model;Username=unused;Password=unused")
-            .UseSnakeCaseNamingConvention()
-            .ConfigureWarnings(warnings =>
-                warnings.Log(Microsoft.EntityFrameworkCore.Diagnostics.CoreEventId.ManyServiceProvidersCreatedWarning));
-        builder.EnableServiceProviderCaching(false);
+            .UseSnakeCaseNamingConvention();
         await using var context = new ExploreDbContext(builder.Options);
         IModel model = context.GetService<IDesignTimeModel>().Model;
 

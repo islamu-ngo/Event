@@ -16,8 +16,8 @@ public class AtprotoOnboardingRetryTrackingTests
     [Test]
     public async Task RetryReloadsTrackedOwnersBeforeCreatingMissingTenantUser()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase($"atproto-onboarding-retry-{Guid.NewGuid():N}")
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase($"atproto-onboarding-retry-{Guid.NewGuid():N}")
             .Options;
         await using var context = new ExploreDbContext(options);
         context.EnableTenantFilterBypass("ATProto onboarding retry tracking test.");

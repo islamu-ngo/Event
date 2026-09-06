@@ -6,10 +6,11 @@ using Explore.Blazor.Hosting;
 
 const BlazorHostProfile hostProfile = BlazorHostProfile.Split;
 var shutdownState = new GracefulShutdownState();
+using var shutdownCts = shutdownState.CancellationTokenSource;
 var builder = WebApplication.CreateBuilder(args);
 builder.AddBlazorHostServices(hostProfile, shutdownState);
 
-var app = builder.Build();
+await using var app = builder.Build();
 await app.InitializeBlazorHostAsync(hostProfile);
 app.UseBlazorHostMiddleware(hostProfile, shutdownState);
 app.MapBlazorHostEndpoints(hostProfile);

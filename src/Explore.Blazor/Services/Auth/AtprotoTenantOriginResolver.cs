@@ -18,7 +18,12 @@ public sealed class AtprotoTenantOriginResolver(
     public AtprotoTenantOriginBinding Resolve(HttpRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var origin = ParseOrigin($"{request.Scheme}://{request.Host.Value}");
+        return Resolve(ParseOrigin($"{request.Scheme}://{request.Host.Value}"));
+    }
+
+    public AtprotoTenantOriginBinding Resolve(Uri requestedOrigin)
+    {
+        var origin = NormalizeOrigin(requestedOrigin);
         var options = configuredOptions.Value;
         foreach (var configured in options.TenantOrigins)
         {

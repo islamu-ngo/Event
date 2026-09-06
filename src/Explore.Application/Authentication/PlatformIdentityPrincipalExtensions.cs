@@ -3,6 +3,7 @@
 
 using System.Security.Claims;
 using Explore.Application.Constants;
+using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
@@ -149,7 +150,8 @@ public static class PlatformIdentityPrincipalExtensions
         GetProviderSubject(RequirePrincipal(principal));
 
     /// <summary>
-    /// Classifies the OIDC provider from the explicit <c>idp</c> claim and validated issuer.
+    /// Classifies account authority from trusted <c>auth_provider</c> claims or the validated OIDC issuer.
+    /// Broker identity-provider hints never replace the authority that issued the account subject.
     /// ATProto identity is accepted only from its verified gateway adapter, never ambient OIDC claims.
     /// </summary>
     public static string GetAuthProvider(this ClaimsPrincipal principal) =>
@@ -165,28 +167,15 @@ public static class PlatformIdentityPrincipalExtensions
             return authority;
         }
 
-        var explicitProvider = identity?.FindFirst("idp")?.Value;
-        if (!string.IsNullOrWhiteSpace(explicitProvider))
+        try
         {
-            var normalized = explicitProvider.Trim().ToLowerInvariant();
-            if (normalized.Contains("google", StringComparison.Ordinal))
-            {
-                return AuthSchemeNames.Google.ToLowerInvariant();
-            }
-
-            if (normalized.Contains("keycloak", StringComparison.Ordinal))
-            {
-                return AuthSchemeNames.Keycloak.ToLowerInvariant();
-            }
+            return ClassifyOidcIssuer(NormalizeIssuerAuthority(identity?.FindFirst("iss")?.Value ?? string.Empty))
+                .ToAuthenticationProviderCode();
         }
-
-        var issuer = identity?.FindFirst("iss")?.Value ?? string.Empty;
-        if (issuer.Contains("accounts.google.com", StringComparison.OrdinalIgnoreCase))
+        catch (ArgumentException)
         {
-            return AuthSchemeNames.Google.ToLowerInvariant();
+            return AuthSchemeNames.Keycloak.ToLowerInvariant();
         }
-
-        return AuthSchemeNames.Keycloak.ToLowerInvariant();
     }
 
     /// <summary>Returns the one canonical persisted key for the authenticated provider account.</summary>
@@ -200,9 +189,14 @@ public static class PlatformIdentityPrincipalExtensions
         string authority = NormalizeIssuerAuthority(issuer);
         string exactSubject = subject;
         return new ProviderAccountKey(
-            AuthenticationProviderKind.Keycloak,
+            ClassifyOidcIssuer(authority),
             $"oidc:{authority.Length}:{authority}:{exactSubject}");
     }
+
+    private static AuthenticationProviderKind ClassifyOidcIssuer(string normalizedIssuer) =>
+        string.Equals(normalizedIssuer, "https://accounts.google.com", StringComparison.Ordinal)
+            ? AuthenticationProviderKind.Google
+            : AuthenticationProviderKind.Keycloak;
 
     public static ProviderAccountKey CreateAtprotoAccountKey(AtprotoDid did) =>
         new(AuthenticationProviderKind.Atproto, did.Value);

@@ -62,4 +62,29 @@
 - [ ] Candidate for ADR.
 - [x] Stays in journal only (observed build-orchestration lesson).
 
+[2026-09-06 Europe/Brussels] — Global signal callbacks can retain disposed test hosts
+
+**Context**: Full API acceptance exhausted memory while constructing many hosts. A bounded investigation separated host disposal from process-wide callback ownership before another complete run.
+
+**Symptom / Observation**: Native API and BFF host controls released caller-owned shutdown state after disposal. Registering the actual startup/shutdown callbacks kept that state reachable after both normal stop and disposal without starting. Each four-case Red had two passing controls and two failing registered cases.
+
+**Root Cause**: `Console.CancelKeyPress` and BFF `ProcessExit` are process-global event roots. Disposing a WebApplication does not remove application-owned static event subscriptions. Their closures retained shutdown state and, in the BFF, the application. Additionally, application roots without lexical disposal could throw during initialization before reaching the disposal performed by `Run`.
+
+**Resolution**: `HostProcessSignalSubscriptions`, created and disposed by the host DI container through `AddServiceDefaults`, records and removes the exact delegates. All three application roots use `await using` for their application. Existing signal callbacks remain unchanged. The native filtered commands `dotnet run --project tests/Event.API.IntegrationTests --configuration Release -- --treenode-filter "/*/*/*ApiHostLifetimeTests/*"` and the corresponding BFF project/`GracefulShutdownLifetimeTests` filter each passed four cases. This establishes released references, not total memory stability or the sole cause of the full-suite failure.
+
+**Why This Matters for Future Work**: An `ApplicationStopped` callback alone is not a disposal owner for a host that never starts. Use a container-created disposable, not an externally constructed singleton instance, when relying on DI disposal. Weak-reference controls can isolate this defect without repeatedly driving the entire suite to OOM. An application log saying “SIGTERM received” is also not proof of an OS signal: the existing handler emits it for any `ApplicationStopping` notification; process termination attribution needs OS/process evidence.
+
+**References**:
+
+- `src/Explore.ServiceDefaults/HostProcessSignalSubscriptions.cs`
+- `src/Explore.API/Hosting/ApiHostStartupExtensions.cs`
+- `src/Explore.Blazor/Extensions/MiddlewareExtensions.cs`
+- `tests/Event.API.IntegrationTests/Hosting/ApiHostLifetimeTests.cs`
+- `tests/Explore.Blazor.IntegrationTests/Hosting/GracefulShutdownLifetimeTests.cs`
+- `docs/internal/TESTING.md`
+
+**Promotion Consideration**:
+
+- [x] Stays in journal as diagnostic evidence; the host-fixture contract is recorded in TESTING.md.
+
 ---

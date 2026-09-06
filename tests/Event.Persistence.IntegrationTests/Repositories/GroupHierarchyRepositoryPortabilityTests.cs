@@ -168,7 +168,7 @@ public sealed class GroupHierarchyRepositoryPortabilityTests
             ForeignKeys = true
         }.ToString();
         var context = new ExploreDbContext(
-            new DbContextOptionsBuilder<ExploreDbContext>()
+            TestDbContextOptions.Create<ExploreDbContext>()
                 .UseSqlite(connectionString)
                 .UseSnakeCaseNamingConvention()
                 .Options);

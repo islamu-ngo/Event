@@ -168,7 +168,7 @@ public sealed class SemanticValueSqlitePersistenceTests
 
     private static async Task<ExploreDbContext> CreateContextAsync()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite("Data Source=:memory:")
             .UseSnakeCaseNamingConvention()
             .Options;

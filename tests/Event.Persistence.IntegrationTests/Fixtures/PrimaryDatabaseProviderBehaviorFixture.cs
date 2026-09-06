@@ -74,36 +74,27 @@ internal sealed class PrimaryDatabaseProviderBehaviorFixture
         var services = new ServiceCollection();
         services.AddDbContext<DataProtectionKeyContext>(options =>
         {
-            options.EnableServiceProviderCaching(false);
             PrimaryDatabaseProviderComposition.ConfigureDataProtection(options, _databaseOptions);
-            options.ConfigureWarnings(warnings =>
-                warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning));
         });
         services
             .AddDataProtection()
             .SetApplicationName(applicationName)
             .PersistKeysToDbContext<DataProtectionKeyContext>();
 
-        return services.BuildServiceProvider(validateScopes: true);
+        return services.BuildIsolatedServiceProvider(validateScopes: true);
     }
 
     public DataProtectionKeyContext CreateDataProtectionContext()
     {
-        var builder = new DbContextOptionsBuilder<DataProtectionKeyContext>();
-        builder.EnableServiceProviderCaching(false);
+        var builder = TestDbContextOptions.Create<DataProtectionKeyContext>();
         PrimaryDatabaseProviderComposition.ConfigureDataProtection(builder, _databaseOptions);
-        builder.ConfigureWarnings(warnings =>
-            warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning));
         return new DataProtectionKeyContext(builder.Options);
     }
 
     private ExploreDbContext CreateContext(params IInterceptor[] interceptors)
     {
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>();
-        builder.EnableServiceProviderCaching(false);
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(builder, _databaseOptions);
-        builder.ConfigureWarnings(warnings =>
-            warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning));
         if (interceptors.Length > 0)
         {
             builder.AddInterceptors(interceptors);

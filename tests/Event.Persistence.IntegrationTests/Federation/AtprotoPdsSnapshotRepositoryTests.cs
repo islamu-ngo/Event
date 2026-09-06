@@ -1,4 +1,4 @@
-// ABOUTME: Deterministic provider-neutral checks for complete AT Protocol PDS snapshot reconciliation.
+// ABOUTME: Relational SQLite checks for complete AT Protocol PDS snapshot reconciliation.
 // ABOUTME: Covers canonical idempotency, missing-record tombstones, rejected-record invalidation, and cursor isolation.
 
 using Explore.Application.Contracts.Persistence;
@@ -237,7 +237,7 @@ public sealed class AtprotoPdsSnapshotRepositoryTests
         const string did = "did:plc:snapshot-owner";
         AtprotoRecord canonical = Record(did, "3mretryrec222", 100, now);
         var rollback = new RollbackSnapshotStateInterceptor();
-        DbContextOptions<ExploreDbContext> options = new DbContextOptionsBuilder<ExploreDbContext>(CreateOptions(connection))
+        DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create(CreateOptions(connection))
             .ReplaceService<IExecutionStrategyFactory, RetryOnceExecutionStrategyFactory>()
             .AddInterceptors(rollback)
             .Options;
@@ -314,7 +314,7 @@ public sealed class AtprotoPdsSnapshotRepositoryTests
         const string service = "https://jetstream.example/cancelled-claim";
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancelAfterSave = new CancelAfterSaveChangesInterceptor(cancellation);
-        DbContextOptions<ExploreDbContext> options = new DbContextOptionsBuilder<ExploreDbContext>(CreateOptions(connection))
+        DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create(CreateOptions(connection))
             .AddInterceptors(cancelAfterSave)
             .Options;
 
@@ -378,7 +378,7 @@ public sealed class AtprotoPdsSnapshotRepositoryTests
 
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancelAfterSave = new CancelAfterSaveChangesInterceptor(cancellation);
-        DbContextOptions<ExploreDbContext> options = new DbContextOptionsBuilder<ExploreDbContext>(CreateOptions(connection))
+        DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create(CreateOptions(connection))
             .AddInterceptors(cancelAfterSave)
             .Options;
         var request = new AtprotoJetstreamApplyRequest(
@@ -469,7 +469,7 @@ public sealed class AtprotoPdsSnapshotRepositoryTests
             ObservedAt: now.AddSeconds(1));
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var cancelAfterSave = new CancelAfterSaveChangesInterceptor(cancellation);
-        DbContextOptions<ExploreDbContext> options = new DbContextOptionsBuilder<ExploreDbContext>(CreateOptions(connection))
+        DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create(CreateOptions(connection))
             .AddInterceptors(cancelAfterSave)
             .Options;
 
@@ -637,7 +637,7 @@ public sealed class AtprotoPdsSnapshotRepositoryTests
     }
 
     private static DbContextOptions<ExploreDbContext> CreateOptions(SqliteConnection connection) =>
-        new DbContextOptionsBuilder<ExploreDbContext>()
+        TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connection)
             .UseSnakeCaseNamingConvention()
             .AddInterceptors(
@@ -749,6 +749,7 @@ public sealed class AtprotoPdsSnapshotRepositoryTests
                 return result;
             }
 
+            await Assert.That(eventData.Context!.Database.CurrentTransaction).IsNotNull();
             FailuresInjected++;
             throw new TestTransientException();
         }

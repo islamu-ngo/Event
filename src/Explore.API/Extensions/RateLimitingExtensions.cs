@@ -138,6 +138,8 @@ public static class RateLimitingExtensions
                     RateLimitPartition.GetNoLimiter<string>("test"));
                 options.AddPolicy(WritePolicy, _ =>
                     RateLimitPartition.GetNoLimiter<string>("test"));
+                options.AddPolicy(AtprotoTransientAuthenticationDefaults.RatePolicy, _ =>
+                    RateLimitPartition.GetNoLimiter<string>("test"));
                 options.AddPolicy(
                     SetupLiveContractMetadata.EnrollmentWriteRatePolicy,
                     _ => RateLimitPartition.GetNoLimiter<string>("test"));
@@ -282,6 +284,16 @@ public static class RateLimitingExtensions
                         QueueLimit = 0
                     });
             });
+
+            // Instance-wide admission bounds pre-authentication crypto and replay storage, not a forged user id.
+            options.AddPolicy(AtprotoTransientAuthenticationDefaults.RatePolicy, _ =>
+                RateLimitPartition.GetFixedWindowLimiter("atproto-transient", _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = section.GetValue("AtprotoTransient:PermitLimit", 60),
+                    Window = TimeSpan.FromSeconds(section.GetValue("AtprotoTransient:WindowSeconds", 60)),
+                    QueueLimit = 0,
+                    AutoReplenishment = true
+                }));
 
             // Write operations: stricter fixed window per user
             options.AddPolicy(WritePolicy, httpContext =>
@@ -612,6 +624,7 @@ public static class RateLimitingExtensions
 
         int ResolvePolicyLimit(string policyName) => policyName switch
         {
+            AtprotoTransientAuthenticationDefaults.RatePolicy => section.GetValue("AtprotoTransient:PermitLimit", 60),
             AuthenticatedPolicy => authPermitLimit,
             WritePolicy => writePermitLimit,
             SetupLiveContractMetadata.EnrollmentWriteRatePolicy =>
@@ -691,6 +704,10 @@ public static class RateLimitingExtensions
 
         string? endpointPolicy = context.GetEndpoint()?
             .Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName;
+        if (endpointPolicy == AtprotoTransientAuthenticationDefaults.RatePolicy)
+        {
+            return AtprotoTransientAuthenticationDefaults.RatePolicy;
+        }
         if (endpointPolicy ==
             ConfigurationImportApiBoundary.UploadRateLimitPolicy)
         {

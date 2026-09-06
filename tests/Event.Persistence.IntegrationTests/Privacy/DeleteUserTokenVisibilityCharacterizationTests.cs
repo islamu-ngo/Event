@@ -154,7 +154,7 @@ public sealed class DeleteUserTokenVisibilityPostgreSqlFixture : IAsyncInitializ
 
     private ExploreDbContext CreateContext()
     {
-        DbContextOptions<ExploreDbContext> options = new DbContextOptionsBuilder<ExploreDbContext>()
+        DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(_container.GetConnectionString())
             .UseSnakeCaseNamingConvention()
             .Options;

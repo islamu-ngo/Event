@@ -294,7 +294,7 @@ public sealed class EventLifecycleStatusSqliteMaterializationTests
     }
 
     private static ExploreDbContext CreateDbContext(string databasePath) => new(
-        new DbContextOptionsBuilder<ExploreDbContext>()
+        TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite($"Data Source={databasePath}")
             .UseSnakeCaseNamingConvention()
             .Options);

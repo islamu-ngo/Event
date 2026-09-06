@@ -256,12 +256,12 @@ public sealed class EventParticipationConfigurationRepositoryTests
             now: DateTime.UtcNow);
 
     private static ParticipationTestDbContext CreateInMemoryContext(string name) =>
-        new(new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase($"{name}-{Guid.NewGuid():N}")
+        new(TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase($"{name}-{Guid.NewGuid():N}")
             .Options);
 
     private static ParticipationTestDbContext CreateRelationalModelContext() =>
-        new(new DbContextOptionsBuilder<ExploreDbContext>()
+        new(TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql("Host=localhost;Database=event_participation_model;Username=unused;Password=unused")
             .UseSnakeCaseNamingConvention()
             .Options);

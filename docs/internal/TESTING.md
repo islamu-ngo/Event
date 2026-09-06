@@ -69,6 +69,17 @@ Each project has a specific role. Run individually — never use solution-level 
 
 ### Run Commands
 
+Host-lifetime regressions in `ApiHostLifetimeTests` and
+`GracefulShutdownLifetimeTests` distinguish stopped/never-started host disposal
+from process-global callback retention using non-inlined helpers and weak
+references. `HostProcessSignalSubscriptions` is DI-created through
+`AddServiceDefaults`; disposal removes each exact Console/ProcessExit delegate.
+Minimal hosts calling the public startup extensions must include those service
+defaults. All executable roots lexically dispose their application if startup
+fails before `Run`. Callback behavior is unchanged, and detaching an event does
+not wait for a callback already dispatched. These focused checks do not replace
+full-project acceptance or prove the cause of an entire process-memory failure.
+
 ```bash
 # Unit tests (no infrastructure needed)
 dotnet test --project tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj --configuration Release --verbosity quiet
@@ -623,6 +634,21 @@ The API integration tests use a **three-host-profile model** to balance speed, f
 These profiles are correctness tests, not performance benchmarks. Runtime benchmark runs live in [BENCHMARKS.md](BENCHMARKS.md) and use BenchmarkDotNet so contributors can compare relative endpoint cost, allocations, and diagnoser output under controlled runs.
 
 ### Fixture Architecture
+
+Onboarding HTTP tests use `OnboardingWebApplicationFactory` with a unique SQLite
+file under the test process's temporary directory. It reuses production provider
+composition, including transaction-completion interceptors that release named
+locks, and deletes its own file after disposing its unpooled connection. An
+in-memory replacement cannot prove this transaction lifecycle. Fixtures seed
+UUIDv7 user identities and issuer-bound external-login keys; a session ID or
+unlinked internal-user claim is not account authority.
+
+Inject disposable `SETUP_SECRET` and, for Keycloak rotation tests,
+`KEYCLOAK_BLAZOR_CLIENT_SECRET` through the environment keys documented in
+`.env.example`. These fixtures do not embed credentials or mutate process-wide
+secret values. Keep real operator credentials out of test runs and logs.
+The reusable API integration CI step generates and masks both disposable values
+for its test process; it does not need repository or operator secret access.
 
 ```
 Event.API.IntegrationTests/

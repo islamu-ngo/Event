@@ -1,0 +1,33 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M1TA26MAV4H3Z37TYQQC99SJ
+Title: "Secure the private ATProto transient bridge"
+Type: feat
+Scope: access
+Summary: "Authenticate server-only transient requests with purpose- and byte-bound assertions, durable replay protection, tenant binding, and browser-proxy exclusion."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/adr/ADR-014-atproto-session-trust-bridge.md
+    Disposition: not-applicable
+    Detail: This private transport phase does not switch existing BFF transient consumers.
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: Distinct service assertions bind exact request bytes and purpose; durable replay admission precedes tenant-bound storage access.
+  Migration:
+    Reference: docs/internal/adr/ADR-014-atproto-session-trust-bridge.md
+    Disposition: not-applicable
+    Detail: Uses the relational transient schema introduced by the preceding storage phase.
+  Configuration:
+    Reference: docs/internal/adr/ADR-014-atproto-session-trust-bridge.md
+    Disposition: not-applicable
+    Detail: Reuses the existing instance OAuth-client signing authority without a new secret provider.
+  OpenAPI:
+    Reference: docs/internal/adr/ADR-014-atproto-session-trust-bridge.md
+    Disposition: not-applicable
+    Detail: Private operations are excluded from public specifications, HAL affordances, and generated browser clients.
+  Operator:
+    Reference: docs/internal/adr/ADR-014-atproto-session-trust-bridge.md
+    Disposition: documented
+    Detail: Browser-facing proxy access is denied; only signed server-to-server requests may use the bounded transient transport.

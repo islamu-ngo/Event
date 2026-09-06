@@ -17,7 +17,7 @@ public sealed class PaidOrderAcceptancePersistenceTests
     [Test]
     public async Task ModelKeepsHistoricalAcceptanceNullableAndUsesTenantQualifiedForeignKeys()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite("Data Source=:memory:")
             .UseSnakeCaseNamingConvention()
             .Options;

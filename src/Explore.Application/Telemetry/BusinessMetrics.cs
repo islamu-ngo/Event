@@ -96,6 +96,8 @@ public sealed class BusinessMetrics : ISchedulerJobTelemetry, IDisposable
     private readonly Counter<long> _customPropertyPurgeDecisions;
     private readonly Counter<long> _idempotencyCleanupRuns;
     private readonly Counter<long> _idempotencyCleanupRows;
+    private readonly Counter<long> _atprotoTransientCleanupRuns;
+    private readonly Counter<long> _atprotoTransientCleanupRows;
     private readonly Counter<long> _aiRetentionCleanupRuns;
     private readonly Counter<long> _aiRetentionCleanupRows;
     private readonly Counter<long> _aiProviderHealthChecks;
@@ -493,6 +495,11 @@ public sealed class BusinessMetrics : ISchedulerJobTelemetry, IDisposable
             "explore.idempotency.cleanup_rows",
             unit: "{row}",
             description: "Total idempotency rows selected or deleted by cleanup mode and outcome");
+
+        _atprotoTransientCleanupRuns = meter.CreateCounter<long>(
+            "explore.atproto.transient.cleanup_runs", "{run}", "Transient cleanup passes by bounded outcome");
+        _atprotoTransientCleanupRows = meter.CreateCounter<long>(
+            "explore.atproto.transient.cleanup_rows", "{row}", "Rows deleted by completed transient cleanup passes");
 
         _aiRetentionCleanupRuns = meter.CreateCounter<long>(
             "explore.ai.retention.cleanup_runs",
@@ -1252,6 +1259,14 @@ public sealed class BusinessMetrics : ISchedulerJobTelemetry, IDisposable
         _idempotencyCleanupRows.Add(rowCount,
             new KeyValuePair<string, object?>("mode", NormalizeTag(mode)),
             new KeyValuePair<string, object?>("outcome", NormalizeTag(outcome)));
+    }
+
+    public void RecordAtprotoTransientCleanup(bool succeeded, int transientRows = 0, int replayRows = 0)
+    {
+        _atprotoTransientCleanupRuns.Add(1, new KeyValuePair<string, object?>("outcome", succeeded ? "succeeded" : "failed"));
+        if (!succeeded) return;
+        _atprotoTransientCleanupRows.Add(Math.Max(0, transientRows), new KeyValuePair<string, object?>("store", "transients"));
+        _atprotoTransientCleanupRows.Add(Math.Max(0, replayRows), new KeyValuePair<string, object?>("store", "assertions"));
     }
 
     public void RecordAiRetentionCleanupRun(string mode, string outcome)

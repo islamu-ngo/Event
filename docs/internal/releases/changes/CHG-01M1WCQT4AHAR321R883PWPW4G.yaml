@@ -1,0 +1,35 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M1WCQT4AHAR321R883PWPW4G
+Title: "Unify Unicode and login schema initialization"
+Type: refactor
+Scope: discovery
+Summary: "Replace divergent development application migration chains with a generated combined schema while preserving Unicode validation, encrypted login storage and independent migration authorities."
+Group: unicode-location-search
+Supersedes:
+  - CHG-01M1VX4A3CQF0676R3QFYNRJBX
+  - CHG-01M1RR9K6M4YAAKCXANW60PSR1
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md
+    Disposition: documented
+    Detail: Replace divergent development application migration histories with combined generated initial schemas. Recreate only an explicitly selected disposable application catalog or restore matching backup data and binaries; no legacy token reader or incremental compatibility chain remains.
+  Security:
+    Reference: docs/internal/DOMAIN.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Preserve strict Unicode validation before mutation, tenant-qualified discovery, erasure fencing and current-key checks together with encrypted tenant-bound login transients and single-use replay claims. Database migration does not authorize logging addresses, credentials or transient ciphertext.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: Generate one combined ExploreDbContext initial migration in each of the four application assemblies, covering five engines. Include relational ATProto transient storage in the initial schema rather than running its earlier additive migration before the replacement initial. Preserve independent Identity, Data Protection and privacy-authority histories.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md
+    Disposition: documented
+    Detail: Use the canonical runbook's generated migration identifiers and coordinated backup/reset procedure. Globalization upgrades require stopped-traffic compatibility evaluation and current-key rebuild or disposable reset; provider-local sorting is not a universal ordering guarantee. An uncertain committed login consume requires a fresh login, not destructive retry.

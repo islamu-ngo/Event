@@ -1464,9 +1464,6 @@ intents:
       - docs/internal/adr/ADR-023-admission-credential-check-in-transfer-recovery.md
       - docs/internal/adr/ADR-024-external-business-integrations-and-protected-payout-boundaries.md
       - islamic-value-sensitive-design/i-vsd-paid-event-payments-consultation.md
-      - dev/zarchive/registration-data-collection/registration-data-collection-plan.md
-      - dev/zarchive/registration-data-collection/registration-data-collection-context.md
-      - dev/zarchive/registration-data-collection/registration-data-collection-tasks.md
     load_skills:
       - clean-architecture-rules
       - cqrs-mediatr-guidelines
@@ -1704,9 +1701,6 @@ intents:
       - docs/internal/INTEGRATIONS.md
       - docs/internal/BLAZOR.md
       - schemas/islamu-event.md
-      - dev/zarchive/registration-data-collection/registration-data-collection-plan.md
-      - dev/zarchive/registration-data-collection/registration-data-collection-context.md
-      - dev/zarchive/registration-data-collection/registration-data-collection-tasks.md
     unique_acceptance:
       - "ISLAMU remains authoritative for workflow, normalized answers, capacity, approval, and confirmation; external completion is evidence only"
       - "Every attempt pins the exact form, provider binding, mapping, participation, workflow, and ticket catalog versions it uses"
@@ -2326,9 +2320,6 @@ intents:
       - "docs/internal/BACKUP_RESTORE_UPGRADE.md"
       - "docs/internal/TROUBLESHOOTING.md"
       - "docs/internal/TESTING.md"
-      - "dev/zarchive/multi-database-persistence-unification/multi-database-persistence-unification-plan.md"
-      - "dev/zarchive/multi-database-persistence-unification/multi-database-persistence-unification-context.md"
-      - "dev/zarchive/multi-database-persistence-unification/multi-database-persistence-unification-tasks.md"
     paths_forbidden:
       - "src/**/Migrations/**/*.cs"
       - "src/**/*ModelSnapshot.cs"

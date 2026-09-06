@@ -1,0 +1,29 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M1S5HPE0EMJ0WQF92VBJR6BZ
+Title: "Keep location-carrier deletion consistent"
+Type: fix
+Scope: privacy
+Summary: "Clear physical location and room references when deleting a session, session group, or agenda item so soft deletion preserves location privacy constraints."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/DOMAIN.md
+    Disposition: documented
+    Detail: Soft deletion clears the complete carrier location tuple without bypassing physical-location mediation constraints.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/README.md
+    Disposition: documented
+    Detail: Removing a scheduled item leaves shared venues and other items' location assignments intact.

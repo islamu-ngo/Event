@@ -28,6 +28,17 @@ public sealed class ApiAuthenticationConflictMiddleware
             return;
         }
 
+        if (AtprotoTransientAuthenticationDefaults.IsPrivatePath(context.Request.Path))
+        {
+            if (!AtprotoTransientRequestBoundary.HasOnlyTransientCredential(context.Request))
+            {
+                await AtprotoTransientRequestBoundary.WriteProblemAsync(context, StatusCodes.Status401Unauthorized);
+                return;
+            }
+            await _next(context);
+            return;
+        }
+
         var hasAuthorizationHeader = context.Request.Headers.ContainsKey("Authorization");
         var hasApiKeyHeader = ApiKeyHeaderReader.HasNonEmptyApiKey(context.Request);
         var hasManagedControlPlaneHeader = ApiKeyHeaderReader.HasNonEmptyApiKey(

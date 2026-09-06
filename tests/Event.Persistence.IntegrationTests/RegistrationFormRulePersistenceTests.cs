@@ -23,7 +23,7 @@ public sealed class RegistrationFormRulePersistenceTests
     public async Task EfModelMapsTypedRuleWithTenantSafeVersionOwnership()
     {
         await using ExploreDbContext context = new(
-            new DbContextOptionsBuilder<ExploreDbContext>()
+            TestDbContextOptions.Create<ExploreDbContext>()
                 .UseNpgsql("Host=localhost;Database=task73_model;Username=unused;Password=unused")
                 .UseSnakeCaseNamingConvention().Options);
         IEntityType entity = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(RegistrationFormRule))!;
@@ -52,7 +52,7 @@ public sealed class RegistrationFormRulePersistenceTests
     public async Task ConditionConverterRoundTripsNestedTypedAst()
     {
         await using ExploreDbContext context = new(
-            new DbContextOptionsBuilder<ExploreDbContext>()
+            TestDbContextOptions.Create<ExploreDbContext>()
                 .UseNpgsql("Host=localhost;Database=task73_converter;Username=unused;Password=unused")
                 .UseSnakeCaseNamingConvention().Options);
         IProperty property = context.GetService<IDesignTimeModel>().Model

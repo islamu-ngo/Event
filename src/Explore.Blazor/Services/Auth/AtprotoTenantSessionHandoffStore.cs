@@ -1,96 +1,79 @@
-// ABOUTME: Protects first-party ATProto cookie-session results behind origin-bound one-time handoff codes.
-// ABOUTME: Keeps platform JWTs and PDS credentials out of cross-host URLs and browser-visible state.
+// ABOUTME: Protects first-party ATProto sessions behind tenant- and browser-bound one-time relational handoffs.
+// ABOUTME: Validates decrypted metadata and proof before requesting candidate-bound consumption from the private API.
 
 using System.Security.Cryptography;
 using System.Text.Json;
-using Explore.Blazor.Authentication;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.WebUtilities;
-using Microsoft.Extensions.Options;
 
 namespace Explore.Blazor.Services.Auth;
 
-public sealed record AtprotoTenantHandoff(
-    AtprotoOAuthFlowSeed Seed,
-    AtprotoBffSessionResult Session,
-    DateTimeOffset ExpiresAt);
-
-public sealed class AtprotoTenantSessionHandoffStore
+public sealed record AtprotoTenantHandoff(AtprotoOAuthFlowSeed Seed, AtprotoBffSessionResult Session, DateTimeOffset ExpiresAt)
 {
-    private const string Purpose = "tenant-handoff-v1";
+    public override string ToString() => nameof(AtprotoTenantHandoff);
+}
+
+public sealed class AtprotoTenantSessionHandoffStore(ApiBackedAtprotoTransientStore transport,
+    IDataProtectionProvider protection, AtprotoTenantOriginResolver resolver, AtprotoBrowserProof proof, TimeProvider clock)
+{
+    private const string Purpose = "tenant_handoff";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private readonly AtprotoAtomicCache _cache;
-    private readonly IDataProtector _protector;
-    private readonly AtprotoTenantOriginResolver _originResolver;
-    private readonly IOptions<AtprotoAuthenticationOptions> _configuredOptions;
-    private readonly TimeProvider _timeProvider;
+    private readonly IDataProtector protector = protection.CreateProtector(typeof(AtprotoTenantSessionHandoffStore).FullName!, "tenant-handoff-v2");
 
-    public AtprotoTenantSessionHandoffStore(
-        AtprotoAtomicCache cache,
-        IDataProtectionProvider dataProtectionProvider,
-        AtprotoTenantOriginResolver originResolver,
-        IOptions<AtprotoAuthenticationOptions> configuredOptions,
-        TimeProvider timeProvider)
+    public async Task<string> CreateAsync(AtprotoOAuthFlowSeed seed, AtprotoBffSessionResult session, CancellationToken cancellationToken)
     {
-        _cache = cache;
-        _protector = dataProtectionProvider.CreateProtector(typeof(AtprotoTenantSessionHandoffStore).FullName!, Purpose);
-        _originResolver = originResolver;
-        _configuredOptions = configuredOptions;
-        _timeProvider = timeProvider;
-    }
-
-    public async Task<string> CreateAsync(
-        AtprotoOAuthFlowSeed seed,
-        AtprotoBffSessionResult session,
-        CancellationToken cancellationToken)
-    {
-        var lifetime = TimeSpan.FromSeconds(Math.Clamp(
-            _configuredOptions.Value.HandoffLifetimeSeconds,
-            30,
-            300));
-        var handoff = new AtprotoTenantHandoff(seed, session, _timeProvider.GetUtcNow() + lifetime);
-        var payload = _protector.Protect(JsonSerializer.SerializeToUtf8Bytes(handoff, JsonOptions));
+        AtprotoOAuthFlowValidation.Validate(seed, resolver, proof);
+        if (!ValidSession(seed, session)) throw new InvalidOperationException("ATProto handoff session binding is invalid.");
+        var expiry = DateTimeOffset.FromUnixTimeMilliseconds(proof.HandoffExpiry(seed.BrowserBinding).ToUnixTimeMilliseconds());
+        var handoff = new AtprotoTenantHandoff(seed, session, expiry);
+        var payload = protector.Protect(JsonSerializer.SerializeToUtf8Bytes(handoff, JsonOptions));
         for (var attempt = 0; attempt < 3; attempt++)
         {
             var code = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
-            if (await _cache.StoreAsync(Purpose, code, payload, lifetime, cancellationToken).ConfigureAwait(false))
-            {
+            if (await transport.CreateAsync(Purpose, code, seed.TenantId, payload, expiry, cancellationToken).ConfigureAwait(false))
                 return code;
-            }
         }
-
         throw new InvalidOperationException("ATProto tenant handoff could not be created.");
     }
 
-    public async Task<AtprotoTenantHandoff?> ConsumeAsync(
-        string code,
-        HttpRequest request,
-        CancellationToken cancellationToken)
+    public async Task<AtprotoTenantHandoff?> ConsumeAsync(string code, HttpRequest request, CancellationToken cancellationToken)
     {
-        var payload = await _cache.ConsumeAsync(Purpose, code, cancellationToken).ConfigureAwait(false);
-        if (payload is null)
-        {
-            return null;
-        }
-
+        AtprotoTenantOriginBinding current;
         try
         {
-            var handoff = JsonSerializer.Deserialize<AtprotoTenantHandoff>(_protector.Unprotect(payload), JsonOptions);
-            var current = _originResolver.Resolve(request);
-            if (handoff is null
-                || handoff.ExpiresAt <= _timeProvider.GetUtcNow()
-                || handoff.Seed.TenantId != current.TenantId
-                || !string.Equals(handoff.Seed.TenantSlug, current.TenantSlug, StringComparison.Ordinal)
-                || !AtprotoTenantOriginResolver.OriginsEqual(handoff.Seed.Origin, current.Origin))
-            {
-                return null;
-            }
-
-            return handoff;
+            if (!request.IsHttps) return null;
+            current = resolver.Resolve(request);
         }
-        catch (Exception exception) when (exception is CryptographicException or JsonException or ArgumentException or InvalidOperationException)
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException) { return null; }
+
+        var candidate = await transport.ReadAsync(Purpose, code, current.TenantId, cancellationToken).ConfigureAwait(false);
+        if (candidate is null) return null;
+        AtprotoTenantHandoff? handoff;
+        try
+        {
+            handoff = JsonSerializer.Deserialize<AtprotoTenantHandoff>(protector.Unprotect(Convert.FromBase64String(candidate.ProtectedPayload)), JsonOptions);
+            if (handoff is null || handoff.Seed is null || handoff.Seed.Origin is null || handoff.ExpiresAt <= clock.GetUtcNow()
+                || handoff.ExpiresAt.ToUnixTimeMilliseconds() != candidate.ExpiresAtUnixMilliseconds
+                || handoff.Seed.TenantId != candidate.TenantId || handoff.Seed.TenantId != current.TenantId
+                || handoff.Seed.TenantSlug != current.TenantSlug
+                || !AtprotoTenantOriginResolver.OriginsEqual(handoff.Seed.Origin, current.Origin)
+                || !proof.Validate(request, handoff.Seed.BrowserBinding)
+                || handoff.ExpiresAt > handoff.Seed.BrowserBinding.ProofExpiresAt
+                || !ValidSession(handoff.Seed, handoff.Session)) return null;
+            AtprotoOAuthFlowValidation.Validate(handoff.Seed, resolver, proof);
+        }
+        catch (Exception exception) when (exception is CryptographicException or JsonException or ArgumentException or InvalidOperationException or FormatException)
         {
             return null;
         }
+        return await transport.ConsumeAsync(candidate, cancellationToken).ConfigureAwait(false) ? handoff : null;
     }
+
+    private bool ValidSession(AtprotoOAuthFlowSeed seed, AtprotoBffSessionResult? session) => session is not null
+        && session.UserId != Guid.Empty && session.ActorId != Guid.Empty && session.ParticipationId != Guid.Empty
+        && session.Did == seed.ExpectedDid && session.Classification == seed.Classification
+        && session.CanonicalActorId == seed.CanonicalActorId
+        && session.ExpectedCanonicalActorConcurrencyStamp == seed.ExpectedCanonicalActorConcurrencyStamp
+        && !string.IsNullOrWhiteSpace(session.AccessToken) && session.AccessToken.Length <= 16 * 1024
+        && session.ExpiresAt > clock.GetUtcNow();
 }

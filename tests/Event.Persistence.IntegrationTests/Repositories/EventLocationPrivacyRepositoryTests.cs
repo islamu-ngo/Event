@@ -657,7 +657,7 @@ public sealed class EventLocationPrivacyRepositoryTests(ProjectionTestContainerF
 
     private ExploreDbContext CreateTenantlessContext()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString)
             .UseSnakeCaseNamingConvention()
             .Options;

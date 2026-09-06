@@ -630,6 +630,16 @@ public sealed class EventLocationDualWriteTests(PostgreSqlContainerFixture fixtu
             await context.SaveChangesAsync(token);
             await service.DetachIfUnreferencedAsync(eventLocationId, token);
         }, CancellationToken.None);
+
+        if (carrier is EventSession or EventSessionGroup or EventAgendaItem)
+        {
+            var entry = context.Entry(carrier);
+            await entry.ReloadAsync();
+            await Assert.That(entry.Property<bool>(nameof(EventSession.IsDeleted)).CurrentValue).IsTrue();
+            await Assert.That(entry.Property<Guid?>(nameof(EventSession.EventLocationId)).CurrentValue).IsNull();
+            await Assert.That(entry.Property<Guid?>(nameof(EventSession.LocationId)).CurrentValue).IsNull();
+            await Assert.That(entry.Property<Guid?>(nameof(EventSession.RoomId)).CurrentValue).IsNull();
+        }
     }
 
     private async Task AssertZeroCarrierGapsAsync()

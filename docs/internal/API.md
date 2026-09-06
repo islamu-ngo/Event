@@ -40,6 +40,15 @@ client are the only browser contract source.
 ## Scope
 This document describes the full API behavior in `Explore.API`: the middleware pipeline, rate limiting, request timeouts, caching strategy, HATEOAS implementation, specification pattern, error handling, content negotiation, and client-generation flow.
 
+### Concurrency Request Headers
+
+Controllers using `EventControllerBase.TryParseConcurrencyStamp` require one
+strong quoted `If-Match` value containing a non-empty, hyphenated GUID. Bare
+GUIDs, weak tags, wildcard/list values, unmatched or repeated quotes, and empty
+GUIDs return validation errors before dispatch. Surrounding header whitespace
+is permitted; the parsed stamp reaches the handler for the existing stale-write
+check. No client timestamp or new concurrency authority is introduced.
+
 For task-first integration guidance, use [API_COOKBOOK.md](API_COOKBOOK.md). Generated OpenAPI output remains the endpoint and DTO reference; Scalar is a development/testing UI over that contract.
 
 ### Generated C# Client Shape

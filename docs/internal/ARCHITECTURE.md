@@ -158,6 +158,13 @@ own topology-specific histories. Migration and model-snapshot files are
 generated artifacts: change model/configuration code, then regenerate; never
 patch generated migration C# manually.
 
+ATProto transient authentication adds a deliberately instance-owned persistence
+boundary, separate from tenant-filtered business entities and the generic
+idempotency cache. Its encrypted payload and assertion-replay tables use
+immutable rows, unique digest claims and candidate-qualified conditional
+deletion. [ADR-014](adr/ADR-014-atproto-session-trust-bridge.md#relational-transient-storage-authority)
+owns the tenant-binding, ciphertext, expiry and uncertain-consume contract.
+
 ## Request Flow
 1. HTTP request enters the middleware pipeline (exception handling → security headers → correlation ID → logging → compression → HATEOAS → routing → timeouts → auth → rate limiting → authorization → output cache → ETag → idempotency).
 2. Controller receives request, dispatches MediatR command/query.

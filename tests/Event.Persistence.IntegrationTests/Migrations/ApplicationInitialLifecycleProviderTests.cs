@@ -44,28 +44,29 @@ public sealed class SqliteApplicationInitialLifecycleTests
     internal static async Task AssertLifecycleAsync(
         PrimaryDatabaseConnectionOptions databaseOptions)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>();
+        var options = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(options, databaseOptions);
         await using var context = new ExploreDbContext(options.Options);
         IMigrator migrator = context.GetService<IMigrator>();
-        string migration = context.Database.GetMigrations().Single();
+        string[] migrations = context.Database.GetMigrations().ToArray();
+        string latestMigration = migrations[^1];
 
-        await migrator.MigrateAsync(migration);
+        await migrator.MigrateAsync(latestMigration);
         await Assert.That(await context.Database.GetAppliedMigrationsAsync())
-            .IsEquivalentTo([migration]);
+            .IsEquivalentTo(migrations);
 
         await migrator.MigrateAsync(Migration.InitialDatabase);
         await Assert.That(await context.Database.GetAppliedMigrationsAsync()).IsEmpty();
 
-        await migrator.MigrateAsync(migration);
+        await migrator.MigrateAsync(latestMigration);
         await Assert.That(await context.Database.GetAppliedMigrationsAsync())
-            .IsEquivalentTo([migration]);
+            .IsEquivalentTo(migrations);
     }
 
     internal static async Task AssertDataProtectionLifecycleAsync(
         PrimaryDatabaseConnectionOptions databaseOptions)
     {
-        var options = new DbContextOptionsBuilder<DataProtectionKeyContext>();
+        var options = TestDbContextOptions.Create<DataProtectionKeyContext>();
         PrimaryDatabaseProviderComposition.ConfigureDataProtection(options, databaseOptions);
         await using var context = new DataProtectionKeyContext(options.Options);
         IMigrator migrator = context.GetService<IMigrator>();

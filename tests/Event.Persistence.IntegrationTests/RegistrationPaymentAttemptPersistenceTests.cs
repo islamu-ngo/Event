@@ -1360,7 +1360,7 @@ public sealed class RegistrationPaymentAttemptPersistenceTests
 
     private static async Task<ExploreDbContext> CreateContextAsync()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite("Data Source=:memory:")
             .UseSnakeCaseNamingConvention()
             .AddInterceptors(
@@ -1380,7 +1380,7 @@ public sealed class RegistrationPaymentAttemptPersistenceTests
         bool ensureCreated = true,
         IInterceptor? interceptor = null)
     {
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>()
+        var builder = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(new SqliteConnectionStringBuilder { DataSource = databasePath }.ToString())
             .UseSnakeCaseNamingConvention()
             .AddInterceptors(

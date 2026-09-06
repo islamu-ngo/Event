@@ -37,12 +37,12 @@ public abstract class EventControllerBase : ControllerBase
         }
 
         var value = ifMatch.Trim();
-        if (value.StartsWith("W/", StringComparison.OrdinalIgnoreCase))
+        if (value.Length != 38 || value[0] != '"' || value[^1] != '"')
         {
             return false;
         }
 
-        value = value.Trim('"');
-        return Guid.TryParse(value, out concurrencyStamp) && concurrencyStamp != Guid.Empty;
+        return Guid.TryParseExact(value.AsSpan(1, 36), "D", out concurrencyStamp)
+            && concurrencyStamp != Guid.Empty;
     }
 }

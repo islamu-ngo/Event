@@ -10,6 +10,7 @@ using Explore.Persistence.Security;
 using Explore.Persistence.Seed;
 using Explore.Infrastructure.ConfigurationManifest;
 using Explore.Infrastructure.Services;
+using Explore.ServiceDefaults;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.API.Hosting;
@@ -40,7 +41,7 @@ public static class ApiHostStartupExtensions
                 GracefulShutdownSeconds);
         });
 
-        Console.CancelKeyPress += (_, eventArgs) =>
+        app.Services.GetRequiredService<HostProcessSignalSubscriptions>().Register((_, eventArgs) =>
         {
             appLogger.LogWarning("SIGINT received. Initiating graceful shutdown...");
             eventArgs.Cancel = true;
@@ -53,7 +54,7 @@ public static class ApiHostStartupExtensions
             catch (ObjectDisposedException)
             {
             }
-        };
+        });
 
         if (!app.Environment.IsEnvironment("Testing") && !state.IsOpenApiGeneration)
         {

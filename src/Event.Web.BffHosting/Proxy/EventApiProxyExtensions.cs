@@ -86,6 +86,17 @@ public static class EventApiProxyExtensions
             {
                 context.AddRequestTransform(async transformContext =>
                 {
+                    // Deny the exact private capability even when a browser presents a valid assertion.
+                    // Header stripping alone cannot establish a server-only transport boundary.
+                    var path = transformContext.HttpContext.Request.Path.Value?.TrimEnd('/');
+                    if (new[] { "create", "read", "consume", "probe" }.Any(operation => string.Equals(
+                            path, "/api/auth/atproto/transient/" + operation, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        transformContext.HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
+                        transformContext.HttpContext.Response.Headers.CacheControl = "no-store";
+                        return;
+                    }
+
                     var enricher = transformContext.HttpContext.RequestServices
                         .GetRequiredService<EventBffRequestEnricher>();
                     var enrichment = await enricher.ResolveForProxyAsync(

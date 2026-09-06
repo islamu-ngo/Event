@@ -156,8 +156,7 @@ public sealed class BffAuthEndpointValidationTests
             {
                 ["Authentication:Provider"] = "atproto",
                 ["Authentication:AtprotoLoginEnabled"] = "true",
-                ["Atproto:PublicUrl"] = "https://events.example.test",
-                ["Atproto:UseSingleNodeMemoryStore"] = "true"
+                ["Atproto:PublicUrl"] = "https://events.example.test"
             })
             .Build();
         var manager = new DynamicAuthSchemeManager(

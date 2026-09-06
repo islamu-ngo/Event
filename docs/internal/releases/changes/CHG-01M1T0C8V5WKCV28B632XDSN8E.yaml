@@ -1,0 +1,29 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M1T0C8V5WKCV28B632XDSN8E
+Title: "Keep stale Web Push cleanup atomic with database retries"
+Type: fix
+Scope: notifications
+Summary: "Commit terminal dispatch updates and same-tenant subscription deactivation as one transactional retry unit, rolling back both changes when cleanup fails."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/NOTIFICATIONS.md
+    Disposition: documented
+    Detail: Tenant and lease predicates remain enforced across atomic dispatch and subscription cleanup.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/communications-and-notifications/in-app-notifications.md
+    Disposition: documented
+    Detail: Retired push-endpoint cleanup cannot leave only one of the dispatch and subscription changes committed.

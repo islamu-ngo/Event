@@ -106,7 +106,7 @@ public sealed class NotificationFanoutSettlementSqliteTests
     }
 
     private static ExploreDbContext CreateContext(SqliteConnection connection) =>
-        new(new DbContextOptionsBuilder<ExploreDbContext>()
+        new(TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connection)
             .UseSnakeCaseNamingConvention()
             .Options);

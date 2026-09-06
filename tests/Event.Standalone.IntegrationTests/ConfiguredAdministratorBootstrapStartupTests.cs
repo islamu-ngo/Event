@@ -168,6 +168,7 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
             EnvironmentName = "Staging"
         });
         builder.WebHost.UseTestServer();
+        builder.AddServiceDefaults();
         builder.Configuration.AddInMemoryCollection(BaseValues(ConfiguredValues()));
         builder.Services.AddLogging();
         builder.Services.AddSingleton<IInstanceOperatorIdentity, OperatorIdentityProbe>();

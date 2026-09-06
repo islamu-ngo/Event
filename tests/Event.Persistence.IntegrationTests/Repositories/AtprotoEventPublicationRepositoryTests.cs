@@ -30,7 +30,7 @@ public sealed class AtprotoEventPublicationRepositoryTests(PostgreSqlContainerFi
         await fixture.ResetAsync();
         (Guid tenantId, Guid eventId) = await SeedEventAsync();
         var counter = new CommandCountingInterceptor();
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString)
             .UseSnakeCaseNamingConvention()
             .AddInterceptors(counter)

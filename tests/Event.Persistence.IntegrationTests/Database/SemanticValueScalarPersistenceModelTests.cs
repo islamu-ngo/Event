@@ -242,11 +242,8 @@ public sealed class SemanticValueScalarPersistenceModelTests
 
     private static ExploreDbContext CreateContext(PrimaryDatabaseProvider provider)
     {
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>();
-        builder.EnableServiceProviderCaching(false);
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(builder, CreateOptions(provider));
-        builder.ConfigureWarnings(warnings =>
-            warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning));
         return new ExploreDbContext(builder.Options);
     }
 

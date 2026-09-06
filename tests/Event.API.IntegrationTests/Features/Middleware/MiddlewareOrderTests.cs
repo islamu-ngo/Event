@@ -8,7 +8,11 @@ using Event.Api.IntegrationTests.Helpers;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Exceptions;
+using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Domain.Settings.Documents;
+using Explore.Domain.Settings.Documents.Payloads;
+using Explore.Persistence;
 using MediatR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -72,6 +76,32 @@ public class MiddlewareOrderTests
         });
 
         using var client = app.CreateClient();
+        using (var scope = app.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            context.Tenants.Add(new Tenant
+            {
+                Id = tenantId,
+                FullName = "Alpha directory",
+                Slug = "alpha",
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!
+            });
+            context.Set<TenantSettingsDocument>().Add(
+                TenantDirectoryOperatorIdentityDocumentDefaults.Create(tenantId,
+                    new TenantDirectoryOperatorIdentitySettings
+                    {
+                        PublicName = "Alpha Operator",
+                        LegalName = "Alpha Operator",
+                        OperatorKindCode = "registered_organization",
+                        JurisdictionCountryCode = "BE",
+                        PublicContactEmail = "operator@alpha.test",
+                        LegalNoticeUrl = "https://alpha.test/legal",
+                        PrivacyUrl = "https://alpha.test/privacy"
+                    }));
+            await context.SaveChangesAsync();
+        }
+
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/PublicExperience/settings");
         request.Headers.Add("X-Tenant-Slug", "alpha");
 

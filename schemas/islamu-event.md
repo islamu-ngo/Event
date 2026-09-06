@@ -7252,6 +7252,35 @@ Table "policy_change_outbox" {
   }
 }
 
+Table "atproto_transient_records" {
+  "id" uuid [pk, not null, note: 'Application-assigned UUIDv7; immutable candidate identity']
+  "purpose" int [not null, note: '1 OAuthState, 2 TenantHandoff, 3 internal HealthProbe']
+  "token_digest" char(64) [not null, note: 'Lowercase SHA-256 locator digest; never the raw state or handoff code']
+  "tenant_id" uuid [note: 'Mandatory nonempty binding for authentication purposes; null only for internal health probes']
+  "protected_payload" varchar(65536) [not null, note: 'BFF-protected ciphertext; application boundary also enforces 64 KiB UTF-8']
+  "expires_at_unix_milliseconds" bigint [not null]
+
+  indexes {
+    (purpose, token_digest) [unique]
+    expires_at_unix_milliseconds
+  }
+
+  Note: 'Instance-owned authentication infrastructure, not a tenant-filtered business aggregate. Rows are insert-only and conditionally deleted using candidate identity, purpose, digest, expected tenant and fresh expiry. Exactly one committed delete may return ciphertext. Tenant-purpose shape is database constrained; live eligibility does not depend on cleanup.'
+}
+
+Table "atproto_transient_assertion_replays" {
+  "id" uuid [pk, not null, note: 'Application-assigned UUIDv7']
+  "assertion_digest" char(64) [not null, note: 'SHA-256 digest of a transient-service assertion identifier; no raw assertion']
+  "expires_at_unix_milliseconds" bigint [not null, note: 'Retains the claim through the full assertion acceptance and clock-skew window']
+
+  indexes {
+    assertion_digest [unique]
+    expires_at_unix_milliseconds
+  }
+
+  Note: 'Instance-owned, insert-only replay authority for machine requests before tenant restoration. Separate from tenant-scoped bootstrap replay and ordinary idempotency records. Bounded cleanup physically deletes expired claims.'
+}
+
 Table "idempotency_records" {
   "id" uuid [pk, not null, note: 'uuidv7()']
   "key" varchar(128) [not null]

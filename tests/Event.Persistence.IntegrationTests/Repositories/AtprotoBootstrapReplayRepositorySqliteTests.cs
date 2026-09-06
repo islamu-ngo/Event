@@ -21,11 +21,19 @@ public sealed class AtprotoBootstrapReplayRepositorySqliteTests
             await CreateDatabaseAsync(databasePath);
             Guid tenantId = Guid.CreateVersion7();
             const string jti = "sqlite-bootstrap-contention";
-            DateTimeOffset expiresAt = DateTimeOffset.UtcNow.AddMinutes(1);
             ExploreDbContext[] contexts = Enumerable.Range(0, 4).Select(_ => CreateContext(databasePath)).ToArray();
 
+            DateTimeOffset expiresAt;
             try
             {
+                foreach (ExploreDbContext context in contexts)
+                {
+                    await context.Database.OpenConnectionAsync();
+                    await Assert.That(await context.IdempotencyRecords.CountAsync())
+                        .IsEqualTo(0);
+                }
+
+                expiresAt = DateTimeOffset.UtcNow.AddMinutes(1);
                 var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 Task<bool>[] attempts = contexts.Select(async context =>
                 {
@@ -107,7 +115,7 @@ public sealed class AtprotoBootstrapReplayRepositorySqliteTests
             DefaultTimeout = 30,
             Pooling = false,
         }.ToString();
-        return new ExploreDbContext(new DbContextOptionsBuilder<ExploreDbContext>()
+        return new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connectionString)
             .UseSnakeCaseNamingConvention()
             .Options);

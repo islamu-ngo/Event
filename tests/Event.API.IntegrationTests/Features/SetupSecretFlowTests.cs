@@ -4,15 +4,21 @@
 using System.Net;
 using System.Net.Http.Json;
 using Event.Api.IntegrationTests.Fixtures;
+using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Authentication;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
+using Explore.Application.DTOs.TenantSettings;
 using Explore.Application.Onboarding;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
+using Explore.Persistence.Database;
+using Explore.Secrets.Database;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -22,7 +28,7 @@ namespace Event.Api.IntegrationTests.Features;
 public class SetupSecretFlowTests
 {
     private const string BaseUrl = "/api/instanceonboarding";
-    private const string SetupSecret = "integration-test-secret-flow";
+    private static string SetupSecret => OnboardingWebApplicationFactory.SetupSecret;
 
     [Test]
     public async Task ValidateSecret_WithCorrectSecret_ShouldReturn200WithValidTrue()
@@ -93,7 +99,7 @@ public class SetupSecretFlowTests
         using var factory = CreateFactoryWithSetupSecret();
         using var client = factory.CreateClient();
 
-        var userId = Guid.NewGuid();
+        var userId = Guid.CreateVersion7();
         await EnsureUserExistsAsync(factory, userId);
 
         // Complete onboarding to end setup mode
@@ -127,7 +133,7 @@ public class SetupSecretFlowTests
         using var factory = CreateFactoryWithSetupSecret();
         using var client = factory.CreateClient();
 
-        var userId = Guid.NewGuid();
+        var userId = Guid.CreateVersion7();
         await EnsureUserExistsAsync(factory, userId);
 
         var completePayload = CreateValidSettings();
@@ -148,7 +154,7 @@ public class SetupSecretFlowTests
         using var factory = CreateFactoryWithSetupSecret();
         using var client = factory.CreateClient();
 
-        var userId = Guid.NewGuid();
+        var userId = Guid.CreateVersion7();
         await EnsureUserExistsAsync(factory, userId);
 
         var completePayload = CreateValidSettings();
@@ -183,7 +189,7 @@ public class SetupSecretFlowTests
         using var factory = CreateFactoryWithSetupSecret();
         using var client = factory.CreateClient();
 
-        var userId = Guid.NewGuid();
+        var userId = Guid.CreateVersion7();
         await EnsureUserExistsAsync(factory, userId);
 
         using var request = CreateInstanceAdminRequest(
@@ -200,7 +206,7 @@ public class SetupSecretFlowTests
         using var factory = CreateFactoryWithSetupSecret();
         using var client = factory.CreateClient();
 
-        var userId = Guid.NewGuid();
+        var userId = Guid.CreateVersion7();
         await EnsureUserExistsAsync(factory, userId);
 
         using var completeRequest = CreateInstanceAdminRequest(
@@ -220,14 +226,12 @@ public class SetupSecretFlowTests
 
     private static AuthenticatedWebApplicationFactory CreateFactoryWithSetupSecret()
     {
-        Environment.SetEnvironmentVariable("SETUP_SECRET", SetupSecret);
-        return new AuthenticatedWebApplicationFactory();
+        return new OnboardingWebApplicationFactory();
     }
 
     private static AuthenticatedWebApplicationFactory CreateFactoryWithSetupSecret(
         IInstanceBootstrapAuditLogger auditLogger)
     {
-        Environment.SetEnvironmentVariable("SETUP_SECRET", SetupSecret);
         return new BootstrapAuditFactory(auditLogger);
     }
 
@@ -248,6 +252,19 @@ public class SetupSecretFlowTests
             FirstName = "Test",
             LastName = "User"
         } });
+        dbContext.UserExternalLogins.Add(new UserExternalLogin
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = userId,
+            User = null!,
+            AuthenticationProviderId = (int)AuthenticationProviderKind.Keycloak,
+            AuthenticationProvider = null!,
+            ProviderKey = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
+                OnboardingWebApplicationFactory.Issuer, userId.ToString("D")).Value,
+            ProviderDisplayName = "keycloak",
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        });
 
         await dbContext.SaveChangesAsync();
     }
@@ -256,7 +273,10 @@ public class SetupSecretFlowTests
         HttpMethod method, string url, Guid userId, object? body, bool includeSetupSecret)
     {
         var request = new HttpRequestMessage(method, url);
-        request.Headers.Add(TestAuthHandler.AuthHeaderName, TestAuthHandler.CreateInstanceAdminHeaderValue(userId));
+        request.Headers.Add(TestAuthHandler.AuthHeaderName,
+            TestAuthHandler.CreateAuthHeaderValue(userId, "Instance Admin",
+                ("iss", OnboardingWebApplicationFactory.Issuer),
+                ("idp", "keycloak")));
 
         if (includeSetupSecret)
             request.Headers.Add("X-Setup-Secret", SetupSecret);
@@ -273,6 +293,16 @@ public class SetupSecretFlowTests
         {
             DeploymentMode = DeploymentMode.SingleTenant,
             SiteProfile = new SelfHostOnboardingProfileDto { SiteName = "Test Instance" },
+            DirectoryOperatorIdentity = new TenantDirectoryOperatorIdentityInputDto
+            {
+                PublicName = "Test Operator",
+                LegalName = "Test Operator",
+                OperatorKindCode = "registered_organization",
+                JurisdictionCountryCode = "BE",
+                PublicContactEmail = "operator@integration.test",
+                LegalNoticeUrl = "https://integration.test/legal",
+                PrivacyUrl = "https://integration.test/privacy"
+            },
             InstanceName = "Test Instance"
         };
     }
@@ -283,7 +313,7 @@ public class SetupSecretFlowTests
     }
 
     private sealed class BootstrapAuditFactory(IInstanceBootstrapAuditLogger auditLogger)
-        : AuthenticatedWebApplicationFactory
+        : OnboardingWebApplicationFactory
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -309,4 +339,86 @@ public class SetupSecretFlowTests
     }
 
     #endregion
+}
+
+// ABOUTME: Isolates onboarding HTTP tests with real SQLite transactions and deployment-injected setup authority.
+// ABOUTME: Keeps the shared registration/auth fixture unchanged and preserves request-scoped tenant filters.
+internal class OnboardingWebApplicationFactory : AuthenticatedWebApplicationFactory
+{
+    internal const string Issuer = "https://auth.example.com";
+    internal static string SetupSecret { get; } = RequireSecret("SETUP_SECRET");
+    private readonly string _databasePath = Path.Combine(
+        Path.GetTempPath(), $"onboarding-{Guid.NewGuid():N}.db");
+    private readonly SqliteConnection _connection;
+
+    internal static string RequireSecret(string key) =>
+        Environment.GetEnvironmentVariable(key) is { Length: > 0 } value
+            ? value
+            : throw new InvalidOperationException($"Inject {key} from the documented test secret authority.");
+
+    public OnboardingWebApplicationFactory()
+    {
+        AdditionalConfiguration["SETUP_SECRET"] = SetupSecret;
+        ClientOptions.BaseAddress = new Uri("https://localhost");
+        _connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = _databasePath,
+            Pooling = false
+        }.ToString());
+        _connection.Open();
+    }
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.ConfigureTestServices(services =>
+        {
+            services.RemoveExploreDbContextRegistrations();
+            var options = new DbContextOptionsBuilder<ExploreDbContext>();
+            ConfigureDatabase(options);
+            using (var context = new ExploreDbContext(options.Options))
+            {
+                context.Database.EnsureCreated();
+            }
+
+            services.AddDbContextFactory<ExploreDbContext>(ConfigureDatabase);
+            services.AddScoped(provider =>
+            {
+                var context = provider.GetRequiredService<IDbContextFactory<ExploreDbContext>>()
+                    .CreateDbContext();
+                context.ClearTenantFilterBypass();
+                context.TenantContext = provider.GetService<ITenantContext>();
+                context.CurrentUserService = provider.GetService<ICurrentUserService>();
+                return context;
+            });
+        });
+    }
+
+    private void ConfigureDatabase(DbContextOptionsBuilder options)
+    {
+        PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
+        {
+            Role = PrimaryDatabaseRole.Runtime,
+            Provider = PrimaryDatabaseProvider.Sqlite,
+            Database = _databasePath
+        });
+        options.UseSqlite(_connection).UseSnakeCaseNamingConvention();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if (disposing)
+        {
+            _connection.Dispose();
+            File.Delete(_databasePath);
+        }
+    }
+
+    public override async ValueTask DisposeAsync()
+    {
+        await base.DisposeAsync();
+        await _connection.DisposeAsync();
+        File.Delete(_databasePath);
+    }
 }

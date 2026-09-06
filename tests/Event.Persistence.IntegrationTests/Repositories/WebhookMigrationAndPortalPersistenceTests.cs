@@ -46,8 +46,8 @@ public sealed class WebhookMigrationAndPortalPersistenceTests(PostgreSqlContaine
     [Test]
     public async Task PersistedBinding_GrantsPortalCapabilityOnlyAfterExactOwnershipVerification()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase($"webhook-portal-binding-{Guid.NewGuid():N}")
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase($"webhook-portal-binding-{Guid.NewGuid():N}")
             .Options;
         await using var context = new ExploreDbContext(options);
         var tenantId = Guid.CreateVersion7();
@@ -146,7 +146,7 @@ public sealed class WebhookMigrationAndPortalPersistenceTests(PostgreSqlContaine
 
     private static ExploreDbContext CreateRelationalContext()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql("Host=localhost;Database=webhook_model;Username=unused;Password=unused")
             .UseSnakeCaseNamingConvention()
             .Options;

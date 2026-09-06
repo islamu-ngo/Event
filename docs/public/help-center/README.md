@@ -28,7 +28,7 @@ No repository-supported Kubernetes or Helm package is currently shipped. Do not 
 
 ## Which identity and authorization systems are required?
 
-Keycloak is the required browser identity authority. Authorization is a separate explicit runtime choice between Cerbos and local DB-backed RBAC. AT Protocol login, when enabled, links to an existing local user and does not create a second authorization model.
+Choose Local Identity, Keycloak, or AT Protocol as the primary browser identity authority; Keycloak is not required for the other modes. Primary AT Protocol can create a passwordless account for a verified DID, while optional AT Protocol sign-in requires an existing exact account link. Authorization is a separate explicit runtime choice between Cerbos and local DB-backed RBAC; changing identity providers does not grant roles or create a second authorization model.
 
 ## What happens if Cerbos is unavailable?
 

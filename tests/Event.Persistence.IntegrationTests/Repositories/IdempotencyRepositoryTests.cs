@@ -80,7 +80,7 @@ public sealed class IdempotencyRepositoryTests(PostgreSqlContainerFixture fixtur
 
     private ExploreDbContext CreateNonRetryingContext(params IInterceptor[] interceptors)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString)
             .UseSnakeCaseNamingConvention()
             .AddInterceptors(interceptors)

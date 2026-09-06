@@ -21,8 +21,8 @@ public sealed class AdmissionTargetMaterializationRepositoryTests
     {
         Guid tenantId = Guid.CreateVersion7();
         Guid eventId = Guid.CreateVersion7();
-        DbContextOptions<ExploreDbContext> options = new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase($"admission-target-materialization-{Guid.NewGuid():N}")
+        DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase($"admission-target-materialization-{Guid.NewGuid():N}")
             .Options;
         DomainEvent eventTarget = CreateEvent(tenantId, eventId);
         EventTicketCatalogVersion catalog = CreateCatalog(tenantId, eventId);

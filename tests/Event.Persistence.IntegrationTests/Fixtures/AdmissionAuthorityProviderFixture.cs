@@ -107,6 +107,7 @@ public sealed class AdmissionAuthorityProviderFixture
             .WithPortBinding(SqlServerPort, assignRandomHostPort: true)
             .WithEnvironment("ACCEPT_EULA", "Y")
             .WithEnvironment("MSSQL_PID", "Developer")
+            .WithEnvironment("MSSQL_MEMORY_LIMIT_MB", "1024")
             .WithEnvironment("MSSQL_SA_PASSWORD", _password)
             .WithWaitStrategy(
                 Wait.ForUnixContainer()
@@ -119,6 +120,7 @@ public sealed class AdmissionAuthorityProviderFixture
             .WithImage(provider == PrimaryDatabaseProvider.MariaDb
                 ? "mariadb:11.4.7"
                 : "mysql:8.4.6")
+            .WithCommand("--performance-schema=OFF", "--innodb-buffer-pool-size=64M")
             .WithPortBinding(MySqlPort, assignRandomHostPort: true)
             .WithWaitStrategy(
                 Wait.ForUnixContainer()

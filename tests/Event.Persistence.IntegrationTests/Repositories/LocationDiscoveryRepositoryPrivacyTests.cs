@@ -129,7 +129,7 @@ public sealed class LocationDiscoveryRepositoryPrivacyTests(PostgreSqlContainerF
 
     private ExploreDbContext CreateTenantContext(Guid tenantId, DbCommandInterceptor interceptor)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString)
             .UseSnakeCaseNamingConvention()
             .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning))

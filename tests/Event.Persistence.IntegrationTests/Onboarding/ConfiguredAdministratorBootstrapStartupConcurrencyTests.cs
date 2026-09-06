@@ -32,16 +32,14 @@ public sealed class ConfiguredAdministratorBootstrapStartupConcurrencyTests
             Path.GetTempPath(),
             $"configured-bootstrap-{Guid.NewGuid():N}.db");
         var coordination = new EmptyBootstrapRaceCoordination();
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         try
         {
             await using (ExploreDbContext setup = CreateContext(databasePath))
             {
-                await setup.Database.EnsureCreatedAsync(timeout.Token);
+                await setup.Database.EnsureCreatedAsync();
                 await setup.Database.ExecuteSqlRawAsync(
-                    "PRAGMA journal_mode=WAL;",
-                    timeout.Token);
+                    "PRAGMA journal_mode=WAL;");
             }
 
             IConfiguration configuration = CreateConfiguration();
@@ -55,15 +53,20 @@ public sealed class ConfiguredAdministratorBootstrapStartupConcurrencyTests
             ConfiguredAdministratorBootstrapStartupRunner first = CreateRunner(firstContext, configuration);
             ConfiguredAdministratorBootstrapStartupRunner second = CreateRunner(secondContext, configuration);
 
-            await Task.WhenAll(
+            // Initialize models without opening connections or triggering the race interceptors.
+            _ = firstContext.Model;
+            _ = secondContext.Model;
+            using (var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30)))
+            {
+                await Task.WhenAll(
                     first.PrepareAsync(timeout.Token),
-                    second.PrepareAsync(timeout.Token))
-                .WaitAsync(timeout.Token);
+                    second.PrepareAsync(timeout.Token));
+            }
 
             await using ExploreDbContext verification = CreateContext(databasePath);
             var states = await verification.InstanceBootstrapStates
                 .AsNoTracking()
-                .ToListAsync(timeout.Token);
+                .ToListAsync();
             await Assert.That(states).Count().IsEqualTo(1);
             await Assert.That(states[0].Status).IsEqualTo(InstanceBootstrapStatus.Pending);
             await Assert.That(states[0].Generation).IsEqualTo(1L);
@@ -131,7 +134,7 @@ public sealed class ConfiguredAdministratorBootstrapStartupConcurrencyTests
             Pooling = false,
             DefaultTimeout = 1
         }.ToString();
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connectionString)
             .UseSnakeCaseNamingConvention()
             .AddInterceptors(interceptors)
@@ -218,12 +221,13 @@ public sealed class ConfiguredAdministratorBootstrapMySqlConcurrencyTests(
     public async Task ConcurrentPrepareAgainstEmptyMySqlFamilyDatabaseConverges(
         PrimaryDatabaseProvider provider)
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         await using (ExploreDbContext setup = CreateContext(fixture.CreateOptions(provider)))
         {
-            await setup.Database.EnsureCreatedAsync(timeout.Token);
+            await setup.Database.EnsureCreatedAsync();
         }
 
+        // Bound the bootstrap race, not provisioning the full application schema.
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         var barrier = new EmptyReadBarrier(participantCount: 2);
         IConfiguration configuration =
             ConfiguredAdministratorBootstrapStartupConcurrencyTests.CreateConfiguration();
@@ -256,7 +260,7 @@ public sealed class ConfiguredAdministratorBootstrapMySqlConcurrencyTests(
         PrimaryDatabaseConnectionOptions options,
         params IInterceptor[] interceptors)
     {
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>();
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(builder, options);
         builder.AddInterceptors(interceptors);
         return new ExploreDbContext(builder.Options);

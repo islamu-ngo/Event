@@ -8,20 +8,18 @@ namespace Event.Api.IntegrationTests.Features;
 internal static class PaidAcceptanceTestFacts
 {
     internal static PaidOrderAcceptanceSnapshot Create(
-        Guid tenantId,
+        OrganizerPaymentRecipientSnapshot recipient,
         Guid orderId,
         Guid eventId,
         string compositionRevision,
-        Guid instancePolicyVersionId,
-        Guid? tenantPolicyVersionId,
         long organizerAmountMinor,
         long platformFeeMinor,
         long platformContributionMinor,
         DateTime acceptedAt) => PaidOrderAcceptanceSnapshot.Create(
-            Guid.CreateVersion7(), tenantId, tenantId, orderId, eventId, compositionRevision, "disclosure",
+            Guid.CreateVersion7(), recipient.TenantId, recipient.TenantId, orderId, eventId, compositionRevision, "disclosure",
             PaidOrderAcceptanceSnapshot.CurrentAcceptanceTemplateIdentifier,
             PaidOrderAcceptanceSnapshot.CurrentAcceptanceTemplateText,
-            Guid.CreateVersion7(),
+            recipient.OrganizerActorId,
             "Example Organizer, legal merchant for this order",
             PaidCheckoutTenantDirectoryOperatorDisclosure.Create(
                 Guid.CreateVersion7(), Guid.CreateVersion7(), "Community Events", "Community Events ASBL",
@@ -35,11 +33,12 @@ internal static class PaidAcceptanceTestFacts
             PaidOrderDeliverySnapshot.Create(
                 new DateTimeOffset(acceptedAt.AddDays(10)), new DateTimeOffset(acceptedAt.AddDays(10).AddHours(3)),
                 "Europe/Brussels"),
-            "EUR", organizerAmountMinor, platformFeeMinor, platformContributionMinor,
-            checked(organizerAmountMinor + platformContributionMinor), instancePolicyVersionId, 1,
+            recipient.CurrencyCode, organizerAmountMinor, platformFeeMinor, platformContributionMinor,
+            checked(organizerAmountMinor + platformContributionMinor), recipient.InstancePolicyVersionId, 1,
             "Refund policy", "en-GB", "support@example.test",
             PaidCheckoutProviderDisclosure.Create(
-                "stripe", "OrganizerDirect", "direct-charge", "EXAMPLE EVENT", "test", "instance-operator"),
+                recipient.ProviderCode, recipient.ProfileCode, "direct-charge", "EXAMPLE EVENT", "test", "instance-operator"),
             [PaidOrderAcceptanceLineFact.Create(Guid.CreateVersion7(), "Admission", 1, organizerAmountMinor, 0, organizerAmountMinor)],
-            acceptedAt, tenantPolicyVersionId);
+            acceptedAt, recipient.TenantPolicyVersionId, recipient.OrganizerPaymentProviderConnectionId,
+            recipient.ConnectPlatformId, recipient.ExternalAccountId, recipient.MerchantCountryCode);
 }

@@ -2,12 +2,14 @@
 // ABOUTME: Registers safe platform meters and activity sources used by API, workers, and infrastructure adapters.
 
 using Explore.ServiceDefaults.Compliance;
+using Explore.ServiceDefaults;
 using Explore.ServiceDefaults.HealthChecks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Compliance.Redaction;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.ServiceDiscovery;
@@ -28,6 +30,7 @@ public static class Extensions
 
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
+        builder.Services.TryAddSingleton<HostProcessSignalSubscriptions>();
         builder.ConfigureRedaction();
 
         builder.ConfigureOpenTelemetry();

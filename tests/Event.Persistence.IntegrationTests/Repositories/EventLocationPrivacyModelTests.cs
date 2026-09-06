@@ -62,16 +62,22 @@ public sealed class EventLocationPrivacyModelTests
                 ?? throw new InvalidOperationException($"{carrierType.Name} is not mapped.");
             await Assert.That(entityType.FindAnnotation("EventLocationPrivacy:ConsistencyTrigger")?.Value)
                 .IsNotNull();
-            await Assert.That(entityType.GetIndexes().Any(index =>
-                index.Properties.Select(property => property.Name).Contains(nameof(EventLocation.TenantId))
-                && index.Properties.Select(property => property.Name).Contains("EventLocationId")))
-                .IsTrue();
+            string[] consistencyProperties =
+            [
+                "TenantId",
+                carrierType == typeof(EventSessionAgendaItem) ? "EventSessionId" : "EventId",
+                "EventLocationId",
+                "LocationId"
+            ];
+            IIndex consistencyIndex = entityType.GetIndexes().Single(index =>
+                index.Properties.Select(property => property.Name).SequenceEqual(consistencyProperties));
+            await Assert.That(consistencyIndex.GetFilter()).IsNull();
         }
     }
 
     private static ExploreDbContext CreateContext()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql("Host=localhost;Database=event_location_privacy_model;Username=unused;Password=unused")
             .UseSnakeCaseNamingConvention()
             .Options;

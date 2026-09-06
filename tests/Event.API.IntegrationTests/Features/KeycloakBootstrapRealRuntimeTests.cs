@@ -20,8 +20,9 @@ namespace Event.Api.IntegrationTests.Features;
 public sealed class KeycloakBootstrapRealRuntimeTests
 {
     private const string BaseUrl = "/api/instanceonboarding";
-    private const string SetupSecret = "integration-setup-secret";
-    private const string RotatedBlazorSecret = "rotated-blazor-secret-for-real-keycloak";
+    private static string SetupSecret => OnboardingWebApplicationFactory.SetupSecret;
+    private static string RotatedBlazorSecret =>
+        OnboardingWebApplicationFactory.RequireSecret("KEYCLOAK_BLAZOR_CLIENT_SECRET");
 
     private readonly KeycloakOnlyFixture _keycloak;
 
@@ -35,6 +36,7 @@ public sealed class KeycloakBootstrapRealRuntimeTests
     {
         using var factory = new RealKeycloakBootstrapFactory(_keycloak.KeycloakBaseUrl);
         using var client = factory.CreateClient();
+        await Assert.That(RotatedBlazorSecret).IsNotEqualTo(KeycloakContainerFixture.TestClientSecret);
         var payload = CreateBootstrapRequest(_keycloak.KeycloakBaseUrl, RotatedBlazorSecret);
 
         try
@@ -76,7 +78,9 @@ public sealed class KeycloakBootstrapRealRuntimeTests
         }
         finally
         {
-            await SendBootstrapRequestAsync(client, CreateBootstrapRequest(_keycloak.KeycloakBaseUrl, KeycloakContainerFixture.TestClientSecret));
+            using var restoreResponse = await SendBootstrapRequestAsync(
+                client, CreateBootstrapRequest(_keycloak.KeycloakBaseUrl, KeycloakContainerFixture.TestClientSecret));
+            await Assert.That(restoreResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         }
     }
 
@@ -108,7 +112,7 @@ public sealed class KeycloakBootstrapRealRuntimeTests
         };
     }
 
-    private sealed class RealKeycloakBootstrapFactory : AuthenticatedWebApplicationFactory
+    private sealed class RealKeycloakBootstrapFactory : OnboardingWebApplicationFactory
     {
         private readonly string _keycloakBaseUrl;
 

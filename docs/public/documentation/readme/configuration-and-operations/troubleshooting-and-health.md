@@ -1,6 +1,8 @@
 ---
 description: Practical troubleshooting guide, symptom matrix, and step-by-step recovery recipes.
 ---
+<!-- ABOUTME: Provides operator recovery steps and sanitized health interpretation. -->
+<!-- ABOUTME: Covers deployment, authentication, database, and dependency failures. -->
 
 # Troubleshooting & Operational Health
 
@@ -242,6 +244,34 @@ Example healthy response from `/health`:
 }
 ```
 *Note: Health responses never disclose passwords, connection strings, or PII.*
+
+### AT Protocol readiness recovery
+
+Inspect the `atproto-authentication` entry on the browser-facing host's
+`/health` response. Disabled AT Protocol is healthy. A failed AT Protocol
+primary is unhealthy (`503`); a failed optional AT Protocol login with an
+explicit Local Identity or Keycloak primary is degraded (`200`). That optional
+failure does not itself take the host out of service, although other checks
+can still fail. `/alive` does not depend on the AT Protocol store probe.
+
+1. For `state_store_unavailable`, restore the private API connection, primary
+   database availability/current migrations, and shared OAuth signing keys.
+   Do not expose or copy key values, assertions, callbacks, or database rows
+   into a support report.
+2. Wait more than ten seconds for the cached readiness result to expire and
+   request `/health` again. The probe has a two-second deadline, uses random
+   non-secret data, and does not automatically retry or hedge requests.
+3. Start a new login from the handle form. Do not retry an old callback or
+   consume request after a lost response. A healthy store probe does not
+   guarantee a user's external PDS or discovery service is available.
+4. If expired rows accumulate, confirm the global scheduler is enabled and
+   `atproto-transient-cleanup` is running every minute. It remains needed when
+   login is disabled. Monitor its fixed success/failure and completed-row
+   counters; never extend expiry to recover an old login.
+
+See [AT Protocol readiness, cleanup, and retention](../federation-and-open-protocols/at-protocol-and-bluesky-jetstream.md#readiness-cleanup-and-retention)
+for cleanup limits, shared protection-key persistence, and backup-retention
+boundaries.
 
 ---
 

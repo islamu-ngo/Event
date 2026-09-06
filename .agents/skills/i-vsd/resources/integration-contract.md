@@ -62,7 +62,7 @@ Planning and plan-review reports include:
 ## Planning Handoff
 - Workstream: <task-name>
 - Status: draft | current | stale | superseded
-- Reviewed input revision: <Git object or sha256 digest>
+- Reviewed input: <workstream name or plan title>
 - Findings and mitigations: IVSD-Fnnn -> IVSD-Mnnn
 - Required plan mappings: <ID -> scenario/task/non-applicability/escalation>
 - Escalations required before: planning approval | implementation | release

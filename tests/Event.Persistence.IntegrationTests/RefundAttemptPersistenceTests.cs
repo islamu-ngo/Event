@@ -391,7 +391,7 @@ public sealed class RefundAttemptPersistenceTests
             merchantCountryCode: recipient?.MerchantCountryCode ?? "BE");
 
     private static DbContextOptions<ExploreDbContext> Options(SqliteConnection connection) =>
-        new DbContextOptionsBuilder<ExploreDbContext>()
+        TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connection)
             .UseSnakeCaseNamingConvention()
             .AddInterceptors(

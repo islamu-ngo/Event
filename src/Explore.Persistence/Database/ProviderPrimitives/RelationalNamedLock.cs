@@ -43,6 +43,8 @@ internal static class RelationalNamedLock
         if (providerName == SqliteProvider)
         {
             string sqliteResource = resource.Trim();
+            SqliteNamedLockTransactionInterceptor.Instance.ReleaseCompletedTransactionsFor(
+                dbContext.Database.GetDbConnection());
             if (SqliteNamedLockTransactionInterceptor.Instance.IsTracked(
                     transaction,
                     sqliteResource))

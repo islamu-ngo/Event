@@ -7,7 +7,7 @@ using var shutdownCts = new CancellationTokenSource();
 var shutdownState = 0;
 var builder = WebApplication.CreateBuilder(args);
 var apiHost = builder.AddApiHostServices(() => Volatile.Read(ref shutdownState) != 0);
-var app = builder.Build();
+await using var app = builder.Build();
 
 await app.RunApiHostStartupAsync(
     apiHost,

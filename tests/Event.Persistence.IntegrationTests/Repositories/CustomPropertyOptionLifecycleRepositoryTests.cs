@@ -225,8 +225,8 @@ public sealed class CustomPropertyOptionLifecycleRepositoryTests
 
     private static ExploreDbContext CreateContext(InMemoryDatabaseRoot databaseRoot)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"), databaseRoot)
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase(Guid.NewGuid().ToString("N"), databaseRoot)
             .Options;
 
         var context = new ExploreDbContext(options);

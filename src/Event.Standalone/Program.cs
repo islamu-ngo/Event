@@ -35,7 +35,7 @@ builder.AddBlazorHostServices(hostProfile, shutdownState);
 builder.Services.AddCombinedApiBridge();
 builder.AddStandaloneSchedulerDashboard();
 
-var app = builder.Build();
+await using var app = builder.Build();
 var primaryDatabase = PrimaryDatabaseConfiguration.BindRuntime(app.Configuration);
 if (primaryDatabase.Provider == PrimaryDatabaseProvider.Sqlite &&
     app.Configuration.GetValue("Hosting:ReplicaCount", 1) != 1)

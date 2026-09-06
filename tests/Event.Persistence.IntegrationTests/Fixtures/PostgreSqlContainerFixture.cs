@@ -10,6 +10,7 @@ using Explore.Persistence.Seed;
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Caching.Memory;
 using Npgsql;
 using Respawn;
 using Respawn.Graph;
@@ -26,6 +27,7 @@ namespace Event.Persistence.IntegrationTests.Fixtures;
 public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
 {
     private readonly PostgreSqlContainer _container;
+    private readonly MemoryCache _metadataCache = new(new MemoryCacheOptions());
     private string? _runtimeConnectionString;
     private Respawner? _respawner;
 
@@ -74,8 +76,15 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        await _container.StopAsync();
-        await _container.DisposeAsync();
+        try
+        {
+            await _container.StopAsync();
+            await _container.DisposeAsync();
+        }
+        finally
+        {
+            _metadataCache.Dispose();
+        }
     }
 
     /// <summary>
@@ -122,13 +131,14 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
         PrimaryDatabaseRole role = PrimaryDatabaseRole.Runtime,
         IReadOnlyList<IInterceptor>? interceptors = null)
     {
-        var optionsBuilder = new DbContextOptionsBuilder<ExploreDbContext>();
+        // Provider/schema and interceptor variants belong to this fixture, not EF's process-wide cache.
+        var optionsBuilder = TestDbContextOptions.Create<ExploreDbContext>()
+            .UseMemoryCache(_metadataCache);
         PrimaryDatabaseConnectionResult database = PrimaryDatabaseProviderComposition.ConfigureApplication(
             optionsBuilder,
             CreateDatabaseOptions(role));
         optionsBuilder.ConfigureWarnings(warnings =>
         {
-            warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning);
             warnings.Ignore(RelationalEventId.PendingModelChangesWarning);
         });
         if (interceptors is { Count: > 0 })

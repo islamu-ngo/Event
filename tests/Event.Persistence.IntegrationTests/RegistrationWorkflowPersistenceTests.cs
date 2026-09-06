@@ -191,7 +191,7 @@ public sealed class RegistrationWorkflowPersistenceTests
 
     private static ExploreDbContext CreateModelContext()
     {
-        DbContextOptions<ExploreDbContext> options = new DbContextOptionsBuilder<ExploreDbContext>()
+        DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql("Host=localhost;Database=task71_model;Username=unused;Password=unused")
             .UseSnakeCaseNamingConvention()
             .Options;
@@ -199,10 +199,12 @@ public sealed class RegistrationWorkflowPersistenceTests
         return new ExploreDbContext(options);
     }
 
-    private static ExploreDbContext CreateInMemoryContext(string databaseName)
+    private readonly Microsoft.EntityFrameworkCore.Storage.InMemoryDatabaseRoot _databaseRoot = new();
+
+    private ExploreDbContext CreateInMemoryContext(string databaseName)
     {
-        DbContextOptions<ExploreDbContext> options = new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase(databaseName)
+        DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase(databaseName, _databaseRoot)
             .Options;
         return new ExploreDbContext(options);
     }

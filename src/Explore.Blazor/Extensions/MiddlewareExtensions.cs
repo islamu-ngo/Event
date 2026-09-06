@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using Explore.Blazor.Client.Services;
 using Explore.Blazor.Middleware;
 using Explore.Blazor.Services;
+using Explore.ServiceDefaults;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Net.Http.Headers;
@@ -162,8 +163,9 @@ public static class MiddlewareExtensions
         GracefulShutdownState shutdownState)
     {
         app.Lifetime.ApplicationStopping.Register(() => OnApplicationStopping(app.Logger, shutdownState));
-        Console.CancelKeyPress += (sender, e) => OnCancelKeyPress(app.Logger, shutdownState, e);
-        AppDomain.CurrentDomain.ProcessExit += (sender, e) => OnProcessExit(app.Logger, shutdownState);
+        app.Services.GetRequiredService<HostProcessSignalSubscriptions>().Register(
+            (sender, e) => OnCancelKeyPress(app.Logger, shutdownState, e),
+            (sender, e) => OnProcessExit(app.Logger, shutdownState));
 
         return app;
     }

@@ -575,7 +575,7 @@ public sealed class WebhookPersistenceTests(PostgreSqlContainerFixture fixture)
 
     private ExploreDbContext CreateRetryingDbContext()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString, npgsql => npgsql.EnableRetryOnFailure())
             .UseSnakeCaseNamingConvention()
             .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning))

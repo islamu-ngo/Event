@@ -23,7 +23,7 @@ public sealed class ConfigurationManifestAuditProviderMigrationTests
     public async Task ProviderHeadContainsAuditTablesAndMatchesCurrentModel(
         PrimaryDatabaseProvider provider)
     {
-        var optionsBuilder = new DbContextOptionsBuilder<ExploreDbContext>();
+        var optionsBuilder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(
             optionsBuilder,
             CreateOptions(provider));

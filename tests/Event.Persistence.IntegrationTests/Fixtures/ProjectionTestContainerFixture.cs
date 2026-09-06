@@ -80,11 +80,8 @@ public class ProjectionTestContainerFixture : IAsyncInitializer, IAsyncDisposabl
             Password = connection.Password,
             TlsMode = PrimaryDatabaseTlsMode.Disabled,
         };
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>();
-        builder.EnableServiceProviderCaching(false);
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(builder, database);
-        builder.ConfigureWarnings(warnings =>
-            warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning));
         return new ExploreDbContext(builder.Options);
     }
 }

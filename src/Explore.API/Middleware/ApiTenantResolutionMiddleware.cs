@@ -166,7 +166,8 @@ public sealed class ApiTenantResolutionMiddleware
 
     private static bool IsTenantExemptPath(PathString path)
     {
-        return path.StartsWithSegments("/api/InstanceOnboarding", StringComparison.OrdinalIgnoreCase)
+        return AtprotoTransientAuthenticationDefaults.IsPrivatePath(path)
+            || path.StartsWithSegments("/api/InstanceOnboarding", StringComparison.OrdinalIgnoreCase)
             || path.StartsWithSegments("/api/System", StringComparison.OrdinalIgnoreCase)
             || path.StartsWithSegments("/api/admin/control-plane", StringComparison.OrdinalIgnoreCase)
             || path.StartsWithSegments("/api/managed-provider-provisioning", StringComparison.OrdinalIgnoreCase)

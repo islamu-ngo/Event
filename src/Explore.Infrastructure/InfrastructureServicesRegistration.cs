@@ -167,6 +167,7 @@ public static class InfrastructureServicesRegistration
         services.AddScoped<AtprotoOAuthClientFactory>();
         services.AddScoped<AtprotoCoreClientFactory>();
         services.AddScoped<AtprotoSessionEnvelopeProtector>();
+        services.AddScoped<AtprotoTransientCleanupService>();
         services.AddScoped<IAtprotoOAuthSecurityGateway, AtprotoOAuthSecurityGateway>();
         services.AddScoped<IAtprotoPublicationPayloadBuilder, AtprotoPublicationPayloadBuilder>();
         services.AddScoped<IAtprotoPdsDeliveryGateway, AtprotoPdsDeliveryGateway>();

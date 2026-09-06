@@ -3,6 +3,10 @@ ABOUTME: Any AI agent or contributor starts HERE, classifies the change, then lo
 
 # Contribution Contract
 
+Intent prerequisites and benchmark expectations must point to committed source
+anchors. Keep ignored workstream plans out of required reads and documentation
+updates so the same contract works in a fresh clone or isolated worktree.
+
 The **Contribution Contract** is this repository's operating model for AI-assisted contribution. It answers — deterministically, before any code is written — the eight questions every safe change must resolve:
 
 | # | Question | Source of Truth |

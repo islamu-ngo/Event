@@ -19,6 +19,7 @@ public static class BffProxyHeaderSanitizer
         EventBffHeaderNames.SetupSecret,
         EventBffHeaderNames.AtprotoBootstrapAssertion,
         EventBffHeaderNames.AtprotoSessionBridgeAssertion,
+        EventBffHeaderNames.AtprotoTransientAssertion,
         EventBffHeaderNames.ApiKey,
         "X-Control-Plane-Key",
         "Access-Token",

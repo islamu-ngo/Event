@@ -18,6 +18,7 @@ public static class ScheduledJobNames
     // Periodic maintenance sweeps. These names appear in scheduler rows and operator tooling, so they are
     // stable identifiers rather than descriptions: renaming one orphans its persisted trigger.
     public const string IdempotencyCleanup = "idempotency-cleanup";
+    public const string AtprotoTransientCleanup = "atproto-transient-cleanup";
     public const string AiRetentionCleanup = "ai-retention-cleanup";
     public const string EmailDispatchRetentionCleanup = "email-dispatch-retention-cleanup";
     public const string WebhookRetentionCleanup = "webhook-retention-cleanup";
@@ -62,6 +63,7 @@ public static class ScheduledJobNames
         WaitlistPromotionScan,
         TenantMaintenanceScan,
         IdempotencyCleanup,
+        AtprotoTransientCleanup,
         AiRetentionCleanup,
         EmailDispatchRetentionCleanup,
         WebhookRetentionCleanup,

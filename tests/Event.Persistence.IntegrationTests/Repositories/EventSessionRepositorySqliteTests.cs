@@ -222,7 +222,7 @@ public sealed class EventSessionRepositorySqliteTests
     }
 
     private static ExploreDbContext CreateContext(SqliteConnection connection, Guid tenantId) =>
-        new(new DbContextOptionsBuilder<ExploreDbContext>()
+        new(TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connection)
             .UseSnakeCaseNamingConvention()
             .Options)

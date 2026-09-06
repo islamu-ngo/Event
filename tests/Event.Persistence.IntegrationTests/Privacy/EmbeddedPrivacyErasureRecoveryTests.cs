@@ -396,7 +396,7 @@ public sealed class EmbeddedPrivacyErasureRecoveryTests
             Provider = PrimaryDatabaseProvider.Sqlite,
             Database = path,
         };
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>();
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(builder, options);
         var context = new ExploreDbContext(builder.Options);
         context.EnableTenantFilterBypass("Embedded authority primary-only recovery rehearsal.");
@@ -420,16 +420,26 @@ public sealed class EmbeddedPrivacyErasureRecoveryTests
             configuration,
             skipDbContextRegistration: true,
             skipLookupCacheInitializer: true);
-        ServiceProvider provider = services.BuildServiceProvider(validateScopes: true);
-
-        await provider.GetRequiredService<EmbeddedPrivacyErasureAuthorityStorage>()
-            .EnsureReadyAsync();
-        IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext> factory = provider
-            .GetRequiredService<IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>>();
-        await using EmbeddedPrivacyErasureAuthorityDbContext context =
-            await factory.CreateDbContextAsync();
-        await context.Database.EnsureCreatedAsync();
-        return provider;
+        services.ConfigureDbContext<EmbeddedPrivacyErasureAuthorityDbContext>(
+            TestDbContextOptions.Apply,
+            ServiceLifetime.Singleton);
+        ServiceProvider provider = services.BuildIsolatedServiceProvider(validateScopes: true);
+        try
+        {
+            await provider.GetRequiredService<EmbeddedPrivacyErasureAuthorityStorage>()
+                .EnsureReadyAsync();
+            IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext> factory = provider
+                .GetRequiredService<IDbContextFactory<EmbeddedPrivacyErasureAuthorityDbContext>>();
+            await using EmbeddedPrivacyErasureAuthorityDbContext context =
+                await factory.CreateDbContextAsync();
+            await context.Database.EnsureCreatedAsync();
+            return provider;
+        }
+        catch
+        {
+            await provider.DisposeAsync();
+            throw;
+        }
     }
 
     private static async Task ExpireFactsAsync(ServiceProvider provider)

@@ -130,7 +130,7 @@ public sealed class EventAuthorityLookupSeederTests
 
     private static ExploreDbContext CreateModelContext()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql("Host=localhost;Database=event_authority_model;Username=unused;Password=unused")
             .UseSnakeCaseNamingConvention()
             .Options;
@@ -140,17 +140,19 @@ public sealed class EventAuthorityLookupSeederTests
 
     private static ExploreDbContext CreateSeederContext(string prefix)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase($"{prefix}-{Guid.NewGuid():N}")
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase($"{prefix}-{Guid.NewGuid():N}")
             .Options;
 
         return new EventAuthorityTestDbContext(options);
     }
 
-    private static ExploreDbContext CreateSharedSeederContext(string databaseName)
+    private readonly Microsoft.EntityFrameworkCore.Storage.InMemoryDatabaseRoot _databaseRoot = new();
+
+    private ExploreDbContext CreateSharedSeederContext(string databaseName)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase(databaseName)
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase(databaseName, _databaseRoot)
             .Options;
 
         return new EventAuthorityTestDbContext(options);

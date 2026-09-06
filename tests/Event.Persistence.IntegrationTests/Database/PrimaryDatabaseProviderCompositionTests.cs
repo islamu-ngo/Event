@@ -54,7 +54,7 @@ public sealed class PrimaryDatabaseProviderCompositionTests
             skipLookupCacheInitializer: true,
             environmentName: "Production");
         services.AddDbContext<ExploreDbContext>(ConfigureTestOptions);
-        using var serviceProvider = services.BuildServiceProvider();
+        using var serviceProvider = services.BuildIsolatedServiceProvider();
 
         var options = serviceProvider.GetRequiredService<DbContextOptions<ExploreDbContext>>();
 
@@ -96,7 +96,7 @@ public sealed class PrimaryDatabaseProviderCompositionTests
             skipLookupCacheInitializer: true,
             environmentName: "Production");
         services.AddDbContext<ExploreDbContext>(ConfigureTestOptions);
-        using var serviceProvider = services.BuildServiceProvider();
+        using var serviceProvider = services.BuildIsolatedServiceProvider();
 
         var options = serviceProvider.GetRequiredService<DbContextOptions<ExploreDbContext>>();
         var interceptors = options.FindExtension<CoreOptionsExtension>()?.Interceptors ?? [];
@@ -121,7 +121,7 @@ public sealed class PrimaryDatabaseProviderCompositionTests
             skipLookupCacheInitializer: true,
             environmentName: "Production");
         services.AddDbContext<ExploreDbContext>(ConfigureTestOptions);
-        using var serviceProvider = services.BuildServiceProvider();
+        using var serviceProvider = services.BuildIsolatedServiceProvider();
 
         await Assert.That(services.Single(service => service.ServiceType == typeof(ISettingMutationLock))
             .ImplementationType).IsEqualTo(typeof(RelationalSettingMutationLock));
@@ -310,7 +310,7 @@ public sealed class PrimaryDatabaseProviderCompositionTests
         var services = new ServiceCollection();
         services.AddExploreDataProtection(BuildConfiguration(provider));
         services.AddDbContext<DataProtectionKeyContext>(ConfigureTestOptions);
-        using var serviceProvider = services.BuildServiceProvider();
+        using var serviceProvider = services.BuildIsolatedServiceProvider();
 
         using var context = serviceProvider.GetRequiredService<DataProtectionKeyContext>();
 
@@ -318,6 +318,7 @@ public sealed class PrimaryDatabaseProviderCompositionTests
     }
 
     [Test]
+    [TUnit.Core.Executors.TestExecutor<FreshEfProcessExecutor>]
     public async Task DesignTimeFactories_UseStructuredPostgresMigratorSettings()
     {
         var values = new Dictionary<string, string?>
@@ -339,6 +340,7 @@ public sealed class PrimaryDatabaseProviderCompositionTests
     }
 
     [Test]
+    [TUnit.Core.Executors.TestExecutor<FreshEfProcessExecutor>]
     public async Task DesignTimeFactories_PreserveExplicitStructuredProviderPriority()
     {
         var values = new Dictionary<string, string?>
@@ -418,15 +420,10 @@ public sealed class PrimaryDatabaseProviderCompositionTests
     private static DbContextOptionsBuilder<TContext> CreateTestOptionsBuilder<TContext>()
         where TContext : DbContext
     {
-        var builder = new DbContextOptionsBuilder<TContext>();
+        var builder = TestDbContextOptions.Create<TContext>();
         ConfigureTestOptions(builder);
         return builder;
     }
 
-    private static void ConfigureTestOptions(DbContextOptionsBuilder builder)
-    {
-        builder.EnableServiceProviderCaching(false);
-        builder.ConfigureWarnings(warnings =>
-            warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning));
-    }
+    private static void ConfigureTestOptions(DbContextOptionsBuilder builder) => TestDbContextOptions.Apply(builder);
 }

@@ -127,7 +127,7 @@ public sealed class AdmissionAuthorityRowFenceProviderTests(
 
     private ExploreDbContext CreateContext(PrimaryDatabaseProvider provider)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>();
+        var options = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(
             options,
             fixture.CreateOptions(provider));

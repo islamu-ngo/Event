@@ -18,6 +18,11 @@ The standalone image (`Event.Standalone`) is the simplest and lowest-overhead op
 | **Single-Process Footprint**: Runs API, BFF/UI, and SQLite in one container without auxiliary database servers. | **Local-First Storage**: Media and database files live in a mounted Docker volume. |
 | **Instant Onboarding**: In-process migrations apply automatically before the HTTP port opens. | **Initial Platform Target**: Built for `linux/amd64`. |
 
+SQLite coordinates transaction-owned work inside the application process.
+Failed operations release that coordination when their transaction and connection
+are cleaned up, so later checkout or configuration requests are not left waiting
+on an abandoned lock. This does not change the one-replica requirement.
+
 ---
 
 ## 2. Quick Run & Production Deployment

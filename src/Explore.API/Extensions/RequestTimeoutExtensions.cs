@@ -1,6 +1,7 @@
 // ABOUTME: Registers named request timeout policies for different endpoint categories.
 // ABOUTME: Provides default, lookup, complex, and control-plane timeout tiers.
 
+using Explore.API.Authentication;
 using Explore.API.ConfigurationImport;
 using ISLAMU.Wire.Contracts.SetupLive;
 using Microsoft.AspNetCore.Http.Timeouts;
@@ -49,6 +50,13 @@ public static class RequestTimeoutExtensions
 
             options.DefaultPolicy = defaultPolicy;
             options.AddPolicy(DefaultPolicy, defaultPolicy);
+            options.AddPolicy(AtprotoTransientAuthenticationDefaults.Scheme, new RequestTimeoutPolicy
+            {
+                Timeout = defaultPolicy.Timeout,
+                TimeoutStatusCode = StatusCodes.Status504GatewayTimeout,
+                WriteTimeoutResponse = context => AtprotoTransientRequestBoundary.WriteProblemAsync(
+                    context, StatusCodes.Status504GatewayTimeout)
+            });
 
             options.AddPolicy(LookupPolicy, new RequestTimeoutPolicy
             {

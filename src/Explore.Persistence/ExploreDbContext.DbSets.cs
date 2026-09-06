@@ -482,6 +482,10 @@ public partial class ExploreDbContext
     public DbSet<EventContactShareExport> EventContactShareExports { get; set; }
     public DbSet<EventContactShareExportItem> EventContactShareExportItems { get; set; }
 
+    // ===== Instance Authentication Transients =====
+    public DbSet<AtprotoTransientRecord> AtprotoTransientRecords { get; set; }
+    public DbSet<AtprotoTransientAssertionReplay> AtprotoTransientAssertionReplays { get; set; }
+
     // ===== Idempotency =====
     public DbSet<IdempotencyRecord> IdempotencyRecords { get; set; }
 

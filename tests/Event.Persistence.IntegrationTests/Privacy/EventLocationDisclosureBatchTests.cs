@@ -290,7 +290,7 @@ public sealed class EventLocationDisclosureBatchTests(RegistrationCoveragePostgr
         Guid tenantId,
         DbCommandInterceptor? interceptor = null)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString)
             .UseSnakeCaseNamingConvention()
             .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning));

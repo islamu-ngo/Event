@@ -1,0 +1,29 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M1THQ0GFXF8BM22C264FFK1N
+Title: "Require strong quoted concurrency headers"
+Type: fix
+Scope: access
+Summary: "Reject malformed If-Match values before dispatch while preserving stale-write checks across API controllers."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+    Detail: Enforces the documented strong quoted GUID contract without changing routes or wire models.
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/contributing/clean-architecture.md
+    Disposition: documented
+    Detail: Clients must quote the observed concurrency GUID and reload after stale-write conflicts.

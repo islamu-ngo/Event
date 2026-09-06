@@ -230,6 +230,7 @@ The platform isolates **physical venue master records** from **per-event disclos
 - Rather than pointing directly to an unmediated `LocationId`, sessions and agenda items reference `EventLocationId`.
 - This ensures session schedules cannot accidentally leak physical addresses, violate parent event privacy policies, or reference a physical venue in a different city from the event.
 - Enforced at the database level by check constraints (`ck_event_session_physical_location_requires_event_location`).
+- Deleting a session, session group, or agenda item clears its canonical event-location reference and the physical location/room keys and navigations together. EF persists deletion as an audited soft-delete UPDATE, so retaining a physical key after detachment would violate the same mediation constraint. The reusable venue and other carriers remain intact.
 
 ### Location Address Source, Visibility, And Promotion
 

@@ -115,7 +115,9 @@ public sealed class AtprotoFederationBaselineGuardTests(PostgreSqlContainerFixtu
         string[] available = context.Database.GetMigrations().ToArray();
         string[] applied = (await context.Database.GetAppliedMigrationsAsync()).ToArray();
 
-        await Assert.That(available).HasSingleItem();
+        await Assert.That(available.Count(migration =>
+                migration.EndsWith("_Init", StringComparison.Ordinal)))
+            .IsEqualTo(1);
         await Assert.That(available[0]).EndsWith("_Init");
         await Assert.That(applied).IsEquivalentTo(available);
     }

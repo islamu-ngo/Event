@@ -46,8 +46,9 @@ public sealed class SemanticValueNonTransactionalMigrationTests(
         await Assert.That(await CountSemanticConstraintsAsync(context))
             .IsEqualTo(ConstraintNames.Length);
         string[] applied = (await context.Database.GetAppliedMigrationsAsync()).ToArray();
-        await Assert.That(applied).HasSingleItem();
-        await Assert.That(applied[0]).EndsWith("_Init");
+        string[] available = context.Database.GetMigrations().ToArray();
+        await Assert.That(applied).IsEquivalentTo(available);
+        await Assert.That(applied.Count(migration => migration.EndsWith("_Init", StringComparison.Ordinal))).IsEqualTo(1);
 
         await ExploreDatabaseMigrator.MigrateAsync(
             context,
@@ -76,7 +77,7 @@ public sealed class SemanticValueNonTransactionalMigrationTests(
     private static ExploreDbContext CreateContext(
         PrimaryDatabaseConnectionOptions options)
     {
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>();
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(builder, options);
         return new ExploreDbContext(builder.Options);
     }

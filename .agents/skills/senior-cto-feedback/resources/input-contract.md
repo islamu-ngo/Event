@@ -22,8 +22,8 @@ Also useful:
 
 Before an approval-capable review, require:
 
-- exact reviewed plan and tasks revisions (Git objects or SHA-256 digests);
-- exact reviewed I-VSD revision, `current` status, and `plan-aligned` disposition;
+- current plan and tasks artifacts (`plan.md`, `tasks.md`);
+- linked I-VSD report with `current` status and `plan-aligned` disposition;
 - resolved mappings from every material `IVSD-*` ID to scenario/task, explicit non-applicability, or escalation;
 - current user-approval state, which the CTO review cannot change.
 
@@ -32,17 +32,17 @@ Before an approval-capable review, require:
 You can still provide useful CTO feedback with partial inputs. Use this order:
 
 1. `...-plan.md` only:
-   - allowed, but call out missing context/tasks coverage.
+   - allowed, but call out missing tasks coverage.
 2. `plan.md` + `tasks.md`:
-   - enough to review sequencing and verification, but resume-state quality is still unknown.
-3. `plan.md` + `context.md`:
-   - enough to review strategy and continuity, but task executability is still under-specified.
+   - standard dual-artifact input; fully sufficient to review architecture, sequencing, and verification.
+3. `plan.md` + `tasks.md` + `context.md`:
+   - full triad input with resume/handoff state.
 4. `plan.md` + referenced repo files:
    - allowed when the user wants architecture critique more than workflow critique.
 
 If the user provides only a vague idea and no implementation plan, this skill should recommend creating an `implementation-plan` workstream first instead of pretending there is a real plan to approve.
 
-Partial inputs may receive useful feedback but never an `Approve` verdict. A missing/stale I-VSD report or unbound revision is `Changes required`.
+Partial inputs may receive useful feedback but never an `Approve` verdict. A missing/stale I-VSD report is `Changes required`.
 
 ## Required Reviewer Checks
 
@@ -53,7 +53,7 @@ For every review, determine:
 3. Which claims are verified by files you actually read?
 4. Which claims remain assumptions?
 5. What is missing that blocks a credible approval?
-6. Do the plan/tasks and I-VSD revisions match the review metadata?
+6. Do the plan, tasks, and I-VSD report match the review metadata?
 7. Did any proposed rewrite trigger I-VSD refresh under its integration contract?
 
 ## Missing-Context Handling

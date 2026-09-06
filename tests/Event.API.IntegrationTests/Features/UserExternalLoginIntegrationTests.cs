@@ -1,6 +1,7 @@
 // ABOUTME: Integration tests for verified authentication flows that resolve internal external-login links.
 // ABOUTME: Proves provider identity resolution remains intact after public external-login CRUD removal.
 
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
@@ -161,12 +162,14 @@ public class UserExternalLoginIntegrationTests
         AtprotoDid did = AtprotoDid.Parse($"did:plc:{Guid.NewGuid():N}");
         Guid userId = Guid.CreateVersion7();
         var events = new List<string>();
+        var currentAttempt = new AsyncLocal<string>();
+        var readsByAttempt = new ConcurrentDictionary<string, int>();
         object eventLock = new();
         void Record(string value)
         {
             lock (eventLock)
             {
-                events.Add(value);
+                events.Add($"{currentAttempt.Value}:{value}");
             }
         }
 
@@ -220,7 +223,8 @@ public class UserExternalLoginIntegrationTests
             .Returns(async _ =>
             {
                 int read = Interlocked.Increment(ref loginReads);
-                if (read <= 2)
+                int attemptRead = readsByAttempt.AddOrUpdate(currentAttempt.Value!, 1, (_, count) => count + 1);
+                if (attemptRead == 1)
                 {
                     Record("initial-read");
                     if (read == 2)
@@ -231,7 +235,7 @@ public class UserExternalLoginIntegrationTests
                     return null;
                 }
 
-                Record(read <= 4 ? "post-claim-reread" : "transaction-reread");
+                Record(attemptRead == 2 ? "post-claim-reread" : "transaction-reread");
                 return login;
             });
 
@@ -276,12 +280,19 @@ public class UserExternalLoginIntegrationTests
             out _,
             bootstrapRepository);
 
+        async Task<AtprotoSessionBootstrapResult> RunAttemptAsync(
+            string name, BootstrapAtprotoSessionCommandHandler handler)
+        {
+            currentAttempt.Value = name;
+            return await handler.Handle(CreateBootstrapCommand(did), CancellationToken.None);
+        }
+
         AtprotoSessionBootstrapResult[] results = await Task.WhenAll(
-            first.Handle(CreateBootstrapCommand(did), CancellationToken.None),
-            second.Handle(CreateBootstrapCommand(did), CancellationToken.None));
+            RunAttemptAsync("first", first),
+            RunAttemptAsync("second", second));
 
         await Assert.That(results.All(result => result.Success)).IsTrue();
-        await Assert.That(loginReads).IsEqualTo(6);
+        await Assert.That(loginReads).IsEqualTo(8);
         await sender.Received(2).Send(
             Arg.Any<ClaimConfiguredInstanceAdministratorCommand>(),
             Arg.Any<CancellationToken>());
@@ -290,11 +301,21 @@ public class UserExternalLoginIntegrationTests
         {
             snapshot = [.. events];
         }
-        await Assert.That(snapshot.IndexOf("verify")).IsLessThan(snapshot.IndexOf("claim"));
-        await Assert.That(snapshot.IndexOf("claim")).IsLessThan(snapshot.IndexOf("post-claim-reread"));
-        await Assert.That(snapshot.IndexOf("post-claim-reread")).IsLessThan(snapshot.IndexOf("prepare"));
-        await Assert.That(snapshot.IndexOf("prepare")).IsLessThan(snapshot.IndexOf("persist-session"));
-        await Assert.That(snapshot.IndexOf("persist-session")).IsLessThan(snapshot.IndexOf("issue-token"));
+        foreach (string attempt in new[] { "first", "second" })
+        {
+            string[] expectedOrder =
+            [
+                "verify", "initial-read", "claim", "post-claim-reread",
+                "transaction-reread", "prepare", "persist-session", "issue-token"
+            ];
+            int previous = -1;
+            foreach (string stage in expectedOrder)
+            {
+                int position = snapshot.IndexOf($"{attempt}:{stage}");
+                await Assert.That(position).IsGreaterThan(previous);
+                previous = position;
+            }
+        }
     }
 
     [Test]
@@ -318,6 +339,21 @@ public class UserExternalLoginIntegrationTests
         var logins = Substitute.For<IUserExternalLoginRepository>();
         logins.GetByProviderAndKey(Arg.Any<ProviderAccountKey>()).Returns(login);
         var sender = Substitute.For<ISender>();
+        gateway.PreparePersistenceAsync(
+                Arg.Any<AtprotoVerifiedOAuthSession>(),
+                Arg.Any<Guid>(),
+                userId,
+                Arg.Any<CancellationToken>())
+            .Returns(call => new AtprotoPreparedOAuthSession(
+                new byte[] { 2 },
+                "encryption-key",
+                1,
+                call.ArgAt<Guid>(1),
+                userId,
+                did,
+                "https://pds.example.test/",
+                "oauth-key",
+                null));
         int claimAttempts = 0;
         ClaimConfiguredInstanceAdministratorCommand? lastClaim = null;
         sender.Send(Arg.Any<ClaimConfiguredInstanceAdministratorCommand>(), Arg.Any<CancellationToken>())
@@ -533,12 +569,21 @@ public class UserExternalLoginIntegrationTests
         var tenantRoles = Substitute.For<ITenantUserRoleGrantRepository>();
         tenantRoles.IsTenantAdminInCurrentTenantAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns(false);
+        var tenants = Substitute.For<ITenantRepository>();
+        tenants.GetById(PlatformDefaults.DefaultTenantId).Returns(new Tenant
+        {
+            Id = PlatformDefaults.DefaultTenantId,
+            FullName = "ATProto tenant",
+            Slug = "atproto",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
+        });
         var onboarding = new AtprotoSubjectOnboardingOperation(
             logins,
             identities,
             actors,
             Substitute.For<IActorTypeRepository>(),
-            Substitute.For<ITenantRepository>(),
+            tenants,
             tenantUsers,
             tenantRoles,
             Substitute.For<IOrganizationRepository>(),
@@ -549,12 +594,7 @@ public class UserExternalLoginIntegrationTests
             Substitute.For<IGroupMemberRepository>(),
             Substitute.For<IActorReferenceConsolidationRepository>(),
             Substitute.For<IGenericRepository<ActorMerge, Guid>>());
-        unitOfWork = Substitute.For<IUnitOfWork>();
-        unitOfWork.ExecuteSerializableAsync(
-                Arg.Any<Func<CancellationToken, Task<AtprotoSubjectOnboardingResult>>>(),
-                Arg.Any<CancellationToken>())
-            .Returns(call => call.ArgAt<Func<CancellationToken, Task<AtprotoSubjectOnboardingResult>>>(0)(
-                call.ArgAt<CancellationToken>(1)));
+        unitOfWork = new InlineUnitOfWork();
         var tenantContext = Substitute.For<ITenantContext>();
         tenantContext.TenantId.Returns(PlatformDefaults.DefaultTenantId);
         var configuration = new ConfigurationBuilder().Build();
@@ -632,6 +672,18 @@ public class UserExternalLoginIntegrationTests
     {
         var payload = claims.Select(claim => new TestClaimPayload { Type = claim.Type, Value = claim.Value }).ToList();
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(payload)));
+    }
+
+    private sealed class InlineUnitOfWork : IUnitOfWork
+    {
+        public Task ExecuteInTransactionAsync(
+            Func<CancellationToken, Task> operation, CancellationToken ct = default) => operation(ct);
+
+        public Task<T> ExecuteInTransactionAsync<T>(
+            Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) => operation(ct);
+
+        public Task<T> ExecuteSerializableAsync<T>(
+            Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) => operation(ct);
     }
 
     private sealed class TestClaimPayload

@@ -288,8 +288,8 @@ public sealed class AtprotoEventProjectionVisibilityInMemoryTests
         };
 
     private static ExploreDbContext CreateContext(Guid tenantId) => new(
-        new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase($"atproto-projection-visibility-{Guid.NewGuid():N}")
+        TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase($"atproto-projection-visibility-{Guid.NewGuid():N}")
             .Options)
     {
         TenantContext = new TestTenantContext(tenantId)

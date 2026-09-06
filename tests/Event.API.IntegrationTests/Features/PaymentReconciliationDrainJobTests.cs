@@ -198,8 +198,7 @@ public sealed class PaymentReconciliationDrainJobTests
             Guid.CreateVersion7(), TenantId, Guid.CreateVersion7(), recipient, "OrganizerDirect", "2026-07-29.dahlia",
             "composition-job", Money.Create(1_000, recipient.CurrencyCode), Money.Create(75, recipient.CurrencyCode), Money.Create(125, recipient.CurrencyCode), "checkout:job:stable", UtcNow.AddMinutes(-2), UtcNow.AddMinutes(30));
         attempt.AttachAcceptance(PaidAcceptanceTestFacts.Create(
-            TenantId, attempt.RegistrationOrderId, Guid.CreateVersion7(), "composition-job",
-            recipient.InstancePolicyVersionId, recipient.TenantPolicyVersionId,
+            recipient, attempt.RegistrationOrderId, Guid.CreateVersion7(), "composition-job",
             1_000, 75, 125, UtcNow.AddMinutes(-1)));
         return attempt;
     }

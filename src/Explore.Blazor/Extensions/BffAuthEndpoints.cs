@@ -298,6 +298,14 @@ public static class BffAuthEndpoints
                 Stopwatch.GetElapsedTime(started));
             return Results.Ok(new AtprotoChallengeResponse(authorizationUrl));
         }
+        catch (AtprotoProofExpiryException exception)
+        {
+            metrics.Record(AtprotoAuthenticationOperation.Challenge, AtprotoAuthenticationOutcome.ValidationFailed,
+                Stopwatch.GetElapsedTime(started));
+            ctx.Response.Headers.RetryAfter = exception.RetryAfterSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            return Results.Problem(statusCode: StatusCodes.Status429TooManyRequests,
+                title: "Wait for the browser proof to expire before starting another sign-in.");
+        }
         catch (OperationCanceledException) when (ctx.RequestAborted.IsCancellationRequested)
         {
             metrics.Record(
@@ -428,6 +436,9 @@ public static class BffAuthEndpoints
         AtprotoOAuthFlowSeed seed,
         AtprotoBffSessionResult session)
     {
+        // Recheck after provider exchange: proof may have expired since state consumption.
+        if (!ctx.RequestServices.GetRequiredService<AtprotoBrowserProof>().Validate(ctx.Request, seed.BrowserBinding))
+            return false;
         var identity = new ClaimsIdentity([
             new Claim("sub", session.UserId.ToString("D")),
             new Claim(ClaimTypes.NameIdentifier, session.UserId.ToString("D")),
@@ -477,6 +488,9 @@ public static class BffAuthEndpoints
             return false;
         }
 
+        // Asynchronous authority checks must not extend the browser proof's fixed completion deadline.
+        if (!ctx.RequestServices.GetRequiredService<AtprotoBrowserProof>().Validate(ctx.Request, seed.BrowserBinding))
+            return false;
         ExploreBffCookieSessionHandler.MarkUserSynchronizationCompleted(properties);
         await ctx.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,

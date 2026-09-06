@@ -58,7 +58,7 @@ public sealed class TenantQueryFilterMutationTests
 
     private static ExploreDbContext CreateContext(SqliteConnection connection, Guid tenantId)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connection)
             .UseSnakeCaseNamingConvention()
             .Options;

@@ -342,7 +342,7 @@ public sealed class RegistrationInventoryHoldPortabilityTests
             ForeignKeys = true,
             Pooling = true,
         }.ToString();
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connectionString)
             .UseSnakeCaseNamingConvention()
             .Options;

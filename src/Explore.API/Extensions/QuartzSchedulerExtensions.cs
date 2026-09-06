@@ -473,6 +473,16 @@ public static class QuartzSchedulerExtensions
         IConfiguration configuration,
         ISet<JobKey> desiredRecurringJobs)
     {
+        // Retained login rows must expire even after the optional ATProto provider is disabled.
+        AddSweepJob<AtprotoTransientCleanupJob>(
+            quartz,
+            QuartzSchedulerKeys.AtprotoTransientCleanup,
+            "Removes expired protected ATProto login records and assertion replay claims.",
+            enabled: true,
+            initialDelaySeconds: 60,
+            TimeSpan.FromMinutes(1),
+            desiredRecurringJobs);
+
         var idempotency = Bind<IdempotencyCleanupSettings>(configuration, IdempotencyCleanupSettings.SectionName);
         AddSweepJob<IdempotencyCleanupJob>(
             quartz,

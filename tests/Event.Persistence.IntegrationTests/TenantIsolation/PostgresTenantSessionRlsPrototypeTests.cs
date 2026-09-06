@@ -247,7 +247,7 @@ public class PostgresTenantSessionRlsPrototypeTests(PostgreSqlContainerFixture f
 
     private PooledDbContextFactory<ExploreDbContext> CreateDbContextFactory()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString)
             .UseSnakeCaseNamingConvention()
             .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning))

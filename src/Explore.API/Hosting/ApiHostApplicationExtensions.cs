@@ -1,6 +1,7 @@
 // ABOUTME: Applies the reusable ordered API middleware pipeline and maps API-owned endpoints.
 // ABOUTME: Preserves OpenAPI, MCP, controllers, health routes, caching, tenancy, and authorization order.
 
+using Explore.API.Authentication;
 using Explore.API.Configuration;
 using Explore.API.Extensions;
 using Explore.API.Filters;
@@ -87,15 +88,24 @@ public static class ApiHostApplicationExtensions
 
         pipeline.UseHateoas();
         pipeline.UseRouting();
+        pipeline.UseWhen(context => AtprotoTransientAuthenticationDefaults.IsPrivatePath(context.Request.Path), branch =>
+        {
+            branch.Use(AtprotoTransientRequestBoundary.GuardAsync);
+            branch.UseRequestTimeouts();
+            branch.UseRateLimiter();
+            branch.UseMiddleware<AtprotoTransientRequestBoundary>();
+        });
         pipeline.UseMiddleware<ApiTenantResolutionMiddleware>();
-        pipeline.UseRequestTimeouts();
+        pipeline.UseWhen(context => !AtprotoTransientAuthenticationDefaults.IsPrivatePath(context.Request.Path),
+            branch => branch.UseRequestTimeouts());
         pipeline.UseMiddleware<ApiAuthenticationConflictMiddleware>();
         pipeline.UseAuthentication();
         pipeline.UseMiddleware<ApiTenantPostAuthenticationMiddleware>();
         pipeline.UseMiddleware<McpRuntimeGateMiddleware>();
         pipeline.UseRequestLocalization();
         pipeline.UseMiddleware<PrivateNoStoreMiddleware>();
-        pipeline.UseRateLimiter();
+        pipeline.UseWhen(context => !AtprotoTransientAuthenticationDefaults.IsPrivatePath(context.Request.Path),
+            branch => branch.UseRateLimiter());
         pipeline.UseAuthorization();
         pipeline.UseMiddleware<IdempotencyMiddleware>();
         pipeline.UseMiddleware<SupportAccessAuditMiddleware>();

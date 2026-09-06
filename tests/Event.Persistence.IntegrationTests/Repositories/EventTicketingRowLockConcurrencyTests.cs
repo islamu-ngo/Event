@@ -297,7 +297,7 @@ public sealed class EventTicketingRowLockScenarioRunner(PostgreSqlContainerFixtu
     {
         var services = new ServiceCollection();
         services.AddHybridCache();
-        return services.BuildServiceProvider();
+        return services.BuildIsolatedServiceProvider();
     }
 
     private async Task<(Guid TenantId, Guid EventId, Guid PoolId)> SeedAsync()

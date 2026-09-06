@@ -509,8 +509,7 @@ public sealed class CoopIncomingWebhookEffectOutboxTests(PostgreSqlContainerFixt
     private static ExploreDbContext CreateMigratorContext(string connectionString)
     {
         var connection = new NpgsqlConnectionStringBuilder(connectionString);
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
-            .EnableServiceProviderCaching(false);
+        var options = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
         {
             Role = PrimaryDatabaseRole.Migrator,
@@ -523,11 +522,7 @@ public sealed class CoopIncomingWebhookEffectOutboxTests(PostgreSqlContainerFixt
             Password = connection.Password,
             TlsMode = PrimaryDatabaseTlsMode.Disabled
         });
-        options.ConfigureWarnings(warnings =>
-        {
-            warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning);
-            warnings.Ignore(RelationalEventId.PendingModelChangesWarning);
-        });
+        options.ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning));
         return new ExploreDbContext(options.Options);
     }
 

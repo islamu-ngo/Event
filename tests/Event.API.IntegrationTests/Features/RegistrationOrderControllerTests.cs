@@ -405,10 +405,9 @@ public sealed class RegistrationOrderControllerTests
     public async Task GuestRead_ReturnsCapabilityScopedHalWithoutAuthenticatedAssembler()
     {
         var mediator = Substitute.For<IMediator>();
-        var assembler = Substitute.For<IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto>>();
         var guestOrder = new GuestRegistrationOrderDto { Id = Guid.CreateVersion7(), EventId = Guid.CreateVersion7() };
         mediator.Send(Arg.Any<GetGuestRegistrationOrderQuery>(), Arg.Any<CancellationToken>()).Returns(guestOrder);
-        var controller = CreateController<GuestRegistrationOrderController>(mediator, assembler);
+        var controller = CreateGuestController(mediator, TimeProvider.System);
 
         ActionResult<HalResource<GuestRegistrationOrderDto>> result = await controller.GetGuest(
             guestOrder.EventId, guestOrder.Id, "opaque-capability");
@@ -419,7 +418,7 @@ public sealed class RegistrationOrderControllerTests
         await Assert.That(resource?.Links).ContainsKey(LinkRelations.ClaimRegistrationOrder);
         await Assert.That(resource?.Links).DoesNotContainKey(LinkRelations.ApplyPromotion);
         await Assert.That(resource?.Links).DoesNotContainKey(LinkRelations.RemovePromotion);
-        await assembler.DidNotReceive().ToResource(Arg.Any<RegistrationOrderDto>(), Arg.Any<HttpContext>());
+        await Assert.That(JsonSerializer.Serialize(resource)).DoesNotContain("opaque-capability");
     }
 
     [Test]
@@ -522,12 +521,10 @@ public sealed class RegistrationOrderControllerTests
         IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto>? assembler = null)
         where TController : ControllerBase
     {
-        // The guest, authenticated, and event-management registration controllers share one constructor
-        // shape, so one factory serves all three capability surfaces.
         IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto> effectiveAssembler =
             assembler ?? Substitute.For<IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto>>();
         object[] arguments = typeof(TController) == typeof(GuestRegistrationOrderController)
-            ? [mediator, effectiveAssembler, TimeProvider.System]
+            ? [mediator, TimeProvider.System]
             : [mediator, effectiveAssembler];
         var controller = (TController)Activator.CreateInstance(typeof(TController), arguments)!;
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
@@ -540,11 +537,7 @@ public sealed class RegistrationOrderControllerTests
 
     private static GuestRegistrationOrderController CreateGuestController(IMediator mediator, TimeProvider timeProvider)
     {
-        var controller = (GuestRegistrationOrderController)Activator.CreateInstance(
-            typeof(GuestRegistrationOrderController),
-            mediator,
-            Substitute.For<IResourceAssembler<RegistrationOrderDto, RegistrationOrderDto>>(),
-            timeProvider)!;
+        var controller = new GuestRegistrationOrderController(mediator, timeProvider);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         var url = Substitute.For<IUrlHelper>();
         url.Link(Arg.Any<string>(), Arg.Any<object>()).Returns(call => $"/api/routes/{call.ArgAt<string>(0)}");

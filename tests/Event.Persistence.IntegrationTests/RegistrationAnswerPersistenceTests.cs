@@ -10,6 +10,7 @@ using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;
@@ -28,7 +29,7 @@ public sealed class RegistrationAnswerPersistenceContractTests
     public async Task ModelDeclaresTypedAnswerIdentitySensitiveShapeAndNamedFilters()
     {
         await using ExploreDbContext context = new(
-            new DbContextOptionsBuilder<ExploreDbContext>()
+            TestDbContextOptions.Create<ExploreDbContext>()
                 .UseNpgsql("Host=localhost;Database=unused;Username=unused;Password=unused")
                 .UseSnakeCaseNamingConvention()
                 .Options);
@@ -78,8 +79,8 @@ public sealed class RegistrationAnswerPersistenceContractTests
     }
 
     private static ExploreDbContext CreateInMemoryContext() => new(
-        new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase($"analytics-{Guid.NewGuid():N}")
+        TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase($"analytics-{Guid.NewGuid():N}")
             .Options);
 
     private static AnalyticsScope SeedAnalyticsScope(ExploreDbContext context)
@@ -194,15 +195,14 @@ public sealed class RegistrationAnswerPostgreSqlPersistenceTests(PostgreSqlConta
     {
         await fixture.ResetAsync();
         await using ExploreDbContext context = fixture.CreateDbContext();
-        IIndex durableIdentity = DurableIdentityIndex(context);
+        string durableIdentity = DurableIdentityName(context);
         string[] expected =
         [
             "ck_registration_answers_exactly_one_value",
             "ck_registration_answers_value_matches_field_type",
             "ck_registration_answers_subject_shape",
             "ck_registration_answers_positive_ordinal",
-            durableIdentity.GetDatabaseName()
-                ?? throw new InvalidOperationException("Registration answer identity index has no database name.")
+            durableIdentity
         ];
 
         string[] actual = await context.Database.SqlQueryRaw<string>(
@@ -254,14 +254,14 @@ public sealed class RegistrationAnswerPostgreSqlPersistenceTests(PostgreSqlConta
             "ck_registration_answers_subject_shape");
 
         await using ExploreDbContext context = fixture.CreateDbContext();
-        IIndex durableIdentity = DurableIdentityIndex(context);
+        string durableIdentity = DurableIdentityName(context);
         DbUpdateException duplicate = await AssertDatabaseFailureAsync(() => context.Database.ExecuteSqlRawAsync(
             $"INSERT INTO {AnswerTable} (id, tenant_id, event_id, registration_order_id, registration_attempt_id, registration_submission_id, registration_workflow_id, registration_requirement_id, registration_form_id, registration_form_version_id, registration_form_section_id, registration_form_field_id, field_type_id, requirement_subject_type_id, requirement_subject_id, answer_subject_type_id, order_subject_id, purchaser_subject_id, participant_subject_id, ticket_assignment_subject_id, session_selection_subject_id, ordinal, text_value, integer_value, decimal_value, boolean_value, date_value, time_value, instant_value, selected_option_id, sensitive_answer_value_id, created_at, created_by, updated_at, updated_by, is_deleted, deleted_at, deleted_by) " +
             $"SELECT gen_random_uuid(), tenant_id, event_id, registration_order_id, registration_attempt_id, registration_submission_id, registration_workflow_id, registration_requirement_id, registration_form_id, registration_form_version_id, registration_form_section_id, registration_form_field_id, field_type_id, requirement_subject_type_id, requirement_subject_id, answer_subject_type_id, order_subject_id, purchaser_subject_id, participant_subject_id, ticket_assignment_subject_id, session_selection_subject_id, ordinal, text_value, integer_value, decimal_value, boolean_value, date_value, time_value, instant_value, selected_option_id, sensitive_answer_value_id, created_at, created_by, updated_at, updated_by, is_deleted, deleted_at, deleted_by FROM {AnswerTable} WHERE id = {{0}}",
             scope.AnswerId));
         PostgresException duplicatePostgres = FindPostgresException(duplicate);
         await Assert.That(duplicatePostgres.SqlState).IsEqualTo(PostgresErrorCodes.UniqueViolation);
-        await Assert.That(duplicatePostgres.ConstraintName).IsEqualTo(durableIdentity.GetDatabaseName());
+        await Assert.That(duplicatePostgres.ConstraintName).IsEqualTo(durableIdentity);
     }
 
     [Test]
@@ -304,18 +304,15 @@ public sealed class RegistrationAnswerPostgreSqlPersistenceTests(PostgreSqlConta
         await Assert.That(otherTenantId).IsNotEqualTo(scope.TenantId);
     }
 
-    private static IIndex DurableIdentityIndex(ExploreDbContext context) =>
-        context.Model.FindEntityType(typeof(RegistrationAnswer))!
-            .GetIndexes()
-            .Single(index => index.Properties.Select(property => property.Name).SequenceEqual(
-            [
-                nameof(RegistrationAnswer.TenantId),
-                nameof(RegistrationAnswer.RegistrationSubmissionId),
-                nameof(RegistrationAnswer.RegistrationFormFieldId),
-                nameof(RegistrationAnswer.AnswerSubjectTypeId),
-                nameof(RegistrationAnswer.EffectiveSubjectIdentity),
-                nameof(RegistrationAnswer.Ordinal)
-            ]));
+    private static string DurableIdentityName(ExploreDbContext context) =>
+        RelationalConstraintDescriptorResolver.UniqueIndex<RegistrationAnswer>(
+            context,
+            nameof(RegistrationAnswer.TenantId),
+            nameof(RegistrationAnswer.RegistrationSubmissionId),
+            nameof(RegistrationAnswer.RegistrationFormFieldId),
+            nameof(RegistrationAnswer.AnswerSubjectTypeId),
+            nameof(RegistrationAnswer.EffectiveSubjectIdentity),
+            nameof(RegistrationAnswer.Ordinal)).Name;
 
     [Test]
     [Category("Runtime")]

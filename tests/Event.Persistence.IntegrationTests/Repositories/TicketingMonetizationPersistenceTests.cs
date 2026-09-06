@@ -341,14 +341,23 @@ public sealed class TicketingMonetizationPersistenceTests
             true,
             90);
 
+        IModel model;
         await using (ExploreDbContext seed = CreateNamedInMemoryContext(databaseName, root))
         {
             seed.EnableTenantFilterBypass("Seeds paid policy repository rows.");
             seed.Set<PaidEventPolicyVersion>().AddRange(instance, tenant);
             await seed.SaveChangesAsync();
+            model = seed.Model;
         }
 
-        await using ExploreDbContext context = CreateNamedInMemoryContext(databaseName, root, tenantId);
+        // The shared InMemory store must use the same key metadata across uncached providers.
+        await using ExploreDbContext context = new TicketingTestDbContext(TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase(databaseName, root)
+            .UseModel(model)
+            .Options)
+        {
+            TenantContext = new TestTenantContext(tenantId)
+        };
         var repository = new PaidEventPolicyRepository(context);
 
         PaidEventPolicyVersion? activeInstance = await repository.GetActiveInstanceAsync(CancellationToken.None);
@@ -1096,7 +1105,7 @@ public sealed class TicketingMonetizationPersistenceTests
         catalog.TenantId, catalog.Id, name, "USD", TicketPricingModeEnum.Free, null, null, null,
         ParticipantDataCollectionModeEnum.None, null, null, null, false, false, null, null, null, null);
 
-    private static TicketingTestDbContext CreateModelContext() => new(new DbContextOptionsBuilder<ExploreDbContext>()
+    private static TicketingTestDbContext CreateModelContext() => new(TestDbContextOptions.Create<ExploreDbContext>()
         .UseNpgsql("Host=localhost;Database=ticketing_model;Username=unused;Password=unused")
         .UseSnakeCaseNamingConvention().Options);
 
@@ -1107,15 +1116,15 @@ public sealed class TicketingMonetizationPersistenceTests
         return connection;
     }
 
-    private static TicketingTestDbContext CreateSqliteContext(SqliteConnection connection) => new(new DbContextOptionsBuilder<ExploreDbContext>()
+    private static TicketingTestDbContext CreateSqliteContext(SqliteConnection connection) => new(TestDbContextOptions.Create<ExploreDbContext>()
         .UseSqlite(connection)
         .UseSnakeCaseNamingConvention()
         .Options);
 
     private static TicketingTestDbContext CreateInMemoryContext(string name, SaveChangesInterceptor? interceptor = null)
     {
-        var optionsBuilder = new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase($"{name}-{Guid.NewGuid():N}");
+        var optionsBuilder = TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase($"{name}-{Guid.NewGuid():N}");
         if (interceptor is not null)
         {
             optionsBuilder.AddInterceptors(interceptor);
@@ -1126,7 +1135,7 @@ public sealed class TicketingMonetizationPersistenceTests
 
     private static ExploreDbContext CreateSqliteContext(SaveChangesInterceptor? interceptor = null)
     {
-        var optionsBuilder = new DbContextOptionsBuilder<ExploreDbContext>()
+        var optionsBuilder = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite("Data Source=:memory:")
             .UseSnakeCaseNamingConvention();
         if (interceptor is not null)
@@ -1139,8 +1148,8 @@ public sealed class TicketingMonetizationPersistenceTests
 
     private static TicketingTestDbContext CreateNamedInMemoryContext(string databaseName, InMemoryDatabaseRoot databaseRoot, Guid? tenantId = null)
     {
-        var context = new TicketingTestDbContext(new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase(databaseName, databaseRoot)
+        var context = new TicketingTestDbContext(TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase(databaseName, databaseRoot)
             .Options);
         if (tenantId is { } value)
         {
@@ -1155,7 +1164,7 @@ public sealed class TicketingMonetizationPersistenceTests
         var services = new ServiceCollection();
         services.AddScoped<ExploreDbContext>(_ => CreateNamedInMemoryContext(databaseName, databaseRoot, tenantId));
         services.ConfigurePersistenceServices(new ConfigurationBuilder().Build(), skipDbContextRegistration: true, skipLookupCacheInitializer: true);
-        return services.BuildServiceProvider(validateScopes: true);
+        return services.BuildIsolatedServiceProvider(validateScopes: true);
     }
 
     private static OrganizerPaymentProviderConnection ReadyConnection(Guid tenantId, Guid organizerActorId, string externalAccountId, int revision)

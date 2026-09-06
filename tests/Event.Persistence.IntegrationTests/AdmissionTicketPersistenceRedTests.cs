@@ -2,6 +2,7 @@
 // ABOUTME: Proves provider parity, real PostgreSQL collisions, and public Application issuance replay.
 
 using System.Data.Common;
+using Event.Persistence.IntegrationTests;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Admissions;
@@ -1534,7 +1535,7 @@ public sealed class AdmissionTicketPersistencePostgreSqlRedTests(PostgreSqlConta
             return context;
 
         context.Dispose();
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString)
             .UseSnakeCaseNamingConvention()
             .AddInterceptors(interceptors)
@@ -2059,7 +2060,7 @@ internal sealed class AdmissionPersistenceSurface
 
     internal static ExploreDbContext CreateModelContext(string provider)
     {
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>();
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
         switch (provider)
         {
             case "PostgreSql":

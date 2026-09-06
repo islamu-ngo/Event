@@ -81,13 +81,8 @@ public sealed class SemanticValueConstraintMigrationTests(
         PrimaryDatabaseProvider provider)
     {
         await using ExploreDbContext context = CreateCatalogContext(provider);
-        IMigrationsAssembly assembly = context.GetService<IMigrationsAssembly>();
-        string providerName = context.Database.ProviderName
-            ?? throw new InvalidOperationException("The migration catalog has no provider name.");
-        KeyValuePair<string, System.Reflection.TypeInfo> migrationEntry =
-            assembly.Migrations.Single();
-        await Assert.That(migrationEntry.Key).EndsWith($"_{MigrationSuffix}");
-        Migration migration = assembly.CreateMigration(migrationEntry.Value, providerName);
+        SemanticMigrationCatalog catalog = await FindSemanticMigrationAsync(context);
+        Migration migration = catalog.Migration;
 
         string[] identities = SemanticChecks(migration)
             .Select(operation => ConstraintIdentity(operation.Table, operation.Name))
@@ -801,7 +796,7 @@ public sealed class SemanticValueConstraintMigrationTests(
     private ExploreDbContext CreatePostgreSqlContext(Action<string>? captureDiagnostics = null)
     {
         var connection = new NpgsqlConnectionStringBuilder(fixture.ConnectionString);
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>();
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(
             builder,
             new PrimaryDatabaseConnectionOptions
@@ -826,7 +821,7 @@ public sealed class SemanticValueConstraintMigrationTests(
 
     private static ExploreDbContext CreateCatalogContext(PrimaryDatabaseProvider provider)
     {
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>();
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(builder, CreateCatalogOptions(provider));
         return new ExploreDbContext(builder.Options);
     }

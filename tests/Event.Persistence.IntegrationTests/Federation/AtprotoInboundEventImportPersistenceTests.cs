@@ -1489,7 +1489,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         }
 
         var interceptor = new CancelAfterSaveInterceptor();
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString)
             .UseSnakeCaseNamingConvention()
             .AddInterceptors(interceptor)
@@ -1594,7 +1594,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             services.AddLogging();
             services.Configure<LocalFileStorageOptions>(options => options.RootPath = storageRoot);
             services.AddSingleton<IFileStorageProvider, LocalFileStorageProvider>();
-            await using ServiceProvider serviceProvider = services.BuildServiceProvider();
+            await using ServiceProvider serviceProvider = services.BuildIsolatedServiceProvider();
             IFileStorageProvider storage = serviceProvider.GetRequiredService<IFileStorageProvider>();
             var transport = new DeterministicThumbnailTransport(RealPipelineImageBytes);
             var gateway = new AtprotoThumbnailBlobGateway(
@@ -1898,7 +1898,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
             services.AddLogging();
             services.Configure<LocalFileStorageOptions>(options => options.RootPath = storageRoot);
             services.AddSingleton<IFileStorageProvider, LocalFileStorageProvider>();
-            await using ServiceProvider serviceProvider = services.BuildServiceProvider();
+            await using ServiceProvider serviceProvider = services.BuildIsolatedServiceProvider();
             IFileStorageProvider storage = serviceProvider.GetRequiredService<IFileStorageProvider>();
             var transport = new DeterministicThumbnailTransport(bytes, "image/png");
             var gateway = new AtprotoThumbnailBlobGateway(

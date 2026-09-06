@@ -1650,4 +1650,25 @@ uninitializable.
 - [ ] Candidate for skill update.
 - [ ] Stays in journal only (one-off debugging lesson).
 
+[2026-09-06 Europe/Brussels] — ATProto controller tests missed named rate-policy failures
+
+**Context**: While replacing transient ATProto storage, two Production BFF hosts were connected to the real API authentication pipeline and PostgreSQL. The tests retained the real bootstrap handler, PDS verification, session encryption and token issuance.
+
+**Symptom / Observation**: After successful OAuth state consumption, `/api/auth/atproto/session` failed with `This endpoint requires a rate limiting policy with name write, but no such policy exists.` The failure occurred before the PDS verification gateway, despite the Testing profile disabling quota enforcement.
+
+**Root Cause**: `AtprotoSessionController` used lowercase `write` and `authenticated` literals, while `RateLimitingExtensions` registered `Write` and `Authenticated`. The Testing no-limiter policies still require matching names. Direct action invocation and a fabricated BFF bootstrap response bypass this middleware boundary and cannot establish usable login.
+
+**Resolution**: All four session-controller actions now reference the existing policy constants; quota values and authorization remain unchanged. `dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release -- --treenode-filter "/*/*/AtprotoRelationalLoginFlowTests/*" --minimum-expected-tests 2 --maximum-parallel-tests 1 --no-progress` passed both initial same-origin and unrelated-domain flows, including private HTTP retrieval of the encrypted persisted session. Later expansion of that class adds further expiry coverage; phase acceptance remains separate.
+
+**Why This Matters for Future Work**: Keep a complete real-HTTP authentication flow in addition to focused controller/adapter tests. Middleware metadata is executable configuration, including when a test substitutes a no-limiter partition; use the registering component's constants instead of duplicating policy names.
+
+**References**:
+- `src/Explore.API/Controllers/AtprotoSessionController.cs:38`
+- `src/Explore.API/Extensions/RateLimitingExtensions.cs:38`
+- `tests/Event.API.IntegrationTests/Authentication/AtprotoRelationalLoginFlowTests.cs`
+- `tests/Event.API.IntegrationTests/Authentication/AtprotoRelationalLoginFixture.cs`
+
+**Promotion Consideration**:
+- [x] Stays in journal only (one-off debugging lesson)
+
 ---

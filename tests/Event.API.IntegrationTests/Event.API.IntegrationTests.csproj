@@ -1,3 +1,5 @@
+<!-- ABOUTME: Hosts API HTTP, relational and cross-host authentication boundary integration tests. -->
+<!-- ABOUTME: Aliases the BFF composition root so backend dependencies never enter BFF runtime or test projects. -->
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- The provider-neutral parity corpus is declared once and linked into every lane that evaluates it,
@@ -8,6 +10,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Explore.API\Explore.API.csproj" />
+    <ProjectReference Include="..\..\src\Explore.Blazor\Explore.Blazor.csproj" Aliases="bff" />
+    <ProjectReference Include="..\..\src\Event.Standalone\Event.Standalone.csproj" Aliases="standalone" />
     <ProjectReference Include="..\..\src\Explore.ServiceDefaults\Explore.ServiceDefaults.csproj" />
   </ItemGroup>
 

@@ -6,7 +6,7 @@
 > **Audience:** Contributors | AI Agents | Platform Architects | Maintainers  
 > **Status:** Canonical & Implemented  
 > **Last Verified:** 2026-09-06 Europe/Brussels<br>
-> **Source Anchors:** [`AGENTS.md`](../../AGENTS.md), [`.agents/CONTEXT_ENGINEERING.md`](../../.agents/CONTEXT_ENGINEERING.md), [`.agents/contract/intents.yaml`](../../.agents/contract/intents.yaml), [`implementation-plan`](../../.agents/skills/implementation-plan/SKILL.md), [`senior-cto-feedback`](../../.agents/skills/senior-cto-feedback/SKILL.md), [`conventional-commit`](../../.agents/skills/conventional-commit/SKILL.md), [`docs/QUICK_REFERENCE.md`](QUICK_REFERENCE.md)
+> **Source Anchors:** [`AGENTS.md`](../../AGENTS.md), [`.agents/CONTEXT_ENGINEERING.md`](../../.agents/CONTEXT_ENGINEERING.md), [`.agents/contract/intents.yaml`](../../.agents/contract/intents.yaml), [`implementation-plan`](../../.agents/skills/implementation-plan/SKILL.md), [`senior-cto-feedback`](../../.agents/skills/senior-cto-feedback/SKILL.md), [`implement-tasks`](../../.agents/skills/implement-tasks/SKILL.md), [`conventional-commit`](../../.agents/skills/conventional-commit/SKILL.md), [`docs/QUICK_REFERENCE.md`](QUICK_REFERENCE.md)
 
 ---
 
@@ -22,7 +22,7 @@ This system enforces six core design tenets:
 2. **Zero-Turn Structural Injection**: When graph tooling is available, pre-flight blast-radius slices reduce manual traversal by injecting callers, callees, impacted flows, and tests on Turn 1.
 3. **Behavior-Bound Test-First Invariants**: Requirements are written as observable system behavior (RFC 2119 + `WHEN`/`THEN` Scenarios) and mapped directly to failing Red tests at pre-agreed public seams *before* production code is touched.
 4. **Portable Root Contract With A Scoped Twin Pair**: `AGENTS.md` is the portable authority. Reciprocal path-rule twins currently cover only `.agents/rules` and `.omo/rules`; Claude, Cursor, Copilot, Gemini, and other harness adapters remain separate drift-prone integration surfaces.
-5. **Phase-Atomic Native Git Delivery**: Planning pre-authors a self-sufficient phase packet containing exact commit metadata, wholly owned paths, inspection/staging/path-limited commit commands, and post-commit verification. Parallel contributors use separate branches/worktrees, while every verified phase closes with literal commit paths and leaves unrelated work untouched.
+5. **Phase-Atomic Native Git Delivery**: Planning pre-authors declarative commit contracts with exact owned paths and verification. Parallel contributors use separate branches/worktrees; each verified phase stages literal paths, commits only its own work, and leaves unrelated work untouched.
 6. **Self-Contained Human Interaction & Zero Plan-Opening UX**: Prompts, feedback requests, milestone reports, and approval inquiries must be completely self-contained. The active implementation plan (`dev/active/<task>/`) is internal machine working memory, not the developer console. Agents must never force developers to open plan files to understand bare IDs (e.g. *"P04/P06 with P03 gates open"*); all decisions must be presented as inline, actionable Decision Briefs.
 
 ```mermaid
@@ -71,8 +71,8 @@ flowchart TB
 
 The repository's agentic system divides its 40+ skills into three distinct tiers:
 
-1. **User-Invoked Orchestration Tier (Human-in-the-Loop Governance)**: High-level governance, ethical design, planning, and critique skills that the developer explicitly invokes to guide intent, scrutinize designs, and approve executable workstreams.
-2. **Plan-Invoked Phase Closure Tier (Standing Execution Authority)**: Planning and CTO review load `conventional-commit` to produce a self-sufficient default contract after every phase verification gate. Normal implementation executes that contract without loading the skill; only a permitted override loads it to author replacements.
+1. **User-Invoked Orchestration Tier (Human-in-the-Loop Governance & Execution)**: High-level governance, ethical design, planning, critique, and autonomous execution skills that the developer explicitly invokes. During execution, the developer combines the `/goal` harness command with the `implement-tasks` skill, instructing the agent to utilize Tavily MCP for external research, Context7 MCP for framework documentation, and Code-Review-Graph MCP for structural discovery, upholding Clean Architecture, enterprise-grade engineering, and pre-release greenfield breaking-change freedom (zero backward compatibility baggage).
+2. **Plan-Authoring Phase Closure Tier (Commit Contract Dependency & Standalone Human Tool)**: The `conventional-commit` skill is a dependency of `implementation-plan` and `senior-cto-feedback`, used during planning and review to pre-author and validate declarative commit contracts in `tasks.md`. The active execution loop does NOT load `conventional-commit` (saving context tokens); it directly executes the pre-authored contract. Human developers also invoke `conventional-commit` standalone when making changes directly or for ad-hoc commits.
 3. **Indirectly-Invoked Domain Execution Tier (Autonomous Machine Guardrails)**: Technical domain patterns, Clean Architecture rules, and tool wrappers that the AI activates autonomously in the background based on edited file paths, matched intents, and domain patterns.
 
 ### The Canonical 5-Stage Human-in-the-Loop Lifecycle
@@ -88,27 +88,28 @@ flowchart TD
 
     subgraph Stage2["Stage 2: Implementation Planning & Interrogation (User-Invoked)"]
         IVSDDoc --> PlanTrigger["User Prompt:\n'Create implementation plan for <feature>'"]
-        PlanTrigger --> PlanSkill["implementation-plan Skill\n• Ingests i-vsd Deliverable\n• Runs /grill-me Technical Socratic Interrogation\n• (If Major Fork: robin-neutral Steelmanning)"]
-        PlanSkill --> DevDocTriadInit["Initializes dev/active/<task>/\n• <task>-plan.md (Scenarios & Architecture)\n• <task>-tasks.md (Tests + Exact Commit Contracts)\n• <task>-context.md (Working Memory)"]
+        PlanTrigger --> PlanSkill["implementation-plan Skill\n• Ingests i-vsd Deliverable\n• Runs /grill-me Technical Socratic Interrogation\n• Dependencies: conventional-commit for commit contracts\n• (If Major Fork: robin-neutral Steelmanning)"]
+        PlanSkill --> DevDocTriadInit["Initializes dev/active/<task>/\n• <task>-plan.md (Scenarios & Architecture)\n• <task>-tasks.md (Tests + Declarative Commit Contracts)\n• <task>-context.md (Ephemeral Working Memory)"]
     end
 
     subgraph Stage3["Stage 3: Adversarial CTO Audit & Socratic Stress-Test (User-Invoked)"]
         DevDocTriadInit --> CTOTrigger["User Prompt:\n'Run senior-cto-feedback'"]
-        CTOTrigger --> CTOSkill["senior-cto-feedback Skill\n• Audits & Directly Refines Triad (Zero Review Files)\n• 3D Scorecard (Completeness, Correctness, Coherence)\n• 4-Point Right-Sizing Check (Split PR Heuristic)\n• 'Worst Break' Catastrophic Invariant Check\n• High-Signal Chat Summary"]
+        CTOTrigger --> CTOSkill["senior-cto-feedback Skill\n• Directly Refines Triad (Zero Review Files)\n• 3D Scorecard (Completeness, Correctness, Coherence)\n• 4-Point Right-Sizing Check (Split PR Heuristic)\n• 'Worst Break' Catastrophic Invariant Check\n• Validates Declarative Per-Phase Commit Contracts\n• High-Signal Chat Summary"]
     end
 
     subgraph Stage4["Stage 4: Implementation Execution & Autonomous Domain Guardrails"]
-        CTOSkill --> ExecTrigger["User Approval & Execution:\n(Can leverage /goal, subagents, or fast loops)"]
+        CTOSkill --> ExecTrigger["User Combines /goal + implement-tasks:\n• Research: Tavily MCP & Context7 MCP\n• Structure: Code-Review-Graph MCP\n• Conventions: Clean Architecture & Enterprise Patterns\n• Pre-Release Freedom: Zero backward compatibility baggage"]
         ExecTrigger --> AutoExecution["Autonomous Domain Execution Loop\n• clean-architecture-rules\n• cqrs-mediatr-guidelines\n• dotnet-efcore-guidelines\n• auth-patterns & outbox-pattern\n• debug-issue & refactor-safely\n• Fast TUnit Slicing (--treenode-filter)"]
-        AutoExecution --> PhaseVerification["Phase Verification\n• One Release build\n• At most one selected project test\n• Ownership disposition for failures"]
-        PhaseVerification --> PhaseCommit["Immediate Phase Commit\n• Execute self-sufficient planned contract\n• Load skill only for override\n• Commit owned paths + record hash"]
+        AutoExecution --> PhaseVerification["Phase Verification\n• Phase-appropriate build/test or docs checks\n• Ownership disposition for failures"]
+        PhaseVerification --> PhaseCommit["Immediate Phase Commit\n• Execute pre-authored declarative tasks.md contract\n• No conventional-commit skill reload\n• Commit owned paths directly (no hash logging)"]
         PhaseCommit --> MorePhases{"More approved phases?"}
         MorePhases -->|"Yes"| AutoExecution
     end
 
-    subgraph Stage5["Stage 5: Workstream Review & Governed Release"]
-        MorePhases -->|"No"| FinalReview["Final Workstream Review\n• Every phase hash recorded\n• No unrelated shared-tree files committed\n• Required release artifacts present"]
-        FinalReview --> Shipped(["Committed on develop / Ready for PR"])
+    subgraph Stage5["Stage 5: Workstream Completion & Knowledge Graduation"]
+        MorePhases -->|"No"| FinalReview["Final Workstream Review & Teaching Summary\n• Comprehensive technical explanation\n• No unrelated shared-tree files committed\n• Dual-documentation parity (public vs internal)"]
+        FinalReview --> KnowledgeGraduation["Knowledge Graduation\n• Move completed task to dev/backlog/\n• Durable ADRs to docs/internal/adr/\n• Durable findings to dev/_journal/"]
+        KnowledgeGraduation --> Shipped(["Task Complete on Dedicated Branch / Ready for PR"])
     end
 ```
 
@@ -116,7 +117,7 @@ flowchart TD
 
 | Tier | Invocation Model | Key Skills | Role & Primary Responsibility |
 |---|---|---|---|
-| **Orchestration Tier** | **User-Invoked** (Direct developer prompt or slash command) | `i-vsd`, `implementation-plan`, `senior-cto-feedback`, `/grill-me`, `/goal`, `robin-neutral` | Sets ethical boundaries, interrogates requirements, authors workstream triads (`dev/active/<task>/`), audits architecture, and directly refines triads before implementation. |
+| **Orchestration Tier** | **User-Invoked** (Direct developer prompt or slash command) | `i-vsd`, `implementation-plan`, `senior-cto-feedback`, `implement-tasks`, `/grill-me`, `/goal`, `robin-neutral` | Sets ethical boundaries, interrogates requirements, authors workstream triads (`dev/active/<task>/`), audits architecture, directly refines triads before implementation, and executes approved work. |
 | **Phase Closure Tier** | **Planning/Review-Invoked; override-only during execution** | `conventional-commit` | Planning writes exact self-sufficient contracts; CTO review validates them; normal execution does not reload the skill. Only material divergence loads it to author recorded replacements before committing owned paths. |
 | **Domain Execution Tier** | **Indirectly-Invoked** (Autonomously activated via matched intent, rule path, or graph trigger) | `clean-architecture-rules`, `cqrs-mediatr-guidelines`, `dotnet-efcore-guidelines`, `blazor-ui-conventions`, `auth-patterns`, `outbox-pattern`, `debug-issue`, `refactor-safely`, `review-changes`, `review-pr`, `accessibility` | Enforces layer boundaries, immutable record contracts, zero-internal-mocking, fail-closed auth, transactional outbox dispatch, and two-axis review during active coding. |
 
@@ -174,20 +175,20 @@ flowchart TD
     StandardIntake --> BlastRadius
     AutonomousIntake --> DevDocsInit
     
-    BlastRadius --> DevDocsInit["4. DEV-DOC TRIAD INITIALIZATION\nCreate dev/active/<task>/\n• plan.md: RFC 2119 + WHEN/THEN Scenarios\n• tasks.md: Tests + Exact Phase Commit Contracts\n• context.md: Resume & Validation Baseline"]
+    BlastRadius --> DevDocsInit["4. DEV-DOC INITIALIZATION\nCreate dev/active/<task>/\n• plan.md: RFC 2119 + WHEN/THEN Scenarios\n• tasks.md: TDD Tasks + Declarative Commit Contracts\n• context.md: Ephemeral session pause memory"]
     
-    DevDocsInit --> TDDExecution["5. BEHAVIOR-BOUND TDD EXECUTION\n• Task N.1 (Red): Author failing Invariant Tests for Scenarios\n• Task N.2 (Green): Implement Production Handlers & Entities\n• Task N.3 (Refactor): Clean Architecture & Registration"]
+    DevDocsInit --> TDDExecution["5. BEHAVIOR-BOUND TDD EXECUTION\n(Driven by implement-tasks + /goal)\n• Task N.1 (Red): Failing Invariant Tests + Compilable Stubs\n• Task N.2 (Green): Minimal Production Logic\n• Task N.3 (Refactor): Clean Architecture & DI Slicing"]
     
     TDDExecution --> LayerVerification["6. LAYER-BOUNDED VERIFICATION\n• Fast Loop: dotnet run -- --treenode-filter\n• Phase Exit: 1 Release Build + 1 Project Test\n• Tier 0–2: Capture QA Evidence to .omo/evidence/"]
     
     LayerVerification --> FailureOwnership{"7. FAILURE OWNERSHIP\nPhase-attributable?"}
     FailureOwnership -->|"Yes: fix before commit"| TDDExecution
-    FailureOwnership -->|"No failure"| PhaseCommit["8. PHASE COMMIT\n• Execute planned contract without reload\n• Load skill only for override\n• Verify paths and record hash"]
+    FailureOwnership -->|"No failure"| PhaseCommit["8. PHASE COMMIT\n• Stage owned paths\n• Commit via declarative tasks.md contract\n• No skill reload, no hash logging"]
     FailureOwnership -->|"Proven unrelated shared-tree failure"| ExternalRecord["Record exact external evidence\nLeave unrelated files untouched\nRequire phase-owned lane green"]
     ExternalRecord --> PhaseCommit
     PhaseCommit --> MorePhases{"More phases?"}
     MorePhases -->|"Yes"| TDDExecution
-    MorePhases -->|"No"| ReviewTeaching["9. REVIEW & TEACHING SUMMARY\n• Two-Axis Review (Standards vs Spec)\n• Comprehensive Technical Teaching Summary\n• Phase hashes and release artifacts reconciled"]
+    MorePhases -->|"No"| ReviewTeaching["9. GRADUATION & TEACHING SUMMARY\n• Graduate task to dev/backlog/\n• Two-Axis Review & Dual-Doc Parity\n• Comprehensive Technical Teaching Summary"]
     
     ReviewTeaching --> Done(["Work Complete & Verified"])
 ```
@@ -259,7 +260,7 @@ Harness injection order does not change repository authority. Root [`AGENTS.md`]
 Substantial or multi-session development tasks are governed by the **Dev-Doc Triad** in `dev/active/<task>/`. This structure enforces strict separation of concerns between architecture, execution, and ephemeral session memory.
 
 > [!NOTE]
-> **Local Working Memory & Gitignore Isolation**: Active workstreams in `dev/active/*` are gitignored to eliminate commit churn, task-checkbox noise, and branch merge conflicts. Agents and developers access, create, and update these files directly using native harness file tools by deterministic path. Only durable architectural decisions graduate to `docs/internal/adr/`, durable findings to `dev/_journal/`, and research reports to `dev/report/`.
+> **Local Working Memory & Gitignore Isolation**: Active workstreams in `dev/active/*` are gitignored to eliminate commit churn, task-checkbox noise, and branch merge conflicts. Agents and developers access, create, and update these files directly using native harness file tools by deterministic path. Only durable architectural decisions graduate to `docs/internal/adr/`, durable findings to `dev/_journal/`, and completed workstreams to `dev/backlog/`.
 
 ```mermaid
 stateDiagram-v2
@@ -268,7 +269,7 @@ stateDiagram-v2
     state "dev/active/<task>/" as ActiveWorkstream {
         state "plan.md (Canonical Design)" as PlanDoc
         state "tasks.md (Hot Execution Ledger)" as TasksDoc
-        state "context.md (Session Working Memory)" as ContextDoc
+        state "context.md (Ephemeral Working Memory)" as ContextDoc
         
         PlanDoc: • Architectural Decisions & ADRs
         PlanDoc: • RFC 2119 Behavioral Contract
@@ -278,23 +279,24 @@ stateDiagram-v2
         
         TasksDoc: • Phase-by-Phase Task Breakdown
         TasksDoc: • Test-First Order (Red -> Green -> Refactor)
-        TasksDoc: • Exact Self-Sufficient Commit Packets
+        TasksDoc: • Declarative Commit Contracts
         TasksDoc: • Hot execution status ([ ], [x])
+        TasksDoc: ❌ NO commit hash recording
         
-        ContextDoc: • Resume State & Current Priority
-        ContextDoc: • Active Blockers & Investigation Ledger
-        ContextDoc: • Validation Baseline Results
-        ContextDoc: • Dated Session Handoffs
+        ContextDoc: • Quick Resume State & Priority
+        ContextDoc: • Active Blockers & Investigation Notes
+        ContextDoc: • Ephemeral Session Handoffs (Optional)
+        ContextDoc: ❌ NO commit hash recording
     }
 
     Draft --> InImplementation: User Approves Plan
     InImplementation --> ReBaselined: Scope/Architecture Shift
     ReBaselined --> InImplementation: Plan Updated & Re-Approved
     InImplementation --> PhaseVerified: Phase Tasks [x] & Verification Resolved
-    PhaseVerified --> PhaseCommitted: Planned Packet + Exact Owned Paths
+    PhaseVerified --> PhaseCommitted: Staged Owned Paths & Committed
     PhaseCommitted --> InImplementation: Next Approved Phase
-    PhaseCommitted --> Verified: Final Phase Reviewed
-    Verified --> [*]: Ready for PR / Merge
+    PhaseCommitted --> Graduated: All Phases Verified
+    Graduated --> [*]: Moved to dev/backlog/ & Ready for PR
 ```
 
 ### Triad Single Responsibility Matrix
@@ -302,8 +304,8 @@ stateDiagram-v2
 | Artifact | Canonical Responsibility | Strictly Forbidden Content | Update Frequency |
 |---|---|---|---|
 | `*-plan.md` | High-level architecture, design decisions, RFC 2119 contracts, `WHEN`/`THEN` scenarios, phase exit criteria, rollback handling. | Granular task checklists, `- [ ]` checkboxes, dynamic statuses (`IN PROGRESS`), ephemeral session progress. | Only when architectural direction or scope shifts. |
-| `*-tasks.md` | Hot execution ledger, granular Red/Green/Refactor tasks, exact phase-owned paths, verification disposition, exact planned commit contracts, governed overrides, and commit tasks. | Long architectural narratives, trade-off debates, session handoff logs. | During planning, after each subtask, before any override, and after each commit. |
-| `*-context.md` | Working memory, quick resume state, blockers, loaded evidence ledger, validation baseline, unrelated shared-tree failures, phase commit hashes, and dated handoffs. | Duplicate task checklists, full source code copies, redundant documentation paste. | At start of session, after phase closure, on blockers, and before handoff/pause. |
+| `*-tasks.md` | Hot execution ledger, granular Red/Green/Refactor tasks, exact phase-owned paths, verification commands, declarative planned commit contracts, and task statuses (`[ ]`, `[x]`). | Long architectural narratives, trade-off debates, session handoff logs, commit hash recording. | During planning, after each subtask, and after each phase commit. |
+| `*-context.md` | Ephemeral working memory for session pauses/handoffs, quick resume state, active blockers, loaded evidence ledger, validation baseline results. | Duplicate task checklists, full source code copies, redundant documentation paste, commit hash recording. | At start of session, on blockers, and before handoff/pause. |
 
 ### The Triad As The Sole Inter-Session Serialization Protocol
 
@@ -363,38 +365,26 @@ When presenting a newly authored or re-baselined implementation plan (Stage 2 ex
 
 ### Native Git Concurrency And Phase-Close Protocol
 
-Parallel contributors should use native Git branches or worktrees instead of
-editing one physical checkout concurrently. A task starts from the intended
-base commit, works on a dedicated branch/worktree, and integrates through normal
-Git review and merge. The phase boundary still owns verification and literal
-commit paths:
+Each active workstream uses a dedicated Git branch or worktree. Planning pre-authors declarative commit contracts; after phase verification, execution stages only owned literal paths and commits directly without reloading `conventional-commit`. Git history is the source of commit provenance.
 
 | Step | Required action | Observable evidence |
 |---|---|---|
-| 1. Reconcile ownership | Update the phase-owned path list from completed tasks and generated outputs. Inspect the dirty tree and existing index before staging. | Every candidate path and hunk maps to the current phase; unrelated dirty/pre-staged paths are listed but untouched. A mixed-ownership file blocks commit until contributors separate or coordinate it. |
-| 2. Verify once | Run the phase's one Release build and selected project test after implementation tasks finish. | Passing output, or an exact failure record with path/project ownership. |
-| 3. Classify failures | Fix phase-attributable failures. A failure is unrelated only when concrete evidence points outside phase-owned files and the phase's selected verification lane is green. | `tasks.md` and `context.md` state the command, first actionable error, external path/owner evidence, and scoped green result. |
-| 4. Consume planned contract | Compare the actual phase outcome with the self-sufficient packet in `tasks.md`; do not load `conventional-commit` merely to reuse it. | Exact metadata, commit paths, inspection commands, staging command, path-limited commit command, and verification command are reused unchanged while truthful. |
-| 5. Govern exceptions | Only when the default will not be used, load `conventional-commit` for the five permitted divergence triggers. | Before commit, `tasks.md` records the reason and a complete metadata/path/command packet for every resulting commit. Style never qualifies. |
-| 6. Commit owned paths | Stage exact files only. Use an explicit path-limited commit only when the task owns the complete diff of each named file. | No blind `git add .`/`git add -A`, no mixed-ownership file, and no unrelated path in the commit. |
-| 7. Prove isolation | Inspect the new commit's path list and record its hash before completing the phase. | Commit file list equals the intended phase-owned set; unrelated working/index state remains present and untouched. |
+| 1. Reconcile & stage | Check `git status --short`. Stage exact phase-owned files (`git add -- <paths>`). | Only files modified by the current phase are staged. No blind `git add .` or `git add -A`. |
+| 2. Verify once | Run phase-appropriate verification: one Release build and one selected project test for code, or formatting/link/schema checks for docs and agent context. | Required checks pass without unrelated test sprawl. |
+| 3. Classify failures | Fix phase-attributable failures immediately. External shared-tree failures are noted without touching foreign code. | Working tree remains bounded to phase-owned scope. |
+| 4. Execute planned commit | Commit staged files directly using the declarative title and description from `tasks.md`. Do not load `conventional-commit`. | Clean native Git commit (`git commit -m "..." -m "..."`). The Git log is the sole source of truth; no hashes recorded in markdown. |
+| 5. Progress or graduate | Proceed to the next phase, or upon completing all phases, graduate the workstream (`dev/active/<task>/` -> `dev/backlog/<task>/`). | Working tree clean (`git status --short`). Release artifacts and teaching summary prepared. |
 
-A phase-attributable failure blocks its commit. A proven unrelated failure does not authorize the agent to repair, stage, discard, or claim ownership of another contributor's work. A message override never happens silently: if the divergence also changes architecture, scope, acceptance criteria, risk, or validation, the normal plan/context refresh triggers apply.
+A phase-attributable failure blocks its commit. A proven unrelated failure does not authorize the agent to repair, stage, discard, or claim ownership of another contributor's work.
 
-Representative `tasks.md` contract:
+Representative `tasks.md` declarative commit contract:
 
 ```markdown
 #### Planned Commit Contract
-- **Default title:** `fix(registration): reject expired holds before confirmation`
-- **Default description:** Keep registration and capacity state unchanged when confirmation references an expired inventory hold.
-- **Changelog treatment:** Public fix
-- **Required trailers:** None
-- **Commit paths:** `src/Registration/HoldConfirmation.cs`, `tests/Registration/HoldConfirmationTests.cs`
-- **Pre-commit inspection commands:** `git status --short`; `git diff --name-only`; `git diff --cached --name-only`
-- **Staging command:** `git add -- src/Registration/HoldConfirmation.cs tests/Registration/HoldConfirmationTests.cs`
-- **Commit command:** `git commit --only -m "fix(registration): reject expired holds before confirmation" -m "Keep registration and capacity state unchanged when confirmation references an expired inventory hold." -- src/Registration/HoldConfirmation.cs tests/Registration/HoldConfirmationTests.cs`
-- **Post-commit verification command:** `git show --name-only --format=fuller HEAD`
-- **Message override:** Not overridden
+- **Title:** `fix(registration): reject expired holds before confirmation`
+- **Description:** Keep registration and capacity state unchanged when confirmation references an expired inventory hold.
+- **Changelog:** Public fix
+- **Files:** `src/Registration/HoldConfirmation.cs`, `tests/Registration/HoldConfirmationTests.cs`
 ```
 
 ---
@@ -416,11 +406,11 @@ flowchart TD
     end
 
     subgraph RedGreenRefactor["3. Execution Sequence (in tasks.md)"]
-        RedPhase["Task N.1 (Red Phase)\nAuthor failing Invariant Tests for Scenarios\n• Test against Public Seams only\n• Include 'Worst Break' Adversarial tests\n• Verify test fails with expected missing capability"]
+        RedPhase["Task N.1 (Red Phase)\nAuthor failing Invariant Tests for Scenarios\n• Test against Public Seams only\n• Include compilable stubs (build succeeds, test fails)\n• Include 'Worst Break' Adversarial tests\n• Verify test fails with expected assertion error"]
         GreenPhase["Task N.2 (Green Phase)\nImplement Handlers, Aggregates & Domain Logic\n• Minimal production code to satisfy test\n• Verify test turns GREEN via --treenode-filter"]
         RefactorPhase["Task N.3 (Refactor & Registration)\nClean Architecture Slicing & DI\n• The Deletion Test (Deep Modules)\n• StarRedactor / HmacRedactor Zero-PII logging\n• Wire DI Service Registrations"]
-        VerificationPhase["Phase Verification\n• One Release build\n• One selected project test"]
-        CommitPhase["Phase-Owned Conventional Commit\n• Self-sufficient default, no skill reload\n• Override-only load, explicit paths"]
+        VerificationPhase["Phase Verification\n• Code: one Release build + selected test\n• Docs: formatting/link/schema checks"]
+        CommitPhase["Phase Commit on Owned Branch/Worktree\n• Stage owned paths (git add -- <paths>)\n• Commit declarative tasks.md contract directly\n• No skill reload, no hash recording"]
     end
 
     PlanContract --> SeamDefinitions
@@ -434,9 +424,10 @@ flowchart TD
 ### Core Testing Invariants
 
 1. **Pre-Agreed Public Seams**: Tests verify behavior strictly through public interfaces (MediatR requests, HTTP routes, aggregate root methods), never by inspecting private internal state or mocking internal collaborators.
-2. **No Tautological Assertions**: Expected values must originate from an independent known-good literal or specification. Assertions that recompute expected values using the same formula as production code (`Assert.Equal(items.Sum(x => x.Price), result.Total)`) are strictly forbidden.
-3. **No Interface Bypassing**: Tests must verify state transitions through the public interface. A test must not bypass the domain aggregate to assert directly against raw database tables.
-4. **Mock Boundary Rule**: Mock **ONLY** external third-party infrastructure (payment gateways, external email delivery, system clock, random generators). **NEVER mock internal domain entities, aggregate roots, repositories, or MediatR handlers.** Use real domain entities and in-memory or Testcontainers-backed databases.
+2. **Compilable Stubs in Red Phase**: In strongly-typed C#/.NET, invariant tests must compile to execute. Agents must author minimal compilable stub types/method signatures (returning default or throwing `NotImplementedException`) alongside the test so that the solution compiles and the test suite executes to produce a genuine behavioral RED failure, never a compile break.
+3. **No Tautological Assertions**: Expected values must originate from an independent known-good literal or specification. Assertions that recompute expected values using the same formula as production code (`Assert.Equal(items.Sum(x => x.Price), result.Total)`) are strictly forbidden.
+4. **No Interface Bypassing**: Tests must verify state transitions through the public interface. A test must not bypass the domain aggregate to assert directly against raw database tables.
+5. **Mock Boundary Rule**: Mock **ONLY** external third-party infrastructure (payment gateways, external email delivery, system clock, random generators). **NEVER mock internal domain entities, aggregate roots, repositories, or MediatR handlers.** Use real domain entities and in-memory or Testcontainers-backed databases.
 
 ---
 
@@ -529,20 +520,15 @@ dotnet test --project tests/<TargetProject>.Tests/<TargetProject>.Tests.csproj -
 # 3. Architecture & Convention Integrity Check:
 dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --verbosity quiet
 
-# 4. Immediate phase close on the task branch/worktree:
+# 4. Immediate phase close on the owned branch or worktree:
 git status --short
-git diff --name-only
-git diff --cached --name-only
-# Use the exact self-sufficient tasks.md contract without loading
-# conventional-commit. Load it only when authoring a permitted override.
+# Stage exact files owned by this phase
 git add -- <phase-owned-path-1> <phase-owned-path-2>
-# If unrelated files were already staged and every named file is wholly
-# phase-owned, use an explicit path-limited commit.
-git commit --only \
-  -m "<type>(<scope>): <benefit-led phase outcome>" \
-  -m "<phase-owned motivation, data flow, and required trailers>" \
-  -- <phase-owned-path-1> <phase-owned-path-2>
-git show --name-only --format=fuller HEAD
+# Commit directly using the declarative tasks.md contract:
+git commit -m "<type>(<scope>): <benefit-led phase outcome>" \
+  -m "<phase-owned motivation, data flow, and required trailers>"
+git status --short
+# Git log is the single source of truth; no commit hashes recorded in markdown.
 
 # 5. Markdown & Diff Integrity Check (Tier 4 / Documentation tasks):
 git diff --check -- .agents/ docs/ dev/

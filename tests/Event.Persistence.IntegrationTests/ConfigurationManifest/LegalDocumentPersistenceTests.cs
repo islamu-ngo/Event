@@ -70,7 +70,7 @@ public sealed class LegalDocumentPersistenceTests
                 DataSource = ":memory:"
             }.ToString());
         await connection.OpenAsync();
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connection)
             .UseSnakeCaseNamingConvention()
             .Options;
@@ -141,7 +141,7 @@ public sealed class LegalDocumentPersistenceTests
                 DataSource = ":memory:"
             }.ToString());
         await connection.OpenAsync();
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connection)
             .UseSnakeCaseNamingConvention()
             .Options;
@@ -181,7 +181,7 @@ public sealed class LegalDocumentPersistenceTests
                 DataSource = ":memory:"
             }.ToString());
         await connection.OpenAsync();
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connection)
             .UseSnakeCaseNamingConvention()
             .Options;
@@ -324,7 +324,7 @@ public sealed class LegalDocumentPersistenceTests
     private static ExploreDbContext CreateModelContext(
         PrimaryDatabaseProvider provider)
     {
-        var optionsBuilder = new DbContextOptionsBuilder<ExploreDbContext>();
+        var optionsBuilder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(
             optionsBuilder,
             CreateOptions(provider));

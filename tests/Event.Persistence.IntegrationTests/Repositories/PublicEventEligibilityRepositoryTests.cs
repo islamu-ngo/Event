@@ -220,8 +220,8 @@ public sealed class PublicEventEligibilityRepositoryTests
 
     private static ExploreDbContext CreateContext(Guid tenantId)
     {
-        var context = new ExploreDbContext(new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase($"public-event-eligibility-{Guid.NewGuid():N}")
+        var context = new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase($"public-event-eligibility-{Guid.NewGuid():N}")
             .Options)
         {
             TenantContext = new TestTenantContext(tenantId)

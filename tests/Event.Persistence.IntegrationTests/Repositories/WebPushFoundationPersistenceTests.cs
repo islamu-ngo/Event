@@ -435,6 +435,74 @@ public sealed class WebPushFoundationPersistenceTests(PostgreSqlContainerFixture
     }
 
     [Test]
+    public async Task DispatchRepository_SubscriptionFailureRollsBackTheTerminalDispatch()
+    {
+        await fixture.ResetAsync();
+        var tenant = CreateTenant("push-cleanup-rollback");
+        var user = CreateUser("push-cleanup-rollback");
+        DateTime failedAt = DateTime.UtcNow;
+        WebPushSubscription subscription;
+        WebPushDispatchOutbox dispatch;
+        Guid leaseToken = Guid.CreateVersion7();
+        await using (ExploreDbContext setup = fixture.CreateDbContext())
+        {
+            setup.AddRange(tenant, user);
+            await setup.SaveChangesAsync();
+            subscription = WebPushSubscription.Create(
+                tenant.Id, user.Id, "device-rollback", "https://push.example/rollback",
+                "key", "auth", null, failedAt);
+            setup.WebPushSubscriptions.Add(subscription);
+            dispatch = CreateDispatch(tenant.Id, subscription.Id, user.Id);
+            dispatch.Status = WebPushDispatchStatus.Processing;
+            dispatch.ProcessingStartedAt = failedAt.AddSeconds(-5);
+            dispatch.ProcessingLeaseToken = leaseToken;
+            setup.WebPushDispatchOutbox.Add(dispatch);
+            await setup.SaveChangesAsync();
+        }
+
+        await using (ExploreDbContext failing = fixture.CreateDbContext(new RejectSubscriptionUpdate()))
+        {
+            await Assert.That(failing.Database.CreateExecutionStrategy().RetriesOnFailure).IsTrue();
+            var repository = new WebPushDispatchOutboxRepository(failing);
+            await Assert.That(async () => await repository.MarkPermanentFailureAndDeactivateSubscription(
+                    tenant.Id, dispatch.Id, leaseToken, subscription.Id,
+                    "gone_410", "Push endpoint retired.", failedAt))
+                .Throws<SubscriptionUpdateFailure>();
+        }
+
+        await using ExploreDbContext verification = fixture.CreateDbContext();
+        var persistedDispatch = await verification.WebPushDispatchOutbox.AsNoTracking()
+            .SingleAsync(row => row.Id == dispatch.Id);
+        var persistedSubscription = await verification.WebPushSubscriptions.AsNoTracking()
+            .SingleAsync(row => row.Id == subscription.Id);
+        await Assert.That(persistedDispatch.Status).IsEqualTo(WebPushDispatchStatus.Processing);
+        await Assert.That(persistedDispatch.ProcessingLeaseToken).IsEqualTo(leaseToken);
+        await Assert.That(persistedDispatch.PermanentFailedAt).IsNull();
+        await Assert.That(persistedSubscription.IsActive).IsTrue();
+        await Assert.That(persistedSubscription.DeactivatedAt).IsNull();
+    }
+
+    private sealed class SubscriptionUpdateFailure : Exception;
+
+    private sealed class RejectSubscriptionUpdate : DbCommandInterceptor
+    {
+        public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (command.CommandText.Contains("UPDATE", StringComparison.OrdinalIgnoreCase)
+                && command.CommandText.Contains("web_push_subscriptions", StringComparison.Ordinal))
+            {
+                throw new SubscriptionUpdateFailure();
+            }
+
+            return ValueTask.FromResult(result);
+        }
+    }
+
+    [Test]
     public async Task CurrentBaseline_PersistsIntendedPushDefaults()
     {
         await fixture.ResetAsync();
@@ -600,7 +668,7 @@ public sealed class WebPushFoundationPersistenceTests(PostgreSqlContainerFixture
 
     private static ExploreDbContext CreateDbContext(string connectionString, SaveChangesInterceptor interceptor)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(connectionString)
             .UseSnakeCaseNamingConvention()
             .AddInterceptors(interceptor)

@@ -32,7 +32,7 @@ priority: high
    - **Green**: Implement production code to satisfy invariants.
    - **Sliced Verification**: Run targeted test class via `--treenode-filter` (~1.5s) inside the worktree directory.
    - **Phase Verification**: Run Release build and single selected project test within the worktree.
-   - **Semantic Phase Commit**: In the isolated worktree, all file changes belong exclusively to this task phase. Stage changes via `git add -A` (or phase-touched paths) and commit using the planned semantic Conventional Commit contract (type, scope, title, description, trailers) from `tasks.md`. Planning defines semantic meaning; execution handles file discovery.
+   - **Immediate Phase Commit**: Inspect ownership, stage exact phase-owned paths (`git add -- <paths>`), and execute each planned atomic contract from `tasks.md`. Isolation does not imply ownership of every dirty file. Preserve unrelated edits; verify the committed inventory and index. No post-commit hash recording.
    - **Reconcile Ledger**: Batch task checkbox updates at phase gates in `tasks.md`.
 6. **Self-Contained Phase Reporting & Zero Plan-Opening Prompts**:
    When pausing for user feedback, milestone approvals, or architectural decisions between phases, executing agents must **never** send cryptic prompts referencing bare IDs (e.g. *"Do you approve proceeding with P04/P06 while keeping both P03 gates open?"*). The developer should **never** have to open `tasks.md` or `plan.md` to understand an agent's prompt. Always provide an inline **Decision Brief**:
@@ -75,7 +75,7 @@ priority: high
    a. Red: compilable stubs + failing invariant test
    b. Green: implementation code
    c. Verify: sliced test -> phase build & test (Cwd: .worktrees/<task>)
-   d. Commit: git add -A && git commit using semantic phase contract from tasks.md
+   d. Commit: git add -- <phase-owned paths> && git commit using each atomic contract from tasks.md
    e. Update: batch checkbox updates in tasks.md
 4. Knowledge Graduation (in worktree):
    a. Any deferred items? -> write dev/backlog/<slug>.md

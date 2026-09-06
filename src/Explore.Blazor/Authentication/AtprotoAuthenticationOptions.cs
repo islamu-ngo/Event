@@ -13,11 +13,7 @@ public class AtprotoAuthenticationOptions : AuthenticationSchemeOptions
 
     public bool AllowDevelopmentLoopback { get; set; }
 
-    public bool UseSingleNodeMemoryStore { get; set; }
-
     public int StateLifetimeSeconds { get; set; } = 300;
-
-    public int HandoffLifetimeSeconds { get; set; } = 60;
 
     public List<AtprotoTenantOrigin> TenantOrigins { get; set; } = [];
 

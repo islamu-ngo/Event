@@ -641,6 +641,13 @@ seed convenience; production/staging do not. The API owns only the Quartz
 scheduler schema, which is applied as idempotent DDL rather than an EF Core
 migration and works on every supported primary provider, including SQLite.
 
+SQLite transaction-owned named locks retain their owning connection separately
+from the transaction object. Commit, rollback, closed/disposed-connection cleanup,
+and reaping completed owners before connection reuse release the process semaphore.
+This prevents implicit rollback from stranding later payment or configuration work
+without releasing a lock while its owning transaction is still active. SQLite
+remains a single-instance deployment; server-provider locking is unchanged.
+
 | Provider | Application migrations | Data Protection migrations | Namespace/history |
 |---|---|---|---|
 | PostgreSQL | `Explore.Persistence` | `Explore.Persistence` | Configured schema (default `islamu_event`) with separate histories |
@@ -1048,7 +1055,7 @@ Readiness interpretation:
 | `data-protection-keys` | Blazor | Persisted ASP.NET Core Data Protection key table is reachable | Not used | BFF key-ring table or backing database is unavailable; existing cookies may fail after restart |
 | `distributed-cache` | API, Blazor, Control Plane BFF | Effective cache round-trip works | Configured Redis fell back to in-memory cache | Effective cache round-trip failed |
 | `oidc-discovery` | API, Blazor, Control Plane BFF | OIDC metadata valid, or OIDC is not configured | Not used | Configured OIDC metadata endpoint is unreachable or invalid |
-| `atproto-authentication` | Blazor | AT Protocol login is disabled, or its canonical public URL/callback, key ring, and state/session stores are ready | Not used | Login is enabled but a bounded prerequisite is unavailable |
+| `atproto-authentication` | Blazor | AT Protocol login is disabled, or local prerequisites and the signed transient-store create/read/consume probe pass | ATProto is unavailable but explicit Local Identity or Keycloak is primary | ATProto is primary (or primary authority is unknown) and a prerequisite/probe fails |
 | `smtp` | API | SMTP connection/auth succeeds | SMTP is not configured | Configured SMTP is unreachable or authentication fails |
 | `email-dispatch` | API | Selected Basic Dispatch trigger is enabled (`Quartz` scheduler or hosted-service fallback) and outbox counts are below warning thresholds | Dispatch is intentionally disabled, due dispatch backlog crosses threshold, stale `Processing` rows cross threshold, or `DeadLettered` rows cross threshold | `Quartz` mode selected while scheduler is disabled; invalid dispatch/scheduler options fail startup; RabbitMQ is not checked in Basic mode |
 | `email-dispatch-retention-cleanup` | API | Retention cleanup is enabled in redaction or dry-run mode | Cleanup is intentionally disabled | Invalid retention options fail startup |
@@ -1451,9 +1458,11 @@ Operator sequence:
 ### Development Application Migration Rebaseline
 
 All development application-provider chains are rebaselined at PostgreSQL
-`20260906173823_Init`, SQLite `20260906173858_Init`, SQL Server
-`20260906173913_Init`, and the shared MySQL/MariaDB catalog
-`20260906173951_Init`. Existing development application
+`20260906223112_Init`, SQLite `20260906223113_Init`, SQL Server
+`20260906223115_Init`, and the shared MySQL/MariaDB catalog
+`20260906223116_Init`. These generated initials contain both complete Unicode
+location search fields and relational ATProto transient authentication storage.
+Existing development application
 databases must be recreated; incremental upgrade from the former development
 chains is intentionally unsupported. Data Protection and retained
 privacy-erasure authority keep their independent histories and must not be
@@ -1704,6 +1713,7 @@ The scheduler job catalog is Application-owned through `IScheduledJobRegistry`. 
 | `email-dispatch-recovery-scan` | Cron `0 */1 * * * ?` (every minute) | None | Stale `EmailDispatchOutbox` processing leases |
 | `event-reminder-dispatch` | One-off time trigger | Pointer-only IDs | Pre-persisted `EmailDispatchOutbox` row |
 | `idempotency-cleanup` | Interval, `IdempotencyCleanup:PollingIntervalMinutes` | None | Expired `idempotency_records` |
+| `atproto-transient-cleanup` | Interval, fixed 1 minute | None | Expired ATProto transient records and assertion-replay claims; remains enabled when ATProto login is disabled |
 | `ai-retention-cleanup` | Interval, `AiRetentionCleanup:PollingIntervalMinutes` | None | Per-tenant `ai_assistant.retention_days` |
 | `email-dispatch-retention-cleanup` | Interval, `EmailDispatchRetention:PollingIntervalMinutes` | None | Email dispatch content retention horizon |
 | `webhook-retention-cleanup` | Interval, `WebhookRetention:PollingIntervalMinutes` | None | Webhook message/attempt retention horizon |
@@ -2219,9 +2229,77 @@ Operational signals are intentionally bounded:
 | `atproto.authentication.operations` | Count of readiness/challenge/callback/bridge/refresh/revoke outcomes with bounded `operation` and `outcome` tags. |
 | `atproto.authentication.duration` | Matching authentication duration histogram in seconds. |
 | `atproto.jetstream.envelopes` | Jetstream connection, replay, fencing, materialization, quarantine, and lease outcomes; the optional `collection` tag is normalized to `event`, `rsvp`, or `unsupported`. |
-| `atproto-authentication` health check | BFF readiness for canonical public URL/callback, signing material, state/session stores, and provider configuration; failure detail is reduced to a stable code. |
+| `atproto-authentication` health check | Local prerequisites plus a signed synthetic transient-store create/read/consume probe; two-second deadline, no retry/hedging, ten-second completed-result cache, stable failure codes only. |
+| `explore.atproto.transient.operations` | Private operation count; only fixed `operation`, verified `purpose`, and `outcome` labels described below. |
+| `explore.atproto.transient.cleanup_runs` | Completed/failed cleanup passes; `outcome=succeeded` or `failed`. |
+| `explore.atproto.transient.cleanup_rows` | Rows deleted by completed passes; `store=transients` or `assertions`. Failed partial-pass work is not reported as a completed row total. |
 | `atproto-jetstream` health check | API readiness for capability resolution and public or DID-curated exact-collection subscription; dormant disabled capability is also healthy. |
 | `pds-sync-drain` structured logs | Aggregate claimed/delivered/failed/claim-lost counts only; provider response bodies, OAuth material, DIDs, record keys, and payloads must not be logged. |
+
+Transient instruments use the existing `Explore.Business` meter. Operation
+labels are closed to `create`, `read`, `consume`, `probe`, or `unknown`;
+purpose labels are `oauth_state`, `tenant_handoff`, `health_probe`, or
+`unknown`, taken only from successfully verified authentication context.
+Outcomes are `succeeded`, `not_found`, `conflict`, `rate_limited`, `rejected`,
+`unavailable`, or `cancelled`. Never label or log tenant/user identifiers,
+locators or their digests, assertions, proof cookies, ciphertext, or keys.
+
+`BffProviderReadinessService` checks local configuration/key/adapter prerequisites
+before its cached result. Concurrent cache misses share one probe per BFF
+singleton through a cancellation-aware gate; the two-second budget includes
+gate waiting. A cancelled waiter neither cancels the active probe nor replaces
+its result. Coalescing is per instance, not distributed; account for aggregate
+replica probes and login operations when sizing the existing instance-wide
+transient admission limit. Its `ApiBackedAtprotoTransientStore` posts the sole
+body `{"purpose":"health_probe"}` to the signed private
+`/api/auth/atproto/transient/probe` endpoint. The Application command generates
+tenantless random non-secret data with a thirty-second expiry, proves creation,
+read-back, and conditional consumption, then returns an empty `204`. No caller
+tenant, locator, or payload is accepted, and the browser proxy denies this
+route. Probe failures reduce to `state_store_unavailable`; they do not disclose
+database errors. This does not certify PDS/discovery availability or durable
+session operations. Disabled ATProto is Healthy; an unavailable ATProto primary
+is Unhealthy (`503`), while optional ATProto with explicit Local Identity or
+Keycloak primary is Degraded (`200`). Other checks can still fail readiness;
+`/alive` is independent of the probe.
+
+`AtprotoTransientCleanupJob` calls one `AtprotoTransientCleanupService` pass
+every minute, starting after sixty seconds, with
+`DisallowConcurrentExecution` and no job payload. Each pass captures one
+Unix-millisecond time and deletes at most five 500-row batches per table,
+stopping on a short batch: at most ten delete calls and 5,000 rows in total.
+Repositories select fixed expired identities before a parameterized,
+non-retrying deletion. A lost delete acknowledgement fails the pass instead
+of letting a provider retry select another batch; the next scheduled pass
+resumes cleanup. Failed passes can have committed partial work.
+There is no 24-hour idempotency grace. The owned job remains registered when
+ATProto is disabled, but `Scheduler:Quartz:Enabled=false` stops it along with
+other scheduler work. Successful passes use the canonical log event
+`Scheduled job {JobName} completed.` with `JobName=atproto-transient-cleanup`.
+
+Keep every BFF/API host within five seconds of trusted UTC and monitor clock
+synchronization. This permits at most ten seconds of pairwise clock difference.
+The transient cutoff is the captured time; the replay cutoff is that time minus
+10,000 milliseconds. Replay claims retain their original acceptance expiry
+(assertion expiry plus five seconds), so the extra retention never widens
+assertion admission. An ahead cleanup host therefore cannot delete a claim
+while a supported behind verifier still accepts it. If a host exceeds the
+clock bound, restore synchronization before returning it to authentication
+traffic; the fixed margin does not protect arbitrary clock drift.
+
+For a store outage, restore API/database access, migrations, and the shared
+OAuth signing authority; wait beyond the ten-second readiness cache, then
+start a fresh login. Never replay an uncertain consume. For cleanup failures,
+restore scheduler/database access and watch failed-run counts and subsequent
+completed-pass row counts. Backlogs above the per-pass cap drain over later
+passes; do not extend expiry or manually recycle locators. Reads and consumes
+reject expired rows independently of deletion, including synthetic leftovers
+from failed probes. Replay claims are retained through their acceptance expiry,
+including five seconds of skew. Active-row cleanup does not erase backup
+copies; apply operator backup retention separately. Preserve and share the
+existing BFF Data Protection keys across restarts/replicas as described in
+[ADR-014](adr/ADR-014-atproto-session-trust-bridge.md); loss of required keys
+fails closed and requires new login flows, not a memory fallback.
 
 For delayed or failed publication, keep the local event authoritative. Inspect the newest non-superseded `PdsSyncOutbox` row for the tenant/event, verify capability, consent, linked session, and public-location eligibility, then follow the stable recovery guidance in [TROUBLESHOOTING.md](TROUBLESHOOTING.md). Do not create a PDS record manually and do not replay by changing the stable record key.
 
@@ -2321,6 +2399,7 @@ Lifecycle classes:
 | `email_dispatch_attempts`, `email_dispatch_receipts` | Durable side-effect ledger | Email dispatch drain/consumer idempotency | Implemented: free-text errors and provider IDs redact transactionally with the selected parent; typed outcomes and timestamps remain | Attempts/receipts follow parent retention; failed/unknown evidence stays while parent is unresolved | Partition only with parent strategy; independent partitioning risks expensive parent/child maintenance | Keep parent-aware regression coverage in the persistence gate |
 | `ai_conversations`, `ai_messages`, `ai_runs`, `ai_conversation_references`, `ai_proposed_actions`, `ai_tool_executions` | User-facing operational state with provider/prompt sensitivity | AI assistant conversation, proposal, and confirmed-tool audit flows | Implemented: the `ai-retention-cleanup` Quartz job (`AiRetentionCleanupJob`) iterates active tenants, binds tenant context, resolves each tenant's `ai_assistant.retention_days`, supports `AiRetentionCleanup:DryRun`, redacts message content/action payload/reference summaries/failure messages/tool failure messages, and soft-deletes expired conversation shells through tenant-filtered repository cleanup. | 30 days by default via `ai_assistant.retention_days`, tenant-configurable through governance settings | Do not partition initially; cleanup predicates use tenant plus conversation age and should stay index-backed until AI history volume proves otherwise | Monitor `ai-retention-cleanup` readiness and `explore.ai.retention.*` metrics before broad history enablement; never log prompt content, action payloads, provider responses, or model secrets |
 | `idempotency_records` | Ephemeral safety cache | `IdempotencyMiddleware` / `IIdempotencyRepository` | Implemented: reads ignore expired rows, and the `idempotency-cleanup` Quartz job (`IdempotencyCleanupJob`) deletes rows older than `ExpiresAt + IdempotencyCleanup:ExpirationGraceHours` in bounded batches; dry-run is available | Delete after `ExpiresAt + 24h` safety buffer by default | Do not partition initially; TTL delete by `ExpiresAt` should be enough unless write volume is extreme | Monitor `idempotency-cleanup` readiness and cleanup metrics; revisit only if delete volume or index bloat threatens SLOs |
+| `atproto_transient_records`, `atproto_transient_assertion_replays` | Ephemeral authentication state and replay protection | Private signed ATProto transient bridge | Implemented: `atproto-transient-cleanup` deletes at most five 500-row batches per table each minute; reads/consumes enforce expiry independently | State at most 10 minutes, handoff at most 2 minutes, synthetic probe 30 seconds; replay claims through assertion acceptance expiry including 5-second skew, then 10-second cleanup retention without extending validity; no 24-hour grace | No partitioning initially; indexed Unix-millisecond expiry supports bounded deletion | Keep cleanup running after disabling login; monitor fixed operation/cleanup counters; active-row deletion does not erase retained backups |
 | `custom_property_projection_dirty_scope` | Rebuildable projection/cache backlog | Projection rebuild/drain coordination | Drained rows remain; pending rows are quota-bounded | Pending rows stay until drained; drained rows retained 7 days for diagnostics | No partitioning initially; the table is quota-bounded per tenant | Add drained-row cleanup and metrics for deleted/drained/pending counts |
 | `event_custom_property_projections`, `event_session_custom_property_projections` | Rebuildable projection/cache | Projection updaters from Layer 3 values | Rebuild and source deletes replace/remove rows; no age cleanup | No independent age retention; rows live while source values and exposure rules require them | Consider tenant/hash or event-date-adjacent strategy only after projection query SLOs require it; range partitioning by `UpdatedAt` is not useful for most lookup predicates | Keep rebuild-first recovery; add periodic consistency checks before partitioning |
 | `external_api_key_quotas` | Operational accounting ledger | External API key quota service | Cascade delete when key is physically deleted; no age cleanup | 24 monthly periods by default for usage reporting | Do not partition initially; one row per key per period should stay small | Add retention by `PeriodEnd` with tenant/admin reporting guardrails |

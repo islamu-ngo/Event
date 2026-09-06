@@ -21,6 +21,10 @@ ISLAMU Event keeps event domain content, attendee registration, payment truth, a
 
 Before publishing a paid or controlled-entry event, verify module policy, registration capacity, provider-confirmed payment/refund state, admission issuance, credential recovery, and exact-target check-in. Current server-issued [HAL links](../security-and-identity/authorization.md#the-golden-rule-of-client-ui-affordances) govern every operator affordance.
 
+## Removing a Scheduled Item
+
+Deleting a session, session group, or agenda item removes that item's venue and room references together. It does not delete the shared venue or another scheduled item's location assignment.
+
 ---
 
 ## Related Guides & Next Steps

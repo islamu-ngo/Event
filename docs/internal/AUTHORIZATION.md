@@ -64,6 +64,17 @@ ATProto credential operations remain server-private. The bootstrap/current-sessi
 
 ## 3. Core Authorization Components
 
+### Provider Account Authority
+
+`PlatformIdentityPrincipalExtensions` derives both the provider code and the
+persisted OIDC account-key kind from the same normalized issuer authority.
+Direct `https://accounts.google.com` identities use Google; Keycloak-brokered
+Google identities retain the Keycloak issuer and subject namespace. An `idp`
+hint or a hostname containing the Google hostname cannot change that authority.
+Trusted first-party `auth_provider` claims retain their explicit precedence.
+Issuer normalization does not change subject case or bytes, and missing or
+invalid issuers cannot reconstruct an OIDC account key.
+
 For authentication, JWT validation, and security-header behavior, see [SECURITY_OVERVIEW.md](SECURITY_OVERVIEW.md).
 
 ### 3.1. Endpoint-Level Authorization

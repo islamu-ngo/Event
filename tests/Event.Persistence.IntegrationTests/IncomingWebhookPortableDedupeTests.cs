@@ -111,7 +111,7 @@ public sealed class IncomingWebhookPortableDedupeTests
             await command.ExecuteNonQueryAsync();
         }
 
-        DbContextOptionsBuilder<ExploreDbContext> options = new DbContextOptionsBuilder<ExploreDbContext>()
+        DbContextOptionsBuilder<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connection)
             .UseSnakeCaseNamingConvention();
         if (interceptor is not null)

@@ -9,6 +9,7 @@ using Explore.Domain.Services.Scheduling;
 using Explore.Domain.ValueObjects;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
+using Microsoft.EntityFrameworkCore;
 using TUnit.Assertions;
 using TUnit.Core;
 

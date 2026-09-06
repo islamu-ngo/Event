@@ -125,7 +125,7 @@ public sealed class EventLocationRegistrationAccessPersistenceTests(Registration
 
     private ExploreDbContext CreateTenantContext(Guid tenantId, DbCommandInterceptor? interceptor = null)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString)
             .UseSnakeCaseNamingConvention()
             .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning));
@@ -453,7 +453,7 @@ public sealed class RegistrationCoveragePostgreSqlFixture : IAsyncInitializer, I
 
     public ExploreDbContext CreateDbContext()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(ConnectionString)
             .UseSnakeCaseNamingConvention()
             .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning))

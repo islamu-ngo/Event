@@ -285,16 +285,14 @@ public sealed class SemanticCoordinatePersistenceTests(RecipientDeliveryMigratio
 
     private DbContextOptionsBuilder<ExploreDbContext> CreateContextOptions(PrimaryDatabaseRole role)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>();
+        var options = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(options, CreateDatabaseOptions(role));
-        options.ConfigureWarnings(warnings =>
-            warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning));
         return options;
     }
 
     private string CreateComposedConnectionString(PrimaryDatabaseRole role)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>();
+        var options = TestDbContextOptions.Create<ExploreDbContext>();
         return PrimaryDatabaseProviderComposition.ConfigureApplication(options, CreateDatabaseOptions(role))
             .ConnectionString;
     }

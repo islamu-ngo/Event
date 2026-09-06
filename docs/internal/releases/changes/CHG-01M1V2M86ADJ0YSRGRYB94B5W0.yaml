@@ -1,0 +1,34 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records bounded retention and non-retrying cleanup of expired ATProto login material.
+Change-Id: CHG-01M1V2M86ADJ0YSRGRYB94B5W0
+Title: "Bound expired ATProto login-data cleanup"
+Type: feat
+Scope: access
+Summary: "Remove expired login transients and replay claims through capped, non-retrying scheduled cleanup."
+Group: database-backed-atproto-auth
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/adr/ADR-014-atproto-session-trust-bridge.md
+    Disposition: not-applicable
+    Detail: Adds cleanup without changing accepted login contracts.
+  Security:
+    Reference: docs/internal/adr/ADR-014-atproto-session-trust-bridge.md
+    Disposition: documented
+    Detail: Expired credentials receive no grace; replay-only cleanup lags acceptance expiry by ten seconds. Claim admission rechecks expiry after its durable commit so an insert delayed across safe cleanup cannot dispatch an expired assertion.
+  Migration:
+    Reference: docs/internal/adr/ADR-014-atproto-session-trust-bridge.md
+    Disposition: not-applicable
+    Detail: Uses the existing schema and expiry indexes; no migration is added.
+  Configuration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: not-applicable
+    Detail: Cadence and batch limits are fixed; the existing global scheduler switch continues to govern execution.
+  OpenAPI:
+    Reference: docs/internal/adr/ADR-014-atproto-session-trust-bridge.md
+    Disposition: not-applicable
+    Detail: No public endpoint or generated contract is added.
+  Operator:
+    Reference: docs/public/documentation/readme/federation-and-open-protocols/at-protocol-and-bluesky-jetstream.md
+    Disposition: documented
+    Detail: Keep host clocks within five seconds of trusted UTC. The minute sweep deletes at most 2500 rows per table, stays registered when ATProto is disabled, and stops on ambiguous acknowledgement; subsequent passes resume without claiming partial work as completed metrics.

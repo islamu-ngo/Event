@@ -12,8 +12,10 @@ using Explore.API.Hateoas;
 using Explore.Application.DTOs.RegistrationAnalytics;
 using Explore.Application.DTOs.RegistrationForms;
 using Explore.Application.Features.RegistrationAnalytics;
+using Explore.Application.Features.RegistrationForms.Requests.Commands;
 using Explore.Application.Features.RegistrationForms.Requests.Queries;
 using Explore.Application.Hateoas;
+using Explore.Application.Responses;
 using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -182,13 +184,30 @@ public sealed class RegistrationFormsControllerContractTests
     }
 
     [Test]
-    public async Task IfMatchParser_AcceptsOnlyStrongQuotedNonEmptyGuid()
+    public async Task DeleteRequirement_AcceptsOnlyStrongQuotedNonEmptyGuid()
     {
-        MethodInfo parser = typeof(RegistrationFormsController).GetMethod("TryParseConcurrencyStamp", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var mediator = Substitute.For<IMediator>();
+        mediator.Send(Arg.Any<DeleteRegistrationRequirementCommand>(), Arg.Any<CancellationToken>())
+            .Returns(call => BaseCommandResponse.Success(
+                call.Arg<DeleteRegistrationRequirementCommand>().ExpectedConcurrencyStamp));
+        RegistrationFormsController controller = CreateController(mediator);
+        Guid eventId = Guid.CreateVersion7();
+        Guid workflowId = Guid.CreateVersion7();
+        Guid requirementId = Guid.CreateVersion7();
         Guid stamp = Guid.CreateVersion7();
-        foreach (string? invalid in new[] { null, "", stamp.ToString(), $"W/\"{stamp:D}\"", "\"not-a-guid\"", $"\"{Guid.Empty:D}\"" })
-            await Assert.That((bool)parser.Invoke(null, new object?[] { invalid, null })!).IsFalse();
-        await Assert.That((bool)parser.Invoke(null, new object?[] { $"\"{stamp:D}\"", null })!).IsTrue();
+        foreach (string? invalid in new[] { null, "", stamp.ToString(), $"W/\"{stamp:D}\"", "\"not-a-guid\"", $"\"{Guid.Empty:D}\"",
+            "*", $"\"{stamp:D}", $"{stamp:D}\"", $"\"\"{stamp:D}\"\"", $"\"{stamp:D}\", \"{Guid.CreateVersion7():D}\"" })
+        {
+            var result = await controller.DeleteRequirement(eventId, workflowId, requirementId, invalid, CancellationToken.None);
+            var response = result.Result as ObjectResult;
+            await Assert.That(response?.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
+            await Assert.That(response!.Value).IsTypeOf<ValidationProblemDetails>();
+        }
+
+        var accepted = await controller.DeleteRequirement(eventId, workflowId, requirementId, $"\"{stamp:D}\"", CancellationToken.None);
+        var success = accepted.Result as OkObjectResult;
+        await Assert.That(success).IsNotNull();
+        await Assert.That(((BaseCommandResponse<Guid>)success!.Value!).Id).IsEqualTo(stamp);
     }
 
     private static RegistrationFormsController CreateController(

@@ -3190,6 +3190,82 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Explore.Domain.AtprotoTransientAssertionReplay", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AssertionDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nchar(64)")
+                        .HasColumnName("assertion_digest")
+                        .IsFixedLength();
+
+                    b.Property<long>("ExpiresAtUnixMilliseconds")
+                        .HasColumnType("bigint")
+                        .HasColumnName("expires_at_unix_milliseconds");
+
+                    b.HasKey("Id")
+                        .HasName("pk_atproto_transient_assertion_replays");
+
+                    b.HasIndex("AssertionDigest")
+                        .IsUnique()
+                        .HasDatabaseName("ix_atproto_transient_assertion_replays_assertion_digest");
+
+                    b.HasIndex("ExpiresAtUnixMilliseconds")
+                        .HasDatabaseName("ix_atproto_transient_assertion_replays_expires_at_unix_milliseconds");
+
+                    b.ToTable("atproto_transient_assertion_replays", "islamu_event");
+                });
+
+            modelBuilder.Entity("Explore.Domain.AtprotoTransientRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<long>("ExpiresAtUnixMilliseconds")
+                        .HasColumnType("bigint")
+                        .HasColumnName("expires_at_unix_milliseconds");
+
+                    b.Property<string>("ProtectedPayload")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("protected_payload");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("int")
+                        .HasColumnName("purpose");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("TokenDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nchar(64)")
+                        .HasColumnName("token_digest")
+                        .IsFixedLength();
+
+                    b.HasKey("Id")
+                        .HasName("pk_atproto_transient_records");
+
+                    b.HasIndex("ExpiresAtUnixMilliseconds")
+                        .HasDatabaseName("ix_atproto_transient_records_expires_at_unix_milliseconds");
+
+                    b.HasIndex("Purpose", "TokenDigest")
+                        .IsUnique()
+                        .HasDatabaseName("ix_atproto_transient_records_purpose_token_digest");
+
+                    b.ToTable("atproto_transient_records", "islamu_event", t =>
+                        {
+                            t.HasCheckConstraint("ck_atproto_transients_tenant_purpose", "(purpose = 3 AND tenant_id IS NULL) OR (purpose IN (1, 2) AND tenant_id IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("Explore.Domain.AudienceAge", b =>
                 {
                     b.Property<int>("Id")

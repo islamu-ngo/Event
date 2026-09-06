@@ -2,6 +2,7 @@
 // ABOUTME: Verifies stable routing, cache metadata, area/mode dispatch, and response typing.
 
 using System.Reflection;
+using System.Text.Json;
 using Explore.API.Attributes;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;
@@ -100,12 +101,14 @@ public sealed class PublicExperienceHomeDiscoveryControllerTests
             });
         var controller = CreateController();
 
-        await controller.GetHomeDiscovery(cancellationToken: CancellationToken.None);
-
-        var links = item.AdditionalProperties["_links"] as Dictionary<string, HalLink>;
-        await Assert.That(links).IsNotNull();
-        await Assert.That(links!["source"].Href)
+        var action = await controller.GetHomeDiscovery(cancellationToken: CancellationToken.None);
+        var response = action.Result as OkObjectResult;
+        await Assert.That(response).IsNotNull();
+        var body = JsonSerializer.SerializeToElement((HomeDiscoveryDto)response!.Value!, JsonSerializerOptions.Web);
+        var source = body.GetProperty("upcomingInArea")[0].GetProperty("_links").GetProperty("source");
+        await Assert.That(source.GetProperty("href").GetString())
             .IsEqualTo($"/api/event-discovery/{item.Federation.AtprotoRecordId}/source");
+        await Assert.That(source.GetProperty("method").GetString()).IsEqualTo("GET");
     }
 
     private PublicExperienceController CreateController() =>

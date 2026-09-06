@@ -38,6 +38,14 @@ public sealed class ApiTenantPostAuthenticationMiddleware
             return;
         }
 
+        if (AtprotoTransientAuthenticationDefaults.IsPrivatePath(context.Request.Path)
+            && context.User.Identity is { IsAuthenticated: true, AuthenticationType: AtprotoTransientAuthenticationDefaults.Scheme })
+        {
+            // The machine can operate only on instance-owned transient infrastructure, not as a tenant or user.
+            await _next(context);
+            return;
+        }
+
         var apiKeyPrincipal = context.User.TryGetApiKeyPrincipalContext();
         var authenticatedTenantId = apiKeyPrincipal?.TenantId;
         var requestedTenantId = ResolveRequestedTenantId(context);

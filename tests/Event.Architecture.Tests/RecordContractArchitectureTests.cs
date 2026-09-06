@@ -41,6 +41,7 @@ public sealed class RecordContractArchitectureTests
         "Explore.Application.DTOs.RegistrationOrders.RegistrationPaymentCommandResultDto",
         "Explore.Application.DTOs.RegistrationOrders.RegistrationRefundCommandResultDto",
         "Explore.Application.DTOs.SupportAccess.SupportAccessSessionCommandResponseDto",
+        "Explore.Application.Features.Authentication.Atproto.Models.AtprotoTransientCommandResult",
         "Explore.Application.Features.Promotions.PromotionCodeIssuedCommandResponseDto",
         "Explore.Application.Features.Promotions.PromotionManagementCommandResponseDto",
         "Explore.Application.Features.Promotions.Requests.Commands.PromotionRedemptionResponseDto",
@@ -231,7 +232,7 @@ public sealed class RecordContractArchitectureTests
             .ToArray();
 
         await Assert.That(IsRecord(typeof(BaseCommandResponse<>))).IsTrue();
-        await Assert.That(descendantNames).Count().IsEqualTo(12);
+        await Assert.That(descendantNames).Count().IsEqualTo(13);
         await Assert.That(descendantNames).IsEquivalentTo(ExpectedBaseCommandResponseDescendants);
         await Assert.That(nonRecords).IsEmpty();
         await Assert.That(indirectDescendants).IsEmpty();
@@ -285,7 +286,7 @@ public sealed class RecordContractArchitectureTests
         await Assert.That(classBaseline.Failures).IsEmpty();
         await Assert.That(bodyBaseline.Failures).IsEmpty();
         await Assert.That(classBaseline.Entries).IsEmpty();
-        await Assert.That(bodyBaseline.Entries).Count().IsEqualTo(7);
+        await Assert.That(bodyBaseline.Entries).Count().IsEqualTo(10);
         await Assert.That(bodyBaseline.Entries.All(entry => entry.Category == "legitimate-target")).IsTrue();
         await Assert.That(DiscoverConcreteMediatRClassRequests()).IsEmpty();
     }

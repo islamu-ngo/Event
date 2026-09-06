@@ -161,8 +161,8 @@ public sealed class RegistrationFormRepositoryTests
         InMemoryDatabaseRoot root,
         Guid tenantId)
     {
-        var context = new ExploreDbContext(new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase(database, root).Options)
+        var context = new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase(database, root).Options)
         {
             TenantContext = new TestTenantContext(tenantId)
         };

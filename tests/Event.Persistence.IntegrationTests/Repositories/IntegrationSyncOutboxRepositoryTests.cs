@@ -157,7 +157,7 @@ public sealed class IntegrationSyncOutboxRepositoryTests
     }
 
     private static ExploreDbContext CreateContext(SqliteConnection connection) => new(
-        new DbContextOptionsBuilder<ExploreDbContext>()
+        TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connection)
             .UseSnakeCaseNamingConvention()
             .Options);

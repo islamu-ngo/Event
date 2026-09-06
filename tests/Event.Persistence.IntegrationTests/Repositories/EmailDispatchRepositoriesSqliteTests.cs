@@ -390,7 +390,7 @@ public sealed class EmailDispatchRepositoriesSqliteTests
             DefaultTimeout = 30,
             Pooling = true
         }.ToString();
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connectionString)
             .UseSnakeCaseNamingConvention()
             .AddInterceptors(

@@ -1294,7 +1294,7 @@ public sealed class RegistrationInventoryHoldConcurrencyTests(PostgreSqlContaine
 
     private ExploreDbContext CreateRetryingTenantContext(Guid tenantId)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString, npgsql => npgsql.EnableRetryOnFailure(
                 maxRetryCount: 3,
                 maxRetryDelay: TimeSpan.FromSeconds(5),

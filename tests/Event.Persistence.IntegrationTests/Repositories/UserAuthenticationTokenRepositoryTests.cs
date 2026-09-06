@@ -94,8 +94,8 @@ public sealed class UserAuthenticationTokenRepositoryTests
 
     private static ExploreDbContext CreateContext(string database, InMemoryDatabaseRoot root)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase(database, root)
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase(database, root)
             .Options;
         var context = new ExploreDbContext(options);
         context.EnableTenantFilterBypass("Encrypted OAuth session repository test.");

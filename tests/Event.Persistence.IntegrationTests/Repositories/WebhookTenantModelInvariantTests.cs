@@ -153,7 +153,7 @@ public sealed partial class WebhookTenantModelInvariantTests
 
     private static ExploreDbContext CreateModelContext()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql("Host=localhost;Database=webhook_model;Username=unused;Password=unused")
             .UseSnakeCaseNamingConvention()
             .Options;

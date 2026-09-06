@@ -13,7 +13,9 @@ using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.DTOs.StorageObject;
 using Explore.Application.DTOs.SupportAccess;
 using Explore.Application.DTOs.Webhooks;
+using Explore.Application.Features.Authentication.Atproto.Models;
 using Explore.Application.Features.Promotions;
+using Explore.Domain;
 using Explore.Application.Features.Promotions.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Serialization;
@@ -34,21 +36,21 @@ public sealed class BaseCommandResponseContractTests
     private static readonly DateTime FixtureUtc = new(2026, 8, 25, 12, 0, 0, DateTimeKind.Utc);
     private static readonly DateTimeOffset FixtureOffset = new(2026, 8, 25, 12, 0, 0, TimeSpan.Zero);
 
-    private static readonly Type[] ExpectedConcreteDescendantTypes =
-    [
-        typeof(CreateExternalApiKeyCommandResponse),
-        typeof(GuestRegistrationOrderLifecycleResponseDto),
-        typeof(GuestRegistrationOrderStartDto),
-        typeof(RegistrationMaterialChangeChoiceCommandResultDto),
-        typeof(RegistrationOrderLifecycleResponseDto),
-        typeof(RegistrationPaymentCommandResultDto),
-        typeof(RegistrationRefundCommandResultDto),
-        typeof(SupportAccessSessionCommandResponseDto),
-        typeof(PromotionCodeIssuedCommandResponseDto),
-        typeof(PromotionManagementCommandResponseDto),
-        typeof(PromotionRedemptionResponseDto),
-        typeof(WebhookProviderPortalAccessCommandResponse),
-    ];
+    private static readonly Type[] ConcreteDescendantTypes = typeof(BaseCommandResponse<>).Assembly.GetTypes()
+        .Where(type => type is { IsClass: true, IsAbstract: false, ContainsGenericParameters: false }
+            && DerivesFromBaseCommandResponse(type))
+        .OrderBy(type => type.FullName, StringComparer.Ordinal)
+        .ToArray();
+
+    // Internal factory-only CQRS results are not wire DTOs. A JSON constructor or source-generation
+    // registration opts a response into the complete wire-contract checks below; neither can silently drift.
+    private static readonly Type[] WireDescendantTypes = ConcreteDescendantTypes
+        .Where(type => type.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            .Any(constructor => constructor.GetCustomAttribute<JsonConstructorAttribute>() is not null)
+            || typeof(ExploreJsonContext).GetCustomAttributesData()
+                .Any(registration => registration.AttributeType == typeof(JsonSerializableAttribute)
+                    && registration.ConstructorArguments[0].Value as Type == type))
+        .ToArray();
 
     private static readonly Type[] RegisteredResponseTypes =
     [
@@ -56,7 +58,7 @@ public sealed class BaseCommandResponseContractTests
         typeof(BaseCommandResponse<ControlPlaneTenantLifecycleTransitionDto>),
         typeof(BaseCommandResponse<IReadOnlyList<EmailDispatchStatusDto>>),
         typeof(BaseCommandResponse<StorageUploadSessionDto>),
-        .. ExpectedConcreteDescendantTypes,
+        .. WireDescendantTypes,
     ];
 
     private static readonly string[] BaseJsonPropertyNames =
@@ -107,20 +109,14 @@ public sealed class BaseCommandResponseContractTests
     ];
 
     [Test]
-    public async Task ConcreteDescendantInventoryIsExactlyTheTwelveOwnedResponseTypes()
+    public async Task EveryDiscoveredDescendantHasExecutableFactoryAndApplicableWireScenarios()
     {
-        Type[] actual = typeof(BaseCommandResponse<>).Assembly.GetTypes()
-            .Where(type => type is { IsClass: true, IsAbstract: false, ContainsGenericParameters: false }
-                && type != typeof(BaseCommandResponse<>)
-                && DerivesFromBaseCommandResponse(type))
-            .OrderBy(type => type.FullName, StringComparer.Ordinal)
-            .ToArray();
-
-        await Assert.That(actual.Select(type => type.FullName).SequenceEqual(
-            ExpectedConcreteDescendantTypes
-                .OrderBy(type => type.FullName, StringComparer.Ordinal)
-                .Select(type => type.FullName),
-            StringComparer.Ordinal)).IsTrue();
+        await Assert.That(CreateDerivedFactoryScenarios().Select(scenario => scenario.ResponseType))
+            .IsEquivalentTo(ConcreteDescendantTypes)
+            .Because("Every concrete response needs executable success, failure, payload and invalid-state coverage.");
+        await Assert.That(CreateDerivedWireScenarios().Select(scenario => scenario.ResponseType))
+            .IsEquivalentTo(WireDescendantTypes)
+            .Because("Every response declaring JSON construction or generated metadata needs complete wire round-trip coverage.");
     }
 
     [Test]
@@ -164,7 +160,7 @@ public sealed class BaseCommandResponseContractTests
     }
 
     [Test]
-    public async Task EveryConcreteDescendantRoundTripsItsCompleteRelevantPayloadJson()
+    public async Task EveryWireDescendantRoundTripsItsCompleteRelevantPayloadJson()
     {
         DerivedWireScenario[] scenarios = CreateDerivedWireScenarios();
 
@@ -189,7 +185,7 @@ public sealed class BaseCommandResponseContractTests
     [Test]
     public async Task PublicResponseStateHasNoSetterOrConstructorEscapeHatch()
     {
-        Type[] responseTypes = [typeof(BaseCommandResponse<Guid>), .. ExpectedConcreteDescendantTypes];
+        Type[] responseTypes = [typeof(BaseCommandResponse<Guid>), .. ConcreteDescendantTypes];
         string[] publicSetters = responseTypes
             .SelectMany(type => type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
             .Where(property => property.SetMethod?.IsPublic == true)
@@ -211,7 +207,7 @@ public sealed class BaseCommandResponseContractTests
     [Test]
     public async Task JsonConstructorsAreInternalAndBindTheIsSuccessClrState()
     {
-        Type[] responseTypes = [typeof(BaseCommandResponse<Guid>), .. ExpectedConcreteDescendantTypes];
+        Type[] responseTypes = [typeof(BaseCommandResponse<Guid>), .. WireDescendantTypes];
 
         foreach (Type responseType in responseTypes)
         {
@@ -254,7 +250,7 @@ public sealed class BaseCommandResponseContractTests
     public async Task InstanceSuccessStateIsReadableAsIsSuccessWithoutHidingTheSuccessFactory()
     {
         Type responseType = typeof(BaseCommandResponse<Guid>);
-        Type[] responseTypes = [responseType, .. ExpectedConcreteDescendantTypes];
+        Type[] responseTypes = [responseType, .. ConcreteDescendantTypes];
 
         foreach (Type contractType in responseTypes)
         {
@@ -792,7 +788,7 @@ public sealed class BaseCommandResponseContractTests
     }
 
     [Test]
-    public async Task EveryConcreteDescendantIsRegisteredAndPreservesPayloadThroughExploreJsonContext()
+    public async Task EveryWireDescendantIsRegisteredAndPreservesPayloadThroughExploreJsonContext()
     {
         var missing = new List<string>();
 
@@ -871,8 +867,11 @@ public sealed class BaseCommandResponseContractTests
         PromotionManagementDto promotion = CreatePromotion();
         WebhookProviderPortalAccessDto portal = CreatePortal();
 
+        AtprotoTransientValue transient = CreateTransientValue();
+
         return
         [
+            Factory(typeof(AtprotoTransientCommandResult), Facts(("value", transient)), ("Value", transient)),
             Factory(typeof(CreateExternalApiKeyCommandResponse),
                 Facts(("id", ResultId), ("message", "result.created"),
                     ("apiKey", SyntheticReveal), ("keyId", SyntheticKeyId)),
@@ -924,6 +923,45 @@ public sealed class BaseCommandResponseContractTests
                 ("IsRetryable", true)),
         ];
     }
+
+    [Test]
+    public async Task PrivateTransientFactoriesBindRowIdentityAndClearPayloadForEveryFailureState()
+    {
+        AtprotoTransientValue value = CreateTransientValue();
+        AtprotoTransientCommandResult success = AtprotoTransientCommandResult.Success(value);
+        await Assert.That(success.IsSuccess).IsTrue();
+        await Assert.That(success.Id).IsEqualTo(value.Id);
+        await Assert.That(success.Value).IsEqualTo(value);
+        await Assert.That(success).IsEqualTo(AtprotoTransientCommandResult.Success(value with { }));
+        await Assert.That(success).IsNotEqualTo(AtprotoTransientCommandResult.Success(value with { TenantId = RelatedId }));
+
+        BaseCommandResponse<Guid>[] failures =
+        [
+            BaseCommandResponse.Validation<Guid>(OneValidationError),
+            BaseCommandResponse.NotFound<Guid>(),
+            BaseCommandResponse.Conflict(ResultId),
+            BaseCommandResponse.Authentication<Guid>(),
+            BaseCommandResponse.Authorization<Guid>(),
+            BaseCommandResponse.Quota<Guid>("quota.blocked", CreateQuota()),
+            BaseCommandResponse.Failure<Guid>("transient_unavailable", errors: FeatureErrors),
+        ];
+        foreach (var failure in failures)
+        {
+            AtprotoTransientCommandResult result = AtprotoTransientCommandResult.Failure(failure);
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.Id).IsEqualTo(failure.Id);
+            await Assert.That(result.FailureCode).IsEqualTo(failure.FailureCode);
+            await Assert.That(result.Message).IsEqualTo(failure.Message);
+            await Assert.That(result.Errors ?? []).IsEquivalentTo(failure.Errors ?? []);
+            await Assert.That(result.QuotaExceeded).IsEqualTo(failure.QuotaExceeded);
+            await Assert.That(result.Value).IsNull();
+        }
+        await Assert.That(() => AtprotoTransientCommandResult.Failure(BaseCommandResponse.Success(ResultId)))
+            .Throws<ArgumentException>();
+    }
+
+    private static AtprotoTransientValue CreateTransientValue() => new(ResultId, AtprotoTransientPurpose.OAuthState,
+        new string('a', 64), TenantId, SyntheticReveal, FixtureOffset.AddMinutes(1).ToUnixTimeMilliseconds());
 
     private static RegistrationOrderDto CreateOrder() => new()
     {

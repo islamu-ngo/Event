@@ -192,7 +192,7 @@ public sealed class PrimaryPersistencePortabilityTests
     }
 
     private static ExploreDbContext CreateContext(SqliteConnection connection) =>
-        new(new DbContextOptionsBuilder<ExploreDbContext>()
+        new(TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connection)
             .UseSnakeCaseNamingConvention()
             .AddInterceptors(SqliteProjectionLockTransactionInterceptor.Instance)

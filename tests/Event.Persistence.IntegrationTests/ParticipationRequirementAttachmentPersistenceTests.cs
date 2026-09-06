@@ -16,7 +16,7 @@ public sealed class ParticipationRequirementAttachmentPersistenceTests
     public async Task EfModelEnforcesAttachmentLineageAndActiveUniqueness()
     {
         await using var context = new ExploreDbContext(
-            new DbContextOptionsBuilder<ExploreDbContext>()
+            TestDbContextOptions.Create<ExploreDbContext>()
                 .UseNpgsql("Host=localhost;Database=task77_model;Username=unused;Password=unused")
                 .UseSnakeCaseNamingConvention().Options);
         IEntityType entity = context.GetService<IDesignTimeModel>().Model

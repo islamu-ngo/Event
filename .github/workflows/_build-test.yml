@@ -333,7 +333,15 @@ jobs:
 
       - name: API Integration Tests
         id: test_api_integration
-        run: dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Event.API.IntegrationTests.trx
+        shell: bash
+        run: |
+          set -euo pipefail
+          SETUP_SECRET="$(openssl rand -hex 32)"
+          KEYCLOAK_BLAZOR_CLIENT_SECRET="$(openssl rand -hex 32)"
+          export SETUP_SECRET KEYCLOAK_BLAZOR_CLIENT_SECRET
+          echo "::add-mask::$SETUP_SECRET"
+          echo "::add-mask::$KEYCLOAK_BLAZOR_CLIENT_SECRET"
+          dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Event.API.IntegrationTests.trx
         env:
           Database__Provider: PostgreSql
           Database__Host: localhost

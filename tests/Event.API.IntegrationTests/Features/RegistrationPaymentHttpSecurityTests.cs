@@ -185,8 +185,7 @@ public sealed class RegistrationPaymentHttpSecurityTests
                 Guid.CreateVersion7(), TenantId, orderId, recipient, "OrganizerDirect", "2026-07-29.dahlia",
                 order.ConcurrencyStamp.ToString("N"), Money.Create(1_000, order.CurrencyCode), Money.Create(75, order.CurrencyCode), Money.Create(125, order.CurrencyCode), "checkout:terminal", UtcNow.AddMinutes(-1), UtcNow.AddMinutes(30));
             terminal.AttachAcceptance(PaidAcceptanceTestFacts.Create(
-                TenantId, orderId, eventId, order.ConcurrencyStamp.ToString("N"),
-                recipient.InstancePolicyVersionId, recipient.TenantPolicyVersionId,
+                recipient, orderId, eventId, order.ConcurrencyStamp.ToString("N"),
                 1_000, 75, 125, UtcNow.AddMinutes(-1)));
             terminal.MarkDispatchFailed(UtcNow.AddSeconds(-30), "req-terminal");
             CheckoutDispatchEffect terminalEffect = CheckoutDispatchEffect.Create(terminal, UtcNow.AddMinutes(-1));
@@ -337,8 +336,7 @@ public sealed class RegistrationPaymentHttpSecurityTests
             order.ConcurrencyStamp.ToString("N"), Money.Create(1_000, order.CurrencyCode), Money.Create(75, order.CurrencyCode), Money.Create(125, order.CurrencyCode), "checkout:" + sessionId, UtcNow,
             order.ExpiresAt <= UtcNow ? UtcNow.AddMinutes(30) : order.ExpiresAt);
         attempt.AttachAcceptance(PaidAcceptanceTestFacts.Create(
-            TenantId, order.Id, order.EventId, order.ConcurrencyStamp.ToString("N"),
-            recipient.InstancePolicyVersionId, recipient.TenantPolicyVersionId,
+            recipient, order.Id, order.EventId, order.ConcurrencyStamp.ToString("N"),
             1_000, 75, 125, UtcNow));
         return attempt;
     }

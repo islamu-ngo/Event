@@ -176,7 +176,7 @@ public sealed class RefundReservationPostgreSqlConcurrencyTests(RefundPostgreSql
 
     private static async Task<ExploreDbContext> CreateContextAsync(string connectionString, bool ensureCreated = true)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(connectionString, provider => provider.EnableRetryOnFailure(3))
             .UseSnakeCaseNamingConvention()
             .Options;

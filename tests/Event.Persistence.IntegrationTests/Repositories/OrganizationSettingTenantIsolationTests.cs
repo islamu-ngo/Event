@@ -186,7 +186,7 @@ public sealed class OrganizationSettingTenantIsolationTests(PostgreSqlContainerF
 
     private static ExploreDbContext CreateSqliteContext(string path)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(new SqliteConnectionStringBuilder
             {
                 DataSource = path,

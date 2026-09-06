@@ -12,6 +12,9 @@ using Explore.Application.Constants;
 using Explore.API.Hateoas;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Controllers;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.Api.IntegrationTests.Features;
 
@@ -191,23 +194,25 @@ public class ContractInvariantsTests
             .Cast<string>()
             .OrderBy(operationId => operationId, System.StringComparer.Ordinal)
             .ToArray();
-        var intentionallyExcludedAtprotoSessionOperations = new HashSet<string>(System.StringComparer.Ordinal)
-        {
-            RouteNames.BootstrapAtprotoSession,
-            RouteNames.GetCurrentAtprotoSession,
-            RouteNames.RefreshCurrentAtprotoSession,
-            RouteNames.DeleteCurrentAtprotoSession
-        };
+        var intentionallyPrivateOperations = _fixture.Factory.Services.GetRequiredService<EndpointDataSource>()
+            .Endpoints
+            .Where(endpoint => endpoint.Metadata.GetMetadata<ApiExplorerSettingsAttribute>()?.IgnoreApi == true)
+            .Select(endpoint => endpoint.Metadata.GetMetadata<IRouteNameMetadata>()?.RouteName
+                ?? endpoint.Metadata.GetMetadata<ControllerActionDescriptor>()?.AttributeRouteInfo?.Name)
+            .OfType<string>()
+            .ToHashSet(System.StringComparer.Ordinal);
         var routeNames = typeof(RouteNames)
             .GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
             .Where(field => field.IsLiteral && field.FieldType == typeof(string))
             .Select(field => (string)field.GetRawConstantValue()!)
-            .Where(routeName => !intentionallyExcludedAtprotoSessionOperations.Contains(routeName))
+            .Where(routeName => !intentionallyPrivateOperations.Contains(routeName))
             .OrderBy(routeName => routeName, System.StringComparer.Ordinal)
             .ToArray();
 
+        await Assert.That(operationIds.Intersect(intentionallyPrivateOperations, System.StringComparer.Ordinal)).IsEmpty()
+            .Because("Endpoint metadata explicitly excludes private capabilities from public discovery.");
         await Assert.That(operationIds).IsEquivalentTo(routeNames)
-            .Because("Route names are the generator input for stable OpenAPI operationIds.");
+            .Because("Every public route name must generate exactly one stable OpenAPI operationId.");
     }
 
     [Test]

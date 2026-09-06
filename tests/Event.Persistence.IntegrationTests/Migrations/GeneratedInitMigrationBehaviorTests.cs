@@ -36,10 +36,9 @@ public sealed class GeneratedInitMigrationBehaviorTests(
         string[] exploreMigrations = MigrationIds(explore);
         string[] dataProtectionMigrations = MigrationIds(dataProtection);
         string[] authorityMigrations = MigrationIds(authority);
-        await Assert.That(exploreMigrations).HasSingleItem();
+        await Assert.That(exploreMigrations.Count(migration => migration.EndsWith("_Init", StringComparison.Ordinal))).IsEqualTo(1);
         await Assert.That(dataProtectionMigrations).HasSingleItem();
         await Assert.That(authorityMigrations).HasSingleItem();
-        await Assert.That(exploreMigrations[0]).EndsWith("_Init");
         await Assert.That(dataProtectionMigrations[0]).EndsWith("_Init");
         await Assert.That(authorityMigrations[0]).EndsWith("_Init");
 
@@ -395,34 +394,25 @@ public sealed class GeneratedInitMigrationBehaviorTests(
 
     private ExploreDbContext CreateExploreContext()
     {
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>()
+        var builder = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString)
-            .UseSnakeCaseNamingConvention()
-            .ConfigureWarnings(warnings =>
-                warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning));
-        builder.EnableServiceProviderCaching(false);
+            .UseSnakeCaseNamingConvention();
         return new ExploreDbContext(builder.Options);
     }
 
     private DataProtectionKeyContext CreateDataProtectionContext()
     {
-        var builder = new DbContextOptionsBuilder<DataProtectionKeyContext>()
+        var builder = TestDbContextOptions.Create<DataProtectionKeyContext>()
             .UseNpgsql(fixture.ConnectionString)
-            .UseSnakeCaseNamingConvention()
-            .ConfigureWarnings(warnings =>
-                warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning));
-        builder.EnableServiceProviderCaching(false);
+            .UseSnakeCaseNamingConvention();
         return new DataProtectionKeyContext(builder.Options);
     }
 
     private PrivacyErasureAuthorityDbContext CreateAuthorityContext()
     {
-        var builder = new DbContextOptionsBuilder<PrivacyErasureAuthorityDbContext>()
+        var builder = TestDbContextOptions.Create<PrivacyErasureAuthorityDbContext>()
             .UseNpgsql(fixture.ConnectionString)
-            .UseSnakeCaseNamingConvention()
-            .ConfigureWarnings(warnings =>
-                warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning));
-        builder.EnableServiceProviderCaching(false);
+            .UseSnakeCaseNamingConvention();
         return new PrivacyErasureAuthorityDbContext(builder.Options);
     }
 
@@ -432,7 +422,8 @@ public sealed class GeneratedInitMigrationBehaviorTests(
     private static Migration InitMigration(DbContext context)
     {
         IMigrationsAssembly assembly = context.GetService<IMigrationsAssembly>();
-        KeyValuePair<string, System.Reflection.TypeInfo> item = assembly.Migrations.Single();
+        KeyValuePair<string, System.Reflection.TypeInfo> item = assembly.Migrations
+            .Single(migration => migration.Key.EndsWith("_Init", StringComparison.Ordinal));
         return assembly.CreateMigration(item.Value, context.Database.ProviderName!);
     }
 

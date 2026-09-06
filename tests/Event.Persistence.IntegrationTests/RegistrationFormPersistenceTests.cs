@@ -161,12 +161,14 @@ public sealed class RegistrationFormPersistenceTests
     }
 
     private static ExploreDbContext CreateModelContext() => new(
-        new DbContextOptionsBuilder<ExploreDbContext>()
+        TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql("Host=localhost;Database=task72_model;Username=unused;Password=unused")
             .UseSnakeCaseNamingConvention().Options);
 
-    private static ExploreDbContext CreateInMemoryContext(string database) => new(
-        new DbContextOptionsBuilder<ExploreDbContext>().UseInMemoryDatabase(database).Options);
+    private readonly Microsoft.EntityFrameworkCore.Storage.InMemoryDatabaseRoot _databaseRoot = new();
+
+    private ExploreDbContext CreateInMemoryContext(string database) => new(
+        TestDbContextOptions.Create<ExploreDbContext>().UseTestInMemoryDatabase(database, _databaseRoot).Options);
 
     private static async Task AssertCompositeForeignKey(IEntityType entity, Type principal, params string[] properties)
     {
@@ -197,7 +199,7 @@ public sealed class RegistrationFormPostgreSqlPersistenceTests(PostgreSqlContain
             await seed.SaveChangesAsync();
 
             var counter = new CommandCountingInterceptor();
-            var options = new DbContextOptionsBuilder<ExploreDbContext>()
+            var options = TestDbContextOptions.Create<ExploreDbContext>()
                 .UseNpgsql(fixture.ConnectionString)
                 .UseSnakeCaseNamingConvention()
                 .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning))

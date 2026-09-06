@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using Explore.Blazor.Constants;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Explore.Blazor.Services.Auth;
 
@@ -33,9 +34,15 @@ public sealed class BffProviderReadinessService(
     IWebHostEnvironment environment,
     ILogger<BffProviderReadinessService> logger,
     AtprotoAuthenticationMetrics atprotoMetrics,
+    ApiBackedAtprotoTransientStore transientStore,
+    IMemoryCache cache,
+    TimeProvider clock,
     AtprotoOAuthClientFactory? atprotoFactory = null)
-    : IBffProviderReadinessService
+    : IBffProviderReadinessService, IDisposable
 {
+    private readonly SemaphoreSlim atprotoReadinessGate = new(1, 1);
+    private static readonly object AtprotoReadinessCacheKey = new();
+    private static readonly TimeSpan AtprotoReadinessCacheTtl = TimeSpan.FromSeconds(10);
     private static readonly Regex GoogleClientIdPattern = new(
         @"^[0-9]+-[a-zA-Z0-9\-]+\.apps\.googleusercontent\.com$",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
@@ -107,7 +114,7 @@ public sealed class BffProviderReadinessService(
         if (scheme == AuthSchemeNames.Atproto)
         {
             var startedAt = Stopwatch.GetTimestamp();
-            var readiness = atprotoFactory?.GetReadiness() ?? new AtprotoOAuthReadiness(false, "provider_not_configured");
+            var readiness = await GetAtprotoReadinessAsync(cancellationToken);
             atprotoMetrics.RecordReadiness(
                 readiness.IsReady,
                 readiness.FailureCode,
@@ -164,6 +171,42 @@ public sealed class BffProviderReadinessService(
 
         return new(true, null);
     }
+
+    private async Task<AtprotoOAuthReadiness> GetAtprotoReadinessAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var readiness = atprotoFactory?.GetReadiness() ?? new AtprotoOAuthReadiness(false, "provider_not_configured");
+        if (!readiness.IsReady) return readiness;
+        if (cache.TryGetValue<(DateTimeOffset ExpiresAt, AtprotoOAuthReadiness Result)>(AtprotoReadinessCacheKey, out var cached)
+            && cached.ExpiresAt > clock.GetUtcNow()) return cached.Result;
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(2));
+        bool entered = false;
+        try
+        {
+            await atprotoReadinessGate.WaitAsync(deadline.Token);
+            entered = true;
+            if (cache.TryGetValue(AtprotoReadinessCacheKey, out cached)
+                && cached.ExpiresAt > clock.GetUtcNow()) return cached.Result;
+            try
+            {
+                readiness = await transientStore.ProbeAsync(deadline.Token)
+                    ? AtprotoOAuthReadiness.Ready : new(false, "state_store_unavailable");
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+            catch (Exception) { readiness = new(false, "state_store_unavailable"); }
+            cache.Set(AtprotoReadinessCacheKey, (clock.GetUtcNow() + AtprotoReadinessCacheTtl, readiness), AtprotoReadinessCacheTtl);
+            return readiness;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            // A timed-out waiter must not replace the result being filled by the active probe.
+            return new(false, "state_store_unavailable");
+        }
+        finally { if (entered) atprotoReadinessGate.Release(); }
+    }
+
+    public void Dispose() => atprotoReadinessGate.Dispose();
 
     public bool HasMinimalProviderConfig(string scheme)
     {

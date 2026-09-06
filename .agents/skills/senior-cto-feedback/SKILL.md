@@ -20,7 +20,10 @@ priority: high
 
 ## Rules
 
-1. **Direct Triad Refinement (Zero Review Files)**: NEVER write, emit, or generate any `*-cto-review.md` or separate feedback markdown files in `dev/active/<task>/` or elsewhere. The CTO review directly updates `dev/active/<task>/<task>-plan.md`, `...-context.md`, and `...-tasks.md` in place. 100% of the CTO's review brain and architectural rigor goes into actionable edits in the triad. Zero artifact clutter.
+1. **Direct Triad Refinement**: Never write `*-cto-review.md` or separate feedback files. Directly update the workstream `plan.md`, `context.md`, and `tasks.md`; preserve actionable findings there.
+
+Review depth is defined in [output-template.md](resources/output-template.md).
+
 2. **Autonomous Execution Without Approval**: Do NOT pause or block to ask the user for approval before editing the triad. Directly apply the architectural, sequencing, testing, and commit contract improvements.
 3. **Crisp, High-Signal Chat Reporting**: When finishing, report back to the user with a concise, high-signal summary in the chat response following [resources/output-template.md](resources/output-template.md) (decisions made, changes applied to the triad, top risks resolved, and execution readiness). Do not duplicate full files in chat; deliver a clear summary that is not too long, but does not omit essential details.
 4. **Follow I-VSD Integration**: Bind updates to exact plan/tasks and I-VSD revisions. If architectural refinements change provider authority, affected stakeholders, or `IVSD-*` mappings, mark the I-VSD report `stale` in the triad metadata and record the revalidation need; do not fabricate approval.

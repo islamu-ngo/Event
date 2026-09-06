@@ -283,7 +283,7 @@ public class GroupHierarchyConstraintTests(PostgreSqlContainerFixture fixture)
 
     private ExploreDbContext CreateRetryingDbContext()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString, npgsql => npgsql.EnableRetryOnFailure())
             .UseSnakeCaseNamingConvention()
             .Options;

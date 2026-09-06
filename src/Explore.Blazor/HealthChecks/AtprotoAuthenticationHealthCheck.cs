@@ -1,4 +1,4 @@
-// ABOUTME: Reports passive AT Protocol login readiness from registered configuration and local prerequisites.
+// ABOUTME: Reports bounded operational AT Protocol readiness while keeping optional providers and liveness independent.
 // ABOUTME: Treats disabled login as healthy dormancy and never probes a user PDS or exposes configuration values.
 
 using Explore.Blazor.Constants;
@@ -33,8 +33,10 @@ public sealed class AtprotoAuthenticationHealthCheck(
             ["failureCode"] = AtprotoAuthenticationMetrics.NormalizeFailureCode(readiness.FailureCode)
         };
 
-        return readiness.IsReady
-            ? HealthCheckResult.Healthy("AT Protocol login prerequisites are ready.", data)
+        if (readiness.IsReady)
+            return HealthCheckResult.Healthy("AT Protocol login prerequisites are ready.", data);
+        return schemeManager.GetActivePrimaryProvider() is "local" or "keycloak"
+            ? HealthCheckResult.Degraded("Optional AT Protocol login is unavailable.", data: data)
             : HealthCheckResult.Unhealthy("AT Protocol login is enabled but unavailable.", data: data);
     }
 }

@@ -4,6 +4,7 @@
 using System.Data.Common;
 using System.Diagnostics;
 using System.Reflection;
+using Event.Persistence.IntegrationTests;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
@@ -19,6 +20,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Caching.Memory;
 using Npgsql;
 using TUnit.Core;
 
@@ -574,7 +576,7 @@ public sealed class AdmissionCheckInConstraintRuntimeTests
     }
 
     private static ExploreDbContext CreateContext(SqliteConnection connection, Guid tenantId) => new(
-        new DbContextOptionsBuilder<ExploreDbContext>()
+        TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connection)
             .UseSnakeCaseNamingConvention()
             .Options)
@@ -1332,9 +1334,11 @@ public sealed class AdmissionCheckInPostgreSqlRedTests(PostgreSqlContainerFixtur
     }
 
     [Test]
+    [NotInParallel]
     public async Task FiftyConcurrentSingleCheckInsMeetDeclaredPostgreSqlLatencyThresholds()
     {
         AdmissionCheckInPerformanceFixture performance = AdmissionCheckInPerformanceFixture.PostgreSqlCi;
+        using var metadataCache = new MemoryCache(new MemoryCacheOptions());
         await fixture.ResetAsync();
         Guid tenantId = Guid.CreateVersion7();
         var warmup = new AdmissionCheckInLoadCase(
@@ -1348,7 +1352,7 @@ public sealed class AdmissionCheckInPostgreSqlRedTests(PostgreSqlContainerFixtur
             warmup.TicketId,
             warmup.TargetId,
             warmup.Digest);
-        await using (ExploreDbContext warmupContext = TenantContext(tenantId))
+        await using (ExploreDbContext warmupContext = CreateMeasuredContext())
         {
             AdmissionCheckInResult warmupResult = await ExecuteApplicationCheckInAsync(
                 warmupContext,
@@ -1378,66 +1382,87 @@ public sealed class AdmissionCheckInPostgreSqlRedTests(PostgreSqlContainerFixtur
                 includeTenant: false);
         }
 
-        var warmContexts = cases
-            .Select(_ => TenantContext(tenantId))
-            .ToArray();
+        var counters = cases.Select(_ => new CredentialLookupCommandCounter()).ToArray();
+        var warmContexts = counters.Select(counter => CreateMeasuredContext(counter)).ToArray();
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         try
         {
+            foreach (ExploreDbContext context in warmContexts)
+            {
+                _ = context.Model;
+            }
             await Task.WhenAll(warmContexts.Select(context =>
                 context.Database.OpenConnectionAsync(CancellationToken.None)));
+
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            Task<AdmissionCheckInPerformanceSample>[] requests = cases
+                .Select((loadCase, index) => ExecuteMeasuredCheckInAsync(
+                    loadCase, warmContexts[index], counters[index], timeout.Token))
+                .ToArray();
+            start.SetResult();
+            AdmissionCheckInPerformanceSample[] samples = await Task.WhenAll(requests);
+            double[] elapsedMilliseconds = samples
+                .Select(sample => sample.Elapsed.TotalMilliseconds)
+                .Order()
+                .ToArray();
+            double p95 = Percentile(elapsedMilliseconds, 0.95);
+            double p99 = Percentile(elapsedMilliseconds, 0.99);
+            Console.WriteLine(
+                $"Phase 21 PostgreSQL latency: count={samples.Length}, p95={p95:F3}ms, p99={p99:F3}ms.");
+            Console.WriteLine(
+                "Phase 21 credential-query distribution: " +
+                string.Join(", ", samples
+                    .GroupBy(sample => sample.CredentialLookupQueries)
+                    .OrderBy(group => group.Key)
+                    .Select(group => $"{group.Key}={group.Count()}")) + ".");
+
+            await Assert.That(samples).HasCount(performance.ConcurrentRequests);
+            await Assert.That(samples.All(sample =>
+                sample.Result.Outcome == AdmissionCheckInOutcome.CheckedIn)).IsTrue();
+            await Assert.That(samples.All(sample => sample.CredentialLookupQueries == 1)).IsTrue();
+            await Assert.That(p95).IsLessThanOrEqualTo(performance.P95MaximumMilliseconds);
+            await Assert.That(p99).IsLessThanOrEqualTo(performance.P99MaximumMilliseconds);
         }
         finally
         {
             await Task.WhenAll(warmContexts.Select(context => context.DisposeAsync().AsTask()));
         }
 
-        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        Task<AdmissionCheckInPerformanceSample>[] requests = cases
-            .Select(ExecuteMeasuredCheckInAsync)
-            .ToArray();
-        start.SetResult();
-        AdmissionCheckInPerformanceSample[] samples = await Task.WhenAll(requests);
-        double[] elapsedMilliseconds = samples
-            .Select(sample => sample.Elapsed.TotalMilliseconds)
-            .Order()
-            .ToArray();
-        double p95 = Percentile(elapsedMilliseconds, 0.95);
-        double p99 = Percentile(elapsedMilliseconds, 0.99);
-        Console.WriteLine(
-            $"Phase 21 PostgreSQL latency: count={samples.Length}, p95={p95:F3}ms, p99={p99:F3}ms.");
-        Console.WriteLine(
-            "Phase 21 credential-query distribution: " +
-            string.Join(", ", samples
-                .GroupBy(sample => sample.CredentialLookupQueries)
-                .OrderBy(group => group.Key)
-                .Select(group => $"{group.Key}={group.Count()}")) + ".");
-
-        await Assert.That(samples).HasCount(performance.ConcurrentRequests);
-        await Assert.That(samples.All(sample =>
-            sample.Result.Outcome == AdmissionCheckInOutcome.CheckedIn)).IsTrue();
-        await Assert.That(samples.All(sample => sample.CredentialLookupQueries == 1)).IsTrue();
-        await Assert.That(p95).IsLessThanOrEqualTo(performance.P95MaximumMilliseconds);
-        await Assert.That(p99).IsLessThanOrEqualTo(performance.P99MaximumMilliseconds);
-
         async Task<AdmissionCheckInPerformanceSample> ExecuteMeasuredCheckInAsync(
-            AdmissionCheckInLoadCase loadCase)
+            AdmissionCheckInLoadCase loadCase,
+            ExploreDbContext context,
+            CredentialLookupCommandCounter counter,
+            CancellationToken cancellationToken)
         {
-            await start.Task.WaitAsync(timeout.Token);
+            await start.Task.WaitAsync(cancellationToken);
             long startedAt = Stopwatch.GetTimestamp();
-            var counter = new CredentialLookupCommandCounter();
-            await using ExploreDbContext context = TenantContext(tenantId, counter);
             AdmissionCheckInResult result = await ExecuteApplicationCheckInAsync(
                 context,
                 tenantId,
                 loadCase.EventId,
                 loadCase.TargetId,
                 loadCase.Digest,
-                timeout.Token);
+                cancellationToken);
             return new AdmissionCheckInPerformanceSample(
                 result,
                 Stopwatch.GetElapsedTime(startedAt),
                 counter.CredentialLookupQueries);
+        }
+
+        ExploreDbContext CreateMeasuredContext(CredentialLookupCommandCounter? counter = null)
+        {
+            var options = TestDbContextOptions.Create<ExploreDbContext>()
+                .UseNpgsql(fixture.ConnectionString)
+                .UseSnakeCaseNamingConvention()
+                .UseMemoryCache(metadataCache);
+            if (counter is not null)
+            {
+                options.AddInterceptors(counter);
+            }
+            return new ExploreDbContext(options.Options)
+            {
+                TenantContext = new TestTenantContext(tenantId)
+            };
         }
     }
 
@@ -1655,7 +1680,7 @@ public sealed class AdmissionCheckInPostgreSqlRedTests(PostgreSqlContainerFixtur
 
     private ExploreDbContext TenantContext(Guid tenantId, params IInterceptor[] interceptors)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString)
             .UseSnakeCaseNamingConvention();
         if (interceptors.Length > 0)
@@ -1862,7 +1887,7 @@ internal sealed class Phase21PersistenceSurface
 
     internal static ExploreDbContext CreateModelContext(string provider)
     {
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>();
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
         switch (provider)
         {
             case "PostgreSql":

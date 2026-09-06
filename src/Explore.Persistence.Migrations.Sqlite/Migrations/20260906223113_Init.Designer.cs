@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Explore.Persistence.Migrations.Sqlite.Migrations
 {
     [DbContext(typeof(ExploreDbContext))]
-    [Migration("20260906173858_Init")]
+    [Migration("20260906223113_Init")]
     partial class Init
     {
         /// <inheritdoc />
@@ -3187,6 +3187,82 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                             t.HasCheckConstraint("ck_atproto_records_provenance", "provenance BETWEEN 1 AND 3");
 
                             t.HasCheckConstraint("ck_atproto_records_source_version", "source_version >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Domain.AtprotoTransientAssertionReplay", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AssertionDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("assertion_digest")
+                        .IsFixedLength();
+
+                    b.Property<long>("ExpiresAtUnixMilliseconds")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("expires_at_unix_milliseconds");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_atproto_transient_assertion_replays");
+
+                    b.HasIndex("AssertionDigest")
+                        .IsUnique()
+                        .HasDatabaseName("ix_atproto_transient_assertion_replays_assertion_digest");
+
+                    b.HasIndex("ExpiresAtUnixMilliseconds")
+                        .HasDatabaseName("ix_atproto_transient_assertion_replays_expires_at_unix_milliseconds");
+
+                    b.ToTable("ie_atproto_transient_assertion_replays", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Domain.AtprotoTransientRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<long>("ExpiresAtUnixMilliseconds")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("expires_at_unix_milliseconds");
+
+                    b.Property<string>("ProtectedPayload")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("protected_payload");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("purpose");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("TokenDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("token_digest")
+                        .IsFixedLength();
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_atproto_transient_records");
+
+                    b.HasIndex("ExpiresAtUnixMilliseconds")
+                        .HasDatabaseName("ix_atproto_transient_records_expires_at_unix_milliseconds");
+
+                    b.HasIndex("Purpose", "TokenDigest")
+                        .IsUnique()
+                        .HasDatabaseName("ix_atproto_transient_records_purpose_token_digest");
+
+                    b.ToTable("ie_atproto_transient_records", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_atproto_transients_tenant_purpose", "(purpose = 3 AND tenant_id IS NULL) OR (purpose IN (1, 2) AND tenant_id IS NOT NULL)");
                         });
                 });
 

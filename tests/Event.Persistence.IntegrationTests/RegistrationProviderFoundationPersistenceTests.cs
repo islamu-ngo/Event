@@ -669,14 +669,16 @@ public sealed class RegistrationProviderFoundationPersistenceTests
     private static bool HasProperties(IReadOnlyIndex index, params string[] propertyNames) =>
         index.Properties.Select(property => property.Name).SequenceEqual(propertyNames);
 
-    private static ExploreDbContext CreateModelContext() => new(new DbContextOptionsBuilder<ExploreDbContext>()
+    private static ExploreDbContext CreateModelContext() => new(TestDbContextOptions.Create<ExploreDbContext>()
         .UseNpgsql("Host=localhost;Database=provider_model;Username=unused;Password=unused")
         .UseSnakeCaseNamingConvention().Options);
 
-    private static ExploreDbContext CreateInMemoryContext(string databaseName) => new(new DbContextOptionsBuilder<ExploreDbContext>()
-        .UseInMemoryDatabase(databaseName).Options);
+    private readonly Microsoft.EntityFrameworkCore.Storage.InMemoryDatabaseRoot _databaseRoot = new();
 
-    private static ExploreDbContext CreateSqliteContext(string databasePath) => new(new DbContextOptionsBuilder<ExploreDbContext>()
+    private ExploreDbContext CreateInMemoryContext(string databaseName) => new(TestDbContextOptions.Create<ExploreDbContext>()
+        .UseTestInMemoryDatabase(databaseName, _databaseRoot).Options);
+
+    private static ExploreDbContext CreateSqliteContext(string databasePath) => new(TestDbContextOptions.Create<ExploreDbContext>()
         .UseSqlite($"Data Source={databasePath}")
         .UseSnakeCaseNamingConvention().Options);
 

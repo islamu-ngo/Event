@@ -15,8 +15,8 @@ public sealed class ApprovalStatusLookupSeederTests
     [Test]
     public async Task RuntimeSeederMaintainsExactApprovalStatusIdsAndCodes()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase($"approval-status-lookups-{Guid.NewGuid():N}")
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase($"approval-status-lookups-{Guid.NewGuid():N}")
             .Options;
 
         await using var context = new ExploreDbContext(options);

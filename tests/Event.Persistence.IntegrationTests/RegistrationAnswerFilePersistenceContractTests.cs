@@ -18,7 +18,7 @@ public sealed class RegistrationAnswerFilePersistenceContractTests
     public async Task ModelDeclaresTenantFiltersStorageContainmentAndQuarantineConstraints()
     {
         await using var context = new ExploreDbContext(
-            new DbContextOptionsBuilder<ExploreDbContext>()
+            TestDbContextOptions.Create<ExploreDbContext>()
                 .UseNpgsql("Host=localhost;Database=unused;Username=unused;Password=unused")
                 .UseSnakeCaseNamingConvention()
                 .Options);
@@ -138,8 +138,8 @@ public sealed class RegistrationAnswerFilePersistenceContractTests
 
     private static ExploreDbContext CreateContext(Guid tenantId)
     {
-        var context = new ExploreDbContext(new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase($"registration-answer-file-{Guid.NewGuid():N}")
+        var context = new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase($"registration-answer-file-{Guid.NewGuid():N}")
             .Options)
         {
             TenantContext = new TestTenantContext(tenantId)

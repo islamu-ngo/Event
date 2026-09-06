@@ -92,7 +92,7 @@ public sealed class DataProtectionKeyPersistenceTests
         var services = new ServiceCollection();
         services.AddDbContext<DataProtectionKeyContext>(options => options.UseSqlite($"Data Source={databasePath}"));
         services.AddDataProtection().SetApplicationName(ApplicationName).PersistKeysToDbContext<DataProtectionKeyContext>();
-        ServiceProvider provider = services.BuildServiceProvider(validateScopes: true);
+        ServiceProvider provider = services.BuildIsolatedServiceProvider(validateScopes: true);
         using IServiceScope scope = provider.CreateScope();
         scope.ServiceProvider.GetRequiredService<DataProtectionKeyContext>().Database.EnsureCreated();
         return provider;
@@ -103,14 +103,14 @@ public sealed class DataProtectionKeyPersistenceTests
         var services = new ServiceCollection();
 
         services.AddDbContext<DataProtectionKeyContext>(options =>
-            options.UseInMemoryDatabase(databaseName, databaseRoot));
+            options.UseTestInMemoryDatabase(databaseName, databaseRoot));
 
         services
             .AddDataProtection()
             .SetApplicationName(ApplicationName)
             .PersistKeysToDbContext<DataProtectionKeyContext>();
 
-        var serviceProvider = services.BuildServiceProvider(validateScopes: true);
+        var serviceProvider = services.BuildIsolatedServiceProvider(validateScopes: true);
 
         using var scope = serviceProvider.CreateScope();
         scope.ServiceProvider.GetRequiredService<DataProtectionKeyContext>().Database.EnsureCreated();

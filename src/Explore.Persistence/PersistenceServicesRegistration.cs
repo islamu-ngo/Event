@@ -593,6 +593,8 @@ public static class PersistenceServicesRegistration
         // Idempotency Repository
         services.AddScoped<IIdempotencyRepository, IdempotencyRepository>();
         services.AddScoped<IAtprotoBootstrapReplayRepository, AtprotoBootstrapReplayRepository>();
+        services.AddScoped<IAtprotoTransientStoreRepository, AtprotoTransientStoreRepository>();
+        services.AddScoped<IAtprotoTransientAssertionReplayRepository, AtprotoTransientAssertionReplayRepository>();
 
         // AI Assistant Repositories
         services.AddScoped<IAiConversationRepository, AiConversationRepository>();

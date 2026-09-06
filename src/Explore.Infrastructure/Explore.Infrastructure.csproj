@@ -1,3 +1,5 @@
+<!-- ABOUTME: Composes infrastructure integrations and their generated protocol clients. -->
+<!-- ABOUTME: Exposes internal transport seams only to owning hosts and integration-test assemblies. -->
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
@@ -11,6 +13,7 @@
     <InternalsVisibleTo Include="Explore.API" />
     <InternalsVisibleTo Include="Explore.Infrastructure.Tests" />
     <InternalsVisibleTo Include="Event.Persistence.IntegrationTests" />
+    <InternalsVisibleTo Include="Event.API.IntegrationTests" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,0 +1,29 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M1T503M73J1D28CNMZCAHVY7
+Title: "Release SQLite transaction locks after rollback cleanup"
+Type: fix
+Scope: storage
+Summary: "Retain connection ownership for SQLite named locks and release completed owners during cleanup or connection reuse so later payment and configuration work cannot remain blocked."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: Active transaction locks remain held while completed SQLite owners are released during cleanup and connection reuse.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/self-hosting/docker-standalone.md
+    Disposition: documented
+    Detail: Failed SQLite operations no longer strand later work behind an abandoned process lock; single-instance deployment remains required.

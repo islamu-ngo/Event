@@ -39,12 +39,9 @@ public sealed class PostgresModelConstraintApplierTests
             Password = container.Password,
             TlsMode = PrimaryDatabaseTlsMode.Disabled,
         };
-        var optionsBuilder = new DbContextOptionsBuilder<ExploreDbContext>();
-        optionsBuilder.EnableServiceProviderCaching(false);
+        var optionsBuilder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseConnectionResult configured =
             PrimaryDatabaseProviderComposition.ConfigureApplication(optionsBuilder, options);
-        optionsBuilder.ConfigureWarnings(warnings =>
-            warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning));
         await using var context = new ExploreDbContext(optionsBuilder.Options);
         await context.Database.MigrateAsync();
 
@@ -62,9 +59,10 @@ public sealed class PostgresModelConstraintApplierTests
             await Assert.That(reader.IsDBNull(2)).IsTrue();
         }
 
-        var appliedMigrations = (await context.Database.GetAppliedMigrationsAsync()).ToArray();
-        await Assert.That(appliedMigrations).HasSingleItem();
-        await Assert.That(appliedMigrations[0]).EndsWith("_Init");
+        string[] appliedMigrations = (await context.Database.GetAppliedMigrationsAsync()).ToArray();
+        string[] availableMigrations = context.Database.GetMigrations().ToArray();
+        await Assert.That(appliedMigrations).IsEquivalentTo(availableMigrations);
+        await Assert.That(appliedMigrations.Count(migration => migration.EndsWith("_Init", StringComparison.Ordinal))).IsEqualTo(1);
 
         await PostgresModelConstraintApplier.ApplyAsync(context);
 

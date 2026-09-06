@@ -16,13 +16,22 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using TUnit.Core;
 
 namespace Event.Api.IntegrationTests.Features;
 
+[NotInParallel]
 public class SetupSecretFlowTests
 {
     private const string BaseUrl = "/api/instanceonboarding";
-    private const string SetupSecret = "integration-test-secret-flow";
+    private static readonly string SetupSecret = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+    private string? _previousSetupSecret;
+
+    [Before(Test)]
+    public void CaptureSetupSecret() => _previousSetupSecret = Environment.GetEnvironmentVariable("SETUP_SECRET");
+
+    [After(Test)]
+    public void RestoreSetupSecret() => Environment.SetEnvironmentVariable("SETUP_SECRET", _previousSetupSecret);
 
     [Test]
     public async Task ValidateSecret_WithCorrectSecret_ShouldReturn200WithValidTrue()

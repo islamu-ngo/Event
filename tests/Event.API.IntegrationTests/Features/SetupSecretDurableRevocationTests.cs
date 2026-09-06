@@ -21,7 +21,7 @@ namespace Event.Api.IntegrationTests.Features;
 [NotInParallel("SetupSecretDurableRevocation")]
 public sealed class SetupSecretDurableRevocationTests
 {
-    private const string SetupSecret = "shared-replica-setup-secret";
+    private static readonly string SetupSecret = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
 
     [Test]
     public async Task ValidateEndpoint_StaleReplicaAfterSharedCompletion_ReturnsGone()

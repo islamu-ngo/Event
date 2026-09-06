@@ -574,6 +574,20 @@ These profiles are correctness tests, not performance benchmarks. Runtime benchm
 
 ### Fixture Architecture
 
+API and BFF integration tests generate runtime-only credentials;
+never supply fixed passwords, client secrets, signing keys, or usable API keys.
+The checked-in Keycloak test realm contains identity, role, and verification
+facts only. Each Keycloak fixture injects its own generated credentials into an
+in-memory `JsonNode` copy and maps serialized bytes into the container. Token
+clients and browser-login tests consume that same fixture's credentials; rotation
+tests restore the originating fixture's secret, not a repository constant.
+The external-API mock JWT authority shares one generated key between signing and
+validation. PostgreSQL fixtures pass runtime container connection material through
+`TestDatabaseConfiguration`; in-memory hosts do not need DB or S3 credential defaults.
+Setup-secret tests retain a shared generated value only for their class/replica
+scenario. Tests that mutate process environment serialize globally and capture
+and restore prior values in native per-test lifecycle hooks, including failures.
+
 ```
 Event.API.IntegrationTests/
 ├── Builders/           # Fluent entity builders (TenantBuilder, UserBuilder, ActorBuilder, EventBuilder)

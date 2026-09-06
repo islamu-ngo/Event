@@ -40,8 +40,15 @@ public class InstanceOnboardingControllerTests
 {
     private const string BaseUrl = "/api/instanceonboarding";
     private const string SettingsBaseUrl = "/api/instance/settings";
-    private const string SetupSecret = "integration-setup-secret";
+    private static readonly string SetupSecret = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
     private const string CerbosBootstrapEndpoint = "http://cerbos-bootstrap.test:3593";
+    private string? _previousSetupSecret;
+
+    [Before(Test)]
+    public void CaptureSetupSecret() => _previousSetupSecret = Environment.GetEnvironmentVariable("SETUP_SECRET");
+
+    [After(Test)]
+    public void RestoreSetupSecret() => Environment.SetEnvironmentVariable("SETUP_SECRET", _previousSetupSecret);
 
     [Test]
     public async Task GetStatus_Anonymous_ShouldReturnOk()

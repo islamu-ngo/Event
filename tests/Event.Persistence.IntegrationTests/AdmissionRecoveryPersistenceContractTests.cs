@@ -33,9 +33,17 @@ public sealed class AdmissionRecoveryPersistenceContractTests
         await Assert.That(entity.FindProperty(nameof(AdmissionRecoveryCapability.ConcurrencyStamp))!
             .IsConcurrencyToken).IsTrue();
         await Assert.That(entity.FindProperty(nameof(AdmissionRecoveryCapability.LookupDigest))!
-            .GetTypeMapping().Converter!.ProviderClrType).IsEqualTo(typeof(byte[]));
+            .ClrType).IsEqualTo(typeof(string));
+        await Assert.That(entity.FindProperty(nameof(AdmissionRecoveryCapability.LookupDigest))!
+            .GetMaxLength()).IsEqualTo(44);
+        await Assert.That(entity.FindProperty(nameof(AdmissionRecoveryCapability.LookupDigest))!
+            .IsFixedLength()).IsTrue();
         await Assert.That(entity.FindProperty(nameof(AdmissionRecoveryCapability.LocatorDigest))!
-            .GetTypeMapping().Converter!.ProviderClrType).IsEqualTo(typeof(byte[]));
+            .ClrType).IsEqualTo(typeof(string));
+        await Assert.That(entity.FindProperty(nameof(AdmissionRecoveryCapability.LocatorDigest))!
+            .GetMaxLength()).IsEqualTo(44);
+        await Assert.That(entity.FindProperty(nameof(AdmissionRecoveryCapability.LocatorDigest))!
+            .IsFixedLength()).IsTrue();
         IIndex digest = FindIndex(
             entity,
             "TenantId",

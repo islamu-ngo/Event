@@ -63,7 +63,8 @@ public sealed class EventLocationPrivacyModelTests
             await Assert.That(entityType.FindAnnotation("EventLocationPrivacy:ConsistencyTrigger")?.Value)
                 .IsNotNull();
             await Assert.That(entityType.GetIndexes().Any(index =>
-                index.GetDatabaseName()!.EndsWith("elp_consistency", StringComparison.Ordinal)))
+                index.Properties.Select(property => property.Name).Contains(nameof(EventLocation.TenantId))
+                && index.Properties.Select(property => property.Name).Contains("EventLocationId")))
                 .IsTrue();
         }
     }

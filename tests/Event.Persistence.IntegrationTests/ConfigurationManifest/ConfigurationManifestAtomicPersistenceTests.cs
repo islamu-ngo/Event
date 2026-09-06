@@ -6,6 +6,7 @@ using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.ConfigurationManifest.Requests.Commands;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Domain.Settings.Documents;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
@@ -76,9 +77,15 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
             await Assert.That(await verification.TenantSettingOverrides
                 .IgnoreQueryFilters()
                 .CountAsync()).IsEqualTo(1);
-            await Assert.That(await verification.TenantSettingsDocuments
+            TenantSettingsDocument[] documents = await verification.TenantSettingsDocuments
                 .IgnoreQueryFilters()
-                .CountAsync()).IsEqualTo(1);
+                .AsNoTracking()
+                .ToArrayAsync();
+            await Assert.That(documents.Select(document => document.DocumentKey)).IsEquivalentTo(
+            [
+                SettingsDocumentKeys.Tenant.Branding,
+                SettingsDocumentKeys.Tenant.DirectoryOperatorIdentity
+            ]);
             OutboxMessage effectOutbox = await verification.OutboxMessages
                 .AsNoTracking()
                 .SingleAsync(message =>
@@ -177,9 +184,16 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
             await Assert.That(await verification.TenantSettingOverrides
                 .IgnoreQueryFilters()
                 .CountAsync(setting => setting.TenantId == newTenantId)).IsEqualTo(1);
-            await Assert.That(await verification.TenantSettingsDocuments
+            TenantSettingsDocument[] newTenantDocuments = await verification.TenantSettingsDocuments
                 .IgnoreQueryFilters()
-                .CountAsync(document => document.TenantId == newTenantId)).IsEqualTo(1);
+                .Where(document => document.TenantId == newTenantId)
+                .AsNoTracking()
+                .ToArrayAsync();
+            await Assert.That(newTenantDocuments.Select(document => document.DocumentKey)).IsEquivalentTo(
+            [
+                SettingsDocumentKeys.Tenant.Branding,
+                SettingsDocumentKeys.Tenant.DirectoryOperatorIdentity
+            ]);
             await Assert.That(results.Single(result =>
                     result.TenantId == existingTenantId).ChangedKeyNames)
                 .IsEmpty();

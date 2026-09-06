@@ -24,12 +24,34 @@ public sealed class NotificationFanoutOccurrenceMigrationTests(
         await ResetSharedMigrationDatabaseAsync();
         await using var context = CreateDbContext();
         IMigrator migrator = context.GetService<IMigrator>();
+        string schema = context.Model.GetDefaultSchema()
+            ?? throw new InvalidOperationException("The event model must declare a default schema.");
+        IForeignKey occurrenceForeignKey = context.Model.FindEntityType(typeof(Explore.Domain.NotificationIntent))!
+            .GetForeignKeys()
+            .Single(foreignKey => foreignKey.Properties.Select(property => property.Name).SequenceEqual(
+            ["TenantId", "FanoutOccurrenceId"]));
+        IIndex recipientIdentity = context.Model.FindEntityType(typeof(Explore.Domain.NotificationIntent))!
+            .GetIndexes()
+            .Single(index => index.Properties.Select(property => property.Name).SequenceEqual(
+            ["TenantId", "FanoutOccurrenceId", "RecipientUserId"]));
+        await Assert.That(occurrenceForeignKey.PrincipalEntityType.ClrType)
+            .IsEqualTo(typeof(Explore.Domain.NotificationFanoutOccurrence));
+        await Assert.That(occurrenceForeignKey.PrincipalKey.Properties.Select(property => property.Name)
+            .SequenceEqual(["TenantId", "Id"])).IsTrue();
+        await Assert.That(recipientIdentity.IsUnique).IsTrue();
+        await Assert.That(recipientIdentity.GetFilter()).IsNull();
 
         try
         {
             await migrator.MigrateAsync();
             await Assert.That(ReadPendingModelOperations(context)).IsEmpty();
-            await AssertSchemaAsync(expected: true);
+            await AssertSchemaAsync(
+                schema,
+                expected: true,
+                occurrenceForeignKey.GetConstraintName()
+                    ?? throw new InvalidOperationException("Fanout occurrence foreign key has no database name."),
+                recipientIdentity.GetDatabaseName()
+                    ?? throw new InvalidOperationException("Fanout recipient identity index has no database name."));
         }
         finally
         {
@@ -85,7 +107,11 @@ public sealed class NotificationFanoutOccurrenceMigrationTests(
         _ => operation.GetType().Name
     };
 
-    private async Task AssertSchemaAsync(bool expected)
+    private async Task AssertSchemaAsync(
+        string schema,
+        bool expected,
+        string occurrenceForeignKeyName,
+        string recipientIdentityIndexName)
     {
         await using var connection = new NpgsqlConnection(fixture.ConnectionString);
         await connection.OpenAsync();
@@ -93,14 +119,14 @@ public sealed class NotificationFanoutOccurrenceMigrationTests(
         await Assert.That(await ExistsAsync(connection, """
             SELECT EXISTS (
                 SELECT 1 FROM information_schema.tables
-                WHERE table_schema = current_schema() AND table_name = 'notification_fanout_occurrences')
-            """)).IsEqualTo(expected);
+                WHERE table_schema = @schema AND table_name = 'notification_fanout_occurrences')
+            """, schema, string.Empty, string.Empty)).IsEqualTo(expected);
         await Assert.That(await ExistsAsync(connection, """
             SELECT EXISTS (
                 SELECT 1 FROM information_schema.columns
-                WHERE table_schema = current_schema() AND table_name = 'notification_intents'
+                WHERE table_schema = @schema AND table_name = 'notification_intents'
                   AND column_name = 'fanout_occurrence_id')
-            """)).IsEqualTo(expected);
+            """, schema, string.Empty, string.Empty)).IsEqualTo(expected);
 
         if (!expected)
         {
@@ -110,19 +136,34 @@ public sealed class NotificationFanoutOccurrenceMigrationTests(
         await Assert.That(await ExistsAsync(connection, """
             SELECT EXISTS (
                 SELECT 1 FROM pg_constraint
-                WHERE conname = 'fk_notification_intents_fanout_occurrence_tenant')
-            """)).IsTrue();
+                WHERE conname = @name
+                  AND connamespace = (SELECT oid FROM pg_namespace WHERE nspname = @schema))
+            """, schema, occurrenceForeignKeyName, string.Empty)).IsTrue();
         await Assert.That(await ExistsAsync(connection, """
             SELECT EXISTS (
-                SELECT 1 FROM pg_indexes
-                WHERE schemaname = current_schema()
-                  AND indexname = 'ux_notification_intents_tenant_occurrence_recipient')
-            """)).IsTrue();
+                SELECT 1
+                FROM pg_index relation_index
+                JOIN pg_class relation ON relation.oid = relation_index.indrelid
+                JOIN pg_class index_relation ON index_relation.oid = relation_index.indexrelid
+                JOIN pg_namespace relation_schema ON relation_schema.oid = relation.relnamespace
+                WHERE relation_schema.nspname = @schema
+                  AND relation.relname = @table
+                  AND index_relation.relname = @name
+                  AND relation_index.indisunique)
+            """, schema, recipientIdentityIndexName, "notification_intents")).IsTrue();
     }
 
-    private static async Task<bool> ExistsAsync(NpgsqlConnection connection, string sql)
+    private static async Task<bool> ExistsAsync(
+        NpgsqlConnection connection,
+        string sql,
+        string schema,
+        string name,
+        string table)
     {
         await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("schema", schema);
+        command.Parameters.AddWithValue("name", name);
+        command.Parameters.AddWithValue("table", table);
         return (bool)(await command.ExecuteScalarAsync()
             ?? throw new InvalidOperationException("Schema existence query returned no value."));
     }

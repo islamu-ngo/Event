@@ -19,6 +19,7 @@ using TUnit.Core;
 namespace Event.Persistence.IntegrationTests.UnitOfWork;
 
 [ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
+[NotInParallel("PersistenceDb")]
 public class EfCoreUnitOfWorkTests
 {
     private readonly PostgreSqlContainerFixture _fixture;

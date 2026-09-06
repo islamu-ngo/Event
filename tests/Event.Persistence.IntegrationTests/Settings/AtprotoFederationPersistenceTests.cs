@@ -13,6 +13,7 @@ using TUnit.Core;
 namespace Event.Persistence.IntegrationTests.Settings;
 
 [ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
+[NotInParallel("PersistenceDb")]
 public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture fixture)
 {
     [Test]

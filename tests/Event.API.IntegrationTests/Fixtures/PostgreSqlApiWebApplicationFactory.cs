@@ -54,8 +54,6 @@ public class PostgreSqlApiWebApplicationFactory : WebApplicationFactory<Program>
                 ["Keycloak:MetadataAddress"] = "https://localhost:8443/realms/ISLAMU/.well-known/openid-configuration",
                 ["S3Settings:Region"] = "us-east-1",
                 ["S3Settings:BucketName"] = "test-bucket",
-                ["S3Settings:AccessKeyId"] = "test-key",
-                ["S3Settings:SecretAccessKey"] = "test-secret",
                 ["S3Settings:Endpoint"] = "https://localhost:9000",
                 ["Deployment:Mode"] = "SingleTenant",
                 ["Deployment:DefaultTenantId"] = PlatformDefaults.DefaultTenantId.ToString(),

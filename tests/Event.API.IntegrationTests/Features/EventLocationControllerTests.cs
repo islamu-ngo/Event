@@ -627,7 +627,7 @@ public sealed class EventLocationRouteRuntimeFixture : IAsyncInitializer, IAsync
         .WithImage("postgres:18-alpine")
         .WithDatabase("event_location_routes")
         .WithUsername("postgres")
-        .WithPassword("postgres")
+        .WithPassword(Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)))
         .Build();
 
     private TestDatabaseReset _databaseReset = null!;

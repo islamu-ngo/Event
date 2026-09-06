@@ -490,7 +490,7 @@ public sealed class NativeRegistrationSubmissionHttpTests
         await using var database = new PostgreSqlBuilder("postgres:18-alpine")
             .WithDatabase("registration_callback_phase9")
             .WithUsername("postgres")
-            .WithPassword("postgres")
+            .WithPassword(Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)))
             .Build();
         await database.StartAsync();
         string connectionString = database.GetConnectionString();

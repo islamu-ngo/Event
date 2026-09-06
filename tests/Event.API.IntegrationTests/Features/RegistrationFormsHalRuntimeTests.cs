@@ -224,7 +224,7 @@ public sealed class RegistrationFormsRealRuntimeFixture : IAsyncInitializer, IAs
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18-alpine")
         .WithDatabase("registration_forms_http")
         .WithUsername("postgres")
-        .WithPassword("postgres")
+        .WithPassword(Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)))
         .Build();
 
     private PostgreSqlApiWebApplicationFactory _factory = null!;

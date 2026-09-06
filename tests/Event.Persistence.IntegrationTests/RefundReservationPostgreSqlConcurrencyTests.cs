@@ -31,15 +31,16 @@ public sealed class RefundReservationPostgreSqlConcurrencyTests(RefundPostgreSql
         Guid tenantId = Guid.CreateVersion7();
         Guid paymentId = Guid.CreateVersion7();
         Guid orderId = Guid.CreateVersion7();
+        PaymentAttempt payment;
         await using (ExploreDbContext seed = await CreateContextAsync(connectionString))
         {
-            await SeedCapturedPaymentAsync(seed, tenantId, paymentId, orderId);
+            payment = await SeedCapturedPaymentAsync(seed, tenantId, paymentId, orderId);
         }
 
         using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(30));
         RefundReservationResult[] results = await Task.WhenAll(
-            ReserveAsync(connectionString, Refund(tenantId, paymentId, orderId, 750, "refund:race:a"), timeout.Token),
-            ReserveAsync(connectionString, Refund(tenantId, paymentId, orderId, 750, "refund:race:b"), timeout.Token));
+            ReserveAsync(connectionString, Refund(payment, 750, "refund:race:a"), timeout.Token),
+            ReserveAsync(connectionString, Refund(payment, 750, "refund:race:b"), timeout.Token));
 
         await Assert.That(results.Count(result => result.Disposition == RefundReservationDisposition.Reserved)).IsEqualTo(1);
         await Assert.That(results.Count(result => result.Disposition == RefundReservationDisposition.CapacityExceeded)).IsEqualTo(1);
@@ -58,19 +59,20 @@ public sealed class RefundReservationPostgreSqlConcurrencyTests(RefundPostgreSql
         Guid paymentId = Guid.CreateVersion7();
         Guid orderId = Guid.CreateVersion7();
         long[] lineTotals = [1, 1, 1];
+        PaymentAttempt payment;
         await using (ExploreDbContext seed = await CreateContextAsync(connectionString))
         {
-            await SeedCapturedPaymentAsync(seed, tenantId, paymentId, orderId, 3, 1, lineTotals);
+            payment = await SeedCapturedPaymentAsync(seed, tenantId, paymentId, orderId, 3, 1, lineTotals);
         }
 
         using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(30));
         RefundReservationResult first = await ReserveAsync(
             connectionString,
-            Refund(tenantId, paymentId, orderId, 1, "refund:line-fee:first", 3, 1, lineTotals),
+            Refund(payment, 1, "refund:line-fee:first"),
             timeout.Token);
         RefundReservationResult second = await ReserveAsync(
             connectionString,
-            Refund(tenantId, paymentId, orderId, 1, "refund:line-fee:second", 3, 1, lineTotals),
+            Refund(payment, 1, "refund:line-fee:second"),
             timeout.Token);
 
         await using ExploreDbContext verification = await CreateContextAsync(connectionString, ensureCreated: false);
@@ -187,7 +189,7 @@ public sealed class RefundReservationPostgreSqlConcurrencyTests(RefundPostgreSql
         return context;
     }
 
-    private static async Task SeedCapturedPaymentAsync(
+    private static async Task<PaymentAttempt> SeedCapturedPaymentAsync(
         ExploreDbContext context,
         Guid tenantId,
         Guid paymentId,
@@ -229,28 +231,24 @@ public sealed class RefundReservationPostgreSqlConcurrencyTests(RefundPostgreSql
             paymentId, tenantId, orderId, recipient, "OrganizerDirect", "2026-08-20.acacia", "refund-race",
             Money.Create(organizerMinor, recipient.CurrencyCode), Money.Create(platformFeeMinor, recipient.CurrencyCode), Money.Create(0, recipient.CurrencyCode), $"payment:{tenantId:N}:{paymentId:N}", UtcNow, UtcNow.AddMinutes(30));
         payment.AttachAcceptance(Acceptance(
-            tenantId, paymentId, orderId, organizerMinor, platformFeeMinor, lineTotals));
+            tenantId, paymentId, orderId, order.EventId, recipient, organizerMinor, platformFeeMinor, lineTotals));
         payment.MarkSucceeded(PaymentProviderId(paymentId), UtcNow.AddSeconds(1), "req_payment");
         context.Tenants.Add(tenant);
         context.RegistrationOrders.Add(order);
         context.PaymentAttempts.Add(payment);
         await context.SaveChangesAsync();
         await context.Database.ExecuteSqlRawAsync("SET session_replication_role = origin;");
+        return payment;
     }
 
     private static RefundAttempt Refund(
-        Guid tenantId,
-        Guid paymentId,
-        Guid orderId,
+        PaymentAttempt payment,
         long totalMinor,
-        string idempotencyKey,
-        long organizerMinor = 1_000,
-        long platformFeeMinor = 75,
-        IReadOnlyList<long>? lineTotals = null) =>
+        string idempotencyKey) =>
         RefundAttempt.Create(
-            Guid.CreateVersion7(), tenantId, paymentId,
-            Acceptance(tenantId, paymentId, orderId, organizerMinor, platformFeeMinor, lineTotals), "acct_original",
-            PaymentProviderId(paymentId), idempotencyKey, totalMinor, UtcNow.AddMinutes(1));
+            Guid.CreateVersion7(), payment.TenantId, payment.Id,
+            payment.AcceptanceSnapshot!, payment.RecipientSnapshot.ExternalAccountId,
+            payment.ProviderPaymentId!, idempotencyKey, totalMinor, UtcNow.AddMinutes(1));
 
     private static string PaymentProviderId(Guid paymentId) => $"pi_{paymentId:N}";
 
@@ -258,14 +256,16 @@ public sealed class RefundReservationPostgreSqlConcurrencyTests(RefundPostgreSql
         Guid tenantId,
         Guid paymentId,
         Guid orderId,
+        Guid eventId,
+        OrganizerPaymentRecipientSnapshot recipient,
         long organizerMinor = 1_000,
         long platformFeeMinor = 75,
         IReadOnlyList<long>? lineTotals = null) =>
         PaidOrderAcceptanceSnapshot.Create(
-            paymentId, tenantId, tenantId, orderId, Guid.CreateVersion7(), "refund-race", "disclosure-1",
+            paymentId, tenantId, tenantId, orderId, eventId, "refund-race", "disclosure-1",
             PaidOrderAcceptanceSnapshot.CurrentAcceptanceTemplateIdentifier,
             PaidOrderAcceptanceSnapshot.CurrentAcceptanceTemplateText,
-            Guid.CreateVersion7(),
+            recipient.OrganizerActorId,
             "Example Organizer",
             PaidCheckoutTenantDirectoryOperatorDisclosure.Create(
                 Guid.CreateVersion7(), Guid.CreateVersion7(), "Community Events", "Community Events ASBL",
@@ -278,12 +278,17 @@ public sealed class RefundReservationPostgreSqlConcurrencyTests(RefundPostgreSql
                 "Dispute Operations", "Payment Reconciliation", "approved"),
             PaidOrderDeliverySnapshot.Create(
                 DateTimeOffset.Parse("2026-09-10T17:00:00Z"), DateTimeOffset.Parse("2026-09-10T20:00:00Z"), "Europe/Brussels"),
-            "EUR", organizerMinor, platformFeeMinor, 0, organizerMinor, Guid.CreateVersion7(), 7,
+            recipient.CurrencyCode, organizerMinor, platformFeeMinor, 0, organizerMinor, recipient.InstancePolicyVersionId, 7,
             "Refunds follow accepted policy v7.", "en-GB", "support@example.test",
             PaidCheckoutProviderDisclosure.Create(
                 "stripe", "OrganizerDirect", "direct-charge", "EXAMPLE EVENT", "test", "instance-operator"),
             (lineTotals ?? [organizerMinor]).Select((total, index) => PaidOrderAcceptanceLineFact.Create(
-                Guid.CreateVersion7(), $"Line {index + 1}", 1, total, 0, total)).ToArray(), UtcNow);
+                Guid.CreateVersion7(), $"Line {index + 1}", 1, total, 0, total)).ToArray(), UtcNow,
+            tenantPolicyVersionId: recipient.TenantPolicyVersionId,
+            organizerPaymentProviderConnectionId: recipient.OrganizerPaymentProviderConnectionId,
+            connectPlatformId: recipient.ConnectPlatformId,
+            externalAccountId: recipient.ExternalAccountId,
+            merchantCountryCode: recipient.MerchantCountryCode);
 }
 
 public sealed class RefundPostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable

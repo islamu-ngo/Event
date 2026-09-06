@@ -1624,3 +1624,30 @@ uninitializable.
 - [ ] Stays in journal only (one-off debugging lesson)
 
 ---
+
+[2026-09-06 Europe/Brussels] — Unicode match parity does not imply universal ordering
+
+**Context**: Replacing location scalar-token encoding with whole-value normalized Unicode under the migration and repository-query intents.
+
+**Symptom / Observation**: The five real engines agreed on authorized literal substring membership, but SQL Server's binary Unicode ordering placed a supplementary display name before the BMP private-use display name; the other tested providers ordered that pair the other way. PostgreSQL and MySQL-family persisted audit timestamps also had lower precision than the original in-memory test values.
+
+**Root Cause**: Binary text collations act on provider-specific Unicode representations and padding rules. Native UUID ordering is another independent comparator. A result limit cannot supply a universal order, and unchanged-state assertions cannot compare pre-round-trip timestamp precision with persisted precision.
+
+**Resolution**: Keep one validated NFC → invariant uppercase → NFC Domain helper and targeted Unicode collation metadata; require membership parity and explicit provider-local stable ordering. Reload seeded values before capturing a persistence atomicity baseline, then compare every scalar before/after rejected writes without weakening assertions. The shared structured-provider Unicode corpus passed on all five engines. No third-party source or new dependencies were retained; only source-free official behavior requirements informed the independently chosen repository-native design.
+
+**Why This Matters for Future Work**: Treat normalization, substring membership, result ordering, and persisted precision as separate contracts. Runtime/ICU upgrades still require stopped-traffic compatibility checks and authorized rebuild/reset; an unchanged revision number does not detect normalization-table drift.
+
+**References**:
+- `src/Explore.Domain/ValueObjects/LocationTextNormalization.cs`
+- `tests/Event.Persistence.IntegrationTests/Database/PrimaryDatabaseProviderBehaviorContractTests.cs`
+- `tests/Event.Persistence.IntegrationTests/Repositories/LocationUnicodeWriteAtomicityTests.cs`
+- `docs/internal/adr/ADR-028-location-unicode-search-text.md`
+- `docs/internal/OPERATIONS.md#location-unicode-runtime-compatibility`
+- PR / commit: pending
+
+**Promotion Consideration**:
+- [x] Candidate for ADR / `MAJOR_DECISIONS.md`: recorded in ADR-028.
+- [ ] Candidate for skill update.
+- [ ] Stays in journal only (one-off debugging lesson).
+
+---

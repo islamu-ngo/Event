@@ -3,6 +3,7 @@
 
 using System.Security.Claims;
 using System.Security.Cryptography;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Infrastructure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.ManagedProviderProvisioning;
@@ -255,9 +256,10 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
         internal ManagedTenantProvisioningPreflight Preflight(AsyncServiceScope scope)
         {
             var app = Application(scope);
-            var settings = new SystemSettingRepository(app, new RelationalSettingMutationLock(app, new EfCoreUnitOfWork(app)));
+            var mutation = new RelationalSettingMutationLock(app, new EfCoreUnitOfWork(app));
+            var settings = new SystemSettingRepository(app, mutation);
             return new(new TenantRepository(app), new TenantPlanRepository(app), new ModuleDefinitionRepository(app),
-                new TenantSettingRepository(app), settings, new TenantBrandingSettingsDocumentLockService(settings),
+                new TenantSettingRepository(app, mutation), settings, new TenantBrandingSettingsDocumentLockService(settings),
                 new TenantPlanStorageQuotaCeilingPolicy(settings), Store(scope));
         }
 
@@ -268,7 +270,7 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
             var unit = new EfCoreUnitOfWork(app);
             var mutation = new RelationalSettingMutationLock(app, unit);
             var settings = new SystemSettingRepository(app, mutation);
-            var tenantSettings = new TenantSettingRepository(app);
+            var tenantSettings = new TenantSettingRepository(app, mutation);
             var documents = new TenantSettingsDocumentRepository(app);
             var cache = scope.ServiceProvider.GetRequiredService<IMemoryCache>();
             var typed = new TypedSettingsDocumentResolver(documents, cache);
@@ -276,7 +278,8 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
             var tenantContext = new TenantContext(accessor, new TenantResolverService([], accessor, Options.Create(new DeploymentSettings())));
             var hierarchy = new HierarchicalSettingsResolver(settings, tenantSettings, new OrganizationSettingRepository(app),
                 new GroupSettingRepository(app), new GroupTenantRepository(app), new UserPreferenceRepository(app), tenantContext,
-                mutation, cache, NullLogger<HierarchicalSettingsResolver>.Instance);
+                mutation, cache, NullLogger<HierarchicalSettingsResolver>.Instance,
+                EmailDispatchSqliteFixture.CreateEmailSettingsWriter(app, mutation));
             return new(tenants, new UserRepository(app), new ActorRepository(app), new UserExternalLoginRepository(app),
                 new TenantUserRepository(app), new TenantUserProfileRepository(app), new TenantUserRoleGrantRepository(app),
                 new RoleRepository(app), new OrganizationRepository(app), new OrganizationTenantRepository(app),

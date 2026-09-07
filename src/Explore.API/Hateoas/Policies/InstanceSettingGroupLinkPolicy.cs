@@ -1,4 +1,4 @@
-// ABOUTME: Authorization-aware HAL links for the ATProto instance-governance setting group.
+// ABOUTME: Authorization-aware HAL links for instance governance and tenant settings groups.
 // ABOUTME: Advertises allowlisted update and lock transitions only when server metadata permits them.
 
 namespace Explore.API.Hateoas.Policies;
@@ -14,6 +14,15 @@ public sealed class AtprotoInstanceSettingGroupLinkPolicy : ILinkPolicy<SettingG
 {
     public IEnumerable<LinkDefinition> GetLinks(SettingGroupResponseDto dto, ClaimsPrincipal? user)
     {
+        if (dto.TenantId.HasValue)
+        {
+            foreach (var link in EmailDeliverySettingsLinkPolicy.TenantLinks(dto))
+                yield return link;
+            yield break;
+        }
+        if (dto.Category != AtprotoFederationSettingDefinitions.Category)
+            yield break;
+
         yield return Link(
             LinkRelations.Self,
             RouteNames.GetInstanceAtprotoFederationSettings,

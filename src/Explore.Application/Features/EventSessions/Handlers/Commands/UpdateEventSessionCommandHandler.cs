@@ -14,6 +14,7 @@ using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Application.Services.Registration;
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Scheduling;
 using Explore.Domain.ValueObjects;
@@ -35,6 +36,7 @@ public class UpdateEventSessionCommandHandler : IRequestHandler<UpdateEventSessi
     private readonly IEventDayRepository _eventDayRepository;
     private readonly IStorageObjectRepository _storageObjectRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ISettingMutationLock _mutationLock;
     private readonly EventLocationAttachmentService _eventLocationAttachmentService;
     private readonly HybridCache _cache;
     private readonly NotificationFanoutOccurrenceCoordinator _fanoutCoordinator;
@@ -61,7 +63,8 @@ public class UpdateEventSessionCommandHandler : IRequestHandler<UpdateEventSessi
         IEventLifecycleScheduler eventLifecycleScheduler,
         IRefundCampaignRepository refundCampaignRepository,
         IUserContext userContext,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        ISettingMutationLock mutationLock)
     {
         _eventSessionRepository = eventSessionRepository;
         _eventRepository = eventRepository;
@@ -74,6 +77,7 @@ public class UpdateEventSessionCommandHandler : IRequestHandler<UpdateEventSessi
         _eventDayRepository = eventDayRepository;
         _storageObjectRepository = storageObjectRepository;
         _unitOfWork = unitOfWork;
+        _mutationLock = mutationLock;
         _eventLocationAttachmentService = eventLocationAttachmentService;
         _cache = cache;
         _fanoutCoordinator = fanoutCoordinator;
@@ -112,7 +116,9 @@ public class UpdateEventSessionCommandHandler : IRequestHandler<UpdateEventSessi
 
         try
         {
-            bool updated = await _unitOfWork.ExecuteSerializableAsync(async token =>
+            bool updated = await _mutationLock.ExecuteOrderedGroupsAsync(
+                [[GovernanceSettingKeys.Email.DeliveryEnabled]],
+                policyToken => _unitOfWork.ExecuteSerializableAsync(async token =>
             {
                 transactionFailure = null;
                 EventSession? eventSession = await _eventSessionRepository.GetById(request.EventSessionId);
@@ -309,7 +315,7 @@ public class UpdateEventSessionCommandHandler : IRequestHandler<UpdateEventSessi
                 tenantIdForCache = parentEvent.TenantId;
                 eventChangedForCache = eventChanged;
                 return true;
-            }, cancellationToken);
+            }, policyToken), cancellationToken);
 
             if (!updated)
             {

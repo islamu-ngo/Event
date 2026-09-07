@@ -7,6 +7,7 @@ using System.Text.Json.Nodes;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Notifications;
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Services;
@@ -15,14 +16,28 @@ public sealed class NotificationFanoutOccurrenceCoordinator(
     INotificationFanoutOccurrenceRepository occurrenceRepository,
     INotificationFanoutEmailSuppressionRepository emailSuppressionRepository,
     IOutboxRepository outboxRepository,
-    NotificationFanoutRecipientTemplateFactory templateFactory)
+    NotificationFanoutRecipientTemplateFactory templateFactory,
+    IEmailDispatchOutboxRepository emailDispatchRepository,
+    ISettingMutationLock mutationLock)
 {
-    public async Task<NotificationFanoutOccurrenceCoordinationResult> CoordinateInCurrentTransactionAsync(
+    public Task<NotificationFanoutOccurrenceCoordinationResult> CoordinateInCurrentTransactionAsync(
         NotificationFanoutOccurrenceCandidate candidate,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(candidate);
-        NotificationFanoutOccurrence incoming = CreateNormalizedOccurrence(candidate);
+        return mutationLock.ExecuteManyAsync(
+            [GovernanceSettingKeys.Email.DeliveryEnabled],
+            token => CoordinateUnderPolicyLockAsync(candidate, token),
+            cancellationToken);
+    }
+
+    private async Task<NotificationFanoutOccurrenceCoordinationResult> CoordinateUnderPolicyLockAsync(
+        NotificationFanoutOccurrenceCandidate candidate,
+        CancellationToken cancellationToken)
+    {
+        EmailDispatchTenantControl? control = await emailDispatchRepository.GetTenantControl(
+            candidate.TenantId, cancellationToken);
+        NotificationFanoutOccurrence incoming = CreateNormalizedOccurrence(candidate, control?.DeliveryPolicyRevision ?? 0);
         ClassifiedOccurrence incomingClassification = ClassifyAndValidate(incoming);
 
         await occurrenceRepository.AcquireSourceThenEventCoordinationLocksAsync(
@@ -51,6 +66,9 @@ public sealed class NotificationFanoutOccurrenceCoordinator(
                 cancellationToken);
         if (replay is not null)
         {
+            // Replay reconstruction uses the original policy epoch, including when this source
+            // previously coalesced a predecessor. Today's policy is not part of source identity.
+            incoming = CreateNormalizedOccurrence(candidate, replay.EmailDeliveryPolicyRevision);
             await ValidateSourceReplayAsync(incoming, incomingClassification, replay, cancellationToken);
             NotificationFanoutOccurrence active = await ResolveActiveOccurrenceAsync(replay, cancellationToken);
             return new(
@@ -123,7 +141,9 @@ public sealed class NotificationFanoutOccurrenceCoordinator(
             PointerCreated: true);
     }
 
-    private NotificationFanoutOccurrence CreateNormalizedOccurrence(NotificationFanoutOccurrenceCandidate candidate)
+    private NotificationFanoutOccurrence CreateNormalizedOccurrence(
+        NotificationFanoutOccurrenceCandidate candidate,
+        long emailDeliveryPolicyRevision)
     {
         ValidateCandidate(candidate);
         DateTime occurredAt = AtPostgresPrecision(candidate.OccurredAt);
@@ -164,7 +184,8 @@ public sealed class NotificationFanoutOccurrenceCoordinator(
             candidate.SourceType.Trim(),
             candidate.SourceId,
             CoalescingKey(candidate.EventId, candidate.SessionId),
-            windowEndsAt);
+            windowEndsAt,
+            emailDeliveryPolicyRevision: emailDeliveryPolicyRevision);
     }
 
     private ClassifiedOccurrence ClassifyAndValidate(NotificationFanoutOccurrence occurrence)
@@ -423,6 +444,7 @@ public sealed class NotificationFanoutOccurrenceCoordinator(
             .ThenByDescending(entry => entry.Occurrence.Id)
             .FirstOrDefault();
         if (latestUpdate is null
+            || latestUpdate.Occurrence.EmailDeliveryPolicyRevision != incoming.EmailDeliveryPolicyRevision
             || !latestUpdate.Occurrence.CoalescingWindowEndsAt.HasValue
             || incoming.OccurredAt > latestUpdate.Occurrence.CoalescingWindowEndsAt.Value)
         {
@@ -485,7 +507,8 @@ public sealed class NotificationFanoutOccurrenceCoordinator(
             incoming.SourceType,
             incoming.SourceId,
             incoming.CoalescingKey,
-            incoming.CoalescingWindowEndsAt);
+            incoming.CoalescingWindowEndsAt,
+            emailDeliveryPolicyRevision: incoming.EmailDeliveryPolicyRevision);
         if (eventWideTimezonePair && latestEnriched && incomingEnriched)
         {
             _ = templateFactory.Parse(coalesced);

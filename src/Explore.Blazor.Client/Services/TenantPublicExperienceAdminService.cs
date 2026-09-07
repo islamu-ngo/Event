@@ -65,7 +65,7 @@ public sealed class TenantPublicExperienceAdminService(
     {
         try
         {
-            SettingGroupResponseDto response = await apiClient.GetTenantScopedSettingsAsync(
+            HalResourceOfSettingGroupResponseDto response = await apiClient.GetTenantScopedSettingsAsync(
                 Category,
                 cancellationToken: cancellationToken);
 
@@ -188,7 +188,7 @@ public sealed class TenantPublicExperienceAdminService(
     {
         try
         {
-            SettingGroupResponseDto response = await apiClient.GetTenantScopedSettingsAsync(
+            HalResourceOfSettingGroupResponseDto response = await apiClient.GetTenantScopedSettingsAsync(
                 Category,
                 cancellationToken: cancellationToken);
 
@@ -356,7 +356,7 @@ public sealed class TenantPublicExperienceAdminService(
         string category,
         CancellationToken cancellationToken)
     {
-        SettingGroupResponseDto response = await apiClient.GetTenantScopedSettingsAsync(
+        HalResourceOfSettingGroupResponseDto response = await apiClient.GetTenantScopedSettingsAsync(
             category,
             cancellationToken: cancellationToken);
 

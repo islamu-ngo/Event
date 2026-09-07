@@ -716,6 +716,37 @@ instance delivery is disabled, but cannot enable the disabled instance fallback.
 instance-owned host uses instance credentials only. Individual settings locks still apply;
 specialized instance SMTP saves preserve them inside the existing ordered mutation locks.
 
+Graph materialization and final handoff use the same `EmailDeliveryPolicy` suppression
+predicate: unavailable optional mail is terminally `Skipped`; required mail is `Parked`.
+`EmailDispatchOutbox.ParkReason` distinguishes `CapabilityUnavailable` from `Operator`
+using a nullable enum backed by a database constraint. Error text is diagnostic data,
+not recovery authority. Explicit replay and resolution clear the current park reason.
+An explicit park of capability-held work changes its reason to `Operator`; repeating
+an operator hold preserves the original reason and timestamp. The command and final
+conditional update accept only known eligible states. Status DTOs retain typed enum
+facts, and separate detail/collection HAL policies expose the permission-qualified
+takeover action without asking clients to reconstruct these rules.
+An already admitted provider handoff remains owned by settlement even when policy
+changes or a duplicate graph is repaired. Configuration/authentication rejection
+after an admitted attempt retains the typed transport parking rule; uncertain
+acceptance remains `Unknown`, never an automatic retry.
+
+Managed administrator invitation admission also requires a current unrevoked
+`TenantAdmin` grant for the exact active `TenantUser`, not just a historically
+succeeded provisioning operation. The evaluator reads that grant without tracking
+before rate reservation and provider handoff. Missing, revoked or unrelated grants
+settle through the existing `invitation_authority_invalid` skipped audit path;
+the audit receipt does not imply an SMTP attempt was admitted.
+
+Policy revisions advance once per scope per logical settings transaction. The
+revision tracker retains immutable initial policy/control baselines keyed to the
+current EF transaction and reconciles them with the current effective policy.
+Temporary incomplete leaves in an atomic host/sender update therefore do not
+create a committed outage watermark; later available edits cannot invalidate a
+graph created earlier in that transaction. A new transaction, including a retry,
+starts with fresh baselines. Original occurrence revisions—not clock ordering—
+decide whether deferred optional work belongs to unavailable history.
+
 Callers of `IEmailDeliveryCapabilityResolver` pass `null` for instance policy, including
 future Local credential gates. Tenant notification capability does not grant authentication
 or change trusted Keycloak/ATProto verification facts. Provider-owned authentication email
@@ -1161,7 +1192,7 @@ Static dispatch settings bind from `EmailDispatchProcessor` and are validated at
 
 | Key | Default | Description |
 |---|---:|---|
-| `Enabled` | `true` | Enables Basic Dispatch Mode. When disabled, the `email-dispatch` readiness check reports `Degraded` intentionally. |
+| `Enabled` | `true` | Enables Basic Dispatch Mode. When intentionally disabled, the `email-dispatch` readiness check reports `Healthy` without querying the outbox. This worker setting does not change `email.delivery_enabled`. |
 | `Mode` | `Quartz` | Selects `Quartz`, `HostedService`, or `Disabled`. `Quartz` uses the durable ADO job store on every supported primary provider; `HostedService` is the portable timer wrapper over the same drain. |
 | `PollingIntervalSeconds` | `5` | Delay between polling loops. Must be greater than zero. |
 | `BatchSize` | `50` | Maximum rows claimed per loop. Valid range `1..1000`. |

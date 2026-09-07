@@ -1,5 +1,5 @@
 // ABOUTME: Tenant-scoped operational control row for Basic Dispatch Mode email sending.
-// ABOUTME: Lets operators pause or resume one tenant's email dispatch without changing durable outbox rows.
+// ABOUTME: Stores tenant-isolated operator controls, delivery-policy revisions, and optional suppression history.
 
 using Explore.Domain.Interfaces;
 
@@ -11,6 +11,10 @@ public class EmailDispatchTenantControl : ITenantEntity, IAuditableEntity
 
     public Guid TenantId { get; set; }
     public Tenant Tenant { get; set; } = null!;
+
+    public long DeliveryPolicyRevision { get; set; }
+    public long? OptionalSuppressedThroughRevision { get; set; }
+    public DateTime? OptionalSuppressedThroughUtc { get; set; }
 
     public bool IsPaused { get; set; }
     public string? PauseReason { get; set; }

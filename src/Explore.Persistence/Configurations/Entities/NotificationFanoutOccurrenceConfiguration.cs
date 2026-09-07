@@ -14,6 +14,7 @@ public sealed class NotificationFanoutOccurrenceConfiguration : IEntityTypeConfi
         builder.ToTable(table =>
         {
             table.HasCheckConstraint("ck_notification_fanout_occurrences_versions", "template_version > 0 AND policy_version > 0");
+            table.HasCheckConstraint("ck_notification_fanout_occurrences_email_revision", "email_delivery_policy_revision >= 0");
             table.HasCheckConstraint("ck_notification_fanout_occurrences_state", "state IN (1, 2)");
             table.HasCheckConstraint(
                 "ck_notification_fanout_occurrences_supersession",
@@ -22,6 +23,7 @@ public sealed class NotificationFanoutOccurrenceConfiguration : IEntityTypeConfi
         });
 
         builder.Property(e => e.Id).ValueGeneratedNever();
+        builder.Property(e => e.EmailDeliveryPolicyRevision).IsRequired();
         builder.Property(e => e.ChangeSetJson).HasColumnType("jsonb").IsRequired();
         builder.Property(e => e.SafeBeforeSnapshotJson).HasColumnType("jsonb").IsRequired();
         builder.Property(e => e.SafeAfterSnapshotJson).HasColumnType("jsonb").IsRequired();

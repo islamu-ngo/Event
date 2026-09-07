@@ -14,6 +14,7 @@ using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Application.Telemetry;
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Federation;
 using MediatR;
@@ -35,7 +36,8 @@ public sealed class HeavyRedactEventCommandHandler(
     BusinessMetrics metrics,
     ILogger<HeavyRedactEventCommandHandler> logger,
     AtprotoEventPublicationPlanner atprotoPublicationPlanner,
-    TimeProvider timeProvider) : IRequestHandler<HeavyRedactEventCommand, BaseCommandResponse<Guid>>
+    TimeProvider timeProvider,
+    ISettingMutationLock mutationLock) : IRequestHandler<HeavyRedactEventCommand, BaseCommandResponse<Guid>>
 {
     private const int ImmediateDeletionBatchSize = 100;
     private const string ActionKind = "heavy_redacted";
@@ -86,7 +88,9 @@ public sealed class HeavyRedactEventCommandHandler(
         var pointerOutboxMessageId = Guid.CreateVersion7();
         var shouldInvalidateCache = false;
         var eventNotFound = false;
-        var transactionResponse = await unitOfWork.ExecuteInTransactionAsync(async token =>
+        var transactionResponse = await mutationLock.ExecuteOrderedGroupsAsync(
+            [[GovernanceSettingKeys.Email.DeliveryEnabled]],
+            policyToken => unitOfWork.ExecuteInTransactionAsync(async token =>
         {
             var graph = await redactionRepository.GetForUpdateAsync(request.Id, token);
             if (graph is null)
@@ -160,7 +164,7 @@ public sealed class HeavyRedactEventCommandHandler(
             return Success(
                 @event.Id,
                 wasIdempotent ? "Event is already heavy-redacted." : "Event heavy-redacted successfully.");
-        }, cancellationToken);
+        }, policyToken), cancellationToken);
 
         if (!transactionResponse.IsSuccess)
         {

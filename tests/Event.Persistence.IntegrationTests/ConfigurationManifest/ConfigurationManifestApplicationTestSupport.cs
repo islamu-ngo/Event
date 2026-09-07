@@ -88,10 +88,11 @@ internal static class ConfigurationManifestApplicationTestSupport
                 new SettingUpsertService(
                     new SystemSettingRepository(context, lockBoundary),
                     Substitute.For<IMediator>(),
-                    policyBoundary),
+                    policyBoundary,
+                    Event.Persistence.IntegrationTests.Fixtures.EmailDispatchSqliteFixture.CreateEmailSettingsWriter(context, lockBoundary)),
                 policyBoundary),
             new ConfigurationManifestTenantSettingMutationBoundary(
-                new TenantSettingRepository(context)),
+                new TenantSettingRepository(context, lockBoundary)),
             operationRepository,
             failureRecorder,
             new ConfigurationManifestEffectDelivery(

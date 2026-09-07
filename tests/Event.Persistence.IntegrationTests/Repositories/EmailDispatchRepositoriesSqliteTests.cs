@@ -1,25 +1,289 @@
 // ABOUTME: File-backed SQLite regressions for provider-portable email repository claims and suppression.
-// ABOUTME: Proves one-winner leases, provider fences, and reminder/fanout ledger alignment through public APIs.
+// ABOUTME: Proves leases, typed SMTP settlements, atomic configuration parking, and reminder/fanout ledger alignment.
 
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
+using Explore.Application.Models;
+using Explore.Application.Notifications;
+using Explore.Application.Telemetry;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;
 using Explore.Domain.Services.Scheduling;
 using Explore.Domain.ValueObjects;
+using Explore.Infrastructure;
+using Explore.Infrastructure.Mail.Unsubscribe;
+using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Seed;
+using Explore.Persistence.Services;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using NSubstitute;
 
 namespace Event.Persistence.IntegrationTests.Repositories;
 
 [NotInParallel("SqliteEmailDispatchRepositories")]
 public sealed class EmailDispatchRepositoriesSqliteTests
 {
+    [Test]
+    [Arguments(true, 5, EmailDispatchFailureSettlementOutcome.Parked, EmailDispatchStatus.Parked)]
+    [Arguments(true, 1, EmailDispatchFailureSettlementOutcome.Parked, EmailDispatchStatus.Parked)]
+    [Arguments(false, 5, EmailDispatchFailureSettlementOutcome.RetryScheduled, EmailDispatchStatus.RetryScheduled)]
+    [Arguments(false, 1, EmailDispatchFailureSettlementOutcome.DeadLettered, EmailDispatchStatus.DeadLettered)]
+    public async Task FailureSettlement_ConfigurationParkingPreservesRetryAndExhaustionSemantics(
+        bool park, int maxAttempts, EmailDispatchFailureSettlementOutcome expectedOutcome, EmailDispatchStatus expectedStatus)
+    {
+        string databasePath = DatabasePath("configuration-park");
+        try
+        {
+            await CreateDatabaseAsync(databasePath);
+            await using ExploreDbContext context = CreateContext(databasePath);
+            EmailDispatchFailureSettlement settlement = await SeedFailureSettlementAsync(context);
+            var repository = new EmailDispatchOutboxRepository(context);
+            EmailDispatchFailureSettlementOutcome result = await repository.SettleProviderFailure(
+                settlement with
+                {
+                    Outcome = park ? SmtpDeliveryOutcome.ConfigurationFailure : SmtpDeliveryOutcome.TransientFailure,
+                    MaxAttempts = maxAttempts
+                }, CancellationToken.None);
+            await Assert.That(result).IsEqualTo(expectedOutcome);
+            EmailDispatchOutbox dispatch = await context.EmailDispatchOutbox.IgnoreQueryFilters().AsNoTracking()
+                .SingleAsync(value => value.Id == settlement.OutboxId);
+            NotificationDelivery delivery = await context.NotificationDeliveries.IgnoreQueryFilters().AsNoTracking()
+                .SingleAsync(value => value.EmailDispatchOutboxId == settlement.OutboxId);
+            await Assert.That(dispatch.Status).IsEqualTo(expectedStatus);
+            await Assert.That(dispatch.NextAttemptAt.HasValue).IsEqualTo(expectedStatus == EmailDispatchStatus.RetryScheduled);
+            await Assert.That(dispatch.ParkedAt.HasValue).IsEqualTo(park);
+            await Assert.That(dispatch.ProcessingLeaseToken).IsNull();
+            await Assert.That(delivery.StatusId).IsEqualTo((int)(park ? NotificationDeliveryStatusEnum.Parked
+                : maxAttempts == 1 ? NotificationDeliveryStatusEnum.DeadLettered : NotificationDeliveryStatusEnum.Queued));
+            if (park)
+            {
+                var seeded = new SeededDispatch(dispatch.TenantId, dispatch.Id, dispatch.PublishEventId);
+                Guid nextLease = Guid.CreateVersion7();
+                await Assert.That(await repository.TryClaimSpecificAsync(ClaimRequest(seeded, nextLease), CancellationToken.None))
+                    .IsNull();
+                bool replayed = await new EfCoreUnitOfWork(context).ExecuteInTransactionAsync(
+                    ct => repository.TryReplayForOperator(dispatch.TenantId, dispatch.Id, null, DateTime.UtcNow, ct));
+                await Assert.That(replayed).IsTrue();
+                await Assert.That(await repository.TryClaimSpecificAsync(ClaimRequest(seeded, nextLease), CancellationToken.None))
+                    .IsNotNull();
+                var evaluator = new EmailDispatchEligibilityEvaluator(context,
+                    new NotificationDeliveryPolicyResolver(), new NotificationPreferenceResolver(context),
+                    new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
+                EmailDispatchEligibilityResult handoff = await evaluator.EvaluateAndBeginProviderHandoffAsync(
+                    new EmailDispatchEligibilityRequest(
+                        TenantId: dispatch.TenantId,
+                        OutboxId: dispatch.Id,
+                        ProcessingLeaseToken: nextLease,
+                        AttemptNumber: 1,
+                        GlobalSmtpRateLimitPerMinute: 100,
+                        TenantSmtpRateLimitPerMinute: 100,
+                        ConsumerId: "replay-worker",
+                        EvaluatedAt: DateTime.UtcNow), CancellationToken.None);
+                await Assert.That(handoff.Outcome).IsEqualTo(EmailDispatchEligibilityOutcome.Eligible);
+                await Assert.That(handoff.AttemptNumber).IsEqualTo(2);
+            }
+        }
+        finally
+        {
+            DeleteDatabase(databasePath);
+        }
+    }
+
+    [Test]
+    [Arguments("stale_lease")]
+    [Arguments("foreign_tenant")]
+    [Arguments("missing_receipt")]
+    [Arguments("accepted")]
+    [Arguments("uncertain")]
+    [Arguments("undefined_outcome")]
+    public async Task ConfigurationParking_RejectsStaleLeaseAndRollsBackPartialSettlement(string failure)
+    {
+        string databasePath = DatabasePath("configuration-fence");
+        try
+        {
+            await CreateDatabaseAsync(databasePath);
+            await using ExploreDbContext context = CreateContext(databasePath);
+            EmailDispatchFailureSettlement settlement = await SeedFailureSettlementAsync(context);
+            var repository = new EmailDispatchOutboxRepository(context);
+            if (failure == "missing_receipt")
+            {
+                await context.EmailDispatchReceipts.IgnoreQueryFilters()
+                    .Where(value => value.EmailDispatchOutboxId == settlement.OutboxId).ExecuteDeleteAsync();
+                await Assert.ThrowsAsync<InvalidOperationException>(() => repository.SettleProviderFailure(
+                    settlement, CancellationToken.None));
+            }
+            else if (failure is "accepted" or "uncertain" or "undefined_outcome")
+            {
+                SmtpDeliveryOutcome outcome = failure switch
+                {
+                    "accepted" => SmtpDeliveryOutcome.Accepted,
+                    "uncertain" => SmtpDeliveryOutcome.Uncertain,
+                    _ => (SmtpDeliveryOutcome)int.MaxValue
+                };
+                await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => repository.SettleProviderFailure(
+                    settlement with { Outcome = outcome }, CancellationToken.None));
+            }
+            else
+            {
+                EmailDispatchFailureSettlementOutcome outcome = await repository.SettleProviderFailure(
+                    failure == "foreign_tenant"
+                        ? settlement with { TenantId = Guid.CreateVersion7() }
+                        : settlement with { ProcessingLeaseToken = Guid.CreateVersion7() }, CancellationToken.None);
+                await Assert.That(outcome).IsEqualTo(EmailDispatchFailureSettlementOutcome.StaleClaim);
+            }
+
+            await using ExploreDbContext read = CreateContext(databasePath);
+            EmailDispatchOutbox dispatch = await read.EmailDispatchOutbox.IgnoreQueryFilters().AsNoTracking()
+                .SingleAsync(value => value.Id == settlement.OutboxId);
+            EmailDispatchAttempt attempt = await read.EmailDispatchAttempts.IgnoreQueryFilters().AsNoTracking()
+                .SingleAsync(value => value.EmailDispatchOutboxId == settlement.OutboxId);
+            NotificationDelivery delivery = await read.NotificationDeliveries.IgnoreQueryFilters().AsNoTracking()
+                .SingleAsync(value => value.EmailDispatchOutboxId == settlement.OutboxId);
+            await Assert.That(dispatch.Status).IsEqualTo(EmailDispatchStatus.Processing);
+            await Assert.That(dispatch.ProcessingLeaseToken).IsEqualTo(settlement.ProcessingLeaseToken);
+            await Assert.That(dispatch.ParkedAt).IsNull();
+            await Assert.That(attempt.Outcome).IsEqualTo(EmailDispatchAttemptOutcome.Unknown);
+            await Assert.That(attempt.CompletedAt).IsNull();
+            await Assert.That(delivery.StatusId).IsEqualTo((int)NotificationDeliveryStatusEnum.Queued);
+        }
+        finally
+        {
+            DeleteDatabase(databasePath);
+        }
+    }
+
+    private static async Task<EmailDispatchFailureSettlement> SeedFailureSettlementAsync(ExploreDbContext context)
+    {
+        SeededDispatch dispatch = await SeedDispatchAsync(context, "settlement", EmailDispatchStatus.Pending);
+        await context.NotificationDeliveries.IgnoreQueryFilters()
+            .Where(value => value.EmailDispatchOutboxId == dispatch.OutboxId)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(
+                value => value.PreferenceCategoryCode, NotificationPreferenceCategoryCodes.RegistrationStatus));
+        Guid lease = Guid.CreateVersion7();
+        await new EmailDispatchOutboxRepository(context).TryClaimSpecificAsync(ClaimRequest(dispatch, lease), CancellationToken.None);
+        var evaluator = new EmailDispatchEligibilityEvaluator(context,
+            new NotificationDeliveryPolicyResolver(), new NotificationPreferenceResolver(context),
+            new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
+        EmailDispatchEligibilityResult handoff = await evaluator.EvaluateAndBeginProviderHandoffAsync(
+            new EmailDispatchEligibilityRequest(
+                TenantId: dispatch.TenantId,
+                OutboxId: dispatch.OutboxId,
+                ProcessingLeaseToken: lease,
+                AttemptNumber: 0,
+                GlobalSmtpRateLimitPerMinute: 100,
+                TenantSmtpRateLimitPerMinute: 100,
+                ConsumerId: "sqlite-worker",
+                EvaluatedAt: DateTime.UtcNow), CancellationToken.None);
+        await Assert.That(handoff.Outcome).IsEqualTo(EmailDispatchEligibilityOutcome.Eligible);
+        return new EmailDispatchFailureSettlement(
+            TenantId: dispatch.TenantId,
+            OutboxId: dispatch.OutboxId,
+            ProcessingLeaseToken: lease,
+            AttemptNumber: handoff.AttemptNumber!.Value,
+            Outcome: SmtpDeliveryOutcome.ConfigurationFailure,
+            RetryDelay: TimeSpan.FromSeconds(30),
+            MaxAttempts: 5,
+            SettledAt: DateTime.UtcNow);
+    }
+
+    [Test]
+    [Arguments(SmtpDeliveryOutcome.Uncertain, "SMTP rejected recipient.", EmailDispatchStatus.Unknown)]
+    [Arguments(SmtpDeliveryOutcome.TransientFailure, "SMTP timeout before connection.", EmailDispatchStatus.RetryScheduled)]
+    [Arguments(SmtpDeliveryOutcome.ConfigurationFailure, "SMTP configuration unavailable.", EmailDispatchStatus.Parked)]
+    public async Task DrainTypedFailure_AlignsRealLedgerWithoutParsingProviderText(
+        SmtpDeliveryOutcome outcome, string providerMessage, EmailDispatchStatus expectedStatus)
+    {
+        string databasePath = DatabasePath("typed-failure");
+        try
+        {
+            await CreateDatabaseAsync(databasePath);
+            SeededDispatch dispatch;
+            await using (ExploreDbContext context = CreateContext(databasePath))
+            {
+                dispatch = await SeedDispatchAsync(context, "typed-failure", EmailDispatchStatus.Pending);
+                await context.NotificationDeliveries.IgnoreQueryFilters()
+                    .Where(value => value.EmailDispatchOutboxId == dispatch.OutboxId)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(
+                        value => value.PreferenceCategoryCode, NotificationPreferenceCategoryCodes.RegistrationStatus));
+            }
+
+            var email = Substitute.For<IEmailService>();
+            email.SendAsync(Arg.Any<EmailMessage>(), Arg.Any<CancellationToken>())
+                .Returns(EmailResult.Fail(providerMessage, outcome: outcome));
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddMetrics();
+            services.AddSingleton<BusinessMetrics>();
+            services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
+            services.AddSingleton(email);
+            services.AddSingleton<IDataProtectionProvider>(new EphemeralDataProtectionProvider());
+            services.AddSingleton<IEmailUnsubscribeTokenService, EmailUnsubscribeTokenService>();
+            services.AddScoped<ITenantContextAccessor>(_ => new TenantContextAccessor(new HttpContextAccessor()));
+            services.AddScoped(_ => CreateContext(databasePath));
+            services.AddScoped<IEmailDispatchOutboxRepository, EmailDispatchOutboxRepository>();
+            services.AddScoped<INotificationPreferenceResolver, NotificationPreferenceResolver>();
+            services.AddSingleton<NotificationDeliveryPolicyResolver>();
+            services.AddScoped<IUnitOfWork, EfCoreUnitOfWork>();
+            services.AddScoped<ISettingMutationLock, RelationalSettingMutationLock>();
+            services.AddScoped<IEmailDispatchEligibilityEvaluator, EmailDispatchEligibilityEvaluator>();
+            await using ServiceProvider provider = services.BuildServiceProvider();
+            using var drain = new EmailDispatchDrainService(
+                provider.GetRequiredService<IServiceScopeFactory>(),
+                Options.Create(new EmailDispatchProcessorSettings()),
+                provider.GetRequiredService<BusinessMetrics>(),
+                provider.GetRequiredService<ILogger<EmailDispatchDrainService>>());
+            EmailDispatchSingleDrainResult result = await drain.ProcessSingleAsync(
+                dispatch.TenantId, dispatch.PublishEventId, "sqlite-worker", CancellationToken.None);
+
+            await using ExploreDbContext read = CreateContext(databasePath);
+            EmailDispatchOutbox persisted = await read.EmailDispatchOutbox.IgnoreQueryFilters().AsNoTracking()
+                .SingleAsync(value => value.Id == dispatch.OutboxId);
+            EmailDispatchAttempt attempt = await read.EmailDispatchAttempts.IgnoreQueryFilters().AsNoTracking()
+                .SingleAsync(value => value.EmailDispatchOutboxId == dispatch.OutboxId);
+            EmailDispatchReceipt receipt = await read.EmailDispatchReceipts.IgnoreQueryFilters().AsNoTracking()
+                .SingleAsync(value => value.EmailDispatchOutboxId == dispatch.OutboxId);
+            NotificationDelivery delivery = await read.NotificationDeliveries.IgnoreQueryFilters().AsNoTracking()
+                .SingleAsync(value => value.EmailDispatchOutboxId == dispatch.OutboxId);
+            await Assert.That(persisted.Status).IsEqualTo(expectedStatus);
+            await Assert.That(result.Outcome).IsEqualTo(expectedStatus switch
+            {
+                EmailDispatchStatus.Unknown => EmailDispatchDrainOutcome.Unknown,
+                EmailDispatchStatus.Parked => EmailDispatchDrainOutcome.Parked,
+                _ => EmailDispatchDrainOutcome.RetryScheduled
+            });
+            await Assert.That(persisted.ProcessingLeaseToken).IsNull();
+            await Assert.That(attempt.Outcome).IsEqualTo(expectedStatus == EmailDispatchStatus.Unknown
+                ? EmailDispatchAttemptOutcome.Unknown : EmailDispatchAttemptOutcome.Failed);
+            await Assert.That(receipt.Status).IsEqualTo(expectedStatus == EmailDispatchStatus.Unknown
+                ? EmailDispatchReceiptStatus.Unknown : EmailDispatchReceiptStatus.Failed);
+            await Assert.That(delivery.StatusId).IsEqualTo((int)(expectedStatus switch
+            {
+                EmailDispatchStatus.Unknown => NotificationDeliveryStatusEnum.Unknown,
+                EmailDispatchStatus.Parked => NotificationDeliveryStatusEnum.Parked,
+                _ => NotificationDeliveryStatusEnum.Queued
+            }));
+            await Assert.That(persisted.NextAttemptAt.HasValue).IsEqualTo(expectedStatus == EmailDispatchStatus.RetryScheduled);
+            await Assert.That(persisted.LastError).IsNotEqualTo(providerMessage);
+        }
+        finally
+        {
+            DeleteDatabase(databasePath);
+        }
+    }
+
     [Test]
     public async Task ClaimsAndStaleRecovery_PreserveOneWinnerPauseStateAndProviderFence()
     {
@@ -380,6 +644,7 @@ public sealed class EmailDispatchRepositoriesSqliteTests
         await context.Database.EnsureCreatedAsync();
         await SqliteDatabaseInitializer.InitializeAsync(context, CancellationToken.None);
         await LookupTableSeeder.SeedAsync(context, CancellationToken.None);
+        await Event.Persistence.IntegrationTests.Fixtures.EmailDispatchSqliteFixture.EnableInstanceEmailAsync(context);
     }
 
     private static ExploreDbContext CreateContext(string databasePath)
@@ -504,7 +769,8 @@ public sealed class EmailDispatchRepositoriesSqliteTests
             "event.updated", 1,
             (int)NotificationDeliveryPolicyEnum.CriticalEventUpdateOptional, 1,
             30, DateTime.UtcNow.AddMinutes(5), "event", scope.EventId,
-            $"event:{scope.EventId:N}:update", DateTime.UtcNow.AddMinutes(5));
+            $"event:{scope.EventId:N}:update", DateTime.UtcNow.AddMinutes(5),
+            emailDeliveryPolicyRevision: 0);
         context.NotificationFanoutOccurrences.Add(occurrence);
         await context.SaveChangesAsync();
 

@@ -1,6 +1,7 @@
 // ABOUTME: Persistence contract for specialized email dispatch outbox state, attempts, and receipts.
 // ABOUTME: Keeps SMTP dispatch state machine in Application while EF Core implementation stays in Persistence.
 
+using Explore.Application.Models;
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;
@@ -89,6 +90,8 @@ public interface IEmailDispatchOutboxRepository
         CancellationToken cancellationToken);
 
     Task<bool> IsTenantPaused(Guid tenantId, CancellationToken cancellationToken);
+
+    Task<EmailDispatchTenantControl?> GetTenantControl(Guid tenantId, CancellationToken cancellationToken);
 
     Task<EmailDispatchTenantControl> SetTenantPauseState(
         Guid tenantId,
@@ -245,11 +248,23 @@ public sealed record EmailDispatchFailureSettlement(
     Guid OutboxId,
     Guid ProcessingLeaseToken,
     int AttemptNumber,
-    string FailureCategory,
-    string FailureMessage,
+    SmtpDeliveryOutcome Outcome,
     TimeSpan RetryDelay,
     int MaxAttempts,
-    DateTime SettledAt);
+    DateTime SettledAt)
+{
+    public string FailureCategory => Failure.Category;
+    public string FailureMessage => Failure.Message;
+
+    private (string Category, string Message) Failure => Outcome switch
+    {
+        SmtpDeliveryOutcome.TransientFailure => (
+            "smtp_send_failed", "SMTP send failed before provider acceptance was confirmed."),
+        SmtpDeliveryOutcome.ConfigurationFailure => (
+            "smtp_configuration_unavailable", "SMTP delivery is parked until transport configuration is restored."),
+        _ => throw new ArgumentOutOfRangeException(nameof(Outcome), Outcome, "Only definite SMTP failures can be settled.")
+    };
+}
 
 public sealed record EmailDispatchPreHandoffRelease(
     Guid TenantId,
@@ -287,7 +302,8 @@ public enum EmailDispatchFailureSettlementOutcome
 {
     RetryScheduled = 1,
     DeadLettered = 2,
-    StaleClaim = 3
+    StaleClaim = 3,
+    Parked = 4
 }
 
 public enum EmailDispatchPreHandoffReleaseOutcome

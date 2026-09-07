@@ -3,8 +3,10 @@
 
 namespace Explore.Infrastructure.ConfigurationManifest;
 
+using Explore.Application.Contracts.Services;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.ConfigurationManifest.Ingestion;
+using Explore.Infrastructure.Mail;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -21,6 +23,8 @@ public static class ConfigurationManifestStartupServicesRegistration
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
+        services.AddDataProtection();
+        services.TryAddScoped<IEmailDeliveryDisableTokenService, EmailDeliveryDisableTokenService>();
         services.AddConfigurationManifestApplication(effectDeliveryMode);
         services.AddOptions<ConfigurationManifestOptions>()
             .Configure(options =>

@@ -7,7 +7,7 @@ namespace Explore.Blazor.Client.Contracts.Services.Shell;
 
 public interface ITenantShellSettingsService
 {
-    Task<SettingGroupResponseDto> GetAsync(CancellationToken cancellationToken = default);
+    Task<HalResourceOfSettingGroupResponseDto> GetAsync(CancellationToken cancellationToken = default);
 
     Task<BaseCommandResponseOfGuid> UpdateAsync(
         string key,

@@ -25,7 +25,7 @@ public class TenantPublicExperienceAdminServiceTests
     {
         // Arrange
         Guid organizationId = Guid.NewGuid();
-        var response = new SettingGroupResponseDto
+        var response = new HalResourceOfSettingGroupResponseDto
         {
             Category = Category,
             Settings =
@@ -91,7 +91,7 @@ public class TenantPublicExperienceAdminServiceTests
                 null,
                 null,
                 Arg.Any<CancellationToken>())
-            .Returns(new SettingGroupResponseDto
+            .Returns(new HalResourceOfSettingGroupResponseDto
             {
                 Category = "Events",
                 Settings =
@@ -108,7 +108,7 @@ public class TenantPublicExperienceAdminServiceTests
                 null,
                 null,
                 Arg.Any<CancellationToken>())
-            .Returns(new SettingGroupResponseDto
+            .Returns(new HalResourceOfSettingGroupResponseDto
             {
                 Category = "Organizations",
                 Settings =
@@ -122,7 +122,7 @@ public class TenantPublicExperienceAdminServiceTests
                 null,
                 null,
                 Arg.Any<CancellationToken>())
-            .Returns(new SettingGroupResponseDto
+            .Returns(new HalResourceOfSettingGroupResponseDto
             {
                 Category = "Groups",
                 Settings =
@@ -135,7 +135,7 @@ public class TenantPublicExperienceAdminServiceTests
                 null,
                 null,
                 Arg.Any<CancellationToken>())
-            .Returns(new SettingGroupResponseDto
+            .Returns(new HalResourceOfSettingGroupResponseDto
             {
                 Category = "AiAssistant",
                 Settings =

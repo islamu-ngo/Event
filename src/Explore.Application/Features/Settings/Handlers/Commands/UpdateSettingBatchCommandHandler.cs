@@ -1,5 +1,5 @@
 // ABOUTME: Batch update handler supporting BestEffort (skip locked, apply rest) and Strict (reject all) modes.
-// ABOUTME: Validates each key independently, then applies valid updates with single cache invalidation.
+// ABOUTME: Validates each key independently and commits SMTP batches under one ordered policy lock and transaction.
 
 namespace Explore.Application.Features.Settings.Handlers.Commands;
 
@@ -12,8 +12,11 @@ using Explore.Application.DTOs.Settings;
 using Explore.Application.Features.Settings.Requests.Commands;
 using Explore.Application.Notifications;
 using Explore.Application.Settings;
+using Explore.Application.Settings.Groups;
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Settings;
+using Explore.Domain.Settings.Definitions;
 using MediatR;
 using Microsoft.Extensions.Logging;
 
@@ -31,6 +34,8 @@ public class UpdateSettingBatchCommandHandler
     private readonly ILocationPrivacyGovernanceMutationService? _locationPrivacyMutations;
     private readonly IPublicationPolicyMutationBoundary _publicationPolicyMutationBoundary;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ISettingMutationLock _mutationLock;
+    private readonly IEmailDeliverySettingsWriter _emailSettingsWriter;
 
     public UpdateSettingBatchCommandHandler(
         IHierarchicalSettingsResolver resolver,
@@ -42,6 +47,8 @@ public class UpdateSettingBatchCommandHandler
         ILogger<UpdateSettingBatchCommandHandler> logger,
         IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary,
         IUnitOfWork unitOfWork,
+        ISettingMutationLock mutationLock,
+        IEmailDeliverySettingsWriter emailSettingsWriter,
         ICerbosConfigResolver? cerbosConfigResolver = null,
         ILocationPrivacyGovernanceMutationService? locationPrivacyMutations = null)
     {
@@ -56,6 +63,8 @@ public class UpdateSettingBatchCommandHandler
         _locationPrivacyMutations = locationPrivacyMutations;
         _publicationPolicyMutationBoundary = publicationPolicyMutationBoundary;
         _unitOfWork = unitOfWork;
+        _mutationLock = mutationLock;
+        _emailSettingsWriter = emailSettingsWriter;
     }
 
     public async Task<BatchUpdateResponseDto> Handle(
@@ -86,6 +95,46 @@ public class UpdateSettingBatchCommandHandler
             };
         }
 
+        var categoryDefinitions = SettingRegistry.GetByCategory(request.Category);
+        var categoryKeys = categoryDefinitions is not null
+            ? new HashSet<string>(categoryDefinitions.Select(definition => definition.Key))
+            : [];
+        if (request.Scope is SettingScope.Instance or SettingScope.Tenant
+            && request.Values.Keys.Any(key => categoryKeys.Contains(key)
+                && EmailDeliverySettingKeys.Contains(key)
+                && SettingRegistry.Get(key) is { } definition
+                && IsScopeAllowed(definition, request.Scope)))
+        {
+            // Resolve governance and validate values while the complete SMTP policy is stable.
+            // Allocate deferred effects per attempt so transaction retries cannot duplicate them.
+            var mutation = await _mutationLock.ExecuteOrderedGroupsAsync(
+                [EmailDeliverySettingKeys.All],
+                token => _unitOfWork.ExecuteSerializableAsync(async transactionToken =>
+                {
+                    var notifications = new List<SettingChangedNotification>();
+                    var response = await HandleAuthorizedAsync(request, categoryKeys, notifications, transactionToken);
+                    return (Response: response, Notifications: notifications);
+                }, token), cancellationToken);
+
+            int appliedCount = mutation.Response.Results.Count(result => result.Applied);
+            if (appliedCount > 0)
+                _resolver.InvalidateCache(request.Scope,
+                    request.Scope == SettingScope.Tenant ? _tenantContext.TenantId : Guid.Empty);
+            foreach (var notification in mutation.Notifications)
+                await _mediator.Publish(notification, CancellationToken.None);
+            LogCompletedBatch(request, appliedCount, mutation.Response.Results.Count - appliedCount);
+            return mutation.Response;
+        }
+
+        return await HandleAuthorizedAsync(request, categoryKeys, deferredNotifications: null, cancellationToken);
+    }
+
+    private async Task<BatchUpdateResponseDto> HandleAuthorizedAsync(
+        UpdateSettingBatchCommand request,
+        IReadOnlySet<string> categoryKeys,
+        List<SettingChangedNotification>? deferredNotifications,
+        CancellationToken cancellationToken)
+    {
         Guid? resolvedUserId = await SettingCommandHelper.ResolveCurrentUserIdAsync(
             _adminContext, _currentUserService, cancellationToken);
 
@@ -111,11 +160,6 @@ public class UpdateSettingBatchCommandHandler
             request.Scope, _tenantContext, resolvedUserId);
         var allKeys = request.Values.Keys.ToList();
         var resolved = await _resolver.ResolveBatchAsync(allKeys, context, cancellationToken);
-
-        var categoryDefinitions = SettingRegistry.GetByCategory(request.Category);
-        var categoryKeys = categoryDefinitions is not null
-            ? new HashSet<string>(categoryDefinitions.Select(d => d.Key))
-            : [];
 
         var validationResults = new List<(string Key, string Value, SettingDefinition Definition,
             string? SerializedValue, string? SkipReason, string? OldValue)>();
@@ -143,7 +187,7 @@ public class UpdateSettingBatchCommandHandler
             }
 
             // Validate scope range
-            if (request.Scope < definition.MinScope || request.Scope > definition.MaxScope)
+            if (!IsScopeAllowed(definition, request.Scope))
             {
                 validationResults.Add((key, value, definition, null,
                     $"Not overridable at {request.Scope} scope.", null));
@@ -245,6 +289,50 @@ public class UpdateSettingBatchCommandHandler
             }
         }
 
+        var smtpEntries = validationResults.Where(result => result.SkipReason is null
+            && EmailDeliverySettingKeys.Contains(result.Key)).ToArray();
+        var appliedSmtpKeys = new HashSet<string>(StringComparer.Ordinal);
+        if (smtpEntries.Length > 0)
+        {
+            var smtpResult = await _emailSettingsWriter.ApplyAsync(
+                smtpEntries.Select(entry => new EmailDeliverySettingMutation(
+                    TenantId: request.Scope == SettingScope.Tenant ? _tenantContext.TenantId : null,
+                    Key: entry.Definition.Key,
+                    Kind: EmailDeliverySettingMutationKind.SetValue,
+                    Value: entry.SerializedValue)).ToImmutableArray(),
+                actorUserId: resolvedUserId, cancellationToken: cancellationToken);
+            if (!smtpResult.IsAccepted())
+            {
+                string message = smtpResult.Status.FailureMessage();
+                if (request.Mode == BatchUpdateMode.Strict)
+                    return new BatchUpdateResponseDto
+                    {
+                        Success = false,
+                        Results = validationResults.Select(entry => new SettingUpdateResultDto
+                            { Key = entry.Key, Applied = false, SkipReason = entry.SkipReason ?? message }).ToList(),
+                        Message = message
+                    };
+                for (int index = 0; index < validationResults.Count; index++)
+                {
+                    var entry = validationResults[index];
+                    if (entry.SkipReason is null && EmailDeliverySettingKeys.Contains(entry.Key))
+                        validationResults[index] = (Key: entry.Key, Value: entry.Value, Definition: entry.Definition,
+                            SerializedValue: entry.SerializedValue, SkipReason: message, OldValue: entry.OldValue);
+                }
+            }
+            else
+            {
+                appliedSmtpKeys.UnionWith(smtpEntries.Select(entry => entry.Key));
+                foreach (var notification in smtpResult.ToNotifications(resolvedUserId))
+                {
+                    if (deferredNotifications is null)
+                        await _mediator.Publish(notification, CancellationToken.None);
+                    else
+                        deferredNotifications.Add(notification);
+                }
+            }
+        }
+
         bool hasValidGuardedEntries = request.Scope is SettingScope.Tenant or SettingScope.Instance
             && validationResults.Any(result => result.SkipReason is null
                 && PublicationPolicySettingKeys.All.Contains(result.Key, StringComparer.Ordinal));
@@ -269,6 +357,13 @@ public class UpdateSettingBatchCommandHandler
             if (skipReason is not null)
             {
                 results.Add(new SettingUpdateResultDto { Key = key, Applied = false, SkipReason = skipReason });
+                continue;
+            }
+
+            if (appliedSmtpKeys.Contains(key))
+            {
+                results.Add(new SettingUpdateResultDto { Key = key, Applied = true });
+                appliedCount++;
                 continue;
             }
 
@@ -322,17 +417,21 @@ public class UpdateSettingBatchCommandHandler
                 }
             }
 
-            await _mediator.Publish(new SettingChangedNotification(
+            var notification = new SettingChangedNotification(
                 key, oldValue, serializedValue,
                 SettingCommandHelper.MapScopeToSource(request.Scope),
-                _tenantContext.TenantId, actorId, DateTime.UtcNow), CancellationToken.None);
+                _tenantContext.TenantId, actorId, DateTime.UtcNow);
+            if (deferredNotifications is null)
+                await _mediator.Publish(notification, CancellationToken.None);
+            else
+                deferredNotifications.Add(notification);
 
             results.Add(new SettingUpdateResultDto { Key = key, Applied = true });
             appliedCount++;
         }
 
         // Single cache invalidation after all writes
-        if (appliedCount > 0)
+        if (appliedCount > 0 && deferredNotifications is null)
         {
             if (request.Scope == SettingScope.User)
                 _resolver.InvalidateUserCache(_tenantContext.TenantId, actorId);
@@ -348,9 +447,8 @@ public class UpdateSettingBatchCommandHandler
         }
 
         var skippedCount = results.Count - appliedCount;
-        _logger.LogInformation(
-            "Batch update complete for category '{Category}' at {Scope}: {Applied} applied, {Skipped} skipped",
-            request.Category, request.Scope, appliedCount, skippedCount);
+        if (deferredNotifications is null)
+            LogCompletedBatch(request, appliedCount, skippedCount);
 
         return new BatchUpdateResponseDto
         {
@@ -361,6 +459,14 @@ public class UpdateSettingBatchCommandHandler
                 : $"{appliedCount} setting(s) updated successfully."
         };
     }
+
+    private void LogCompletedBatch(UpdateSettingBatchCommand request, int appliedCount, int skippedCount) =>
+        _logger.LogInformation(
+            "Batch update complete for category '{Category}' at {Scope}: {Applied} applied, {Skipped} skipped",
+            request.Category, request.Scope, appliedCount, skippedCount);
+
+    private static bool IsScopeAllowed(SettingDefinition definition, SettingScope scope) =>
+        scope >= definition.MinScope && scope <= definition.MaxScope;
 
     private async Task<BatchUpdateResponseDto> ApplyGuardedBatchAsync(
         UpdateSettingBatchCommand request,

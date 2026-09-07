@@ -116,6 +116,9 @@ public static class TenantFilterBypassReasons
     public const string EmailDispatchTenantOperation =
         "Email dispatch tenant operation bypasses ambient context only after applying an explicit tenant predicate.";
 
+    public const string EmailDeliveryPolicyReconciliation =
+        "SMTP policy reconciliation accesses non-secret settings and control rows for selected tenants under delivery-policy coordination.";
+
     public const string WebhookWorkerCrossTenantQueue =
         "Webhook delivery worker polls and updates durable webhook rows across tenants using explicit id/status predicates.";
 

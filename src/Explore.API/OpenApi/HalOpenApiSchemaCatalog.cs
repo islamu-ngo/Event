@@ -137,6 +137,9 @@ internal static class HalOpenApiSchemaCatalog
         // Email dispatch admin DTOs
         typeof(Explore.Application.DTOs.EmailDispatch.EmailDispatchStatusDto),
         typeof(Explore.Application.DTOs.EmailDispatch.EmailDispatchProcessorControlDto),
+        typeof(Explore.Application.DTOs.Onboarding.InstanceSmtpSettingsDto),
+        typeof(Explore.Application.DTOs.EmailDispatch.EmailDeliveryDisablePreviewDto),
+        typeof(Explore.Application.DTOs.EmailDispatch.EmailDeliveryDisableAffectedScopeDto),
 
         typeof(Explore.Application.DTOs.RegistrationOrders.RegistrationOrderDto),
         typeof(Explore.Application.DTOs.RegistrationOrders.GuestRegistrationOrderDto),
@@ -273,6 +276,8 @@ internal static class HalOpenApiSchemaCatalog
 
     public static IReadOnlyDictionary<string, Type> DetailResourceMappings { get; } = new Dictionary<string, Type>
     {
+        ["HalResourceOfInstanceSmtpSettingsDto"] = typeof(Explore.Application.DTOs.Onboarding.InstanceSmtpSettingsDto),
+        ["HalResourceOfEmailDeliveryDisablePreviewDto"] = typeof(Explore.Application.DTOs.EmailDispatch.EmailDeliveryDisablePreviewDto),
         ["HalResourceOfLocalIdentitySummary"] = typeof(Explore.Application.Contracts.Identity.LocalIdentitySummary),
         ["HalResourceOfLocalCredentialOperationStatus"] = typeof(Explore.Application.Contracts.Identity.LocalCredentialOperationStatus),
         ["HalResourceOfLocalCredentialIssueDto"] = typeof(Explore.Application.Features.Authentication.Local.Models.LocalCredentialIssueDto),

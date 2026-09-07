@@ -36,7 +36,8 @@ public sealed class PrimaryPersistencePortabilityTests
             expectedTenantId,
             "domains.tenant_custom_domain",
             SettingValueSerializer.Serialize("Events.Example.COM."));
-        var repository = new TenantSettingRepository(context);
+        var repository = new TenantSettingRepository(context,
+            new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
 
         TenantSetting? match = await repository.GetByDomainHostAsync("  events.example.com.  ");
 
@@ -56,7 +57,8 @@ public sealed class PrimaryPersistencePortabilityTests
             Guid.CreateVersion7(),
             "domains.tenant_custom_domain",
             "events.example.com");
-        var repository = new TenantSettingRepository(context);
+        var repository = new TenantSettingRepository(context,
+            new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
 
         TenantSetting? match = await repository.GetByDomainHostAsync("events.example.com");
 

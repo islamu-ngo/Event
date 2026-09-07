@@ -16,6 +16,7 @@ using Explore.Application.DTOs.Management.Validators;
 using Explore.Application.Features.ManagedProviderProvisioning.Requests.Commands;
 using Explore.Application.Features.Management;
 using Explore.Application.Management;
+using Explore.Application.Settings.Groups;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
@@ -534,7 +535,9 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
             {
                 (ManagedProviderClientProvisioningResultDto? Result,
                     BaseCommandResponse<ManagedProviderClientProvisioningResultDto>? Failure) outcome =
-                    await mutationLock.ExecuteManyAsync<(
+                    await mutationLock.ExecuteOrderedGroupsAsync(
+                    [EmailSettingGroup.SettingKeys.Append(GovernanceSettingKeys.TenantDelegation.LockSmtp)],
+                    policyToken => mutationLock.ExecuteManyAsync<(
                         ManagedProviderClientProvisioningResultDto? Result,
                         BaseCommandResponse<ManagedProviderClientProvisioningResultDto>? Failure)>(
                     BuildManagedMutationKeys(resolvedBootstrap!),
@@ -584,7 +587,7 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
                         resolvedBootstrap = recheck.Resolved!;
                         return (await ProvisionAsync(ct), null);
                     },
-                    cancellationToken);
+                    policyToken), cancellationToken);
 
                 if (outcome.Failure is not null)
                 {
@@ -1282,7 +1285,11 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
                 GovernanceSettingKeys.Domains.AllowTenantCustomDomain,
                 ManagedTenantProvisioningPreflight.DomainNamespaceMutationKey
             ]);
-        return keys.Distinct(StringComparer.Ordinal).ToArray();
+        // SMTP session locks are owned before this transaction; ordinary setting locks retain
+        // their transaction-first order so concurrent non-SMTP writers cannot invert the lock order.
+        return keys.Except(EmailSettingGroup.SettingKeys.Append(GovernanceSettingKeys.TenantDelegation.LockSmtp),
+                StringComparer.Ordinal)
+            .ToArray();
     }
 
     private static bool SupportsVerifiedEmailMatch(string identityProvider) =>

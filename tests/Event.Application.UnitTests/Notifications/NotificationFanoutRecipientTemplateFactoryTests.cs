@@ -486,7 +486,8 @@ public sealed class NotificationFanoutRecipientTemplateFactoryTests
             sessionScoped ? "event-session" : "event",
             Guid.CreateVersion7(),
             $"fanout:{Guid.NewGuid():N}",
-            null);
+            null,
+            emailDeliveryPolicyRevision: 0);
     }
 
     private static string RawTimezoneSnapshot(

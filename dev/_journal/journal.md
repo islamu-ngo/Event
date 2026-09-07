@@ -1644,6 +1644,95 @@ uninitializable.
 **Promotion Consideration**:
 - [ ] Candidate for `docs/internal/QUICK_REFERENCE.md` (new non-inferable rule)
 - [ ] Candidate for a path-scoped rule
+[2026-09-06 Europe/Brussels] — Tenant plan assignment omitted version settings and quotas
+
+**Context**: While fencing SMTP configuration writers in email-optional
+self-hosting P02, real relational tests exercised tenant plan assignment through
+a fresh handler context.
+
+**Symptom / Observation**: Applying a plan reported success without persisting
+its SMTP overrides. A system-locked SMTP field also reported success because the
+handler returned before evaluating the setting. The initial five-case SQLite
+run had four failures and one passing tenant-mismatch check.
+
+**Root Cause**: `TenantPlanRepository.GetAssignmentAsync` includes the assigned
+version but not its `Settings` or `Quotas` collections. The handler treated these
+unloaded, initialized-empty collections as a genuinely empty plan. Tests that
+supply populated navigation objects do not exercise this repository boundary.
+
+**Resolution**: The handler explicitly uses the existing `GetVersionAsync` read,
+which includes both collections, before deriving its mutation keys. SMTP keys
+are acquired before the assignment transaction; other setting locks retain their
+existing transaction ordering. Six real SQLite cases pass, including pure and
+mixed plans, global SMTP lock contention, tenant mismatch, a locked instance
+setting, and a persisted storage quota above the ceiling. Verification:
+`dotnet run --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release -- --treenode-filter "/*/*/*TenantPlanEmailMutationTests/*"`.
+Implementation is uncommitted P02 work, not a completed phase gate.
+
+**Why This Matters for Future Work**: An included parent navigation does not
+establish that its child collections were loaded. Verify state-changing plan
+application against the real repository using a separate context after seeding;
+do not infer an empty plan from an incomplete entity graph.
+
+**References**:
+- `src/Explore.Persistence/Repositories/TenantPlanRepository.cs:37`
+- `src/Explore.Persistence/Repositories/TenantPlanRepository.cs:167`
+- `src/Explore.Application/Features/ControlPlane/Handlers/Commands/ApplyControlPlaneTenantPlanAssignmentCommandHandler.cs:56`
+- `tests/Event.Persistence.IntegrationTests/Repositories/TenantPlanEmailMutationTests.cs`
+- `.agents/skills/dotnet-efcore-guidelines/SKILL.md`
+- PR / commit: pending
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for new `.claude/rules/*.md` entry
+- [ ] Candidate for skill update: `dotnet-efcore-guidelines`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [x] Stays in journal only (one-off debugging lesson)
+
+---
+
+[2026-09-06 Europe/Brussels] — SMTP locks do not refresh EF tracked policy rows
+
+**Context**: While reviewing the email-optional delivery fence, two SQLite
+contexts exercised repeated successful system and tenant settings writes.
+
+**Symptom / Observation**: Context A wrote X, context B committed Y, then A
+requested X again. The final database value remained Y. Lock-only updates could
+similarly leave a setting locked after an unlock request, and returned previous
+values came from A's stale copy. All five initial regression cases failed.
+
+**Root Cause**: Tracking queries reuse an entity already held by the context
+without refreshing its current or original property values. A serializing policy
+lock therefore does not by itself make a reused context authoritative. Assigning
+X to A's existing X may produce no value-column update despite the database now
+containing Y. This behavior is described in [EF tracking documentation](https://learn.microsoft.com/en-us/ef/core/querying/tracking).
+
+**Resolution**: Inside the acquired SMTP policy boundary, detach only the
+requested system setting or the exact tenant's requested SMTP rows before the
+existing query. Re-querying establishes a current baseline. Detachment retains
+the caller's scalar input even when it is the same previously tracked object;
+lock-only writes preserve the database's current non-lock fields. Unrelated
+pending state is not detached or cleared. Five real SQLite cases pass with
+`dotnet run --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release -- --treenode-filter "/*/*/*EmailDeliveryTrackedPolicyTests/*"`.
+This is uncommitted P02 work, not full phase acceptance.
+
+**Why This Matters for Future Work**: Whenever a context survives a completed
+mutation, inspect both transaction ordering and the state of its identity map.
+Do not clear an entire caller-owned tracker or reload a same-instance request
+without protecting its intended input. Test committed results through another
+context, including unrelated pending state and previous-value reporting.
+
+**References**:
+- `src/Explore.Persistence/Repositories/SystemSettingRepository.cs`
+- `src/Explore.Persistence/Repositories/TenantSettingRepository.cs`
+- `src/Explore.Persistence/RelationalSettingMutationLock.cs`
+- `tests/Event.Persistence.IntegrationTests/Repositories/EmailDeliveryTrackedPolicyTests.cs`
+- `.agents/skills/dotnet-efcore-guidelines/SKILL.md`
+- PR / commit: pending
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for new `.claude/rules/*.md` entry
 - [x] Candidate for skill update: `dotnet-efcore-guidelines`
 - [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
 - [ ] Stays in journal only (one-off debugging lesson)
@@ -1931,5 +2020,190 @@ uninitializable.
 - [ ] Candidate for skill update
 - [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
 - [ ] Stays in journal only (one-off debugging lesson)
+[2026-09-06 Europe/Brussels] — Fanout occurrence time differs from graph creation time
+
+**Context**: While implementing optional-email suppression, traced notification
+source history through deferred recipient graph creation and conflict repair.
+
+**Symptom / Observation**: A fanout event can occur before a delivery-policy
+cutoff while its recipient intent is materialized afterward. Using the intent's
+creation timestamp would admit that older optional notification after re-enable.
+
+**Root Cause**: `NotificationFanoutRecipientTemplateFactory` preserves
+`NotificationFanoutOccurrence.OccurredAt` on its email draft, but
+`RecipientNotificationMaterializer.BuildGraph` assigns the graph's materialization
+time to intent and delivery rows. Repair retains the winning intent while it may
+attach newly constructed child rows. Those timestamps describe different events.
+
+**Resolution**: Final admission uses the linked occurrence's `OccurredAt` only
+after tenant/event/occurrence validation under the existing precedence lock.
+Nonfanout admission uses the persisted winning intent timestamp, not a rebuilt
+child row's creation time. Compare only the exact tenant's suppression history.
+Seven real SQLite cases pass with `dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --treenode-filter "/*/*/*EmailDeliverySuppressionCutoffTests/*"`.
+This is a bounded P02 correction, not proof of cross-clock cutover ordering;
+source policy revisions must establish that ordering before phase acceptance.
+
+**Why This Matters for Future Work**: Never infer business occurrence order from
+a delayed projection's insertion time. Preserve original source identity and
+history across deduplication, repair and coalescing. More timestamp precision
+does not establish ordering between application and database clocks.
+
+**References**:
+- `src/Explore.Application/Notifications/NotificationFanoutRecipientTemplateFactory.cs:370`
+- `src/Explore.Application/Notifications/RecipientNotificationMaterializer.cs:127`
+- `src/Explore.Persistence/Repositories/NotificationIntentRepository.cs:140`
+- `src/Explore.Persistence/Services/EmailDispatchEligibilityEvaluator.cs:107`
+- `tests/Event.Persistence.IntegrationTests/Repositories/EmailDeliverySuppressionCutoffTests.cs`
+- PR / commit: pending
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for new `.claude/rules/*.md` entry
+- [ ] Candidate for skill update: `outbox-pattern`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [x] Stays in journal only (one-off debugging lesson)
+
+---
+
+[2026-09-06 Europe/Brussels] — Source revisions and graph repair have separate delivery authority
+
+**Context**: Continued the email-optional cutover work after the timestamp-only
+checkpoint above, reviewing real SQLite materialization, admission and settlement.
+
+**Symptom / Observation**: Reversed application/database timestamps admitted old
+optional work and suppressed new work. Repair after admission and disable cleared
+a live SMTP lease. Reusing an email materialization request after rollback retained
+the failed attempt's Skipped state even after delivery was enabled.
+
+**Root Cause**: Clock timestamps do not establish policy ordering. A Queued
+notification delivery can already have a Processing outbox, receipt and provider
+handoff attempt. Database rollback restores persisted state, not fields mutated on
+the caller's reusable CLR object.
+
+**Resolution**: Capture the original nonnegative policy revision under the SMTP
+policy lock. Preserve it across source replay, coalescing and graph repair; compare
+it with only the exact tenant's nullable suppression revision. Graph repair applies
+current policy only to genuinely reconstructed email work, leaving existing linked
+outboxes under admission/settlement ownership. Materialization builds a fresh email
+entity from routing/content/identity/schedule fields for each transaction attempt.
+Nine graph and seven deliberately reversed-clock admission cases pass in
+`EmailDeliveryGraphRevisionTests` and `EmailDeliverySuppressionRevisionTests`.
+The latter replaces the historical cutoff test class referenced above.
+
+**Why This Matters for Future Work**: Never treat projection status as proof that
+a provider handoff has not started, and never assume database rollback resets an
+input entity. Preserve durable admission evidence while reconstructing only missing
+work. UTC timestamps remain useful audit metadata, not cross-clock ordering tokens.
+
+**References**:
+- `src/Explore.Domain/Services/EmailDeliveryPolicy.cs`
+- `src/Explore.Application/Notifications/RecipientNotificationMaterializer.cs`
+- `src/Explore.Persistence/Repositories/NotificationIntentRepository.cs`
+- `src/Explore.Persistence/Services/EmailDispatchEligibilityEvaluator.cs`
+- `tests/Event.Persistence.IntegrationTests/Repositories/EmailDeliveryGraphRevisionTests.cs`
+- `tests/Event.Persistence.IntegrationTests/Repositories/EmailDeliverySuppressionRevisionTests.cs`
+- PR / commit: pending; bounded SQLite evidence, not full provider/phase acceptance
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for new `.claude/rules/*.md` entry
+- [ ] Candidate for skill update: `outbox-pattern`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [x] Stays in journal only (bounded implementation lesson)
+
+---
+
+[2026-09-06 Europe/Brussels] — SMTP policy history must describe committed transactions, not individual setting writes
+
+**Context**: Extended optional-email suppression from explicit disablement to
+unavailable durable configuration, and introduced typed capability/operator park
+provenance before implementing automatic recovery.
+
+**Symptom / Observation**: A valid inherited SMTP configuration becomes temporarily
+incomplete while an atomic tenant batch writes its own host before its sender.
+Recording that intermediate state as outage history would suppress valid backlog.
+Advancing a revision for every leaf also gives one logical save multiple revisions
+and can invalidate a graph created between available edits.
+
+**Root Cause**: Existing repository hooks reconciled each setting write in isolation,
+although the caller's UoW commits the whole configuration atomically. Enabled alone
+also failed to represent incomplete-but-enabled capability and its deferred sources.
+
+**Resolution**: The existing tracker retains immutable initial policy/control
+baselines per DbContext transaction and scope, shared by instance and tenant hooks.
+Each scope advances once per transaction. Suppression compares initial/current
+availability and restores original watermarks if temporary invalidity is repaired
+before commit. New transaction IDs discard old baselines, including on retry.
+Real SQLite graph tests cover host/sender batching and enable/materialize/edit;
+metadata tests preserve rollback, scope isolation and nullable zero semantics.
+The shared fixture now configures initial SMTP atomically rather than committing
+two unavailable intermediate states and incorrectly expecting no such history.
+
+**Why This Matters for Future Work**: Derive durable policy history from the same
+atomic boundary that makes the policy visible. Error strings must not authorize
+recovery: typed park provenance distinguishes operator holds from capability waits,
+but expiry, current authorization and uncertain-send fences still need enforcement.
+Runtime secret-provider/network outages are not settings transactions and are not
+automatically represented by these durable configuration revisions.
+
+**References**:
+- `src/Explore.Persistence/Services/EmailDeliveryPolicyRevisionTracker.cs`
+- `src/Explore.Domain/Services/EmailDeliveryPolicy.cs`
+- `src/Explore.Domain/EmailDispatchOutbox.cs`
+- `tests/Event.Persistence.IntegrationTests/Repositories/EmailDeliveryGraphRevisionTests.cs`
+- `tests/Event.Persistence.IntegrationTests/Repositories/EmailDeliveryPolicyRevisionTests.cs`
+- `tests/Event.Persistence.IntegrationTests/Repositories/EmailDeliveryParkReasonTests.cs`
+- PR / commit: pending; SQLite increment only, full recovery/provider gates remain open
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for new `.claude/rules/*.md` entry
+- [ ] Candidate for skill update: `outbox-pattern`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [x] Stays in journal only (transaction-reconciliation lesson)
+
+---
+
+[2026-09-06 Europe/Brussels] — Rechecking cached admin roles is not fresh authority
+
+**Context**: P02 guarded email-disable commands require current administrator
+authority before preview and again before a confirmed mutation.
+
+**Symptom / Observation**: An initial command design called `IAdminContext`
+role methods again after acquiring the SMTP policy lease. That looked like a
+fresh check, but `AdminContext` caches those answers for five sliding minutes.
+An in-memory substitute that immediately reflected revocation would conceal this
+production difference.
+
+**Root Cause**: Repeating a service call does not change its consistency contract.
+DB-derived cached role answers are still cached authority, and local invalidation
+is not proof that every process or an already-waiting request sees revocation.
+
+**Resolution**: The new preview and disable handlers use `AdminContext` only to
+resolve identity. Existing platform-role and current-tenant grant repositories
+check authority before the shared lease and inside the serializable transaction.
+No new authority facade or global cache-policy change was introduced. The focused
+command `dotnet test --project tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj --configuration Release --treenode-filter "/*/*/*EmailDeliveryDisableCommandHandlerTests/*"`
+passes 29/29, including stale cached answers and revocation during lease acquisition.
+Real database commit tests and provider-level revocation ordering remain separate gates.
+
+**Why This Matters for Future Work**: For privileged revocation-sensitive writes,
+inspect the concrete authority dependency, not just its method name. Test doubles
+must not silently strengthen production consistency. Reuse uncached native
+authority reads where the operation requires fresh facts.
+
+**References**:
+- `src/Explore.Infrastructure/Identity/AdminContext.cs`
+- `src/Explore.Application/Features/EmailDispatch/Handlers/Commands/DisableEmailDeliveryCommandHandler.cs`
+- `src/Explore.Application/Features/EmailDispatch/Handlers/Queries/PreviewEmailDeliveryDisableQueryHandler.cs`
+- `tests/Event.Application.UnitTests/Features/EmailDispatch/Commands/EmailDeliveryDisableCommandHandlerTests.cs`
+- PR / commit: pending P02; no full-phase acceptance
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for new `.claude/rules/*.md` entry
+- [ ] Candidate for skill update: `auth-patterns`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [x] Stays in journal only (authority-consistency lesson)
 
 ---

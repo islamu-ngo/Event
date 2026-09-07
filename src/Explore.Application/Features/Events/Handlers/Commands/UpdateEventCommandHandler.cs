@@ -19,6 +19,7 @@ using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Application.Services.Registration;
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Federation;
 using Explore.Domain.Services.Scheduling;
@@ -41,6 +42,7 @@ public class UpdateEventCommandHandler : IRequestHandler<UpdateEventCommand, Bas
     private readonly IEventScheduleProjectionCalculator _scheduleProjectionCalculator;
     private readonly HybridCache _cache;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ISettingMutationLock _mutationLock;
     private readonly IUserContext _userContext;
     private readonly AtprotoEventPublicationPlanner _atprotoPublicationPlanner;
     private readonly NotificationFanoutOccurrenceCoordinator _fanoutCoordinator;
@@ -66,7 +68,8 @@ public class UpdateEventCommandHandler : IRequestHandler<UpdateEventCommand, Bas
         NotificationFanoutOccurrenceCoordinator fanoutCoordinator,
         IEventLifecycleScheduler eventLifecycleScheduler,
         IRefundCampaignRepository refundCampaignRepository,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        ISettingMutationLock mutationLock)
     {
         _eventRepository = eventRepository;
         _audienceAgeRepository = audienceAgeRepository;
@@ -80,6 +83,7 @@ public class UpdateEventCommandHandler : IRequestHandler<UpdateEventCommand, Bas
         _scheduleProjectionCalculator = scheduleProjectionCalculator;
         _cache = cache;
         _unitOfWork = unitOfWork;
+        _mutationLock = mutationLock;
         _userContext = userContext;
         _atprotoPublicationPlanner = atprotoPublicationPlanner;
         _fanoutCoordinator = fanoutCoordinator;
@@ -116,7 +120,9 @@ public class UpdateEventCommandHandler : IRequestHandler<UpdateEventCommand, Bas
         Guid eventIdForCache = Guid.Empty;
         Guid tenantIdForCache = Guid.Empty;
 
-        BaseCommandResponse<Guid> response = await _unitOfWork.ExecuteSerializableAsync(async token =>
+        BaseCommandResponse<Guid> response = await _mutationLock.ExecuteOrderedGroupsAsync(
+            [[GovernanceSettingKeys.Email.DeliveryEnabled]],
+            policyToken => _unitOfWork.ExecuteSerializableAsync(async token =>
         {
             Explore.Domain.Event? eventEntity = await _eventRepository.GetScheduleGraphForUpdateAsync(request.EventId, token);
             if (eventEntity is null)
@@ -269,7 +275,7 @@ public class UpdateEventCommandHandler : IRequestHandler<UpdateEventCommand, Bas
             eventIdForCache = eventEntity.Id;
             tenantIdForCache = eventEntity.TenantId;
             return BaseCommandResponse.Success(eventEntity.Id, "Event updated successfully.");
-        }, cancellationToken);
+        }, policyToken), cancellationToken);
 
         if (!response.IsSuccess)
         {

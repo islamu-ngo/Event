@@ -30,6 +30,7 @@ public class ResetSettingCommandHandler
     private readonly ILocationPrivacyGovernanceMutationService? _locationPrivacyMutations;
     private readonly IPublicationPolicyMutationBoundary _publicationPolicyMutationBoundary;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IEmailDeliverySettingsWriter _emailSettingsWriter;
 
     public ResetSettingCommandHandler(
         IHierarchicalSettingsResolver resolver,
@@ -41,6 +42,7 @@ public class ResetSettingCommandHandler
         ILogger<ResetSettingCommandHandler> logger,
         IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary,
         IUnitOfWork unitOfWork,
+        IEmailDeliverySettingsWriter emailSettingsWriter,
         ICerbosConfigResolver? cerbosConfigResolver = null,
         ILocationPrivacyGovernanceMutationService? locationPrivacyMutations = null)
     {
@@ -55,6 +57,7 @@ public class ResetSettingCommandHandler
         _locationPrivacyMutations = locationPrivacyMutations;
         _publicationPolicyMutationBoundary = publicationPolicyMutationBoundary;
         _unitOfWork = unitOfWork;
+        _emailSettingsWriter = emailSettingsWriter;
     }
 
     public async Task<BaseCommandResponse<Guid>> Handle(
@@ -87,6 +90,19 @@ public class ResetSettingCommandHandler
         if (!authorized)
         {
             return BaseCommandResponse.Validation<Guid>([authError!], authError);
+        }
+
+        if (EmailDeliverySettingKeys.Contains(request.Key))
+        {
+            Guid? actor = await SettingCommandHelper.ResolveCurrentUserIdAsync(_adminContext, _currentUserService, cancellationToken);
+            var result = await _emailSettingsWriter.ApplyAsync(
+                [new EmailDeliverySettingMutation(TenantId: _tenantContext.TenantId, Key: definition.Key,
+                    Kind: EmailDeliverySettingMutationKind.Remove)],
+                actorUserId: actor, cancellationToken: cancellationToken);
+            if (result.IsAccepted())
+                foreach (var notification in result.ToNotifications(actor))
+                    await _mediator.Publish(notification, CancellationToken.None);
+            return result.ToCommandResponse(_tenantContext.TenantId, "SMTP override reset.");
         }
 
         // Get current value for notification

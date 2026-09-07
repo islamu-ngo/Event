@@ -3,7 +3,10 @@
 
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Scheduling;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Features.SupportAccess;
 using Explore.Application.Responses;
 using Explore.Domain;
@@ -919,28 +922,28 @@ public sealed class BusinessMetrics : ISchedulerJobTelemetry, IDisposable
             new KeyValuePair<string, object?>("owner_type", ownerType ?? "unknown"));
     }
 
-    public void RecordEmailDispatchAttempt(string? outcome = null, string? failureCategory = null)
+    public void RecordEmailDispatchAttempt(EmailDispatchDrainOutcome outcome)
     {
         _emailDispatchAttempts.Add(1,
             new KeyValuePair<string, object?>("outcome", NormalizeEmailDispatchAttemptOutcome(outcome)),
-            new KeyValuePair<string, object?>("failure_category", NormalizeEmailDispatchFailureCategory(failureCategory)));
+            new KeyValuePair<string, object?>("failure_category", EmailDispatchFailureCategory(outcome)));
     }
 
-    public void RecordEmailDispatchOperationalOutcome(string? outcome, string? reason)
+    public void RecordEmailDispatchOperationalOutcome(EmailDispatchEligibilityOutcome outcome, string? reason)
     {
         _emailDispatchOperationalOutcomes.Add(1,
             new KeyValuePair<string, object?>("outcome", NormalizeEmailDispatchOperationalOutcome(outcome)),
             new KeyValuePair<string, object?>("reason", NormalizeEmailDispatchOperationalReason(reason)));
     }
 
-    public void RecordEmailDispatchRabbitMqPublish(string? outcome = null, string? failureCategory = null)
+    public void RecordEmailDispatchRabbitMqPublish(EmailDispatchPublishOutcome outcome, string? failureCategory = null)
     {
         _emailDispatchRabbitMqPublishes.Add(1,
             new KeyValuePair<string, object?>("outcome", NormalizeEmailDispatchRabbitMqPublishOutcome(outcome)),
             new KeyValuePair<string, object?>("failure_category", NormalizeEmailDispatchRabbitMqPublishFailureCategory(failureCategory)));
     }
 
-    public void RecordEmailDispatchRabbitMqConsume(string? outcome = null, string? failureCategory = null)
+    public void RecordEmailDispatchRabbitMqConsume(EmailDispatchConsumeOutcome outcome, string? failureCategory = null)
     {
         _emailDispatchRabbitMqConsumes.Add(1,
             new KeyValuePair<string, object?>("outcome", NormalizeEmailDispatchRabbitMqConsumeOutcome(outcome)),
@@ -2142,37 +2145,37 @@ public sealed class BusinessMetrics : ISchedulerJobTelemetry, IDisposable
         };
     }
 
-    private static string NormalizeEmailDispatchAttemptOutcome(string? outcome)
+    private static string NormalizeEmailDispatchAttemptOutcome(EmailDispatchDrainOutcome outcome)
     {
-        return NormalizeTag(outcome) switch
+        return outcome switch
         {
-            "sent" => "sent",
-            "retry_scheduled" => "retry_scheduled",
-            "dead_lettered" => "dead_lettered",
-            "unknown" => "unknown",
+            EmailDispatchDrainOutcome.Sent => "sent",
+            EmailDispatchDrainOutcome.RetryScheduled => "retry_scheduled",
+            EmailDispatchDrainOutcome.DeadLettered => "dead_lettered",
+            EmailDispatchDrainOutcome.Parked => "parked",
+            EmailDispatchDrainOutcome.Unknown => "unknown",
             _ => "other"
         };
     }
 
-    private static string NormalizeEmailDispatchOperationalOutcome(string? outcome)
+    private static string NormalizeEmailDispatchOperationalOutcome(EmailDispatchEligibilityOutcome outcome)
     {
-        return NormalizeTag(outcome) switch
+        return outcome switch
         {
-            "skipped" => "skipped",
-            "rate_deferred" => "rate_deferred",
+            EmailDispatchEligibilityOutcome.Skipped => "skipped",
+            EmailDispatchEligibilityOutcome.RateDeferred => "rate_deferred",
             _ => "other"
         };
     }
 
-    private static string NormalizeEmailDispatchFailureCategory(string? failureCategory)
+    private static string EmailDispatchFailureCategory(EmailDispatchDrainOutcome outcome)
     {
-        return NormalizeTag(failureCategory ?? "none") switch
+        return outcome switch
         {
-            "none" => "none",
-            "smtp_send_failed" => "smtp_send_failed",
-            "smtp_outcome_unknown" => "smtp_outcome_unknown",
-            "accepted_settlement_unknown" => "accepted_settlement_unknown",
-            "processing_lease_expired" => "processing_lease_expired",
+            EmailDispatchDrainOutcome.Sent => "none",
+            EmailDispatchDrainOutcome.RetryScheduled or EmailDispatchDrainOutcome.DeadLettered => "smtp_send_failed",
+            EmailDispatchDrainOutcome.Parked => "smtp_configuration_unavailable",
+            EmailDispatchDrainOutcome.Unknown => "smtp_outcome_unknown",
             _ => "other"
         };
     }
@@ -2206,29 +2209,28 @@ public sealed class BusinessMetrics : ISchedulerJobTelemetry, IDisposable
         };
     }
 
-    private static string NormalizeEmailDispatchRabbitMqPublishOutcome(string? outcome)
+    private static string NormalizeEmailDispatchRabbitMqPublishOutcome(EmailDispatchPublishOutcome outcome)
     {
-        return NormalizeTag(outcome) switch
+        return outcome switch
         {
-            "disabled" => "disabled",
-            "confirmed" => "confirmed",
-            "returned" => "returned",
-            "nacked" => "nacked",
-            "failed" => "failed",
-            "timeout" => "timeout",
+            EmailDispatchPublishOutcome.Disabled => "disabled",
+            EmailDispatchPublishOutcome.Confirmed => "confirmed",
+            EmailDispatchPublishOutcome.Returned => "returned",
+            EmailDispatchPublishOutcome.Nacked => "nacked",
+            EmailDispatchPublishOutcome.Failed => "failed",
             _ => "other"
         };
     }
 
-    private static string NormalizeEmailDispatchRabbitMqConsumeOutcome(string? outcome)
+    private static string NormalizeEmailDispatchRabbitMqConsumeOutcome(EmailDispatchConsumeOutcome outcome)
     {
-        return NormalizeTag(outcome) switch
+        return outcome switch
         {
-            "acked" => "acked",
-            "rejected" => "rejected",
-            "nacked" => "nacked",
-            "replayed" => "replayed",
-            "parked" => "parked",
+            EmailDispatchConsumeOutcome.Acked => "acked",
+            EmailDispatchConsumeOutcome.Rejected => "rejected",
+            EmailDispatchConsumeOutcome.Nacked => "nacked",
+            EmailDispatchConsumeOutcome.Replayed => "replayed",
+            EmailDispatchConsumeOutcome.Parked => "parked",
             _ => "other"
         };
     }

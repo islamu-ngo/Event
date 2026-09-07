@@ -175,7 +175,8 @@
                             <InstanceSmtpSection Model="_smtpModel" OnboardingService="InstanceOnboardingService"
                                                 IsSingleTenant="IsSingleTenantMode"
                                                 LockForTenants="_delegation.LockTenantSmtp == true"
-                                                SaveLockAsync="SaveSmtpLockAsync" />
+                                                SaveLockAsync="SaveSmtpLockAsync"
+                                                DeliveryChanged="RefreshSmtpAsync" />
                         }
                         else if (_currentSection == "analytics-privacy")
                         {
@@ -358,7 +359,7 @@
 
     // Infrastructure models
     private HalResourceOfInstanceStorageSettingsDto _storageModel = new();
-    private InstanceSmtpSettingsDto _smtpModel = new();
+    private HalResourceOfInstanceSmtpSettingsDto _smtpModel = new();
     private AuthProviderConfigurationDto _authProviderModel = new();
     private AuthorizationProviderConfigurationDto _authorizationProviderModel = new();
     private TenantPolicySettingsDto _tenantModel = new();
@@ -645,6 +646,8 @@
 
         return response;
     }
+
+    private async Task RefreshSmtpAsync() => _smtpModel = await InstanceOnboardingService.GetSmtpSettingsAsync();
 
     private Task SaveAsync() => SaveAsync(false);
 

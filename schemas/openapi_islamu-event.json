@@ -58196,41 +58196,35 @@
           "200": {
             "description": "OK",
             "content": {
-              "text/plain; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/InstanceSmtpSettingsDto"
-                }
-              },
               "application/json; v=0.1": {
                 "schema": {
-                  "$ref": "#/components/schemas/InstanceSmtpSettingsDto"
+                  "$ref": "#/components/schemas/HalResourceOfInstanceSmtpSettingsDto"
                 }
               },
-              "text/json; v=0.1": {
+              "application/hal+json; v=0.1": {
                 "schema": {
-                  "$ref": "#/components/schemas/InstanceSmtpSettingsDto"
+                  "$ref": "#/components/schemas/HalResourceOfInstanceSmtpSettingsDto"
                 }
-              }
+              },
+              "application/json": { },
+              "application/hal+json": { }
             }
           },
           "403": {
             "description": "Forbidden",
             "content": {
-              "text/plain; v=0.1": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              },
               "application/json; v=0.1": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
                 }
               },
-              "text/json; v=0.1": {
+              "application/hal+json; v=0.1": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
                 }
-              }
+              },
+              "application/json": { },
+              "application/hal+json": { }
             }
           }
         },
@@ -58337,6 +58331,284 @@
           }
         },
         "x-endpoint-class": "Authenticated"
+      }
+    },
+    "/api/instance/settings/smtp/disable-preview": {
+      "post": {
+        "tags": [
+          "InstanceMessagingSettings"
+        ],
+        "summary": "Preview Instance SMTP Disable",
+        "operationId": "PreviewInstanceSmtpDisable",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfEmailDeliveryDisablePreviewDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfEmailDeliveryDisablePreviewDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "x-endpoint-class": "Admin",
+        "x-rate-limit-policy": "Write"
+      }
+    },
+    "/api/instance/settings/smtp/disable": {
+      "post": {
+        "tags": [
+          "InstanceMessagingSettings"
+        ],
+        "summary": "Disable Instance SMTP",
+        "operationId": "DisableInstanceSmtp",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailDeliveryDisableRequest"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailDeliveryDisableRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseCommandResponseOfGuid"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseCommandResponseOfGuid"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseCommandResponseOfGuid"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-endpoint-class": "Admin",
+        "x-rate-limit-policy": "Write"
       }
     },
     "/api/instance/settings/smtp/test": {
@@ -87874,23 +88146,14 @@
         "x-endpoint-class": "Authenticated"
       }
     },
-    "/api/settings/tenant/{category}": {
-      "get": {
+    "/api/settings/email-delivery/disable-preview": {
+      "post": {
         "tags": [
           "Settings"
         ],
-        "summary": "Get Tenant Settings",
-        "description": "Returns effective settings for the given category at tenant scope. Requires tenant administrator.",
-        "operationId": "GetTenantScopedSettings",
+        "summary": "Preview Tenant SMTP Disable",
+        "operationId": "PreviewTenantSmtpDisable",
         "parameters": [
-          {
-            "name": "category",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
           {
             "name": "api-version",
             "in": "query",
@@ -87910,19 +88173,168 @@
           "200": {
             "description": "OK",
             "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfEmailDeliveryDisablePreviewDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfEmailDeliveryDisablePreviewDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          }
+        },
+        "x-endpoint-class": "Authenticated",
+        "x-rate-limit-policy": "Write"
+      }
+    },
+    "/api/settings/email-delivery/disable": {
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Disable Tenant SMTP",
+        "operationId": "DisableTenantSmtp",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailDeliveryDisableRequest"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailDeliveryDisableRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
               "text/plain; v=0.1": {
                 "schema": {
-                  "$ref": "#/components/schemas/SettingGroupResponseDto"
+                  "$ref": "#/components/schemas/BaseCommandResponseOfGuid"
                 }
               },
               "application/json; v=0.1": {
                 "schema": {
-                  "$ref": "#/components/schemas/SettingGroupResponseDto"
+                  "$ref": "#/components/schemas/BaseCommandResponseOfGuid"
                 }
               },
               "text/json; v=0.1": {
                 "schema": {
-                  "$ref": "#/components/schemas/SettingGroupResponseDto"
+                  "$ref": "#/components/schemas/BaseCommandResponseOfGuid"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
                 }
               }
             }
@@ -87965,6 +88377,135 @@
                   "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-endpoint-class": "Authenticated",
+        "x-rate-limit-policy": "Write"
+      }
+    },
+    "/api/settings/tenant/{category}": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Get Tenant Settings",
+        "description": "Returns effective settings for the given category at tenant scope. Requires tenant administrator.",
+        "operationId": "GetTenantScopedSettings",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfSettingGroupResponseDto"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfSettingGroupResponseDto"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
             }
           }
         },
@@ -114782,6 +115323,140 @@
           }
         }
       },
+      "EmailDeliveryDisableAffectedScopeDto": {
+        "required": [
+          "tenantId",
+          "revision"
+        ],
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "EmailDeliveryDisablePreviewDto": {
+        "required": [
+          "tenantId",
+          "expectedRevision",
+          "isLocked",
+          "affectedScopes",
+          "confirmationToken",
+          "expiresAtUtc"
+        ],
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "isLocked": {
+            "type": "boolean"
+          },
+          "affectedScopes": {
+            "type": "array",
+            "items": {
+              "required": [
+                "tenantId",
+                "revision"
+              ],
+              "type": "object",
+              "properties": {
+                "tenantId": {
+                  "type": [
+                    "null",
+                    "string"
+                  ],
+                  "format": "uuid"
+                },
+                "revision": {
+                  "pattern": "^-?(?:0|[1-9]\\d*)$",
+                  "type": [
+                    "integer",
+                    "string"
+                  ],
+                  "format": "int64"
+                }
+              }
+            }
+          },
+          "confirmationToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "expiresAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "canDisable": {
+            "type": "boolean"
+          }
+        }
+      },
+      "EmailDeliveryDisableRequest": {
+        "required": [
+          "expectedRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "confirmationToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "acknowledgement": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "EmailDispatchParkReason": {
+        "enum": [
+          "CapabilityUnavailable",
+          "Operator"
+        ],
+        "type": "string"
+      },
       "EmailDispatchProcessorControlDto": {
         "type": "object",
         "properties": {
@@ -114825,6 +115500,19 @@
           }
         }
       },
+      "EmailDispatchStatus": {
+        "enum": [
+          "Pending",
+          "Processing",
+          "Sent",
+          "RetryScheduled",
+          "DeadLettered",
+          "Parked",
+          "Unknown",
+          "Skipped"
+        ],
+        "type": "string"
+      },
       "EmailDispatchStatusDto": {
         "type": "object",
         "properties": {
@@ -114844,7 +115532,7 @@
             "format": "uuid"
           },
           "deliveryStatus": {
-            "type": "string"
+            "$ref": "#/components/schemas/EmailDispatchStatus"
           },
           "attemptCount": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -114894,6 +115582,16 @@
               "string"
             ],
             "format": "date-time"
+          },
+          "parkReason": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EmailDispatchParkReason"
+              }
+            ]
           },
           "contentRedactedAt": {
             "type": [
@@ -131063,6 +131761,94 @@
           }
         }
       },
+      "HalResourceOfEmailDeliveryDisablePreviewDto": {
+        "required": [
+          "tenantId",
+          "expectedRevision",
+          "isLocked",
+          "affectedScopes",
+          "confirmationToken",
+          "expiresAtUtc"
+        ],
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "isLocked": {
+            "type": "boolean"
+          },
+          "affectedScopes": {
+            "type": "array",
+            "items": {
+              "required": [
+                "tenantId",
+                "revision"
+              ],
+              "type": "object",
+              "properties": {
+                "tenantId": {
+                  "type": [
+                    "null",
+                    "string"
+                  ],
+                  "format": "uuid"
+                },
+                "revision": {
+                  "pattern": "^-?(?:0|[1-9]\\d*)$",
+                  "type": [
+                    "integer",
+                    "string"
+                  ],
+                  "format": "int64"
+                }
+              }
+            }
+          },
+          "confirmationToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "expiresAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "canDisable": {
+            "type": "boolean"
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
       "HalResourceOfEmailDispatchProcessorControlDto": {
         "type": "object",
         "properties": {
@@ -131139,7 +131925,7 @@
             "format": "uuid"
           },
           "deliveryStatus": {
-            "type": "string"
+            "$ref": "#/components/schemas/EmailDispatchStatus"
           },
           "attemptCount": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -131189,6 +131975,16 @@
               "string"
             ],
             "format": "date-time"
+          },
+          "parkReason": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EmailDispatchParkReason"
+              }
+            ]
           },
           "contentRedactedAt": {
             "type": [
@@ -137462,6 +138258,59 @@
           },
           "setupSecretGuidance": {
             "type": "string"
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
+      "HalResourceOfInstanceSmtpSettingsDto": {
+        "type": "object",
+        "properties": {
+          "deliveryEnabled": {
+            "type": "boolean"
+          },
+          "host": {
+            "type": "string"
+          },
+          "port": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "security": {
+            "type": "string"
+          },
+          "fromAddress": {
+            "type": "string"
+          },
+          "fromName": {
+            "type": "string"
+          },
+          "timeoutSeconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "skipCertificateValidation": {
+            "type": "boolean"
           },
           "_links": {
             "type": "object",
@@ -144312,6 +145161,13 @@
         ],
         "type": "object",
         "properties": {
+          "tenantId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
           "category": {
             "type": "string"
           },
@@ -148013,6 +148869,9 @@
       "InstanceSmtpSettingsDto": {
         "type": "object",
         "properties": {
+          "deliveryEnabled": {
+            "type": "boolean"
+          },
           "host": {
             "type": "string"
           },
@@ -157327,6 +158186,9 @@
       "PatchInstanceSmtpSettingsDto": {
         "type": "object",
         "properties": {
+          "deliveryEnabled": {
+            "$ref": "#/components/schemas/OptionalUpdateOfboolean"
+          },
           "configuration": {
             "$ref": "#/components/schemas/OptionalUpdateOfInstanceSmtpConfigurationWriteDto"
           }
@@ -165573,6 +166435,13 @@
         ],
         "type": "object",
         "properties": {
+          "tenantId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
           "category": {
             "type": "string"
           },

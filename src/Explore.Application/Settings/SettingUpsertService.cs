@@ -20,17 +20,20 @@ public class SettingUpsertService
     private readonly IMediator _mediator;
     private readonly IPublicationPolicyMutationBoundary _publicationPolicyMutationBoundary;
     private readonly ILocationPrivacyGovernanceMutationService? _locationPrivacyMutations;
+    private readonly IEmailDeliverySettingsWriter _emailSettingsWriter;
 
     public SettingUpsertService(
         ISystemSettingRepository systemSettingRepository,
         IMediator mediator,
         IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary,
+        IEmailDeliverySettingsWriter emailSettingsWriter,
         ILocationPrivacyGovernanceMutationService? locationPrivacyMutations = null)
     {
         _systemSettingRepository = systemSettingRepository;
         _mediator = mediator;
         _publicationPolicyMutationBoundary = publicationPolicyMutationBoundary;
         _locationPrivacyMutations = locationPrivacyMutations;
+        _emailSettingsWriter = emailSettingsWriter;
     }
 
     public Task<PublicationPolicyMutationResult> ApplyInstancePublicationPolicyAsync(
@@ -70,7 +73,9 @@ public class SettingUpsertService
 
         await InvalidateCommittedMutationAsync(persistence.Mutation);
         await _mediator.Publish(new SettingChangedNotification(
-            settingKey, persistence.PreviousStoredValue, value, SettingSource.SystemDefault, null, actorId, DateTime.UtcNow), CancellationToken.None);
+            settingKey, EmailDeliverySettingsWriteResultExtensions.AuditValue(settingKey, persistence.PreviousStoredValue),
+            EmailDeliverySettingsWriteResultExtensions.AuditValue(settingKey, value),
+            SettingSource.SystemDefault, null, actorId, DateTime.UtcNow), CancellationToken.None);
     }
 
     /// <summary>
@@ -111,6 +116,18 @@ public class SettingUpsertService
         CancellationToken cancellationToken = default)
     {
         EnsureUnguarded(settingKey);
+        if (EmailDeliverySettingKeys.Contains(settingKey))
+        {
+            var result = await _emailSettingsWriter.ApplyAsync(
+                [new EmailDeliverySettingMutation(TenantId: null, Key: settingKey,
+                    Kind: EmailDeliverySettingMutationKind.SetLock, IsLocked: isLocked)],
+                actorUserId: actorId, cancellationToken: cancellationToken);
+            result.EnsureAccepted();
+            return result.ToNotifications(actorId).FirstOrDefault() ?? new SettingChangedNotification(
+                key: settingKey, oldValue: null, newValue: null,
+                scope: isLocked ? SettingSource.SystemLocked : SettingSource.SystemDefault,
+                tenantId: null, actorUserId: actorId, changedAt: DateTime.UtcNow);
+        }
         var definition = Domain.Settings.SettingRegistry.Get(settingKey);
         var changedAt = DateTime.UtcNow;
         string? previousStoredValue = await _systemSettingRepository.UpsertLockAsync(new SystemSetting
@@ -240,8 +257,8 @@ public class SettingUpsertService
 
         var notification = new SettingChangedNotification(
             settingKey,
-            persistence.PreviousStoredValue,
-            value,
+            EmailDeliverySettingsWriteResultExtensions.AuditValue(settingKey, persistence.PreviousStoredValue),
+            EmailDeliverySettingsWriteResultExtensions.AuditValue(settingKey, value),
             isLocked ? SettingSource.SystemLocked : SettingSource.SystemDefault,
             null,
             actorId,
@@ -262,6 +279,18 @@ public class SettingUpsertService
         CancellationToken cancellationToken,
         bool useCallerTransaction = false)
     {
+        if (EmailDeliverySettingKeys.Contains(setting.SettingKey))
+        {
+            var result = await _emailSettingsWriter.ApplyAsync(
+                [new EmailDeliverySettingMutation(TenantId: null, Key: setting.SettingKey,
+                    Kind: EmailDeliverySettingMutationKind.SetValue, Value: setting.Value, IsLocked: setting.IsLocked)],
+                actorUserId: actorId, cancellationToken: cancellationToken);
+            result.EnsureAccepted();
+            return new SettingPersistenceResult(
+                PreviousStoredValue: result.Changes.IsEmpty ? setting.Value : result.Changes[0].PreviousValue,
+                Mutation: null);
+        }
+
         if (_locationPrivacyMutations?.Handles(setting.SettingKey) != true)
         {
             string? previousStoredValue = useCallerTransaction

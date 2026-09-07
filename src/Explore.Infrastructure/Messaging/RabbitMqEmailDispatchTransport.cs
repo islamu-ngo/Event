@@ -138,7 +138,7 @@ public sealed class RabbitMqEmailDispatchTransport : IEmailDispatchTransport, IA
         var options = _settings.CurrentValue;
         if (!options.Enabled)
         {
-            _metrics.RecordEmailDispatchRabbitMqPublish("disabled", "none");
+            _metrics.RecordEmailDispatchRabbitMqPublish(EmailDispatchPublishOutcome.Disabled);
             return EmailDispatchPublishResult.Disabled();
         }
 
@@ -200,7 +200,7 @@ public sealed class RabbitMqEmailDispatchTransport : IEmailDispatchTransport, IA
                 body: body,
                 cancellationToken: timeout.Token);
 
-            _metrics.RecordEmailDispatchRabbitMqPublish("confirmed", "none");
+            _metrics.RecordEmailDispatchRabbitMqPublish(EmailDispatchPublishOutcome.Confirmed);
             _logger.LogInformation(
                 "RabbitMQ confirmed EmailDispatch pointer publish {PublishEventId} for tenant {TenantId} with sequence {PublishSequenceNumber}",
                 pointer.PublishEventId,
@@ -211,35 +211,35 @@ public sealed class RabbitMqEmailDispatchTransport : IEmailDispatchTransport, IA
         }
         catch (PublishReturnException ex)
         {
-            _metrics.RecordEmailDispatchRabbitMqPublish("returned", "mandatory_return");
+            _metrics.RecordEmailDispatchRabbitMqPublish(EmailDispatchPublishOutcome.Returned, EmailDispatchPublishFailure.MandatoryReturn.ToCode());
             return new EmailDispatchPublishResult(
-                EmailDispatchPublishOutcome.Returned,
-                ex.PublishSequenceNumber,
-                ex.ReplyCode,
-                ex.ReplyText,
-                "mandatory_return");
+                Outcome: EmailDispatchPublishOutcome.Returned,
+                PublishSequenceNumber: ex.PublishSequenceNumber,
+                ReplyCode: ex.ReplyCode,
+                ReplyText: ex.ReplyText,
+                FailureCategory: EmailDispatchPublishFailure.MandatoryReturn);
         }
         catch (PublishException ex)
         {
             var outcome = ex.IsReturn ? EmailDispatchPublishOutcome.Returned : EmailDispatchPublishOutcome.Nacked;
-            var failureCategory = ex.IsReturn ? "mandatory_return" : "publisher_nack";
-            _metrics.RecordEmailDispatchRabbitMqPublish(outcome.ToString().ToLowerInvariant(), failureCategory);
+            var failureCategory = ex.IsReturn ? EmailDispatchPublishFailure.MandatoryReturn : EmailDispatchPublishFailure.PublisherNack;
+            _metrics.RecordEmailDispatchRabbitMqPublish(outcome, failureCategory.ToCode());
             return new EmailDispatchPublishResult(outcome, ex.PublishSequenceNumber, FailureCategory: failureCategory);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            _metrics.RecordEmailDispatchRabbitMqPublish("failed", "publish_timeout");
-            return new EmailDispatchPublishResult(EmailDispatchPublishOutcome.Failed, FailureCategory: "publish_timeout");
+            _metrics.RecordEmailDispatchRabbitMqPublish(EmailDispatchPublishOutcome.Failed, EmailDispatchPublishFailure.PublishTimeout.ToCode());
+            return new EmailDispatchPublishResult(EmailDispatchPublishOutcome.Failed, FailureCategory: EmailDispatchPublishFailure.PublishTimeout);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _metrics.RecordEmailDispatchRabbitMqPublish("failed", "broker_publish_failed");
+            _metrics.RecordEmailDispatchRabbitMqPublish(EmailDispatchPublishOutcome.Failed, EmailDispatchPublishFailure.BrokerPublishFailed.ToCode());
             _logger.LogWarning(
                 ex,
                 "RabbitMQ EmailDispatch pointer publish failed for {PublishEventId} and tenant {TenantId}",
                 pointer.PublishEventId,
                 pointer.TenantId);
-            return new EmailDispatchPublishResult(EmailDispatchPublishOutcome.Failed, FailureCategory: "broker_publish_failed");
+            return new EmailDispatchPublishResult(EmailDispatchPublishOutcome.Failed, FailureCategory: EmailDispatchPublishFailure.BrokerPublishFailed);
         }
         finally
         {

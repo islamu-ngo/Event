@@ -268,10 +268,9 @@ public class CustomPropertyProjectionCoordinationTests
     {
         var statusRepo = new CustomPropertyProjectionStatusRepository(context);
         var dirtyScopeRepo = new CustomPropertyProjectionDirtyScopeRepository(context);
-        var tenantSettingRepo = new TenantSettingRepository(context);
-        var systemSettingRepo = new SystemSettingRepository(
-            context,
-            new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
+        var mutationLock = new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context));
+        var tenantSettingRepo = new TenantSettingRepository(context, mutationLock);
+        var systemSettingRepo = new SystemSettingRepository(context, mutationLock);
         var quotaResolver = new CustomPropertyQuotaResolver(tenantSettingRepo, systemSettingRepo);
 
         return new EventCustomPropertyProjectionUpdater(

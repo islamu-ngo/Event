@@ -1154,6 +1154,10 @@ public static class RouteNames
     public const string GetInstanceSmtpSettings = nameof(GetInstanceSmtpSettings);
     public const string UpdateInstanceSmtpSettings = nameof(UpdateInstanceSmtpSettings);
     public const string TestInstanceSmtpConnection = nameof(TestInstanceSmtpConnection);
+    public const string PreviewInstanceSmtpDisable = nameof(PreviewInstanceSmtpDisable);
+    public const string DisableInstanceSmtp = nameof(DisableInstanceSmtp);
+    public const string PreviewTenantSmtpDisable = nameof(PreviewTenantSmtpDisable);
+    public const string DisableTenantSmtp = nameof(DisableTenantSmtp);
     public const string GetInstanceResolverConfiguration = nameof(GetInstanceResolverConfiguration);
     public const string UpdateInstanceResolverConfiguration = nameof(UpdateInstanceResolverConfiguration);
     public const string GetInstanceAnalyticsGovernanceSettings = nameof(GetInstanceAnalyticsGovernanceSettings);

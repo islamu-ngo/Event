@@ -35,5 +35,6 @@ public enum EmailDispatchEligibilityOutcome
     TenantPaused = 3,
     LostClaim = 4,
     RateDeferred = 5,
-    ProcessorPaused = 6
+    ProcessorPaused = 6,
+    Parked = 7
 }

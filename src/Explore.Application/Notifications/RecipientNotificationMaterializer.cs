@@ -5,6 +5,7 @@ using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Notifications;
@@ -12,14 +13,22 @@ namespace Explore.Application.Notifications;
 public sealed class RecipientNotificationMaterializer(
     IRecipientNotificationGraphRepository notificationGraphRepository,
     IUnitOfWork unitOfWork,
+    ISettingMutationLock mutationLock,
     IPrivacyErasureStateRepository? privacyErasureStateRepository = null) : IRecipientNotificationMaterializer
 {
-    public async Task<RecipientNotificationMaterializationResult> MaterializeAsync(
+    public Task<RecipientNotificationMaterializationResult> MaterializeAsync(
         RecipientNotificationMaterialization request,
         CancellationToken cancellationToken = default)
     {
         Validate(request);
+        return mutationLock.ExecuteOrderedGroupsAsync(
+            [[GovernanceSettingKeys.Email.DeliveryEnabled]],
+            token => MaterializeUnderPolicyLockAsync(request, token), cancellationToken);
+    }
 
+    private async Task<RecipientNotificationMaterializationResult> MaterializeUnderPolicyLockAsync(
+        RecipientNotificationMaterialization request, CancellationToken cancellationToken)
+    {
         try
         {
             return await unitOfWork.ExecuteInTransactionAsync(
@@ -201,7 +210,7 @@ public sealed class RecipientNotificationMaterializer(
                     : request.InAppSkipReason.Trim()));
         }
 
-        EmailDispatchOutbox? email = request.Email;
+        EmailDispatchOutbox? email = request.Email is { } draftEmail ? CreateEmailDraft(draftEmail) : null;
         if (request.IncludeEmailChannel)
         {
             if (email is not null)
@@ -242,6 +251,32 @@ public sealed class RecipientNotificationMaterializer(
 
         return new RecipientNotificationMaterializationResult(intent, intent.Deliveries.ToArray(), notification, email);
     }
+
+    // Each transaction owns its email entity; rollback cannot restore a mutated request object.
+    private static EmailDispatchOutbox CreateEmailDraft(EmailDispatchOutbox source) => new()
+    {
+        Id = source.Id,
+        TenantId = source.TenantId,
+        PublishEventId = source.PublishEventId,
+        Kind = source.Kind,
+        SourceType = source.SourceType,
+        SourceId = source.SourceId,
+        EventId = source.EventId,
+        RegistrationOrderId = source.RegistrationOrderId,
+        RecipientUserId = source.RecipientUserId,
+        RecipientAddressSource = source.RecipientAddressSource,
+        ManagedTenantProvisioningOperationId = source.ManagedTenantProvisioningOperationId,
+        RecipientEmail = source.RecipientEmail,
+        Subject = source.Subject,
+        PlainTextBody = source.PlainTextBody,
+        HtmlBody = source.HtmlBody,
+        ReplyTo = source.ReplyTo,
+        MaxAttempts = source.MaxAttempts,
+        NextAttemptAt = source.NextAttemptAt,
+        CorrelationId = source.CorrelationId,
+        CreatedAt = source.CreatedAt,
+        CreatedBy = source.CreatedBy
+    };
 
     private static NotificationDelivery CreateDelivery(
         RecipientNotificationMaterialization request,

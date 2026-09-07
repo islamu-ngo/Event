@@ -693,7 +693,7 @@ public sealed class InstanceAdminSettingsLayoutTests : IDisposable
         _instanceOnboardingService.GetTenantDelegationAsync().Returns(new TenantDelegationSettingsDto());
         _instanceOnboardingService.GetRenderPolicyAsync().Returns(new RenderPolicySettingsDto());
         _instanceOnboardingService.GetStorageSettingsAsync().Returns(new HalResourceOfInstanceStorageSettingsDto());
-        _instanceOnboardingService.GetSmtpSettingsAsync().Returns(new InstanceSmtpSettingsDto());
+        _instanceOnboardingService.GetSmtpSettingsAsync().Returns(new HalResourceOfInstanceSmtpSettingsDto());
         _instanceOnboardingService.GetAuthProviderConfigurationAsAdminAsync().Returns(new AuthProviderConfigurationDto());
         _instanceOnboardingService.GetAuthorizationProviderConfigurationAsAdminAsync()
             .Returns(new AuthorizationProviderConfigurationDto { Provider = "local" });

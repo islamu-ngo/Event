@@ -288,9 +288,9 @@ public class TenantAdminSettingsRedirectTests : IDisposable
             item.Instance.OnClick.InvokeAsync(new MouseEventArgs()));
     }
 
-    private static SettingGroupResponseDto CreatePolicyCategory(string category) => category switch
+    private static HalResourceOfSettingGroupResponseDto CreatePolicyCategory(string category) => category switch
     {
-        "Events" => new SettingGroupResponseDto
+        "Events" => new HalResourceOfSettingGroupResponseDto
         {
             Category = category,
             Settings =
@@ -302,7 +302,7 @@ public class TenantAdminSettingsRedirectTests : IDisposable
                 EditableBoolean("events.card_click_opens_detail_page")
             ]
         },
-        "Organizations" => new SettingGroupResponseDto
+        "Organizations" => new HalResourceOfSettingGroupResponseDto
         {
             Category = category,
             Settings =
@@ -311,12 +311,12 @@ public class TenantAdminSettingsRedirectTests : IDisposable
                 EditableBoolean("organizations.self_registration_enabled")
             ]
         },
-        "Groups" => new SettingGroupResponseDto
+        "Groups" => new HalResourceOfSettingGroupResponseDto
         {
             Category = category,
             Settings = [EditableBoolean("groups.self_registration_enabled")]
         },
-        _ => new SettingGroupResponseDto { Category = category }
+        _ => new HalResourceOfSettingGroupResponseDto { Category = category }
     };
 
     private static EffectiveSettingDto EditableBoolean(string key) => new()

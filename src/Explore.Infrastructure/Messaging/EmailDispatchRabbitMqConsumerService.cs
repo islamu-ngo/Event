@@ -111,7 +111,7 @@ public sealed class EmailDispatchRabbitMqConsumerService(
         var parseResult = EmailDispatchRabbitMqConsumerDecision.ParsePointer(body);
         if (!parseResult.IsValid)
         {
-            metrics.RecordEmailDispatchRabbitMqConsume("rejected", parseResult.FailureCategory);
+            metrics.RecordEmailDispatchRabbitMqConsume(EmailDispatchConsumeOutcome.Rejected, parseResult.FailureCategory);
             logger.LogWarning(
                 "Rejecting malformed RabbitMQ EmailDispatch pointer delivery {DeliveryTag} with category {FailureCategory}",
                 args.DeliveryTag,
@@ -152,7 +152,7 @@ public sealed class EmailDispatchRabbitMqConsumerService(
         }
         catch (Exception ex)
         {
-            metrics.RecordEmailDispatchRabbitMqConsume("nacked", "consumer_exception");
+            metrics.RecordEmailDispatchRabbitMqConsume(EmailDispatchConsumeOutcome.Nacked, "consumer_exception");
             logger.LogWarning(
                 ex,
                 "Nacking RabbitMQ EmailDispatch pointer {PublishEventId} for tenant {TenantId} after consumer exception",

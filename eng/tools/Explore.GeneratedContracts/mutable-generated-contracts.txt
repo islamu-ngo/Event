@@ -15,7 +15,7 @@ EventSessionAgendaItemListDto
 EventSessionListDto
 FooterGovernanceSettingsDto
 FooterLinkGroupListDto
-InstanceSmtpSettingsDto
+HalResourceOfInstanceSmtpSettingsDto
 McpGovernanceSettingsDto
 ModuleSettingsDto
 Options

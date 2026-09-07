@@ -1,7 +1,6 @@
 // ABOUTME: Resolves explicit email intent and coherent SMTP ownership through existing settings and secret authorities.
 // ABOUTME: Disabled delivery never resolves secrets; tenant transports never inherit instance credentials.
 
-using System.Net.Mail;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Secrets;
@@ -40,25 +39,14 @@ public sealed class EmailDeliveryCapabilityResolver(
                 .ToDictionary(value => value.Key)
             : instance;
 
-        var ownsTransport = effective.TryGetValue(GovernanceSettingKeys.Email.SmtpHost, out var host)
-            && IsTenantOwned(host);
-        var ownerId = ownsTransport ? tenantId : null;
+        var policy = EmailDeliveryPolicySnapshot.Evaluate(instance, effective, tenantId);
+        var ownerId = policy.TransportTenantId;
+        var enabled = policy.Enabled;
+        if (policy.State != EmailDeliveryState.Available)
+            return (Capability(policy.State, enabled, ownerId), null);
+
         var owner = new EmailSettingGroup();
-        owner.Populate(ownsTransport ? effective : instance);
-        var requested = new EmailSettingGroup();
-        requested.Populate(effective);
-        var enabled = owner.DeliveryEnabled && requested.DeliveryEnabled;
-        var hasHost = !string.IsNullOrWhiteSpace(owner.SmtpHost);
-        var hasSender = !string.IsNullOrWhiteSpace(owner.FromAddress);
-        var coherentSender = !ownsTransport ||
-            (effective.TryGetValue(GovernanceSettingKeys.Email.FromAddress, out var sender) && IsTenantOwned(sender));
-        var valid = coherentSender && owner.SmtpPort is > 0 and <= 65535 && owner.SmtpTimeoutSeconds > 0
-            && MailAddress.TryCreate(owner.FromAddress, out _)
-            && Enum.TryParse<SmtpSecurityMode>(owner.SmtpSecurity, true, out var parsedSecurity)
-            && Enum.IsDefined(parsedSecurity);
-        var state = EmailDeliveryPolicy.Evaluate(enabled, hasHost, hasSender, valid, true);
-        if (state != EmailDeliveryState.Available)
-            return (Capability(state, enabled, ownerId), null);
+        owner.Populate(ownerId.HasValue ? effective : instance);
 
         var (username, usernameMissing) = await ResolveCredentialAsync(SecretDefinitionRegistry.Keys.Smtp.Username, ownerId, cancellationToken);
         var (password, passwordMissing) = await ResolveCredentialAsync(SecretDefinitionRegistry.Keys.Smtp.Password, ownerId, cancellationToken);
@@ -101,9 +89,6 @@ public sealed class EmailDeliveryCapabilityResolver(
 
         return (result, binding is not null && result.Status == SecretResolutionStatus.Unconfigured);
     }
-
-    private static bool IsTenantOwned(ResolvedSetting setting) =>
-        setting.Source is SettingSource.TenantOverride or SettingSource.TenantLocked;
 
     private static bool IsAuthorityFailure(SecretResolutionResult result) =>
         result.Status is not (SecretResolutionStatus.Resolved or SecretResolutionStatus.Unconfigured);

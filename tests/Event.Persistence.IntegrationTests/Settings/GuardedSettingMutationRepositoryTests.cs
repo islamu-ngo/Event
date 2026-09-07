@@ -57,7 +57,8 @@ public sealed class GuardedSettingMutationRepositoryTests(PostgreSqlContainerFix
         var saveObserver = new SaveObserver();
         await using (ExploreDbContext context = fixture.CreateDbContext(saveObserver))
         {
-            var repository = new TenantSettingRepository(context);
+            var repository = new TenantSettingRepository(context,
+                new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
             Func<Task> guardedMutation = mutation switch
             {
                 TenantMutation.Set => () => repository.SetValueAsync(tenantId, GuardedKey, "true"),
@@ -103,7 +104,8 @@ public sealed class GuardedSettingMutationRepositoryTests(PostgreSqlContainerFix
         var saveObserver = new SaveObserver();
         await using (ExploreDbContext context = fixture.CreateDbContext(saveObserver))
         {
-            var repository = new TenantSettingRepository(context);
+            var repository = new TenantSettingRepository(context,
+                new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
 
             await Assert.ThrowsAsync<InvalidOperationException>(() => repository.UpsertManyForTenantAsync(
                 tenantId,

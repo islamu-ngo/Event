@@ -21,7 +21,7 @@ public sealed class EmailDispatchQuartzJobsTests
     {
         var drainService = Substitute.For<IEmailDispatchDrainService>();
         drainService.ProcessBatchAsync(Arg.Any<CancellationToken>())
-            .Returns(new EmailDispatchDrainResult(1, 1, 1, 0, 0, 0, 0, 0, 0));
+            .Returns(new EmailDispatchDrainResult { PendingCount = 1, ProcessedCount = 1, SentCount = 1 });
         var job = new EmailDispatchDrainJob(drainService, NullLogger<EmailDispatchDrainJob>.Instance);
 
         await job.Execute(CreateContext());

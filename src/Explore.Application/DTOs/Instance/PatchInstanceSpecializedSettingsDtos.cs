@@ -44,8 +44,9 @@ public sealed record InstanceS3ConfigurationWriteDto
 
 public sealed record PatchInstanceSmtpSettingsDto
 {
+    public OptionalUpdate<bool> DeliveryEnabled { get; init; } = OptionalUpdate<bool>.Unspecified();
     public OptionalUpdate<InstanceSmtpConfigurationWriteDto> Configuration { get; init; } = OptionalUpdate<InstanceSmtpConfigurationWriteDto>.Unspecified();
-    public bool HasChanges() => Configuration.HasValue;
+    public bool HasChanges() => DeliveryEnabled.HasValue || Configuration.HasValue;
 }
 
 public sealed record InstanceSmtpConfigurationWriteDto

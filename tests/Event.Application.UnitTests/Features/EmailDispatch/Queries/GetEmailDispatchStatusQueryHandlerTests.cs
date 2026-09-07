@@ -83,7 +83,8 @@ public sealed class GetEmailDispatchStatusQueryHandlerTests
         await Assert.That(dto.TenantId).IsEqualTo(tenantId);
         await Assert.That(dto.SourceType).IsEqualTo("registration_order");
         await Assert.That(dto.SourceId).IsEqualTo(sourceId);
-        await Assert.That(dto.DeliveryStatus).IsEqualTo(nameof(EmailDispatchStatus.Sent));
+        await Assert.That(dto.DeliveryStatus).IsEqualTo(EmailDispatchStatus.Sent);
+        await Assert.That(dto.ParkReason).IsNull();
         await Assert.That(dto.AttemptCount).IsEqualTo(2);
         await Assert.That(dto.DeliveredAt).IsEqualTo(deliveredAt);
         await Assert.That(dto.ContentRedactedAt).IsEqualTo(contentRedactedAt);
@@ -101,6 +102,40 @@ public sealed class GetEmailDispatchStatusQueryHandlerTests
         await Assert.That(dtoPropertyNames).DoesNotContain("ReplyTo");
         await Assert.That(dtoPropertyNames).DoesNotContain("ProviderMessageId");
         await Assert.That(dtoPropertyNames).DoesNotContain("LastError");
+    }
+
+    [Test]
+    [Arguments(EmailDispatchParkReason.CapabilityUnavailable)]
+    [Arguments(EmailDispatchParkReason.Operator)]
+    [Arguments(null)]
+    public async Task HandleParkedRowsPreservesTypedParkReason(EmailDispatchParkReason? parkReason)
+    {
+        var tenantId = Guid.NewGuid();
+        var parkedAt = DateTime.UtcNow;
+        _repository.GetStatusRows(tenantId, 50, Arg.Any<CancellationToken>())
+            .Returns([
+                new EmailDispatchOutbox
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenantId,
+                    SourceType = "registration_order",
+                    RecipientEmail = "registrant@example.test",
+                    Subject = "Registration confirmation",
+                    Status = EmailDispatchStatus.Parked,
+                    ParkReason = parkReason,
+                    ParkedAt = parkedAt
+                }
+            ]);
+
+        var result = await CreateHandler().Handle(
+            request: new GetEmailDispatchStatusQuery { TenantId = tenantId, Limit = 50 },
+            cancellationToken: CancellationToken.None);
+
+        await Assert.That(result.IsSuccess).IsTrue();
+        var dto = result.Id!.Single();
+        await Assert.That(dto.DeliveryStatus).IsEqualTo(EmailDispatchStatus.Parked);
+        await Assert.That(dto.ParkReason).IsEqualTo(parkReason);
+        await Assert.That(dto.ParkedAt).IsEqualTo(parkedAt);
     }
 
     private GetEmailDispatchStatusQueryHandler CreateHandler() => new(_repository);

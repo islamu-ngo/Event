@@ -1,5 +1,5 @@
 // ABOUTME: Tests API SMTP readiness health-check registration metadata.
-// ABOUTME: Guards the launch-critical SMTP probe timeout and readiness classification.
+// ABOUTME: Guards bounded optional SMTP probes without weakening core readiness registrations.
 
 using Event.Api.IntegrationTests.Fixtures;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,7 +15,7 @@ public sealed class SmtpHealthCheckRegistrationTests
     private static readonly TimeSpan ExpectedSmtpReadinessTimeout = TimeSpan.FromSeconds(5);
 
     [Test]
-    public async Task SmtpReadinessRegistrationUsesBoundedTimeout()
+    public async Task SmtpReadinessRegistrationUsesBoundedTimeoutAndCoreFailureFallback()
     {
         await using var factory = new CustomWebApplicationFactory();
 

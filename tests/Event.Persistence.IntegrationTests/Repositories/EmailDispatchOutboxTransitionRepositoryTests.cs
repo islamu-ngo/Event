@@ -6,6 +6,7 @@ using System.Diagnostics;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Models;
 using Explore.Application.Notifications;
 using Explore.Domain;
 using Explore.Domain.Constants;
@@ -441,7 +442,7 @@ public sealed class EmailDispatchOutboxTransitionRepositoryTests(PostgreSqlConta
     }
 
     [Test]
-    public async Task EligibilityPreservesAuthorizationBoundManagedInvitationDestination()
+    public async Task EligibilitySkipsRetiredManagedInvitationDespiteAdministratorAuthority()
     {
         await fixture.ResetAsync();
         await using var context = fixture.CreateDbContext();
@@ -462,8 +463,13 @@ public sealed class EmailDispatchOutboxTransitionRepositoryTests(PostgreSqlConta
             CreateEligibilityRequest(tenant.Id, dispatch.Id, leaseToken),
             CancellationToken.None);
 
-        await Assert.That(result.Outcome).IsEqualTo(EmailDispatchEligibilityOutcome.Eligible);
-        await Assert.That(result.RecipientEmail).IsEqualTo(invitedAddress);
+        await Assert.That(result.Outcome).IsEqualTo(EmailDispatchEligibilityOutcome.Skipped);
+        await Assert.That(result.RecipientEmail).IsNull();
+        await Assert.That(result.SkipReason).IsEqualTo("managed_administrator_invitation_retired");
+        var skipped = (await repository.GetByTenantAndId(tenant.Id, dispatch.Id, CancellationToken.None))!;
+        await Assert.That(skipped.Status).IsEqualTo(EmailDispatchStatus.Skipped);
+        await Assert.That(skipped.ProcessingLeaseToken).IsNull();
+        await Assert.That(skipped.RecipientEmail).IsEqualTo(invitedAddress);
     }
 
     [Test]
@@ -1219,13 +1225,12 @@ public sealed class EmailDispatchOutboxTransitionRepositoryTests(PostgreSqlConta
 
         var firstOutcome = await repository.SettleProviderFailure(
             new EmailDispatchFailureSettlement(
-                graph.Dispatch.TenantId,
-                graph.Dispatch.Id,
-                firstLease,
-                graph.Attempt.AttemptNumber,
-                "smtp_send_failed",
-                "SMTP send failed before provider acceptance was confirmed.",
-                TimeSpan.Zero,
+                TenantId: graph.Dispatch.TenantId,
+                OutboxId: graph.Dispatch.Id,
+                ProcessingLeaseToken: firstLease,
+                AttemptNumber: graph.Attempt.AttemptNumber,
+                Outcome: SmtpDeliveryOutcome.TransientFailure,
+                RetryDelay: TimeSpan.Zero,
                 MaxAttempts: 3,
                 SettledAt: firstSettledAt),
             CancellationToken.None);
@@ -1285,13 +1290,12 @@ public sealed class EmailDispatchOutboxTransitionRepositoryTests(PostgreSqlConta
 
         var outcome = await repository.SettleProviderFailure(
             new EmailDispatchFailureSettlement(
-                graph.Dispatch.TenantId,
-                graph.Dispatch.Id,
-                graph.Dispatch.ProcessingLeaseToken!.Value,
-                graph.Attempt.AttemptNumber,
-                "smtp_send_failed",
-                "SMTP send failed before provider acceptance was confirmed.",
-                TimeSpan.Zero,
+                TenantId: graph.Dispatch.TenantId,
+                OutboxId: graph.Dispatch.Id,
+                ProcessingLeaseToken: graph.Dispatch.ProcessingLeaseToken!.Value,
+                AttemptNumber: graph.Attempt.AttemptNumber,
+                Outcome: SmtpDeliveryOutcome.TransientFailure,
+                RetryDelay: TimeSpan.Zero,
                 MaxAttempts: 1,
                 SettledAt: settledAt),
             CancellationToken.None);
@@ -1988,6 +1992,19 @@ public sealed class EmailDispatchOutboxTransitionRepositoryTests(PostgreSqlConta
         if (operation is not null)
         {
             context.ManagedTenantProvisioningOperations.Add(operation);
+            context.TenantUserRoleGrants.Add(new TenantUserRoleGrant
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = tenantId,
+                Tenant = null!,
+                TenantUserId = tenantUser.Id,
+                TenantUser = tenantUser,
+                RoleId = (int)RoleEnum.TenantAdmin,
+                Role = null!,
+                RoleScopeId = (int)RoleScopeEnum.Tenant,
+                GrantedAt = now,
+                CreatedAt = now
+            });
         }
         context.NotificationIntents.Add(intent);
         await context.SaveChangesAsync();
@@ -2093,7 +2110,8 @@ public sealed class EmailDispatchOutboxTransitionRepositoryTests(PostgreSqlConta
         new(
             context,
             new NotificationDeliveryPolicyResolver(),
-            new NotificationPreferenceResolver(context));
+            new NotificationPreferenceResolver(context),
+            new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
 
     private static async Task MakeGraphUnknownAsync(ExploreDbContext context, AcceptedSettlementGraph graph)
     {

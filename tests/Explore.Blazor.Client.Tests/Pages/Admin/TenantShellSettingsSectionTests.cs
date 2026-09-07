@@ -74,7 +74,7 @@ public sealed class TenantShellSettingsSectionTests : IDisposable
             Arg.Any<CancellationToken>());
     }
 
-    private static SettingGroupResponseDto CreateSettings(
+    private static HalResourceOfSettingGroupResponseDto CreateSettings(
         bool canEdit,
         string? reason = null,
         SettingSource source = SettingSource.TenantOverride) => new()

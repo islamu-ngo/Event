@@ -3,6 +3,7 @@
 
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Models;
 using Explore.Domain;
 
 namespace Explore.Infrastructure.Tests.Fixtures;
@@ -317,6 +318,9 @@ public sealed class InMemoryEmailDispatchOutboxRepository(EmailDispatchOutbox di
         return Task.FromResult(false);
     }
 
+    public Task<EmailDispatchTenantControl?> GetTenantControl(Guid tenantId, CancellationToken cancellationToken) =>
+        Task.FromResult<EmailDispatchTenantControl?>(null);
+
     public Task<EmailDispatchTenantControl> SetTenantPauseState(
         Guid tenantId,
         bool isPaused,
@@ -368,6 +372,7 @@ public sealed class InMemoryEmailDispatchOutboxRepository(EmailDispatchOutbox di
             dispatch.ProcessingLeaseToken = null;
             dispatch.DeadLetteredAt = null;
             dispatch.ParkedAt = null;
+            dispatch.ParkReason = null;
             dispatch.UnknownAt = null;
             dispatch.LastFailureCategory = null;
             dispatch.LastError = null;
@@ -783,6 +788,8 @@ public sealed class InMemoryEmailDispatchOutboxRepository(EmailDispatchOutbox di
         EmailDispatchFailureSettlement settlement,
         CancellationToken cancellationToken)
     {
+        if (settlement.Outcome is not (SmtpDeliveryOutcome.TransientFailure or SmtpDeliveryOutcome.ConfigurationFailure))
+            throw new ArgumentOutOfRangeException(nameof(settlement), settlement.Outcome, "Only definite SMTP failures can be settled.");
         lock (_gate)
         {
             if (dispatch.TenantId != settlement.TenantId
@@ -794,10 +801,14 @@ public sealed class InMemoryEmailDispatchOutboxRepository(EmailDispatchOutbox di
                 return Task.FromResult(EmailDispatchFailureSettlementOutcome.StaleClaim);
             }
 
-            var exhausted = settlement.AttemptNumber >= settlement.MaxAttempts;
-            dispatch.Status = exhausted ? EmailDispatchStatus.DeadLettered : EmailDispatchStatus.RetryScheduled;
+            var parked = settlement.Outcome == SmtpDeliveryOutcome.ConfigurationFailure;
+            var exhausted = !parked && settlement.AttemptNumber >= settlement.MaxAttempts;
+            dispatch.Status = parked ? EmailDispatchStatus.Parked
+                : exhausted ? EmailDispatchStatus.DeadLettered : EmailDispatchStatus.RetryScheduled;
+            dispatch.ParkedAt = parked ? settlement.SettledAt : null;
+            dispatch.ParkReason = parked ? EmailDispatchParkReason.CapabilityUnavailable : null;
             dispatch.DeadLetteredAt = exhausted ? settlement.SettledAt : null;
-            dispatch.NextAttemptAt = exhausted ? null : settlement.SettledAt.Add(settlement.RetryDelay);
+            dispatch.NextAttemptAt = parked || exhausted ? null : settlement.SettledAt.Add(settlement.RetryDelay);
             dispatch.ProcessingLeaseToken = null;
             dispatch.ProcessingStartedAt = null;
             dispatch.LastFailureCategory = settlement.FailureCategory;
@@ -816,7 +827,9 @@ public sealed class InMemoryEmailDispatchOutboxRepository(EmailDispatchOutbox di
             receipt.FailedAt = settlement.SettledAt;
             receipt.FailureCode = settlement.FailureCategory;
             receipt.FailureMessage = settlement.FailureMessage;
-            return Task.FromResult(exhausted
+            return Task.FromResult(parked
+                ? EmailDispatchFailureSettlementOutcome.Parked
+                : exhausted
                 ? EmailDispatchFailureSettlementOutcome.DeadLettered
                 : EmailDispatchFailureSettlementOutcome.RetryScheduled);
         }
@@ -850,8 +863,8 @@ public sealed class InMemoryEmailDispatchOutboxRepository(EmailDispatchOutbox di
                 value.AttemptNumber == settlement.AttemptNumber);
             attempt.Outcome = EmailDispatchAttemptOutcome.Unknown;
             attempt.CompletedAt = settlement.SettledAt;
-            attempt.FailureCategory = "accepted_settlement_unknown";
-            attempt.SanitizedErrorMessage = "SMTP accepted the message, but local settlement is uncertain. Automatic resend is disabled pending reconciliation.";
+            attempt.FailureCategory = "smtp_outcome_unknown";
+            attempt.SanitizedErrorMessage = "SMTP acceptance or local settlement could not be confirmed. Automatic resend is disabled pending reconciliation.";
             attempt.ProviderMessageId = null;
 
             dispatch.Status = EmailDispatchStatus.Unknown;
@@ -867,7 +880,7 @@ public sealed class InMemoryEmailDispatchOutboxRepository(EmailDispatchOutbox di
             receipt.CompletedAt = null;
             receipt.FailedAt = settlement.SettledAt;
             receipt.ProviderMessageId = null;
-            receipt.FailureCode = "accepted_settlement_unknown";
+            receipt.FailureCode = "smtp_outcome_unknown";
         }
 
         return Task.FromResult(EmailDispatchAcceptedReconciliationOutcome.Unknown);

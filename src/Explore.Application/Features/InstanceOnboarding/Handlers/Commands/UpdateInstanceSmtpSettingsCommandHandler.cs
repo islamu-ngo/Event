@@ -35,23 +35,33 @@ public class UpdateInstanceSmtpSettingsCommandHandler : IRequestHandler<UpdateIn
                 "Only instance administrators can update SMTP settings.");
         }
 
-        if (!request.Patch.HasChanges() || request.Patch.Configuration.Value is null)
+        if (!request.Patch.HasChanges()
+            || (request.Patch.Configuration.HasValue && request.Patch.Configuration.Value is null))
         {
-            const string message = "SMTP settings patch must include a complete configuration group.";
+            const string message = "SMTP settings patch must include delivery enablement or a complete configuration group.";
+            return BaseCommandResponse.Validation<Guid>([message], message);
+        }
+        if (request.Patch.DeliveryEnabled.HasValue && !request.Patch.DeliveryEnabled.Value)
+        {
+            const string message = "Disabling email delivery requires a preview and confirmation.";
             return BaseCommandResponse.Validation<Guid>([message], message);
         }
 
-        var patch = request.Patch.Configuration.Value;
-        var settings = await _smtpSettingService.ReadSettingsAsync();
-        settings.Host = patch.Host;
-        settings.Port = patch.Port;
-        settings.Security = patch.Security;
-        settings.FromAddress = patch.FromAddress;
-        settings.FromName = patch.FromName;
-        settings.TimeoutSeconds = patch.TimeoutSeconds;
-        settings.SkipCertificateValidation = patch.SkipCertificateValidation;
+        var settings = request.Patch.Configuration.Value is { } patch
+            ? new InstanceSmtpSettingsDto
+            {
+                Host = patch.Host,
+                Port = patch.Port,
+                Security = patch.Security,
+                FromAddress = patch.FromAddress,
+                FromName = patch.FromName,
+                TimeoutSeconds = patch.TimeoutSeconds,
+                SkipCertificateValidation = patch.SkipCertificateValidation
+            }
+            : null;
 
-        await _smtpSettingService.ApplySettingsAsync(settings);
+        await _smtpSettingService.ApplySettingsAsync(settings, actorUserId: request.UserId,
+            enableDelivery: request.Patch.DeliveryEnabled.HasValue, cancellationToken: cancellationToken);
 
         _smtpConfigResolver.InvalidateCache();
 

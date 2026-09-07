@@ -5,25 +5,31 @@ using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
-using Explore.Application.Settings.Groups;
-using Explore.Domain;
+using Explore.Application.Settings;
 using Explore.Domain.Constants;
+using MediatR;
 
 namespace Explore.Application.Services;
 
 public class InstanceSmtpSettingService : IInstanceSmtpSettingService
 {
     private readonly ISystemSettingRepository _systemSettingRepository;
-    private readonly ISettingMutationLock _mutationLock;
+    private readonly IEmailDeliverySettingsWriter _emailSettingsWriter;
+    private readonly IPublisher _publisher;
 
-    public InstanceSmtpSettingService(ISystemSettingRepository systemSettingRepository, ISettingMutationLock mutationLock)
+    public InstanceSmtpSettingService(
+        ISystemSettingRepository systemSettingRepository,
+        IEmailDeliverySettingsWriter emailSettingsWriter,
+        IPublisher publisher)
     {
         _systemSettingRepository = systemSettingRepository;
-        _mutationLock = mutationLock;
+        _emailSettingsWriter = emailSettingsWriter;
+        _publisher = publisher;
     }
 
     public async Task<InstanceSmtpSettingsDto> ReadSettingsAsync()
     {
+        var enabled = await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Email.DeliveryEnabled);
         var host = await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Email.SmtpHost);
         var port = await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Email.SmtpPort);
         var security = await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Email.SmtpSecurity);
@@ -34,6 +40,7 @@ public class InstanceSmtpSettingService : IInstanceSmtpSettingService
 
         return new InstanceSmtpSettingsDto
         {
+            DeliveryEnabled = DeserializeBoolean(enabled?.Value, false),
             Host = DeserializeString(host?.Value, string.Empty),
             Port = DeserializeInt(port?.Value, 587),
             Security = DeserializeString(security?.Value, "StartTls"),
@@ -44,70 +51,40 @@ public class InstanceSmtpSettingService : IInstanceSmtpSettingService
         };
     }
 
-    public Task ApplySettingsAsync(InstanceSmtpSettingsDto settings) =>
-        _mutationLock.ExecuteManyAsync(EmailSettingGroup.SettingKeys, async _ =>
-        {
-            await ApplySettingsCoreAsync(settings);
-            return true;
-        });
-
-    private async Task ApplySettingsCoreAsync(InstanceSmtpSettingsDto settings)
+    public async Task ApplySettingsAsync(
+        InstanceSmtpSettingsDto? settings,
+        Guid? actorUserId = null,
+        bool enableDelivery = false,
+        CancellationToken cancellationToken = default)
     {
-        await UpsertSystemSettingAsync(
-            GovernanceSettingKeys.Email.SmtpHost,
-            JsonSerializer.Serialize(settings.Host.Trim()),
-            SettingValueType.String,
-            "Email",
-            1,
-            "SMTP host server name");
-
-        await UpsertSystemSettingAsync(
-            GovernanceSettingKeys.Email.SmtpPort,
-            JsonSerializer.Serialize(settings.Port > 0 ? settings.Port : 587),
-            SettingValueType.Integer,
-            "Email",
-            2,
-            "SMTP server port");
-
-        await UpsertSystemSettingAsync(
-            GovernanceSettingKeys.Email.SmtpSecurity,
-            JsonSerializer.Serialize(settings.Security.Trim()),
-            SettingValueType.String,
-            "Email",
-            5,
-            "SMTP security mode: None, StartTls, SslOnConnect, or Auto");
-
-        await UpsertSystemSettingAsync(
-            GovernanceSettingKeys.Email.FromAddress,
-            JsonSerializer.Serialize(settings.FromAddress.Trim()),
-            SettingValueType.String,
-            "Email",
-            6,
-            "Default sender email address");
-
-        await UpsertSystemSettingAsync(
-            GovernanceSettingKeys.Email.FromName,
-            JsonSerializer.Serialize(settings.FromName.Trim()),
-            SettingValueType.String,
-            "Email",
-            7,
-            "Default sender display name");
-
-        await UpsertSystemSettingAsync(
-            GovernanceSettingKeys.Email.SmtpTimeoutSeconds,
-            JsonSerializer.Serialize(settings.TimeoutSeconds > 0 ? settings.TimeoutSeconds : 30),
-            SettingValueType.Integer,
-            "Email",
-            8,
-            "SMTP connection timeout in seconds");
-
-        await UpsertSystemSettingAsync(
-            GovernanceSettingKeys.Email.SmtpSkipCertValidation,
-            JsonSerializer.Serialize(settings.SkipCertificateValidation),
-            SettingValueType.Boolean,
-            "Email",
-            9,
-            "Skip TLS certificate validation (for development only)");
+        var result = await _emailSettingsWriter.ApplyAsync(
+            [
+                .. (enableDelivery
+                    ? new[] { new EmailDeliverySettingMutation(TenantId: null, Key: GovernanceSettingKeys.Email.DeliveryEnabled,
+                        Kind: EmailDeliverySettingMutationKind.SetValue, Value: "true") }
+                    : []),
+                .. (settings is null ? [] : new[]
+                {
+                    new EmailDeliverySettingMutation(TenantId: null, Key: GovernanceSettingKeys.Email.SmtpHost,
+                        Kind: EmailDeliverySettingMutationKind.SetValue, Value: JsonSerializer.Serialize(settings.Host.Trim())),
+                    new EmailDeliverySettingMutation(TenantId: null, Key: GovernanceSettingKeys.Email.SmtpPort,
+                        Kind: EmailDeliverySettingMutationKind.SetValue, Value: JsonSerializer.Serialize(settings.Port > 0 ? settings.Port : 587)),
+                    new EmailDeliverySettingMutation(TenantId: null, Key: GovernanceSettingKeys.Email.SmtpSecurity,
+                        Kind: EmailDeliverySettingMutationKind.SetValue, Value: JsonSerializer.Serialize(settings.Security.Trim())),
+                    new EmailDeliverySettingMutation(TenantId: null, Key: GovernanceSettingKeys.Email.FromAddress,
+                        Kind: EmailDeliverySettingMutationKind.SetValue, Value: JsonSerializer.Serialize(settings.FromAddress.Trim())),
+                    new EmailDeliverySettingMutation(TenantId: null, Key: GovernanceSettingKeys.Email.FromName,
+                        Kind: EmailDeliverySettingMutationKind.SetValue, Value: JsonSerializer.Serialize(settings.FromName.Trim())),
+                    new EmailDeliverySettingMutation(TenantId: null, Key: GovernanceSettingKeys.Email.SmtpTimeoutSeconds,
+                        Kind: EmailDeliverySettingMutationKind.SetValue, Value: JsonSerializer.Serialize(settings.TimeoutSeconds > 0 ? settings.TimeoutSeconds : 30)),
+                    new EmailDeliverySettingMutation(TenantId: null, Key: GovernanceSettingKeys.Email.SmtpSkipCertValidation,
+                        Kind: EmailDeliverySettingMutationKind.SetValue, Value: JsonSerializer.Serialize(settings.SkipCertificateValidation))
+                })
+            ],
+            actorUserId: actorUserId, cancellationToken: cancellationToken);
+        result.EnsureAccepted();
+        foreach (var notification in result.ToNotifications(actorUserId))
+            await _publisher.Publish(notification, CancellationToken.None);
     }
 
     private static int DeserializeInt(string? rawValue, int defaultValue)
@@ -162,26 +139,4 @@ public class InstanceSmtpSettingService : IInstanceSmtpSettingService
         }
     }
 
-    private async Task UpsertSystemSettingAsync(
-        string settingKey,
-        string value,
-        SettingValueType valueType,
-        string category,
-        int displayOrder,
-        string description)
-    {
-        var existing = await _systemSettingRepository.GetByKey(settingKey);
-        await _systemSettingRepository.UpsertInCurrentTransactionAsync(new SystemSetting
-        {
-            SettingKey = settingKey,
-            Value = value,
-            ValueType = valueType,
-            IsLocked = existing?.IsLocked ?? false,
-            Description = description,
-            Category = category,
-            DisplayOrder = displayOrder,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        });
-    }
 }

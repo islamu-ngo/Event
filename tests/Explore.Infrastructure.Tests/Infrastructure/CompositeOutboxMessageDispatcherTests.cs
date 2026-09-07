@@ -819,7 +819,8 @@ public sealed class CompositeOutboxMessageDispatcherTests
             sourceType: "event",
             sourceId: eventId,
             coalescingKey: $"event:{eventId:N}:schedule",
-            coalescingWindowEndsAt: occurredAt);
+            coalescingWindowEndsAt: occurredAt,
+            emailDeliveryPolicyRevision: 0);
     }
 
     private static NotificationFanoutRun CreateRun(NotificationFanoutOccurrence occurrence) =>

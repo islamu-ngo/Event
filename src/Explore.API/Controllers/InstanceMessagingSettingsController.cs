@@ -7,6 +7,10 @@ using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
 using Explore.API.Hateoas;
+using Explore.API.Filters;
+using Explore.Application.DTOs.EmailDispatch;
+using Explore.Application.Features.EmailDispatch.Requests.Commands;
+using Explore.Application.Features.EmailDispatch.Requests.Queries;
 using Explore.API.Models;
 using Explore.Application.Authorization;
 using Explore.Application.Constants;
@@ -60,16 +64,65 @@ public sealed class InstanceMessagingSettingsController : InstanceSettingsContro
     [HttpGet("smtp", Name = RouteNames.GetInstanceSmtpSettings)]
     [EndpointSummary("Get Instance SMTP Settings")]
     [EndpointDescription("Returns instance SMTP settings. Only instance admins can access.")]
-    [ProducesResponseType(typeof(InstanceSmtpSettingsDto), StatusCodes.Status200OK)]
+    [PrivateNoStore]
+    [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
+    [ProducesResponseType(typeof(HalResource<InstanceSmtpSettingsDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
-    public async Task<ActionResult<InstanceSmtpSettingsDto>> GetSmtpSettings(CancellationToken cancellationToken = default)
+    public async Task<ActionResult<HalResource<InstanceSmtpSettingsDto>>> GetSmtpSettings(
+        [FromServices] IResourceAssembler<InstanceSmtpSettingsDto, InstanceSmtpSettingsDto> assembler,
+        CancellationToken cancellationToken = default)
     {
         if (!await IsInstanceAdminOrSetupAuthenticated(cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
         var settings = await _mediator.Send(new GetInstanceSmtpSettingsQuery(), cancellationToken);
-        return Ok(settings);
+        return Ok(await assembler.ToResource(settings, HttpContext));
+    }
+
+    [HttpPost("smtp/disable-preview", Name = RouteNames.PreviewInstanceSmtpDisable)]
+    [EndpointClassification(EndpointClass.Admin)]
+    [EndpointSummary("Preview Instance SMTP Disable")]
+    [PrivateNoStore]
+    [SuppressIdempotencyResponseStorage]
+    [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
+    [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
+    [ProducesResponseType(typeof(HalResource<EmailDeliveryDisablePreviewDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<HalResource<EmailDeliveryDisablePreviewDto>>> PreviewSmtpDisable(
+        [FromServices] IResourceAssembler<EmailDeliveryDisablePreviewDto, EmailDeliveryDisablePreviewDto> assembler,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(new PreviewEmailDeliveryDisableQuery(TenantId: null), cancellationToken);
+        return response.IsSuccess
+            ? Ok(await assembler.ToResource(response.Id!, HttpContext))
+            : this.ToEmailDeliveryDisableProblem(response);
+    }
+
+    [HttpPost("smtp/disable", Name = RouteNames.DisableInstanceSmtp)]
+    [EndpointClassification(EndpointClass.Admin)]
+    [EndpointSummary("Disable Instance SMTP")]
+    [PrivateNoStore]
+    [SuppressIdempotencyResponseStorage]
+    [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(BaseCommandResponse<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<BaseCommandResponse<Guid>>> DisableSmtp(
+        [FromBody] EmailDeliveryDisableRequest body, CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(new DisableEmailDeliveryCommand(TenantId: null,
+            ExpectedRevision: body.ExpectedRevision, Acknowledgement: body.Acknowledgement,
+            ConfirmationToken: body.ConfirmationToken), cancellationToken);
+        return response.IsSuccess ? Ok(response) : this.ToEmailDeliveryDisableProblem(response);
     }
 
     [HttpPatch("smtp", Name = RouteNames.UpdateInstanceSmtpSettings)]
+    [PrivateNoStore]
     [EndpointSummary("Update Instance SMTP Settings")]
     [EndpointDescription("Updates instance SMTP settings. Requires instance administrator.")]
     [Consumes("application/json")]

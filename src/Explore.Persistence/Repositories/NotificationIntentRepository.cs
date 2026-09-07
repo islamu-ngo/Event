@@ -3,10 +3,16 @@
 
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
+using Explore.Application.Notifications;
 using Explore.Domain;
+using Explore.Domain.Constants;
+using Explore.Domain.Enums;
+using Explore.Domain.Services;
 using Explore.Persistence.Database;
 using Explore.Persistence.Extensions;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Schema.ProviderPrimitives;
+using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
@@ -17,10 +23,13 @@ public sealed class NotificationIntentRepository : GenericRepository<Notificatio
 {
     private const string UniqueViolationSqlState = "23505";
     private readonly ExploreDbContext _dbContext;
+    private readonly ISettingMutationLock _mutationLock;
+    private readonly NotificationDeliveryPolicyResolver _deliveryPolicyResolver = new();
 
-    public NotificationIntentRepository(ExploreDbContext dbContext) : base(dbContext)
+    public NotificationIntentRepository(ExploreDbContext dbContext, ISettingMutationLock mutationLock) : base(dbContext)
     {
         _dbContext = dbContext;
+        _mutationLock = mutationLock;
     }
 
     public async Task<NotificationIntent> CreateIntentAsync(NotificationIntent intent, CancellationToken cancellationToken = default)
@@ -28,9 +37,17 @@ public sealed class NotificationIntentRepository : GenericRepository<Notificatio
         return await CreateGraphAsync(intent, cancellationToken);
     }
 
-    public async Task<NotificationIntent> CreateGraphAsync(NotificationIntent intent, CancellationToken cancellationToken = default)
+    public Task<NotificationIntent> CreateGraphAsync(NotificationIntent intent, CancellationToken cancellationToken = default) =>
+        _mutationLock.ExecuteManyAsync([GovernanceSettingKeys.Email.DeliveryEnabled],
+            token => CreateGraphUnderPolicyLockAsync(intent, token), cancellationToken);
+
+    private async Task<NotificationIntent> CreateGraphUnderPolicyLockAsync(
+        NotificationIntent intent, CancellationToken cancellationToken)
     {
-        await EnsureFanoutOccurrencePendingUnderEventLockAsync(intent, cancellationToken);
+        var occurrence = await EnsureFanoutOccurrencePendingUnderEventLockAsync(intent, cancellationToken);
+        var control = await ReadTenantControlAsync(intent.TenantId, cancellationToken);
+        intent.EmailDeliveryPolicyRevision = occurrence?.EmailDeliveryPolicyRevision ?? control?.DeliveryPolicyRevision ?? 0;
+        await ApplyEmailPolicyAsync(intent, intent.Deliveries, control, cancellationToken);
         try
         {
             _dbContext.NotificationIntents.Add(intent);
@@ -137,12 +154,21 @@ public sealed class NotificationIntentRepository : GenericRepository<Notificatio
         return delivery;
     }
 
-    public async Task RepairMissingRecipientDeliveryRowsAsync(
+    public Task RepairMissingRecipientDeliveryRowsAsync(
         NotificationIntent winningIntent,
         IReadOnlyList<NotificationDelivery> expectedDeliveries,
         Notification? expectedNotification,
         EmailDispatchOutbox? expectedEmail,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        _mutationLock.ExecuteManyAsync([GovernanceSettingKeys.Email.DeliveryEnabled], async token =>
+        {
+            await RepairUnderPolicyLockAsync(winningIntent, expectedDeliveries, expectedNotification, expectedEmail, token);
+            return true;
+        }, cancellationToken);
+
+    private async Task RepairUnderPolicyLockAsync(NotificationIntent winningIntent,
+        IReadOnlyList<NotificationDelivery> expectedDeliveries, Notification? expectedNotification,
+        EmailDispatchOutbox? expectedEmail, CancellationToken cancellationToken)
     {
         await EnsureFanoutOccurrencePendingUnderEventLockAsync(winningIntent, cancellationToken);
         var tracked = await _dbContext.NotificationIntents
@@ -155,6 +181,7 @@ public sealed class NotificationIntentRepository : GenericRepository<Notificatio
                 && intent.Id == winningIntent.Id,
                 cancellationToken);
 
+        List<NotificationDelivery> reconstructedEmailDeliveries = [];
         foreach (NotificationDelivery expected in expectedDeliveries)
         {
             NotificationDelivery? existing = tracked.Deliveries.SingleOrDefault(row => row.ChannelId == expected.ChannelId);
@@ -175,8 +202,17 @@ public sealed class NotificationIntentRepository : GenericRepository<Notificatio
                 }
 
                 tracked.Deliveries.Add(expected);
+                _dbContext.NotificationDeliveries.Add(expected);
+                if (expected.ChannelId == (int)NotificationPreferenceChannelEnum.Email)
+                    reconstructedEmailDeliveries.Add(expected);
                 continue;
             }
+
+            // Repair does not authorize replay of terminal email history or release an operator park.
+            if (existing.ChannelId == (int)NotificationPreferenceChannelEnum.Email
+                && existing.StatusId is not ((int)NotificationDeliveryStatusEnum.Pending)
+                    and not ((int)NotificationDeliveryStatusEnum.Queued))
+                continue;
 
             if (existing.NotificationId is null && expected.NotificationId is not null && expectedNotification is not null)
             {
@@ -184,6 +220,7 @@ public sealed class NotificationIntentRepository : GenericRepository<Notificatio
                 expectedNotification.NotificationIntent = tracked;
                 existing.NotificationId = expectedNotification.Id;
                 existing.Notification = expectedNotification;
+                _dbContext.Notifications.Add(expectedNotification);
             }
 
             if (existing.EmailDispatchOutboxId is null && expected.EmailDispatchOutboxId is not null && expectedEmail is not null)
@@ -192,19 +229,27 @@ public sealed class NotificationIntentRepository : GenericRepository<Notificatio
                 expectedEmail.NotificationIntent = tracked;
                 existing.EmailDispatchOutboxId = expectedEmail.Id;
                 existing.EmailDispatchOutbox = expectedEmail;
+                _dbContext.EmailDispatchOutbox.Add(expectedEmail);
+                reconstructedEmailDeliveries.Add(existing);
             }
         }
 
+        // Existing outboxes belong to admission/settlement, including a live SMTP handoff.
+        if (reconstructedEmailDeliveries.Count > 0)
+        {
+            var control = await ReadTenantControlAsync(tracked.TenantId, cancellationToken);
+            await ApplyEmailPolicyAsync(tracked, reconstructedEmailDeliveries, control, cancellationToken);
+        }
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task EnsureFanoutOccurrencePendingUnderEventLockAsync(
+    private async Task<NotificationFanoutOccurrence?> EnsureFanoutOccurrencePendingUnderEventLockAsync(
         NotificationIntent intent,
         CancellationToken cancellationToken)
     {
         if (intent.FanoutOccurrenceId is not { } occurrenceId)
         {
-            return;
+            return null;
         }
 
         if (intent.EventId is not { } eventId
@@ -221,17 +266,71 @@ public sealed class NotificationIntentRepository : GenericRepository<Notificatio
             intent.TenantId,
             eventId,
             cancellationToken);
-        bool remainsPending = await _dbContext.NotificationFanoutOccurrences
+        var occurrence = await _dbContext.NotificationFanoutOccurrences
             .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
             .AsNoTracking()
-            .AnyAsync(occurrence => occurrence.TenantId == intent.TenantId
+            .SingleOrDefaultAsync(occurrence => occurrence.TenantId == intent.TenantId
                 && occurrence.Id == occurrenceId
                 && occurrence.EventId == eventId
                 && occurrence.State == NotificationFanoutOccurrenceState.Pending,
                 cancellationToken);
-        if (!remainsPending)
+        if (occurrence is null)
         {
             throw new NotificationFanoutOccurrenceUnavailableException();
+        }
+        return occurrence;
+    }
+
+    private Task<EmailDispatchTenantControl?> ReadTenantControlAsync(Guid tenantId, CancellationToken cancellationToken) =>
+        _dbContext.EmailDispatchTenantControls
+            .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
+            .AsNoTracking().SingleOrDefaultAsync(control => control.TenantId == tenantId, cancellationToken);
+
+    private async Task ApplyEmailPolicyAsync(NotificationIntent intent,
+        IEnumerable<NotificationDelivery> candidates, EmailDispatchTenantControl? control, CancellationToken cancellationToken)
+    {
+        var deliveries = candidates.Where(delivery =>
+            delivery.ChannelId == (int)NotificationPreferenceChannelEnum.Email
+            && delivery.StatusId is (int)NotificationDeliveryStatusEnum.Pending or (int)NotificationDeliveryStatusEnum.Queued)
+            .ToArray();
+        if (deliveries.Length == 0)
+            return;
+
+        var policy = await EmailDeliveryPolicyReader.ReadAsync(_dbContext, intent.TenantId, cancellationToken);
+        DateTime now = await RelationalDatabaseClock.GetUtcNowAsync(_dbContext, cancellationToken);
+        foreach (var delivery in deliveries)
+        {
+            var definition = await _dbContext.Set<NotificationDeliveryPolicy>().AsNoTracking()
+                .SingleAsync(value => value.Id == delivery.DeliveryPolicyId, cancellationToken);
+            var resolution = _deliveryPolicyResolver.Resolve(definition.Id, definition.MasterCode, delivery.PolicyVersion);
+            if (!resolution.IsSupported)
+                throw new InvalidOperationException("Notification graph has an unsupported email delivery policy.");
+            bool skip = EmailDeliveryPolicy.ShouldSuppressOptional(
+                state: policy.State, honorsPreference: resolution.HonorsPreference,
+                occurrenceRevision: intent.EmailDeliveryPolicyRevision,
+                suppressedThroughRevision: control?.OptionalSuppressedThroughRevision);
+            if (!skip && policy.State == EmailDeliveryState.Available)
+                continue;
+
+            string reason = skip && policy.State is (EmailDeliveryState.Disabled or EmailDeliveryState.Available)
+                ? "email_delivery_disabled" : "email_capability_unavailable";
+            delivery.StatusId = (int)(skip ? NotificationDeliveryStatusEnum.Skipped : NotificationDeliveryStatusEnum.Parked);
+            delivery.ProviderStatus = skip ? "skipped" : "parked";
+            delivery.FailureCategory = reason;
+            delivery.CompletedAt = skip ? now : null;
+            delivery.UpdatedAt = now;
+            if (delivery.EmailDispatchOutbox is not { } email)
+                continue;
+            email.Status = skip ? EmailDispatchStatus.Skipped : EmailDispatchStatus.Parked;
+            email.ParkedAt = skip ? null : now;
+            email.ParkReason = skip ? null : EmailDispatchParkReason.CapabilityUnavailable;
+            email.NextAttemptAt = null;
+            email.ProcessingStartedAt = null;
+            email.ProcessingLeaseToken = null;
+            email.LastFailureCategory = reason;
+            email.LastError = "Email delivery was suppressed before SMTP handoff by the delivery policy.";
+            email.LastFailureAt = now;
+            email.UpdatedAt = now;
         }
     }
 

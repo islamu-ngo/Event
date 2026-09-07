@@ -5,6 +5,7 @@ namespace Explore.Application.Features.ConfigurationManifest.Application;
 
 using System.Collections.Immutable;
 using Explore.Application.Features.ConfigurationManifest.Catalog;
+using Explore.Application.Features.ConfigurationManifest.Validation;
 using Explore.Application.Notifications;
 using Explore.Application.Settings;
 
@@ -51,6 +52,15 @@ public sealed class ConfigurationManifestInstanceSettingMutationBoundary(
             throw new ArgumentException(
                 "Instance setting mutation timestamp must use UTC kind.",
                 nameof(input));
+        }
+
+        if (input.Mutations.Any(mutation => EmailDeliverySettingKeys.Contains(mutation.Key)))
+        {
+            return new ConfigurationManifestInstanceSettingMutationResult(
+                Success: false,
+                FailureCode: ConfigurationManifestFailureCodes.KeyNotAllowed,
+                Message: "SMTP settings are not accepted in configuration manifests.",
+                DeferredNotifications: []);
         }
 
         var seenKeys = new HashSet<string>(StringComparer.Ordinal);

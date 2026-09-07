@@ -9,5 +9,9 @@ public interface IInstanceSmtpSettingService
 {
     Task<InstanceSmtpSettingsDto> ReadSettingsAsync();
 
-    Task ApplySettingsAsync(InstanceSmtpSettingsDto settings);
+    Task ApplySettingsAsync(
+        InstanceSmtpSettingsDto? settings,
+        Guid? actorUserId = null,
+        bool enableDelivery = false,
+        CancellationToken cancellationToken = default);
 }

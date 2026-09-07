@@ -9,6 +9,7 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Settings;
+using Explore.Domain.Settings.Definitions;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -22,7 +23,7 @@ namespace Event.Persistence.IntegrationTests.Repositories;
 [NotInParallel("PersistenceDb")]
 public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFixture fixture)
 {
-    private const string SettingKey = GovernanceSettingKeys.Email.SmtpHost;
+    private static readonly string SettingKey = PublicExperienceSettingDefinitions.EventCatalogLabel.Key;
     private readonly Guid _actorId = Guid.NewGuid();
 
     [Test]
@@ -30,7 +31,7 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
     {
         Guid tenantId = await SeedAsync(tenantLocked: true);
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new TenantSettingRepository(context);
+        var repository = new TenantSettingRepository(context, CreateMutationLock(context));
 
         await repository.SetValueAsync(tenantId, SettingKey, "\"updated\"");
 
@@ -165,7 +166,7 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
         Guid unlockActor = Guid.NewGuid();
         Guid deniedUnlockActor = Guid.NewGuid();
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new TenantSettingRepository(context);
+        var repository = new TenantSettingRepository(context, CreateMutationLock(context));
 
         bool lockApplied = await repository.LockAsync(tenantId, SettingKey, deniedLockActor);
         bool unlockApplied = await repository.UnlockAsync(tenantId, SettingKey, unlockActor);
@@ -185,13 +186,13 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
         Guid tenantId = await SeedAsync(tenantLocked: false);
         Guid actorId = Guid.NewGuid();
         await using ExploreDbContext context = fixture.CreateDbContext();
-        var repository = new TenantSettingRepository(context);
+        var repository = new TenantSettingRepository(context, CreateMutationLock(context));
 
         await repository.UpsertManyForTenantAsync(
             tenantId,
             [
                 new TenantSettingOverrideUpsert(SettingKey, "\"updated\"", true),
-                new TenantSettingOverrideUpsert(GovernanceSettingKeys.Email.SmtpPort, "2525", false)
+                new TenantSettingOverrideUpsert(GovernanceSettingKeys.Storage.DefaultTenantQuotaBytes, "2525", false)
             ],
             actorId);
 
@@ -201,7 +202,7 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
             .Where(setting => setting.TenantId == tenantId)
             .ToListAsync();
         TenantSetting updated = saved.Single(setting => setting.SettingKey == SettingKey);
-        TenantSetting inserted = saved.Single(setting => setting.SettingKey == GovernanceSettingKeys.Email.SmtpPort);
+        TenantSetting inserted = saved.Single(setting => setting.SettingKey == GovernanceSettingKeys.Storage.DefaultTenantQuotaBytes);
         await Assert.That(updated.UpdatedBy).IsEqualTo(actorId);
         await Assert.That(updated.UpdatedAt).IsNotNull();
         await Assert.That(inserted.CreatedBy).IsEqualTo(actorId);
@@ -214,10 +215,10 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
         Guid tenantId = await SeedAsync(tenantLocked: false);
         await using ExploreDbContext firstContext = fixture.CreateDbContext();
         await using ExploreDbContext secondContext = fixture.CreateDbContext();
-        var firstRepository = new TenantSettingRepository(firstContext);
-        var secondRepository = new TenantSettingRepository(secondContext);
         RelationalSettingMutationLock firstLock = CreateMutationLock(firstContext);
         RelationalSettingMutationLock secondLock = CreateMutationLock(secondContext);
+        var firstRepository = new TenantSettingRepository(firstContext, firstLock);
+        var secondRepository = new TenantSettingRepository(secondContext, secondLock);
 
         bool lockApplied = await RunFirstThenSecondAsync(
             firstLock,
@@ -286,10 +287,10 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
         Guid tenantId = await SeedAsync(tenantLocked: true);
         await using ExploreDbContext firstContext = fixture.CreateDbContext();
         await using ExploreDbContext secondContext = fixture.CreateDbContext();
-        var firstRepository = new TenantSettingRepository(firstContext);
-        var secondRepository = new TenantSettingRepository(secondContext);
         RelationalSettingMutationLock firstLock = CreateMutationLock(firstContext);
         RelationalSettingMutationLock secondLock = CreateMutationLock(secondContext);
+        var firstRepository = new TenantSettingRepository(firstContext, firstLock);
+        var secondRepository = new TenantSettingRepository(secondContext, secondLock);
 
         bool unlockApplied = await RunFirstThenSecondAsync(
             firstLock,
@@ -311,10 +312,10 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
         Guid tenantId = await SeedAsync(tenantLocked: false);
         await using ExploreDbContext firstContext = fixture.CreateDbContext();
         await using ExploreDbContext secondContext = fixture.CreateDbContext();
-        var firstRepository = new TenantSettingRepository(firstContext);
-        var secondRepository = new TenantSettingRepository(secondContext);
         RelationalSettingMutationLock firstLock = CreateMutationLock(firstContext);
         RelationalSettingMutationLock secondLock = CreateMutationLock(secondContext);
+        var firstRepository = new TenantSettingRepository(firstContext, firstLock);
+        var secondRepository = new TenantSettingRepository(secondContext, secondLock);
 
         bool unlockApplied = await RunFirstThenSecondAsync(
             firstLock,
@@ -346,7 +347,7 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
         var releaseFirst = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         Task<bool> firstTask = firstLock.ExecuteManyAsync(
-            [GovernanceSettingKeys.Email.SmtpPort, SettingKey],
+            [GovernanceSettingKeys.Storage.DefaultTenantQuotaBytes, SettingKey],
             async token =>
             {
                 firstEntered.SetResult();
@@ -355,7 +356,7 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
             });
         await firstEntered.Task;
         Task<bool> secondTask = secondLock.ExecuteManyAsync(
-            [SettingKey, GovernanceSettingKeys.Email.SmtpPort],
+            [SettingKey, GovernanceSettingKeys.Storage.DefaultTenantQuotaBytes],
             _ => Task.FromResult(true));
 
         await WaitUntilAdvisoryLockIsWaitingAsync(secondBackendPid, secondTask);
@@ -374,9 +375,9 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
         RelationalSettingMutationLock mutationLock = CreateMutationLock(context);
 
         bool result = await mutationLock.ExecuteManyAsync(
-            [GovernanceSettingKeys.Email.SmtpPort, SettingKey],
+            [GovernanceSettingKeys.Storage.DefaultTenantQuotaBytes, SettingKey],
             token => mutationLock.ExecuteManyAsync(
-                [SettingKey, GovernanceSettingKeys.Email.SmtpPort],
+                [SettingKey, GovernanceSettingKeys.Storage.DefaultTenantQuotaBytes],
                 _ => Task.FromResult(true),
                 token));
 
@@ -398,7 +399,7 @@ public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFix
         RelationalSettingMutationLock secondLock = CreateMutationLock(secondContext);
         var firstSystemRepository = new SystemSettingRepository(firstContext, firstLock);
         var secondSystemRepository = new SystemSettingRepository(secondContext, secondLock);
-        var secondTenantRepository = new TenantSettingRepository(secondContext);
+        var secondTenantRepository = new TenantSettingRepository(secondContext, secondLock);
 
         BaseCommandResponse<Guid> result = await RunFirstThenSecondAsync(
             firstLock,

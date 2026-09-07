@@ -21,7 +21,8 @@ public sealed class SetControlPlaneTenantSettingCommandHandler(
     IHierarchicalSettingsResolver settingsResolver,
     IMediator mediator,
     IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    IEmailDeliverySettingsWriter emailDeliverySettingsWriter)
     : IRequestHandler<SetControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> Handle(
@@ -55,6 +56,26 @@ public sealed class SetControlPlaneTenantSettingCommandHandler(
                 request.TenantId,
                 "setting_validation_failed",
                 "The tenant setting value is invalid.");
+        }
+
+        if (EmailDeliverySettingKeys.Contains(request.Key))
+        {
+            EmailDeliverySettingsWriteResult result = await emailDeliverySettingsWriter.ApplyAsync(
+                [new EmailDeliverySettingMutation(
+                    TenantId: request.TenantId,
+                    Key: request.Key,
+                    Kind: EmailDeliverySettingMutationKind.SetValue,
+                    Value: serializedValue)],
+                actorUserId,
+                cancellationToken);
+            if (result.IsAccepted() && !result.Changes.IsEmpty)
+            {
+                settingsResolver.InvalidateCache(SettingScope.Tenant, request.TenantId);
+                foreach (SettingChangedNotification notification in result.ToNotifications(actorUserId))
+                    await mediator.Publish(notification, CancellationToken.None);
+            }
+
+            return result.ToCommandResponse(request.TenantId, "Tenant setting updated.");
         }
 
         if (PublicationPolicySettingKeys.All.Contains(request.Key, StringComparer.Ordinal))

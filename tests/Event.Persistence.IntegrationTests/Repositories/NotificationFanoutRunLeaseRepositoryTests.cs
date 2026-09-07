@@ -970,7 +970,8 @@ public sealed class NotificationFanoutRunLeaseRepositoryTests(PostgreSqlContaine
             sourceType: "event",
             sourceId: @event.Id,
             coalescingKey: $"event:{@event.Id:N}:schedule",
-            coalescingWindowEndsAt: occurrenceTime);
+            coalescingWindowEndsAt: occurrenceTime,
+            emailDeliveryPolicyRevision: 0);
         context.NotificationFanoutOccurrences.Add(occurrence);
         await context.SaveChangesAsync();
         if (ensureRun)
@@ -1016,7 +1017,8 @@ public sealed class NotificationFanoutRunLeaseRepositoryTests(PostgreSqlContaine
             sourceType: "event",
             sourceId: scenario.EventId,
             coalescingKey: $"event:{scenario.EventId:N}:schedule:{suffix}",
-            coalescingWindowEndsAt: occurredAt);
+            coalescingWindowEndsAt: occurredAt,
+            emailDeliveryPolicyRevision: 0);
         context.NotificationFanoutOccurrences.Add(occurrence);
         await context.SaveChangesAsync();
         if (ensureRun)

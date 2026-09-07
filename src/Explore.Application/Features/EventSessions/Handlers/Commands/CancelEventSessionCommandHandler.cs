@@ -5,8 +5,10 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.EventSessions.Requests.Commands;
 using Explore.Application.Notifications;
+using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Microsoft.Extensions.Caching.Hybrid;
 
@@ -19,7 +21,8 @@ public sealed class CancelEventSessionCommandHandler(
     HybridCache cache,
     NotificationFanoutOccurrenceCoordinator fanoutCoordinator,
     IEventLifecycleScheduler eventLifecycleScheduler,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    ISettingMutationLock mutationLock)
     : EventSessionLifecycleTransitionCommandHandlerBase<CancelEventSessionCommand>(
         eventSessionRepository,
         eventRepository,
@@ -27,6 +30,11 @@ public sealed class CancelEventSessionCommandHandler(
         cache,
         timeProvider)
 {
+    protected override Task<BaseCommandResponse<Guid>> ExecuteTransitionAsync(
+        Func<CancellationToken, Task<BaseCommandResponse<Guid>>> operation,
+        CancellationToken cancellationToken) => mutationLock.ExecuteOrderedGroupsAsync(
+            [[GovernanceSettingKeys.Email.DeliveryEnabled]], operation, cancellationToken);
+
     protected override string ActionName => "cancel";
     protected override string PastTenseActionName => "cancelled";
     protected override string ConcurrencyFailureCode => "event_session_cancel_concurrency_conflict";

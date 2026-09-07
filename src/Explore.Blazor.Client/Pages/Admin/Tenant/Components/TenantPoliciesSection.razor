@@ -598,7 +598,7 @@
     {
         try
         {
-            SettingGroupResponseDto? response = await TenantOnboardingService.GetTenantSettingsAsync(category);
+            HalResourceOfSettingGroupResponseDto? response = await TenantOnboardingService.GetTenantSettingsAsync(category);
             if (response is null || !string.Equals(response.Category, category, StringComparison.OrdinalIgnoreCase))
             {
                 return null;
@@ -623,7 +623,7 @@
     {
         try
         {
-            SettingGroupResponseDto? response = await TenantOnboardingService.GetTenantSettingsAsync(category);
+            HalResourceOfSettingGroupResponseDto? response = await TenantOnboardingService.GetTenantSettingsAsync(category);
             if (_disposed)
             {
                 return;

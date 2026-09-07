@@ -12,7 +12,7 @@ public interface ITenantOnboardingService
     Task<TenantPolicySettingsDto> GetSettingsAsync();
     Task<TenantPolicySettingsDto?> GetManagementSettingsAsync(
         CancellationToken cancellationToken = default);
-    Task<SettingGroupResponseDto?> GetTenantSettingsAsync(
+    Task<HalResourceOfSettingGroupResponseDto?> GetTenantSettingsAsync(
         string category,
         CancellationToken cancellationToken = default);
     Task<BaseCommandResponseOfGuid> UpdateTenantSettingAsync(
@@ -95,7 +95,7 @@ public class TenantOnboardingService : ITenantOnboardingService
         }
     }
 
-    public async Task<SettingGroupResponseDto?> GetTenantSettingsAsync(
+    public async Task<HalResourceOfSettingGroupResponseDto?> GetTenantSettingsAsync(
         string category,
         CancellationToken cancellationToken = default)
     {

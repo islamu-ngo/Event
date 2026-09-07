@@ -5,6 +5,20 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 ## 2026-09-07
 
+- **Guarded SMTP delivery disable.** Instance administration exposes
+  `POST /api/instance/settings/smtp/disable-preview` and `/disable`; current-tenant
+  administration exposes `POST /api/settings/email-delivery/disable-preview` and
+  `/disable`. Preview returns non-secret scope/revision impact and an expiring,
+  actor-bound confirmation token. Commit requires that token, the observed revision
+  and the exact acknowledgement `DISABLE EMAIL DELIVERY`; stale evidence returns
+  409 without mutation. Current persisted administrator authority and settings
+  locks are checked independently of the token.
+- **Breaking: SMTP read responses use HAL.** Instance SMTP settings publish
+  `deliveryEnabled` and server-authored action links. Clients discover
+  `disable-preview` and `disable` rather than inferring authority from roles;
+  generic settings writes cannot bypass confirmed disable. Preview/commit responses
+  are private and no-store. The native generated client now uses
+  `HalResourceOfInstanceSmtpSettingsDto` instead of its former plain response type.
 - **Breaking: Local sign-in accepts an identifier.** API and BFF Local login
   requests use `identifier` instead of `email`, without a compatibility alias.
   Usernames and email addresses resolve existing Local credentials; successful
@@ -95,6 +109,16 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
   tenant overrides cannot bypass this gate. External-provider authority is unchanged.
   Local login responses are private/no-store and excluded from generic idempotency
   response storage and replay, so a repeated key cannot reuse an earlier success.
+### Email-dispatch operator hold ownership
+
+- Status resources expose nullable `parkReason` with `CapabilityUnavailable` or
+  `Operator`. `deliveryStatus` is now a typed enum in the contract; JSON continues
+  to use the existing named status values.
+- Permission-qualified `park` links include capability-parked messages so an
+  operator can take ownership of the hold. Repeating an existing operator hold
+  does not overwrite its reason or timestamp.
+- Undefined statuses do not advertise mutation links. Processing, redacted and
+  uncertain-send rows cannot be parked; existing reconciliation rules remain.
 
 ## 2026-09-01
 

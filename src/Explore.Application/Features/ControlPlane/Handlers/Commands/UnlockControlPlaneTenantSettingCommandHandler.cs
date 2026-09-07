@@ -18,7 +18,9 @@ public sealed class UnlockControlPlaneTenantSettingCommandHandler(
     ISettingMutationLock mutationLock,
     ICurrentUserService currentUserService,
     IHierarchicalSettingsResolver settingsResolver,
-    IMediator mediator)
+    IMediator mediator,
+    IEmailDeliverySettingsWriter emailDeliverySettingsWriter,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<UnlockControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> Handle(
@@ -60,9 +62,23 @@ public sealed class UnlockControlPlaneTenantSettingCommandHandler(
         }
 
         (BaseCommandResponse<Guid> Response, SettingChangedNotification? Notification) outcome =
-            await mutationLock.ExecuteAsync<(BaseCommandResponse<Guid>, SettingChangedNotification?)>(
-            request.Key,
-            async token =>
+            EmailDeliverySettingKeys.Contains(request.Key)
+                ? await mutationLock.ExecuteOrderedGroupsAsync(
+                    [EmailDeliverySettingKeys.All],
+                    token => unitOfWork.ExecuteSerializableAsync(ApplyAsync, token),
+                    cancellationToken)
+                : await mutationLock.ExecuteAsync(request.Key, ApplyAsync, cancellationToken);
+
+        if (outcome.Notification is not null)
+        {
+            settingsResolver.InvalidateCache(SettingScope.Tenant, request.TenantId);
+            await mediator.Publish(outcome.Notification, CancellationToken.None);
+        }
+
+        return outcome.Response;
+
+        async Task<(BaseCommandResponse<Guid> Response, SettingChangedNotification? Notification)>
+            ApplyAsync(CancellationToken token)
             {
                 if (await systemSettingRepository.IsLocked(request.Key, token))
                 {
@@ -84,6 +100,21 @@ public sealed class UnlockControlPlaneTenantSettingCommandHandler(
                 {
                     return (ControlPlaneTenantSettingSecurity.Failure(
                         request.TenantId, "setting_state_conflict", "The tenant setting is already unlocked."), null);
+                }
+
+                if (EmailDeliverySettingKeys.Contains(request.Key))
+                {
+                    EmailDeliverySettingsWriteResult result = await emailDeliverySettingsWriter.ApplyAsync(
+                        [new EmailDeliverySettingMutation(
+                            TenantId: request.TenantId,
+                            Key: request.Key,
+                            Kind: EmailDeliverySettingMutationKind.SetLock,
+                            IsLocked: false)],
+                        actorUserId,
+                        token);
+                    return (
+                        result.ToCommandResponse(request.TenantId, "Tenant setting unlocked."),
+                        result.IsAccepted() ? result.ToNotifications(actorUserId).SingleOrDefault() : null);
                 }
 
                 bool applied = await repository.UnlockAsync(
@@ -109,15 +140,6 @@ public sealed class UnlockControlPlaneTenantSettingCommandHandler(
                     actorUserId,
                     DateTime.UtcNow);
                 return (response, notification);
-            },
-            cancellationToken);
-
-        if (outcome.Notification is not null)
-        {
-            settingsResolver.InvalidateCache(SettingScope.Tenant, request.TenantId);
-            await mediator.Publish(outcome.Notification, cancellationToken);
-        }
-
-        return outcome.Response;
+            }
     }
 }

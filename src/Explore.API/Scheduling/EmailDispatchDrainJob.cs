@@ -22,7 +22,7 @@ public sealed class EmailDispatchDrainJob(
 
         var result = await drainService.ProcessBatchAsync(context.CancellationToken);
         logger.LogInformation(
-            "Quartz job {JobName} completed. Pending={PendingCount}, Processed={ProcessedCount}, Sent={SentCount}, RetryScheduled={RetryScheduledCount}, DeadLettered={DeadLetteredCount}, Unknown={UnknownCount}, TenantPaused={TenantPausedCount}, AlreadyClaimed={AlreadyClaimedCount}",
+            "Quartz job {JobName} completed. Pending={PendingCount}, Processed={ProcessedCount}, Sent={SentCount}, RetryScheduled={RetryScheduledCount}, DeadLettered={DeadLetteredCount}, Unknown={UnknownCount}, TenantPaused={TenantPausedCount}, AlreadyClaimed={AlreadyClaimedCount}, Parked={ParkedCount}",
             ScheduledJobNames.EmailDispatchDrain,
             result.PendingCount,
             result.ProcessedCount,
@@ -31,6 +31,7 @@ public sealed class EmailDispatchDrainJob(
             result.DeadLetteredCount,
             result.UnknownCount,
             result.TenantPausedCount,
-            result.AlreadyClaimedCount);
+            result.AlreadyClaimedCount,
+            result.ParkedCount);
     }
 }

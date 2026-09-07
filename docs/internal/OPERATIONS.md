@@ -1053,8 +1053,8 @@ Readiness interpretation:
 | `distributed-cache` | API, Blazor, Control Plane BFF | Effective cache round-trip works | Configured Redis fell back to in-memory cache | Effective cache round-trip failed |
 | `oidc-discovery` | API, Blazor, Control Plane BFF | OIDC metadata valid, or OIDC is not configured | Not used | Configured OIDC metadata endpoint is unreachable or invalid |
 | `atproto-authentication` | Blazor | AT Protocol login is disabled, or its canonical public URL/callback, key ring, and state/session stores are ready | Not used | Login is enabled but a bounded prerequisite is unavailable |
-| `smtp` | API | SMTP connection/auth succeeds | SMTP is not configured | Configured SMTP is unreachable or authentication fails |
-| `email-dispatch` | API | Selected Basic Dispatch trigger is enabled (`Quartz` scheduler or hosted-service fallback) and outbox counts are below warning thresholds | Dispatch is intentionally disabled, due dispatch backlog crosses threshold, stale `Processing` rows cross threshold, or `DeadLettered` rows cross threshold | `Quartz` mode selected while scheduler is disabled; invalid dispatch/scheduler options fail startup; RabbitMQ is not checked in Basic mode |
+| `smtp` | API | Instance delivery is disabled without a transport probe, or its configured SMTP connection/authentication succeeds | Instance delivery is enabled but its capability is unavailable, or SMTP connection/authentication fails or times out | Required capability/diagnostic resolution throws, or health-check composition fails; the registration retains an `Unhealthy` fallback |
+| `email-dispatch` | API | Worker is intentionally disabled (`Enabled=false` or `Mode=Disabled`), or the selected trigger is enabled and outbox counts are below warning thresholds | `Quartz` mode selected while the scheduler is disabled; operator pause or backlog, stale-processing, unknown, dead-letter, or age thresholds require attention | Outbox/database status cannot be read or health-check composition fails; invalid dispatch/scheduler options still fail startup |
 | `email-dispatch-retention-cleanup` | API | Retention cleanup is enabled in redaction or dry-run mode | Cleanup is intentionally disabled | Invalid retention options fail startup |
 | `email-dispatch-rabbitmq` | API | RabbitMQ Dispatch Mode is disabled, or enabled and topology can be declared | Not used | RabbitMQ mode is enabled but the broker/topology is unreachable or invalid |
 | `queue-drains` | API | Scheduler-owned IntegrationSync, incoming-webhook, bulk-replay, optional provider-publication, and PDS lanes are enabled as configured and below aggregate thresholds | A required lane is disabled or any enabled lane reaches its bounded due, stale, ambiguous, unknown, executing, or dead-letter threshold | The bounded aggregate database query fails |
@@ -1083,7 +1083,8 @@ Operational rules:
 - Treat `Degraded` as deployable only when the affected dependency is optional for the deployment mode and the response body clearly identifies the dependency.
 - Treat `Unhealthy` as non-deployable for rolling updates; fix the dependency or intentionally switch the related feature/provider off.
 - Treat `data-protection-keys` unhealthy as a BFF session-continuity blocker. Preserve or restore the `data_protection_keys` table before investigating Keycloak, browser storage, or cookie middleware.
-- SMTP readiness is launch-critical when email is enabled. A 2026-07-04 FullLocal proof stopped Mailpit through `aspire resource mailpit stop` and API `/health` correctly returned HTTP 503 with `smtp` Unhealthy, then returned HTTP 200 Healthy after Mailpit restart. The SMTP readiness registration is bounded to five seconds; the follow-up proof returned HTTP 503 in `5.014s` with `smtp` Unhealthy and recovered to HTTP 200 after Mailpit restart.
+- SMTP is optional for core readiness. `SmtpHealthCheck` resolves instance delivery capability with a `null` tenant scope before probing. Disabled delivery is `Healthy` without SMTP network I/O; enabled but unavailable capability is `Degraded`. Configured SMTP connection/authentication failures and network timeouts are also `Degraded`, so `/health` remains HTTP 200 when core checks are healthy. `SmtpEmailService.TestConnectionAsync` explicitly resolves instance transport; it does not probe the ambient tenant's SMTP server.
+- `IEmailConnectionTester` returns ordinary network/authentication outcomes as `EmailResult`. Exceptions escaping capability or diagnostic resolution remain `Unhealthy`, including required authority/database failures; health-check composition failures retain the same fail-closed fallback. The SMTP registration keeps its five-second timeout. Health output uses bounded codes and safe metadata, never transport `Message`, `ErrorMessage`, or exception details. Database, authorization, privacy-authority, and signing-key readiness failures are not weakened by optional email.
 - Instance Cerbos readiness follows authorization fail-closed semantics: if the operator selected `authorization.provider=cerbos`, an unreachable PDP makes `/health` unhealthy rather than silently falling back to local RBAC.
 - Local authorization mode skips Cerbos readiness, so self-hosted/local deployments do not need a Cerbos PDP unless explicitly selected.
 - Basic Email Dispatch Mode skips RabbitMQ readiness entirely. A self-hosted deployment can send registration confirmation email with API + PostgreSQL + configured SMTP only. The default trigger is the Quartz `email-dispatch-drain` job; the hosted service mode is a fallback over the same drain service. The `email-dispatch` readiness payload also reports safe aggregate outbox counts for due dispatch backlog, retry-scheduled rows, stale processing leases, and dead-letter rows.
@@ -1592,6 +1593,43 @@ Operational expectations:
 No additional configuration keys were added for SSE refresh hints in this implementation slice.
 
 ### Basic Email Dispatch Operations
+
+#### Delivery policy revocation
+
+SMTP administration uses a read-only impact preview followed by a separately
+authorized disable command. `PreviewEmailDeliveryDisableQueryHandler` resolves
+current persisted administrator grants and reads effective policy through
+`EmailDeliveryDisableImpactReader`. The preview compares the actual instance/tenant
+policy with the proposed disable; independently enabled tenant-owned transports
+are excluded from an instance disable's affected scopes.
+
+`EmailDeliveryDisableTokenService` uses existing ASP.NET Core Data Protection with
+a separate purpose and five-minute lifetime. Its protected digest binds the actor,
+target, revision, lock state and ordered affected-scope revisions; no preview token
+is persisted. `DisableEmailDeliveryCommandHandler` rechecks authority and impact
+under the ordered SMTP mutation lock and serializable unit of work, then delegates
+the confirmed mutation to `IEmailDeliverySettingsWriter`. Setting, revision and
+optional-work suppression commit together; cache notifications follow commit.
+Generic single, batch and reset writes cannot bypass deliberate disable, and
+configuration manifests continue to exclude SMTP policy.
+
+The API publishes `disable-preview` and `disable` HAL relations and private,
+no-store responses. A stale revision, changed impact or invalid confirmation cannot
+mutate policy. Preserve SMTP values, delegation locks, operator pauses and rate
+state when disabling. A handoff admitted before disable commits may still finish;
+the policy fence prevents new admission, not recall of an accepted message.
+Optional historical work stays suppressed after re-enable. Required work resumes
+only from eligible capability parks; operator holds and `Unknown` acceptance
+remain separately controlled. Retired `TenantAdministratorInvitation` rows always
+take the existing transactional skip/redaction path, even after administrator
+authority and SMTP capability return.
+
+The native `EmailDeliveryControl` migrations add primary-store policy/source
+revisions, suppression watermarks and typed park provenance with constraints.
+They do not change external Identity schemas. Apply the generated migration for
+the selected primary provider; never hand-edit migrations or snapshots. Reverting
+these migrations removes fence metadata and is not a queue-replay recovery action.
+Keep application code and its generated schema together during rollback.
 
 Registration confirmation email is handled as a durable side effect:
 

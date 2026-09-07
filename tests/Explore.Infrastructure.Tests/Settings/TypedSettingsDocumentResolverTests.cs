@@ -11,6 +11,8 @@ using Explore.Domain.Settings.Documents;
 using Explore.Domain.Settings.Documents.Payloads;
 using Explore.Infrastructure;
 using Explore.Infrastructure.Services;
+using Explore.Persistence.Repositories;
+using Explore.Tests.Shared.Settings;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -225,19 +227,20 @@ public sealed class TypedSettingsDocumentResolverTests : IDisposable
     [Test]
     public async Task ConfigureInfrastructureServices_RegistersTypedResolverAlongsideCurrentScalarResolverDuringCutover()
     {
+        await using var fixture = await SmtpSettingsDatabase.CreateAsync();
         var services = new ServiceCollection();
         IConfiguration configuration = new ConfigurationBuilder().Build();
-        services.AddScoped(_ => Substitute.For<ISystemSettingRepository>());
-        services.AddScoped(_ => Substitute.For<ITenantSettingRepository>());
-        services.AddScoped(_ => Substitute.For<IOrganizationSettingRepository>());
-        services.AddScoped(_ => Substitute.For<IOrganizationTenantRepository>());
-        services.AddScoped(_ => Substitute.For<IGroupSettingRepository>());
-        services.AddScoped(_ => Substitute.For<IGroupTenantRepository>());
-        services.AddScoped(_ => Substitute.For<IUserPreferenceRepository>());
-        services.AddScoped(_ => Substitute.For<ITenantContext>());
-        services.AddScoped(_ => Substitute.For<ISettingMutationLock>());
-        services.AddScoped(_ => Substitute.For<ITenantSettingsDocumentRepository>());
-        services.AddScoped(_ => Substitute.For<ILogger<HierarchicalSettingsResolver>>());
+        services.AddLogging();
+        services.AddScoped<ISystemSettingRepository>(_ => new SystemSettingRepository(fixture.Context, fixture.MutationLock));
+        services.AddScoped<ITenantSettingRepository>(_ => new TenantSettingRepository(fixture.Context, fixture.MutationLock));
+        services.AddScoped<IOrganizationSettingRepository>(_ => new OrganizationSettingRepository(fixture.Context));
+        services.AddScoped<IGroupSettingRepository>(_ => new GroupSettingRepository(fixture.Context));
+        services.AddScoped<IGroupTenantRepository>(_ => new GroupTenantRepository(fixture.Context));
+        services.AddScoped<IUserPreferenceRepository>(_ => new UserPreferenceRepository(fixture.Context));
+        services.AddSingleton<ITenantContext>(fixture);
+        services.AddSingleton(fixture.MutationLock);
+        services.AddScoped<IEmailDeliverySettingsWriter>(_ => fixture.Writer);
+        services.AddScoped<ITenantSettingsDocumentRepository>(_ => new TenantSettingsDocumentRepository(fixture.Context));
 
         services.ConfigureInfrastructureServices(configuration);
 

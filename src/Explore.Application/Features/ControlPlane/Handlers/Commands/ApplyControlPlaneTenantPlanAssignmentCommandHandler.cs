@@ -25,7 +25,8 @@ public sealed class ApplyControlPlaneTenantPlanAssignmentCommandHandler(
     ISettingMutationLock mutationLock,
     IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary,
     IHierarchicalSettingsResolver settingsResolver,
-    IMediator mediator)
+    IMediator mediator,
+    IEmailDeliverySettingsWriter emailDeliverySettingsWriter)
     : IRequestHandler<ApplyControlPlaneTenantPlanAssignmentCommand, BaseCommandResponse<Guid>>
 {
     private const string InvalidPublicationPolicyCode = "event_reporting_intake_policy_invalid";
@@ -53,14 +54,24 @@ public sealed class ApplyControlPlaneTenantPlanAssignmentCommandHandler(
             return Failure(request.AssignmentId, "tenant_plan_assignment_not_active");
         }
 
-        TenantPlanVersion version = assignment.TenantPlanVersion;
+        TenantPlanVersion? version = await tenantPlanRepository.GetVersionAsync(
+            assignment.TenantPlanVersionId,
+            cancellationToken);
+        if (version is null)
+        {
+            return Failure(request.AssignmentId, "tenant_plan_version_not_found");
+        }
+
         TenantPlanVersionSetting[] guardedSettings = version.Settings
             .Where(IsGuarded)
             .OrderBy(GuardedKeyOrder)
             .ToArray();
         TenantPlanVersionSetting[] unguardedSettings = version.Settings
-            .Where(setting => !IsGuarded(setting))
+            .Where(setting => !IsGuarded(setting) && !EmailDeliverySettingKeys.Contains(setting.SettingKey))
             .OrderBy(setting => setting.SettingKey, StringComparer.Ordinal)
+            .ToArray();
+        TenantPlanVersionSetting[] smtpSettings = version.Settings
+            .Where(setting => EmailDeliverySettingKeys.Contains(setting.SettingKey))
             .ToArray();
         TenantSettingOverrideUpsert[] unguardedUpserts = unguardedSettings
             .Select(setting => new TenantSettingOverrideUpsert(setting.SettingKey, setting.JsonValue, setting.IsLocked))
@@ -75,22 +86,27 @@ public sealed class ApplyControlPlaneTenantPlanAssignmentCommandHandler(
             ? [.. unguardedMutationKeys, GovernanceSettingKeys.Storage.DefaultTenantQuotaBytes]
             : unguardedMutationKeys;
 
-        if (guardedSettings.Length == 0 && outerMutationKeys.Length == 0)
+        if (guardedSettings.Length == 0 && outerMutationKeys.Length == 0 && smtpSettings.Length == 0)
         {
             return Success(request.AssignmentId);
         }
 
-        (BaseCommandResponse<Guid> Response, IReadOnlyList<SettingChangedNotification> Notifications) outcome =
-            await unitOfWork.ExecuteInTransactionAsync(
-                token => outerMutationKeys.Length == 0
+        Task<(BaseCommandResponse<Guid> Response, IReadOnlyList<SettingChangedNotification> Notifications)>
+            ApplyTransactionAsync(CancellationToken token) => smtpSettings.Length == 0
+                ? unitOfWork.ExecuteInTransactionAsync(ApplyWithLocksAsync, token)
+                : unitOfWork.ExecuteSerializableAsync(ApplyWithLocksAsync, token);
+
+        Task<(BaseCommandResponse<Guid> Response, IReadOnlyList<SettingChangedNotification> Notifications)>
+            ApplyWithLocksAsync(CancellationToken transactionToken) => outerMutationKeys.Length == 0
                     ? ApplyInsideTransactionAsync(
                         request,
                         assignment,
                         version,
                         guardedSettings,
+                        smtpSettings,
                         unguardedUpserts,
                         unguardedMutationKeys,
-                        token)
+                        transactionToken)
                     : mutationLock.ExecuteManyAsync(
                         outerMutationKeys,
                         innerToken => ApplyInsideTransactionAsync(
@@ -98,18 +114,31 @@ public sealed class ApplyControlPlaneTenantPlanAssignmentCommandHandler(
                             assignment,
                             version,
                             guardedSettings,
+                            smtpSettings,
                             unguardedUpserts,
                             unguardedMutationKeys,
                             innerToken),
-                        token),
-                cancellationToken);
+                        transactionToken);
+
+        (BaseCommandResponse<Guid> Response, IReadOnlyList<SettingChangedNotification> Notifications) outcome;
+        try
+        {
+            outcome = smtpSettings.Length == 0
+                ? await ApplyTransactionAsync(cancellationToken)
+                : await mutationLock.ExecuteOrderedGroupsAsync(
+                    [EmailDeliverySettingKeys.All], ApplyTransactionAsync, cancellationToken);
+        }
+        catch (TenantPlanApplyRejectedException exception)
+        {
+            return exception.Response;
+        }
 
         if (outcome.Notifications.Count > 0)
         {
             settingsResolver.InvalidateCache(SettingScope.Tenant, request.TenantId);
             foreach (SettingChangedNotification notification in outcome.Notifications)
             {
-                await mediator.Publish(notification, cancellationToken);
+                await mediator.Publish(notification, CancellationToken.None);
             }
         }
 
@@ -122,6 +151,7 @@ public sealed class ApplyControlPlaneTenantPlanAssignmentCommandHandler(
             TenantPlanAssignment assignment,
             TenantPlanVersion version,
             IReadOnlyList<TenantPlanVersionSetting> guardedSettings,
+            IReadOnlyList<TenantPlanVersionSetting> smtpSettings,
             IReadOnlyList<TenantSettingOverrideUpsert> unguardedUpserts,
             IReadOnlyList<string> unguardedSettingKeys,
             CancellationToken cancellationToken)
@@ -132,7 +162,7 @@ public sealed class ApplyControlPlaneTenantPlanAssignmentCommandHandler(
             return (Failure(request.AssignmentId, quotaError), []);
         }
 
-        foreach (string settingKey in unguardedSettingKeys)
+        foreach (string settingKey in unguardedSettingKeys.Concat(smtpSettings.Select(setting => setting.SettingKey)))
         {
             if (await systemSettingRepository.IsLocked(settingKey, cancellationToken))
             {
@@ -142,6 +172,23 @@ public sealed class ApplyControlPlaneTenantPlanAssignmentCommandHandler(
 
         DateTime occurredAtUtc = DateTime.UtcNow;
         var notifications = new List<SettingChangedNotification>();
+        if (smtpSettings.Count > 0)
+        {
+            EmailDeliverySettingsWriteResult result = await emailDeliverySettingsWriter.ApplyAsync(
+                [.. smtpSettings.Select(setting => new EmailDeliverySettingMutation(
+                    TenantId: request.TenantId,
+                    Key: setting.SettingKey,
+                    Kind: EmailDeliverySettingMutationKind.SetValue,
+                    Value: setting.JsonValue,
+                    IsLocked: setting.IsLocked))],
+                request.AppliedByUserId,
+                cancellationToken);
+            if (!result.IsAccepted())
+                return (result.ToCommandResponse(request.AssignmentId, "Tenant plan applied."), []);
+
+            notifications.AddRange(result.ToNotifications(request.AppliedByUserId));
+        }
+
         if (guardedSettings.Count > 0)
         {
             PublicationPolicyMutationResult boundaryResult = await publicationPolicyMutationBoundary.ApplyTenantAsync(
@@ -162,7 +209,7 @@ public sealed class ApplyControlPlaneTenantPlanAssignmentCommandHandler(
                 string failureCode = string.IsNullOrWhiteSpace(boundaryResult.FailureCode)
                     ? InvalidPublicationPolicyCode
                     : boundaryResult.FailureCode;
-                return (Failure(request.AssignmentId, failureCode), []);
+                throw new TenantPlanApplyRejectedException(Failure(request.AssignmentId, failureCode));
             }
 
             notifications.AddRange(boundaryResult.DeferredNotifications);
@@ -218,4 +265,10 @@ public sealed class ApplyControlPlaneTenantPlanAssignmentCommandHandler(
 
     private static BaseCommandResponse<Guid> Failure(Guid assignmentId, string error) =>
         BaseCommandResponse.Failure(error, error, [error], assignmentId);
+
+    private sealed class TenantPlanApplyRejectedException(BaseCommandResponse<Guid> response)
+        : Exception("Tenant plan application was rejected.")
+    {
+        public BaseCommandResponse<Guid> Response { get; } = response;
+    }
 }

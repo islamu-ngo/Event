@@ -184,7 +184,8 @@ public sealed class NotificationFanoutOccurrenceHandoffServiceTests
             sourceType: "event",
             sourceId: eventId,
             coalescingKey: $"event:{eventId:N}:schedule",
-            coalescingWindowEndsAt: occurredAt);
+            coalescingWindowEndsAt: occurredAt,
+            emailDeliveryPolicyRevision: 0);
     }
 
     private static NotificationFanoutRun CreateRun(

@@ -1,9 +1,12 @@
+<!-- ABOUTME: Infrastructure behavior and external-provider integration tests. -->
+<!-- ABOUTME: Shares source fixtures across test projects while preserving production dependency boundaries. -->
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- The provider-neutral parity corpus is declared once and linked into every lane that evaluates it,
        so Local and Cerbos can never drift onto different scenario sets. -->
   <ItemGroup>
     <Compile Include="..\Shared\Authorization\ProviderNeutralCorpus.cs" Link="Authorization\ProviderNeutralCorpus.cs" />
+    <Compile Include="..\Shared\Settings\SmtpSettingsDatabase.cs" Link="Settings\SmtpSettingsDatabase.cs" />
     <Compile Include="..\Shared\Telemetry\EventLocationPrivacyMetricsFactory.cs" Link="Telemetry\EventLocationPrivacyMetricsFactory.cs" />
   </ItemGroup>
 

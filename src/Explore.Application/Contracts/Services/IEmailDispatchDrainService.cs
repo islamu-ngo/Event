@@ -16,16 +16,19 @@ public interface IEmailDispatchDrainService
         CancellationToken cancellationToken);
 }
 
-public sealed record EmailDispatchDrainResult(
-    int PendingCount,
-    int ProcessedCount,
-    int SentCount,
-    int RetryScheduledCount,
-    int DeadLetteredCount,
-    int UnknownCount,
-    int SkippedCount,
-    int TenantPausedCount,
-    int AlreadyClaimedCount);
+public sealed record EmailDispatchDrainResult
+{
+    public int PendingCount { get; init; }
+    public int ProcessedCount { get; init; }
+    public int SentCount { get; init; }
+    public int RetryScheduledCount { get; init; }
+    public int DeadLetteredCount { get; init; }
+    public int UnknownCount { get; init; }
+    public int SkippedCount { get; init; }
+    public int TenantPausedCount { get; init; }
+    public int AlreadyClaimedCount { get; init; }
+    public int ParkedCount { get; init; }
+}
 
 public sealed record EmailDispatchRecoveryResult(
     int RecoveredCount,
@@ -43,11 +46,13 @@ public sealed record EmailDispatchSingleDrainResult(
         or EmailDispatchDrainOutcome.TenantPaused
         or EmailDispatchDrainOutcome.AlreadyClaimed
         or EmailDispatchDrainOutcome.AlreadySettled
-        or EmailDispatchDrainOutcome.Deferred;
+        or EmailDispatchDrainOutcome.Deferred
+        or EmailDispatchDrainOutcome.Parked;
 }
 
 public enum EmailDispatchDrainOutcome
 {
+    Unspecified = 0,
     Sent,
     RetryScheduled,
     DeadLettered,
@@ -57,5 +62,6 @@ public enum EmailDispatchDrainOutcome
     AlreadyClaimed,
     Missing,
     AlreadySettled,
-    Deferred
+    Deferred,
+    Parked
 }

@@ -67,10 +67,11 @@ public sealed class TenantOnboardingAtomicRollbackTests
         await using (var write = new ExploreDbContext(writeOptions))
         {
             write.EnableTenantFilterBypass("Atomic onboarding rollback test.");
-            var policyRepository = new TenantSettingRepository(write);
+            var unitOfWork = new EfCoreUnitOfWork(write);
+            var policyRepository = new TenantSettingRepository(write,
+                new RelationalSettingMutationLock(write, unitOfWork));
             var documentRepository = new TenantSettingsDocumentRepository(write);
             var onboardingRepository = new TenantOnboardingStateRepository(write);
-            var unitOfWork = new EfCoreUnitOfWork(write);
             TenantSettingsDocument branding = TenantBrandingSettingsDocumentDefaults.Create(tenantId, "Atomic Brand");
             TenantSettingsDocument identity = TenantDirectoryOperatorIdentityDocumentDefaults.Create(
                 tenantId,

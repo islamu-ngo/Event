@@ -254,6 +254,7 @@ public static class InfrastructureServicesRegistration
         services.AddScoped<IEmailConnectionTester>(provider => provider.GetRequiredService<SmtpEmailService>());
         services.AddSingleton<IEmailDispatchDrainService, EmailDispatchDrainService>();
         services.AddScoped<IEmailUnsubscribeTokenService, EmailUnsubscribeTokenService>();
+        services.AddScoped<IEmailDeliveryDisableTokenService, EmailDeliveryDisableTokenService>();
         services.AddSingleton<IGuestCapabilityTokenService, GuestCapabilityTokenService>();
         services.AddScoped<IRegistrationProviderDescriptor, NullRegistrationProviderDescriptor>();
         services.AddScoped<IRegistrationProviderDescriptor, NativeRegistrationProviderDescriptor>();

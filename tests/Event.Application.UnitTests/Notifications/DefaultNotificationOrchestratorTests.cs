@@ -43,7 +43,7 @@ public sealed class DefaultNotificationOrchestratorTests
         var unitOfWork = new TrackingUnitOfWork();
         var draft = CreateDraft(AppNotificationCategory.RegistrationLifecycle);
         privacyState.Fence(draft.UserId!.Value);
-        var orchestrator = new DefaultNotificationOrchestrator(resolver, repository, privacyState, unitOfWork);
+        var orchestrator = new DefaultNotificationOrchestrator(resolver, repository, privacyState, unitOfWork, unitOfWork);
 
         var result = await orchestrator.EnqueueAsync(draft);
 
@@ -70,7 +70,7 @@ public sealed class DefaultNotificationOrchestratorTests
                 ExternalWorkflowProviderKind: AppExternalWorkflowProviderKind.Coop,
                 RequiresLocalAudit: true),
             draft => privacyState.Fence(draft.UserId!.Value));
-        var orchestrator = new DefaultNotificationOrchestrator(resolver, repository, privacyState, unitOfWork);
+        var orchestrator = new DefaultNotificationOrchestrator(resolver, repository, privacyState, unitOfWork, unitOfWork);
 
         var result = await orchestrator.EnqueueAsync(CreateDraft(AppNotificationCategory.TrustSafetyModeration));
 
@@ -189,11 +189,12 @@ public sealed class DefaultNotificationOrchestratorTests
         CapturingNotificationIntentRepository repository,
         NotificationOwnershipDecision decision)
     {
+        var unitOfWork = new TrackingUnitOfWork();
         return new DefaultNotificationOrchestrator(
             new FixedNotificationOwnershipResolver(decision),
             repository,
             new FencedPrivacyErasureStateRepository(),
-            new TrackingUnitOfWork());
+            unitOfWork, unitOfWork);
     }
 
     private static NotificationIntentDraft CreateDraft(
@@ -333,8 +334,16 @@ public sealed class DefaultNotificationOrchestratorTests
         public Task SaveChangesAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
-    private sealed class TrackingUnitOfWork : IUnitOfWork
+    private sealed class TrackingUnitOfWork : IUnitOfWork, ISettingMutationLock
     {
+        public Task<T> ExecuteAsync<T>(string canonicalSettingKey,
+            Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default) =>
+            operation(cancellationToken);
+
+        public Task<T> ExecuteManyAsync<T>(IEnumerable<string> canonicalSettingKeys,
+            Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default) =>
+            operation(cancellationToken);
+
         public int SerializableExecutionCount { get; private set; }
         public bool IsExecutingSerializable { get; private set; }
 

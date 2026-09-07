@@ -59,7 +59,8 @@ public sealed class NotificationFanoutOccurrencePointerTests
             sourceType: "event",
             sourceId: eventId,
             coalescingKey: $"event:{eventId:N}:schedule",
-            coalescingWindowEndsAt: occurredAt);
+            coalescingWindowEndsAt: occurredAt,
+            emailDeliveryPolicyRevision: 0);
         Guid messageId = Guid.CreateVersion7();
 
         OutboxMessage message = NotificationFanoutOccurrenceOutboxMessageFactory.Create(occurrence, messageId);

@@ -7,6 +7,10 @@ namespace Explore.Domain;
 
 public class EmailDispatchOutbox : ITenantEntity, IAuditableEntity, ISoftDeletable
 {
+    public static bool CanParkForOperator(EmailDispatchStatus status, EmailDispatchParkReason? parkReason) =>
+        status is EmailDispatchStatus.Pending or EmailDispatchStatus.RetryScheduled or EmailDispatchStatus.DeadLettered
+        || status == EmailDispatchStatus.Parked && parkReason == EmailDispatchParkReason.CapabilityUnavailable;
+
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }
     public Tenant? Tenant { get; set; }
@@ -47,6 +51,7 @@ public class EmailDispatchOutbox : ITenantEntity, IAuditableEntity, ISoftDeletab
     public DateTime? SentAt { get; set; }
     public DateTime? DeadLetteredAt { get; set; }
     public DateTime? ParkedAt { get; set; }
+    public EmailDispatchParkReason? ParkReason { get; set; }
     public DateTime? UnknownAt { get; set; }
     public DateTime? ContentRedactedAt { get; set; }
 
@@ -105,4 +110,10 @@ public enum RecipientAddressSource
 {
     TenantUserVerifiedEmail = 1,
     ManagedTenantAdministratorInvitation = 2
+}
+
+public enum EmailDispatchParkReason
+{
+    CapabilityUnavailable = 1,
+    Operator = 2
 }

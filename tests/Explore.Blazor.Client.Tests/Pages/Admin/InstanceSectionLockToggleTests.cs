@@ -16,6 +16,9 @@ public class InstanceSectionLockToggleTests : IDisposable
     {
         _ctx = new BlazorTestContext();
         _ctx.SetAuthenticatedUser(Guid.NewGuid(), "Instance Admin", "admin@example.com");
+        _ctx.Services.AddSingleton(TimeProvider.System);
+        _ctx.AddMockService<IEmailDeliveryAdminService>().GetInstanceAsync(Arg.Any<CancellationToken>())
+            .Returns(new HalResourceOfInstanceSmtpSettingsDto { DeliveryEnabled = false });
         _ctx.AddMockService<IInstanceOnboardingService>();
         _tenantOnboardingService = _ctx.AddMockService<ITenantOnboardingService>();
         _ctx.AddMockService<ITenantOnboardingService>();
@@ -38,7 +41,7 @@ public class InstanceSectionLockToggleTests : IDisposable
     public async Task SmtpSection_SingleTenant_NoLockToggle()
     {
         var cut = _ctx.RenderMudComponent<InstanceSmtpSection>(parameters => parameters
-            .Add(component => component.Model, new InstanceSmtpSettingsDto())
+            .Add(component => component.Model, new HalResourceOfInstanceSmtpSettingsDto())
             .Add(component => component.IsSingleTenant, true)
             .Add(component => component.LockForTenants, false));
 
@@ -95,7 +98,7 @@ public class InstanceSectionLockToggleTests : IDisposable
     public async Task SmtpSection_LockToggle_WhenSaveFails_AnnouncesAuthoritativeRestore()
     {
         var cut = _ctx.RenderMudComponent<InstanceSmtpSection>(parameters => parameters
-            .Add(component => component.Model, new InstanceSmtpSettingsDto())
+            .Add(component => component.Model, new HalResourceOfInstanceSmtpSettingsDto())
             .Add(component => component.IsSingleTenant, false)
             .Add(component => component.LockForTenants, false)
             .Add(component => component.SaveLockAsync, _ => Task.FromResult(false)));

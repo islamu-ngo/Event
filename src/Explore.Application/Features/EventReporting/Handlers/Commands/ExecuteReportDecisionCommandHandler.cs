@@ -11,6 +11,7 @@ using Explore.Application.Features.Events.Requests.Commands;
 using Explore.Application.Notifications;
 using Explore.Application.Responses;
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using MediatR;
 
@@ -31,7 +32,8 @@ public sealed class ExecuteReportDecisionCommandHandler(
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService,
-    IMediator mediator) : IRequestHandler<ExecuteReportDecisionCommand, BaseCommandResponse<Guid>>
+    IMediator mediator,
+    ISettingMutationLock mutationLock) : IRequestHandler<ExecuteReportDecisionCommand, BaseCommandResponse<Guid>>
 {
     private static readonly TimeSpan ProcessingLeaseDuration = TimeSpan.FromMinutes(10);
 
@@ -552,7 +554,9 @@ public sealed class ExecuteReportDecisionCommandHandler(
         PreparedCompletion prepared,
         CancellationToken cancellationToken)
     {
-        return await unitOfWork.ExecuteSerializableAsync(async token =>
+        return await mutationLock.ExecuteOrderedGroupsAsync(
+            [[GovernanceSettingKeys.Email.DeliveryEnabled]],
+            policyToken => unitOfWork.ExecuteSerializableAsync(async token =>
         {
             EventReport? report = await eventReportRepository.GetByIdForUpdateAsync(tenantId, request.ReportId, token);
             TargetValidation target = ValidateTarget(report, request);
@@ -617,7 +621,7 @@ public sealed class ExecuteReportDecisionCommandHandler(
 
             await eventReportRepository.Update(report!);
             return Success(request.DecisionId, "Event report decision executed successfully.");
-        }, cancellationToken);
+        }, policyToken), cancellationToken);
     }
 
     private async Task<CurrentRecipientMaterializations> ResolveCurrentRecipientsAsync(

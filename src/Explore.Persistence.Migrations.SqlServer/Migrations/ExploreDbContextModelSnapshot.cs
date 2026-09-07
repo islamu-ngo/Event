@@ -5076,6 +5076,10 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("notification_intent_id");
 
+                    b.Property<int?>("ParkReason")
+                        .HasColumnType("int")
+                        .HasColumnName("park_reason");
+
                     b.Property<DateTime?>("ParkedAt")
                         .HasColumnType("datetime2")
                         .HasColumnName("parked_at");
@@ -5233,6 +5237,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
 
                     b.ToTable("email_dispatch_outbox", "islamu_event", t =>
                         {
+                            t.HasCheckConstraint("ck_email_dispatch_outbox_park_reason", "park_reason IS NULL OR park_reason IN (1, 2)");
+
                             t.HasCheckConstraint("ck_email_dispatch_outbox_processing_fence", "(CASE WHEN status = 2 THEN 1 ELSE 0 END) = (CASE WHEN processing_started_at IS NOT NULL AND processing_lease_token IS NOT NULL THEN 1 ELSE 0 END)");
 
                             t.HasCheckConstraint("ck_email_dispatch_outbox_recipient_authority", "(recipient_address_source = 1 AND recipient_user_id IS NOT NULL AND managed_tenant_provisioning_operation_id IS NULL AND kind <> 8) OR (recipient_address_source = 2 AND recipient_user_id IS NOT NULL AND managed_tenant_provisioning_operation_id IS NOT NULL AND kind = 8 AND source_type = 'managed_tenant_provisioning' AND source_id = managed_tenant_provisioning_operation_id)");
@@ -5250,6 +5256,12 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
+                    b.Property<long>("DeliveryPolicyRevision")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("delivery_policy_revision");
+
                     b.Property<int?>("GlobalSmtpRateLimitPerMinuteOverride")
                         .HasColumnType("int")
                         .HasColumnName("global_smtp_rate_limit_per_minute_override");
@@ -5261,6 +5273,14 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                     b.Property<bool>("OptionalRemindersDeferred")
                         .HasColumnType("bit")
                         .HasColumnName("optional_reminders_deferred");
+
+                    b.Property<long?>("OptionalSuppressedThroughRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("optional_suppressed_through_revision");
+
+                    b.Property<DateTime?>("OptionalSuppressedThroughUtc")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("optional_suppressed_through_utc");
 
                     b.Property<string>("PauseReason")
                         .HasMaxLength(500)
@@ -5308,9 +5328,13 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         {
                             t.HasCheckConstraint("ck_email_dispatch_processor_states_global_rate_override", "global_smtp_rate_limit_per_minute_override IS NULL OR global_smtp_rate_limit_per_minute_override BETWEEN 1 AND 100000");
 
+                            t.HasCheckConstraint("ck_email_dispatch_processor_states_revision_nonnegative", "delivery_policy_revision >= 0");
+
                             t.HasCheckConstraint("ck_email_dispatch_processor_states_smtp_rate_pair", "(CASE WHEN smtp_available_tokens IS NULL THEN 1 ELSE 0 END) = (CASE WHEN smtp_refill_at IS NULL THEN 1 ELSE 0 END)");
 
                             t.HasCheckConstraint("ck_email_dispatch_processor_states_smtp_tokens_nonnegative", "smtp_available_tokens IS NULL OR smtp_available_tokens >= 0");
+
+                            t.HasCheckConstraint("ck_email_dispatch_processor_states_suppression_revision", "optional_suppressed_through_revision IS NULL OR optional_suppressed_through_revision BETWEEN 0 AND delivery_policy_revision");
                         });
                 });
 
@@ -5424,9 +5448,23 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("created_by");
 
+                    b.Property<long>("DeliveryPolicyRevision")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("delivery_policy_revision");
+
                     b.Property<bool>("IsPaused")
                         .HasColumnType("bit")
                         .HasColumnName("is_paused");
+
+                    b.Property<long?>("OptionalSuppressedThroughRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("optional_suppressed_through_revision");
+
+                    b.Property<DateTime?>("OptionalSuppressedThroughUtc")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("optional_suppressed_through_utc");
 
                     b.Property<string>("PauseReason")
                         .HasMaxLength(500)
@@ -5473,9 +5511,13 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
 
                     b.ToTable("email_dispatch_tenant_controls", "islamu_event", t =>
                         {
+                            t.HasCheckConstraint("ck_email_dispatch_tenant_controls_revision_nonnegative", "delivery_policy_revision >= 0");
+
                             t.HasCheckConstraint("ck_email_dispatch_tenant_controls_smtp_rate_pair", "(CASE WHEN smtp_available_tokens IS NULL THEN 1 ELSE 0 END) = (CASE WHEN smtp_refill_at IS NULL THEN 1 ELSE 0 END)");
 
                             t.HasCheckConstraint("ck_email_dispatch_tenant_controls_smtp_tokens_nonnegative", "smtp_available_tokens IS NULL OR smtp_available_tokens >= 0");
+
+                            t.HasCheckConstraint("ck_email_dispatch_tenant_controls_suppression_revision", "optional_suppressed_through_revision IS NULL OR optional_suppressed_through_revision BETWEEN 0 AND delivery_policy_revision");
                         });
                 });
 
@@ -17809,6 +17851,10 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasColumnType("int")
                         .HasColumnName("delivery_policy_id");
 
+                    b.Property<long>("EmailDeliveryPolicyRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("email_delivery_policy_revision");
+
                     b.Property<Guid>("EventId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("event_id");
@@ -17918,6 +17964,8 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
 
                     b.ToTable("notification_fanout_occurrences", "islamu_event", t =>
                         {
+                            t.HasCheckConstraint("ck_notification_fanout_occurrences_email_revision", "email_delivery_policy_revision >= 0");
+
                             t.HasCheckConstraint("ck_notification_fanout_occurrences_state", "state IN (1, 2)");
 
                             t.HasCheckConstraint("ck_notification_fanout_occurrences_supersession", "(state = 1 AND superseded_by_occurrence_id IS NULL AND suppression_reason IS NULL AND superseded_at IS NULL) OR (state = 2 AND superseded_by_occurrence_id IS NOT NULL AND suppression_reason IS NOT NULL AND superseded_at IS NOT NULL)");
@@ -18159,6 +18207,12 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("deleted_by");
 
+                    b.Property<long>("EmailDeliveryPolicyRevision")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("email_delivery_policy_revision");
+
                     b.Property<Guid?>("EventId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("event_id");
@@ -18275,7 +18329,10 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                     b.HasIndex("TenantId", "StatusId", "CreatedAt")
                         .HasDatabaseName("ix_notification_intents_tenant_id_status_id_created_at");
 
-                    b.ToTable("notification_intents", "islamu_event");
+                    b.ToTable("notification_intents", "islamu_event", t =>
+                        {
+                            t.HasCheckConstraint("ck_notification_intents_email_policy_revision_nonnegative", "email_delivery_policy_revision >= 0");
+                        });
                 });
 
             modelBuilder.Entity("Explore.Domain.NotificationIntentStatus", b =>

@@ -133,7 +133,7 @@ public class TenantOnboardingServiceTests
                 Arg.Any<string?>(),
                 Arg.Any<string?>(),
                 Arg.Any<CancellationToken>())
-            .Returns(new SettingGroupResponseDto { Category = "Events" });
+            .Returns(new HalResourceOfSettingGroupResponseDto { Category = "Events" });
 
         var result = await _service.GetTenantSettingsAsync("Events");
 

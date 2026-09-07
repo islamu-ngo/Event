@@ -67,7 +67,7 @@ public sealed class EmailDispatchRabbitMqPointerPublisherTests
                 Arg.Any<CancellationToken>())
             .Returns([dispatch]);
         transport.PublishDispatchPointerAsync(Arg.Any<EmailDispatchPointer>(), Arg.Any<CancellationToken>())
-            .Returns(new EmailDispatchPublishResult(EmailDispatchPublishOutcome.Nacked, FailureCategory: "publisher_nack"));
+            .Returns(new EmailDispatchPublishResult(EmailDispatchPublishOutcome.Nacked, FailureCategory: EmailDispatchPublishFailure.PublisherNack));
         var publisher = CreatePublisher(repository, transport, new EmailDispatchRabbitMqSettings { Enabled = true });
 
         EmailDispatchRabbitMqPointerPublisherResult result = await publisher.PublishDuePointersAsync(CancellationToken.None);
@@ -97,7 +97,7 @@ public sealed class EmailDispatchRabbitMqPointerPublisherTests
                 Arg.Any<CancellationToken>())
             .Returns([dispatch]);
         transport.PublishDispatchPointerAsync(Arg.Any<EmailDispatchPointer>(), Arg.Any<CancellationToken>())
-            .Returns(new EmailDispatchPublishResult(EmailDispatchPublishOutcome.Returned, FailureCategory: "mandatory_return"));
+            .Returns(new EmailDispatchPublishResult(EmailDispatchPublishOutcome.Returned, FailureCategory: EmailDispatchPublishFailure.MandatoryReturn));
         var publisher = CreatePublisher(repository, transport, new EmailDispatchRabbitMqSettings { Enabled = true });
 
         EmailDispatchRabbitMqPointerPublisherResult result = await publisher.PublishDuePointersAsync(CancellationToken.None);
@@ -123,7 +123,7 @@ public sealed class EmailDispatchRabbitMqPointerPublisherTests
                 Arg.Any<CancellationToken>())
             .Returns([dispatch]);
         transport.PublishDispatchPointerAsync(Arg.Any<EmailDispatchPointer>(), Arg.Any<CancellationToken>())
-            .Returns(new EmailDispatchPublishResult(EmailDispatchPublishOutcome.Failed, FailureCategory: "publish_timeout"));
+            .Returns(new EmailDispatchPublishResult(EmailDispatchPublishOutcome.Failed, FailureCategory: EmailDispatchPublishFailure.PublishTimeout));
         var publisher = CreatePublisher(repository, transport, new EmailDispatchRabbitMqSettings { Enabled = true });
 
         EmailDispatchRabbitMqPointerPublisherResult result = await publisher.PublishDuePointersAsync(CancellationToken.None);
@@ -174,6 +174,51 @@ public sealed class EmailDispatchRabbitMqPointerPublisherTests
             "pointer_publish_exception",
             Arg.Any<DateTime>(),
             Arg.Any<CancellationToken>());
+    }
+
+    [Test]
+    [Arguments(EmailDispatchPublishOutcome.Returned, EmailDispatchPublishFailure.MandatoryReturn, "mandatory_return")]
+    [Arguments(EmailDispatchPublishOutcome.Nacked, EmailDispatchPublishFailure.PublisherNack, "publisher_nack")]
+    [Arguments(EmailDispatchPublishOutcome.Failed, EmailDispatchPublishFailure.PublishTimeout, "publish_timeout")]
+    [Arguments(EmailDispatchPublishOutcome.Failed, EmailDispatchPublishFailure.BrokerPublishFailed, "broker_publish_failed")]
+    [Arguments(EmailDispatchPublishOutcome.Failed, EmailDispatchPublishFailure.PointerPublishException, "pointer_publish_exception")]
+    [Arguments(EmailDispatchPublishOutcome.Failed, EmailDispatchPublishFailure.Unknown, "unknown")]
+    [Arguments(EmailDispatchPublishOutcome.Failed, (EmailDispatchPublishFailure)int.MaxValue, "unknown")]
+    [Arguments(EmailDispatchPublishOutcome.Returned, null, "returned")]
+    [Arguments(EmailDispatchPublishOutcome.Nacked, null, "nacked")]
+    [Arguments(EmailDispatchPublishOutcome.Failed, null, "failed")]
+    [Arguments((EmailDispatchPublishOutcome)int.MaxValue, null, "unknown")]
+    public async Task PublishDuePointersAsync_PersistsOnlyBoundedFailureCodes(
+        EmailDispatchPublishOutcome outcome,
+        EmailDispatchPublishFailure? failure,
+        string expectedCode)
+    {
+        var dispatch = CreateDispatch();
+        var originalStatus = dispatch.Status;
+        var repository = Substitute.For<IEmailDispatchOutboxRepository>();
+        var transport = Substitute.For<IEmailDispatchTransport>();
+        repository.GetRabbitMqPublishBatch(
+                Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns([dispatch]);
+        repository.MarkRabbitMqPublishFailed(
+                dispatch.Id, Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                dispatch.RabbitMqLastPublishFailureCategory = call.ArgAt<string>(1);
+                return Task.CompletedTask;
+            });
+        transport.PublishDispatchPointerAsync(Arg.Any<EmailDispatchPointer>(), Arg.Any<CancellationToken>())
+            .Returns(new EmailDispatchPublishResult(
+                Outcome: outcome,
+                ReplyText: "External broker text is not a durable failure code.",
+                FailureCategory: failure));
+        var publisher = CreatePublisher(repository, transport, new EmailDispatchRabbitMqSettings { Enabled = true });
+
+        var result = await publisher.PublishDuePointersAsync(CancellationToken.None);
+
+        await Assert.That(result.FailedCount).IsEqualTo(1);
+        await Assert.That(dispatch.RabbitMqLastPublishFailureCategory).IsEqualTo(expectedCode);
+        await Assert.That(dispatch.Status).IsEqualTo(originalStatus);
     }
 
     private static EmailDispatchRabbitMqPointerPublisher CreatePublisher(

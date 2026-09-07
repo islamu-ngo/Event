@@ -1,0 +1,34 @@
+# ABOUTME: Records fenced SMTP revocation, guarded administration and optional email readiness.
+# ABOUTME: Binds primary-store revision migrations and the generated SMTP HAL contract.
+Change-Id: CHG-01M1SMGHRPKD72MCAMJPJ7WGRW
+Title: fence SMTP revocation and preserve core readiness
+Type: fix
+Scope: notifications
+Summary: Serialize delivery disable with send admission, suppress obsolete optional work, preserve uncertain handoffs, and report email failure without taking the directory offline.
+Group: email-optional-self-hosting
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: SMTP settings use HAL response contracts and generic settings writes cannot bypass preview-confirmed delivery disable.
+  Security:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: Current persisted administrator authority and ordered policy locks fence send admission and actor-bound disable confirmation; retired administrator invitations remain terminal.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: Native EmailDeliveryControl migrations add policy and source revisions, suppression watermarks and typed park provenance to each primary-store provider.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: Delivery disable preserves SMTP configuration, secret authority and delegation locks while guarded setting writes invalidate effective policy after commit.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: Four named preview and disable operations expose private confirmation contracts and server-authored HAL links through native regenerated clients.
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Disabled email requires no SMTP probe, degraded email preserves healthy core readiness, and recovery does not replay skipped work or unknown acceptance.

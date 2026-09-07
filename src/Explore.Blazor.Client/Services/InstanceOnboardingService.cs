@@ -45,7 +45,7 @@ public interface IInstanceOnboardingService
     Task<BaseCommandResponseOfGuid> UpdateStorageSettingsAsync(HalResourceOfInstanceStorageSettingsDto settings);
     Task<InstanceStorageProviderStatusDto> TestStorageConnectionAsync();
     Task<InstanceStorageUsageDto?> RecalculateStorageUsageAsync();
-    Task<InstanceSmtpSettingsDto> GetSmtpSettingsAsync();
+    Task<HalResourceOfInstanceSmtpSettingsDto> GetSmtpSettingsAsync();
     Task<BaseCommandResponseOfGuid> UpdateSmtpSettingsAsync(InstanceSmtpConfigurationWriteDto settings);
     Task<SmtpConnectionTestResultDto> TestSmtpConnectionAsync();
     Task<int> GetActiveTenantCountAsync();
@@ -321,7 +321,7 @@ public sealed class InstanceOnboardingService(
         }
     }
 
-    public Task<InstanceSmtpSettingsDto> GetSmtpSettingsAsync() =>
+    public Task<HalResourceOfInstanceSmtpSettingsDto> GetSmtpSettingsAsync() =>
         GetSettingsAsync(ct => messagingClient.GetInstanceSmtpSettingsAsync(cancellationToken: ct), () => new());
 
     public Task<BaseCommandResponseOfGuid> UpdateSmtpSettingsAsync(InstanceSmtpConfigurationWriteDto settings) =>

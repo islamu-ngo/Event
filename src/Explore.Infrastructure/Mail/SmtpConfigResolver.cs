@@ -12,9 +12,11 @@ public sealed class SmtpConfigResolver(
     ITenantContext tenantContext,
     IHierarchicalSettingsResolver settings) : ISmtpConfigResolver
 {
-    public async Task<SmtpConfiguration?> ResolveAsync(CancellationToken cancellationToken = default) =>
-        (await resolver.ResolveTransportAsync(
-            tenantContext.TenantId == Guid.Empty ? null : tenantContext.TenantId, cancellationToken)).Configuration;
+    public Task<SmtpConfiguration?> ResolveAsync(CancellationToken cancellationToken = default) =>
+        ResolveAsync(tenantContext.TenantId == Guid.Empty ? null : tenantContext.TenantId, cancellationToken);
+
+    public async Task<SmtpConfiguration?> ResolveAsync(Guid? tenantId, CancellationToken cancellationToken = default) =>
+        (await resolver.ResolveTransportAsync(tenantId, cancellationToken)).Configuration;
 
     public void InvalidateCache(Guid? tenantId = null) =>
         settings.InvalidateCache(tenantId.HasValue ? SettingScope.Tenant : null, tenantId);

@@ -69,13 +69,20 @@ public sealed class EmailDispatchRabbitMqConsumerDecisionTests
     [Test]
     public async Task FromDrainResultWhenOutcomeIsDurableAcknowledgesDelivery()
     {
-        foreach (EmailDispatchDrainOutcome outcome in Enum.GetValues<EmailDispatchDrainOutcome>())
+        foreach (EmailDispatchDrainOutcome outcome in new[]
         {
-            if (outcome == EmailDispatchDrainOutcome.Missing)
-            {
-                continue;
-            }
-
+            EmailDispatchDrainOutcome.Sent,
+            EmailDispatchDrainOutcome.RetryScheduled,
+            EmailDispatchDrainOutcome.DeadLettered,
+            EmailDispatchDrainOutcome.Unknown,
+            EmailDispatchDrainOutcome.Skipped,
+            EmailDispatchDrainOutcome.TenantPaused,
+            EmailDispatchDrainOutcome.AlreadyClaimed,
+            EmailDispatchDrainOutcome.AlreadySettled,
+            EmailDispatchDrainOutcome.Deferred,
+            EmailDispatchDrainOutcome.Parked
+        })
+        {
             EmailDispatchRabbitMqSettlement decision = EmailDispatchRabbitMqConsumerDecision.DecideForDrainResult(
                 new EmailDispatchSingleDrainResult(outcome, Guid.CreateVersion7()));
 
@@ -83,6 +90,19 @@ public sealed class EmailDispatchRabbitMqConsumerDecisionTests
             await Assert.That(decision.Requeue).IsFalse();
             await Assert.That(decision.FailureCategory).IsEqualTo("durable_outcome");
         }
+    }
+
+    [Test]
+    [Arguments(0)]
+    [Arguments(int.MaxValue)]
+    public async Task FromDrainResultWhenOutcomeIsUnspecifiedOrUndefinedDoesNotAcknowledge(int outcomeValue)
+    {
+        var result = new EmailDispatchSingleDrainResult((EmailDispatchDrainOutcome)outcomeValue);
+        var decision = EmailDispatchRabbitMqConsumerDecision.DecideForDrainResult(result);
+
+        await Assert.That(result.IsDurableOutcome).IsFalse();
+        await Assert.That(decision.Action).IsEqualTo(EmailDispatchRabbitMqSettlementAction.Reject);
+        await Assert.That(decision.Requeue).IsFalse();
     }
 
     [Test]

@@ -15,14 +15,16 @@ public sealed class EmailDispatchRabbitMqPointerPublisher(
     IOptionsMonitor<EmailDispatchRabbitMqSettings> settings,
     ILogger<EmailDispatchRabbitMqPointerPublisher> logger)
 {
-    private const string PublisherExceptionFailureCategory = "pointer_publish_exception";
-
     public async Task<EmailDispatchRabbitMqPointerPublisherResult> PublishDuePointersAsync(CancellationToken cancellationToken)
     {
         var options = settings.CurrentValue;
         if (!options.Enabled)
         {
-            return new EmailDispatchRabbitMqPointerPublisherResult(0, 0, 0, 0);
+            return new EmailDispatchRabbitMqPointerPublisherResult(
+                EligibleCount: 0,
+                ConfirmedCount: 0,
+                FailedCount: 0,
+                SkippedCount: 0);
         }
 
         var now = DateTime.UtcNow;
@@ -61,7 +63,7 @@ public sealed class EmailDispatchRabbitMqPointerPublisher(
 
                 await repository.MarkRabbitMqPublishFailed(
                     row.Id,
-                    NormalizeFailureCategory(result.FailureCategory, result.Outcome),
+                    GetFailureCode(result),
                     attemptedAt,
                     cancellationToken);
                 failed++;
@@ -74,7 +76,7 @@ public sealed class EmailDispatchRabbitMqPointerPublisher(
             {
                 await repository.MarkRabbitMqPublishFailed(
                     row.Id,
-                    PublisherExceptionFailureCategory,
+                    EmailDispatchPublishFailure.PointerPublishException.ToCode(),
                     attemptedAt,
                     CancellationToken.None);
                 failed++;
@@ -87,16 +89,23 @@ public sealed class EmailDispatchRabbitMqPointerPublisher(
             }
         }
 
-        return new EmailDispatchRabbitMqPointerPublisherResult(rows.Count, confirmed, failed, skipped);
+        return new EmailDispatchRabbitMqPointerPublisherResult(
+            EligibleCount: rows.Count,
+            ConfirmedCount: confirmed,
+            FailedCount: failed,
+            SkippedCount: skipped);
     }
 
-    private static string NormalizeFailureCategory(string? failureCategory, EmailDispatchPublishOutcome outcome)
-    {
-        var value = string.IsNullOrWhiteSpace(failureCategory)
-            ? outcome.ToString().ToLowerInvariant()
-            : failureCategory.Trim();
-        return value.Length <= 100 ? value : value[..100];
-    }
+    private static string GetFailureCode(EmailDispatchPublishResult result) =>
+        result.FailureCategory is { } failure
+            ? failure.ToCode()
+            : result.Outcome switch
+            {
+                EmailDispatchPublishOutcome.Returned => "returned",
+                EmailDispatchPublishOutcome.Nacked => "nacked",
+                EmailDispatchPublishOutcome.Failed => "failed",
+                _ => "unknown"
+            };
 }
 
 public sealed record EmailDispatchRabbitMqPointerPublisherResult(

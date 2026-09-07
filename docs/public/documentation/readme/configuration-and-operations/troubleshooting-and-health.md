@@ -1,6 +1,8 @@
 ---
 description: Practical troubleshooting guide, symptom matrix, and step-by-step recovery recipes.
 ---
+<!-- ABOUTME: Operator troubleshooting and recovery guidance for deployment and runtime failures. -->
+<!-- ABOUTME: Explains readiness responses and optional email without exposing private diagnostics. -->
 
 # Troubleshooting & Operational Health
 
@@ -226,21 +228,82 @@ The platform exposes standardized, sanitized health endpoints:
 
 | Endpoint | Method | Purpose | Healthy Response |
 |---|---|---|---|
-| `/alive` | `GET` | **Liveness Probe**: Confirms the process is running. | `200 OK` (plain text) |
-| `/health` | `GET` | **Readiness Probe**: Evaluates DB, Keycloak, storage, and Cerbos connections. | `200 OK` with sanitized JSON status |
+| `/alive` | `GET` | **Liveness Probe**: Confirms the process is running. | `200 OK` with sanitized JSON status |
+| `/health` | `GET` | **Readiness Probe**: Checks required infrastructure and reports optional-service health. | `200 OK` with sanitized JSON status |
 
-Example healthy response from `/health`:
+Both `Healthy` and `Degraded` readiness return HTTP 200. `Unhealthy` returns HTTP 503. Inspect the individual checks to distinguish an optional email incident from a core dependency failure.
+
+### Optional Email Readiness
+
+| Situation | Health result | Operator action |
+|---|---|---|
+| Outbound email is disabled, including an unconfigured installation with delivery left off | `smtp` is `Healthy`; no SMTP connection is attempted | No mail server is needed for this readiness check. |
+| Email is explicitly enabled, but configuration is incomplete, SMTP connection/authentication fails, or the network probe times out | `smtp` is `Degraded`; `/health` stays HTTP 200 if core checks are healthy | Check the instance's delivery setting, SMTP address, port, TLS mode, and credentials through the configured [secret authority](secrets.md). |
+| Required configuration/secret authority, database access, or health-check composition fails | `Unhealthy`; `/health` returns HTTP 503 | Restore the failing core dependency. Optional email does not bypass these checks. |
+
+The SMTP readiness probe and instance connection test use **instance SMTP settings**. They do not validate a tenant's separate mail server.
+
+The `email-dispatch` check is `Healthy` when its worker is intentionally disabled. A selected but disabled scheduler is `Degraded`, while failures reading the dispatch database remain `Unhealthy`. HTTP 200 alone does not confirm that email can be delivered.
+
+When delivery is disabled or its configuration is unavailable, optional notifications
+are recorded as skipped rather than kept for a later flood of email. In-app delivery
+continues. Required email can be parked while its delivery requirements are unavailable;
+an operator hold is a separate reason and must not be released by restoring SMTP.
+If a capability-held message offers a park action, using it places that message
+under an explicit operator hold. Repeating the hold does not replace its original
+reason or time. Follow the actions offered by the server; a message already being
+sent cannot be taken back by parking it.
+Do not assume that correcting SMTP has sent a parked message. Inspect its delivery
+state, and never automatically replay a message whose acceptance is unknown. A send
+already admitted before a policy change may still complete.
+
+Old managed-administrator invitation messages are retired and always skipped,
+including after email or administrator access is restored. Managed provisioning
+now links an existing Local administrator instead of producing an invitation.
+A skipped audit entry is not a sent email.
+
+### Deliberately Disabling Email
+
+Use the disable action advertised in the instance SMTP or current tenant email
+settings. Tenant controls respect instance delegation and individual settings
+locks. If no action is offered, changing a generic setting or resetting an override
+does not bypass that restriction.
+
+1. Request the disable preview and review its affected scopes and policy revision.
+   Disabling instance delivery does not necessarily disable a tenant that uses its
+   own independently enabled transport.
+2. Type `DISABLE EMAIL DELIVERY` exactly and confirm before the preview expires.
+   Cancelling leaves delivery unchanged. The confirmation expires after five
+   minutes and is valid only for the administrator, scope and impact that produced it.
+3. If policy, scope or administrator authority changes, obtain a new preview.
+   A stale confirmation returns a conflict instead of silently applying different
+   impact; do not automatically retry it.
+
+Disable preserves SMTP configuration and locks, and takes effect at new send
+admission. A send already admitted may still finish. Re-enabling delivery does not
+replay skipped optional history or release operator holds and unknown outcomes.
+Keep confirmation tokens out of logs and support tickets; the preview contains no
+SMTP credentials or message content.
+
+Example partial response when outbound email is disabled and core checks are healthy (other checks omitted):
+
 ```json
 {
   "status": "Healthy",
-  "totalDuration": "00:00:00.018",
-  "entries": {
-    "database": { "status": "Healthy" },
-    "keycloak": { "status": "Healthy" },
-    "storage": { "status": "Healthy" }
-  }
+  "message": "Ok",
+  "totalDuration": 18,
+  "checks": [
+    {
+      "name": "smtp",
+      "status": "Healthy",
+      "description": "smtp_disabled",
+      "duration": 1,
+      "data": { "enabled": false, "state": "Disabled" }
+    }
+  ]
 }
 ```
+
 *Note: Health responses never disclose passwords, connection strings, or PII.*
 
 ---

@@ -7,6 +7,11 @@ namespace Explore.Domain.Services;
 
 public static class EmailDeliveryPolicy
 {
+    public static bool ShouldSuppressOptional(EmailDeliveryState state, bool honorsPreference,
+        long occurrenceRevision, long? suppressedThroughRevision) =>
+        honorsPreference && (state != EmailDeliveryState.Available
+            || suppressedThroughRevision is { } cutoff && occurrenceRevision <= cutoff);
+
     public static EmailDeliveryState Evaluate(
         bool enabled,
         bool hasHost,

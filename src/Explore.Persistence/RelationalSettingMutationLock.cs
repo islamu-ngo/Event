@@ -2,6 +2,8 @@
 // ABOUTME: Acquires ordered manifest leases before caller-owned transactions so snapshots start after every wait.
 
 using Explore.Application.Contracts.Persistence;
+using Explore.Domain.Constants;
+using Explore.Domain.Settings.Definitions;
 using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -54,6 +56,28 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
             throw new ArgumentException(
                 "At least one canonical setting key is required.",
                 nameof(canonicalSettingKeys));
+        }
+
+        if (RequiresEmailDeliveryFence(orderedKeys))
+        {
+            IReadOnlySet<string>? outerKeys = _outerOrderedKeys.Value;
+            if (outerKeys is null)
+            {
+                if (_dbContext.Database.CurrentTransaction is not null)
+                    throw new InvalidOperationException(
+                        "SMTP policy locks must be acquired before the caller-owned transaction begins.");
+
+                // Admission owns this policy lock before opening its transaction. Writers must
+                // use the same order so a database writer cannot block its own lock holder.
+                return ExecuteOrderedGroupsAsync(
+                    [orderedKeys],
+                    token => _unitOfWork.ExecuteInTransactionAsync(
+                        innerToken => ExecuteInsideTransactionAsync(orderedKeys, operation, innerToken), token),
+                    cancellationToken);
+            }
+
+            if (!orderedKeys.All(outerKeys.Contains))
+                throw new InvalidOperationException("Nested SMTP mutations must declare all policy keys in the outer lock group.");
         }
 
         return _dbContext.Database.CurrentTransaction is not null
@@ -179,15 +203,16 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
     internal static string[] NormalizeCanonicalKeys(
         IEnumerable<string> canonicalSettingKeys)
     {
-        return canonicalSettingKeys
-            .Select(key =>
-            {
-                ArgumentException.ThrowIfNullOrWhiteSpace(key);
-                return key.Trim().ToLowerInvariant();
-            })
+        string[] normalizedKeys = canonicalSettingKeys
+            .Select(NormalizeCanonicalKey)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(key => key, StringComparer.Ordinal)
             .ToArray();
+
+        return RequiresEmailDeliveryFence(normalizedKeys)
+            ? [GovernanceSettingKeys.Email.DeliveryEnabled,
+                .. normalizedKeys.Where(key => key != GovernanceSettingKeys.Email.DeliveryEnabled)]
+            : normalizedKeys;
     }
 
     internal static string[] NormalizeOrderedCanonicalKeyGroups(
@@ -207,6 +232,19 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
             }
         }
 
+        if (ordered.Remove(GovernanceSettingKeys.Email.DeliveryEnabled))
+            ordered.Insert(0, GovernanceSettingKeys.Email.DeliveryEnabled);
+
         return ordered.ToArray();
+    }
+
+    internal static bool RequiresEmailDeliveryFence(IEnumerable<string> keys) =>
+        keys.Select(NormalizeCanonicalKey).Any(key => key == GovernanceSettingKeys.TenantDelegation.LockSmtp
+            || EmailSettingDefinitions.All.Any(definition => definition.Key == key));
+
+    internal static string NormalizeCanonicalKey(string key)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        return key.Trim().ToLowerInvariant();
     }
 }

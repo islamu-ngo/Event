@@ -5,6 +5,7 @@ namespace Explore.Persistence;
 
 using Explore.Application.Contracts.Persistence;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -17,6 +18,8 @@ public static class ConfigurationManifestPersistenceServicesRegistration
 
         services.TryAddScoped<IUnitOfWork, EfCoreUnitOfWork>();
         services.TryAddScoped<ISettingMutationLock, RelationalSettingMutationLock>();
+        services.TryAddScoped<IEmailDeliveryDisableImpactReader, EmailDeliveryDisableImpactReader>();
+        services.TryAddScoped<IEmailDeliverySettingsWriter, EmailDeliverySettingsWriter>();
         services.TryAddScoped<ICoordinatedSettingMutationStore, CoordinatedSettingMutationRepository>();
         services.TryAddScoped<ITenantRepository, TenantRepository>();
         services.TryAddScoped<ISystemSettingRepository, SystemSettingRepository>();

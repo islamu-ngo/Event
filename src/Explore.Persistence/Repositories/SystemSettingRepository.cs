@@ -1,11 +1,12 @@
-// ABOUTME: Repository implementation for SystemSetting entity providing data access
-// for system-wide configuration settings with caching support.
+// ABOUTME: Persists system settings with canonical per-key mutation coordination.
+// ABOUTME: SMTP writes require policy ownership before caller-owned transactions, including explicit transaction writes.
 
 namespace Explore.Persistence.Repositories;
 
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Settings;
 using Explore.Domain;
+using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 
 public class SystemSettingRepository : ISystemSettingRepository
@@ -34,6 +35,8 @@ public class SystemSettingRepository : ISystemSettingRepository
         SystemSetting setting,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(setting);
+        EmailDeliverySettingKeys.RejectGenericMutation(setting.SettingKey);
         if (PublicationPolicySettingKeys.All.Contains(setting.SettingKey, StringComparer.Ordinal))
         {
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
@@ -50,6 +53,7 @@ public class SystemSettingRepository : ISystemSettingRepository
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(setting);
+        EmailDeliverySettingKeys.RejectGenericMutation(setting.SettingKey);
         if (_dbContext.Database.CurrentTransaction is null)
         {
             throw new InvalidOperationException(
@@ -64,13 +68,18 @@ public class SystemSettingRepository : ISystemSettingRepository
                 "Guarded publication-policy settings require coordinated mutation.");
         }
 
-        return UpsertCoreAsync(setting, cancellationToken);
+        return RelationalSettingMutationLock.RequiresEmailDeliveryFence([setting.SettingKey])
+            ? _mutationLock.ExecuteAsync(setting.SettingKey,
+                token => UpsertCoreAsync(setting, token), cancellationToken)
+            : UpsertCoreAsync(setting, cancellationToken);
     }
 
     public Task<string?> UpsertLockAsync(
         SystemSetting setting,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(setting);
+        EmailDeliverySettingKeys.RejectGenericMutation(setting.SettingKey);
         if (PublicationPolicySettingKeys.All.Contains(setting.SettingKey, StringComparer.Ordinal))
         {
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
@@ -80,6 +89,10 @@ public class SystemSettingRepository : ISystemSettingRepository
             setting.SettingKey,
             async token =>
             {
+                var policyBefore = RelationalSettingMutationLock.RequiresEmailDeliveryFence([setting.SettingKey])
+                    ? await EmailDeliveryPolicyReader.ReadAllAsync(_dbContext, token)
+                    : null;
+                DetachTrackedSmtpSetting(setting.SettingKey);
                 SystemSetting? existing = await _dbContext.SystemSettings
                     .FirstOrDefaultAsync(candidate => candidate.SettingKey == setting.SettingKey, token);
                 string? previousValue = existing?.Value;
@@ -96,6 +109,9 @@ public class SystemSettingRepository : ISystemSettingRepository
                 }
 
                 await _dbContext.SaveChangesAsync(token);
+                if (policyBefore is not null)
+                    await EmailDeliveryPolicyRevisionTracker.RecordInstanceAsync(_dbContext, policyBefore,
+                        setting.UpdatedBy ?? setting.CreatedBy, token);
                 return previousValue;
             },
             cancellationToken);
@@ -131,6 +147,10 @@ public class SystemSettingRepository : ISystemSettingRepository
         SystemSetting setting,
         CancellationToken cancellationToken)
     {
+        var policyBefore = RelationalSettingMutationLock.RequiresEmailDeliveryFence([setting.SettingKey])
+            ? await EmailDeliveryPolicyReader.ReadAllAsync(_dbContext, cancellationToken)
+            : null;
+        DetachTrackedSmtpSetting(setting.SettingKey);
         SystemSetting? existing = await _dbContext.SystemSettings
             .FirstOrDefaultAsync(
                 candidate => candidate.SettingKey == setting.SettingKey,
@@ -155,6 +175,24 @@ public class SystemSettingRepository : ISystemSettingRepository
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+        if (policyBefore is not null)
+            await EmailDeliveryPolicyRevisionTracker.RecordInstanceAsync(_dbContext, policyBefore,
+                setting.UpdatedBy ?? setting.CreatedBy, cancellationToken);
         return previousValue;
+    }
+
+    private void DetachTrackedSmtpSetting(string key)
+    {
+        if (!RelationalSettingMutationLock.RequiresEmailDeliveryFence([key]))
+            return;
+
+        // The policy lock protects the next read, but EF's identity map can still contain
+        // an earlier transaction's row. Detaching preserves a same-instance request's values.
+        string canonicalKey = RelationalSettingMutationLock.NormalizeCanonicalKey(key);
+        var entries = _dbContext.ChangeTracker.Entries<SystemSetting>()
+            .Where(entry => RelationalSettingMutationLock.NormalizeCanonicalKey(entry.Entity.SettingKey) == canonicalKey)
+            .ToArray();
+        foreach (var entry in entries)
+            entry.State = EntityState.Detached;
     }
 }

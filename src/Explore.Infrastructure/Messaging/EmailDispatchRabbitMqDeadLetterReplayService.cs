@@ -153,7 +153,7 @@ public sealed class EmailDispatchRabbitMqDeadLetterReplayService(
                     if (!replayed)
                     {
                         await channel.BasicNackAsync(args.DeliveryTag, multiple: false, requeue: true, stoppingToken);
-                        metrics.RecordEmailDispatchRabbitMqConsume("nacked", "replay_state_changed");
+                        metrics.RecordEmailDispatchRabbitMqConsume(EmailDispatchConsumeOutcome.Nacked, "replay_state_changed");
                         logger.LogWarning(
                             "Nacked RabbitMQ EmailDispatch dead-letter pointer {PublishEventId} for tenant {TenantId} because durable replay state changed before reset",
                             pointer.PublishEventId,
@@ -164,7 +164,7 @@ public sealed class EmailDispatchRabbitMqDeadLetterReplayService(
 
                 await PublishReplayAsync(channel, options, pointer, stoppingToken);
                 await channel.BasicAckAsync(args.DeliveryTag, multiple: false, stoppingToken);
-                metrics.RecordEmailDispatchRabbitMqConsume("replayed", "none");
+                metrics.RecordEmailDispatchRabbitMqConsume(EmailDispatchConsumeOutcome.Replayed, "none");
                 logger.LogInformation(
                     "Replayed RabbitMQ EmailDispatch dead-letter pointer {PublishEventId} for tenant {TenantId}",
                     pointer.PublishEventId,
@@ -189,7 +189,7 @@ public sealed class EmailDispatchRabbitMqDeadLetterReplayService(
         }
         catch (Exception ex)
         {
-            metrics.RecordEmailDispatchRabbitMqConsume("nacked", "dlq_replay_exception");
+            metrics.RecordEmailDispatchRabbitMqConsume(EmailDispatchConsumeOutcome.Nacked, "dlq_replay_exception");
             logger.LogWarning(
                 ex,
                 "Nacking RabbitMQ EmailDispatch dead-letter pointer {PublishEventId} for tenant {TenantId} after replay exception",
@@ -210,7 +210,7 @@ public sealed class EmailDispatchRabbitMqDeadLetterReplayService(
     {
         await PublishParkingAsync(channel, options, args, body, replayReason, cancellationToken);
         await channel.BasicAckAsync(args.DeliveryTag, multiple: false, cancellationToken);
-        metrics.RecordEmailDispatchRabbitMqConsume("parked", failureCategory);
+        metrics.RecordEmailDispatchRabbitMqConsume(EmailDispatchConsumeOutcome.Parked, failureCategory);
         logger.LogWarning(
             "Parked RabbitMQ EmailDispatch dead-letter delivery {DeliveryTag} with reason {ReplayReason}",
             args.DeliveryTag,

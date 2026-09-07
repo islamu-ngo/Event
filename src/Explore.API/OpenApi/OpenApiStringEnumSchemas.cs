@@ -55,6 +55,8 @@ internal static class OpenApiStringEnumSchemaCatalog
         typeof(ConfigurationImportEffectStatus),
         typeof(ConfigurationImportScope),
         typeof(ConfigurationImportSessionState),
+        typeof(EmailDispatchParkReason),
+        typeof(EmailDispatchStatus),
         typeof(LocationAddressSourceEnum),
         typeof(LocationAddressVisibilityEnum)
     ];
@@ -85,6 +87,8 @@ internal static class OpenApiStringEnumSchemaCatalog
         typeof(ConfigurationPortabilityClass),
         typeof(ConfigurationManifestExportView),
         typeof(DeclineBehavior),
+        typeof(EmailDispatchParkReason),
+        typeof(EmailDispatchStatus),
         typeof(EmailDispatchUnknownReconciliationOutcome),
         typeof(EntityTypeName),
         typeof(EventReportDecisionKind),

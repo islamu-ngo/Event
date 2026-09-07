@@ -23,6 +23,10 @@ namespace Explore.Blazor.Client.Serialization;
     WriteIndented = false,
     AllowTrailingCommas = true)]
 [JsonSerializable(typeof(JsonElement))]
+[JsonSerializable(typeof(HalResourceOfInstanceSmtpSettingsDto))]
+[JsonSerializable(typeof(HalResourceOfEmailDeliveryDisablePreviewDto))]
+[JsonSerializable(typeof(HalResourceOfSettingGroupResponseDto))]
+[JsonSerializable(typeof(EmailDeliveryDisableRequest))]
 [JsonSerializable(typeof(HalResourceOfControlPlaneOverviewDto))]
 [JsonSerializable(typeof(HalCollectionResourceOfLocalIdentitySummary))]
 [JsonSerializable(typeof(HalResourceOfLocalIdentitySummary))]

@@ -62,6 +62,8 @@
 - [ ] Candidate for ADR.
 - [x] Stays in journal only (observed build-orchestration lesson).
 
+---
+
 [2026-09-06 Europe/Brussels] — Global signal callbacks can retain disposed test hosts
 
 **Context**: Full API acceptance exhausted memory while constructing many hosts. A bounded investigation separated host disposal from process-wide callback ownership before another complete run.

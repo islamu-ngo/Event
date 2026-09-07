@@ -12,12 +12,9 @@ Instead:
 2. **Autonomous Execution Without Approval**: The CTO skill does not pause to request user approval before applying these edits; it applies them directly.
 3. **Crisp Chat Reporting**: All findings, decisions, and applied modifications are reported back to the user in a crisp, high-signal chat response.
 
-## Adaptive Review Sizing
-
-- **Comprehensive audit (Tiers 0–2)**: Apply the full scorecard, adversarial risks, and I-VSD freshness checks directly to the triad.
-- **Lean review (Tiers 3–4)**: Use the lean verdict, blast-radius/edge-case, contract/sequencing, and direct-adjustment sections below.
-
 ## Required Chat Response Structure
+
+The finishing chat response must follow this structure:
 
 ```markdown
 ## Senior CTO Feedback & Triad Refinements Applied
@@ -27,14 +24,6 @@ Instead:
 [A direct, punchy 2-3 sentence executive statement explaining the architectural assessment, why the triad was updated, and the overall readiness of the workstream.]
 
 ---
-
-### Review Metadata
-- Review depth: Comprehensive | Lean
-- Reviewed workstream: `<task-name>`
-- Reviewed artifacts: `[plan.md, context.md, tasks.md]`
-- I-VSD freshness: Current | Stale | Missing
-- Decision: Approved as Refined | Split Applied | Scope Pruned & Aligned | Reject | Defer
-- User approval: Not granted by this review
 
 ### Key Decisions Made
 - **[Decision 1 — e.g. Architectural Boundary]**: [Decision summary, e.g., Enforced server-side HAL link affordances and moved validation out of Blazor UI into CQRS command pipeline.]
@@ -78,31 +67,6 @@ Instead:
 [Clear, direct guidance on the exact next step for the developer or implementing agent to run, e.g.:
 "The triad is fully refined and execution-ready. Begin implementation with **Phase 1, Task 1.1** (authoring the failing invariant tests in `tests/...`). Run:
 `dotnet test --treenode-filter '/*/*/*<TestClass>/*'`"]
-```
-
-## Structure: Lean Review (Tiers 3–4: Application, UI, Refactoring)
-
-```markdown
-# Senior CTO Feedback (Lean Review)
-
-Last Updated: YYYY-MM-DD Europe/Brussels
-
-## Review Metadata
-- Reviewed workstream: `<task-name>`
-- Reviewed artifacts: `[plan.md, tasks.md]`
-- Decision: Approve | Approve with required changes | Split before approval | Reject | Defer
-
-## 1. Executive Verdict & Decision
-[One concise paragraph with the verdict and top priorities.]
-
-## 2. Blast Radius & Edge Cases
-[Unaddressed callers, callees, downstream events, or missing boundary scenarios.]
-
-## 3. Architecture, Contracts & Invariant Tests
-[Clean Architecture conformance, declarative commit contracts, absence of mock-mirroring, and TUnit verification lanes.]
-
-## 4. Concrete Plan Adjustments
-[Actionable list of changes applied or required in plan.md and tasks.md.]
 ```
 
 ## Answer Style Rules

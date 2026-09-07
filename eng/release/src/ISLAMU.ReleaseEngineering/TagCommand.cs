@@ -520,7 +520,7 @@ public static class TagCommand
     private static string ResolveReleaseDirectory(string root, string path)
     {
         string releaseDirectory = ResolveChild(root, path, mustExist: true);
-        string expectedParent = Path.Combine(root, "docs", "internal", "releases");
+        string expectedParent = Path.Join(Path.GetFullPath(root), "docs", "internal", "releases");
         if (!string.Equals(Path.GetDirectoryName(releaseDirectory), expectedParent, PathComparison)) throw new IOException();
         return releaseDirectory;
     }

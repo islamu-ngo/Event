@@ -82,6 +82,11 @@ Every change must answer these eight questions **before editing any file**:
 12. **Strict Test Quality Over Quantity (No Mock-Mirroring or Scraping)**: Tests MUST guard true business invariants, rich domain state machines, concurrency races, tenant isolation, and security fail-closed semantics. Prohibit tautological mock-mirroring (`Received(1)`), framework-testing boilerplate (testing EF Core cancellation), raw source-code / CSS text scraping, and ephemeral mutation test project sprawl.
 13. **Dual-Documentation Parity & Separation (Public vs Internal)**: Any change impacting external configuration (`.env.example`), deployment topologies (`docker-compose.yml`), public API endpoints, or administrative features MUST update both the public adopter guide in `docs/public/` (operator/adopter perspective on GitBook) and the technical source anchor in `docs/internal/` (C# architecture and invariants) within the same PR, following Single Responsibility without duplicating raw configs. See `docs/internal/DOCUMENTATION_ARCHITECTURE.md`.
 14. **Self-Contained Interaction & Zero Plan-Opening Overhead**: Prompts, questions, feedback requests, and status reports to the developer MUST be completely self-contained and immediately actionable without requiring the developer to open `dev/active/<task>/...` or grep internal plan files. Agents must NEVER reference bare phase/task IDs (`P04/P06`, `T02.1`, `P03 gates`) in isolation. Every approval request, decision prompt, or milestone update MUST provide a self-contained Decision Brief inline: descriptive human names of features/components, current context, the exact choice with rationale, and clear recommended options with trade-offs. The implementation plan is internal working memory; the chat response is the developer console.
+15. **The 3-Ring Progressive Verification Model & Yak-Shaving Quarantine**:
+    - **Ring 1 (Inner Loop / Sliced)**: Subtask changes MUST be verified via fast in-memory TUnit sliced tests (`--treenode-filter "/*/*/*<TestClass>/*"`) targeting Domain or Application unit tests in **< 2 seconds**. Zero Docker containers or network I/O in the inner loop. 90%+ of algorithmic/normalization/business invariants belong in `Event.Domain.UnitTests`.
+    - **Ring 2 (Phase Exit Gate)**: Verify the single touched project against ONE canonical provider (e.g., SQLite in-memory or single PostgreSQL container) in **< 15 seconds**.
+    - **Ring 3 (Plan Exit / Workstream Gate)**: The full multi-database provider matrix (PostgreSQL, SQLite, SQL Server, MySQL), migration checks, and full suites are run ONCE at the end of the entire implementation plan before PR creation.
+    - **Yak-Shaving Quarantine**: Agents are strictly FORBIDDEN from absorbing or repairing pre-existing unrelated test suite rot encountered during feature work. If an existing test fails outside the task's path, verify if it reproduces on an untouched base worktree, log it under `*-context.md` (or `dev/backlog/`), and quarantine it. Never derail feature implementation to fix unrelated persistence suite failures.
 
 **Full list:** [`docs/internal/QUICK_REFERENCE.md`](docs/internal/QUICK_REFERENCE.md)
 
@@ -121,10 +126,21 @@ When a task touches a topic covered by docs, skills, or rules, retrieve the **sm
 
 Before the first product edit, ensure local tracking is fresh against upstream (`git checkout develop && git pull --ff-only`), then establish the green baseline once for code changes. Do not rerun an unchanged baseline; every PR touching product code must still leave the build and minimum tests green.
 
+**The 3-Ring Progressive Verification Hierarchy:**
+1. **Ring 1 (Inner Loop — Subtask Level, < 2s)**:
+   - Run ONLY the target test class using TUnit slicing: `--treenode-filter "/*/*/*<TestClass>/*"`.
+   - Strictly in-memory (`Event.Domain.UnitTests` or `Event.Application.UnitTests`).
+   - Zero Docker containers, zero network I/O, zero database setup lag.
+2. **Ring 2 (Phase Exit Gate — Phase Level, < 15s)**:
+   - Run a single Release build and at most ONE selected project test against a single canonical provider.
+   - Forbid running the multi-database provider matrix during intermediate phase exits.
+3. **Ring 3 (Plan Exit Gate — Workstream Level)**:
+   - Full multi-database matrix, migration round-trips, and architecture guardrails run ONCE at the end of the workstream before PR creation.
+
 **Scope & Layer Discipline:**
 - **Tier 4 (Docs / Agent Context):** For documentation, agent context, markdown-only, or comment changes, DO NOT run `dotnet build` or .NET test suites. Verification is strictly scoped to markdown formatting, link integrity, and schema checks.
 - **Layer-Bounded Execution:** Never run test suites belonging to unrelated architectural layers (e.g., no database integration tests for UI changes; no Blazor tests for CQRS handlers).
-- **TUnit Slicing:** During active development, run ONLY the target test class using `--treenode-filter "/*/*/*<TestClass>/*"` (~1.5s). Full project runs (`--project`) are reserved for phase exits or PR completion.
+- **Yak-Shaving Quarantine Rule:** Never derail feature implementation to fix pre-existing test rot or broken fixtures outside the task path. Verify reproduction on clean base, log under `*-context.md`, quarantine the failure, and proceed with the assigned deliverable.
 
 **Build Command (Code Changes Only):**
 ```bash

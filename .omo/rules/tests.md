@@ -24,7 +24,11 @@ related_intents: [add-get-endpoint, add-write-endpoint, add-cqrs-handler, add-ef
 - All test projects and source files (`**/*Tests/*.cs`).
 
 ## Path-Specific Constraints
-- **Clean-Architecture Sliced Execution**: Never run solution-wide tests or irrelevant downstream layer suites (e.g. no database integration tests when modifying Blazor UI or Application unit tests). During active subtask iteration, use TUnit tree-node filtering (`--treenode-filter "/*/*/*<TestClassName>/*"`) for fast ~1.5s feedback.
+- **Clean-Architecture Sliced Execution & The 3-Ring Progressive Verification Model**:
+  - **Ring 1 (Inner Loop, < 2s)**: Subtask iteration runs ONLY fast in-memory TUnit sliced tests (`--treenode-filter "/*/*/*<TestClass>/*"`) in `Event.Domain.UnitTests` or `Event.Application.UnitTests`. Zero Docker containers or network I/O in the inner loop. 90%+ of algorithmic, normalization, validation, and state-machine checks belong in `Event.Domain.UnitTests` (< 50ms).
+  - **Ring 2 (Phase Exit Gate, < 15s)**: Intermediate phase exits run Release build + at most ONE selected project test against ONE canonical provider. Intermediate phase runs of multi-database matrices are strictly forbidden.
+  - **Ring 3 (Plan Exit Gate)**: The full 5-database provider matrix, migrations, and architecture guardrails run once at workstream exit.
+- **The Yak-Shaving Quarantine Rule**: Agents are strictly forbidden from absorbing, debugging, or fixing pre-existing test suite rot or broken fixtures outside the phase-owned scope. If an existing test fails outside the task path, verify if it reproduces on clean base branch, log in `*-context.md` (`Validation Baseline / Pre-Existing Technical Debt`), quarantine it, and proceed with the assigned deliverable.
 - **Test-First Invariant Specification**: Author failing contract/invariant tests *before* implementing production code (Red Phase). Never write code first and generate post-hoc tests that merely mirror implementation assumptions ("The Ugly Mirror").
 - **High-Leverage Behavioral Assertions**: Assert against public contracts (MediatR requests, HTTP routes, ProblemDetails RFC 7807, database state invariants) rather than private implementation details. Prioritize concurrency races, state transitions, and real DB integration tests over shallow getter/setter mocks.
 - **Pre-Agreed Public Seams**: Tests verify behavior through public interfaces (MediatR commands/queries, API endpoints, aggregate root methods), never by reaching into private internals or mocking internal collaborators.

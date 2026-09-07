@@ -87,7 +87,7 @@ public static class ChangeWorkflowCommand
         }
 
         string id = AllocateUnused(root, timeout);
-        string directory = Path.Combine(root, "docs", "internal", "releases", "changes");
+        string directory = Path.Join(Path.GetFullPath(root), "docs", "internal", "releases", "changes");
         Directory.CreateDirectory(directory);
         string path = Path.Combine(directory, id + ".yaml");
         WriteAtomic(path, StrictUtf8.GetBytes(Fragment(id, title, type, scope, summary, group)));
@@ -281,7 +281,7 @@ public static class ChangeWorkflowCommand
             throw new ChangeWorkflowException($"change_rename_target_used:{newId}");
         }
 
-        string fragments = Path.Combine(root, "docs", "internal", "releases", "changes");
+        string fragments = Path.Join(Path.GetFullPath(root), "docs", "internal", "releases", "changes");
         string oldFragment = Path.Combine(fragments, oldId + ".yaml");
         string newFragment = Path.Combine(fragments, newId + ".yaml");
         if (!File.Exists(newFragment))
@@ -309,7 +309,7 @@ public static class ChangeWorkflowCommand
         }
 
         var rename = new ChangeIdRename(commitOid, oldId, newId, reason);
-        string directory = Path.Combine(root, "docs", "internal", "releases", "change-id-renames");
+        string directory = Path.Join(Path.GetFullPath(root), "docs", "internal", "releases", "change-id-renames");
         Directory.CreateDirectory(directory);
         string path = Path.Combine(directory, commitOid + ".yaml");
         WriteAtomic(path, StrictUtf8.GetBytes(ChangeIdRenamePolicy.Serialize(rename)));

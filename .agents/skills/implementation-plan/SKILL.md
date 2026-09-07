@@ -28,7 +28,11 @@ priority: high
 2. Follow I-VSD `planning` mode: reuse one shared repository evidence packet, create the draft `islamic-value-sensitive-design/i-vsd-<task-name>.md`, resolve material branches through `grill-me`, draft the triad, then revalidate its `IVSD-*` mappings before declaring it plan-aligned. The plan request satisfies the normal I-VSD agreement prompt but never suppresses necessary user questions.
 3. **Upstream Freshness & Repository Evidence**: Before investigating, ensure local tracking reflects upstream reality (`git checkout develop && git pull --ff-only`). Verify every claimed path, symbol, test, contract, and configuration key from repository evidence, then classify the work against every relevant intent and carry its docs, skills, rules, scope, tests, acceptance criteria, forbidden moves, and **Release, Changelog, And Phase Commit Strategy** into the plan.
 4. **Behavior vs. Code Separation & Scenario Contract**: In `plan.md`, define externally observable behavior contracts using RFC 2119 keywords (`SHALL`/`MUST`) and concrete `WHEN`/`THEN` scenarios before designing code. Implementation details (classes, handlers, migrations) belong strictly in Section 5 Architecture. Classify changes as `Behavioral Delta` (requiring scenarios) vs `Non-Behavioral Delta` (pure refactor/tooling).
-5. **Invariant-First Slicing & Quality Over Quantity**: Sequence failing invariant/specification tests (Red Phase) *before* production code (Green Phase) specifically for **Core Domain Invariants, Concurrency Races, State Machines, and Security Boundaries**. Standard CQRS commands/queries, API endpoints, and UI components do NOT require dogmatic Red/Green micro-task decomposition; implement them directly and verify via targeted contract/integration tests without boilerplate mock-mirroring (`NSubstitute.Received(1)`).
+5. **Invariant-First Slicing & The 3-Ring Progressive Verification Model**:
+   - **Ring 1 (Inner Loop, < 2s)**: Sequence failing invariant/specification tests (Red Phase) *before* production code (Green Phase) specifically for **Core Domain Invariants, Concurrency Races, State Machines, and Security Boundaries**. Pure domain invariants belong in `Event.Domain.UnitTests` (< 50ms). Subtasks specify in-memory TUnit slicing (`--treenode-filter "/*/*/*<TestClass>/*"`). Standard CQRS commands/queries, API endpoints, and UI components do NOT require dogmatic Red/Green micro-task decomposition; implement them directly and verify via targeted contract/integration tests without boilerplate mock-mirroring (`NSubstitute.Received(1)`).
+   - **Ring 2 (Phase Exit Gate, < 15s)**: Every intermediate phase ends with one Release build and at most ONE selected project test against ONE canonical provider. **Planning multi-database matrix runs or container sweeps during intermediate phases is strictly forbidden.**
+   - **Ring 3 (Plan Exit Gate)**: The full 5-database matrix, migrations, and architecture tests are planned strictly at the final plan exit before PR creation.
+   - **Yak-Shaving Quarantine Rule**: Forbid planning or executing fixes for unrelated pre-existing test rot or broken fixtures outside the task scope. Unrelated failures are quarantined, logged in `context.md` / `dev/backlog/`, and deferred.
 6. **Greenfield Breaking Change Freedom**: This platform is pre-release (0 users, 0 external adopters). Never plan backward-compatibility shims, deprecated route aliases, or legacy compatibility layers. Break and replace cleanly to achieve optimal architecture.
 7. **Strict Deferrable Open Questions Gate**: Unknowns in `plan.md` Section 2.6 are strictly for genuinely deferrable details that will not alter scope, architectural patterns, or task breakdown. If an unknown would shift the task sequence, resolve it via `grill-me` before finalizing the plan.
 8. **Dev-Doc Triad & Lean Working Memory**: Maintain clean separation across artifacts without unnecessary duplication:
@@ -46,7 +50,7 @@ priority: high
 4. **Mock-Mirroring & Tautological Test Debt ("The Ugly Mirror")**, which writes unit tests that mock internal dependencies and assert method call counts (`Received(1)`), framework behavior (EF Core cancellation), or raw source/CSS strings instead of enforcing real domain invariants.
 5. **Backward-Compatibility Hesitation**, which introduces deprecated endpoint aliases, adapter shims, or migration baggage in a greenfield project with zero external users.
 6. Future-state-first planning, which designs changes before reporting what exists, what is missing, and what evidence supports those conclusions.
-7. Verification sprawl, which wastes implementation time on per-task checks, multiple test commands, app startup, browser automation, Playwright, Chrome DevTools MCP, Aspire, Docker, or live-service smoke tests.
+7. **Verification Sprawl & Premature Multi-Provider Matrices**, which wastes implementation time planning multi-container sweeps, 5-database matrices, app startup, browser automation, Playwright, Chrome DevTools MCP, Aspire, Docker, or live-service smoke tests during intermediate phases.
 8. Stale checkbox debt, which postpones task updates until a separate refresh command and leaves completed implementation appearing unfinished.
 9. **Dev-Doc Triad Bleed / Duplication**, which pollutes `plan.md` with granular task checklists (`- [ ]`), dynamic execution statuses (`IN PROGRESS`), or session handoffs, duplicating `tasks.md` and `context.md`.
 10. **Monolithic Umbrella Commits or Bash Script Over-Engineering**, which bundles hundreds of files into one giant commit, pre-generates brittle raw bash scripts with escaping errors instead of declarative contracts, or forces post-commit hash recording into ephemeral docs.
@@ -71,18 +75,17 @@ revalidate I-VSD mappings -> cross-check
 ```
 
 ```text
-Fast subtask verification (TUnit sliced):
+Ring 1 subtask verification (TUnit sliced in-memory, < 2s):
 dotnet run --project <one-relevant-project>.csproj --no-build -- --treenode-filter "/*/*/*<TargetTestClass>/*"
 
-Phase-end verification only:
+Ring 2 phase-end verification & immediate phase close (< 15s, single canonical provider):
 dotnet build --configuration Release --verbosity quiet
 dotnet test --project <one-relevant-project>.csproj --configuration Release --verbosity quiet
-
-Immediate phase close on the task branch:
-run phase build & test verification once
-stage exact phase-owned paths using git add
-execute git commit using the planned declarative contract
+stage phase-owned paths and execute git commit using the planned declarative contract
 verify clean git status and proceed to the next phase
+
+Ring 3 plan exit gate (workstream boundary):
+full multi-provider matrix, migrations, and architecture rules run once before PR creation
 ```
 
 ```text

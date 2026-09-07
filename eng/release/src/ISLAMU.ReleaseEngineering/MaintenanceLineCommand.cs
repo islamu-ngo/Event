@@ -36,7 +36,7 @@ public static class MaintenanceLineCommand
         {
             string root = ResolveDirectory(repositoryRoot);
             string releaseDirectory = ResolveChild(root, args[1]);
-            if (!string.Equals(Path.GetDirectoryName(releaseDirectory), Path.Combine(root, "docs", "internal", "releases"), PathComparison))
+            if (!string.Equals(Path.GetDirectoryName(releaseDirectory), Path.Join(Path.GetFullPath(root), "docs", "internal", "releases"), PathComparison))
             {
                 return Reject(output, "maintenance_line_path_invalid");
             }

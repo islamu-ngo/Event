@@ -59,6 +59,7 @@ jobs:
             base_sha="HEAD~1"
           fi
 
+          changed_files="$(git diff --name-only "$base_sha" "${GITHUB_SHA:-HEAD}" || true)"
           relevant_files="$(printf '%s\n' "$changed_files" | grep -E '^(src/Explore\.API/.*\.(cs|csproj|json)$|src/Explore\.Application/.*\.cs$|src/Explore\.Domain/.*\.cs$|tests/Event\.API\.IntegrationTests/.*\.(cs|csproj)$|tests/Explore\.GeneratedContracts\.Tests/.*\.(cs|csproj)$|eng/tools/Explore\.GeneratedContracts/.*|eng/tools/Explore\.ApiContractInventory/.*|src/Explore\.Blazor\.Client/(nswag\.json|Explore\.Blazor\.Client\.csproj|Clients/EventApiClient\.g\.cs)$|schemas/openapi_islamu-event\.json$|docs/(internal/)?API_CONTRACT_INVENTORY\.md$|docs/(internal/)?API_CONTRACT_TEST_DEBT\.md$|docs/(internal/)?API_CHANGELOG\.md$|Directory\.Packages\.props$|dotnet-tools\.json$|global\.json$|\.ci/spectral\.yaml$|\.ci/scripts/validate-api-contract-skip-inventory\.cs$|\.github/workflows/openapi-contract\.yml$)' || true)"
 
           if [ -n "$relevant_files" ]; then

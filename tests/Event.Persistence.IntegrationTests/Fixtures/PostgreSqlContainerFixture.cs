@@ -1,6 +1,8 @@
 // ABOUTME: PostgreSQL container fixture for persistence integration tests using Testcontainers.
 // ABOUTME: Provides container lifecycle, schema migration via MigrateAsync, lookup seeding, and Respawn-based reset.
 
+using System.Collections.Concurrent;
+using System.Data.Common;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Persistence;
 using Explore.Persistence.Database;
@@ -23,10 +25,12 @@ namespace Event.Persistence.IntegrationTests.Fixtures;
 /// <summary>
 /// Shared PostgreSQL container fixture that provides production-faithful schema via MigrateAsync
 /// and deterministic state reset via Respawn between tests.
+/// Supports dynamic schema-per-run isolation (SET search_path = test_<run_id>) for race-free test execution.
 /// </summary>
 public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
 {
     private readonly PostgreSqlContainer _container;
+    private readonly ConcurrentBag<string> _isolatedSchemas = new();
     private readonly MemoryCache _metadataCache = new(new MemoryCacheOptions());
     private string? _runtimeConnectionString;
     private Respawner? _respawner;
@@ -70,7 +74,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
         {
             DbAdapter = DbAdapter.Postgres,
             SchemasToInclude = [ApplicationSchema],
-        TablesToIgnore = CreateLookupTables()
+            TablesToIgnore = CreateLookupTables()
         });
     }
 
@@ -78,12 +82,40 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
     {
         try
         {
-            await _container.StopAsync();
-            await _container.DisposeAsync();
+            if (!_isolatedSchemas.IsEmpty)
+            {
+                await using var connection = new NpgsqlConnection(ConnectionString);
+                await connection.OpenAsync();
+                foreach (var schema in _isolatedSchemas)
+                {
+                    try
+                    {
+                        await using var cmd = connection.CreateCommand();
+                        cmd.CommandText = $"DROP SCHEMA IF EXISTS \"{schema}\" CASCADE;";
+                        await cmd.ExecuteNonQueryAsync();
+                    }
+                    catch (DbException)
+                    {
+                        // Best-effort schema cleanup before container disposal
+                    }
+                }
+            }
+        }
+        catch (DbException)
+        {
+            // Container teardown takes precedence
         }
         finally
         {
-            _metadataCache.Dispose();
+            try
+            {
+                await _container.StopAsync();
+                await _container.DisposeAsync();
+            }
+            finally
+            {
+                _metadataCache.Dispose();
+            }
         }
     }
 
@@ -95,6 +127,77 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
     {
         var context = CreateDbContextInternal(PrimaryDatabaseRole.Runtime, interceptors);
         context.EnableTenantFilterBypass("Persistence integration test system context.");
+        return context;
+    }
+
+    /// <summary>
+    /// Creates a dedicated dynamic PostgreSQL schema (e.g. test_<guid>) to isolate test runs
+    /// and prevent concurrency collisions with other test classes.
+    /// </summary>
+    public async Task<string> CreateIsolatedSchemaAsync(string schemaPrefix = "test_")
+    {
+        var schemaName = $"{schemaPrefix}{Guid.NewGuid():N}";
+        await using var connection = new NpgsqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"CREATE SCHEMA IF NOT EXISTS \"{schemaName}\";";
+        await command.ExecuteNonQueryAsync();
+        _isolatedSchemas.Add(schemaName);
+        return schemaName;
+    }
+
+    /// <summary>
+    /// Drops an isolated schema and all its objects.
+    /// </summary>
+    public async Task DropIsolatedSchemaAsync(string schemaName)
+    {
+        if (string.IsNullOrWhiteSpace(schemaName) ||
+            schemaName == ApplicationSchema ||
+            schemaName == RelationalModelNamespace.DefaultSchema)
+        {
+            return;
+        }
+
+        await using var connection = new NpgsqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"DROP SCHEMA IF EXISTS \"{schemaName}\" CASCADE;";
+        await command.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>
+    /// Creates a fresh DbContext with dynamic schema-per-run isolation.
+    /// Sets search_path to the isolated schema with fallback to the seeded application schema.
+    /// </summary>
+    public async Task<ExploreDbContext> CreateIsolatedDbContextAsync(
+        string? schemaPrefix = "test_",
+        params IInterceptor[] interceptors)
+    {
+        var schema = await CreateIsolatedSchemaAsync(schemaPrefix ?? "test_");
+        var searchPathInterceptor = new PostgresSearchPathInterceptor(schema, ApplicationSchema);
+        var combinedInterceptors = interceptors.Length > 0
+            ? interceptors.Append(searchPathInterceptor).ToArray()
+            : [searchPathInterceptor];
+
+        var context = CreateDbContextInternal(PrimaryDatabaseRole.Runtime, combinedInterceptors, schema);
+        context.EnableTenantFilterBypass("Persistence integration test isolated schema context.");
+        return context;
+    }
+
+    /// <summary>
+    /// Creates a DbContext configured to use a specific schema and search path.
+    /// </summary>
+    public ExploreDbContext CreateDbContextForSchema(
+        string schema,
+        params IInterceptor[] interceptors)
+    {
+        var searchPathInterceptor = new PostgresSearchPathInterceptor(schema, ApplicationSchema);
+        var combinedInterceptors = interceptors.Length > 0
+            ? interceptors.Append(searchPathInterceptor).ToArray()
+            : [searchPathInterceptor];
+
+        var context = CreateDbContextInternal(PrimaryDatabaseRole.Runtime, combinedInterceptors, schema);
+        context.EnableTenantFilterBypass("Persistence integration test explicit schema context.");
         return context;
     }
 
@@ -129,14 +232,15 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
 
     private ExploreDbContext CreateDbContextInternal(
         PrimaryDatabaseRole role = PrimaryDatabaseRole.Runtime,
-        IReadOnlyList<IInterceptor>? interceptors = null)
+        IReadOnlyList<IInterceptor>? interceptors = null,
+        string? schema = null)
     {
         // Provider/schema and interceptor variants belong to this fixture, not EF's process-wide cache.
         var optionsBuilder = TestDbContextOptions.Create<ExploreDbContext>()
             .UseMemoryCache(_metadataCache);
         PrimaryDatabaseConnectionResult database = PrimaryDatabaseProviderComposition.ConfigureApplication(
             optionsBuilder,
-            CreateDatabaseOptions(role));
+            CreateDatabaseOptions(role, schema));
         optionsBuilder.ConfigureWarnings(warnings =>
         {
             warnings.Ignore(RelationalEventId.PendingModelChangesWarning);
@@ -145,7 +249,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
         {
             optionsBuilder.AddInterceptors(interceptors);
         }
-        if (role == PrimaryDatabaseRole.Runtime)
+        if (role == PrimaryDatabaseRole.Runtime && schema is null)
         {
             _runtimeConnectionString = database.ConnectionString;
         }
@@ -153,7 +257,9 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
         return new ExploreDbContext(optionsBuilder.Options);
     }
 
-    private PrimaryDatabaseConnectionOptions CreateDatabaseOptions(PrimaryDatabaseRole role)
+    private PrimaryDatabaseConnectionOptions CreateDatabaseOptions(
+        PrimaryDatabaseRole role,
+        string? schema = null)
     {
         var container = new NpgsqlConnectionStringBuilder(_container.GetConnectionString());
         return new PrimaryDatabaseConnectionOptions
@@ -163,7 +269,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             Host = container.Host,
             Port = container.Port,
             Database = container.Database,
-            Schema = RelationalModelNamespace.DefaultSchema,
+            Schema = schema ?? RelationalModelNamespace.DefaultSchema,
             Username = container.Username,
             Password = container.Password,
             TlsMode = PrimaryDatabaseTlsMode.Disabled,
@@ -289,4 +395,29 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
         new("webhook_provider_publication_attempt_outcomes"),
         new("webhook_provider_publication_statuses"),
     ];
+}
+
+/// <summary>
+/// EF Core connection interceptor that sets PostgreSQL search_path on each connection open for dynamic schema isolation.
+/// </summary>
+public sealed class PostgresSearchPathInterceptor(string schema, string? fallbackSchema = null) : DbConnectionInterceptor
+{
+    private readonly string _fallbackSchema = fallbackSchema ?? RelationalModelNamespace.DefaultSchema;
+
+    public override void ConnectionOpened(DbConnection connection, ConnectionEndEventData eventData)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = $"SET search_path TO \"{schema}\", \"{_fallbackSchema}\", public;";
+        command.ExecuteNonQuery();
+    }
+
+    public override async Task ConnectionOpenedAsync(
+        DbConnection connection,
+        ConnectionEndEventData eventData,
+        CancellationToken cancellationToken = default)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"SET search_path TO \"{schema}\", \"{_fallbackSchema}\", public;";
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
 }

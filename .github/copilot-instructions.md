@@ -35,7 +35,7 @@ Priority order (highest wins):
 ## Copilot-Specific Notes
 
 - Copilot does not auto-load `.agents/rules/*.md`. When suggesting code under `Explore.*/` or `Event.*Tests/`, retrieve the matching rule once before generating multi-file changes.
-- Inline completions that only fit `AGENTS.md §5` rules (e.g., ABOUTME header, file-scoped namespace, manual validator instantiation) are safe defaults.
+- Inline completions that only fit `AGENTS.md §5` rules (e.g., self-documenting code without synthetic headers, file-scoped namespace, manual validator instantiation) are safe defaults.
 - For any change that crosses a layer (Domain → Application, Application → Persistence, etc.), stop and load the relevant skill before continuing.
 - Do not suggest:
   - Defining or hard-coding secrets, passwords, or tokens in `AppHost.cs`, tests, controllers, or code; secrets belong exclusively in Infisical or `.env` / `.env.example`.

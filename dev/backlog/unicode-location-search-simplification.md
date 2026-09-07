@@ -8,7 +8,7 @@ Last Updated: 2026-09-07 Europe/Brussels
 ## 1. Ownership And Delivery
 
 - Owner: active Unicode implementation workstream, with independent privacy/security and persistence reviews.
-- Status: implemented and committed on `develop`; user-authorized upstream merge and combined-schema regeneration are complete. Final local build/project gates and five-engine Unicode/migration proof pass. Delivery remains incomplete because release-history validation, required CI and a separately discovered secret-binding provider defect need disposition. Nothing has been pushed or approved as fully delivered. The design and historical evidence below are not a claim that every delivery gate passed.
+- Status: Unicode implementation complete and committed on `develop`, including the post-PR38 test reconciliation. PR38 and the earlier Unicode commits are already in `origin/develop`; the final test/documentation commits remain local pending publication authority. Task-specific verification passes. Unrelated CI and provider/fixture failures are quarantined separately, not treated as missing Unicode features or claimed green. The design and historical evidence below are not a whole-pipeline success claim.
 - Parent: `dev/active/prevent-ci-failures-and-unicode-simplification/`; this backlog item is the permanent source-free handoff when that ignored working memory is removed.
 - Repository evidence: `3f9b796b4a0aea6fff40baaaf88e07add663e863`, 2026-09-06.
 - Intents: `add-ef-migration` (security), `update-repository-query` (domain state), focused `test-suite-rationalization`; protect Tier 2 privacy lifecycle invariants.
@@ -28,9 +28,19 @@ The reviewed merge preserves upstream relational ATProto storage and local Unico
 
 Final merged verification: Release240warnings/0errors; Domain1134/1134; Application2066/2066; Architecture578passed/1existing skip; standalone14/14; Persistence1608passed/0failed/5structured-environment skips,33m17.822s,native exit0. Four pending-model checks, strict production MigrationService clean/repeat10/10, five-engine generated lifecycle20/20 and final Unicode/runtime20/20 pass. Every final corpus process was observed loading .NET10.0.10 and ICU78.3. This certifies the observed profile, not arbitrary future runtime tables or production capacity.
 
-Four Persistence skips are covered by the explicit Unicode/runtime20/20. The fifth, existing SecretBindingProviderContractTests, separately passes PostgreSQL/SQLite/SQLServer but fails MySQL/MariaDB: an instance-only filtered unique index is enforced globally and rejects same-key bindings belonging to distinct tenants. No fixture weakening or security-model/migration repair was made; obtain separate scope alignment. The actual nonempty release range also fails on already-published historical commit metadata; do not rewrite published history or invent a baseline. Required CI/publication authority remains open.
+Four Persistence skips are covered by the explicit Unicode/runtime20/20. The fifth, existing SecretBindingProviderContractTests, separately passes PostgreSQL/SQLite/SQLServer but fails MySQL/MariaDB. Its unchanged uniqueness defect is now [a separate backlog item](secret-binding-provider-uniqueness.md), following PR38's quarantine rule. No fixture weakening or security-model/migration repair was made. The earlier failing release commit is now inside origin/develop, not a blocker in the current comparison range; historical failure evidence remains truthful.
 
 Independent requirement audit supports UNI-01–11 functional coverage and required documentation presence. The derived2000 overflow guard is implemented, but no accepted500-unit input producing more than2000 derived units was demonstrated; expansion tests reach1000. Do not claim dynamic coverage of an unobserved runtime branch. Future globalization upgrades remain governed by the documented stopped-traffic comparison/rebuild/reset contract.
+
+### Post-PR38 Closeout — 2026-09-07
+
+The merge added obsolete scalar-token Domain tests and ASCII-marker metadata tests. Their actual Red outcomes were34 compile errors and2 failed metadata assertions. The minimal reconciliation removes both redundant files and retains Hangul/Jamo and decomposed Angstrom examples in the existing public-aggregate normalization tests. No production source, schema, dependency or compatibility layer changed.
+
+Final local checks pass: normalization27/27, full Domain1136/1136, Release0errors and Architecture578passed/1existing skip. All8 current PostgreSQL Unicode query cases pass. The prior five-engine corpus, strict10 production-service runs and four pending-model checks remain applicable because their actual source/fixture/model inputs are unchanged; independent review confirmed that applicability. The historical full Persistence1608pass result is not relabeled as a clean result for PR38's rewritten tests.
+
+The changed PostgreSQL cohort reports12pass/4fail; the four failures are [invalid ATProto fixture record IDs](atproto-snapshot-fixture-record-ids.md), unchanged from published develop. Current remote CI stops on [missing verification-tool prerequisites](ci-verification-tool-prerequisites.md); its skipped database jobs are not passes. Both are quarantined under the merged governance contract, with source-parity and execution limits recorded. No new original Unicode requirement is deferred.
+
+Both immutable Unicode fragments passed independent schema/impact/reference/commit-link review; native original checkpoint preflight and the nonempty final task-delta preflight pass. Full governed release preparation was not requested or performed, and no release descriptor/baseline was fabricated. Remaining publication/implementation-head CI follow-through is explicit in the active ledger; local completion does not imply remote green CI.
 
 ## 2. Verified Problem
 
@@ -115,7 +125,7 @@ One schema-changing vertical commit may contain multiple layers and generated fi
 
 ## 7. Exact Migration Families And Recovery
 
-Verified current application artifacts to replace through EF generation:
+Verified intake application artifacts replaced through EF generation (current combined heads are recorded above and in the operations runbook):
 
 | Engine | Application migration project / initial ID |
 | --- | --- |

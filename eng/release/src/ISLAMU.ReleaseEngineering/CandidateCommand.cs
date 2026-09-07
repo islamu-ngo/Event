@@ -1,6 +1,3 @@
-// ABOUTME: Verifies exact preparation commit B and emits deterministic pre-tag candidate evidence.
-// ABOUTME: Recomputes release context and notes from local Git plus the promoted trusted bundle.
-
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;

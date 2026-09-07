@@ -1,6 +1,3 @@
-// ABOUTME: Composes the one shared metadata, assertion, response-bound, and DNS-safe OAuth pipeline.
-// ABOUTME: Keeps CarpaNet signing adaptation in Infrastructure while reusing transport security policy.
-
 using Explore.Atproto.Transport;
 
 namespace Explore.Infrastructure.Services.Federation;

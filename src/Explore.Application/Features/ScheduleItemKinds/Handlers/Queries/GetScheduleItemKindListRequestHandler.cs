@@ -1,6 +1,3 @@
-// ABOUTME: Query handler returning all available schedule item kinds.
-// ABOUTME: Maps ScheduleItemKind entities to ScheduleItemKindListDto list.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ScheduleItemKind;

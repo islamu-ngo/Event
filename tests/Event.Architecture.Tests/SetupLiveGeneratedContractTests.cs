@@ -1,6 +1,3 @@
-// ABOUTME: Pins the generated Setup live OpenAPI and client contract closure.
-// ABOUTME: Rejects missing binary writes, untyped HAL data, and secret/provider read surfaces.
-
 namespace Event.Architecture.Tests;
 
 using System.Net;

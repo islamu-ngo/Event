@@ -1,6 +1,3 @@
-// ABOUTME: Public MediatR query for report dialog options for one event.
-// ABOUTME: Lets the Application layer decide whether the event can currently be reported.
-
 using Explore.Application.DTOs.EventReporting;
 using MediatR;
 

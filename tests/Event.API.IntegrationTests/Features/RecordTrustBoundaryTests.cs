@@ -1,6 +1,3 @@
-// ABOUTME: Adversarial HTTP tests for record request bodies at the tenant trust boundary.
-// ABOUTME: Proves client-supplied tenant fields cannot override the server-selected command tenant.
-
 using System.Net;
 using System.Net.Http.Json;
 using Event.Api.IntegrationTests.Fixtures;

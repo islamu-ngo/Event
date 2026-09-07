@@ -1,6 +1,3 @@
-// ABOUTME: Handles paginated retrieval of event session template lists scoped to a parent event template.
-// ABOUTME: Uses HybridCache to keep repeated tenant-admin list reads efficient.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionTemplate;

@@ -1,6 +1,3 @@
-// ABOUTME: Requests best-effort remote revocation of the authenticated user's current ATProto session.
-// ABOUTME: Carries only the server-derived tenant/user/DID tuple and returns a bounded outcome.
-
 using Explore.Application.Features.Authentication.Atproto.Models;
 using MediatR;
 

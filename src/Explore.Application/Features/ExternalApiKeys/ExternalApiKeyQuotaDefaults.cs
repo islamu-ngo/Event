@@ -1,6 +1,3 @@
-// ABOUTME: Default quota and rate-limit policy values for external API keys by owner type.
-// ABOUTME: Provides sensible defaults when callers omit explicit credit configuration during key creation.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Features.ExternalApiKeys;

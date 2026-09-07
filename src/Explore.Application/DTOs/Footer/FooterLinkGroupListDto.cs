@@ -1,6 +1,3 @@
-// ABOUTME: Lightweight list DTO for footer link groups in admin list views.
-// ABOUTME: Does not include child links to keep list payloads small.
-
 namespace Explore.Application.DTOs.Footer;
 
 public sealed record FooterLinkGroupListDto

@@ -1,6 +1,3 @@
-// ABOUTME: Table-driven contract tests for EventLocation field classes, purpose ceilings, and DTO shapes.
-// ABOUTME: Proves public physical-ID absence, purpose separation, and value-free hidden and TBA responses.
-
 using System.Collections.Immutable;
 using System.Reflection;
 using System.Text.Json;

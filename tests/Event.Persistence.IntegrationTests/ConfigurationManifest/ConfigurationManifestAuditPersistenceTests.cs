@@ -1,6 +1,3 @@
-// ABOUTME: Verifies configuration-manifest audit persistence is safe, append-oriented, and tenant isolated.
-// ABOUTME: Proves failed operations survive through a fresh context without reviving rolled-back writes.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
 using Explore.Domain.Enums;

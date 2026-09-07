@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the governed polymorphic reference registry covers every supported discriminator.
-// ABOUTME: Prevents external bindings, notifications, and custom-property targets from drifting back to string-only contracts.
-
 namespace Event.Domain.UnitTests.References;
 
 using System.Reflection;

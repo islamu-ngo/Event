@@ -1,6 +1,3 @@
-// ABOUTME: Maps public recovery commands to uniform request and one-time consume orchestration.
-// ABOUTME: Derives tenant authority from server context and never accepts it from transport input.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.AdmissionTickets;

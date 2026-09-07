@@ -1,6 +1,3 @@
-// ABOUTME: Grouped update DTO for event-session speaker link mutations.
-// ABOUTME: Nullable groups allow callers to update the session side or actor side independently.
-
 using System;
 
 namespace Explore.Application.DTOs.EventSessionSpeaker;

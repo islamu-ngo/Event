@@ -1,6 +1,3 @@
-// ABOUTME: Verifies account ticket navigation affordances come only from typed HAL relations.
-// ABOUTME: Covers empty, self-link, and registration-order link rendering without role inspection.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Admissions;
 using TicketsPage = Explore.Blazor.Client.Pages.Tickets.Tickets;

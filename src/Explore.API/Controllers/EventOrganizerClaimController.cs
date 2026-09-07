@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for authenticated event organizer-claim evidence workflows.
-// ABOUTME: Dispatches existing CQRS requests and assembles event-scoped claim HAL resources.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

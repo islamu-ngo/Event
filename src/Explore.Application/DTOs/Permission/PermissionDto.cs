@@ -1,6 +1,3 @@
-// ABOUTME: Full permission detail DTO including all fields for admin views.
-// ABOUTME: Used by GetPermissionList and GetAssignablePermissions queries.
-
 namespace Explore.Application.DTOs.Permission;
 
 public sealed record PermissionDto

@@ -1,6 +1,3 @@
-// ABOUTME: Groups advisory AI tool metadata used by catalogs, inventories, prompts, and UX.
-// ABOUTME: Keeps descriptive agent metadata separate from authorization and execution authority.
-
 namespace Explore.Application.Features.AiAssistant.Tools;
 
 public sealed record AiToolAgentMetadata(

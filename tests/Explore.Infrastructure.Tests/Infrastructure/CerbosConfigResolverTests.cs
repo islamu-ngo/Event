@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for CerbosConfigResolver cache invalidation and BYO client eviction.
-// ABOUTME: Verifies tenant-specific and all-tenant refresh paths after Cerbos settings change.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Models;

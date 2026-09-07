@@ -1,6 +1,3 @@
-// ABOUTME: Exposes authenticated event-scoped registration workflow and form-authoring endpoints.
-// ABOUTME: Keeps route identity and strong If-Match stamps authoritative before MediatR dispatch.
-
 using System.ComponentModel.DataAnnotations;
 using Asp.Versioning;
 using Explore.API.Attributes;

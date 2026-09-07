@@ -1,6 +1,3 @@
-// ABOUTME: Persistence contract for tenant-filtered event public actions.
-// ABOUTME: Returns domain entities for ordered display and organizer-managed mutation flows.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

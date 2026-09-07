@@ -1,6 +1,3 @@
-// ABOUTME: Configures tenant-safe group membership relationships and uniqueness.
-// ABOUTME: Preserves group, user, role, position, and tenant ownership boundaries.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

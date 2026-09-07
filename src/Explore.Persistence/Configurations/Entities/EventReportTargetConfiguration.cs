@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for tenant-scoped report target references.
-// ABOUTME: Keeps target rows bound to their report and optional storage object inside the same tenant.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

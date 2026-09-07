@@ -1,6 +1,3 @@
-// ABOUTME: Service implementation for managing tenant policy settings with instance-level delegation constraints.
-// ABOUTME: Partial class root with constructor, constants, and shared static resolvers (Resolve*/Deserialize*/Normalize*).
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

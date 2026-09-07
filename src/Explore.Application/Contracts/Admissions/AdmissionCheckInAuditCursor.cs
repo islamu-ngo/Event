@@ -1,6 +1,3 @@
-// ABOUTME: Encodes the exact admission-audit keyset boundary as one opaque machine cursor.
-// ABOUTME: Preserves UTC occurrence and UUID tie-breaker data without exporting fact identifiers.
-
 using System.Buffers.Binary;
 
 namespace Explore.Application.Contracts.Admissions;

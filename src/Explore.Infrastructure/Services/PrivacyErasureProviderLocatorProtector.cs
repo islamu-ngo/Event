@@ -1,6 +1,3 @@
-// ABOUTME: Purpose-bound Data Protection adapter for short-lived privacy-erasure provider locators.
-// ABOUTME: Supports key rotation while preventing plaintext remote identifiers from reaching persistence.
-
 using Explore.Application.Contracts.Services;
 using Microsoft.AspNetCore.DataProtection;
 

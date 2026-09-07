@@ -1,6 +1,3 @@
-// ABOUTME: Exercises configured-administrator bootstrap locking and convergence on real PostgreSQL transactions.
-// ABOUTME: Uses command interception gates to prove exact replay, attacker loss, generation fencing, and atomic rollback.
-
 using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;

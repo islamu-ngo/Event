@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for scheduler administration control commands.
-// ABOUTME: Verifies read-only refusal happens before the scheduler is touched and refusals map to failure codes.
-
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Features.Scheduling.Handlers.Commands;
 using Explore.Application.Features.Scheduling.Requests.Commands;

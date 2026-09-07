@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for RuntimeAnalyticsProvider provider routing, safe feature-flag defaults, and cache behavior.
-// ABOUTME: Verifies runtime provider resolution stays stable within cache window and avoids unnecessary config resolution.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Models;
 using Explore.Domain.Enums;

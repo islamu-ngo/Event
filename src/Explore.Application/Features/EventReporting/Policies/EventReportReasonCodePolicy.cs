@@ -1,6 +1,3 @@
-// ABOUTME: Normalizes and validates event-report reason codes before domain persistence.
-// ABOUTME: Keeps phase-one report taxonomy enum-backed while storing stable lowercase string codes.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Features.EventReporting.Policies;

@@ -1,5 +1,3 @@
-<!-- ABOUTME: Defines the minimal BCL executable boundary for the future Setup Assistant CLI. -->
-<!-- ABOUTME: References only Setup Core and intentionally exposes no command contract in SA-120. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>

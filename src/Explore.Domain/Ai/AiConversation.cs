@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-scoped aggregate root for AI assistant conversations, messages, runs, references, and actions.
-// ABOUTME: Enforces message ordering and lifecycle transitions without provider or persistence dependencies.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

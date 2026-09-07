@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for support-access end reason lookup rows.
-// ABOUTME: Uses stable int IDs that map to SupportAccessEndReasonEnum.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

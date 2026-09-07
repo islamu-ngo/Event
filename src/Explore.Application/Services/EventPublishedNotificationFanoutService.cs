@@ -1,6 +1,3 @@
-// ABOUTME: Creates durable notification rows for subscribers when an event is published.
-// ABOUTME: Uses NotificationFanoutRun progress records and deterministic dedup keys for at-least-once safety.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Models.InternalEvents;

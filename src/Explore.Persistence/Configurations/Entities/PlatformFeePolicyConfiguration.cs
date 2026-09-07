@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for immutable instance platform fee policy versions.
-// ABOUTME: Preserves basis-point storage, fixed-charge field access, and active-version uniqueness.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

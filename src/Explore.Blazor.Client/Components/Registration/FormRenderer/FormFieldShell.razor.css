@@ -1,6 +1,3 @@
-/* ABOUTME: Tokenized semantic layout for native registration field labels, help, and server issues. */
-/* ABOUTME: Uses logical properties so one field shell remains correct in LTR and RTL. */
-
 .form-field { display: grid; gap: var(--isl-space-2); }
 .form-field__label { color: var(--isl-color-text); font-weight: 600; }
 .form-field__optional { color: var(--isl-color-text-secondary); font-size: var(--mud-typography-caption-size); margin-inline-start: var(--isl-space-2); font-weight: 400; }

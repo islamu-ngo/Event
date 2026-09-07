@@ -1,6 +1,3 @@
-// ABOUTME: Applies a tenant-admin-only decision to retained OrganizationTenant legitimacy evidence.
-// ABOUTME: Preserves separate participation approval and rejects stale or ineligible document reviews.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

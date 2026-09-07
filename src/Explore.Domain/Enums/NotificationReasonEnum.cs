@@ -1,6 +1,3 @@
-// ABOUTME: Enum companion for the NotificationReason lookup entity.
-// ABOUTME: Values match the seeded IDs in the notification_reasons table.
-
 namespace Explore.Domain.Enums;
 
 public enum NotificationReasonEnum

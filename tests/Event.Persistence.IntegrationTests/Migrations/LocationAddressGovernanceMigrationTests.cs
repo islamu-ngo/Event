@@ -1,6 +1,3 @@
-// ABOUTME: Verifies current PostgreSQL address-governance constraints and five-provider schema parity.
-// ABOUTME: Pins the four development-only rebaselines while proving lookup IDs, FKs, defaults, and checks.
-
 #nullable enable
 
 using System.Data.Common;

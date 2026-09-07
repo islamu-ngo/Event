@@ -1,6 +1,3 @@
-// ABOUTME: Implements deterministic create, open, edit, validate, format, diff, coverage, and export operations.
-// ABOUTME: Delegates artifact bytes and strict contract validation exclusively to frozen Wire codecs.
-
 namespace ISLAMU.Event.Setup.Core;
 
 using System.Text.Json;

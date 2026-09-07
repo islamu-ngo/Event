@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning all speakers for a specific event session.
-// ABOUTME: Used for session detail speaker roster.
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;

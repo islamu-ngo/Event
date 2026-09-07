@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for multi-tenant-only embedded control-plane route suppression.
-// ABOUTME: Ensures single-tenant admins fall back to tenant settings even during onboarding.
-
 using Blazouter.Models;
 using Explore.Blazor.Client.Routing.Guards;
 

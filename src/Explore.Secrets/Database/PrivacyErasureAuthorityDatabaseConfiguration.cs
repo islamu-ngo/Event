@@ -1,6 +1,3 @@
-// ABOUTME: Binds the external privacy-erasure authority from structured PostgreSQL settings.
-// ABOUTME: Reuses primary database validation and native Npgsql construction without raw-string inputs.
-
 using System.Net;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;

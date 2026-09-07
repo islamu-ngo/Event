@@ -1,4 +1,3 @@
-# ABOUTME: Cerbos resource policy for event resources.
 # Events are org-scoped: owners, event teams, and org admins edit; platform admins moderate.
 
 apiVersion: api.cerbos.dev/v1

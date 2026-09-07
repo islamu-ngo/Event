@@ -1,6 +1,3 @@
-// ABOUTME: EF Core implementation for querying event custom-property projection rows.
-// ABOUTME: Supports exposure-ceiling filtering and tenant-scoped counts for governance.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

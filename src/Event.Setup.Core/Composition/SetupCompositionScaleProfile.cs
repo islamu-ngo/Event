@@ -1,6 +1,3 @@
-// ABOUTME: Defines evidence-bound admission for measured Setup composition workload profiles.
-// ABOUTME: Keeps canonical parser limits unchanged and rejects every unbound profile without fallback.
-
 namespace ISLAMU.Event.Setup.Core.Composition;
 
 using ISLAMU.Event.Setup.Core;

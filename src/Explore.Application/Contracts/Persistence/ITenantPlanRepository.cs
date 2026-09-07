@@ -1,6 +1,3 @@
-// ABOUTME: Persistence contract for normalized tenant plan SaaS tier aggregates.
-// ABOUTME: Returns entities for plan lookup, version reads, and active tenant assignments.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

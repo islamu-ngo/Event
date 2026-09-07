@@ -1,6 +1,3 @@
-// ABOUTME: Persists one idempotent allocation of finite add-on inventory to an order line.
-// ABOUTME: Tracks partial release without changing ticket capacity or admission state.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

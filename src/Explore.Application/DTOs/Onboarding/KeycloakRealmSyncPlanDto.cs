@@ -1,6 +1,3 @@
-// ABOUTME: Safe read-only Keycloak realm sync preview returned to instance administrators.
-// ABOUTME: Combines desired state, diagnostics, and additive operation plans without applying changes.
-
 namespace Explore.Application.DTOs.Onboarding;
 
 public sealed record KeycloakRealmSyncPlanDto

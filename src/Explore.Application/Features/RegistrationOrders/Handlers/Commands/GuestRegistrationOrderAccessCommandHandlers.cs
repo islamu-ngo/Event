@@ -1,6 +1,3 @@
-// ABOUTME: Handles guest registration-order starts and lifecycle commands through one scoped capability check.
-// ABOUTME: Delegates creation and transaction-sensitive transitions to the established Application services.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

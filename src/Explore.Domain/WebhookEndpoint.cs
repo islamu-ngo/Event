@@ -1,6 +1,3 @@
-// ABOUTME: Owner-scoped outgoing webhook endpoint with provider ids, secret refs, and delivery controls.
-// ABOUTME: Inherits typed ownership from its consumer while preserving instance-or-tenant query scope.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

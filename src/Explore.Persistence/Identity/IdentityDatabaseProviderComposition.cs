@@ -1,6 +1,3 @@
-// ABOUTME: Configures EF Core providers and isolated migration history for ExternalIdentityDbContext.
-// ABOUTME: Keeps provider-specific database mechanics out of authentication services and application contracts.
-
 using Explore.Persistence.Database;
 using Explore.Persistence.Schema;
 using Explore.Secrets.Database;

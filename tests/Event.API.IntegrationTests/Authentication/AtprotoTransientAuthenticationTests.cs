@@ -1,6 +1,3 @@
-// ABOUTME: Attacks the private transient bridge through real HTTP, ES256 and PostgreSQL replay claims.
-// ABOUTME: Proves missing authority fails closed and one assertion can dispatch at most once.
-
 using System.Net;
 using System.Text;
 using System.Text.Json;

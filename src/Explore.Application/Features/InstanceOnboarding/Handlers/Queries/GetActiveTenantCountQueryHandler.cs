@@ -1,4 +1,3 @@
-// ABOUTME: Returns the count of active tenants for deployment mode toggle safeguards.
 // Used by the UI to enable/disable single-tenant revert based on tenant count.
 
 using Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Append-only PII-free security evidence for an exceptional exact EventLocation read.
-// ABOUTME: Records requester, purpose, authorization decision, time, and trace identity without values.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

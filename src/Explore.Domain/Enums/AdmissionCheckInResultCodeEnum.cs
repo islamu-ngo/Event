@@ -1,6 +1,3 @@
-// ABOUTME: Defines stable and exhaustive outcomes for admission check-in and undo decisions.
-// ABOUTME: Values support deterministic operator feedback without interpreting mutable state.
-
 namespace Explore.Domain.Enums;
 
 public enum AdmissionCheckInResultCodeEnum

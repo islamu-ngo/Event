@@ -1,6 +1,3 @@
-// ABOUTME: OpenTelemetry Meter for secret resolution (counters + histogram).
-// ABOUTME: Records resolution outcomes and duration without ever emitting secret values.
-
 namespace Explore.Secrets.Observability;
 
 using System.Diagnostics.Metrics;

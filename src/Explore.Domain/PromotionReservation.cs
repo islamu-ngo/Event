@@ -1,6 +1,3 @@
-// ABOUTME: Defines one order-scoped promotion reservation with a portable one-active slot.
-// ABOUTME: Keeps terminal history unlimited by moving consumed/released/expired rows onto their own slot id.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

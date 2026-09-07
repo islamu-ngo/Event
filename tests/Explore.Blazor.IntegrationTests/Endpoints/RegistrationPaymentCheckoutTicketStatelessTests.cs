@@ -1,6 +1,3 @@
-// ABOUTME: Proves stateless checkout cookies traverse independent Split BFF hosts through shared Data Protection keys.
-// ABOUTME: Rejects cookies protected by an unrelated key ring without requiring Redis or per-ticket state.
-
 using Explore.Blazor.Extensions;
 using Explore.Blazor.Client.Services.Http;
 using Explore.Blazor.Services;

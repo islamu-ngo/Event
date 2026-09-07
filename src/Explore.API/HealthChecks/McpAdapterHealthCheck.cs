@@ -1,6 +1,3 @@
-// ABOUTME: Readiness health check for the optional API-hosted MCP adapter posture.
-// ABOUTME: Reports startup and runtime effective state without tenant, prompt, payload, endpoint URL, or secret data.
-
 using Explore.API.Configuration;
 using Explore.API.Mcp;
 using Microsoft.Extensions.Diagnostics.HealthChecks;

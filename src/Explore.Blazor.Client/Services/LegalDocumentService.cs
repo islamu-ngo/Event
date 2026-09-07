@@ -1,6 +1,3 @@
-// ABOUTME: Loads one anonymous published legal document through the generated API client.
-// ABOUTME: Treats missing or unavailable publication as absent without inventing fallback legal prose.
-
 namespace Explore.Blazor.Client.Services;
 
 using Explore.Blazor.Client.Clients;

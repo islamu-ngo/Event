@@ -1,6 +1,3 @@
-// ABOUTME: Declares target-authorized configuration import receipt and history reads.
-// ABOUTME: Keeps target authority route-derived and returns value-minimized operation evidence only.
-
 namespace Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 
 using System.Collections.Immutable;

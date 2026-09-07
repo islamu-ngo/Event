@@ -1,6 +1,3 @@
-// ABOUTME: Tests the operator-safe readiness posture for email dispatch retention cleanup.
-// ABOUTME: Verifies enabled, dry-run, and intentionally disabled states without exposing PII.
-
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.HealthChecks;
 using Explore.Infrastructure;

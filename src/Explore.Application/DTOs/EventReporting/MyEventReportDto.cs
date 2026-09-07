@@ -1,6 +1,3 @@
-// ABOUTME: Limited reporter-facing projection of a submitted event report.
-// ABOUTME: Deliberately excludes evidence text, reporter hashes, moderator identity, and internal review notes.
-
 namespace Explore.Application.DTOs.EventReporting;
 
 public sealed record MyEventReportDto

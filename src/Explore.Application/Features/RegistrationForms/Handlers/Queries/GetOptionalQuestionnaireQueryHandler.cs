@@ -1,6 +1,3 @@
-// ABOUTME: Maps one active walk-in standalone attachment to an anonymous immutable descriptor.
-// ABOUTME: Fails closed for absent, deleted, non-published, or incomplete attachment graphs.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.RegistrationForms;

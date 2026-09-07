@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the two-axis authentication provider onboarding experience.
-// ABOUTME: Guards Local Identity defaults and independent ATProto selection.
-
 using Bunit.TestDoubles;
 using Explore.Blazor.Client.Pages.Onboarding;
 using Explore.Blazor.Client.Pages.Onboarding.Components;

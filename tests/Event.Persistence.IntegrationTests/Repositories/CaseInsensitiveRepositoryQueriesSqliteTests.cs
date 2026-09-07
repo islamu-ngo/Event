@@ -1,6 +1,3 @@
-// ABOUTME: File-backed SQLite regressions for provider-neutral case-insensitive repository queries.
-// ABOUTME: Proves privacy-provider equality and wildcard actor search without PostgreSQL ILIKE.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

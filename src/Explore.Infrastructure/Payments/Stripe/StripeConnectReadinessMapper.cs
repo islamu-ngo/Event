@@ -1,6 +1,3 @@
-// ABOUTME: Shared Stripe Account to provider-neutral readiness mapper for polling and webhooks.
-// ABOUTME: Keeps Stripe SDK projections bounded inside Infrastructure without duplicate mapping logic.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.OrganizerPaymentConnections;

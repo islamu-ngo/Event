@@ -1,6 +1,3 @@
-// ABOUTME: Dismissable tenant-configured announcement bar for public informational messages.
-// ABOUTME: Loads persisted public experience settings and notifies parent layout when visibility changes.
-
 using System.Globalization;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;

@@ -1,6 +1,3 @@
-// ABOUTME: Model-first persistence tests for event participation configuration and normalized lookup repair.
-// ABOUTME: Uses EF's current model and InMemory provider so checks do not depend on generated migrations.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
 using Explore.Domain.Enums;

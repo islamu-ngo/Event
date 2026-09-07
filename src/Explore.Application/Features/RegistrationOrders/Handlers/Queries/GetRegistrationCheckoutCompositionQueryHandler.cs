@@ -1,6 +1,3 @@
-// ABOUTME: Builds public ticket-selection data from the current published catalog.
-// ABOUTME: Fails closed for non-public, ineligible, or non-platform-managed events.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

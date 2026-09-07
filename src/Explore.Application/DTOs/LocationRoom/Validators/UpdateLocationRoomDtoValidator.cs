@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for grouped LocationRoom PATCH payloads.
-// ABOUTME: Keeps parent-location existence checks local while validating explicit nullable field operations.
-
 using Explore.Application.Contracts.Persistence;
 using FluentValidation;
 

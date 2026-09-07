@@ -1,6 +1,3 @@
-// ABOUTME: Minimal JS module for tenant-scoped cookie consent read/write/clear.
-// ABOUTME: Values are "accepted" or "declined" only — no timestamps or user IDs.
-
 export function readConsent(cookieKey) {
     if (!cookieKey) return null;
     const match = document.cookie.match(new RegExp("(?:^|;\\s*)" + escapeRegex(cookieKey) + "=([^;]*)"));

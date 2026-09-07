@@ -1,6 +1,3 @@
-// ABOUTME: Factory for draft tenant directory-operator identity documents.
-// ABOUTME: Seeds only the public name while leaving accountable legal facts explicit and incomplete.
-
 namespace Explore.Domain.Settings.Documents;
 
 using System.Text.Json;

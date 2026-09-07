@@ -1,6 +1,3 @@
-// ABOUTME: Enforces a fixed-memory admission recovery budget over normalized identity buckets.
-// ABOUTME: Uses a process-random HMAC partition key so no PII or attacker-sized key set is retained.
-
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;

@@ -1,6 +1,3 @@
-// ABOUTME: Holds one bounded Studio rule editor state and its generated write contract.
-// ABOUTME: Keeps target, effect, and condition conversion typed and transport-independent.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Pages.Studio.RegistrationForms;

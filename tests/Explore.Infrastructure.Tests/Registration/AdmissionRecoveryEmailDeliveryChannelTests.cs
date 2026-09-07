@@ -1,6 +1,3 @@
-// ABOUTME: Verifies recovery email emits one canonical same-origin one-time link.
-// ABOUTME: Uses background-safe public origin configuration and deterministic idempotency lineage.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Models;

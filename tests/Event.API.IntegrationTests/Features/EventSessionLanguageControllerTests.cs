@@ -1,6 +1,3 @@
-// ABOUTME: API contract tests for event-session language update behavior.
-// ABOUTME: Verifies PATCH If-Match validation and route-ID command forwarding.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;

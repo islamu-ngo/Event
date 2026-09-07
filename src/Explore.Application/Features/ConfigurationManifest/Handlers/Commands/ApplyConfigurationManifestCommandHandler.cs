@@ -1,6 +1,3 @@
-// ABOUTME: Applies validated configuration manifests through one lock-scoped retryable transaction.
-// ABOUTME: Rechecks all state before writes and releases sanitized cache effects only after commit.
-
 namespace Explore.Application.Features.ConfigurationManifest.Handlers.Commands;
 
 using System.Collections.Immutable;

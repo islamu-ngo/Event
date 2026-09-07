@@ -1,6 +1,3 @@
-/* ABOUTME: Styles for EventTemplateDefinitionEditor component.
-   ABOUTME: BEM isolation pattern. */
-
 .event-template-definition-editor {
     display: flex;
     flex-direction: column;

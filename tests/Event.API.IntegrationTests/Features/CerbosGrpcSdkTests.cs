@@ -1,6 +1,3 @@
-// ABOUTME: Cerbos gRPC SDK integration tests using the production Cerbos.Sdk client library.
-// ABOUTME: Validates that the official gRPC client can connect to the containerized PDP and return correct decisions.
-
 using Cerbos.Api.V1.Effect;
 using Cerbos.Sdk;
 using Cerbos.Sdk.Builder;

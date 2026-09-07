@@ -1,6 +1,3 @@
-// ABOUTME: Explicitly redeems a recovery capability and reissues one admission delivery document.
-// ABOUTME: Keeps 20.5 credential/QR/print presentation out of the base recovery authority service.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

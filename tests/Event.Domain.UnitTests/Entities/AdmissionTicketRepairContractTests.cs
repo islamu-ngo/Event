@@ -1,6 +1,3 @@
-// ABOUTME: Specifies repaired admission authority, refund-line, append-only-history, and UUIDv7 invariants.
-// ABOUTME: Proves issuance consumes the real confirmed repository-native lineage graph.
-
 using System.Reflection;
 using Explore.Domain.Enums;
 

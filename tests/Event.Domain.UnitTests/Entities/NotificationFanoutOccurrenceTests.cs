@@ -1,6 +1,3 @@
-// ABOUTME: Locks immutable fanout occurrence snapshots and the explicit supersession transition.
-// ABOUTME: Prevents mutable event state from rewriting a previously recorded attendee change.
-
 using Explore.Domain;
 
 namespace Event.Domain.UnitTests.Entities;

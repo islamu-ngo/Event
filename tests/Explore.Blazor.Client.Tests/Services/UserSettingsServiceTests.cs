@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for authenticated user settings reads through the generated Event API client.
-// ABOUTME: Verifies authenticated routing and generated setting source values at the service boundary.
-
 using Microsoft.JSInterop;
 
 namespace Explore.Blazor.Client.Tests.Services;

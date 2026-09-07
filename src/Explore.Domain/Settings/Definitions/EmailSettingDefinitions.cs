@@ -1,6 +1,3 @@
-// ABOUTME: Setting definitions for non-secret email and SMTP delivery governance.
-// ABOUTME: Authentication credentials are intentionally absent and externally resolved.
-
 namespace Explore.Domain.Settings.Definitions;
 
 public static class EmailSettingDefinitions

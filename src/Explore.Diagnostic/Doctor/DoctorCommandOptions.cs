@@ -1,6 +1,3 @@
-// ABOUTME: Parses doctor CLI options without introducing a command-line dependency.
-// ABOUTME: Keeps Phase 2 diagnostics read-only by exposing no repair or bootstrap mutation flags.
-
 namespace Explore.Diagnostic.Doctor;
 
 public sealed record DoctorCommandOptions(string? RepositoryRoot, TimeSpan Timeout, bool ShowHelp)

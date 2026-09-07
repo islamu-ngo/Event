@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for AI consent grants authored by data subjects.
-// ABOUTME: Reads use AsNoTracking; writes are tracked. Tenant filter applies via ExploreDbContext.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

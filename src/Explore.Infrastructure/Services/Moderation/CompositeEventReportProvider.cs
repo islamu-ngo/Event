@@ -1,6 +1,3 @@
-// ABOUTME: Composite moderation provider that layers optional signals and review mirroring on local reporting.
-// ABOUTME: Uses configuration switches so external provider failures never affect report intake persistence.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.EventReporting.Models;
 using Explore.Domain.Enums;

@@ -1,6 +1,3 @@
-// ABOUTME: Classification of API endpoints by intended audience and protection level.
-// ABOUTME: Used by [EndpointClassification] attribute to tag controllers/actions for governance.
-
 namespace Explore.API.Attributes;
 
 /// <summary>

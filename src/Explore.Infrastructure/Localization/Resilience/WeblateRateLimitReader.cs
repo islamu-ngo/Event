@@ -1,6 +1,3 @@
-// ABOUTME: Stateless reader that extracts retry delay from Weblate X-RateLimit-Reset headers on 429.
-// ABOUTME: Called by the Polly pipeline's DelayGenerator — synchronous header-only parsing.
-
 using System.Net;
 
 namespace Explore.Infrastructure.Localization.Resilience;

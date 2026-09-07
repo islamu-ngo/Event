@@ -1,6 +1,3 @@
-# ABOUTME: Validates that governed OpenAPI and generated API client artifacts are current.
-# ABOUTME: Regenerates openapi/client outputs for relevant API-surface changes and fails on drift.
-
 name: OpenAPI Contract Guard
 
 permissions:

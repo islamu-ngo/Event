@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query for fetching all tags in a given tag type.
-// ABOUTME: Returns IEnumerable<TagDto>.
 using Explore.Application.DTOs.Tag;
 using MediatR;
 

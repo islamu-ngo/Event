@@ -1,6 +1,3 @@
-// ABOUTME: Handles manifest, tenant-package, legal, and doctor commands through deterministic Setup Core workflows.
-// ABOUTME: Reads explicit artifacts, performs real section diffs, and writes only approved canonical outputs.
-
 using ISLAMU.Event.Setup.Core;
 using ISLAMU.Event.Setup.Core.Environment;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;

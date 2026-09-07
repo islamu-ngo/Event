@@ -1,6 +1,3 @@
-// ABOUTME: Defines atomic fenced persistence for a complete current-state ATProto repository snapshot.
-// ABOUTME: Keeps cursor ownership unchanged while applying canonical records, projections, presentations, and tombstones.
-
 using Explore.Application.Features.Federation.Atproto.Models;
 
 namespace Explore.Application.Contracts.Persistence;

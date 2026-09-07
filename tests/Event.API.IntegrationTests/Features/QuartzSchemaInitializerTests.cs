@@ -1,6 +1,3 @@
-// ABOUTME: Tests for the embedded Quartz scheduler DDL and its provider-aware statement builder.
-// ABOUTME: Proves every supported provider ships a script, the prefix is substituted, and unsafe prefixes are rejected.
-
 using Explore.API.Scheduling;
 using Explore.Secrets.Database;
 using TUnit.Core;

@@ -1,6 +1,3 @@
-// ABOUTME: Specifies complete Unicode location text through public aggregate write boundaries.
-// ABOUTME: Guards canonical matching, literal text preservation, accepted bounds, and rejection atomicity.
-
 using Explore.Domain.Enums;
 
 namespace Event.Domain.UnitTests;

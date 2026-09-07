@@ -1,6 +1,3 @@
-// ABOUTME: Maps durable fenced outbound provider-submission write effects for worker polling.
-// ABOUTME: Stores identifiers and settlement state only so provider payloads are rebuilt after claim.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

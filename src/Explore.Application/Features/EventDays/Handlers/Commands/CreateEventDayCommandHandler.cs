@@ -1,6 +1,3 @@
-// ABOUTME: Handler for creating a new EventDay with validation and tenant scoping.
-// ABOUTME: Validates event ownership, date uniqueness, maps DTO, sets TenantId from parent event.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventDay.Validators;

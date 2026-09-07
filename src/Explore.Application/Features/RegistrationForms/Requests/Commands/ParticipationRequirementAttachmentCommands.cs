@@ -1,6 +1,3 @@
-// ABOUTME: Defines explicit authorized attach and detach commands for participation requirements.
-// ABOUTME: Carries event context and strong participation-configuration concurrency stamps.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

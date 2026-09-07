@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-scoped subscription from a tenant-local user to an organization or group actor.
-// ABOUTME: Stores unsubscribe/resubscribe lifecycle state without deleting the durable relationship row.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

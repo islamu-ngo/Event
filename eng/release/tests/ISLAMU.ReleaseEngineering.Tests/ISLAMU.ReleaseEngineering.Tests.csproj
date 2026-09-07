@@ -1,5 +1,3 @@
-<!-- ABOUTME: Defines focused TUnit coverage for the release-engineering command surface. -->
-<!-- ABOUTME: References only the standalone release-engine project, never product projects. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>

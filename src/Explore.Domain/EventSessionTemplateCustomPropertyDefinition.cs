@@ -1,6 +1,3 @@
-// ABOUTME: Versioned Layer 3 custom-property definition owned by an event session template.
-// ABOUTME: Captures template-time validation, exposure, and default-value metadata before session instantiation.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;

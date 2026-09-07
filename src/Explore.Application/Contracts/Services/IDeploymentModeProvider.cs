@@ -1,6 +1,3 @@
-// ABOUTME: Unified contract for async-safe deployment mode resolution across middleware and filters.
-// ABOUTME: Replaces static volatile cache and inline DB queries with a single shared provider.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Contracts.Services;

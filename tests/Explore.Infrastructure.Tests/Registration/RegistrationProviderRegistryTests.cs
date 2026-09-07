@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the concrete registration provider registry exact-tuple behavior.
-// ABOUTME: Keeps duplicate tuple rejection in Infrastructure where descriptor registration is composed.
-
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Infrastructure.Registration;
 

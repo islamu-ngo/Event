@@ -1,6 +1,3 @@
-// ABOUTME: Exposes the canonical current-instance configuration manifest download endpoint.
-// ABOUTME: Dispatches the instance-authorized query and returns only its fully buffered bounded bytes.
-
 namespace Explore.API.Controllers;
 
 using Asp.Versioning;

@@ -1,6 +1,3 @@
-// ABOUTME: Compiles strict configuration manifests into deterministic instance-and-tenant apply plans.
-// ABOUTME: Revalidates contracts, separates scope ownership, and derives canonical bootstrap identity without I/O.
-
 namespace Explore.Application.Features.ConfigurationManifest.Compilation;
 
 using System.Collections.Immutable;

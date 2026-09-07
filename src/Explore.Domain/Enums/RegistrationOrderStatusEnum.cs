@@ -1,6 +1,3 @@
-// ABOUTME: Enum mirror for stable RegistrationOrderStatus lookup identities.
-// ABOUTME: Includes the explicit terminal rejected outcome for organizer approval workflows.
-
 namespace Explore.Domain.Enums;
 
 public enum RegistrationOrderStatusEnum

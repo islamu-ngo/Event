@@ -1,6 +1,3 @@
-// ABOUTME: Compile-time catalog of workspaces currently available to the application shell.
-// ABOUTME: Registers Events, Studio, AI, and Settings with authentication and availability policies.
-
 namespace Explore.Blazor.Client.Services.Shell;
 
 using Explore.Blazor.Client.Clients;

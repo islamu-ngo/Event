@@ -1,6 +1,3 @@
-// ABOUTME: Event calendar export endpoints for organizer and attendee-scoped ICS downloads.
-// ABOUTME: Owns calendar retention warnings and file-name sanitization; no lifecycle or moderation authority.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

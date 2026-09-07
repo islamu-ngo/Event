@@ -1,6 +1,3 @@
-// ABOUTME: Guards Stripe.net ownership and keeps the Stripe surface confined to Infrastructure.
-// ABOUTME: Verifies the central pin and repository source usage stay inside the Infrastructure boundary.
-
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 

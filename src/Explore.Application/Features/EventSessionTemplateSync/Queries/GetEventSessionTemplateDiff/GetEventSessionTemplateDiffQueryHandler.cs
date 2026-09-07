@@ -1,6 +1,3 @@
-// ABOUTME: Handles event-session-template diff requests by delegating to the explicit diff service and wrapping the DTO response.
-// ABOUTME: Keeps the query path read-only while preserving the repo-wide BaseCommandResponse envelope convention.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventSessionTemplateSync;
 using Explore.Application.Responses;

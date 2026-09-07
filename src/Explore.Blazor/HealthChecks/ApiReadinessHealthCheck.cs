@@ -1,6 +1,3 @@
-// ABOUTME: Blazor BFF readiness health check for the downstream Explore API dependency.
-// ABOUTME: Uses a scoped generated API client probe so readiness follows the isolated backend boundary.
-
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace Explore.Blazor.HealthChecks;

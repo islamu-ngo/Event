@@ -1,6 +1,3 @@
-// ABOUTME: Admin API controller for operator-safe Basic Dispatch Mode email dispatch status.
-// ABOUTME: Exposes sanitized lifecycle fields without email recipient, body, subject, or raw provider errors.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

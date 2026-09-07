@@ -1,6 +1,3 @@
-// ABOUTME: Contract for LocationRoom CRUD operations consumed by Blazor UI components.
-// ABOUTME: Wraps the NSwag-generated location-room client methods.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.Events;

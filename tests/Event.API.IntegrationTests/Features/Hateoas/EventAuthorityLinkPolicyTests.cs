@@ -1,6 +1,3 @@
-// ABOUTME: HAL contract tests for event public actions and organizer claims.
-// ABOUTME: Enforces independent collection policies and event-scoped permission metadata.
-
 using System.Reflection;
 using System.Text.Json;
 using Explore.API.Hateoas.Policies;

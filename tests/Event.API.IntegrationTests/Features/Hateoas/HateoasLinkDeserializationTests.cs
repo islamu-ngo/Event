@@ -1,6 +1,3 @@
-// ABOUTME: Regression guard for HAL _links surviving NSwag round-trip deserialization via [JsonExtensionData].
-// ABOUTME: Proves the Blazor client can read _links.edit from both single-resource and collection-item payloads.
-
 using System.Net;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;

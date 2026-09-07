@@ -1,6 +1,3 @@
-// ABOUTME: MediatR notification handler that writes structured audit log entries for setting changes.
-// ABOUTME: Uses Serilog structured logging so entries appear in Loki with queryable Key/Scope/Tenant fields.
-
 using Explore.Domain.Settings;
 using MediatR;
 using Microsoft.Extensions.Logging;

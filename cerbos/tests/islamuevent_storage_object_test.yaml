@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos policy test suite for storage_object resources.
-# ABOUTME: Covers authenticated upload-session creation, tenant management, and protected content reads.
-
 name: StorageObjectPolicyTests
 description: "Validates storage_object upload and tenant management permissions"
 

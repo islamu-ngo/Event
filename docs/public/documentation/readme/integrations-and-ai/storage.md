@@ -4,7 +4,7 @@ description: Choose local or S3-compatible object storage and preserve metadata-
 
 # Storage Providers Architecture
 
-ISLAMU Event implements a clean storage abstraction supporting both **Local Mounted Filesystem** storage and **S3-Compatible Cloud Object Storage** (such as self-hosted MinIO, Cloudflare R2, or AWS S3).
+ISLAMU Event implements a clean storage abstraction supporting both **Local Mounted Filesystem** storage and **S3-Compatible Cloud Object Storage** (such as Hetzner Object Storage, self-hosted MinIO, Cloudflare R2, or AWS S3).
 
 ---
 

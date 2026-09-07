@@ -1,6 +1,3 @@
-// ABOUTME: Application boundary for bounded purpose-scoped EventLocation disclosure batches.
-// ABOUTME: Returns one immutable fail-closed result per unambiguous EventLocation request.
-
 using Explore.Application.Contracts.LocationPrivacy;
 
 namespace Explore.Application.Contracts.Services;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines explicit registration workflow, form, version, and publish-preflight reads.
-// ABOUTME: Routes every authoring read through event-scoped manage-workflow authorization.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.RegistrationForms;
 using MediatR;

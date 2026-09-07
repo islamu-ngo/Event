@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for AI prompt request construction and bounded message packing.
-// ABOUTME: Verifies system prompt safety text, registry-backed tool schema allow-listing, and context size limits.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Features.AiAssistant.Prompting;

@@ -1,6 +1,3 @@
-// ABOUTME: Declares PII-free participant completion, approval, and revocation command intent.
-// ABOUTME: Derives tenant, subject, and operator authority from trusted Application services.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

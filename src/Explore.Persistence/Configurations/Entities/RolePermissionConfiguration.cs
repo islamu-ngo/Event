@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for RolePermission join table with composite PK (RoleId, PermissionId).
-// ABOUTME: Links roles to their granted permissions for dynamic RBAC authorization.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

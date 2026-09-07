@@ -1,6 +1,3 @@
-// ABOUTME: Owns tenant-bound Setup target enrollment authority and capability rotation.
-// ABOUTME: Stores only one-way evidence and enforces terminal revoke/expiry fences.
-
 namespace Explore.Domain.SetupLive;
 
 using Explore.Domain.Interfaces;

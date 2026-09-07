@@ -1,6 +1,3 @@
-// ABOUTME: Operator-safe summary of one bounded storage reconciliation pass.
-// ABOUTME: Reports counts for missing metadata, orphan backing objects, quarantine, and deletion.
-
 namespace Explore.Application.Models.Storage;
 
 public sealed record StorageReconciliationResult(

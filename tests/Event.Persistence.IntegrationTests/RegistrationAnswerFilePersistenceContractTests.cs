@@ -1,6 +1,3 @@
-// ABOUTME: Verifies registration file metadata is tenant-filtered and storage references are tenant-contained.
-// ABOUTME: Checks the EF model without modifying generated migrations or snapshots.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;

@@ -1,6 +1,3 @@
-// ABOUTME: WebApplicationFactory for Explore.Blazor BFF integration tests with deterministic test-time overrides.
-// ABOUTME: Replaces auth, resolver configuration, and cache dependencies so middleware/endpoints run in isolation.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Services;
 using Microsoft.AspNetCore.Authentication;

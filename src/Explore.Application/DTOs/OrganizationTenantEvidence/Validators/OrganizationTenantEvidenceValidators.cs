@@ -1,6 +1,3 @@
-// ABOUTME: Boundary validators for OrganizationTenant legitimacy-evidence submission and review.
-// ABOUTME: Rejects empty storage/concurrency identifiers, unsupported decisions, and oversized review notes.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.OrganizationTenantEvidence.Validators;

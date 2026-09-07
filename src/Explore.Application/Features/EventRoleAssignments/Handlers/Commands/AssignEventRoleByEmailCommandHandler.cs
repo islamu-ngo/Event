@@ -1,6 +1,3 @@
-// ABOUTME: Handler that resolves target users by email for event-role assignment requests.
-// ABOUTME: Keeps API controllers thin while reusing the canonical AssignEventRoleCommand flow.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventRoleAssignments.Requests.Commands;
 using Explore.Application.Responses;

@@ -1,6 +1,3 @@
-// ABOUTME: Authorized query for webhook consumers belonging to one canonical typed owner.
-// ABOUTME: Carries a selected owner that the authorization pipeline resolves from trusted state.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Webhooks;
 using MediatR;

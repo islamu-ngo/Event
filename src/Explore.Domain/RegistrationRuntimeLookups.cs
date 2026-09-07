@@ -1,6 +1,3 @@
-// ABOUTME: Normalized lookup rows for Phase 8.1 registration runtime attempt and submission states.
-// ABOUTME: Provides stable integer identities while keeping persistence enum-free.
-
 namespace Explore.Domain;
 
 public sealed class RegistrationAttemptStatus

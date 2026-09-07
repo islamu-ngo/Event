@@ -1,6 +1,3 @@
-// ABOUTME: Atomic read-optimized projection row derived from one event-local custom-property value.
-// ABOUTME: Keeps hot query paths out of raw Layer 3 joins while remaining rebuildable from Layer 3 source-of-truth rows.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;

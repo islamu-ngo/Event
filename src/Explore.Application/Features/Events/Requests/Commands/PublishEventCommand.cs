@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for publishing a draft event.
-// ABOUTME: Supplies event resource context for authorization before the publish handler runs.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Responses;

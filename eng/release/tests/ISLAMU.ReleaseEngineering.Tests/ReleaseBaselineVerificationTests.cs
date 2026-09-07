@@ -1,6 +1,3 @@
-// ABOUTME: Proves non-SemVer changelog baseline verification is signed, authorized, and immutable.
-// ABOUTME: Exercises deterministic baseline evidence without creating or mutating release tags.
-
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;

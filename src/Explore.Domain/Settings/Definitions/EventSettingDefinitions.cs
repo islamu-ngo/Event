@@ -1,6 +1,3 @@
-// ABOUTME: Setting definitions for event policies (submission, approval, UI behavior).
-// ABOUTME: Overridable at Tenant scope so each tenant can customize event policies.
-
 namespace Explore.Domain.Settings.Definitions;
 
 public static class EventSettingDefinitions

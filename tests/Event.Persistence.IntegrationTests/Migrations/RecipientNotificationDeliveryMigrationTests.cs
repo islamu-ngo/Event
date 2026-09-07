@@ -1,6 +1,3 @@
-// ABOUTME: Verifies recipient-delivery ledger schema in the rebased PostgreSQL baseline.
-// ABOUTME: Proves model parity and required recipient constraints without deleted migration boundaries.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Persistence;
 using Microsoft.EntityFrameworkCore;

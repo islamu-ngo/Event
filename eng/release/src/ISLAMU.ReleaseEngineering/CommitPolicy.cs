@@ -1,6 +1,3 @@
-// ABOUTME: Parses untrusted Conventional Commit messages into bounded release-policy classifications.
-// ABOUTME: Distinguishes public notes, engineering omissions, explained skips, and breaking-change validity.
-
 using System.Text.RegularExpressions;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;

@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral capabilities and bounded results for hosted Checkout creation and retrieval.
-// ABOUTME: Validates immutable money, identifiers, and same-origin return URLs before provider handoff.
-
 namespace Explore.Application.Contracts.Payments;
 
 public interface IHostedCheckoutSessionCreator

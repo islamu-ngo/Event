@@ -1,6 +1,3 @@
-// ABOUTME: Specifies durable tenant/event stop-sale and independently reviewed resume state.
-// ABOUTME: Proves every transition appends immutable actor evidence and stopping is immediate.
-
 using Explore.Domain;
 using TUnit.Assertions;
 using TUnit.Core;

@@ -1,6 +1,3 @@
-// ABOUTME: Parses and renders the single constrained Markdown grammar used by legal documents.
-// ABOUTME: Produces deterministic encoded HTML without I/O and value-safe readiness diagnostics.
-
 namespace ISLAMU.Wire.Contracts.ConfigurationPortability;
 
 using System.Collections.Immutable;

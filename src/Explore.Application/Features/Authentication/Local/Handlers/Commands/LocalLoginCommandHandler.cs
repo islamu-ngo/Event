@@ -1,6 +1,3 @@
-// ABOUTME: Validates local sign-in intent, delegates credential verification, and synchronizes the platform user.
-// ABOUTME: Returns a token only after the normalized local provider account is linked successfully.
-
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Authentication.Local.Models;

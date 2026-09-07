@@ -1,6 +1,3 @@
-// ABOUTME: Presence-aware write contracts for specialized instance settings resources.
-// ABOUTME: Keeps non-secret provider transitions grouped while preserving omitted configuration.
-
 using Explore.Application.DTOs.Analytics;
 using Explore.Application.DTOs.Storage;
 using Explore.Application.Models.Common;

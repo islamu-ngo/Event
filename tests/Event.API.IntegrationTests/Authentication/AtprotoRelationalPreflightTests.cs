@@ -1,6 +1,3 @@
-// ABOUTME: Verifies challenge rejection after native operational readiness against Production BFF and PostgreSQL.
-// ABOUTME: Guards malformed input, hostile provider metadata and near-expiry proof without creating additional login state.
-
 extern alias bff;
 
 using System.Net;

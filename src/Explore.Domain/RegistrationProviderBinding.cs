@@ -1,6 +1,3 @@
-// ABOUTME: Connects a registration provider connection to one immutable published mapping revision.
-// ABOUTME: Guards provider mapping publication so attempts/submissions can pin stable revision evidence.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

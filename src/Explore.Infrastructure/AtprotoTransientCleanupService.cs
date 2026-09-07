@@ -1,6 +1,3 @@
-// ABOUTME: Sweeps expired ATProto authentication transients and assertion replay claims.
-// ABOUTME: Retains replay claims across replica clock drift and bounds each store to five batches of five hundred rows.
-
 using Explore.Application.Contracts.Persistence;
 
 namespace Explore.Infrastructure;

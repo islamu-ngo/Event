@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for sensitive event-report evidence rows.
-// ABOUTME: Stores encrypted reporter text and bounded evidence metadata away from report intake fields.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

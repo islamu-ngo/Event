@@ -1,6 +1,3 @@
-// ABOUTME: RED contracts for optional provider results across the private API and HAL boundary.
-// ABOUTME: Pins one executable search relation, typed outcomes, and browser-safe suggestion fields.
-
 using System.Reflection;
 using Explore.API.Controllers;
 using Explore.API.Filters;

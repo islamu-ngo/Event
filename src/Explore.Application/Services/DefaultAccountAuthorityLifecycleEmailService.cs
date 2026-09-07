@@ -1,6 +1,3 @@
-// ABOUTME: Default account-authority lifecycle email delegation service.
-// ABOUTME: Records safe local delegation audit and leaves provider email execution to Infrastructure.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Notifications;

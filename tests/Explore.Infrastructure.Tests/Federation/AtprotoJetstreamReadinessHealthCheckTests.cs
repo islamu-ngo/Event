@@ -1,6 +1,3 @@
-// ABOUTME: Tests capability-aware ATProto Jetstream readiness without exposing tenant or DID identities.
-// ABOUTME: Proves empty DID filtering enables public discovery and that lost connectivity degrades readiness.
-
 using Explore.Infrastructure.HealthChecks;
 using Explore.Infrastructure.Services.Federation;
 using Microsoft.Extensions.Diagnostics.HealthChecks;

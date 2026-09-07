@@ -1,6 +1,3 @@
-// ABOUTME: Test-only controller exposing tenant route context and rewritten request path values.
-// ABOUTME: Enables middleware integration assertions without modifying production endpoints.
-
 using Explore.Blazor.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

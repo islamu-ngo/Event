@@ -1,6 +1,3 @@
-// ABOUTME: Executes each Coop effect claim in a fresh tenant-bound scope and machine principal.
-// ABOUTME: Authorizes the narrow incoming-webhook action and clears ambient state on every exit path.
-
 using Explore.Application.Authentication;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;

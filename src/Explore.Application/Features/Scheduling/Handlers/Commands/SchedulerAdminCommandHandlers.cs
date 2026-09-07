@@ -1,6 +1,3 @@
-// ABOUTME: Command handlers for operator-initiated scheduler and per-job control actions.
-// ABOUTME: Each delegates execution and refusal mapping to the shared scheduler command handler base.
-
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Features.Scheduling.Requests.Commands;
 using Explore.Application.Responses;

@@ -1,6 +1,3 @@
-// ABOUTME: Adversarially verifies typed DID ingress across AT Protocol Infrastructure adapters.
-// ABOUTME: Proves fail-before-provider behavior, exact scalar egress, adapter method policy, and safe diagnostics.
-
 using System.Net;
 using System.Text;
 using CarpaNet.Jetstream;

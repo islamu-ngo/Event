@@ -1,6 +1,3 @@
-// ABOUTME: Specifies the complete machine-readable configuration portability registry.
-// ABOUTME: Prevents scope, secret, PII, and application-data categories from gaining authority.
-
 namespace Event.Application.UnitTests.Features.ConfigurationManifest;
 
 using System.Collections;

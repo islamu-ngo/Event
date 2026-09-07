@@ -1,6 +1,3 @@
-// ABOUTME: Evaluates persisted paid-ticket catalog publication readiness inside Application.
-// ABOUTME: Reuses live policy, organizer, connection, currency, disclosure, and authorization facts.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

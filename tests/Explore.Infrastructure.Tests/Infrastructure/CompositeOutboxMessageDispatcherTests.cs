@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for composite outbox dispatch routing to internal side-effect handlers.
-// ABOUTME: Verifies retired broker events fail closed while local fanout and provider sync still route.
-
 using System.Text.Json;
 using System.Diagnostics.Metrics;
 using Explore.Application.Caching;

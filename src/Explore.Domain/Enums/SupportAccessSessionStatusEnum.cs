@@ -1,6 +1,3 @@
-// ABOUTME: Lookup enum for support-access session lifecycle states.
-// ABOUTME: Values map to SupportAccessSessionStatus lookup rows and must remain stable.
-
 namespace Explore.Domain.Enums;
 
 public enum SupportAccessSessionStatusEnum

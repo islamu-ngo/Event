@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos resource policy for per-actor subscription resources.
-# ABOUTME: Authenticated users enter handlers; handler-level checks enforce current-user ownership and tenant-local state.
-
 apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   resource: "islamuevent_actor_subscription"

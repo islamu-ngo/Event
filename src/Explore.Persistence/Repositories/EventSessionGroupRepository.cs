@@ -1,6 +1,3 @@
-// ABOUTME: EF repository for event session groups (tracks, devrooms, stages, program sections).
-// ABOUTME: Provides ordered event-scoped reads while relying on global tenant and soft-delete filters.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.Extensions;

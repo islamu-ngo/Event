@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for provider-neutral external correlation bindings used by provisioning flows.
-// ABOUTME: Exposes entity-returning lookups only; bindings never grant application authority by themselves.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

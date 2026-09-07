@@ -1,6 +1,3 @@
-// ABOUTME: Anonymous-safe API controller for first-party browser analytics relay transport.
-// ABOUTME: Relays browser events through MediatR so tenant-aware governance still applies server-side.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

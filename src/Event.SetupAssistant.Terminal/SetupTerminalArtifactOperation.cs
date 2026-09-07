@@ -1,6 +1,3 @@
-// ABOUTME: Composes one target-owned secret into the canonical Core dotenv workflow and protected writer.
-// ABOUTME: Returns only value-free readiness and digest metadata while clearing rendered and input buffers.
-
 namespace ISLAMU.Event.SetupAssistant.Terminal;
 
 using System.Security.Cryptography;

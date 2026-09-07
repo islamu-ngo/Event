@@ -1,6 +1,3 @@
-// ABOUTME: Local moderation queue case created from an event report.
-// ABOUTME: Owns assignment, waiting, decision-ready, and closure state transitions.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

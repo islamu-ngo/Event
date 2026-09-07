@@ -1,6 +1,3 @@
-// ABOUTME: Implements custom-property value operations through event and session tag clients.
-// ABOUTME: Handles getting and setting single and multi values for Event and EventSession.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.CustomProperties;
 using Explore.Blazor.Client.Models.CustomProperties;

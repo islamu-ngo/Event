@@ -1,6 +1,3 @@
-// ABOUTME: Covers durable registration requirement fulfillment and fenced finalization domain invariants.
-// ABOUTME: Verifies optional skips remain auditable while mandatory skips and stale effect claims fail closed.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;

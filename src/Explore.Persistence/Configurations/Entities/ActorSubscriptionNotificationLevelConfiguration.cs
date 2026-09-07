@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for actor subscription notification level lookup values.
-// ABOUTME: Keeps notification policy IDs stable for subscription storage and fanout decisions.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

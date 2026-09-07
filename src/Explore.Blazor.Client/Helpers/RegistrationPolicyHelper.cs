@@ -1,6 +1,3 @@
-// ABOUTME: Client-side mirror of the server-owned registration policy wire contract.
-// ABOUTME: Determines which registration scopes are allowed by a given event registration policy.
-
 namespace Explore.Blazor.Client.Helpers;
 
 /// <summary>

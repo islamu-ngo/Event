@@ -1,6 +1,3 @@
-// ABOUTME: Client contract for event-scoped promotion management through generated API models.
-// ABOUTME: Keeps Studio components independent of API client implementation details.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Pages.Studio;
 

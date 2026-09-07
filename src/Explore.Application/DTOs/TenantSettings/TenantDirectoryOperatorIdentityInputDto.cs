@@ -1,6 +1,3 @@
-// ABOUTME: Input contract for explicitly supplied tenant directory-operator identity facts.
-// ABOUTME: Maps public accountability fields to the Domain payload without deriving another authority role.
-
 namespace Explore.Application.DTOs.TenantSettings;
 
 using Explore.Domain.Settings.Documents.Payloads;

@@ -1,6 +1,3 @@
-// ABOUTME: Migrates state-dependent ATProto endpoint security cases onto real API/PostgreSQL and Production BFF hosts.
-// ABOUTME: Verifies callback rejection ordering, protected target propagation, cookie contracts and configured onboarding without bridge mocks.
-
 extern alias bff;
 
 using System.Net;

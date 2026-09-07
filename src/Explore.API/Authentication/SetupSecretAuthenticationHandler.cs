@@ -1,6 +1,3 @@
-// ABOUTME: Authenticates setup-secret authority only for the two canonical instance provider GET and PATCH routes.
-// ABOUTME: Fails closed without placing setup secret material in principals, logs, responses, or exceptions.
-
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Explore.API.ExceptionHandling;

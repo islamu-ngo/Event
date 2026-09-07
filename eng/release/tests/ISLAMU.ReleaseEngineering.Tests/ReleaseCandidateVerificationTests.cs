@@ -1,6 +1,3 @@
-// ABOUTME: Proves verify-candidate binds release evidence to exact preparation commit B.
-// ABOUTME: Exercises deterministic candidate manifests, stale outputs, wrong commits, and artifact drift.
-
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;

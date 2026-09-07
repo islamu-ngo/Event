@@ -1,6 +1,3 @@
-// ABOUTME: Handles creation of an event ticket catalog draft.
-// ABOUTME: Validates event authority and catalog uniqueness before persisting the draft.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;

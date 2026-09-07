@@ -1,6 +1,3 @@
-// ABOUTME: Signs purpose-separated transient requests with the existing active OAuth-client key authority.
-// ABOUTME: Binds exact serialized bytes and canonical operation paths without borrowing a user's or pinned flow's identity.
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Cryptography;
 using Microsoft.IdentityModel.Tokens;

@@ -1,6 +1,3 @@
-// ABOUTME: Handles GrantAiConsentCommand — validates, checks for existing active grant, creates new grant.
-// ABOUTME: Uses manually-instantiated validator per project convention (no IValidator<T> DI).
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.AiAssistant.Requests.Commands;
 using Explore.Application.Features.AiAssistant.Validators;

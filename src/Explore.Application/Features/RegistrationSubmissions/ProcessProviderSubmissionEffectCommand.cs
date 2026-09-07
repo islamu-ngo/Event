@@ -1,6 +1,3 @@
-// ABOUTME: Processes one fenced provider-submission webhook effect through Phase 8 registration persistence.
-// ABOUTME: Enforces sync-mode storage boundaries without adding provider-specific callback adapters.
-
 using System.Security.Cryptography;
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;

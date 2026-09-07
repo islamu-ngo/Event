@@ -1,6 +1,3 @@
-// ABOUTME: Focused tests for the generated-client platform monetization adapter.
-// ABOUTME: Proves HAL pass-through, generated update DTO dispatch, and cancellation propagation.
-
 using Explore.Blazor.Client.Services;
 
 namespace Explore.Blazor.Client.Tests.Services;

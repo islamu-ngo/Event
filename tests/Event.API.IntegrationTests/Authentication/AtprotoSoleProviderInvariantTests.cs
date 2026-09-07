@@ -1,6 +1,3 @@
-// ABOUTME: Proves ATProto-only authentication provisions verified DIDs while password entry points fail closed.
-// ABOUTME: Exercises the real Application and PostgreSQL seams with only the external PDS and token issuers substituted.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Diagnostics;

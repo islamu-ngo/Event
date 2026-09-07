@@ -1,6 +1,3 @@
-// ABOUTME: Per-attempt audit ledger for EmailDispatchOutbox delivery through SMTP or future transports.
-// ABOUTME: Captures normalized result/error details without exposing email body content to operator status views.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

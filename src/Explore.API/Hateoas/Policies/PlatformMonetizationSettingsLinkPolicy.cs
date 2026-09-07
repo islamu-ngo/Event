@@ -1,6 +1,3 @@
-// ABOUTME: Defines permission-bound HAL candidates for the singleton instance platform monetization settings document.
-// ABOUTME: Keeps view and edit affordances aligned to the same instance-setting key and server authorization actions.
-
 using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;

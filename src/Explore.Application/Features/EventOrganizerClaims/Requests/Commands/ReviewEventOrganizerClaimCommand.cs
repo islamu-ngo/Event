@@ -1,6 +1,3 @@
-// ABOUTME: Curator-authorized CQRS request for reviewing an event organizer claim.
-// ABOUTME: Approval changes claim and event authority together under one retryable transaction.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventOrganizerClaim;
 using Explore.Application.Responses;

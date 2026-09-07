@@ -1,6 +1,3 @@
-// ABOUTME: Token-boundary tests for browser-readable current-user BFF identity projection.
-// ABOUTME: Ensures server-held token-shaped claims are not returned by /bff/me responses.
-
 
 namespace Explore.Blazor.IntegrationTests.Endpoints;
 

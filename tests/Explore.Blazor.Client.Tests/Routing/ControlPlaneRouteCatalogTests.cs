@@ -1,6 +1,3 @@
-// ABOUTME: Verifies shared Event control-plane route metadata used by embedded and separate Blazor hosts.
-// ABOUTME: Keeps top-level navigation free from detail routes that require route parameters.
-
 using Explore.Blazor.Client.Routing.ControlPlane;
 
 namespace Explore.Blazor.Client.Tests.Routing;

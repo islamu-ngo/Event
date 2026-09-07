@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for setup-time Keycloak bootstrap requests.
-// ABOUTME: Blocks malformed URLs, blank identifiers, control characters, and oversized secret payloads before side effects.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.Onboarding.Validators;

@@ -1,6 +1,3 @@
-// ABOUTME: Maps promotion Domain entities into organizer-safe Application DTOs.
-// ABOUTME: Keeps code digests, key versions, and plaintext outside query and command projections.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

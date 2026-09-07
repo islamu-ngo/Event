@@ -1,6 +1,3 @@
-// ABOUTME: Enforces the canonical EventTicketing feature-slice file layout.
-// ABOUTME: Prevents flat handlers, misplaced services, and multi-request source files.
-
 using System.Text.RegularExpressions;
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventTicketing;

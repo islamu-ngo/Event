@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation validator for grouped Event PATCH updates.
-// ABOUTME: Enforces present-group intent, clear-null operations, lookup existence, and timezone alias consistency.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Models.Common;
 using Explore.Domain.Services.Scheduling;

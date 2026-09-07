@@ -1,6 +1,3 @@
-// ABOUTME: Defines TUnit category constants for infrastructure provider and runtime-adjacent tests.
-// ABOUTME: Keeps focused Email and RabbitMQ test filters stable across infrastructure test classes.
-
 namespace Explore.Infrastructure.Tests.Fixtures;
 
 public static class InfrastructureTestCategories

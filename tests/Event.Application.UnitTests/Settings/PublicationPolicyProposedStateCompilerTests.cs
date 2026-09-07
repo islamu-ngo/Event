@@ -1,6 +1,3 @@
-// ABOUTME: Decision-complete RED contract for pure proposed publication-policy state compilation.
-// ABOUTME: Pins hierarchical precedence, atomic overlays, fail-closed inputs, and deterministic instance output.
-
 namespace Event.Application.UnitTests.Settings;
 
 using System.Collections.Immutable;

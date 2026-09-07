@@ -1,6 +1,3 @@
-// ABOUTME: Maps one durable replay-safe fulfillment per add-on order line.
-// ABOUTME: Keeps fulfillment tenant-qualified and unrelated to admission persistence.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

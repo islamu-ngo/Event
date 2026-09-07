@@ -1,6 +1,3 @@
-// ABOUTME: Builds valid immutable paid-order acceptance authority for focused refund service tests.
-// ABOUTME: Keeps refund fixtures on the same buyer-accepted policy path used by production attempts.
-
 using Explore.Domain;
 
 namespace Event.Application.UnitTests.Services.Registration;

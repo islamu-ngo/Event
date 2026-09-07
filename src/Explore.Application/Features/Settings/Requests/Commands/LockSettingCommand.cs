@@ -1,6 +1,3 @@
-// ABOUTME: Command for locking a setting at Instance or Tenant scope, preventing lower-scope overrides.
-// ABOUTME: Lower-scope values remain in storage but become non-effective while the lock is active.
-
 namespace Explore.Application.Features.Settings.Requests.Commands;
 
 using Explore.Application.Responses;

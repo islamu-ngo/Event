@@ -1,6 +1,3 @@
-// ABOUTME: HAL policy for private event organizer payment connection management resources.
-// ABOUTME: Exposes self and onboarding only through exact paid-commerce event authorization.
-
 using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;

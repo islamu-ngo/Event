@@ -1,6 +1,3 @@
-// ABOUTME: Specifies one legal rendering path for preview and last-published public composition.
-// ABOUTME: Proves locale fallback and failed draft work never replace immutable public evidence.
-
 namespace Event.Application.UnitTests.Features.ConfigurationManifest;
 
 using Explore.Application.Features.ConfigurationManifest.LegalDocuments;

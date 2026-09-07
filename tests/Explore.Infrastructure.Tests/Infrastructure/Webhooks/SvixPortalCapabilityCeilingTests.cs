@@ -1,6 +1,3 @@
-// ABOUTME: Tests the server-derived capability ceiling for Svix App Portal access.
-// ABOUTME: Proves authorization, verification, provider support, and governance only narrow access.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;

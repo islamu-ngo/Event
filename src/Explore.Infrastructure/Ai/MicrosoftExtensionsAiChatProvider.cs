@@ -1,6 +1,3 @@
-// ABOUTME: Adapts Microsoft.Extensions.AI IChatClient implementations to the platform AI provider contract.
-// ABOUTME: Keeps SDK abstractions inside Infrastructure while preserving safe ATCR proposal and error semantics.
-
 using System.Diagnostics;
 using System.Net.Http;
 using System.Text.Json;

@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for organization member read authorization posture.
-// ABOUTME: Ensures identity-bearing organization member reads fail closed for authenticated non-admin callers.
-
 using System.Net;
 using Event.Api.IntegrationTests.Fixtures;
 using TUnit.Assertions;

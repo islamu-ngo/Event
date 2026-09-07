@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for structured first-run bootstrap audit logging.
-// ABOUTME: Verifies log levels, event IDs, and bounded field normalization.
-
 using Explore.Application.Onboarding;
 using Explore.Application.Services;
 using Microsoft.Extensions.Logging;

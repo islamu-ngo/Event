@@ -1,6 +1,3 @@
-// ABOUTME: API controller for tenant onboarding status and tenant policy onboarding actions.
-// ABOUTME: Exposes tenant onboarding questionnaire state and completion/update endpoints.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

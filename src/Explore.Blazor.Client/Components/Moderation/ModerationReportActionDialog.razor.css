@@ -1,6 +1,3 @@
-/* ABOUTME: CSS-isolated layout for the moderation report action dialog. */
-/* ABOUTME: Keeps action inputs compact and consistent with operational moderation surfaces. */
-
 .moderation-report-action-dialog__title {
     align-items: center;
     display: flex;

@@ -1,6 +1,3 @@
-// ABOUTME: Proves the real Application composition root registers admission issuance and credential options.
-// ABOUTME: Prevents isolated builds from replacing or excluding production admission registration.
-
 using Explore.Application;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Admissions;

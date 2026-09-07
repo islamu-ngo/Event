@@ -1,6 +1,3 @@
-// ABOUTME: Audit log for tenant plan application, rollback, and assignment transitions.
-// ABOUTME: Captures changed settings and quotas without storing tenant business data.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines compact required, length, email, and URL partitions for organization input.
-// ABOUTME: Uses independent literals and property paths instead of one class per field.
-
 using Explore.Application.DTOs.Organization;
 using Explore.Application.DTOs.Organization.Validators;
 

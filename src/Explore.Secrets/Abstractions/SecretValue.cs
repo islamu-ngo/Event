@@ -1,4 +1,3 @@
-// ABOUTME: Record types for secret values with optional metadata.
 // Includes version information and timestamps for audit purposes.
 
 namespace Explore.Secrets.Abstractions;

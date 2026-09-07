@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for soft-deleting a room.
-// ABOUTME: Secured via AuthorizeResource for the location_room resource kind.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

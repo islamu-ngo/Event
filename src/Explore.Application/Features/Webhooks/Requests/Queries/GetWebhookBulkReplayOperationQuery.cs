@@ -1,6 +1,3 @@
-// ABOUTME: Authorized query for one tenant-scoped webhook bulk replay operation.
-// ABOUTME: Exposes normalized lifecycle and bounded scheduling evidence without delivery payloads.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Webhooks;
 using MediatR;

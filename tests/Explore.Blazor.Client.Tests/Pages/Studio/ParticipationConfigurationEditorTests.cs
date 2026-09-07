@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for the Studio participation configuration editor.
-// ABOUTME: Verifies typed initial state, Domain-legal field combinations, concurrency-preserving save, and accessible outcomes.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Pages.Studio;

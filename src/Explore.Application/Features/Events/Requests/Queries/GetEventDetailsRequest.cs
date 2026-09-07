@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query request for fetching full event details by ID or slug.
-// ABOUTME: Returns EventDto.
 using System;
 using System.Collections.Generic;
 using System.Text;

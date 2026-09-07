@@ -1,6 +1,3 @@
-// ABOUTME: Authorized CQRS reads for one Organization participation's legitimacy evidence.
-// ABOUTME: Carries only global Organization identity while tenant scope comes from the ambient request context.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.OrganizationTenantEvidence;
 using MediatR;

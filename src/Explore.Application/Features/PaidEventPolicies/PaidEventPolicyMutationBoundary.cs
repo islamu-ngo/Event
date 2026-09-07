@@ -1,6 +1,3 @@
-// ABOUTME: Owns canonical immutable paid-event policy revisions for CQRS and manifest callers.
-// ABOUTME: Linearizes policy authority under serializable named locks and supports caller-owned transactions.
-
 namespace Explore.Application.Features.PaidEventPolicies;
 
 using Explore.Application.Contracts.Persistence;

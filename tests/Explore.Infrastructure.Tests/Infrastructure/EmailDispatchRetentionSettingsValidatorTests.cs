@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for email dispatch retention and redaction settings validation.
-// ABOUTME: Verifies unsafe scheduling, batch, and retention values fail startup validation.
-
 using Explore.Infrastructure;
 
 namespace Explore.Infrastructure.Tests.Infrastructure;

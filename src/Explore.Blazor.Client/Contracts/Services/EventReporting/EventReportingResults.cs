@@ -1,6 +1,3 @@
-// ABOUTME: Result models for reporter-facing event-reporting Blazor service calls.
-// ABOUTME: Keeps UI error handling explicit without polluting pure service interface files.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.EventReporting;

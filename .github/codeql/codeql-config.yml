@@ -1,6 +1,3 @@
-# ABOUTME: CodeQL configuration excluding generated code and test assemblies.
-# ABOUTME: Prevents runner memory exhaustion and timeouts on non-product artifacts.
-
 name: "CodeQL Custom Config"
 
 paths-ignore:

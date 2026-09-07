@@ -1,5 +1,3 @@
-// ABOUTME: Severity levels for lifecycle readiness errors.
-// ABOUTME: Only Error severity blocks readiness; Warning/Info are advisory.
 namespace Explore.Application.Services.Lifecycle;
 
 /// <summary>

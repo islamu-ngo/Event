@@ -1,6 +1,3 @@
-// ABOUTME: RudderStack analytics provider implementation using RudderStack HTTP API.
-// ABOUTME: Avoids process-wide static singleton state to keep tenant configuration isolated.
-
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json.Serialization;

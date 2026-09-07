@@ -1,6 +1,3 @@
-// ABOUTME: Tests public versus managed event-session-group location projections.
-// ABOUTME: Proves public CQRS handlers redact physical fields while managed handlers retain them.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

@@ -1,5 +1,3 @@
-// ABOUTME: Domain unit tests for UiThemePalette value object — hex normalization and structural invariants.
-
 namespace Explore.Domain.UnitTests.ValueObjects;
 
 using Explore.Domain.Enums;

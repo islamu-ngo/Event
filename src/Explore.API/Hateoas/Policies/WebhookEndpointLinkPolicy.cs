@@ -1,6 +1,3 @@
-// ABOUTME: HAL link policy for webhook endpoint management resources.
-// ABOUTME: Emits server-authorized endpoint collection and detail affordances for webhook administration.
-
 using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;

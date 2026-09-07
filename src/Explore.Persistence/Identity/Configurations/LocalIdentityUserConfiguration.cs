@@ -1,6 +1,3 @@
-// ABOUTME: Configures the embedded Identity user table, indexes, concurrency, and relationships.
-// ABOUTME: Reproduces the required Identity store model without changing ExploreDbContext inheritance.
-
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

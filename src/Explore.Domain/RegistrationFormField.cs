@@ -1,6 +1,3 @@
-// ABOUTME: Defines a version-owned registration field with stable machine identity and governance.
-// ABOUTME: Keeps validation, option membership, and provider-neutral cloning behind the version aggregate.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 using Explore.Domain.Services.Registration;

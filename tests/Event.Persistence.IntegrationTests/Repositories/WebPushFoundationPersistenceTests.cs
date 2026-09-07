@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL-backed tests for Web Push preference metadata, subscription persistence, and dispatch outbox transitions.
-// ABOUTME: Proves tenant isolation, active uniqueness, idempotent claims, retry/dead-letter, lease recovery, and stale cleanup.
-
 using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;

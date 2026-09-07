@@ -1,6 +1,3 @@
-// ABOUTME: Defines fail-closed ticketing recovery thresholds, revision floors, and declared restore targets.
-// ABOUTME: Carries only secret references and key versions; key material remains in Infisical or environment.
-
 namespace Explore.Secrets.Configuration;
 
 public sealed class TicketingRecoveryOperatorOptions

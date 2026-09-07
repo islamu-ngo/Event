@@ -1,6 +1,3 @@
-// ABOUTME: Configures the organization_pii extension table with strict 1:1 PK/FK to organizations.
-// ABOUTME: Stores removable organization-identifying fields separately from core organization lifecycle data.
-
 namespace Explore.Persistence.Configurations.Entities;
 
 using Explore.Domain;

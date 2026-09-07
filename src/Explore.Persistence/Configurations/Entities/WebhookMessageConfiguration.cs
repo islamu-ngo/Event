@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for canonical outgoing webhook message envelopes.
-// ABOUTME: Adds provider, aggregate, idempotency, and retention indexes for outbox-backed dispatch.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

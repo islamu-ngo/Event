@@ -1,6 +1,3 @@
-// ABOUTME: API contract coverage for the anonymous composite public-home discovery endpoint.
-// ABOUTME: Verifies stable routing, cache metadata, area/mode dispatch, and response typing.
-
 using System.Reflection;
 using System.Text.Json;
 using Explore.API.Attributes;

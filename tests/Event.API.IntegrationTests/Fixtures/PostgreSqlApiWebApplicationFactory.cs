@@ -1,4 +1,3 @@
-// ABOUTME: WebApplicationFactory backed by a real PostgreSQL database with TestAuthHandler authentication.
 // Accepts a connection string from Testcontainers and optional configuration overrides per host profile.
 
 using Explore.Application.Contracts.Infrastructure;

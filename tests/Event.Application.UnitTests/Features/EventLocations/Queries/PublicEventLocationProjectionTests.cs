@@ -1,6 +1,3 @@
-// ABOUTME: Behavioral tests for public EventLocation projection across session, group, agenda, and program responses.
-// ABOUTME: Proves each response uses one purpose-limited disclosure batch and never revives legacy physical fields.
-
 using AutoMapper;
 using Event.Application.UnitTests.Common;
 using Explore.Application.Contracts.Infrastructure;

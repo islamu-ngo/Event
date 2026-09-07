@@ -1,6 +1,3 @@
-// ABOUTME: Canonical analytics event catalog and shared property keys for the platform.
-// ABOUTME: Start small and grow intentionally as business events are added to the abstraction.
-
 namespace Explore.Application.Analytics;
 
 public static class AnalyticsEvents

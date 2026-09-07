@@ -1,6 +1,3 @@
-// ABOUTME: Event-scoped organizer queries for exact event agenda collection and detail reads.
-// ABOUTME: Resource authorization protects physical location fields from public disclosure.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventAgendaItem;
 using MediatR;

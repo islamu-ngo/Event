@@ -1,6 +1,3 @@
-// ABOUTME: Exercises the combined-host browser-to-API credential bridge in an in-memory HTTP pipeline.
-// ABOUTME: Proves fail-closed cookie handling, external-client independence, sanitization, and principal isolation.
-
 using System.Net;
 using System.Security.Claims;
 using System.Text.Encodings.Web;

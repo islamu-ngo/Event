@@ -1,6 +1,3 @@
-// ABOUTME: Proves configured-administrator startup converges when concurrent transactions observe an empty database.
-// ABOUTME: Uses a command interceptor barrier and shared-file SQLite so the race is deterministic without timing waits.
-
 using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Services;

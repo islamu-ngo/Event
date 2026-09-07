@@ -1,6 +1,3 @@
-// ABOUTME: HAL link policies for instance and tenant storage administration resources.
-// ABOUTME: Emits save, provider-test, and usage-recalculate affordances from server-side authorization checks.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Collections.Generic;

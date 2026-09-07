@@ -1,6 +1,3 @@
-// ABOUTME: Resolves the scheduler administration deployment policy from validated host scheduler settings.
-// ABOUTME: Gives HAL link emission and command handlers one shared answer about availability and mutability.
-
 using Explore.API.Configuration;
 using Explore.Application.Contracts.Scheduling;
 using Microsoft.Extensions.Options;

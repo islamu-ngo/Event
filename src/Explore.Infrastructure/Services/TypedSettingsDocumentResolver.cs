@@ -1,6 +1,3 @@
-// ABOUTME: Resolves tenant-owned typed settings documents from additive JSONB storage.
-// ABOUTME: Runs beside the legacy scalar hierarchical resolver during typed-settings migration.
-
 namespace Explore.Infrastructure.Services;
 
 using System.Text.Json;

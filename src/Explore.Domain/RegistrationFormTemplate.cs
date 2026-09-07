@@ -1,6 +1,3 @@
-// ABOUTME: Catalogs tenant or platform registration-form templates by pointing at one published form version.
-// ABOUTME: Keeps blueprint metadata thin so runtime instantiation clones immutable version graphs by provenance.
-
 using Explore.Domain.Interfaces;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;

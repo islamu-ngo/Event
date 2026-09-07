@@ -1,6 +1,3 @@
-// ABOUTME: Represents either an authenticated local Identity session or a machine-readable failure.
-// ABOUTME: Snapshots role claims so callers cannot mutate issued-session state after construction.
-
 using System.Collections.ObjectModel;
 
 namespace Explore.Application.Features.Authentication.Local.Models;

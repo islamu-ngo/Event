@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for moderation report action dialog validation.
-// ABOUTME: Protects client-side action metadata validation before moderator commands are emitted.
-
 using System.Reflection;
 using Explore.Blazor.Client.Components.Moderation;
 

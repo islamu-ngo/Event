@@ -1,6 +1,3 @@
-// ABOUTME: Defines deterministic registration-form schema artifact generation without persistence or provider IO.
-// ABOUTME: Returns the four canonical artifacts, their complete bundle, and its lowercase SHA-256 identity.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Services;

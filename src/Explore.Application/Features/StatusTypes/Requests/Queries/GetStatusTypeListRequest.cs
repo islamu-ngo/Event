@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query request for fetching all status types.
-// ABOUTME: Returns IEnumerable<StatusTypeDto>.
 using System;
 using System.Collections.Generic;
 using System.Text;

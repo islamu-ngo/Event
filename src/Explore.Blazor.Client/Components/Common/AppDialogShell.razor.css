@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped CSS for AppDialogShell — consistent dialog structural chrome. */
-/* ABOUTME: BEM block .app-dialog-shell with __header, __body, __actions elements. */
-
 .app-dialog-shell {
     display: flex;
     flex-direction: column;

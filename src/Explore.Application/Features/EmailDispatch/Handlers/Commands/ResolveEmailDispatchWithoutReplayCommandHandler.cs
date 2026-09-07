@@ -1,6 +1,3 @@
-// ABOUTME: Resolves deferred email dispatch work without replay through an atomic durable transition.
-// ABOUTME: Preserves unresolved rows for operators until an authorized explicit resolution succeeds.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using Explore.Application.Features.EmailDispatch.Validators;

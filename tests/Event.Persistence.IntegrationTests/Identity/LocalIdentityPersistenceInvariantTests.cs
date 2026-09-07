@@ -1,6 +1,3 @@
-// ABOUTME: Guards normalized Local Identity persistence and convention-derived relational names.
-// ABOUTME: Verifies provider lookup FKs and namespace rules across every supported EF Core provider.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;

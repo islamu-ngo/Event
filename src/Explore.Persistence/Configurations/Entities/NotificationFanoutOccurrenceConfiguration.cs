@@ -1,6 +1,3 @@
-// ABOUTME: Maps immutable notification fanout occurrences and tenant-safe source relationships.
-// ABOUTME: Enforces snapshot, pointer-source, coalescing, and supersession invariants in PostgreSQL.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

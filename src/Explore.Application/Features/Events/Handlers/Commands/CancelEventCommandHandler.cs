@@ -1,6 +1,3 @@
-// ABOUTME: Handler that transitions an event to the Cancelled lifecycle state.
-// ABOUTME: Atomically persists the lifecycle change and durable attendee-notification occurrence.
-
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;

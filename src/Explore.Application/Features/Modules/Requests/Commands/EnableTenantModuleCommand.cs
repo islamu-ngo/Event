@@ -1,6 +1,3 @@
-// ABOUTME: Command request for enabling a module capability for the current tenant.
-// ABOUTME: Uses tenant update authorization so module governance follows tenant-admin policy.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

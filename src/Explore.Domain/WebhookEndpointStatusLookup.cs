@@ -1,6 +1,3 @@
-// ABOUTME: Stable relational lookup rows for webhook endpoint lifecycle states.
-// ABOUTME: Mirrors WebhookEndpointStatus identifiers used by endpoint aggregates and public contracts.
-
 namespace Explore.Domain;
 
 public sealed class WebhookEndpointStatusLookup

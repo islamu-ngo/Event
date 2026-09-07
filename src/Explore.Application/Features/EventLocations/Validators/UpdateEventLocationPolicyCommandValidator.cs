@@ -1,6 +1,3 @@
-// ABOUTME: Validates typed EventLocation policy input before any tracked mutation begins.
-// ABOUTME: Rejects missing concurrency evidence, unknown enum values, and non-UTC reveal instants.
-
 using Explore.Application.Features.EventLocations.Requests.Commands;
 using Explore.Domain.Enums;
 using FluentValidation;

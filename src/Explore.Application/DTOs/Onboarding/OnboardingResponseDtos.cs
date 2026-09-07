@@ -1,6 +1,3 @@
-// ABOUTME: Response DTOs for instance onboarding endpoints replacing anonymous types.
-// ABOUTME: Provides structured, documented response shapes for setup validation, connection tests, and configuration status.
-
 namespace Explore.Application.DTOs.Onboarding;
 
 /// <summary>

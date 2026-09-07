@@ -1,6 +1,3 @@
-// ABOUTME: Validates optional request-scoped Cerbos Admin API credentials for policy synchronization.
-// ABOUTME: Requires a complete bounded credential pair without exposing either value in errors.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.Onboarding.Validators;

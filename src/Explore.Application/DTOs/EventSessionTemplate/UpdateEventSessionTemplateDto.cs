@@ -1,6 +1,3 @@
-// ABOUTME: Grouped partial-update contract for event session template metadata and definitions.
-// ABOUTME: Identity, parent ownership, and concurrency are server-owned rather than body-owned.
-
 using Explore.Application.Models.Common;
 
 namespace Explore.Application.DTOs.EventSessionTemplate;

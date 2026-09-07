@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for OrganizationSharedContacts page showing email contacts shared with an organization.
-// ABOUTME: Supports search, CSV/TSV export with JS file download interop.
-
 using Blazouter.Services;
 using Explore.Blazor.Client.Contracts.Services;
 using Microsoft.AspNetCore.Components;

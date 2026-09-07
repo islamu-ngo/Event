@@ -1,5 +1,3 @@
-<!-- ABOUTME: Defines the focused executable TUnit boundary for the sole Setup Assistant terminal target. -->
-<!-- ABOUTME: References only its owning target and approved test infrastructure. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>

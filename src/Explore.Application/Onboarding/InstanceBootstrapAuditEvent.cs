@@ -1,6 +1,3 @@
-// ABOUTME: Structured audit event model for first-run setup and bootstrap operations.
-// ABOUTME: Carries bounded, non-secret metadata for operator logs without adding persistence coupling.
-
 namespace Explore.Application.Onboarding;
 
 public enum InstanceBootstrapAuditEventType

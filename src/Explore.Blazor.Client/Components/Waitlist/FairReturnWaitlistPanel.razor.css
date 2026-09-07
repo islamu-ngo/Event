@@ -1,6 +1,3 @@
-/* ABOUTME: Styles the fair-return waitlist panel with logical spacing and visible state hierarchy. */
-/* ABOUTME: Uses only RTL-safe properties and keeps controls usable under zoom and narrow layouts. */
-
 .fair-return-waitlist {
     display: grid;
     gap: 1rem;

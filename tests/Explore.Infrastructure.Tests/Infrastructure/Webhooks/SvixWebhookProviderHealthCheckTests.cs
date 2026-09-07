@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the Svix webhook provider readiness health check.
-// ABOUTME: Verifies provider selection and secret-resolution reporting without leaking sensitive values.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Telemetry;

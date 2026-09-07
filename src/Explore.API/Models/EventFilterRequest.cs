@@ -1,6 +1,3 @@
-// ABOUTME: Query-bindable model for EventController.GetAll — collapses 40+ individual parameters into a single [FromQuery] target.
-// ABOUTME: Transport concern only; mapped to GetEventListRequest (MediatR) in the controller.
-
 using System.ComponentModel.DataAnnotations;
 using Explore.Application.DTOs.CustomPropertyProjection;
 

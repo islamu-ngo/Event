@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral safety signal envelope returned by moderation signal integrations.
-// ABOUTME: Stores bounded verdict metadata and safe summaries without raw provider payloads.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Features.EventReporting.Models;

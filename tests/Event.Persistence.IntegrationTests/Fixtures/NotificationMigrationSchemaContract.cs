@@ -1,6 +1,3 @@
-// ABOUTME: Reads PostgreSQL notification schema contracts by tenant-qualified column shape.
-// ABOUTME: Verifies migrated keys and indexes without depending on generated identifier spelling.
-
 using Npgsql;
 
 namespace Event.Persistence.IntegrationTests.Fixtures;

@@ -1,6 +1,3 @@
-// ABOUTME: Purpose-specific EventLocation read requests for public, attendee, and management API surfaces.
-// ABOUTME: Keeps requester identity server-derived and scopes every disclosure read to its parent event.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.Location;

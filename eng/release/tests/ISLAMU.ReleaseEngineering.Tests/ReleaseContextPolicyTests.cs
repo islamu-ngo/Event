@@ -1,6 +1,3 @@
-// ABOUTME: Proves governed release-context policy for versions, prereleases, backports, and display IDs.
-// ABOUTME: Compares deterministic release-context.v1.json against checked-in golden fixtures.
-
 using ISLAMU.ReleaseEngineering;
 
 namespace ISLAMU.ReleaseEngineering.Tests;

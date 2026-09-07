@@ -1,6 +1,3 @@
-// ABOUTME: Registers tiered rate limiting policies for the API.
-// ABOUTME: Provides global, authenticated, public transactional, write, and control-plane rate/concurrency tiers.
-
 using System.Globalization;
 using System.Net;
 using System.Security.Claims;

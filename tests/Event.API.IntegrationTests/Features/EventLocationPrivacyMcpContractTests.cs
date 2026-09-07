@@ -1,6 +1,3 @@
-// ABOUTME: Characterizes Stage-A event-location privacy across MCP event surfaces.
-// ABOUTME: Keeps anonymous descriptors location-safe and proves location-bearing tools invoke the AI disclosure gateway.
-
 using Explore.API.Hateoas;
 using Explore.API.Mcp;
 using Explore.Application.Contracts.Identity;

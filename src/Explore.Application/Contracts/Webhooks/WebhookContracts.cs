@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral webhook contract models shared by application services and provider adapters.
-// ABOUTME: Defines envelopes, delivery messages, endpoint requests, and result shapes without infrastructure dependencies.
-
 namespace Explore.Application.Contracts.Webhooks;
 
 public sealed record WebhookEventEnvelope(

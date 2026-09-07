@@ -1,6 +1,3 @@
-// ABOUTME: Parses and renders one strict bounded UTF-8 dotenv dialect without interpolation or execution.
-// ABOUTME: Produces canonical ordinal LF bytes only after the entire document validates successfully.
-
 namespace ISLAMU.Event.Setup.Core.Environment;
 
 using System.Text;

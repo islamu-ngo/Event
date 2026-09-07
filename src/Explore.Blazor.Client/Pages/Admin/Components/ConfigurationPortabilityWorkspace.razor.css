@@ -1,6 +1,3 @@
-/* ABOUTME: Responsive, RTL-safe layout for configuration portability workspaces. */
-/* ABOUTME: Uses semantic state borders, visible focus, and reduced-motion-safe native controls. */
-
 .configuration-portability {
     display: grid;
     gap: var(--isl-space-5);

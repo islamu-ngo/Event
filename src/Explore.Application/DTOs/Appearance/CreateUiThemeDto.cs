@@ -1,6 +1,3 @@
-// ABOUTME: Input model for creating a new platform or tenant-owned UI theme.
-// ABOUTME: Keeps scope intent explicit while the handler derives the actual owner scope from admin authorization.
-
 namespace Explore.Application.DTOs.Appearance;
 
 public sealed record CreateUiThemeDto

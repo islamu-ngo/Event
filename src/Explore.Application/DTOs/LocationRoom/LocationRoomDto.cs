@@ -1,6 +1,3 @@
-// ABOUTME: Detail read-model DTO for a single LocationRoom entity.
-// ABOUTME: Includes parent location name for display context.
-
 namespace Explore.Application.DTOs.LocationRoom;
 
 public sealed record LocationRoomDto

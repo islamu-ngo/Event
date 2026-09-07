@@ -1,6 +1,3 @@
-// ABOUTME: Catalog of fixed Event lifecycle automation cases intentionally scoped away from generic workflow rules.
-// ABOUTME: Documents which lifecycle triggers may create durable EmailDispatchOutbox rows in the first automation slice.
-
 namespace Explore.Application.Services;
 
 public static class EventLifecycleAutomationUseCases

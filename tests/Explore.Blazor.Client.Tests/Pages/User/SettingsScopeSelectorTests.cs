@@ -1,6 +1,3 @@
-// ABOUTME: Rendered tests for the server-authoritative Settings scope selector.
-// ABOUTME: Verifies unavailable administrative scopes never become local affordances.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Shell;
 using Explore.Blazor.Client.Pages.User.Components;

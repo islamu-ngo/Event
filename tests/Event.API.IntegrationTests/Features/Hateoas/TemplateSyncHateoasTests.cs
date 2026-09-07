@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS authorization contract tests for template sync affordances.
-// ABOUTME: Protects manual sync controllers from bypassing server-side HAL authorization filtering.
-
 using System.Security.Claims;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;

@@ -1,6 +1,3 @@
-// ABOUTME: Business-readable scenario seed for tenant contexts in integration tests.
-// ABOUTME: Creates a complete tenant + user + actor graph for test scenarios.
-
 using Event.Api.IntegrationTests.Builders;
 using Explore.Domain;
 using Explore.Domain.Constants;

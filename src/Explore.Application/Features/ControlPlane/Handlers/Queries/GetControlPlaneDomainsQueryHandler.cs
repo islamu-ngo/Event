@@ -1,6 +1,3 @@
-// ABOUTME: Builds the multi-tenant control-plane domain and DNS checklist from existing settings.
-// ABOUTME: Keeps DNS status guidance local to configured hosts instead of performing external lookups.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.ControlPlane;
 using Explore.Application.Features.ControlPlane.Requests.Queries;

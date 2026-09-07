@@ -1,6 +1,3 @@
-// ABOUTME: HAL link policy for the multi-tenant control-plane overview.
-// ABOUTME: Emits instance-setting permission metadata so clients gate actions by links only.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Security.Claims;

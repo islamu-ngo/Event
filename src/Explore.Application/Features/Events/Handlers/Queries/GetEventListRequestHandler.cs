@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning a paginated, filtered list of events.
-// ABOUTME: Applies EventFilter specification and maps to EventListDto.
 using System.Security.Cryptography;
 using System.Text;
 using AutoMapper;

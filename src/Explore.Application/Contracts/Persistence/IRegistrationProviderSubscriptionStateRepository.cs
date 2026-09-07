@@ -1,6 +1,3 @@
-// ABOUTME: Application-owned persistence seam for registration provider subscription state entities.
-// ABOUTME: Lets renewal and response-sweep workers claim tenant rows without depending on EF Core.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines migration-ready retained-authority schema, role, function, and ACL identifiers.
-// ABOUTME: Keeps runtime access function-only and revokes table, sequence, and unsafe default privileges.
-
 namespace Explore.Persistence.Privacy.ErasureAuthority;
 
 public static class PrivacyErasureAuthorityDatabaseContract

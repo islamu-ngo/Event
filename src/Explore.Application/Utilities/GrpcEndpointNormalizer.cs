@@ -1,6 +1,3 @@
-// ABOUTME: Normalizes and validates gRPC endpoint values shared across onboarding, API config mapping, and infrastructure services.
-// ABOUTME: Accepts either full URLs or bare host:port values and defaults bare remote endpoints to HTTPS.
-
 using System.Net;
 
 namespace Explore.Application.Utilities;

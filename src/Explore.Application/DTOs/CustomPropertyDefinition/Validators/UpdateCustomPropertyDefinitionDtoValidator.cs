@@ -1,6 +1,3 @@
-// ABOUTME: Validates grouped shared custom-property definition PATCH payload shape.
-// ABOUTME: Rejects empty groups before a handler validates the merged persisted candidate.
-
 using Explore.Application.DTOs.CustomPropertyDefinition;
 using FluentValidation;
 

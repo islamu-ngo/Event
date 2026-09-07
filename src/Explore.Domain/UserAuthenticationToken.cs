@@ -1,6 +1,3 @@
-// ABOUTME: Stores tenant-scoped metadata and an encrypted ATProto OAuth session envelope.
-// ABOUTME: Keeps OAuth tokens and the private DPoP key out of plaintext database columns.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Persists ticketing recovery mode, validates manifests, and fences restored bearer authority.
-// ABOUTME: Uses tenant-qualified replay, serializable transactions, durable reissue intent, and no provider I/O.
-
 using Explore.Application.Contracts.Recovery;
 using Explore.Domain;
 using Explore.Domain.Enums;

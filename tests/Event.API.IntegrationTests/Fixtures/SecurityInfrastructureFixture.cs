@@ -1,6 +1,3 @@
-// ABOUTME: Composite fixture combining privately owned Keycloak and Cerbos test containers.
-// ABOUTME: Prevents TUnit nested-initializer discovery from starting duplicate security infrastructure.
-
 using TUnit.Core.Interfaces;
 
 namespace Event.Api.IntegrationTests.Fixtures;

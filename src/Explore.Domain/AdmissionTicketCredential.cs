@@ -1,6 +1,3 @@
-// ABOUTME: Stores one digest-only version of admission authority as an aggregate-owned child.
-// ABOUTME: Retains revoked metadata for bounded rotation history and never stores bearer plaintext.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

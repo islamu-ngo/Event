@@ -1,6 +1,3 @@
-// ABOUTME: Tests tenant workspace-shell governance controls and server-authoritative editability.
-// ABOUTME: Proves D8 settings write exact values while locked settings remain disabled with reasons.
-
 using Explore.Blazor.Client.Contracts.Services.Shell;
 using Explore.Blazor.Client.Pages.Admin.Tenant.Components;
 using MudBlazor;

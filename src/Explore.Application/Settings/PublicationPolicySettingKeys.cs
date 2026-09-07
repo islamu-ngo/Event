@@ -1,6 +1,3 @@
-// ABOUTME: Defines the deterministic guarded-key order used by publication-policy compilation.
-// ABOUTME: Keeps the compiler aligned with canonical setting definitions and policy-state construction.
-
 namespace Explore.Application.Settings;
 
 using System.Collections.Immutable;

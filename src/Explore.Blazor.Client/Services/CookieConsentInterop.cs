@@ -1,6 +1,3 @@
-// ABOUTME: Blazor JS interop wrapper for tenant-scoped cookie consent read/write/clear.
-// ABOUTME: Loads cookie-consent.js module lazily and safely no-ops on JS failures.
-
 using Explore.Blazor.Client.Contracts.Interop;
 using Microsoft.JSInterop;
 

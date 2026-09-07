@@ -1,6 +1,3 @@
-// ABOUTME: Verifies external event actions accept only normalized HTTPS destinations.
-// ABOUTME: Prevents unsafe schemes, protocol-relative URLs, userinfo, and fragments from becoming public links.
-
 using Explore.Domain.ValueObjects;
 
 namespace Event.Domain.UnitTests.ValueObjects;

@@ -1,6 +1,3 @@
-// ABOUTME: Validates untrusted AI tool payload JSON against registry field policies before schema checks.
-// ABOUTME: Fails closed for malformed JSON, non-object payloads, unknown fields, and forbidden fields.
-
 using System.Text.Json;
 
 namespace Explore.Application.Features.AiAssistant.Tools;

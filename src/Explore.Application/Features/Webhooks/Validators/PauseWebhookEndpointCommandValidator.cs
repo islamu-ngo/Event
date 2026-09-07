@@ -1,6 +1,3 @@
-// ABOUTME: Validates manual webhook endpoint pause identity and audit-reason evidence.
-// ABOUTME: Restricts reason codes to the same normalized character set accepted by the audit aggregate.
-
 using Explore.Application.Features.Webhooks.Requests.Commands;
 using Explore.Domain;
 using FluentValidation;

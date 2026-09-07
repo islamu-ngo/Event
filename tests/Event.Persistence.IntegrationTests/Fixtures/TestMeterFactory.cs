@@ -1,6 +1,3 @@
-// ABOUTME: Minimal IMeterFactory implementation for integration tests that construct metric instruments directly.
-// ABOUTME: Keeps projection tests independent from the API service-provider metrics registration.
-
 using System.Diagnostics.Metrics;
 
 namespace Event.Persistence.IntegrationTests.Fixtures;

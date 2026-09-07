@@ -1,6 +1,3 @@
-// ABOUTME: Applies exact-subject local User erasure dispositions across tenant boundaries.
-// ABOUTME: Keeps compiled destructive operations in Persistence and inside the caller's transaction.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

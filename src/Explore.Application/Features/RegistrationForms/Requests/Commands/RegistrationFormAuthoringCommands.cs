@@ -1,6 +1,3 @@
-// ABOUTME: Defines every explicit registration workflow and form-authoring mutation request.
-// ABOUTME: Carries event authorization context and strong expected concurrency stamps into handlers.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.RegistrationForms;
 using Explore.Application.Responses;

@@ -1,6 +1,3 @@
-// ABOUTME: Instance governance settings endpoints covering modules, policies, delegation, AI, analytics, and footer.
-// ABOUTME: Governance values gate tenant capability, so each write goes through the governance settings service.
-
 using Explore.Application.Authentication;
 using Asp.Versioning;
 using Explore.API.Attributes;

@@ -1,6 +1,3 @@
-// ABOUTME: Classifies Svix SDK failures into bounded categories used by webhook provider services.
-// ABOUTME: Prevents raw provider errors from leaking into canonical webhook results, logs, or API responses.
-
 using Svix;
 
 namespace Explore.Infrastructure.Webhooks;

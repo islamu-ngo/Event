@@ -1,6 +1,3 @@
-// ABOUTME: Verifies event authorization-target lookup bypasses tenant filters only by exact event ID.
-// ABOUTME: Proves cross-tenant authorization resolution does not leak ambient tenant event rows.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;

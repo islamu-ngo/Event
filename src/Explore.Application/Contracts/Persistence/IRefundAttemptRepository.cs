@@ -1,6 +1,3 @@
-// ABOUTME: Defines entity-first persistence operations for refund reservations and dispute projections.
-// ABOUTME: Keeps atomic capacity decisions and tenant-qualified idempotency behind one repository boundary.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

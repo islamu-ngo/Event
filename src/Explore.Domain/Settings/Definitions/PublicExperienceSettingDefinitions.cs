@@ -1,6 +1,3 @@
-// ABOUTME: Setting definitions for conservative anonymous public-experience posture configuration.
-// ABOUTME: Keeps metadata instance-to-tenant scoped and stores bounded config documents as JSON defaults.
-
 namespace Explore.Domain.Settings.Definitions;
 
 using Explore.Domain.Constants;

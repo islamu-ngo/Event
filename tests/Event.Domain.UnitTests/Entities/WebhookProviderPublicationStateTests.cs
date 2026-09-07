@@ -1,6 +1,3 @@
-// ABOUTME: Domain tests for the authoritative provider-publication state machine and immutable plan identity.
-// ABOUTME: Verifies fenced transitions, append-only evidence, bounded retries, and idempotency-window safety.
-
 using Explore.Domain;
 
 namespace Event.Domain.UnitTests.Entities;

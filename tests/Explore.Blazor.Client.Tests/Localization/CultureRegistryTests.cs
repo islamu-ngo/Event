@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the Blazor-owned culture allowlist and normalization behavior.
-// ABOUTME: Protects client localization from depending on clean-architecture implementation projects.
-
 using Explore.Blazor.Client.Localization;
 
 namespace Explore.Blazor.Client.Tests.Localization;

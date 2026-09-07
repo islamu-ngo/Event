@@ -1,6 +1,3 @@
-// ABOUTME: bUnit tests for provider-neutral instance and tenant storage settings sections.
-// ABOUTME: Verifies HAL-gated actions and locked tenant storage states in admin UI components.
-
 using Explore.Blazor.Client.Pages.Admin.Instance.Components;
 using Explore.Blazor.Client.Pages.Admin.Tenant.Components;
 using MudBlazor;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines and dispatches durable post-commit effects for applied configuration manifests.
-// ABOUTME: Reconstructs only safe key-name cache and notification effects from persisted audit results.
-
 namespace Explore.Application.Features.ConfigurationManifest.Application;
 
 using System.Collections.Immutable;

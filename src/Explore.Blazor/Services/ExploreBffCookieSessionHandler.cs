@@ -1,6 +1,3 @@
-// ABOUTME: Bridges shared BFF cookie-token refresh events into Explore-specific session state.
-// ABOUTME: Handles admin-claim enrichment, setup-aware redirects, and circuit token cleanup outside Event.Web.BffHosting.
-
 using System.Security.Claims;
 using System.Diagnostics.CodeAnalysis;
 using Event.Web.BffHosting.Authentication;

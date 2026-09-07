@@ -1,6 +1,3 @@
-// ABOUTME: Inspects compiled controller calls and constructors for service-location boundaries.
-// ABOUTME: Replaces controller source scraping with executable metadata from the shipped API assembly.
-
 using System.Reflection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;

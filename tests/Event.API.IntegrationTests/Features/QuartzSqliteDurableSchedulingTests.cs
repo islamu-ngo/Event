@@ -1,6 +1,3 @@
-// ABOUTME: End-to-end proof that Tier 1 standalone SQLite gets durable Quartz scheduling from the embedded DDL.
-// ABOUTME: Applies the schema to a real SQLite file, runs a scheduler over it, and verifies state survives a restart.
-
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Scheduling;
 using Explore.Secrets.Database;

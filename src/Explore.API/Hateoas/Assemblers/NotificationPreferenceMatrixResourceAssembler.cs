@@ -1,6 +1,3 @@
-// ABOUTME: Resource assembler for the authenticated user's notification preference matrix.
-// ABOUTME: Wraps the matrix DTO in HAL links so clients gate preference actions from _links.
-
 namespace Explore.API.Hateoas.Assemblers;
 
 using Explore.Application.Contracts.Hateoas;

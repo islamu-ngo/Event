@@ -1,4 +1,3 @@
-// ABOUTME: Enum representing the three states of a tag in the tri-state filter dropdown.
 // Neutral = no filter, Include = must be present, Exclude = must not be present.
 
 namespace Explore.Blazor.Client.Models;

@@ -1,6 +1,3 @@
-// ABOUTME: Tests shared DI registration for dock layout services.
-// ABOUTME: Ensures shell/workspace components receive one scoped dock state through both contracts.
-
 using Explore.Blazor.Client.Extensions;
 using Explore.Blazor.Client.Services.Docking;
 

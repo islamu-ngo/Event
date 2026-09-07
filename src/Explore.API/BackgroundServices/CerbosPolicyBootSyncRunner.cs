@@ -1,6 +1,3 @@
-// ABOUTME: Reconciles an explicit deployment-selected authorization provider during API startup.
-// ABOUTME: Retries bounded Cerbos verification and policy publishing without logging endpoints or credentials.
-
 using Explore.Application.Contracts.Services;
 using Explore.Infrastructure.Services;
 using Microsoft.Extensions.Options;

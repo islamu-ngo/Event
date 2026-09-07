@@ -1,6 +1,3 @@
-// ABOUTME: Tests for the Blazor AI assistant generated-client service wrapper.
-// ABOUTME: Verifies safe fallbacks, idempotency propagation, and HAL resource preservation.
-
 using Explore.Blazor.Client.Contracts.Services.Ai;
 using Explore.Blazor.Client.Services.Ai;
 

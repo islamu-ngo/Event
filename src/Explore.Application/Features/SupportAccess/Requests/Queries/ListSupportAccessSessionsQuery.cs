@@ -1,6 +1,3 @@
-// ABOUTME: Authorized query for bounded support-access session history by target tenant.
-// ABOUTME: Tenant predicate is explicit so audit/history reads cannot degrade into cross-tenant listing.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.SupportAccess;
 using Explore.Application.Responses;

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies TenantSettingRepository tenant-filter bypasses stay bounded by exact tenant/key predicates.
-// ABOUTME: Proves tenant setting reads and mutations do not leak or mutate ambient wrong-tenant rows.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Settings;

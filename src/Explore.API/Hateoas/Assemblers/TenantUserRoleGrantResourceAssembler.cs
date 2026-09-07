@@ -1,6 +1,3 @@
-// ABOUTME: HAL resource assembler for tenant user role grant resources.
-// ABOUTME: Converts TenantUserRoleGrant detail/list DTOs to HAL resources with links.
-
 namespace Explore.API.Hateoas.Assemblers;
 
 using Explore.Application.Contracts.Hateoas;

@@ -1,6 +1,3 @@
-// ABOUTME: Handles the Rule 12 governance report query computing promotion recommendations via the Atlassian 4-question matrix.
-// ABOUTME: Aggregates across event and event-session runtime definitions with tenant isolation.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.CustomPropertyGovernance;

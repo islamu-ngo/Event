@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mappings for normalized tenant plan SaaS tier persistence.
-// ABOUTME: Enforces lookup-backed statuses, version rows, settings, quotas, assignments, and audit logs.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.ValueGenerators;

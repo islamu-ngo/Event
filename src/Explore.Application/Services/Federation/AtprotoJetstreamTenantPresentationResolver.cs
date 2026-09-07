@@ -1,6 +1,3 @@
-// ABOUTME: Resolves active tenants eligible to present globally canonical ATProto Jetstream records.
-// ABOUTME: Applies instance lock and single-tenant bypass semantics from a bounded entity query set.
-
 namespace Explore.Application.Services.Federation;
 
 using Explore.Application.Contracts.Persistence;

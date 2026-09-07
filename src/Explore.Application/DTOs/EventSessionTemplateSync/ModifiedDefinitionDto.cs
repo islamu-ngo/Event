@@ -1,6 +1,3 @@
-// ABOUTME: Describes a template-backed session runtime definition whose explicit fields differ from the target template version.
-// ABOUTME: Carries the runtime concurrency stamp to support precise concurrent-update conflict reporting during apply.
-
 namespace Explore.Application.DTOs.EventSessionTemplateSync;
 
 public sealed record ModifiedDefinitionDto(

@@ -1,6 +1,3 @@
-// ABOUTME: Quartz trigger for one bounded pass over durable payment-reconciliation effects.
-// ABOUTME: Keeps cadence in the shared scheduler while Application owns retrieval and fenced settlement.
-
 using Explore.Application.Contracts.Payments;
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Services.Registration;

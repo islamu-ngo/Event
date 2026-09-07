@@ -1,6 +1,3 @@
-// ABOUTME: Value-free local rotation acknowledgements and deployment convergence evaluation.
-// ABOUTME: Requires every declared replica before convergence and fails closed at the stale deadline.
-
 namespace Explore.Secrets.Services;
 
 public enum SecretRotationLocalStatus

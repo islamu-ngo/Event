@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for Svix-compatible webhook signing and verification.
-// ABOUTME: Covers raw-body integrity, timestamp tolerance, fixed header names, and secret rotation support.
-
 using System.Text;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Infrastructure.Webhooks;

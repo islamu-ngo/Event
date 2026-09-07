@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for tenant/provider storage usage counters.
-// ABOUTME: Provides quota-counter lookup and creation while preserving tenant-scoped persistence rules.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;

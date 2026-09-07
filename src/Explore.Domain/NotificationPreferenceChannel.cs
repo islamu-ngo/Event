@@ -1,6 +1,3 @@
-// ABOUTME: Lookup row for one supported notification preference delivery channel.
-// ABOUTME: Restricts the matrix to explicitly supported channels such as Email and In-App.
-
 namespace Explore.Domain;
 
 public class NotificationPreferenceChannel

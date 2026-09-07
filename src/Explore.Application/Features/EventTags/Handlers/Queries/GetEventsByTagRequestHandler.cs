@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning events associated with a specific tag.
-// ABOUTME: Used for tag-filtered event browsing.
 using System;
 using System.Collections.Generic;
 using System.Threading;

@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS link policies for tenant user role grant detail and collection views.
-// ABOUTME: Provides self, tenant, create, and revoke links with permission checks.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Collections.Generic;

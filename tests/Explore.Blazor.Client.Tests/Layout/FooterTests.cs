@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for structured anonymous footer operator disclosures.
-// ABOUTME: Verifies tenant and instance roles remain separate with no prose fallback contract.
-
 using System.Reflection;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Layout;

@@ -1,6 +1,3 @@
-// ABOUTME: Calls the retained authority's fixed SECURITY DEFINER append and read functions through its DbContext connection.
-// ABOUTME: Preserves the runtime role's function-only boundary and never performs ordinary DbSet table access.
-
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Domain;

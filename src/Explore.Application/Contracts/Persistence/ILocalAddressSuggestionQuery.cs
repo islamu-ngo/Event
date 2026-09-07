@@ -1,6 +1,3 @@
-// ABOUTME: Defines a bounded persistence query for tenant-safe local address suggestions.
-// ABOUTME: Returns only bounded exact display fields plus governed source and visibility labels.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Contracts.Persistence;

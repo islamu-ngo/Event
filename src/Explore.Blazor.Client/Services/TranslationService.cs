@@ -1,6 +1,3 @@
-// ABOUTME: Client-side translation service with in-memory caching (30-min TTL).
-// ABOUTME: Fetches via NSwag client; validates language codes against CultureRegistry at fetch boundaries only.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Localization;

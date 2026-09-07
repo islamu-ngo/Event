@@ -1,6 +1,3 @@
-// ABOUTME: Exposes no-store, target-authorized configuration transfer staging and promotion endpoints.
-// ABOUTME: Keeps nonce/proof capabilities in headers and routes received bytes through ordinary import preview.
-
 namespace Explore.API.Controllers;
 
 using System.ComponentModel.DataAnnotations;

@@ -1,6 +1,3 @@
-// ABOUTME: Anonymous callback endpoint for provider-hosted registration submissions.
-// ABOUTME: Captures bounded exact-byte callbacks through the shared incoming-webhook intake boundary.
-
 using System.Text.Json;
 using Asp.Versioning;
 using Explore.API.Attributes;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines lifecycle commands for submitting, routing, finalizing, and resolving registration orders.
-// ABOUTME: Commands carry only an aggregate identifier; authorization remains a separate policy concern.
-
 using Explore.Application.DTOs.RegistrationOrders;
 using MediatR;
 

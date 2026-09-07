@@ -1,6 +1,3 @@
-// ABOUTME: Result contracts for raw incoming webhook verification and idempotency capture.
-// ABOUTME: Carries bounded ProblemDetails metadata without exposing raw payloads or secrets.
-
 using Explore.API.ExceptionHandling;
 using Explore.Application.Contracts.Webhooks;
 using Microsoft.AspNetCore.Http;

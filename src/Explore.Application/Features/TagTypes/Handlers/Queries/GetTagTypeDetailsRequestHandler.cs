@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning a single tag type by ID.
-// ABOUTME: Maps TagType entity to TagTypeDto.
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.TagType;

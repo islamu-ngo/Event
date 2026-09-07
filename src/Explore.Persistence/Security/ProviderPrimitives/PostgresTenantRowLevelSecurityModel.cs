@@ -1,6 +1,3 @@
-// ABOUTME: Model-derived tenant-table inventory and PostgreSQL Row-Level Security policy generation.
-// ABOUTME: Enforces defense-in-depth tenant isolation against raw SQL and bypassed query filters.
-
 using System.Collections;
 using System.Text;
 using Explore.Persistence.Database;

@@ -1,6 +1,3 @@
-// ABOUTME: Abstract base controller exposing request-scoped identity and concurrency parsing to API actions.
-// ABOUTME: Derives identity from the request principal so no controller resolves services or parses claims.
-
 using Explore.Application.Authentication;
 using Microsoft.AspNetCore.Mvc;
 

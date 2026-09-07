@@ -1,6 +1,3 @@
-// ABOUTME: Registers named request timeout policies for different endpoint categories.
-// ABOUTME: Provides default, lookup, complex, and control-plane timeout tiers.
-
 using Explore.API.Authentication;
 using Explore.API.ConfigurationImport;
 using ISLAMU.Wire.Contracts.SetupLive;

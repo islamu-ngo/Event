@@ -1,6 +1,3 @@
-// ABOUTME: Stable lookup identifiers governing who may reuse a Location's current address.
-// ABOUTME: Defaults to quarantine and keeps creator, organization, and tenant approval scopes explicit.
-
 namespace Explore.Domain.Enums;
 
 public enum LocationAddressVisibilityEnum

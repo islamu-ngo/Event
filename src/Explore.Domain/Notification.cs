@@ -1,6 +1,3 @@
-// ABOUTME: Domain entity for user notifications (RSVP confirmations, approval updates, waitlists).
-// ABOUTME: Supports linking to the source entity via NotificationEntityType/EntityId for deep linking.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

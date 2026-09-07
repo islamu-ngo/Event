@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped styles for the instance support-access console. */
-/* ABOUTME: Uses BEM classes and design tokens for dense operational admin workflows. */
-
 .support-access-console {
     display: block;
     min-inline-size: 0;

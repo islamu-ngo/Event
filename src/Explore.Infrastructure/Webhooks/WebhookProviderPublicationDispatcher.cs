@@ -1,6 +1,3 @@
-// ABOUTME: Dispatches one fenced provider publication from immutable persisted message authority.
-// ABOUTME: Preserves stable provider identity and treats ambiguous submission or stale completion conservatively.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.Extensions.Options;

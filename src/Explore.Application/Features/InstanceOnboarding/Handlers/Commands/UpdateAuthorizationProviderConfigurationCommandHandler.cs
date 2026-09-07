@@ -1,6 +1,3 @@
-// ABOUTME: Handles post-onboarding authorization provider updates by instance administrators.
-// ABOUTME: Verifies Cerbos endpoint reachability before allowing the runtime provider to switch to Cerbos.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Instance;

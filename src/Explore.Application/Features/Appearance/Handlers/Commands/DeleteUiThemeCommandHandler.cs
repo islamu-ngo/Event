@@ -1,6 +1,3 @@
-// ABOUTME: Handles deletion of UI themes with scope-aware authorization.
-// ABOUTME: Refuses to delete a theme currently marked as the default for its scope to preserve catalog invariants.
-
 namespace Explore.Application.Features.Appearance.Handlers.Commands;
 
 using Explore.Application.Contracts.Identity;

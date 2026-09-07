@@ -1,6 +1,3 @@
-// ABOUTME: Applies the generated-record policy using Roslyn syntax spans rather than text patterns.
-// ABOUTME: Produces byte-stable record/init output while retaining protected generated classes unchanged.
-
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;

@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for adding a tag to an event.
-// ABOUTME: Carries the CreateEventTagsDto payload.
 using System;
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventTags;

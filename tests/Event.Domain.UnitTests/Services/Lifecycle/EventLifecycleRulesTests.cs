@@ -1,6 +1,3 @@
-// ABOUTME: Exhaustively verifies the fixed Event lifecycle transition authority matrix.
-// ABOUTME: Guards Draft edit predicates and invalid status handling for downstream reuse.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Lifecycle;
 

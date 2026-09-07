@@ -1,6 +1,3 @@
-// ABOUTME: Handles bounded audit-event queries for a support-access session.
-// ABOUTME: Verifies the session belongs to the requested target tenant before returning audit evidence.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.SupportAccess;
 using Explore.Application.Features.SupportAccess.Requests.Queries;

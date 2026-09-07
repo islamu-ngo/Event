@@ -1,6 +1,3 @@
-// ABOUTME: Contract for resolving typed non-secret settings documents.
-// ABOUTME: Additive to the legacy scalar hierarchical settings resolver during typed-settings migration.
-
 namespace Explore.Application.Contracts.Infrastructure;
 
 using Explore.Application.Settings;

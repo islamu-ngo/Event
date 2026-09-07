@@ -1,6 +1,3 @@
-// ABOUTME: Executes the two measured PostgreSQL SKIP LOCKED queue reads through finalized EF metadata.
-// ABOUTME: Keeps physical identifiers and provider syntax out of queue repositories while preserving named filters.
-
 using System.Linq.Expressions;
 using Explore.Domain;
 using Explore.Domain.Enums;

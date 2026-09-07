@@ -1,6 +1,3 @@
-// ABOUTME: Sends native integration sync outbox rows to Listmonk through the NSwag-generated API client.
-// ABOUTME: Resolves tenant-scoped Listmonk settings and secrets without exposing credentials to logs.
-
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;

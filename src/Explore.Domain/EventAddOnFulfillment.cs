@@ -1,6 +1,3 @@
-// ABOUTME: Records one durable fulfillment outcome for an add-on order line.
-// ABOUTME: Uses a stable operation identity while remaining independent from admission.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

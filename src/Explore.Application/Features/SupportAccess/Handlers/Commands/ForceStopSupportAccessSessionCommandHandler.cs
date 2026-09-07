@@ -1,6 +1,3 @@
-// ABOUTME: Handles administrative revocation of active support-access sessions.
-// ABOUTME: Records force-stop lifecycle evidence separately from actor-owned stops.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.SupportAccess;

@@ -1,6 +1,3 @@
-// ABOUTME: Complete tenant-scoped entity graph required to build one public ATProto event record.
-// ABOUTME: Keeps repositories entity-first while Application owns privacy filtering and immutable snapshot mapping.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

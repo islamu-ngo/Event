@@ -1,5 +1,3 @@
-// ABOUTME: Locks a tenant setting override so the tenant cannot unlock or change it.
-// ABOUTME: Instance-admin scoped Control Plane command using explicit tenant identity.
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

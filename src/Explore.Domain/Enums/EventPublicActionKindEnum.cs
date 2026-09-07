@@ -1,6 +1,3 @@
-// ABOUTME: Canonical integer identifiers for public event action kinds.
-// ABOUTME: Values must remain aligned with persistence seeding and API lookup metadata.
-
 namespace Explore.Domain.Enums;
 
 public enum EventPublicActionKindEnum

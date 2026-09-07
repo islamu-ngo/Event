@@ -1,9 +1,6 @@
 using System;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Tenant;
-// ABOUTME: FluentValidation rules for grouped Tenant PATCH payloads.
-// ABOUTME: Validates supplied metadata groups and rejects empty wrappers.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.Tenant.Validators;

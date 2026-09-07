@@ -1,6 +1,3 @@
-// ABOUTME: AI provider configuration bound from AiProvider:* configuration section.
-// ABOUTME: Provider field references ai_provider_kinds lookup table by stable integer ID.
-
 using Explore.Application.Contracts.Infrastructure.Ai;
 
 public sealed class AiProviderSettings

@@ -1,6 +1,3 @@
-// ABOUTME: Singleton service that manages the setup secret lifecycle for instance onboarding.
-// ABOUTME: Reads setup/provisioning configuration, generates or disables setup-secret validation safely, and validates with timing-safe comparison.
-
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Contracts.Persistence;

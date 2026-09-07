@@ -1,6 +1,3 @@
-// ABOUTME: Gates participant reads by guest capability, current-account ownership, or organizer participant permission.
-// ABOUTME: Keeps missing, malformed, expired, and cross-scope guest access indistinguishable.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped CSS for the Luma-inspired single-page CreateEvent layout. */
-/* ABOUTME: Uses BEM methodology. All selectors use ::deep since content is inside MudBlazor component tree. */
-
 /* ===== Block: create-event ===== */
 
 .create-event {

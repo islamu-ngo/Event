@@ -1,6 +1,3 @@
-// ABOUTME: String-enum contracts describing public home-discovery selection and section availability.
-// ABOUTME: Lives outside the DTO namespace while remaining explicitly registered in the OpenAPI enum catalog.
-
 using System.Text.Json.Serialization;
 
 namespace Explore.Application.Models.PublicExperience;

@@ -1,6 +1,3 @@
-// ABOUTME: Public ticket-catalog-derived event price summary for discovery and event detail responses.
-// ABOUTME: Keeps display pricing derived from published selectable ticket types rather than Event fields.
-
 namespace Explore.Application.DTOs.Event;
 
 public sealed record EventTicketPriceSummaryDto

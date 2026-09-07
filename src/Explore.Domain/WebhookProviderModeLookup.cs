@@ -1,6 +1,3 @@
-// ABOUTME: Stable relational lookup rows for webhook delivery provider modes.
-// ABOUTME: Mirrors WebhookProviderMode identifiers snapshotted by consumers and delivery plans.
-
 namespace Explore.Domain;
 
 public sealed class WebhookProviderModeLookup

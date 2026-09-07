@@ -1,6 +1,3 @@
-// ABOUTME: Client-side FluentValidation rules for grouped Location update DTOs.
-// ABOUTME: Mirrors the server wrapper contract enough for admin edit dialogs to fail fast.
-
 using Explore.Blazor.Client.Clients;
 using FluentValidation;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Applies PostgreSQL constraints declared as EF model metadata after standard migrations run.
-// ABOUTME: Bridges Npgsql gaps such as exclusion constraints while keeping entity configuration authoritative.
-
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;

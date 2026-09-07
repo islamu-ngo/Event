@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL tests for incoming webhook retry, terminal-state, and receipt-backed recovery behavior.
-// ABOUTME: Proves transient work commits once, exhausted work dead-letters, and durable effects are never replayed.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;

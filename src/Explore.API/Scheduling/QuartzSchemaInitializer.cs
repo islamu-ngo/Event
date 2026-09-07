@@ -1,6 +1,3 @@
-// ABOUTME: Applies the embedded, idempotent Quartz.NET scheduler DDL to the primary application database.
-// ABOUTME: Replaces EF Core scheduler migrations so every supported provider shares one co-located table set.
-
 using System.Collections.Frozen;
 using System.Globalization;
 using System.Reflection;

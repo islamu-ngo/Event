@@ -1,6 +1,3 @@
-// ABOUTME: Google Sheets approved-field submission sink for post-commit registration delivery.
-// ABOUTME: Uses existing provider secret binding and bounded JSON append payloads without logging answers or credentials.
-
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;

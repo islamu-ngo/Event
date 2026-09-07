@@ -1,6 +1,3 @@
-// ABOUTME: Stable relational lookup rows for incoming webhook inbox lifecycle states.
-// ABOUTME: Mirrors IncomingWebhookMessageStatus identifiers used by claims, settlement, and operations queries.
-
 namespace Explore.Domain;
 
 public sealed class IncomingWebhookMessageStatusLookup

@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for the authoritative single-column instance setup overview.
-// ABOUTME: Verifies task mapping, refresh deduplication, launch gates, secret recovery, and mode-specific handoffs.
-
 using System.Text.Json;
 using AngleSharp.Dom;
 using Explore.Blazor.Client.Models.Responses;

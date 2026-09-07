@@ -1,6 +1,3 @@
-// ABOUTME: Parses and verifies the deployment-local configured administrator authority.
-// ABOUTME: Produces value-free fingerprints and fresh server-owned onboarding snapshots without network access.
-
 using System.Buffers.Binary;
 using System.Globalization;
 using System.Security.Cryptography;

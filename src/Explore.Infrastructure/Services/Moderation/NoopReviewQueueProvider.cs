@@ -1,6 +1,3 @@
-// ABOUTME: No-op review queue provider for LocalOnly and disabled external review queue modes.
-// ABOUTME: Reports disabled queue mirroring without attempting outbound provider synchronization.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.EventReporting.Models;
 

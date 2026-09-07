@@ -1,6 +1,3 @@
-// ABOUTME: Pins strict source-generated JSON behavior for the configuration manifest.
-// ABOUTME: Verifies canonical envelope names, flat keys, and unknown-member rejection.
-
 namespace Event.Application.UnitTests.Features.ConfigurationManifest;
 
 using System.Text.Json;

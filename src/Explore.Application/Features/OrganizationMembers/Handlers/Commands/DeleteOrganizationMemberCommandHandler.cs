@@ -1,6 +1,3 @@
-// ABOUTME: Handler for removing a member from an organization.
-// ABOUTME: Validates authorization, fetches membership record, delegates deletion.
-
 using System;
 using System.Linq;
 using System.Threading;

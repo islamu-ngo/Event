@@ -1,6 +1,3 @@
-// ABOUTME: File-backed SQLite regressions for atomic email dispatch eligibility and SMTP rate admission.
-// ABOUTME: Proves concurrent evaluators reserve one global token without executing PostgreSQL-only SQL.
-
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Notifications;
 using Explore.Domain;

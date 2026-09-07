@@ -1,6 +1,3 @@
-// ABOUTME: RED deterministic contracts for disabled, reachable, and degraded Photon readiness.
-// ABOUTME: Proves status-only HTTP, bounded cancellation, safe output, and zero address probing.
-
 using System.Net;
 
 namespace Explore.Infrastructure.Tests.Geocoding;

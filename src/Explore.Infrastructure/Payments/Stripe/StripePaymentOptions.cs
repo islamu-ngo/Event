@@ -1,6 +1,3 @@
-// ABOUTME: Validated Stripe payment configuration for test/live mode isolation.
-// ABOUTME: Keeps Stripe mode evidence checks and option validation inside Infrastructure.
-
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Creates the narrow authority context from structured migrator settings.
-// ABOUTME: Uses the same validated PostgreSQL contract as runtime and migration composition.
-
 using Explore.Secrets.Configuration;
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;

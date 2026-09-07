@@ -1,6 +1,3 @@
-// ABOUTME: Proves manifest tenant, setting, document, result, and operation writes commit atomically.
-// ABOUTME: Covers relational rerun idempotency, partial overlap, and isolated failure evidence.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.ConfigurationManifest.Requests.Commands;

@@ -1,6 +1,3 @@
-// ABOUTME: Public system metadata endpoints for safe startup and onboarding decisions.
-// ABOUTME: Exposes non-sensitive configuration state without requiring Blazor to read API secrets.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Hateoas;

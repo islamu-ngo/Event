@@ -1,6 +1,3 @@
-// ABOUTME: Command for removing a setting override at a specific scope, restoring cascade inheritance.
-// ABOUTME: After reset, the effective value falls through to the next higher scope in the hierarchy.
-
 namespace Explore.Application.Features.Settings.Requests.Commands;
 
 using Explore.Application.Responses;

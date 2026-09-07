@@ -1,6 +1,3 @@
-// ABOUTME: Updates communication consent only for the authenticated reporter's own event report.
-// ABOUTME: Persists changed consent atomically and leaves unchanged requests audit-neutral.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

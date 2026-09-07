@@ -1,6 +1,3 @@
-// ABOUTME: Characterizes the reusable API host boundary and its factory-hosted liveness surface.
-// ABOUTME: Protects public composition modules while preserving Program-based integration hosting.
-
 using System.Net;
 using System.Reflection;
 using System.Text.Json;

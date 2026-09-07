@@ -1,6 +1,3 @@
-// ABOUTME: Lookup-table entity for secret data-plane source types.
-// ABOUTME: IDs mirror SecretSourceType values and are referenced by SecretBinding.
-
 namespace Explore.Domain;
 
 public class SecretSourceTypeLookup

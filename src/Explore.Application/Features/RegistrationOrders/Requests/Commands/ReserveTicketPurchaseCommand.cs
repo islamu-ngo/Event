@@ -1,6 +1,3 @@
-// ABOUTME: Defines the tenant-implicit CQRS request for reserving ticket-purchase authority.
-// ABOUTME: Accepts context selectors but never accepts account identity or an enforcement dimension from callers.
-
 using Explore.Application.Responses;
 using Explore.Domain;
 using FluentValidation;

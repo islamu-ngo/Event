@@ -1,6 +1,3 @@
-// ABOUTME: Appends normalized webhook administrative audit events through the shared DbContext transaction.
-// ABOUTME: Provides no mutation or deletion surface so stored evidence remains immutable.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 

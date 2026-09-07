@@ -1,6 +1,3 @@
-// ABOUTME: Verifies stable registration approval identifiers and fail-closed lifecycle classification.
-// ABOUTME: Covers capacity, live disclosure, deletion, terminal states, and irreversible transitions.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;
 

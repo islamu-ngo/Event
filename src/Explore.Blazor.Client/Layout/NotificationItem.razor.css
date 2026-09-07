@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped CSS for NotificationItem — individual notification row with hover actions. */
-/* ABOUTME: BEM block: notification-item. Three-column layout: icon | content | action buttons. */
-
 .notification-item {
     display: flex;
     align-items: flex-start;

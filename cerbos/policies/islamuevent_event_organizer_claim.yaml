@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos resource policy for event organizer-claim evidence and review actions.
-# ABOUTME: Keeps claim submission human-scoped and claim review tenant-curator-only.
-
 apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   resource: "islamuevent_event_organizer_claim"

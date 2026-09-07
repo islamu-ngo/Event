@@ -1,6 +1,3 @@
-// ABOUTME: Handles setup-time Keycloak bootstrap then persists only runtime auth provider configuration.
-// ABOUTME: Keeps one-time admin credentials out of persisted settings, responses, logs, and browser-visible diagnostics.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.Onboarding.Validators;

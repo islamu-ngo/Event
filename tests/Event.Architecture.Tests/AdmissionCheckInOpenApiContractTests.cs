@@ -1,6 +1,3 @@
-// ABOUTME: Pins admission enum components and DTO references in canonical OpenAPI and generated contracts.
-// ABOUTME: Prevents HAL-flattened operational enums from degrading to integers or disappearing from NSwag output.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;
 

@@ -1,6 +1,3 @@
-// ABOUTME: API DTO describing one data field in a canonical webhook event payload.
-// ABOUTME: Keeps event-type catalog responses stable without exposing descriptor internals.
-
 namespace Explore.Application.DTOs.Webhooks;
 
 public sealed record WebhookEventDataFieldDto

@@ -1,6 +1,3 @@
-// ABOUTME: Read-only operator surface reporting live Quartz scheduler, job, and trigger state.
-// ABOUTME: Exposes scheduling metadata only; it never reveals dispatch payloads or tenant message content.
-
 using Explore.Application.Contracts.Scheduling;
 using Quartz;
 using Quartz.Impl.Matchers;

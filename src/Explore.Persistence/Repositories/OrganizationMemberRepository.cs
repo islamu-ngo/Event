@@ -1,6 +1,3 @@
-// ABOUTME: Persists organization memberships and loads their user, role, organization, and actor details.
-// ABOUTME: Keeps permission-scoped membership reads entity-based and tenant-filtered through ExploreDbContext.
-
 using System;
 using System.Collections.Generic;
 using System.Text;

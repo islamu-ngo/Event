@@ -1,6 +1,3 @@
-// ABOUTME: Internal normalized value object for Coop decision callback processing.
-// ABOUTME: Resolves provider action text into local decision, trace, and audit metadata.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Features.EventReporting.Models;

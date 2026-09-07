@@ -1,6 +1,3 @@
-// ABOUTME: Contract for EventSeries operations — list, detail, create, update, and search.
-// ABOUTME: Used by EventSeriesSection component for series selection on Create/Edit Event pages.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Models;
 

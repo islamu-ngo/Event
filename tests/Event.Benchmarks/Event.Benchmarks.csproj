@@ -1,5 +1,3 @@
-<!-- ABOUTME: BenchmarkDotNet console project for Event API and hot-path performance measurements. -->
-<!-- ABOUTME: References product layers needed to host realistic API benchmark scenarios. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>

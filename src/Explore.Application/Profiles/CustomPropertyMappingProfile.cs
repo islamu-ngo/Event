@@ -1,6 +1,3 @@
-// ABOUTME: AutoMapper profile for Category, CustomPropertyDefinition, EventTemplate, EventCustomProperty, EventSessionTemplate, EventSessionCustomProperty entities.
-// ABOUTME: Split from monolithic MappingProfile.cs for domain-cohesion.
-
 using AutoMapper;
 using Explore.Application.DTOs.Category;
 using Explore.Application.DTOs.CustomPropertyDefinition;

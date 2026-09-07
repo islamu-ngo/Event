@@ -1,6 +1,3 @@
-// ABOUTME: Handles projection status query returning current state of event custom-property projections for a tenant.
-// ABOUTME: Maps from CustomPropertyProjectionStatus entities to ProjectionStatusDto.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

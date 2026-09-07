@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS link policies for moderator-facing event-report queue resources.
-// ABOUTME: Emits state-aware workflow affordances backed by event-level authorization checks.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Collections.Generic;

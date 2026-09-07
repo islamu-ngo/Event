@@ -1,6 +1,3 @@
-// ABOUTME: Bounds and rewinds private request bytes after early timeout and rate admission, before crypto or storage.
-// ABOUTME: Guards credential ambiguity and dependency responses without logging assertion, body or provider diagnostics.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Telemetry;
 using Microsoft.AspNetCore.Http.Features;

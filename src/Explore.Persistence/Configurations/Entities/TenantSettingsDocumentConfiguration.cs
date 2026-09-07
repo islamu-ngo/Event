@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for tenant-owned typed settings JSONB documents.
-// ABOUTME: Adds additive Phase 2 storage without changing legacy scalar setting tables.
-
 namespace Explore.Persistence.Configurations.Entities;
 
 using Explore.Domain.Settings.Documents;

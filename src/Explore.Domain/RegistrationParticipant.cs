@@ -1,6 +1,3 @@
-// ABOUTME: Defines a tenant-scoped participant independently from purchaser and user identity.
-// ABOUTME: Enforces same-order adult guardians while keeping participant PII in a split entity.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

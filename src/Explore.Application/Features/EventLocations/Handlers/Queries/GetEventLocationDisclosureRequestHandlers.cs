@@ -1,6 +1,3 @@
-// ABOUTME: Builds purpose-specific EventLocation API contracts through the centralized disclosure service.
-// ABOUTME: Enforces public event eligibility and filters unauthorized private results without exposing physical entities.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.LocationPrivacy;

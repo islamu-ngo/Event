@@ -1,6 +1,3 @@
-// ABOUTME: Offline break-glass CLI for granting instance administration to one linked ATProto DID.
-// ABOUTME: Uses structured database authority, migration-current checks, and identity-free bounded output.
-
 #:project ../../src/Explore.Persistence/Explore.Persistence.csproj
 #:project ../../src/Explore.Persistence.Migrations.Sqlite/Explore.Persistence.Migrations.Sqlite.csproj
 #:project ../../src/Explore.Persistence.Migrations.SqlServer/Explore.Persistence.Migrations.SqlServer.csproj

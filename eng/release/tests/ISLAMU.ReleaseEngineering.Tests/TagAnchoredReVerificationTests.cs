@@ -1,6 +1,3 @@
-// ABOUTME: Proves a governed release re-verifies from its tag alone after its line branch moves or disappears.
-// ABOUTME: Pins the durability property while keeping every immutable-object failure closed.
-
 using ISLAMU.ReleaseEngineering;
 
 namespace ISLAMU.ReleaseEngineering.Tests;

@@ -1,6 +1,3 @@
-// ABOUTME: Captures Microsoft and isolated Serilog output from BFF identity and session readers.
-// ABOUTME: Anchors current raw opaque-value leaks as explicit Task 4.2 migration failures.
-
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Globalization;

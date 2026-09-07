@@ -1,6 +1,3 @@
-// ABOUTME: Defines the governed CreateEventDraft AI tool contract for prompts and parser validation.
-// ABOUTME: Keeps provider schema, allowed fields, and confirmation posture in one Application-layer source.
-
 using Explore.Application.Authorization;
 using Explore.Application.Features.AiAssistant.Actions;
 using Explore.Domain.Ai;

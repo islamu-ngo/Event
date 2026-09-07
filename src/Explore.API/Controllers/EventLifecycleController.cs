@@ -1,6 +1,3 @@
-// ABOUTME: Event write-lifecycle endpoints from draft creation through publication and removal.
-// ABOUTME: Each action translates HTTP into one CQRS command and maps its failure code to ProblemDetails.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

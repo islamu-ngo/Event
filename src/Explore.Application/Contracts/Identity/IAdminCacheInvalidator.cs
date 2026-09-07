@@ -1,4 +1,3 @@
-// ABOUTME: Contract for invalidating cached admin authority profiles when membership changes.
 // Called by PolicySyncService after permission changes to ensure fresh authorization decisions.
 
 namespace Explore.Application.Contracts.Identity;

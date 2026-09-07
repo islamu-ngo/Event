@@ -47,6 +47,7 @@ ABOUTME: Focuses on non-inferable constraints and project-specific behavior.
     - **Ring 2 (Phase Exit Gate)**: Verify the modified project against a single canonical provider in < 15s.
     - **Ring 3 (Plan Exit Gate)**: The full 5-database matrix, migrations, and architecture tests run strictly at plan exit before PR creation.
     - **Yak-Shaving Quarantine**: Agents are strictly forbidden from fixing unrelated pre-existing test suite rot or fixture failures encountered during feature tasks. Prove if it reproduces on untouched base, log it in `*-context.md` / `dev/backlog/`, quarantine it, and proceed with the assigned scope.
+34. **Self-Documenting Code & Retirement of ABOUTME on Code**: Source code (`.cs`, `.razor`, `.css`) relies on Clean Architecture naming, directory structure, and standard C# XML doc comments (`/// <summary>`) for discovery. The legacy `ABOUTME:` comment prefix is officially retired for source code; agents must not generate it in new code. Internal documentation in `docs/internal/` and `.agents/` uses natural Markdown metadata blocks (`> **Audience:** ...`) or frontmatter. See [`docs/internal/GOVERNANCE.md`](GOVERNANCE.md#header--file-metadata-policy-natural-metadata--code-retirement).
 
 ## Multi-Tenancy Reminder
 Runtime tenant resolution:

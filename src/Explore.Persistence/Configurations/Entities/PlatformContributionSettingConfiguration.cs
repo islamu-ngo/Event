@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for immutable instance platform contribution setting versions.
-// ABOUTME: Preserves stored copy, option field access, and active-version uniqueness.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

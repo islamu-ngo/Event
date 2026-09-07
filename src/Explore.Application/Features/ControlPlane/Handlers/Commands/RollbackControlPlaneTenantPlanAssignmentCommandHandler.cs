@@ -1,6 +1,3 @@
-// ABOUTME: Command handler for reactivating a previous tenant plan assignment.
-// ABOUTME: Marks the current active assignment as rolled back without applying settings side effects.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ControlPlane.Requests.Commands;
 using Explore.Application.Responses;

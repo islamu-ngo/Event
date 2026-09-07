@@ -1,6 +1,3 @@
-// ABOUTME: Specifies the immutable BaseCommandResponse result and named valid-state factory contract.
-// ABOUTME: Covers every concrete descendant, generated JSON metadata, valid states, and complete payload preservation.
-
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Text.Json;

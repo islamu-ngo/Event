@@ -1,6 +1,3 @@
-// ABOUTME: Repository interface for EventIslamicAspect entity.
-// ABOUTME: Extends generic repository with aspect-specific queries.
-
 namespace Explore.Application.Contracts.Persistence;
 
 using System;

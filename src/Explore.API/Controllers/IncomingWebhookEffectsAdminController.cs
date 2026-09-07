@@ -1,6 +1,3 @@
-// ABOUTME: Authenticated operator API for safe incoming Coop effect inspection and redrive.
-// ABOUTME: Returns HAL affordances without callback payloads, hashes, provider IDs, or raw failures.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

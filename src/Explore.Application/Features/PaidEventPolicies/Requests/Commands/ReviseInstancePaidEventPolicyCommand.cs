@@ -1,6 +1,3 @@
-// ABOUTME: Command request for revising the instance paid-event policy.
-// ABOUTME: Uses the existing instance setting authorization resource boundary.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.PaidEventPolicies;
 using Explore.Application.Features.PaidEventPolicies.Requests.Queries;

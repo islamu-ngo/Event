@@ -1,6 +1,3 @@
-// ABOUTME: Represents the tenant lookup values needed by runtime tenant-resolution caches.
-// ABOUTME: Keeps cache-loading data shape in Application so Infrastructure can stay persistence-agnostic.
-
 namespace Explore.Application.Models.Tenants;
 
 public sealed class TenantLookupRecord

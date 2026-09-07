@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for EventTemplate CRUD with nested definitions and options.
-// ABOUTME: Supports versioned template management, publishing, and transactional definition persistence.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

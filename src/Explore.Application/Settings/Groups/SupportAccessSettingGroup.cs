@@ -1,6 +1,3 @@
-// ABOUTME: Strongly-typed support-access governance settings resolved from instance policy.
-// ABOUTME: Keeps fail-closed duration, write-mode, ticket, and one-session controls centralized.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain.Constants;
 

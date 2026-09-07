@@ -1,6 +1,3 @@
-// ABOUTME: Blazor service contract for sensitive and stateful webhook operations.
-// ABOUTME: Keeps payload, delivery control, provider publication, and bulk replay workflows behind generated contracts.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.Webhooks;

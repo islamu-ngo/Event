@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped styles for the Community footer template with prominent social links.
-   ABOUTME: Layout-specific styles for social card grid, link rows, and centered bottom bar. */
-
 /* Social bar section */
 ::deep .footer-community__social-bar {
     text-align: center;

@@ -1,6 +1,3 @@
-// ABOUTME: Handles manual authorization policy package archive download requests.
-// ABOUTME: Delegates archive construction to the provider-neutral Infrastructure package service seam.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;

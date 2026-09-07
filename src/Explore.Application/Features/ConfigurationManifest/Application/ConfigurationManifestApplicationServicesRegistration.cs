@@ -1,6 +1,3 @@
-// ABOUTME: Registers the narrow Application graph required for configuration-manifest startup execution.
-// ABOUTME: Selects immediate runtime effects or durable deferred delivery without loading unrelated services.
-
 namespace Explore.Application.Features.ConfigurationManifest.Application;
 
 using Explore.Application.Contracts.Services;

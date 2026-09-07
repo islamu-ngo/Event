@@ -1,6 +1,3 @@
-// ABOUTME: Verifies AI provider metrics use bounded, safe OpenTelemetry tags.
-// ABOUTME: Guards against exposing prompts, model IDs, endpoints, provider request IDs, or secrets.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Telemetry;
 using NSubstitute;

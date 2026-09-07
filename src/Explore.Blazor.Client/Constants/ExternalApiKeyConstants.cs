@@ -1,6 +1,3 @@
-// ABOUTME: Client-side constants for external API key scopes and owner types.
-// ABOUTME: Mirrors server-side ExternalApiKeyScopes catalog for UI scope selection.
-
 namespace Explore.Blazor.Client.Constants;
 
 /// <summary>

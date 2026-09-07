@@ -1,6 +1,3 @@
-// ABOUTME: Application-layer policy for Layer 3 custom-property machine identity and semantic boundary enforcement.
-// ABOUTME: Ensures Namespace + Key normalization, reserved-root governance, and Layer 2 collision rejection are consistent.
-
 using Explore.Application.Contracts.Services;
 using Explore.Domain.Constants;
 

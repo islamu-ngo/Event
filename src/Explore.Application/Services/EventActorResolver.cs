@@ -1,5 +1,3 @@
-// ABOUTME: Resolves the owning actor for event creation (organization, group, or personal).
-// ABOUTME: Enforces permission checks and tenant publishing-policy in one place.
 using System;
 using System.Threading;
 using System.Threading.Tasks;

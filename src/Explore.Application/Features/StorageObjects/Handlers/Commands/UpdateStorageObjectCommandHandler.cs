@@ -1,5 +1,3 @@
-// ABOUTME: Handler for updating storage object metadata with validation.
-// ABOUTME: Validates input, fetches entity, applies field updates.
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.StorageObject;

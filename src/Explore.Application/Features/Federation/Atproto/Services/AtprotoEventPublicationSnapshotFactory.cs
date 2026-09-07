@@ -1,6 +1,3 @@
-// ABOUTME: Builds the canonical immutable ATProto event snapshot from a complete repository entity graph.
-// ABOUTME: Fails closed on tenant, visibility, placement, or privacy inconsistencies and never reads raw location values directly.
-
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Net;

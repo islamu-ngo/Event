@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for OutboxMessage entity with optimized indexes for background processor polling.
-// ABOUTME: Configures UUID v7 generation, JSONB payload, string constraints, and composite worker-poll index.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

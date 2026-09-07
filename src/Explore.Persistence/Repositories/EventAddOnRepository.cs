@@ -1,6 +1,3 @@
-// ABOUTME: Serializes add-on inventory, fulfillment, and refund lifecycle writes.
-// ABOUTME: Uses tenant-qualified row fences and durable operation identities for replay safety.
-
 using System.Data;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

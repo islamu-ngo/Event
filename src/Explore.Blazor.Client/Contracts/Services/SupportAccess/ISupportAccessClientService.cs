@@ -1,6 +1,3 @@
-// ABOUTME: Client-side contract for BFF-mediated support-access session status and commands.
-// ABOUTME: Keeps Razor components dependent on server-confirmed state instead of browser claims.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Models.Responses;
 

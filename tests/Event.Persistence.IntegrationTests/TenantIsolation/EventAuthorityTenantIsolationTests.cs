@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL-backed tests for fail-closed tenant isolation of event public actions and organizer claims.
-// ABOUTME: Verifies tenant and soft-delete filters remain independently enforceable for Phase 1 aggregates.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;

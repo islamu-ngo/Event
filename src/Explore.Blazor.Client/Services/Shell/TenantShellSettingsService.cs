@@ -1,6 +1,3 @@
-// ABOUTME: Adapts generated tenant-setting operations for workspace-shell governance controls.
-// ABOUTME: Centralizes the UiShell category and exact update payload construction.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Shell;
 

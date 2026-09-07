@@ -1,6 +1,3 @@
-// ABOUTME: Write DTO for creating session runtime custom property options, used nested within definition DTOs.
-// ABOUTME: Mirrors CreateEventCustomPropertyOptionDto shape for consistency across the EAV system.
-
 namespace Explore.Application.DTOs.EventSessionCustomProperty;
 
 public sealed record CreateEventSessionCustomPropertyOptionDto

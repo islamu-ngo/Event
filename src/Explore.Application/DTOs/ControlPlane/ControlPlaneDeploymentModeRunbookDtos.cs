@@ -1,6 +1,3 @@
-// ABOUTME: Read and command models for the Control Plane deployment-mode migration runbook.
-// ABOUTME: Keeps single-tenant and multi-tenant transitions deliberate, audited, and server-authoritative.
-
 namespace Explore.Application.DTOs.ControlPlane;
 
 public sealed record ControlPlaneDeploymentModeRunbookDto

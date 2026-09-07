@@ -1,6 +1,3 @@
-// ABOUTME: HAL assembler for control-plane tenant plan SaaS tier resources.
-// ABOUTME: Routes tenant plan DTOs through the shared HATEOAS authorization pipeline.
-
 namespace Explore.API.Hateoas.Assemblers;
 
 using Explore.API.Hateoas.Policies;

@@ -1,6 +1,3 @@
-// ABOUTME: Read model for convention-first onboarding preflight status.
-// ABOUTME: Separates launch-blocking checks from operational warnings for setup UI/API consumers.
-
 namespace Explore.Application.DTOs.Onboarding;
 
 public sealed record OnboardingPreflightDto

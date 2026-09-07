@@ -1,6 +1,3 @@
-// ABOUTME: Authorized projection of an event organizer claim and its review state.
-// ABOUTME: Exposes normalized status metadata and optimistic concurrency for claimant and curator flows.
-
 using System.Text.Json.Serialization;
 
 namespace Explore.Application.DTOs.EventOrganizerClaim;

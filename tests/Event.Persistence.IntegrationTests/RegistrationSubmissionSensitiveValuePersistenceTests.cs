@@ -1,6 +1,3 @@
-// ABOUTME: Proves sensitive native registration values persist as Data Protection ciphertext on real PostgreSQL.
-// ABOUTME: Verifies key-version round-trip and confirms the plaintext is absent from the stored side-table row.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Infrastructure.Services;

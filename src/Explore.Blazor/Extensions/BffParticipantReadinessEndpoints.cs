@@ -1,6 +1,3 @@
-// ABOUTME: Maps private BFF reads and antiforgery-protected participant readiness actions.
-// ABOUTME: Forwards only exact route lineage and the opaque guest capability through generated clients.
-
 using Explore.Blazor.Client.Clients;
 using Microsoft.AspNetCore.Mvc;
 

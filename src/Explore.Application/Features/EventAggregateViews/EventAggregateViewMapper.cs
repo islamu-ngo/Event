@@ -1,6 +1,3 @@
-// ABOUTME: Shared mapper and JSON facet parser for EventWithSessions aggregate view queries.
-// ABOUTME: Applies explicit exposure ranking, safe JSON deserialization, and metadata enrichment without reflection.
-
 using System.Text.Json;
 using Explore.Application.DTOs.EventAggregateView;
 using Explore.Domain;

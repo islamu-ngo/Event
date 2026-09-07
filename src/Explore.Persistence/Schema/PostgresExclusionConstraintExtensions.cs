@@ -1,6 +1,3 @@
-// ABOUTME: EF model extensions for PostgreSQL exclusion constraints not natively modeled by Npgsql.
-// ABOUTME: Stores provider-specific constraint metadata on entity configurations for schema application.
-
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

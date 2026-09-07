@@ -1,6 +1,3 @@
-// ABOUTME: Verifies TenantLookupSource uses tenant-filter bypass only for bounded cache warmup reads.
-// ABOUTME: Proves active tenant lookup settings are resolved across ambient tenant context without inactive leakage.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Settings;

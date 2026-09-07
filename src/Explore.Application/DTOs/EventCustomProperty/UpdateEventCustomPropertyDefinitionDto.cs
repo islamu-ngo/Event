@@ -1,6 +1,3 @@
-// ABOUTME: Grouped PATCH DTO for event-local custom-property definition updates.
-// ABOUTME: Parent identity and provenance remain persisted while omitted groups preserve existing state.
-
 using Explore.Application.DTOs.CustomPropertyDefinition;
 
 namespace Explore.Application.DTOs.EventCustomProperty;

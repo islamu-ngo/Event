@@ -1,6 +1,3 @@
-// ABOUTME: Invalidates distributed cache entries when a policy set changes.
-// ABOUTME: Uses versioned cache keys so stale reads miss and recompute deterministically.
-
 using Explore.Domain.Settings;
 using MediatR;
 using Microsoft.Extensions.Caching.Distributed;

@@ -1,6 +1,3 @@
-// ABOUTME: HAL assembler for organization member detail and collection resources.
-// ABOUTME: Adds scoped member-management affordances using tenant and organization authorization metadata.
-
 namespace Explore.API.Hateoas.Assemblers;
 
 using Explore.Application.Authorization;

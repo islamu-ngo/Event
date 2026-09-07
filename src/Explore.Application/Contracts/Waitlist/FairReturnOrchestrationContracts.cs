@@ -1,6 +1,3 @@
-// ABOUTME: Defines scheduler-neutral durable fair-return orchestration contracts and bounded outcomes.
-// ABOUTME: Keeps stable operation identity, fair claims, leases, and payment/refund pointers explicit.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Waitlist;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines the entity-first persistence port for Setup live enrollment and secret-write state.
-// ABOUTME: Keeps tenant-qualified replay reads and atomic SaveChanges ownership inside Application contracts.
-
 namespace Explore.Application.Contracts.Persistence;
 
 using Explore.Domain.SetupLive;

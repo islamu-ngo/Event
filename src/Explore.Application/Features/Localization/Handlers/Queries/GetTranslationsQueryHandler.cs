@@ -1,6 +1,3 @@
-// ABOUTME: Handler for GetTranslationsQuery that resolves all translations for a language.
-// ABOUTME: Uses ITranslationManagementProvider to export translations, returns key-value dictionary.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Localization.Requests.Queries;
 using Explore.Domain.Common.Localization;

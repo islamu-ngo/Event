@@ -1,4 +1,3 @@
-# ABOUTME: Cerbos resource policy for tag resources.
 # Tags are tenant-scoped lookup data: tenant admins manage, users can view.
 
 apiVersion: api.cerbos.dev/v1

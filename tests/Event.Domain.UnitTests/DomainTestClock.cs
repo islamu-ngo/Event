@@ -1,6 +1,3 @@
-// ABOUTME: Provides one fixed UTC instant for deterministic Domain test fixtures.
-// ABOUTME: Prevents wall-clock boundary luck without replacing explicit scenario timestamps.
-
 namespace Event.Domain.UnitTests;
 
 internal static class DomainTestClock

@@ -1,6 +1,3 @@
-// ABOUTME: Handler for canceling pending storage upload sessions and releasing reserved quota.
-// ABOUTME: Keeps cancellation idempotent and marks stale sessions expired before returning state.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.StorageObject;

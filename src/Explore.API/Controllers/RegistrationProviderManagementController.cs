@@ -1,6 +1,3 @@
-// ABOUTME: Authenticated event-scoped API for registration-provider health and reconciliation queue management.
-// ABOUTME: Returns no-store HAL resources with bounded provider metadata and no attendee answers or payloads.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

@@ -1,6 +1,3 @@
-/* ABOUTME: Styles the create-location dialog's manual address fallback. */
-/* ABOUTME: Keeps unfocused field boundaries above WCAG non-text contrast requirements. */
-
 /* ===== Block: create-location-dialog ===== */
 .create-location-dialog__manual-fields {
     --mud-palette-lines-inputs: var(--mud-palette-text-secondary);

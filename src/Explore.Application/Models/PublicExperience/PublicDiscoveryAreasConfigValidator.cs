@@ -1,6 +1,3 @@
-// ABOUTME: Validates bounded public discovery-area documents against structural and tenant ownership rules.
-// ABOUTME: Keeps location IDs internal while enforcing stable IDs, coarse centroids, and unambiguous mapping.
-
 namespace Explore.Application.Models.PublicExperience;
 
 public static class PublicDiscoveryAreasConfigValidator

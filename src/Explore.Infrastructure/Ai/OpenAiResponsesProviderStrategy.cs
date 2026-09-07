@@ -1,6 +1,3 @@
-// ABOUTME: Strategy for the first-class OpenAI company provider using the Responses API.
-// ABOUTME: Delegates to OpenAiResponsesChatProvider and reports configured_no_probe status.
-
 using Explore.Application.Contracts.Infrastructure.Ai;
 
 namespace Explore.Infrastructure.Ai;

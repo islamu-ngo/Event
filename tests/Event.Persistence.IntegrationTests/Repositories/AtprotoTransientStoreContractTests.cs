@@ -1,6 +1,3 @@
-// ABOUTME: Specifies domain and relational invariants for instance-owned ATProto transient authentication rows.
-// ABOUTME: Covers closed purposes, payload bounds, immutability, insert-only claims, expiry, and fail-closed guards.
-
 using System.Text;
 using Explore.Domain;
 using Explore.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Audit entity that records every tenant lifecycle status transition.
-// ABOUTME: Captures old/new status, who triggered the transition, and an optional reason.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

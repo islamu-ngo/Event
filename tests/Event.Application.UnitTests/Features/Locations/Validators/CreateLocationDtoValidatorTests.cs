@@ -1,6 +1,3 @@
-// ABOUTME: Defines compact boundary partitions for untrusted manual location payloads.
-// ABOUTME: Leaves coordinate authority to Domain and compiled API-contract tests.
-
 using Explore.Application.DTOs.Location;
 using Explore.Application.DTOs.Location.Validators;
 

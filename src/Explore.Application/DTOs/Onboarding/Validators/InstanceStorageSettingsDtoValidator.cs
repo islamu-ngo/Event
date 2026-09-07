@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for provider-neutral instance storage admin settings.
-// ABOUTME: Enforces byte ceilings, provider allow-listing, and optional S3 URL shape before persistence.
-
 using Explore.Application.DTOs.Storage;
 using Explore.Domain;
 using FluentValidation;

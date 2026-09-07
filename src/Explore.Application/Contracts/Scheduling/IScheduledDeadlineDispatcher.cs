@@ -1,6 +1,3 @@
-// ABOUTME: Application port for asking infrastructure to wake a named job at a future instant.
-// ABOUTME: Lets Application express "wake me at T with these identifiers" without knowing a scheduler exists.
-
 namespace Explore.Application.Contracts.Scheduling;
 
 /// <summary>

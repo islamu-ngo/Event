@@ -1,6 +1,3 @@
-// ABOUTME: Specifies deterministic secret-free QR SVG rendering and production Infrastructure registration.
-// ABOUTME: Verifies fixed geometry, colors, quiet zone, bounded output, invalid rejection, and real DI resolution.
-
 using ISLAMU.Wire.Contracts.Admissions;
 using Explore.Application.Contracts.Admissions;
 using Explore.Infrastructure;

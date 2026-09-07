@@ -1,6 +1,3 @@
-// ABOUTME: Discovers the final package-free environment catalogue and dotenv owners at runtime.
-// ABOUTME: Keeps Red tests compilable while requiring one complete public Core contract before execution.
-
 namespace ISLAMU.Setup.Core.EnvironmentTests;
 
 using System.Collections;

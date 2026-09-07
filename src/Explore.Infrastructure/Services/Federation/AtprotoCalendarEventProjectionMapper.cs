@@ -1,6 +1,3 @@
-// ABOUTME: Converts a validated generated community event record into the bounded public domain projection.
-// ABOUTME: Selects only canonical safe HTTPS source links and coarse human-readable location text.
-
 using CommunityLexicon.Calendar;
 using CommunityLexicon.Location;
 using Explore.Application.Services.Federation;

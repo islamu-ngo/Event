@@ -1,6 +1,3 @@
-// ABOUTME: Implements the first-class Anthropic company provider adapter using the Messages API.
-// ABOUTME: Reuses the shared Anthropic Messages mapper while defaulting to api.anthropic.com.
-
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Telemetry;
 using Microsoft.Extensions.Options;

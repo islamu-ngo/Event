@@ -1,6 +1,3 @@
-// ABOUTME: Authorized presence-aware patch command for tenant directory-operator identity.
-// ABOUTME: Binds mutation to the current tenant and exact expected document revision.
-
 namespace Explore.Application.Features.TenantSettingsDocuments.Requests.Commands;
 
 using Explore.Application.Authorization;

@@ -1,6 +1,3 @@
-// ABOUTME: Route guard for multi-tenant-only embedded control-plane pages.
-// ABOUTME: Keeps completed and onboarding single-tenant deployments on admin settings instead.
-
 using Blazouter.Interfaces;
 using Blazouter.Models;
 using Explore.Blazor.Client.Services;

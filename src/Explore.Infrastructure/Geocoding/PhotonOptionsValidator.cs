@@ -1,6 +1,3 @@
-// ABOUTME: Defines and validates fail-safe optional Photon geocoding configuration.
-// ABOUTME: Rejects implicit endpoints, the public demo service, and unbounded request settings.
-
 using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure.Geocoding;

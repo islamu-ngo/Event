@@ -1,6 +1,3 @@
-// ABOUTME: Applies explicit operator-selected event template sync plans inside one transactional unit of work.
-// ABOUTME: Recomputes diffs server-side, enforces quota and concurrency rules, refreshes projections, and writes audit entries.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

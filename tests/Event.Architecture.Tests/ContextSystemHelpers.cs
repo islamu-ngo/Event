@@ -1,6 +1,3 @@
-// ABOUTME: Resolves repository paths used by source-code architecture tests.
-// ABOUTME: Maps source project names to their directories from compiled test output.
-
 namespace Event.Architecture.Tests;
 
 internal static class ContextSystemHelpers

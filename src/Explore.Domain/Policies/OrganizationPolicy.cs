@@ -1,6 +1,3 @@
-// ABOUTME: Typed policy for organization governance — verification and self-registration rules.
-// ABOUTME: Each field is a PolicySlot allowing instance admins to lock tenant overrides.
-
 namespace Explore.Domain.Policies;
 
 public sealed class OrganizationPolicy

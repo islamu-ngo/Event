@@ -1,6 +1,3 @@
-// ABOUTME: API contract tests for the first-party analytics relay endpoint.
-// ABOUTME: Verifies anonymous public classification, stable route name, and dedicated rate limiting.
-
 using System.Reflection;
 using Explore.API.Attributes;
 using Explore.API.Controllers;

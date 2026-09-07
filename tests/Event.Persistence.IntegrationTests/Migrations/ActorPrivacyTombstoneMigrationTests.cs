@@ -1,6 +1,3 @@
-// ABOUTME: Verifies deleted ownerless Actor tombstones in the current PostgreSQL baseline.
-// ABOUTME: Proves live ownership remains strict without preserving obsolete migration stages.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;

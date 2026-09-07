@@ -1,6 +1,3 @@
-// ABOUTME: Owns EF options isolation for every test-created context and DI factory in this assembly.
-// ABOUTME: Keep providers EF-managed for ReplaceService; explicit InMemory roots preserve shared test stores.
-
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;

@@ -1,6 +1,3 @@
-// ABOUTME: Unit-style API feature tests for tenant storage settings PATCH command behavior.
-// ABOUTME: Verifies rejection paths, transaction ownership, and post-commit cache invalidation.
-
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;

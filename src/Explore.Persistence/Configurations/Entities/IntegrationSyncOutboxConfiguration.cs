@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for durable native integration sync outbox rows.
-// ABOUTME: Adds tenant-safe relationships, worker-poll indexes, and idempotency for registration-originated Listmonk sync.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

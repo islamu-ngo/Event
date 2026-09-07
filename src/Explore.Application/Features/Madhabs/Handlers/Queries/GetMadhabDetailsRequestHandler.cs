@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning a single madhab (Islamic jurisprudence school) by ID.
-// ABOUTME: Maps Madhab entity to MadhabDto.
 using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;

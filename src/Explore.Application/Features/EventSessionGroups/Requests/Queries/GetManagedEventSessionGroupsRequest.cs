@@ -1,6 +1,3 @@
-// ABOUTME: Event-scoped organizer queries for exact program-section collection and detail reads.
-// ABOUTME: Both requests authorize against the parent event before exposing location and room fields.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventSessionGroup;
 using MediatR;

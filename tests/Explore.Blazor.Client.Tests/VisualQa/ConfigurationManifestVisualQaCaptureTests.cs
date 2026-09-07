@@ -1,6 +1,3 @@
-// ABOUTME: Generates optional real bUnit-rendered HTML for configuration-manifest visual QA.
-// ABOUTME: Embeds production MudBlazor, design-token, and scoped component styles without altering runtime code.
-
 using System.Globalization;
 using System.Text.Encodings.Web;
 using Explore.Blazor.Client.Clients;

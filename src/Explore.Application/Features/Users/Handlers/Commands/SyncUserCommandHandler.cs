@@ -1,6 +1,3 @@
-// ABOUTME: Handles user synchronization from external identity providers (Keycloak, Google, ATProto).
-// ABOUTME: Uses IUnitOfWork to atomically create/update user, actor, and external login records.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Authentication;

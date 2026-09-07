@@ -1,6 +1,3 @@
-// ABOUTME: Unit-style tests for the API-hosted Quartz email dispatch jobs.
-// ABOUTME: Proves jobs delegate to Application drain contracts and treat scheduler payloads as pointers only.
-
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Scheduling;
 using Explore.Application.Contracts.Scheduling;

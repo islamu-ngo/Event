@@ -1,6 +1,3 @@
-// ABOUTME: Handles browser analytics relay requests using tenant-aware analytics config and governance.
-// ABOUTME: Enables relay transport without allowing raw browser payloads to bypass privacy or provider rules.
-
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Explore.Application.Analytics;

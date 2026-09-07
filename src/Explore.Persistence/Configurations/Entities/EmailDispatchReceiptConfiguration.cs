@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for email dispatch idempotency receipts keyed by tenant and publish event id.
-// ABOUTME: Used by Basic Dispatch Mode now and future RabbitMQ consumers later for duplicate-safe processing.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

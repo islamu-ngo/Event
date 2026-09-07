@@ -1,6 +1,3 @@
-// ABOUTME: API contract tests for authenticated user profile endpoints.
-// ABOUTME: Covers auth requirements, PATCH route shape, and If-Match precondition validation.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;

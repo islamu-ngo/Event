@@ -1,6 +1,3 @@
-// ABOUTME: Write contracts for attaching and reviewing OrganizationTenant legitimacy evidence.
-// ABOUTME: Accepts only an application storage identifier plus a bounded review decision and notes.
-
 namespace Explore.Application.DTOs.OrganizationTenantEvidence;
 
 public sealed record CreateOrganizationTenantEvidenceUploadSessionDto

@@ -1,6 +1,3 @@
-// ABOUTME: Control-plane tenant lifecycle endpoints from creation through suspension, archive, and purge.
-// ABOUTME: Every transition funnels through one helper so lifecycle responses stay uniform.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

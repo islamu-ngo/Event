@@ -1,6 +1,3 @@
-// ABOUTME: Application boundary for order-keyed event reminder suppression and reprojection.
-// ABOUTME: Keeps durable email state authoritative while scheduling remains a post-commit acceleration.
-
 namespace Explore.Application.Contracts.Services;
 
 public interface IEventLifecycleScheduler

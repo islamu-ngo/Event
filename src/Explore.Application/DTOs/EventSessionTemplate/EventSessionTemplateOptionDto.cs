@@ -1,6 +1,3 @@
-// ABOUTME: Read-only DTO for session template property options, returned nested within definition DTOs.
-// ABOUTME: Mirrors EventTemplateOptionDto shape for consistency across the EAV system.
-
 namespace Explore.Application.DTOs.EventSessionTemplate;
 
 public sealed record EventSessionTemplateOptionDto

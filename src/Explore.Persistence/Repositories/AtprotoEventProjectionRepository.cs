@@ -1,6 +1,3 @@
-// ABOUTME: Queries typed ATProto event projections through tenant presentation and local-echo boundaries.
-// ABOUTME: Applies public filters, deterministic ordering, and bounded top-window pagination in PostgreSQL.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

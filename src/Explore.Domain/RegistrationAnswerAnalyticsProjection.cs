@@ -1,6 +1,3 @@
-// ABOUTME: Domain-owned bounded read model for governed registration-answer analytics projections.
-// ABOUTME: Keeps persistence aggregates entity/read-model shaped so Application maps outward DTOs itself.
-
 namespace Explore.Domain;
 
 public sealed record RegistrationAnswerAnalyticsProjection(

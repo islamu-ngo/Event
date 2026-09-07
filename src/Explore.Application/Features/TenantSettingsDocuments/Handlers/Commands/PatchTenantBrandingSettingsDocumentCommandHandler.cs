@@ -1,6 +1,3 @@
-// ABOUTME: Applies presence-aware grouped patches to tenant branding typed settings documents.
-// ABOUTME: Merges and validates one tracked payload before atomic governance, persistence, and cache invalidation.
-
 namespace Explore.Application.Features.TenantSettingsDocuments.Handlers.Commands;
 
 using System.Text.Json;

@@ -1,6 +1,3 @@
-// ABOUTME: Serializes transfer offers and acceptance on the shared admission assignment/ticket fence.
-// ABOUTME: Rotates holder credentials and stages pointer-only notification outbox evidence atomically.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Domain;
 using Explore.Persistence.Database;

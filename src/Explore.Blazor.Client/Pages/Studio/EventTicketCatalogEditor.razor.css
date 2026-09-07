@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped BEM layout for ticket catalog authoring and shared-capacity visualization. */
-/* ABOUTME: Uses shared design tokens with responsive, RTL-safe action and card layouts. */
-
 .event-ticket-catalog,
 .event-ticket-catalog__section,
 .event-ticket-catalog__cards {

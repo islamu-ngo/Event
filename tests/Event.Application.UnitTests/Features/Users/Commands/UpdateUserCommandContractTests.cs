@@ -1,6 +1,3 @@
-// ABOUTME: Contract tests for route-ID based user update commands and DTO validation.
-// ABOUTME: Guards the representative PATCH update shape before broader entity migrations.
-
 namespace Event.Application.UnitTests.Features.Users.Commands;
 
 using Explore.Application.Authorization;

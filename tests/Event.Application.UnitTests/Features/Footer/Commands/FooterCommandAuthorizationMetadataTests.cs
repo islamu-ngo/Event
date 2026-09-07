@@ -1,6 +1,3 @@
-// ABOUTME: Verifies tenant-scoped footer mutation commands require tenant update authorization metadata.
-// ABOUTME: Prevents footer write paths from regressing to controller-only authentication.
-
 using System.Reflection;
 using Explore.Application.Authorization;
 using Explore.Application.Features.Footer.Requests.Commands;

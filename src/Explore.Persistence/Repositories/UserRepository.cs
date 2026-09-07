@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for global users, normalized-email resolution, and PII erasure.
-// ABOUTME: Returns user entities and keeps read-only identity lookups no-tracking.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

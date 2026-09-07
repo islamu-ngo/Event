@@ -1,5 +1,3 @@
-<!-- ABOUTME: Defines the standalone release-engineering command-line project. -->
-<!-- ABOUTME: Keeps release tooling isolated from all product application projects. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>

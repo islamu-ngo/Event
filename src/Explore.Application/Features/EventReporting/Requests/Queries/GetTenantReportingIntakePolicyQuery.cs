@@ -1,6 +1,3 @@
-// ABOUTME: Authorized query for the current tenant's effective event-reporting intake policy.
-// ABOUTME: Uses the canonical setting key so authorization providers can resolve fresh instance-lock metadata.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Domain.Constants;

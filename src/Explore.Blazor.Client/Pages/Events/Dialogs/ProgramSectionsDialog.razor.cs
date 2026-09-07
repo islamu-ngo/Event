@@ -1,6 +1,3 @@
-// ABOUTME: Dialog helper entrypoint for showing ProgramSectionsDialog via typed static API.
-// ABOUTME: Keeps section/track dialog invocation in code-behind instead of inline Razor blocks.
-
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
 

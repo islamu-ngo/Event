@@ -1,6 +1,3 @@
-// ABOUTME: DTO for EventIslamicAspect containing Islamic-specific event properties.
-// ABOUTME: Defines read, create, and grouped update contracts for Islamic event aspects.
-
 namespace Explore.Application.DTOs.EventAspects;
 
 using Explore.Application.Models.Common;

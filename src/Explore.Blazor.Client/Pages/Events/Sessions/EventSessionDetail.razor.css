@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped CSS for EventSessionDetail page layout and management action bar. */
-/* ABOUTME: Mirrors event detail action-bar behavior while keeping session content compact. */
-
 .event-session-detail {
     min-height: 100vh;
     padding-block-start: var(--isl-space-8);

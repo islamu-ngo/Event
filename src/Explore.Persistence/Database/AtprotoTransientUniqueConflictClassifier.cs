@@ -1,6 +1,3 @@
-// ABOUTME: Identifies only ATProto transient locator and assertion replay uniqueness conflicts.
-// ABOUTME: Prevents unrelated persistence failures from being mislabeled as duplicate authentication claims.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 namespace Explore.Persistence.Database;

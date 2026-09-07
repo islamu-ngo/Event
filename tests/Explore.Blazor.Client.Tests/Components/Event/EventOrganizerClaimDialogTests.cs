@@ -1,6 +1,3 @@
-// ABOUTME: bUnit tests for organizer claim validation and generated-client request mapping.
-// ABOUTME: Verifies claim submission uses the trusted active shell actor rather than local role checks.
-
 using Explore.Blazor.Client.Components.Events;
 using Explore.Blazor.Client.Services.Shell;
 using Microsoft.Extensions.DependencyInjection.Extensions;

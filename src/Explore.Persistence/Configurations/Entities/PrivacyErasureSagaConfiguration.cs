@@ -1,6 +1,3 @@
-// ABOUTME: Maps the fenced User privacy-erasure saga and its fixed-size receipt hash.
-// ABOUTME: Enforces intent idempotency, sequence fencing, typed policy identity, and UTC receipt bounds.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

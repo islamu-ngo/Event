@@ -1,6 +1,3 @@
-// ABOUTME: Validator for GrantAiConsentCommand request invariants.
-// ABOUTME: Kept outside handler namespaces so architecture tests treat handlers as pure handlers.
-
 using Explore.Application.Features.AiAssistant.Requests.Commands;
 using FluentValidation;
 

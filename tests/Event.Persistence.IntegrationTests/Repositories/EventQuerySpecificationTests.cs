@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for EventQuerySpecification filters and sorts against real PostgreSQL.
-// ABOUTME: Verifies that specification predicates translate correctly to SQL via EventRepository.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Specifications.Events;
 using Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: Persistence contract for specialized email dispatch outbox state, attempts, and receipts.
-// ABOUTME: Keeps SMTP dispatch state machine in Application while EF Core implementation stays in Persistence.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

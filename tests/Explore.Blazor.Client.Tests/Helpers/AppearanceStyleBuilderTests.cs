@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for shared Blazor appearance style generation.
-// ABOUTME: Verifies event theme backgrounds, effects, and readable text variables.
-
 using Explore.Blazor.Client.Helpers;
 
 namespace Explore.Blazor.Client.Tests.Helpers;

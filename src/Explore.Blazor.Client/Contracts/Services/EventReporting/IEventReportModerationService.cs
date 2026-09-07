@@ -1,6 +1,3 @@
-// ABOUTME: Client contract for moderator-facing event-report queue and detail reads.
-// ABOUTME: Keeps privileged moderation evidence behind an explicit service boundary.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.EventReporting;

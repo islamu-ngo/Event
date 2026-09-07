@@ -1,6 +1,3 @@
-// ABOUTME: Single entry point that sanitizes entity fields before they reach any AI prompt.
-// ABOUTME: All AI context must pass through this gateway; direct PII/repository use is blocked.
-
 namespace Explore.Application.Features.AiAssistant.Disclosure;
 
 /// <summary>

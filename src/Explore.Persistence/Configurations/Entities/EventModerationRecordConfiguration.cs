@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for safe event moderation history records.
-// ABOUTME: Enforces tenant/event ownership, safe metadata lengths, and idempotent correlation uniqueness.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

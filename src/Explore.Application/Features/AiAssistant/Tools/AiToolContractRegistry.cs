@@ -1,6 +1,3 @@
-// ABOUTME: Provides the Application-layer registry for AI tool definitions and payload validation.
-// ABOUTME: Keeps tool allow-lists and safe provider-payload normalization centralized before downstream use.
-
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Explore.Domain.Ai;

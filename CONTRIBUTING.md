@@ -1,6 +1,3 @@
-<!-- ABOUTME: Canonical public-facing contributor guide for ISLAMU Event. -->
-<!-- ABOUTME: Defines contribution expectations, project scope, discussion requirements, AI policy, CLA, and workflows. -->
-
 # Contributing to ISLAMU Event
 
 We’re glad you are interested in contributing to ISLAMU Event!

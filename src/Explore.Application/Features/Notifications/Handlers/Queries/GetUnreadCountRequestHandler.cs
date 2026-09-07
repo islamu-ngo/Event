@@ -1,6 +1,3 @@
-// ABOUTME: Handles retrieval of the unread notification count for the authenticated user.
-// ABOUTME: Leverages partial index on is_read=false for efficient counting.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Notification;

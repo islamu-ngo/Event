@@ -1,6 +1,3 @@
-// ABOUTME: Global concrete owner for system and service Actors that do not represent people or organizations.
-// ABOUTME: Keeps machine identity separate from tenant participation and external unclassified subjects.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

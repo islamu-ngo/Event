@@ -1,6 +1,3 @@
-// ABOUTME: Validates generated event-session update requests used by the Blazor composer.
-// ABOUTME: Checks the generated grouped patch values without introducing a local request mirror.
-
 using Explore.Blazor.Client.Clients;
 using FluentValidation;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Link-policy contract tests for control-plane domain and DNS HAL affordances.
-// ABOUTME: Protects domain guidance links from drifting away from instance-setting authorization metadata.
-
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.Authorization;

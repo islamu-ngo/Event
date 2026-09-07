@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for tenant user role grant read authorization posture.
-// ABOUTME: Ensures identity-bearing role-grant reads fail closed for authenticated non-admin callers.
-
 using System.Net;
 using Event.Api.IntegrationTests.Fixtures;
 using TUnit.Assertions;

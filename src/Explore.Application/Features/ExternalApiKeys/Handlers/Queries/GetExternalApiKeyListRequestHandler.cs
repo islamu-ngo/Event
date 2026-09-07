@@ -1,6 +1,3 @@
-// ABOUTME: Lists external API keys that the current user is allowed to manage.
-// ABOUTME: Aggregates personal, organization, group, tenant, and instance-admin keys based on caller authority.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ExternalApiKey;

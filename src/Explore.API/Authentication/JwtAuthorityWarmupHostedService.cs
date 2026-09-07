@@ -1,6 +1,3 @@
-// ABOUTME: Eagerly reloads DynamicJwtConfigurationService and prefetches OIDC/JWKS metadata at startup.
-// ABOUTME: Prevents the first authenticated request from blocking on a cold Keycloak network call beyond Polly timeouts.
-
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
 namespace Explore.API.Authentication;

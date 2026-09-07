@@ -1,6 +1,3 @@
-// ABOUTME: Defines provider-neutral refund creation, retrieval, observations, and bounded failures.
-// ABOUTME: Keeps original-account routing and stable idempotency explicit without leaking provider SDK types.
-
 namespace Explore.Application.Contracts.Payments;
 
 public interface IRefundCreator

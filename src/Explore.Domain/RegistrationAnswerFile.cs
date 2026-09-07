@@ -1,6 +1,3 @@
-// ABOUTME: Associates a validated storage object with one native registration File field.
-// ABOUTME: Keeps uploaded bytes quarantined until an operator records an explicit manual release.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

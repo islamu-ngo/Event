@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the deterministic fake AI chat provider.
-// ABOUTME: Verifies fake chat, model catalog, and proposed-action output without network calls.
-
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Features.AiAssistant.Tools;
 using Explore.Domain.Ai;

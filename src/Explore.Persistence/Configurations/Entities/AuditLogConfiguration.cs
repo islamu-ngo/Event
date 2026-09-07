@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for AuditLog entity with indexes for efficient querying.
-// ABOUTME: Optimized for querying by entity, by actor, and by time range.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for event-session language assignment reads.
-// ABOUTME: Provides no-tracking session-language queries with caller cancellation propagation.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

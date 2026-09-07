@@ -1,6 +1,3 @@
-// ABOUTME: Issues persisted external API keys for all five owner types (User, Organization, Group, Tenant, InstanceAdmin).
-// ABOUTME: Generates one-time raw secrets in the handler while storing only hash and public key id.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

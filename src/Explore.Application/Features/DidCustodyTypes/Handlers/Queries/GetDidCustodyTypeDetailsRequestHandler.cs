@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning a single DID custody type by ID.
-// ABOUTME: Maps entity to DidCustodyTypeDto.
 using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;

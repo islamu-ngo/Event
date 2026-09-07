@@ -1,6 +1,3 @@
-// ABOUTME: Executes bounded tenant-scoped deletion of expired registration answers and PII.
-// ABOUTME: Deletes dependent answers before ciphertext atomically while preserving consent and export audit evidence.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;

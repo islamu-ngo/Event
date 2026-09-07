@@ -1,6 +1,3 @@
-// ABOUTME: Maps webhook message domain entities into safe management API DTOs.
-// ABOUTME: Intentionally omits PayloadJson so delivery history does not leak event payload contents.
-
 using Explore.Application.DTOs.Webhooks;
 using Explore.Domain;
 

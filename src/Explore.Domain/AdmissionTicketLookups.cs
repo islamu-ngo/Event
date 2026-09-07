@@ -1,6 +1,3 @@
-// ABOUTME: Normalized lookup rows for admission ticket, credential, and transition-reason identities.
-// ABOUTME: Keeps stable persisted IDs and codes separate from Domain enum convenience mirrors.
-
 namespace Explore.Domain;
 
 public sealed class AdmissionTicketStatus

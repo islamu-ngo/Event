@@ -1,6 +1,3 @@
-// ABOUTME: Exercises real Data Protection, response cookie serialization and independent browser cookie jars.
-// ABOUTME: Guards stable parallel-flow binding, expiry budgets, cold-cookie races and cross-origin/key-loss rejection.
-
 using System.Net;
 using Explore.Blazor.Services.Auth;
 using Microsoft.AspNetCore.DataProtection;

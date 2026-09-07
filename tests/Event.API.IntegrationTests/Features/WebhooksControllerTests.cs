@@ -1,6 +1,3 @@
-// ABOUTME: API contract tests for outgoing webhook provider management endpoints.
-// ABOUTME: Verifies Svix App Portal route metadata, authorization metadata, and MediatR mapping.
-
 using System.Reflection;
 using System.Security.Claims;
 using Explore.API.Attributes;

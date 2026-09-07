@@ -1,6 +1,3 @@
-// ABOUTME: Validates local sign-in credentials before any Identity store access.
-// ABOUTME: Applies bounded email and password rules without revealing account existence.
-
 using Explore.Application.Features.Authentication.Local.Models;
 using FluentValidation;
 

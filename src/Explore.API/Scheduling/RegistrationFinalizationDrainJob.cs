@@ -1,6 +1,3 @@
-// ABOUTME: Quartz job that drains durable registration-finalization effects on a fixed cadence.
-// ABOUTME: Migrates the worker's timer only; the fenced claim semantics stay inside the MediatR command.
-
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Features.RegistrationSubmissions.Commands;
 using MediatR;

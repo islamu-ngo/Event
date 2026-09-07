@@ -1,6 +1,3 @@
-// ABOUTME: Event card component supporting three layout modes (CompactGrid, DetailedList, SingleRow).
-// ABOUTME: Extracted from EventList inline rendering for reusability and settings-driven customization.
-
 using System.Globalization;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Helpers;

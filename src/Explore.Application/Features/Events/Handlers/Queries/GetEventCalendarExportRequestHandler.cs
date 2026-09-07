@@ -1,6 +1,3 @@
-// ABOUTME: Builds the public calendar export read model from event and primary-session data.
-// ABOUTME: Enforces published/public visibility before the API serializes the .ics file.
-
 using Explore.Application.Contracts.LocationPrivacy;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

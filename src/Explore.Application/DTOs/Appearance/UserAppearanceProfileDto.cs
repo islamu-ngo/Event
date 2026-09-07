@@ -1,6 +1,3 @@
-// ABOUTME: DTO for a user-owned appearance profile — a stable snapshot independent of source preset.
-// ABOUTME: Returned by the profiles endpoint so the UI can list, activate, and manage user themes.
-
 namespace Explore.Application.DTOs.Appearance;
 
 public sealed record UserAppearanceProfileDto

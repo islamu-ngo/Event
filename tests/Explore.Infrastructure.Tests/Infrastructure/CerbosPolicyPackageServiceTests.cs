@@ -1,6 +1,3 @@
-// ABOUTME: Tests manifest construction and Admin API publishing for bundled Cerbos policy artifacts.
-// ABOUTME: Verifies tenant-aware and instance-only targets stay isolated during policy synchronization.
-
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;

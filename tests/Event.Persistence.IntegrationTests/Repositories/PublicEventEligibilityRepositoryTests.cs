@@ -1,6 +1,3 @@
-// ABOUTME: Deterministic repository tests for the central public Event eligibility predicate.
-// ABOUTME: Covers local owner participation, federated source correlation, and public read consistency without Docker.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Specifications.Events;

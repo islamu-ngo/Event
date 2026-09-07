@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-level policy aggregate — overrides instance defaults where allowed.
-// ABOUTME: Only fields with ChildOverrideMode.Allow at the instance level can be set here.
-
 namespace Explore.Domain.Policies;
 
 public sealed class TenantPolicySet

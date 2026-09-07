@@ -1,6 +1,3 @@
-// ABOUTME: Lookup entity describing support-access session lifecycle states.
-// ABOUTME: Backed by stable int IDs from SupportAccessSessionStatusEnum.
-
 namespace Explore.Domain;
 
 public class SupportAccessSessionStatus

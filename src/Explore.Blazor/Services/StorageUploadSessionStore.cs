@@ -1,6 +1,3 @@
-// ABOUTME: BFF-owned storage upload session store for binding browser upload proxy calls.
-// ABOUTME: Prevents client-supplied provider destinations by resolving server-issued API upload sessions from cache.
-
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text.Json;

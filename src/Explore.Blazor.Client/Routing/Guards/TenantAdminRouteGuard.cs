@@ -1,6 +1,3 @@
-// ABOUTME: Route guard that restricts tenant admin routes to tenant-scoped administrators.
-// ABOUTME: Uses BFF/API tenant authority without promoting instance administrators to tenant administrators.
-
 using Blazouter.Interfaces;
 using Blazouter.Models;
 using Explore.Blazor.Client.Services;

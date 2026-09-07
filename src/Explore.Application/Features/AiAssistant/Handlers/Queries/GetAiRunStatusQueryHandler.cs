@@ -1,6 +1,3 @@
-// ABOUTME: Retrieves safe status metadata for an AI run in an owned conversation.
-// ABOUTME: Avoids raw provider payloads while supporting future polling endpoints.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Ai;

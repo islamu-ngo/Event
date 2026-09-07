@@ -1,6 +1,3 @@
-// ABOUTME: Registers output caching policies and HybridCache (L1+L2) for the API.
-// ABOUTME: Provides 5 named output cache policies and configures in-memory + distributed hybrid caching.
-
 using Explore.Application.Constants;
 using Microsoft.Extensions.Caching.Hybrid;
 

@@ -1,6 +1,3 @@
-// ABOUTME: DTO for instance-level authentication provider configuration managed during setup and admin UI.
-// ABOUTME: Represents enabled auth providers (Keycloak, ATProto, Google) and their credentials.
-
 using Explore.Application.DTOs.Secrets;
 
 namespace Explore.Application.DTOs.Onboarding;

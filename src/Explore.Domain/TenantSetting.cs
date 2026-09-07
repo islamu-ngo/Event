@@ -1,4 +1,3 @@
-// ABOUTME: Tenant-specific setting override for the cascading settings engine.
 // Allows tenants to customize settings unless locked at the system level.
 
 namespace Explore.Domain;

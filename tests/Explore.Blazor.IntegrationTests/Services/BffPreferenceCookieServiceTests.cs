@@ -1,6 +1,3 @@
-// ABOUTME: Unit-style tests for anonymous BFF preference cookie defaults and persistence.
-// ABOUTME: Protects preference endpoint decomposition from changing SSR cookie behavior.
-
 using Explore.Blazor.Services.Preferences;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;

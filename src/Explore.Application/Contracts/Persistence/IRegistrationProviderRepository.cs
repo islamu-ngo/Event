@@ -1,6 +1,3 @@
-// ABOUTME: Entity-first repository contract for persisted registration-provider connections and bindings.
-// ABOUTME: Supports next-wave capability resolution without exposing DTO projections from Persistence.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

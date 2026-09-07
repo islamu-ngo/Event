@@ -1,6 +1,3 @@
-// ABOUTME: Management endpoints for persisted external API keys.
-// ABOUTME: Keeps controllers thin by delegating issuance, listing, and revocation to MediatR handlers.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

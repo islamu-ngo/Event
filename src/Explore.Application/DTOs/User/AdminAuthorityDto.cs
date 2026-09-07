@@ -1,6 +1,3 @@
-// ABOUTME: DTO returned by GET /api/User/admin-authority to convey persisted administrative authority.
-// ABOUTME: Covers instance, tenant, organization, and group scopes for BFF and route authorization.
-
 namespace Explore.Application.DTOs.User;
 
 /// <summary>

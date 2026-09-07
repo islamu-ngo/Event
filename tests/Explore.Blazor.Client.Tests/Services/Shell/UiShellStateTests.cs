@@ -1,6 +1,3 @@
-// ABOUTME: Tests route-driven workspace state and session-only last-route tracking.
-// ABOUTME: Verifies navigation changes preserve query strings without creating durable state.
-
 namespace Explore.Blazor.Client.Tests.Services.Shell;
 
 using Explore.Blazor.Client.Clients;

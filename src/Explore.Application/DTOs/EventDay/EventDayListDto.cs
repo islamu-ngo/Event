@@ -1,6 +1,3 @@
-// ABOUTME: List read-model DTO for EventDay used in paginated collection responses.
-// ABOUTME: Lightweight projection with key fields for day-level admin lists and agenda grouping.
-
 namespace Explore.Application.DTOs.EventDay;
 
 public sealed record EventDayListDto

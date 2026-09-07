@@ -1,6 +1,3 @@
-// ABOUTME: Configuration options for the explicitly selected secret authority.
-// ABOUTME: Supports Environment, Infisical, and Development/Testing User Secrets.
-
 using Explore.Secrets.Abstractions;
 
 namespace Explore.Secrets.Configuration;

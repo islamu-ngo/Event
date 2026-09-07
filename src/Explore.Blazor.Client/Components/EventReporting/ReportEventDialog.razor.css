@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped layout for the event reporting dialog form. */
-/* ABOUTME: Uses BEM-style selectors so dialog internals remain locally maintainable. */
-
 .report-event-dialog__title {
     align-items: center;
     display: flex;

@@ -1,6 +1,3 @@
-// ABOUTME: Pins the typed event participation configuration matrix and stable lookup identifiers.
-// ABOUTME: Verifies shared-PK contracts, typed validation failures, recovery policies, and atomic reconfiguration.
-
 using Explore.Domain.Enums;
 
 namespace Event.Domain.UnitTests.Entities;

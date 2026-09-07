@@ -1,6 +1,3 @@
-// ABOUTME: Validates registration-form template catalog CQRS requests at the application boundary.
-// ABOUTME: Rejects missing source provenance, template metadata, and instantiation target identifiers.
-
 using Explore.Application.Features.RegistrationForms.Requests.Commands;
 using Explore.Application.Features.RegistrationForms.Requests.Queries;
 using FluentValidation;

@@ -1,6 +1,3 @@
-// ABOUTME: Applies one typed platform privacy-erasure fact inside an existing application transaction.
-// ABOUTME: Shares User and location mutation, checkpoint, outbox, and cache behavior across authority topologies.
-
 using Explore.Application.Caching;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Persistence;

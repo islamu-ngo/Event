@@ -1,6 +1,3 @@
-// ABOUTME: Typed policy for tenant delegation — controls what tenants can self-manage.
-// ABOUTME: Covers self-service registration, white-labeling, SMTP/storage/analytics delegation.
-
 namespace Explore.Domain.Policies;
 
 public sealed class TenantDelegationPolicy

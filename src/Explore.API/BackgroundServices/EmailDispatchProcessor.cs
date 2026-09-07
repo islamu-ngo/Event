@@ -1,6 +1,3 @@
-// ABOUTME: Hosted timer wrapper that triggers the EmailDispatch drain service for Basic Dispatch Mode.
-// ABOUTME: Keeps scheduling mechanics separate from PostgreSQL-owned email dispatch state transitions.
-
 using Explore.Infrastructure;
 using Microsoft.Extensions.Options;
 

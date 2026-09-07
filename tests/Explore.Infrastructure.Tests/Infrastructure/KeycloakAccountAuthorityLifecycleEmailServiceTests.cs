@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for Keycloak-owned identity lifecycle email delegation.
-// ABOUTME: Verifies required-action email calls, URL blocking, and safe redacted outcomes.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;

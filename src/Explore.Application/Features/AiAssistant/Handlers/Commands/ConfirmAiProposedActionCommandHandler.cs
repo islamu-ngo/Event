@@ -1,6 +1,3 @@
-// ABOUTME: Confirms AI-proposed actions and executes supported tools through existing CQRS commands.
-// ABOUTME: Enforces tenant and conversation ownership before mutating proposed-action state.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Ai;

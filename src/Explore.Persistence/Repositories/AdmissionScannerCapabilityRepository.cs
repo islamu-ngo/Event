@@ -1,6 +1,3 @@
-// ABOUTME: Stores digest-only scanner capability aggregates with tenant-qualified issue idempotency.
-// ABOUTME: Uses a savepoint so portable unique races can reload the winner without aborting the caller transaction.
-
 using System.Linq.Expressions;
 using Explore.Application.Contracts.Admissions;
 using Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for catalog-owned ticket types and their pricing metadata.
-// ABOUTME: Preserves bigint minor-unit columns, tenant alternate keys, and restrictive entitlement relationships.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

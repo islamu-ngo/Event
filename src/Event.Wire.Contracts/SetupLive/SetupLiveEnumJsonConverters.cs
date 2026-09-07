@@ -1,6 +1,3 @@
-// ABOUTME: Converts every Setup live enum through exact string-only wire vocabularies.
-// ABOUTME: Rejects numeric tokens, wrong case, unknown aliases, and undefined values.
-
 namespace ISLAMU.Wire.Contracts.SetupLive;
 
 using System.Text.Json;

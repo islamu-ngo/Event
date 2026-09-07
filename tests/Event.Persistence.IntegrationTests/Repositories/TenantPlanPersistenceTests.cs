@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL-backed tests for normalized tenant plan persistence.
-// ABOUTME: Verifies SaaS tier lookup seeding, version content normalization, and active assignment constraints.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Constants;

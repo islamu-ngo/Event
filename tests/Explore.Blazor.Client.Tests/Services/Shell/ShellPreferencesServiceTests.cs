@@ -1,6 +1,3 @@
-// ABOUTME: Tests durable shell selection preference validation, fallback, and deduplicated writes.
-// ABOUTME: Proves revoked workspaces, actors, and settings scopes never regain client authority.
-
 using Explore.Blazor.Client.Services.Shell;
 
 namespace Explore.Blazor.Client.Tests.Services.Shell;

@@ -1,6 +1,3 @@
-// ABOUTME: Authorized query for one webhook endpoint management row.
-// ABOUTME: Requires the authorization pipeline to resolve the persisted endpoint consumer owner.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Webhooks;
 using MediatR;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines the governed Islamic aspect upsert AI tool contract for MCP proposals.
-// ABOUTME: Keeps aspect module, permission context, schema, and field allow-list centralized.
-
 using Explore.Application.Authorization;
 using Explore.Application.Features.AiAssistant.Actions;
 using Explore.Domain.Ai;

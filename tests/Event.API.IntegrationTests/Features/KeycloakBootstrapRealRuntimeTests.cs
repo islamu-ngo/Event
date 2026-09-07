@@ -1,6 +1,3 @@
-// ABOUTME: Real-runtime tests for setup-time Keycloak bootstrap against a disposable Keycloak container.
-// ABOUTME: Verifies the setup endpoint, Infrastructure adapter, and Keycloak token endpoint agree on rotated secrets.
-
 using System.Net;
 using System.Net.Http.Json;
 using Event.Api.IntegrationTests.Fixtures;

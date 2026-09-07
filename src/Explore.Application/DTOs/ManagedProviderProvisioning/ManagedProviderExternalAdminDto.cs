@@ -1,6 +1,3 @@
-// ABOUTME: External identity payload for the tenant administrator created by provider provisioning.
-// ABOUTME: Uses stable IdP issuer/provider and subject values instead of mutable email as authority.
-
 namespace Explore.Application.DTOs.ManagedProviderProvisioning;
 
 public sealed record ManagedProviderExternalAdminDto

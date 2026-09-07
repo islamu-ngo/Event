@@ -1,6 +1,3 @@
-// ABOUTME: Focused generic outbox processor tests for claim ownership and terminal reconciliation.
-// ABOUTME: Proves stale workers cannot reconcile state and only a successful dead-letter transition invokes the hook.
-
 using Explore.API.BackgroundServices;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

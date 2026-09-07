@@ -1,6 +1,3 @@
-// ABOUTME: Quartz.NET adapter implementing the Application scheduler-operations contract for operator tooling.
-// ABOUTME: Confines every scheduler library type to the API layer and projects scheduling metadata only.
-
 using Explore.Application.Contracts.Scheduling;
 using Quartz;
 using Quartz.Impl.Matchers;

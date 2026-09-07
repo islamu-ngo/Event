@@ -1,6 +1,3 @@
-// ABOUTME: Records Data Protection purpose chains while delegating cryptography to the framework.
-// ABOUTME: Lets token tests prove purpose, version, and tenant isolation without inspecting token plaintext.
-
 using Microsoft.AspNetCore.DataProtection;
 
 namespace Explore.Infrastructure.Tests.Geocoding;

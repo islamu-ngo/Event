@@ -1,6 +1,3 @@
-// ABOUTME: Strong string-backed identifier for route-addressable application workspaces.
-// ABOUTME: Keeps workspace identity stable without coupling shell logic to a central enum.
-
 namespace Explore.Blazor.Client.Services.Shell;
 
 public sealed record WorkspaceKey

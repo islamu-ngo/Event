@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning a single event status by ID.
-// ABOUTME: Maps EventStatus entity to EventStatusDto.
 using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;

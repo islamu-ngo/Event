@@ -1,5 +1,3 @@
-// ABOUTME: Validates pull request metadata for release-impact and changelog evidence.
-// ABOUTME: Runs from pull_request_target without executing pull-request head code.
 #:property RestorePackagesWithLockFile=false
 #pragma warning disable CA1050 // File-based CI scripts intentionally keep helper policy types in the script file.
 

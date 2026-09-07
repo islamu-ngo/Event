@@ -1,6 +1,3 @@
-// ABOUTME: API controller for tag type lookup table (read-only enumeration).
-// ABOUTME: Provides tag type categories for event tag classification and filtering.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Hateoas;

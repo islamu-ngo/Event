@@ -1,6 +1,3 @@
-// ABOUTME: Validates local registration, creates Identity credentials, and synchronizes the platform user.
-// ABOUTME: Withholds the issued token when domain account synchronization does not complete.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Features.Authentication.Local.Validators;

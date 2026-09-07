@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query request for fetching all registration modes.
-// ABOUTME: Returns IEnumerable<RegistrationModeDto>.
 using System.Collections.Generic;
 using Explore.Application.DTOs.RegistrationMode;
 using MediatR;

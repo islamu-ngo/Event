@@ -1,6 +1,3 @@
-// ABOUTME: Central registry of all setting definitions in the platform.
-// ABOUTME: Static, code-defined — avoids DB bootstrapping issues and ensures compile-time validation.
-
 namespace Explore.Domain.Settings;
 
 using System.Collections.Frozen;

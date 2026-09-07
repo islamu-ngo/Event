@@ -1,6 +1,3 @@
-// ABOUTME: Handles administrative restoration for reversibly light-moderated events.
-// ABOUTME: Preserves moderation audit history while returning eligible events to Published.
-
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

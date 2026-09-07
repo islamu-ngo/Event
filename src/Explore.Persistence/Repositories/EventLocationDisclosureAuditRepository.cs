@@ -1,6 +1,3 @@
-// ABOUTME: Appends and reads PII-free EventLocation disclosure-policy history.
-// ABOUTME: Rejects stale or non-contiguous policy versions before the database uniqueness guard.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
 using Explore.Domain;

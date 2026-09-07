@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for EventDetail display helper behavior.
-// ABOUTME: Verifies storage-backed event images render when API responses include an image id without a resolved URI.
-
 using System.Reflection;
 using System.Security.Claims;
 using System.Text.Json;

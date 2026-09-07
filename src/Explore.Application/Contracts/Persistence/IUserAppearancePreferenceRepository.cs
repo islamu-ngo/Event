@@ -1,6 +1,3 @@
-// ABOUTME: Repository interface for UserAppearancePreference — active profile selection per user/scope.
-// ABOUTME: Unique per (UserId, TenantId) so a user can have different profiles per tenant.
-
 namespace Explore.Application.Contracts.Persistence;
 
 using Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: RED contracts for fail-safe Photon startup configuration and provider composition.
-// ABOUTME: Proves executable runtime bounds without turning deployment evidence into application options.
-
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;

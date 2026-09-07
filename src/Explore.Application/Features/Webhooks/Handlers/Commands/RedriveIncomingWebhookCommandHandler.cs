@@ -1,6 +1,3 @@
-// ABOUTME: Atomically redrives a dead-lettered incoming webhook and records operator audit evidence.
-// ABOUTME: Rejects stale generations, wrong-tenant identities, active work, and unauthenticated actors.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;

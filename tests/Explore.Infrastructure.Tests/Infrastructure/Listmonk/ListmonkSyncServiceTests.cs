@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for Listmonk subscriber sync through the NSwag-generated API client.
-// ABOUTME: Verifies request shaping, Basic auth, and retry classification without real network calls.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;

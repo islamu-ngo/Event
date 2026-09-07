@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for administratively hiding an event after moderation.
-// ABOUTME: Uses a dedicated authorization action so moderation does not imply edit authority.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

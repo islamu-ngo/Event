@@ -1,4 +1,3 @@
-// ABOUTME: Unit tests for CategoryService covering category CRUD and neutralized category-event methods.
 // Verifies HAL conversion, pagination usage, and error handling contracts for read and write operations.
 
 using Explore.Blazor.Client.Constants;

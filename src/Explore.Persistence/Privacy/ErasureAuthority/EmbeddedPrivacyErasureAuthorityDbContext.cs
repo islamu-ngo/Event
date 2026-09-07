@@ -1,6 +1,3 @@
-// ABOUTME: Owns the SQLite privacy-erasure authority model for embedded and co-located storage.
-// ABOUTME: Uses fixed ie_ table names so the schema-less provider remains predictable.
-
 using Explore.Domain;
 using Explore.Persistence.Privacy.ErasureAuthority.Configurations;
 using Explore.Persistence.Schema;

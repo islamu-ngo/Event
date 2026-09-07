@@ -1,6 +1,3 @@
-// ABOUTME: ASP.NET Core Identity role entity for embedded Local authentication.
-// ABOUTME: Uses stable UUIDv7 aggregate keys without coupling Identity roles to Domain authorization roles.
-
 using Microsoft.AspNetCore.Identity;
 
 namespace Explore.Persistence.Identity;

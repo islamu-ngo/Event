@@ -1,6 +1,3 @@
-// ABOUTME: Application-owned typed authorization port and provider-neutral decision model.
-// ABOUTME: Keeps capabilities catalog-bound while Local and Cerbos stay infrastructure adapters.
-
 namespace Explore.Application.Contracts.Infrastructure;
 
 using System.Collections.Generic;

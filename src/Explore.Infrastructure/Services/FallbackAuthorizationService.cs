@@ -1,6 +1,3 @@
-// ABOUTME: Database-driven authorization service used when Cerbos PDP is unavailable.
-// ABOUTME: Main dispatch class — delegates to evaluators (partial) and batch optimization (partial).
-
 using System.Diagnostics;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;

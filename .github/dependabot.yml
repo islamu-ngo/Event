@@ -1,6 +1,3 @@
-# ABOUTME: Configures Dependabot update automation for GitHub Actions and NuGet dependencies.
-# ABOUTME: Keeps immutable GitHub Actions SHA pins and NuGet dependencies maintainable.
-
 version: 2
 updates:
   - package-ecosystem: github-actions

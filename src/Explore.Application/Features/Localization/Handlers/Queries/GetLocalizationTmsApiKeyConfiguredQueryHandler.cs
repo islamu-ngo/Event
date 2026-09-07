@@ -1,6 +1,3 @@
-// ABOUTME: Checks localization TMS API-key SecretBinding metadata for the active tenant.
-// ABOUTME: Reports only binding presence and never resolves or returns the secret value.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Localization.Requests.Queries;

@@ -1,6 +1,3 @@
-// ABOUTME: Tests BFF reverse-proxy header sanitization before API forwarding occurs.
-// ABOUTME: Verifies browser credentials are stripped while ordinary request metadata survives.
-
 using Event.Web.BffHosting.Security;
 
 namespace Explore.Blazor.IntegrationTests.Services;

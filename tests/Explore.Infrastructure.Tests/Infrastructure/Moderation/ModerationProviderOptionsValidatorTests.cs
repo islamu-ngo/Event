@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for moderation provider runtime option validation.
-// ABOUTME: Guards LocalOnly defaults, supported modes, and evidence-sharing safety rules.
-
 using Explore.Application.Features.EventReporting.Models;
 using Explore.Infrastructure.Configuration;
 

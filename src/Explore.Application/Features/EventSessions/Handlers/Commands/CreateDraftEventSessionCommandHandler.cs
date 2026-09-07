@@ -1,6 +1,3 @@
-// ABOUTME: Handler for creating unscheduled draft event sessions under an existing event.
-// ABOUTME: Applies lifecycle readiness policy before persisting a draft without fake schedule values.
-
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSession.Validators;

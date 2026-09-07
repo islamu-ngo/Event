@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the typed instance-bootstrap lifecycle against the migrated PostgreSQL schema.
-// ABOUTME: Covers round trips, fixed fingerprints, local-user lineage, schema cutover, and current-row ordering.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;

@@ -1,6 +1,3 @@
-// ABOUTME: Dispatches event-report provider sync outbox messages through the runtime provider boundary.
-// ABOUTME: Persists idempotent external link and signal outcomes while keeping local reports authoritative.
-
 using System.Text;
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;

@@ -1,6 +1,3 @@
-// ABOUTME: Maps strict paid-policy manifest payloads into canonical tenant policy inputs.
-// ABOUTME: Keeps preflight and mutation on the same provider-neutral Domain policy shape.
-
 namespace Explore.Application.Features.ConfigurationManifest.Compilation;
 
 using Explore.Application.DTOs.PaidEventPolicies;

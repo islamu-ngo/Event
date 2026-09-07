@@ -1,6 +1,3 @@
-// ABOUTME: Runtime authentication scheme manager that dynamically registers OIDC/OAuth schemes.
-// ABOUTME: Reads auth config from API + env vars, registers Keycloak/Google/ATProto schemes without restart.
-
 using Event.Web.BffHosting.Authentication;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Constants;

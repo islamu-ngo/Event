@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for order-linked event admission coverage reads.
-// ABOUTME: Keeps tenant and soft-delete filtering intact for location-access evaluation.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;

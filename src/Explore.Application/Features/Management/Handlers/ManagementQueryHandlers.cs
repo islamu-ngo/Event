@@ -1,6 +1,3 @@
-// ABOUTME: Projects Event-owned deployment mode, version, registration, and capability metadata for managed mode.
-// ABOUTME: Returns only bounded instance lifecycle data and keeps standalone mode absent by default.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

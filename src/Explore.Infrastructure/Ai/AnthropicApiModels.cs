@@ -1,6 +1,3 @@
-// ABOUTME: Anthropic Messages API contract models for typed HTTP communication via Refit.
-// ABOUTME: Supports text, image, tool_use, and tool_result content blocks for multi-turn tool calling.
-
 using System.Text.Json.Serialization;
 
 namespace Explore.Infrastructure.Ai;

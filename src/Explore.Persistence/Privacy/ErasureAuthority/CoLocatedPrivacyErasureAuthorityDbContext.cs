@@ -1,6 +1,3 @@
-// ABOUTME: Owns co-located PostgreSQL privacy-erasure authority tables in the configured primary schema.
-// ABOUTME: Keeps co-located migrations separate from external function-and-ACL authority migrations.
-
 using Explore.Domain;
 using Explore.Persistence.Database;
 using Explore.Persistence.Privacy.ErasureAuthority.Configurations;

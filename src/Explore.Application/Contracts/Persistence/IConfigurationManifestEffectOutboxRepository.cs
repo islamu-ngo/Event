@@ -1,6 +1,3 @@
-// ABOUTME: Narrow generic-outbox port for durable configuration-manifest post-commit effects.
-// ABOUTME: Supports atomic enqueue, exact delivery, and restart-time draining without exposing unrelated messages.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

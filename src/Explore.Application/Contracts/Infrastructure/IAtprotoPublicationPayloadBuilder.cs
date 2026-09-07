@@ -1,6 +1,3 @@
-// ABOUTME: Defines the CarpaNet-free boundary for validated ATProto event record payloads.
-// ABOUTME: Returns exact immutable JSON and SHA-256 only after lexicon and encoded-size validation pass.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Federation.Atproto.Models;
 

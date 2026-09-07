@@ -1,6 +1,3 @@
-// ABOUTME: Orchestrates generated payment, refund, and campaign client calls.
-// ABOUTME: Preserves capability authorization boundaries and never logs sensitive financial data.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Helpers;

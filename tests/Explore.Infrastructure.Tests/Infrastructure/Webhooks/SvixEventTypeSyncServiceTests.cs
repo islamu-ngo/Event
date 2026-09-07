@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for synchronizing canonical webhook event types into Svix.
-// ABOUTME: Ensures provider-mode no-op behavior, schema forwarding, idempotency keys, and bounded failures.
-
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.Webhooks;
 using Explore.Infrastructure.Configuration;

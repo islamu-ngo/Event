@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning all available languages.
-// ABOUTME: Maps Language entities to LanguageDto list.
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;

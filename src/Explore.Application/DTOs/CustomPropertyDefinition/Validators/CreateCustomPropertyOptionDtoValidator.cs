@@ -1,6 +1,3 @@
-// ABOUTME: Validates one option payload inside a shared Layer 3 custom-property definition request.
-// ABOUTME: Enforces required machine identity and keeps option write shape deterministic.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.CustomPropertyDefinition.Validators;

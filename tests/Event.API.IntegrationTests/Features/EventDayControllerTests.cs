@@ -1,6 +1,3 @@
-// ABOUTME: API route contract tests for EventDayController endpoints.
-// ABOUTME: Verifies grouped PATCH update contract, route-ID authority, authorization metadata, and conflict response metadata.
-
 using System.Reflection;
 using Explore.API.Attributes;
 using Explore.API.Controllers;

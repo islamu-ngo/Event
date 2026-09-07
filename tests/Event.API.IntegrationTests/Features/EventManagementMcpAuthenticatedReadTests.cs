@@ -1,6 +1,3 @@
-// ABOUTME: MCP protocol tests for authenticated event-management read tools.
-// ABOUTME: Verifies private management reads require auth and use existing my-events ownership filtering.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;

@@ -1,6 +1,3 @@
-// ABOUTME: Tenant render-policy settings payload for typed document storage.
-// ABOUTME: Controls non-secret public rendering behavior.
-
 namespace Explore.Domain.Settings.Documents.Payloads;
 
 public sealed record RenderPolicySettings

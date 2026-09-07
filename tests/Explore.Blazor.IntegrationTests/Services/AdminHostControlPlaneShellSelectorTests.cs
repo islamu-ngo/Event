@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the existing Blazor host switches to control-plane shell only on configured admin hosts.
-// ABOUTME: Keeps public and tenant hosts on the normal shell while dedicated admin hosts use the operator surface.
-
 using Event.Web.BffHosting.Options;
 using Event.Web.BffHosting.Security;
 using Explore.Blazor.Services;

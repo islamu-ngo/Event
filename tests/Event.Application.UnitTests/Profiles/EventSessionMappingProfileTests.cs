@@ -1,6 +1,3 @@
-// ABOUTME: Verifies event-session detail and list projections include loaded parent-event lifecycle state.
-// ABOUTME: Keeps parent event status sourced from domain navigation data rather than client inference.
-
 using AutoMapper;
 using Event.Application.UnitTests.Common;
 using Explore.Application.DTOs.EventSession;

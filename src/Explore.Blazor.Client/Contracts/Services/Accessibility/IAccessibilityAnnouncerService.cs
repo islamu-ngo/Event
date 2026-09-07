@@ -1,6 +1,3 @@
-// ABOUTME: Contract for ARIA live region announcements to screen readers.
-// ABOUTME: Wraps JS interop for polite and assertive announcements via accessibility.js.
-
 namespace Explore.Blazor.Client.Contracts.Services.Accessibility;
 
 /// <summary>

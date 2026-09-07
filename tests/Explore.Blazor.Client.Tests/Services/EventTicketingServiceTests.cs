@@ -1,6 +1,3 @@
-// ABOUTME: Focused tests for the generated-client event ticketing adapter.
-// ABOUTME: Proves fail-closed parsing, cancellation, generated DTO pass-through, and exact identifier dispatch.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Pages.Studio;

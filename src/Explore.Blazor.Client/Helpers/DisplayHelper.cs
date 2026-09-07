@@ -1,6 +1,3 @@
-// ABOUTME: Shared helper for generating display initials from names.
-// ABOUTME: Replaces 5 duplicate GetInitials/GetActorInitials methods across the codebase.
-
 namespace Explore.Blazor.Client.Helpers;
 
 /// <summary>

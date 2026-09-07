@@ -1,6 +1,3 @@
-// ABOUTME: Defines account- and capability-scoped registration-order read contracts.
-// ABOUTME: Requires a full order/event/capability tuple for anonymous order visibility.
-
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.DTOs.RegistrationSubmissions;
 using MediatR;

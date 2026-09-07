@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for EventSessionIslamicAspect scheduling invariants.
-// ABOUTME: Proves fixed and prayer-relative session states cannot drift from their required field shape.
-
 using Explore.Domain;
 using TUnit.Assertions;
 using TUnit.Core;

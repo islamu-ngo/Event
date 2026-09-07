@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped styling for the shared Settings scope selector. */
-/* ABOUTME: Presents authorized scopes as responsive token-driven navigation links. */
-
 .settings-scope-selector {
     display: flex;
     flex-wrap: wrap;

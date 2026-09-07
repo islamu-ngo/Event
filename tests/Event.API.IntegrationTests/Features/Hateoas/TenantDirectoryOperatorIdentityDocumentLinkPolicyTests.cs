@@ -1,6 +1,3 @@
-// ABOUTME: Specifies HAL affordances for tenant directory-operator identity administration.
-// ABOUTME: Proves edit is emitted only as a permission-bound server capability.
-
 namespace Event.Api.IntegrationTests.Features.Hateoas;
 
 using Explore.API.Hateoas;

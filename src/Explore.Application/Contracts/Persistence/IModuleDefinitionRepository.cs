@@ -1,4 +1,3 @@
-// ABOUTME: Repository interface for ModuleDefinition entity providing
 // data access for module governance and discovery.
 
 using Explore.Domain.Modules;

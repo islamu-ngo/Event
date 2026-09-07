@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for UserProfile auth-sensitive loading/error/fallback/success states.
-// ABOUTME: Verifies sync fallback and stats/review rendering from service data.
-
 using Explore.Blazor.Client.Pages.User;
 
 namespace Explore.Blazor.Client.Tests.Pages.User;

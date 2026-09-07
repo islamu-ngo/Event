@@ -1,6 +1,3 @@
-// ABOUTME: Owns BFF session refresh orchestration while keeping bearer tokens server-side.
-// ABOUTME: Updates cookie claims and circuit token state without exposing token material in responses.
-
 using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Security.Claims;

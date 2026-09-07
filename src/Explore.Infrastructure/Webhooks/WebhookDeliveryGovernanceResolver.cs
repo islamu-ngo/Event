@@ -1,6 +1,3 @@
-// ABOUTME: Resolves lock-aware webhook delivery governance and applies startup safety ceilings.
-// ABOUTME: Produces one immutable policy snapshot for each tenant claim or delivery execution.
-
 using System.Globalization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Webhooks;

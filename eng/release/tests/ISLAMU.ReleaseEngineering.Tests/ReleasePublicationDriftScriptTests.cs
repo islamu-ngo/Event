@@ -1,6 +1,3 @@
-// ABOUTME: Proves publication drift is reported against canonical release identity and never repaired.
-// ABOUTME: Exercises the repository-owned file-based drift reporter with synthetic projection documents.
-
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;

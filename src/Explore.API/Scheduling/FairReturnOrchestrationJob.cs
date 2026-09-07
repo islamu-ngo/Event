@@ -1,6 +1,3 @@
-// ABOUTME: Quartz wake-up for one bounded pass over durable fair-return orchestration effects.
-// ABOUTME: Carries only an optional effect UUID; all payment, refund, and retry state stays persisted.
-
 using Explore.Application.Contracts.Scheduling;
 using Explore.Infrastructure.Waitlist;
 using Quartz;

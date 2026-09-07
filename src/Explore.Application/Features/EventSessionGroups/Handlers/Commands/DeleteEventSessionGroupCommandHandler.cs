@@ -1,6 +1,3 @@
-// ABOUTME: Handler for soft-deleting event session groups while preserving EventSession program items.
-// ABOUTME: Uses repository soft-delete semantics for explicit group removal.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventSessionGroups.Requests.Commands;
 using Explore.Application.Responses;

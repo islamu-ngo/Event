@@ -1,6 +1,3 @@
-// ABOUTME: Runs opaque production EF construction contracts in a fresh copy of this test executable.
-// ABOUTME: Exact TUnit node IDs retain parameterized coverage; child failures and cancellation reach dotnet test.
-
 using System.Diagnostics;
 using TUnit.Core;
 using TUnit.Core.Interfaces;

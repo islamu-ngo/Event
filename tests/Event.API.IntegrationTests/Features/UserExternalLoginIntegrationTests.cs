@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for verified authentication flows that resolve internal external-login links.
-// ABOUTME: Proves provider identity resolution remains intact after public external-login CRUD removal.
-
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;

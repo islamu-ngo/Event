@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for EventSessionTemplateInstantiationService covering session-template-to-runtime definition creation.
-// ABOUTME: Validates provenance tracking, option ID remapping, default value creation, and namespace+key fallback matching.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.Services;
 using Explore.Domain;

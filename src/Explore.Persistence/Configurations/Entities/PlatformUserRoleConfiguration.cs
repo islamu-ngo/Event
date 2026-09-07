@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for global user-to-role assignments.
-// ABOUTME: Enforces uniqueness per user-role pair for platform-scoped authorization.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

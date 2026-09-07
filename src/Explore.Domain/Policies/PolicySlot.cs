@@ -1,6 +1,3 @@
-// ABOUTME: Generic wrapper separating a policy value from child scope delegation authority.
-// ABOUTME: Each governed field is a PolicySlot — the value and whether child scopes can override it.
-
 namespace Explore.Domain.Policies;
 
 public sealed class PolicySlot<T>

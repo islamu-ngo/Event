@@ -1,6 +1,3 @@
-// ABOUTME: Validates Local webhook endpoint resume identity and optimistic state evidence.
-// ABOUTME: Restricts mandatory audit reasons to the normalized audit aggregate character set.
-
 using Explore.Application.Features.Webhooks.Requests.Commands;
 using Explore.Domain;
 using FluentValidation;

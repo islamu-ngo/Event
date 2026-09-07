@@ -1,6 +1,3 @@
-// ABOUTME: Tests for CookieConsentStateService cross-component event bridge.
-// ABOUTME: Verifies RequestReopenAsync invokes subscribers and safely handles no subscribers.
-
 namespace Explore.Blazor.Client.Tests.Services;
 
 public class CookieConsentStateServiceTests

@@ -1,6 +1,3 @@
-// ABOUTME: Read-only detail DTO for template property definitions, includes nested options and all validation metadata.
-// ABOUTME: Used both nested within EventTemplateDto and standalone for definition detail queries.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.DTOs.EventTemplate;

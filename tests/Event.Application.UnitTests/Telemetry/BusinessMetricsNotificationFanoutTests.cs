@@ -1,6 +1,3 @@
-// ABOUTME: Verifies notification fanout metrics use bounded, safe OpenTelemetry tags.
-// ABOUTME: Guards against exposing event, actor, user, or deduplication identifiers in metric dimensions.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Services;
 using Explore.Application.Telemetry;

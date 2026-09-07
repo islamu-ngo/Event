@@ -1,6 +1,3 @@
-// ABOUTME: Tests analytics governance rules for consent-aware identity handling and property sanitization.
-// ABOUTME: Keeps the shared event taxonomy and privacy posture enforced at the Application layer.
-
 using Explore.Application.Analytics;
 using Explore.Application.Models;
 using Explore.Application.Services;

@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for tenant-scoped storage upload sessions and reservations.
-// ABOUTME: Returns entities so handlers own DTO mapping and policy orchestration.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

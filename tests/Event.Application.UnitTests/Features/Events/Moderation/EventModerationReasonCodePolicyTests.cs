@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for structured event moderation reason-code normalization.
-// ABOUTME: Verifies API-bound audit metadata remains bounded, code-shaped, and defaultable.
-
 using Explore.Application.Features.Events.Moderation;
 using Explore.Application.Features.Events.Requests.Commands;
 

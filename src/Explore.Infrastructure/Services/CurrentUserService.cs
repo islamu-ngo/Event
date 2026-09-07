@@ -1,6 +1,3 @@
-// ABOUTME: Adapts the ambient HTTP principal to the Application current-user contract.
-// ABOUTME: Delegates platform user resolution to the canonical Application identity authority.
-
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Infrastructure;
 using Microsoft.AspNetCore.Http;

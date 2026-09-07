@@ -1,6 +1,3 @@
-@* ABOUTME: Renders a native yes-or-no checkbox without treating an optional unchecked value as an error. *@
-@* ABOUTME: Keeps label activation, Space-key behavior, and announced server issues native. *@
-
 <FormFieldShell @ref="_shell" ControlId="@ControlId" FieldKey="@FieldKey" FieldTypeCode="BOOLEAN"
                 Label="@Label" Required="@Required" Issues="@Issues">
     <input id="@ControlId" name="@FieldKey" type="checkbox" checked="@(Value is true)" required="@Required"

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for validating untrusted AI provider proposed actions.
-// ABOUTME: Ensures only registry-approved JSON-object action payloads can become persisted proposals.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Features.AiAssistant.Actions;

@@ -1,6 +1,3 @@
-// ABOUTME: Specifies bounded, target-bound, side-effect-free configuration import sessions.
-// ABOUTME: Pins expiry, replay, preview freshness, safe evidence, and protected-byte boundaries.
-
 namespace Event.Application.UnitTests.Features.ConfigurationManifest;
 
 using System.Reflection;

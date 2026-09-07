@@ -1,6 +1,3 @@
-// ABOUTME: MediatR query for generating a read-only Keycloak realm sync preview.
-// ABOUTME: Lets instance settings endpoints request typed additive drift plans without Infrastructure details.
-
 using Explore.Application.DTOs.Onboarding;
 using MediatR;
 

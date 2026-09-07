@@ -1,4 +1,3 @@
-// ABOUTME: Code-behind for the tri-state category filter dropdown component.
 // Manages category states (Neutral/Include/Exclude), search, badge counts, and mode toggles.
 
 using Explore.Blazor.Client.Clients;

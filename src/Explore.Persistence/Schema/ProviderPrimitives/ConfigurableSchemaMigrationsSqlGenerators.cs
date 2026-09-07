@@ -1,6 +1,3 @@
-// ABOUTME: Rebinds canonical generated migration schemas to the validated runtime schema.
-// ABOUTME: Keeps PostgreSQL and SQL Server migrations generated once while supporting operator namespaces.
-
 using System.Collections;
 using System.Reflection;
 using Explore.Persistence.Database;

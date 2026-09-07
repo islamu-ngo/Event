@@ -1,6 +1,3 @@
-// ABOUTME: Exercises collection of caller-owned shutdown state after the API startup lifecycle ends.
-// ABOUTME: Detects process-wide signal subscriptions retaining disposed hosts across repeated composition.
-
 using System.Runtime.CompilerServices;
 using Explore.API.Hosting;
 using Microsoft.AspNetCore.Builder;

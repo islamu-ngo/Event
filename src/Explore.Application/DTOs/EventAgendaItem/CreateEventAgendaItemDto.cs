@@ -1,6 +1,3 @@
-// ABOUTME: DTO for creating a new event-level agenda item (break, prayer, opening, logistics).
-// ABOUTME: StartTime/EndTime are UTC; local projections are computed by the handler via Reschedule().
-
 namespace Explore.Application.DTOs.EventAgendaItem;
 
 public sealed record CreateEventAgendaItemDto

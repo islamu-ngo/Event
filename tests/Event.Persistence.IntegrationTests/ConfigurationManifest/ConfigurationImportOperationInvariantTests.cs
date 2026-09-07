@@ -1,6 +1,3 @@
-// ABOUTME: Breaks configuration-import transaction, concurrency, history, and rollback invariants on PostgreSQL.
-// ABOUTME: Proves one-session fencing, rollback atomicity, target isolation, and append-only recovery evidence.
-
 namespace Event.Persistence.IntegrationTests.ConfigurationManifest;
 
 using Event.Persistence.IntegrationTests.Fixtures;

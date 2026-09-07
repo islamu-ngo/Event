@@ -1,6 +1,3 @@
-// ABOUTME: Batch evaluation optimization for FallbackAuthorizationService.
-// ABOUTME: Pre-resolves admin authority once per batch to eliminate repeated async overhead.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;

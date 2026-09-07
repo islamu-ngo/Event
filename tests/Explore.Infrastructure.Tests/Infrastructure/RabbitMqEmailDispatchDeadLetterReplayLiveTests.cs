@@ -1,6 +1,3 @@
-// ABOUTME: Runtime RabbitMQ tests for EmailDispatch dead-letter replay and parking behavior.
-// ABOUTME: Proves replay validates durable outbox state before republishing or parking DLQ payloads.
-
 using System.Diagnostics.Metrics;
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;

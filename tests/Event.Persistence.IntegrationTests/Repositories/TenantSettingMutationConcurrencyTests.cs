@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL concurrency tests for linearized system and tenant setting mutations.
-// ABOUTME: Uses two DbContexts to prove value-only writes, expected-state CAS, and advisory-lock ordering.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Responses;

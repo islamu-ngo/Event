@@ -1,6 +1,3 @@
-// ABOUTME: Architecture guardrails for durable side-effect execution boundaries.
-// ABOUTME: Prevents handlers and controllers from bypassing EmailDispatchOutbox or broker transport abstractions.
-
 namespace Event.Architecture.Tests;
 
 using System.Text.RegularExpressions;

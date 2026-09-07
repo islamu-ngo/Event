@@ -1,6 +1,3 @@
-// ABOUTME: Maps the tenant-scoped EventLocation disclosure-policy aggregate and active uniqueness rules.
-// ABOUTME: Enforces physical-or-TBA shape, tenant-safe parents, fail-closed TBA fields, and optimistic concurrency.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

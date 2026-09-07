@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for actor-scoped Studio dashboard and managed-event pages.
-// ABOUTME: Verifies shell-context actor loading, stale-result safety, and HAL-gated affordances.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Shell;

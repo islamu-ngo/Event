@@ -1,6 +1,3 @@
-// ABOUTME: Defines entity-first persistence for privacy-erasure fences, sagas, and policy coverage.
-// ABOUTME: Keeps receipt lookup and policy-version state inside the application database boundary.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

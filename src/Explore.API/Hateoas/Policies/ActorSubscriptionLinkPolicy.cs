@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS link policies for current-user actor subscriptions.
-// ABOUTME: Emits self, target actor, update, unsubscribe, and create links guarded by authorization metadata.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Collections.Generic;

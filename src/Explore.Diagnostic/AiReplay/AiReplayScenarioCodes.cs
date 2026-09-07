@@ -1,6 +1,3 @@
-// ABOUTME: Defines stable scenario codes for deterministic AI fake/replay reports.
-// ABOUTME: Keeps report generation, tests, and CI trend artifacts aligned.
-
 namespace Explore.Diagnostic.AiReplay;
 
 public static class AiReplayScenarioCodes

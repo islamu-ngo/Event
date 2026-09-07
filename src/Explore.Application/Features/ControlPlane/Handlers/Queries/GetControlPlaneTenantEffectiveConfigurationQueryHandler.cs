@@ -1,6 +1,3 @@
-// ABOUTME: Builds the Control Plane effective configuration view for one tenant.
-// ABOUTME: Resolves registered settings, active plan assignment, and quota usage from existing services.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies hardened AT Protocol federation persistence in the rebased PostgreSQL baseline.
-// ABOUTME: Covers the final tables, constraints, and source-version uniqueness without deleted history boundaries.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;

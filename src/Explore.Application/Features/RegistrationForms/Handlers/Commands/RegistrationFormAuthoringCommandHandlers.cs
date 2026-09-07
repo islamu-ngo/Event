@@ -1,6 +1,3 @@
-// ABOUTME: Provides one MediatR handler for every explicit registration workflow and form mutation.
-// ABOUTME: Manually validates each request before delegating to the aggregate authoring service.
-
 using Explore.Application.Features.RegistrationForms.Requests.Commands;
 using Explore.Application.Features.RegistrationForms.Validators;
 using Explore.Application.Responses;

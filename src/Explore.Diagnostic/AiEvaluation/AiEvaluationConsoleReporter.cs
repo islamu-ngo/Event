@@ -1,6 +1,3 @@
-// ABOUTME: Formats advisory AI evaluation report output for local operators and CI artifacts.
-// ABOUTME: Prints only scenario status metadata and generated file paths, never prompts or payloads.
-
 namespace Explore.Diagnostic.AiEvaluation;
 
 public static class AiEvaluationConsoleReporter

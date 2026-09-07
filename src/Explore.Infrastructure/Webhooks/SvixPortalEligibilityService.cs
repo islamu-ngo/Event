@@ -1,6 +1,3 @@
-// ABOUTME: Batch eligibility service for Svix provider portal HAL affordances.
-// ABOUTME: Fails closed on runtime, persistence, binding, version, or governance uncertainty.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Domain;

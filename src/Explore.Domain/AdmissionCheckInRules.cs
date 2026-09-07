@@ -1,6 +1,3 @@
-// ABOUTME: Evaluates pure entitlement-aware check-in and undo transitions from a rehydrated projection.
-// ABOUTME: Returns deterministic codes, ordered immutable facts, and next state without persistence mutation.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Domain;

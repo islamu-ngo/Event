@@ -1,6 +1,3 @@
-// ABOUTME: Verifies exhaustive deterministic event-description rendering and independent source-field classification.
-// ABOUTME: Uses public canaries across sessions, aspects, lookups, EAV, media, and disclosed locations while excluding private data.
-
 using System.Collections.Immutable;
 using System.Globalization;
 using Explore.Application.Contracts.LocationPrivacy;

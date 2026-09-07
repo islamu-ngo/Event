@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for authenticated user profile operations and preferences.
-// ABOUTME: Manages user account data, profile updates, and user-specific settings.
-
 using System.Security.Claims;
 using Explore.Application.Authentication;
 using Asp.Versioning;

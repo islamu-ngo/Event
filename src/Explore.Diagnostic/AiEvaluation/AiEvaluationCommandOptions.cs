@@ -1,6 +1,3 @@
-// ABOUTME: Parses advisory AI evaluation report CLI options without adding a parser dependency.
-// ABOUTME: Keeps report generation explicit and separate from read-only doctor checks.
-
 namespace Explore.Diagnostic.AiEvaluation;
 
 public sealed record AiEvaluationCommandOptions(

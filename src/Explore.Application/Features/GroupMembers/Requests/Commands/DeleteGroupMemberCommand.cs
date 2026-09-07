@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for removing a member from a group.
-// ABOUTME: Carries the group member ID.
 using Explore.Application.Responses;
 using MediatR;
 

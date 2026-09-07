@@ -1,6 +1,3 @@
-// ABOUTME: Resolves persisted notification delivery policy identifiers into dispatch-time eligibility rules.
-// ABOUTME: Fails closed on code or version drift so current state can only narrow queued authorization.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Notifications;

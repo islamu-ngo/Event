@@ -1,6 +1,3 @@
-// ABOUTME: Typed capability facts resolved for a concrete webhook provider and supported version.
-// ABOUTME: Keeps provider feature authority fail-closed and versioned for configuration, HAL, and portal decisions.
-
 namespace Explore.Domain;
 
 [Flags]

@@ -1,6 +1,3 @@
-// ABOUTME: Lightweight permission DTO for list views and dropdowns.
-// ABOUTME: Excludes verbose fields like Description for compact display.
-
 namespace Explore.Application.DTOs.Permission;
 
 public sealed record PermissionListDto

@@ -1,6 +1,3 @@
-// ABOUTME: Central route name catalog for API endpoint metadata and HAL link generation.
-// ABOUTME: Keeps controller route names stable and discoverable for OpenAPI and clients.
-
 namespace Explore.API.Hateoas;
 
 /// <summary>

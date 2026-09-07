@@ -1,6 +1,3 @@
-// ABOUTME: Exercises BFF transient serialization and signing against the real API and PostgreSQL repositories.
-// ABOUTME: Guards replica races, candidate ABA, tenant binding and indeterminate consumption without Redis.
-
 extern alias bff;
 
 using System.Net;

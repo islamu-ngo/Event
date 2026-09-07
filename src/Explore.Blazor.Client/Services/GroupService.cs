@@ -1,6 +1,3 @@
-// ABOUTME: Service for group creation, membership administration, and settings management in Blazor.
-// ABOUTME: Uses the generated API client and forwards If-Match headers for guarded Group PATCH updates.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Helpers;
 

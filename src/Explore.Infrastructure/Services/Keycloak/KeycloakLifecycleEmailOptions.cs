@@ -1,6 +1,3 @@
-// ABOUTME: Runtime options for Keycloak-owned identity lifecycle email delegation.
-// ABOUTME: Keeps admin credentials and endpoint settings outside Application contracts.
-
 using Explore.Application.Notifications;
 
 namespace Explore.Infrastructure.Services.Keycloak;

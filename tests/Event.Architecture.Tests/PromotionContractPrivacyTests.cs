@@ -1,6 +1,3 @@
-// ABOUTME: Locks promotion OpenAPI and generated-client privacy boundaries.
-// ABOUTME: Guards capability transport, one-time code exposure, and safe pricing totals.
-
 using System.Text.Json;
 
 namespace Event.Architecture.Tests;

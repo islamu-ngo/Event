@@ -1,6 +1,3 @@
-// ABOUTME: Defines explicitly configured currency-qualified amount/count ceilings and rolling organizer windows.
-// ABOUTME: Evaluates conservative reserved exposure without inventing defaults or categorically disabling Checkout.
-
 using Explore.Domain.ValueObjects;
 
 namespace Explore.Domain;

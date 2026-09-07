@@ -1,6 +1,3 @@
-// ABOUTME: Defines authorized exact-target summaries and export-safe cursor-based admission audit contracts.
-// ABOUTME: Exposes only stable counts, categories, target types, and hourly UTC buckets without sensitive lineage.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

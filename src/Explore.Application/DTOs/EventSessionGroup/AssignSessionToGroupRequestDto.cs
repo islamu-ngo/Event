@@ -1,6 +1,3 @@
-// ABOUTME: Request contract for assigning an EventSession program item to an EventSessionGroup.
-// ABOUTME: Includes EventId for explicit same-event validation; TenantId remains server-owned.
-
 namespace Explore.Application.DTOs.EventSessionGroup;
 
 public sealed record AssignSessionToGroupRequestDto

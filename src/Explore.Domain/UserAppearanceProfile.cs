@@ -1,7 +1,3 @@
-// ABOUTME: User-owned appearance profile — a stable snapshot independent of source preset after creation.
-// ABOUTME: When a user selects a preset, this entity receives a copy of the palette so tenant changes cannot break the user's UI.
-// ABOUTME: Supports multiple profiles per user (e.g., "My Blue Light", "High Contrast", "Ramadan Theme").
-
 namespace Explore.Domain;
 
 using Explore.Domain.Enums;

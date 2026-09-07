@@ -1,6 +1,3 @@
-// ABOUTME: Verifies authentication provider configuration persists normalized provider lookup identifiers.
-// ABOUTME: Proves reads expose stable provider metadata without persisting provider-name strings.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Services;

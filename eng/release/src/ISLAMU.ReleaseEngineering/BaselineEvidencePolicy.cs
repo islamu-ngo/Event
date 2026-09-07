@@ -1,6 +1,3 @@
-// ABOUTME: Reads and validates first-release changelog baseline evidence files.
-// ABOUTME: Keeps non-SemVer baseline refs separate from governed SemVer release history.
-
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;

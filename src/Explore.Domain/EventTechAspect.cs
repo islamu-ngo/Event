@@ -1,4 +1,3 @@
-// ABOUTME: Tech aspect for events containing hackathon details, skill levels, and tech stack info.
 // Uses 1:1 shared primary key pattern where Id is both PK and FK to Event.
 
 namespace Explore.Domain;

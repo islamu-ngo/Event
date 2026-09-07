@@ -1,6 +1,3 @@
-// ABOUTME: Event list page logic for loading filters, events, and registrations.
-// ABOUTME: Preserves initial prerender results to avoid hydration flicker on SEO pages.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;

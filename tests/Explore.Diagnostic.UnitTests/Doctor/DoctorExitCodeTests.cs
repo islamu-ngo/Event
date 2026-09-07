@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for doctor PASS/WARN/FAIL exit-code semantics.
-// ABOUTME: Ensures warnings stay non-blocking while hard failures fail automation.
-
 using Explore.Diagnostic.Doctor;
 
 namespace Explore.Diagnostic.UnitTests.Doctor;

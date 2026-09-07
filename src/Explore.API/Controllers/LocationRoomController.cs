@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for location room CRUD operations scoped to locations.
-// ABOUTME: Manages rooms within locations for session venue assignment with HATEOAS.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

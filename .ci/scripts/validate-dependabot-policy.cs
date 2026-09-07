@@ -1,5 +1,3 @@
-// ABOUTME: Validates Dependabot rules required for maintainable GitHub Actions SHA pins.
-// ABOUTME: Keeps workflow supply-chain immutability aligned with automated update coverage.
 #:property RestorePackagesWithLockFile=false
 
 using System.Text.RegularExpressions;

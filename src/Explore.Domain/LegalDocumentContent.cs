@@ -1,6 +1,3 @@
-// ABOUTME: Owns bounded localized legal source and non-certifying template provenance.
-// ABOUTME: Enforces a deterministic network-free Markdown subset before public mutation.
-
 namespace Explore.Domain;
 
 using System.Text;

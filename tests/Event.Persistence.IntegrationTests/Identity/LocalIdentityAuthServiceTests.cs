@@ -1,6 +1,3 @@
-// ABOUTME: Exercises Local Identity registration and lockout against the real ASP.NET Core Identity stores.
-// ABOUTME: Proves passwords are hashed, unverified email stays untrusted, and repeated failures lock accounts.
-
 using System.Security.Cryptography;
 using System.IdentityModel.Tokens.Jwt;
 using Explore.Application.Configuration;

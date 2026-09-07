@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for querying event session custom-property projection rows.
-// ABOUTME: Supports admin inspection and exposure-filtered reads for session scope.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

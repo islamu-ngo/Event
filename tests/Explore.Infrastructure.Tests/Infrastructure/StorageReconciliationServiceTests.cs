@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for dry-run-first storage reconciliation orchestration.
-// ABOUTME: Verifies metadata quarantine, idempotent deletion, and local orphan handling policies.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

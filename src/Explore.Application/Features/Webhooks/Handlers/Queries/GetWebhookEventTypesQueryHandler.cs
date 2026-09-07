@@ -1,6 +1,3 @@
-// ABOUTME: Query handler that maps canonical webhook event descriptors into API catalog DTOs.
-// ABOUTME: Keeps catalog reads provider-neutral and generated from the same registry used by delivery providers.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;

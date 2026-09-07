@@ -1,6 +1,3 @@
-// ABOUTME: File-backed SQLite regressions for ATProto bootstrap JTI replay consumption.
-// ABOUTME: Proves concurrent same-tenant uses have one winner while tenant scopes remain isolated.
-
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Microsoft.Data.Sqlite;

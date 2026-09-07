@@ -1,6 +1,3 @@
-// ABOUTME: Deterministic non-Docker tests for unit-of-work retry and rollback exception safety.
-// ABOUTME: Forces an EF execution-strategy retry and verifies failed-attempt tracking is discarded.
-
 using System.Data.Common;
 using Explore.Domain;
 using Explore.Domain.Enums;

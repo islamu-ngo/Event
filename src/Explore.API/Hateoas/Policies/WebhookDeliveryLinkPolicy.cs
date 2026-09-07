@@ -1,6 +1,3 @@
-// ABOUTME: HAL link policies for webhook message and delivery attempt audit resources.
-// ABOUTME: Emits server-authorized delivery-history and retry affordances for webhook administration.
-
 using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;

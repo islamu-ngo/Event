@@ -1,6 +1,3 @@
-// ABOUTME: List DTO for storage object metadata used by collection endpoints.
-// ABOUTME: Includes provider, visibility, and lifecycle fields needed by local-first UI affordances.
-
 namespace Explore.Application.DTOs.StorageObject;
 
 public sealed record StorageObjectListDto

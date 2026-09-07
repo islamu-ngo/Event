@@ -1,6 +1,3 @@
-// ABOUTME: Persists authenticated shell dock snapshots through user settings with tenant-local anonymous fallback.
-// ABOUTME: Promotes one anonymous shell snapshot after login and omits governed navigation overrides when disabled.
-
 using Explore.Blazor.Client.Components.Shell;
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Contracts.Services.Shell;

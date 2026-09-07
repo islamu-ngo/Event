@@ -1,6 +1,3 @@
-// ABOUTME: Generic implementation of IAuthorizableResourceDescriptor using delegate-based property extraction.
-// ABOUTME: Each instance is configured with lambdas for extracting resource ID, typed facts, and scope from a DTO.
-
 namespace Explore.Application.Authorization;
 
 /// <summary>

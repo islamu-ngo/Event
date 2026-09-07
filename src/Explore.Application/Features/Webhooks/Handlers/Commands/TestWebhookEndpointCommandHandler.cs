@@ -1,6 +1,3 @@
-// ABOUTME: Handles endpoint test-webhook scheduling through the canonical immutable delivery graph.
-// ABOUTME: Persists one message, delivery plan, and Local target atomically with its audit event.
-
 using System.Globalization;
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies Studio registration-authoring delegation and fail-closed HAL target checks.
-// ABOUTME: Proves strong ETag formatting and prevents stale or mismatched mutation dispatch.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Services;
 

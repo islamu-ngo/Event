@@ -1,6 +1,3 @@
-// ABOUTME: API integration and route contract tests for event session controller endpoints.
-// ABOUTME: Verifies public session reads stay anonymous while management session reads require authorization.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;

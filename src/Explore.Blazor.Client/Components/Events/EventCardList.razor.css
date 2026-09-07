@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped vertical rhythm for reusable single-row event card lists. */
-/* ABOUTME: Keeps profile and organization event sections visually aligned with EventList card spacing. */
-
 .event-card-list {
     display: flex;
     flex-direction: column;

@@ -1,6 +1,3 @@
-// ABOUTME: Generated-client delegation tests for Studio event promotion management.
-// ABOUTME: Verifies typed HAL parsing plus cancellation-preserving lifecycle mutations.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Services;
 

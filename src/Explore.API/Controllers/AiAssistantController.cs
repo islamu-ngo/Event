@@ -1,6 +1,3 @@
-// ABOUTME: Authenticated API surface for AI assistant bootstrap and future conversation workflows.
-// ABOUTME: Exposes safe HAL bootstrap metadata while keeping provider secrets and history private.
-
 using System.Text.Json;
 using Asp.Versioning;
 using Explore.API.Attributes;

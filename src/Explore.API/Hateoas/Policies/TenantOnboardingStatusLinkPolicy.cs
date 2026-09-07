@@ -1,6 +1,3 @@
-// ABOUTME: HAL policies for tenant onboarding completion and post-launch management affordances.
-// ABOUTME: Encodes tenant and platform authority as permission-checked links for Blazor consumers.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Security.Claims;

@@ -1,6 +1,3 @@
-// ABOUTME: Characterizes current registration-order money snapshots before promotion-domain changes.
-// ABOUTME: Pins pre-discount line freezing and contribution/fee total validation as the Phase 17 baseline.
-
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Locks the public reusable Blazor host surface and the thin Split composition root.
-// ABOUTME: Preserves Blazor and client isolation from backend layers and circular project references.
-
 using System.Xml.Linq;
 
 namespace Event.Architecture.Tests;

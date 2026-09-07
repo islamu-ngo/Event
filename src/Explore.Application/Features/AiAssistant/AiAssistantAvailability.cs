@@ -1,6 +1,3 @@
-// ABOUTME: Resolves tenant-governed AI assistant availability for Application handlers.
-// ABOUTME: Keeps send/history handlers fail-closed before provider calls or persistence mutations.
-
 using System.Net;
 using System.Net.Sockets;
 using Explore.Application.Contracts.Infrastructure.Ai;

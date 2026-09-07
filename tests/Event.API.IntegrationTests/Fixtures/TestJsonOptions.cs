@@ -1,6 +1,3 @@
-// ABOUTME: Shared JsonSerializerOptions for API integration tests.
-// ABOUTME: Mirrors the API's JSON contract including JsonStringEnumConverter so tests can deserialize string-encoded enums.
-
 using System.Text.Json;
 using System.Text.Json.Serialization;
 

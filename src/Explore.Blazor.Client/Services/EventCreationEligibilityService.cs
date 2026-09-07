@@ -1,6 +1,3 @@
-// ABOUTME: Determines whether the current user should see the "Create Event" button in the nav menu.
-// ABOUTME: Uses the API event-creation context so write affordances stay server-authorized.
-
 namespace Explore.Blazor.Client.Services;
 
 /// <summary>

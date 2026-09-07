@@ -1,6 +1,3 @@
-// ABOUTME: Defines the tenant-level policy for who can publish events.
-// ABOUTME: Controls whether only actor-backed entities or also individual users can create events.
-
 namespace Explore.Domain.Enums;
 
 public enum EventPublishingPolicyEnum

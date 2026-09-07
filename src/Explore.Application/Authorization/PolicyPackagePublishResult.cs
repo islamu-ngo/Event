@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral result model for policy package publish attempts.
-// ABOUTME: Reports applied, degraded, and failed states without exposing provider response payloads or secrets.
-
 namespace Explore.Application.Authorization;
 
 /// <summary>

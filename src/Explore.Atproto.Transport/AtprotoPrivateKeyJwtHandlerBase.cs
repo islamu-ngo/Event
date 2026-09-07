@@ -1,6 +1,3 @@
-// ABOUTME: Applies strict OAuth form, client, callback, DPoP proof, and response nonce policy once.
-// ABOUTME: Delegates only assertion signing so BFF and Infrastructure cannot diverge in validation.
-
 using System.Text;
 
 namespace Explore.Atproto.Transport;

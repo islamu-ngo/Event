@@ -1,6 +1,3 @@
-// ABOUTME: Canonical ClaimsPrincipal reading for platform user identity and provider bootstrap identity.
-// ABOUTME: Single authority for the documented user-id fallback chain and provider account reconstruction.
-
 using System.Security.Claims;
 using Explore.Application.Constants;
 using Explore.Domain;

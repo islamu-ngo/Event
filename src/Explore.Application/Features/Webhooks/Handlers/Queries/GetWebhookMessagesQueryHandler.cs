@@ -1,6 +1,3 @@
-// ABOUTME: Handles typed owner-scoped webhook message audit reads for management APIs.
-// ABOUTME: Resolves canonical ownership before bounded repository access and safe entity mapping.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.DTOs.Webhooks;

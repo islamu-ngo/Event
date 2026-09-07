@@ -1,6 +1,3 @@
-// ABOUTME: Defines RED persistence contracts for subject-correct participant admission readiness.
-// ABOUTME: Requires one tenant-qualified fence shared by completion, consent, approval, issuance, and check-in.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;

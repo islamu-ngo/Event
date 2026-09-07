@@ -1,6 +1,3 @@
-// ABOUTME: Models an immutable instance-wide replay claim for a transient-service assertion.
-// ABOUTME: Derives a lowercase namespaced SHA-256 digest and retains it until final acceptance expiry.
-
 using System.Security.Cryptography;
 using System.Text;
 namespace Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: Handles paginated retrieval of shared Layer 3 custom-property definition catalogs.
-// ABOUTME: Uses HybridCache to keep repeated tenant-admin list reads efficient.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.CustomPropertyDefinition;

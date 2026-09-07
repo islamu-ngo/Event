@@ -1,6 +1,3 @@
-// ABOUTME: Models the closed registration-condition AST for typed Studio controls.
-// ABOUTME: Converts generated read conditions into generated write inputs without script text.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Architecture guard for retired generic federation and identity CRUD surfaces.
-// ABOUTME: Keeps provider-owned keys, cursors, indexes, and login mappings behind dedicated workflows.
-
 namespace Event.Architecture.Tests;
 
 using System.Text.Json;

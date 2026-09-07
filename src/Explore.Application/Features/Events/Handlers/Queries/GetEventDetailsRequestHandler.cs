@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning full event details by ID or slug.
-// ABOUTME: Maps Event entity to EventDto with nested sessions and speakers.
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

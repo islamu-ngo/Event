@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for WorkspaceNavigationHost — renders the active workspace's navigation provider.
-// ABOUTME: Subscribes to UiShellState for content swapping; owns shared overlay header chrome.
-
 using Explore.Blazor.Client.Services.Docking;
 using Explore.Blazor.Client.Services.Shell;
 using Microsoft.AspNetCore.Components;

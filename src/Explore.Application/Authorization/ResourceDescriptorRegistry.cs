@@ -1,6 +1,3 @@
-// ABOUTME: Static registry mapping DTO types to resource kind strings for authorization checks.
-// ABOUTME: Used by both HATEOAS RequirePermission extensions (API layer) and AuthorizationBehavior (Application layer).
-
 namespace Explore.Application.Authorization;
 
 using Explore.Application.DTOs.Actor;

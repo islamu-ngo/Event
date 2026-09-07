@@ -1,6 +1,3 @@
-// ABOUTME: Tests API SMTP readiness health-check registration metadata.
-// ABOUTME: Guards the launch-critical SMTP probe timeout and readiness classification.
-
 using Event.Api.IntegrationTests.Fixtures;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;

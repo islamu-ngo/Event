@@ -1,6 +1,3 @@
-// ABOUTME: Defines authenticated admission stop, restore, reconcile, and health contracts.
-// ABOUTME: Keeps operator reasons and public statuses bounded, tenant-qualified, and PII-free.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Admissions;

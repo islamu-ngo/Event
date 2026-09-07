@@ -1,6 +1,3 @@
-// ABOUTME: Issues opaque guest capability tokens and matches their SHA-256 hashes in constant time.
-// ABOUTME: Keeps token generation stateless and never persists or logs plaintext token values.
-
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Contracts.Services;

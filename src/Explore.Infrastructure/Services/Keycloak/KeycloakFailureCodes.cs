@@ -1,6 +1,3 @@
-// ABOUTME: Defines canonical machine-readable failure codes for Keycloak bootstrap operations.
-// ABOUTME: Keeps Infrastructure results and API ProblemDetails mapping aligned without string duplication.
-
 namespace Explore.Infrastructure.Services.Keycloak;
 
 public static class KeycloakFailureCodes

@@ -1,6 +1,3 @@
-// ABOUTME: Handler for WithdrawContactShareConsentCommand — marks a consent as withdrawn.
-// ABOUTME: Delegates to IContactShareConsentService for the actual business logic.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.ContactShareConsents.Requests.Commands;
 using Explore.Application.Responses;

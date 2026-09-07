@@ -1,6 +1,3 @@
-// ABOUTME: Thin Split-profile Blazor BFF composition root over reusable owning-assembly host modules.
-// ABOUTME: Retains Program-based WebApplicationFactory compatibility and caller-owned shutdown state.
-
 using Explore.Blazor.Extensions;
 using Explore.Blazor.Hosting;
 

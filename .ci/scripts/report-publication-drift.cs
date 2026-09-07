@@ -1,6 +1,3 @@
-// ABOUTME: Compares provider-published release pages against the canonical notes hash and tag reference.
-// ABOUTME: Reports drift deterministically without repairing it and never invalidates a signed release.
-
 #:property RestorePackagesWithLockFile=false
 #pragma warning disable CA1050
 

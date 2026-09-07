@@ -1,6 +1,3 @@
-// ABOUTME: Client contract for the purpose-partitioned EventLocation disclosure API surface.
-// ABOUTME: Returns HAL resources for management reads so UI affordances gate on server links only.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.Events;

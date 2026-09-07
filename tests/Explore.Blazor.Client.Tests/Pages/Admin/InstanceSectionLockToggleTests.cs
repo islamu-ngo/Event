@@ -1,6 +1,3 @@
-// ABOUTME: bUnit tests verifying lock toggle visibility in instance section components.
-// ABOUTME: Ensures lock toggles are hidden in single-tenant mode and visible in multi-tenant mode.
-
 using Explore.Blazor.Client.Models.Analytics;
 using Explore.Blazor.Client.Pages.Admin.Instance.Components;
 using MudBlazor;

@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral registration capability contracts and typed D3 request/result records.
-// ABOUTME: Keeps provider operations segregated so downstream callbacks depend on capabilities, not provider names.
-
 using System.Text.Json;
 using Explore.Domain;
 

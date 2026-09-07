@@ -1,6 +1,3 @@
-// ABOUTME: Enforces optional network allowlists for configured browser-BFF admin hosts.
-// ABOUTME: Keeps dedicated admin host protection reusable without depending on app-specific layers.
-
 using System.Net;
 using Event.Web.BffHosting.Abstractions;
 using Event.Web.BffHosting.Options;

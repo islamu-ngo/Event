@@ -1,6 +1,3 @@
-// ABOUTME: Specifies accessible local address autocomplete and deterministic async behavior.
-// ABOUTME: Proves keyboard semantics, latest-request wins, bounded errors, and cancellation.
-
 using AngleSharp.Dom;
 using Explore.Blazor.Client.Components.Locations;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;

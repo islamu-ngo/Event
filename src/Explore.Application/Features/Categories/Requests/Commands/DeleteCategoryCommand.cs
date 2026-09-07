@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for deleting a category by ID.
-// ABOUTME: Carries the target category ID.
 using System;
 using Explore.Application.Authorization;
 using MediatR;

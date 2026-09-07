@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for MachineScopeMapping scope-to-action gate used by machine-principal authorization.
-// ABOUTME: Validates every {resource_kind, action} pairing against the V1 scope catalog across all owner types.
-
 using Explore.Application.Authorization;
 using Explore.Domain.Constants;
 

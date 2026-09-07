@@ -1,6 +1,3 @@
-// ABOUTME: Handler for ExportSharedContactsCommand — generates CSV/TSV file and records audit trail.
-// ABOUTME: Validates org approval, builds file content, persists export + export item audit records.
-
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;

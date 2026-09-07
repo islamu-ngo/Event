@@ -1,6 +1,3 @@
-// ABOUTME: Defines the RED contract for provider-neutral ATProto thumbnail blob acquisition and staging.
-// ABOUTME: Requires fresh DID/PDS resolution, bounded image validation, and observable staged-object cleanup.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;

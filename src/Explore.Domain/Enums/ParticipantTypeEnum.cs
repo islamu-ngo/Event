@@ -1,6 +1,3 @@
-// ABOUTME: Enum mirror for stable participant-type lookup identities.
-// ABOUTME: Distinguishes adult, represented, employee, guest, and unnamed participants.
-
 namespace Explore.Domain.Enums;
 
 public enum ParticipantTypeEnum

@@ -1,6 +1,3 @@
-// ABOUTME: Normalized webhook retention classifications and tenant-scoped legal or operational holds.
-// ABOUTME: Keeps cleanup exclusions durable without mutating immutable message and audit evidence.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

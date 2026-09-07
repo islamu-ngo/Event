@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for BlockInSingleTenantAttribute and RequireMultiTenantAttribute filter behavior.
-// ABOUTME: Verifies deployment-mode gating returns RFC 7807 ProblemDetails instead of empty status results.
-
 using Explore.API.Filters;
 using Explore.Application.Contracts.Services;
 using Explore.Domain.Enums;

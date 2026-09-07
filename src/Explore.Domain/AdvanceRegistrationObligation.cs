@@ -1,6 +1,3 @@
-// ABOUTME: Normalized lookup describing whether advance registration is applicable, optional, or required.
-// ABOUTME: Keeps attendance obligation independent from participation ownership and identity access.
-
 namespace Explore.Domain;
 
 public sealed class AdvanceRegistrationObligation

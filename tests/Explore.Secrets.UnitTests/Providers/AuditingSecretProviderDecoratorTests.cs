@@ -1,6 +1,3 @@
-// ABOUTME: Verifies that secret-provider audits cover mutations but never secret reads.
-// ABOUTME: Guards bounded failure codes so provider diagnostics cannot enter audit storage.
-
 using System.Security.Claims;
 using Explore.Application.Constants;
 using Explore.Secrets.Abstractions;

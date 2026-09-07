@@ -1,6 +1,3 @@
-/* ABOUTME: CSS isolation for the dedicated event session editing page. */
-/* ABOUTME: Mirrors the create-session composer while keeping edit-specific styles scoped. */
-
 .edit-session {
     min-height: 100%;
     background: var(--isl-color-surface-subtle, transparent);

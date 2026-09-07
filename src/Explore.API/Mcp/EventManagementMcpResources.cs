@@ -1,6 +1,3 @@
-// ABOUTME: MCP resources for authenticated event-management context reads.
-// ABOUTME: Projects action affordances from REST HAL links so MCP clients follow the same capability source.
-
 using System.ComponentModel;
 using System.Text.Json;
 using Explore.API.Hateoas;

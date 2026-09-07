@@ -1,6 +1,3 @@
-// ABOUTME: Persistence boundary for atomic report-decision execution claims and state loads.
-// ABOUTME: Keeps lease contention and PostgreSQL conditional updates outside application handlers.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the reporter-facing EventReportingService wrapper.
-// ABOUTME: Verifies HAL pagination mapping and resilient fallbacks around generated API calls.
-
 using Explore.Blazor.Client.Contracts.Services.EventReporting;
 using Explore.Blazor.Client.Helpers;
 

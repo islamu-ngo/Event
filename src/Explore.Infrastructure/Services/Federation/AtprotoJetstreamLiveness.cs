@@ -1,6 +1,3 @@
-// ABOUTME: Publishes whether the leased Jetstream consumer currently holds an open subscription.
-// ABOUTME: Lets readiness reflect connectivity rather than event arrival, which is far too rare to poll.
-
 using System.Diagnostics.Metrics;
 
 namespace Explore.Infrastructure.Services.Federation;

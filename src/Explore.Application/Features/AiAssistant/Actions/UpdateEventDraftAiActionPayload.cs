@@ -1,6 +1,3 @@
-// ABOUTME: Defines the safe AI-proposed payload shape for draft event updates.
-// ABOUTME: Excludes tenant, actor, lifecycle status, ownership, and schedule projection fields.
-
 using Explore.Application.DTOs.Event;
 
 namespace Explore.Application.Features.AiAssistant.Actions;

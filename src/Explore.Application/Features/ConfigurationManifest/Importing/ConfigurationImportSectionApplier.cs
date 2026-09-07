@@ -1,6 +1,3 @@
-// ABOUTME: Applies selected portable sections through canonical transaction-aware mutation boundaries.
-// ABOUTME: Resolves trusted target tenants independently from source package identities and values.
-
 namespace Explore.Application.Features.ConfigurationManifest.Importing;
 
 using System.Collections.Immutable;

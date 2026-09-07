@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for idempotent event-report provider sync outbox dispatch.
-// ABOUTME: Verifies provider outcomes are persisted as local report links and signals.
-
 using System.Diagnostics.Metrics;
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;

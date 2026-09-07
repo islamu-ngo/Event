@@ -1,6 +1,3 @@
-// ABOUTME: Startup validation for optional RabbitMQ Dispatch Mode settings.
-// ABOUTME: Rejects structurally unsafe broker topology values before side-effect workers run.
-
 using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure;

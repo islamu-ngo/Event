@@ -1,6 +1,3 @@
-// ABOUTME: Regression tests for Blazor bootstrap authority and configuration mapping.
-// ABOUTME: Protects credentials and Aspire discovery from lower-authority compatibility keys.
-
 using Explore.Blazor.Extensions;
 using Microsoft.Extensions.Configuration;
 

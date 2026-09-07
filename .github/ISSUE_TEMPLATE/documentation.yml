@@ -1,6 +1,3 @@
-# ABOUTME: Documentation issue template for ISLAMU Event.
-# ABOUTME: Collects stale claims, expected corrections, source anchors, and affected documentation paths.
-
 name: 📚 Documentation Issue
 description: Report stale, missing, confusing, or incorrect documentation.
 title: "[Docs]: "

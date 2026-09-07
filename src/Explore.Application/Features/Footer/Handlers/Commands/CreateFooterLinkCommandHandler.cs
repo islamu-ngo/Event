@@ -1,6 +1,3 @@
-// ABOUTME: Handles CreateFooterLinkCommand — creates a new link inside a footer group.
-// ABOUTME: Validates group ownership and auto-assigns Order within the group.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;

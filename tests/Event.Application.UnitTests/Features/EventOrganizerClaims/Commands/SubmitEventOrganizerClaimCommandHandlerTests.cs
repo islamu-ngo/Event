@@ -1,6 +1,3 @@
-// ABOUTME: Verifies organizer-claim submission requires current tenant participation for the claimant actor.
-// ABOUTME: Covers user, organization, and group eligibility while retaining existing controller permission checks.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventOrganizerClaim;

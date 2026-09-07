@@ -1,6 +1,3 @@
-// ABOUTME: Connects Web Push HTTP requests to the same public IP address validated by the SSRF policy.
-// ABOUTME: Prevents DNS rebinding between endpoint validation and the outbound TLS connection.
-
 using System.Net;
 using System.Net.Sockets;
 

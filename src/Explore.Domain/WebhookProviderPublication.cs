@@ -1,6 +1,3 @@
-// ABOUTME: Authoritative tenant-scoped aggregate for one provider submission of a webhook message.
-// ABOUTME: Freezes provider identity/configuration and enforces fenced publication and bounded reconciliation.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

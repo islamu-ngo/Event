@@ -1,6 +1,3 @@
-// ABOUTME: Validates grouped event session template patches before merged-state validation in the handler.
-// ABOUTME: Rejects empty wrappers, empty metadata groups, and missing definition item collections.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.EventSessionTemplate.Validators;

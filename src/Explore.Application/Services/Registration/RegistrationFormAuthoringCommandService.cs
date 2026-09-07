@@ -1,6 +1,3 @@
-// ABOUTME: Executes registration workflow and form-authoring aggregate mutations behind one event boundary.
-// ABOUTME: Enforces tenant, event, and optimistic-concurrency checks before every tracked write.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;

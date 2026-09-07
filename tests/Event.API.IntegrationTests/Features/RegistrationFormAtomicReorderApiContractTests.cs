@@ -1,6 +1,3 @@
-// ABOUTME: Locks canonical atomic registration-form reorder routes and HAL affordances.
-// ABOUTME: Verifies draft-only update authorization and authoritative version response contracts.
-
 using System.Reflection;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;

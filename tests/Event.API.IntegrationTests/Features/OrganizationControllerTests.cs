@@ -1,6 +1,3 @@
-// ABOUTME: API integration tests for organization read/write endpoints.
-// ABOUTME: Covers anonymous reads, authenticated write protection, PATCH contract, and action-route authorization.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;

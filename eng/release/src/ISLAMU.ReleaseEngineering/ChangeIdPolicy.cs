@@ -1,6 +1,3 @@
-// ABOUTME: Defines historical and collision-resistant Change-Id syntax plus ULID-style generation.
-// ABOUTME: Keeps new allocation sortable and race-resistant without reinterpreting persisted history.
-
 using System.Numerics;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;

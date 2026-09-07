@@ -1,6 +1,3 @@
-// ABOUTME: Persistence contract for support-access session entity queries.
-// ABOUTME: Returns Domain entities and requires bounded actor/tenant predicates for sensitive reads.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Exposes the narrow optional Event managed-mode capability, registration, status, and credential contract.
-// ABOUTME: Keeps standalone mode absent and protects managed writes with isolated directional machine trust.
-
 using System.Security.Claims;
 using Asp.Versioning;
 using Explore.API.Attributes;

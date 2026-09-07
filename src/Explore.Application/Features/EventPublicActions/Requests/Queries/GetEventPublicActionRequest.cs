@@ -1,6 +1,3 @@
-// ABOUTME: Public CQRS query for one reviewed action addressed by stored identifiers.
-// ABOUTME: Supports safe detail and redirect routes without accepting caller-provided destinations.
-
 using Explore.Application.DTOs.Event;
 using MediatR;
 

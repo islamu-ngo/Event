@@ -1,6 +1,3 @@
-// ABOUTME: Verifies template sync requests use explicit custom-property-template authorization metadata.
-// ABOUTME: Prevents sync diff/apply/history flows from regressing to controller-only authentication.
-
 using System.Reflection;
 using Explore.Application.Authorization;
 using Explore.Application.Features.EventSessionTemplateSync.Commands.ApplyEventSessionTemplateSync;

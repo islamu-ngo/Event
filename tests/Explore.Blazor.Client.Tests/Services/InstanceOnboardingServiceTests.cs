@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for InstanceOnboardingService BFF endpoint mapping and command behavior.
-// ABOUTME: Covers typed startup status mapping, onboarding/admin settings, auth provider flows, and storage HAL affordances.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;

@@ -1,6 +1,3 @@
-// ABOUTME: Enforces the effective footer link-group governance lock before tenant mutations.
-// ABOUTME: Single-tenant mode bypasses instance governance locks by platform rule.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;

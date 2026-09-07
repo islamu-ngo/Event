@@ -1,6 +1,3 @@
-// ABOUTME: Enforces captured-payment refund capacity and open-dispute exclusion.
-// ABOUTME: Counts every non-released attempt so ambiguity cannot double-spend a capture.
-
 using Explore.Domain.ValueObjects;
 
 namespace Explore.Domain;

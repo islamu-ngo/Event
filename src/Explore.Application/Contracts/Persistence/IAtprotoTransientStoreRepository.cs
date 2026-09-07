@@ -1,6 +1,3 @@
-// ABOUTME: Defines relational persistence operations for encrypted ATProto authentication transients.
-// ABOUTME: Separates pre-tenant OAuth lookup from tenant-bound read and single-winner consumption.
-
 using Explore.Domain;
 namespace Explore.Application.Contracts.Persistence;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Validates the closed buyer-choice vocabulary for paid-event material changes.
-// ABOUTME: Rejects missing campaign identity and free-form text at the request boundary.
-
 using Explore.Application.DTOs.RegistrationOrders;
 using FluentValidation;
 

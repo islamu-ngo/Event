@@ -1,6 +1,3 @@
-// ABOUTME: Defines canonical Event control-plane route paths under the instance administration root.
-// ABOUTME: Prevents embedded and separate control-plane hosts from drifting on shared route strings.
-
 namespace Explore.Blazor.Client.Routing.ControlPlane;
 
 public static class ControlPlaneRoutes

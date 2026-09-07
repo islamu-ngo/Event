@@ -1,5 +1,3 @@
-// ABOUTME: Domain entity for tenant-scoped customizable navigation links.
-// ABOUTME: Supports auditing (IAuditableEntity) and soft-delete (ISoftDeletable).
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

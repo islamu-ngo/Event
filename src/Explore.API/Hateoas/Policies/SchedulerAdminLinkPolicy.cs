@@ -1,6 +1,3 @@
-// ABOUTME: HAL link policies for the scheduler administration overview and scheduled-job collection.
-// ABOUTME: Emits control affordances only when permissions, scheduler availability, and host mutability all allow.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Security.Claims;

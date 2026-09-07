@@ -1,6 +1,3 @@
-// ABOUTME: Verifies authority EF tooling consumes only structured migrator settings.
-// ABOUTME: Locks design-time composition to the shared PostgreSQL contract and distinct history table.
-
 using System.Data;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Secrets.Database;

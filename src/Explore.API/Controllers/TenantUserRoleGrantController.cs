@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for auditable tenant user role grants.
-// ABOUTME: Exposes create/revoke mutations and HAL collection/detail reads via CQRS/MediatR.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

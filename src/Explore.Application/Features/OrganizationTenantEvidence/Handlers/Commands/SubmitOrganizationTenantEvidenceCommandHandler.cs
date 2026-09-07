@@ -1,6 +1,3 @@
-// ABOUTME: Attaches one eligible private document to a pending OrganizationTenant participation.
-// ABOUTME: Validates organization-admin authority and exact tenant/participation storage ownership before retaining evidence.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Runs the CarpaNet AT Protocol OAuth challenge and callback inside the Blazor BFF.
-// ABOUTME: Enforces bounded handles, protected flow bindings, HTTPS redirects, and verified bridge results.
-
 using System.Text.Encodings.Web;
 using CarpaNet.OAuth.Storage;
 using Explore.Blazor.Services.Auth;

@@ -1,6 +1,3 @@
-// ABOUTME: Secured MediatR query for authenticated management access to event details.
-// ABOUTME: Allows authorized actors to retrieve moderated events without changing the public detail route.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Event;
 using MediatR;

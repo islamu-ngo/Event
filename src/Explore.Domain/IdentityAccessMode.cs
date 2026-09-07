@@ -1,6 +1,3 @@
-// ABOUTME: Normalized lookup describing the identity required to enter a platform-managed participation workflow.
-// ABOUTME: Distinguishes account, guest, and opaque capability-token access without boolean combinations.
-
 namespace Explore.Domain;
 
 public sealed class IdentityAccessMode

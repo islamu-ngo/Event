@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the Keycloak Admin API bootstrap infrastructure adapter.
-// ABOUTME: Verifies safe HTTP flow, realm/client mutation behavior, URL blocking, and secret redaction.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;

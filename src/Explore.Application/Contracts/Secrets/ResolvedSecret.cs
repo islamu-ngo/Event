@@ -1,6 +1,3 @@
-// ABOUTME: Immutable record returned by ISecretResolver carrying the materialized secret value
-// ABOUTME: plus provenance metadata for audit, observability, and cache coordination.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Contracts.Secrets;

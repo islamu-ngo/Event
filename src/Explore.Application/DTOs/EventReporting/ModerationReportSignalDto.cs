@@ -1,6 +1,3 @@
-// ABOUTME: Management projection for provider or local moderation signals.
-// ABOUTME: Exposes bounded verdict metadata and safe summaries without raw provider payloads.
-
 namespace Explore.Application.DTOs.EventReporting;
 
 public sealed record ModerationReportSignalDto

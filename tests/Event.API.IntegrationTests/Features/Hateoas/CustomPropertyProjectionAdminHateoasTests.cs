@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS authorization contract tests for custom-property projection admin affordances.
-// ABOUTME: Protects projection rebuild/drain/status links from drifting away from server authorization metadata.
-
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.Authorization;

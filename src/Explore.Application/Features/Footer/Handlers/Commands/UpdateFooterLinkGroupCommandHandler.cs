@@ -1,6 +1,3 @@
-// ABOUTME: Handles UpdateFooterLinkGroupCommand — updates title and active state.
-// ABOUTME: Validates group ownership before persisting changes.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;

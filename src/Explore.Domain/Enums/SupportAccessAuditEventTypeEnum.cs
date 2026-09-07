@@ -1,6 +1,3 @@
-// ABOUTME: Lookup enum for support-access audit event categories.
-// ABOUTME: Values identify lifecycle, denial, request-observation, and command-commit evidence.
-
 namespace Explore.Domain.Enums;
 
 public enum SupportAccessAuditEventTypeEnum

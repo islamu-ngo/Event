@@ -1,6 +1,3 @@
-// ABOUTME: Command contract for a presence-aware patch of the current tenant branding typed settings document.
-// ABOUTME: Uses typed JSONB settings only; no scalar fallback, scalar backfill, or dual-write path.
-
 namespace Explore.Application.Features.TenantSettingsDocuments.Requests.Commands;
 
 using Explore.Application.Authorization;

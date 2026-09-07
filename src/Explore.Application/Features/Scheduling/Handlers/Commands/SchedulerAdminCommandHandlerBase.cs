@@ -1,6 +1,3 @@
-// ABOUTME: Shared execution and outcome mapping for every scheduler administration command handler.
-// ABOUTME: Enforces the read-only host policy centrally so no individual action can forget to honour it.
-
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Responses;
 

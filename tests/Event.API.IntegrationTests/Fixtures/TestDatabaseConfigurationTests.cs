@@ -1,6 +1,3 @@
-// ABOUTME: Focused contract coverage for Testcontainers PostgreSQL configuration projection.
-// ABOUTME: Verifies the test helper never leaves a raw connection-string configuration key behind.
-
 using TUnit.Core;
 
 namespace Event.Api.IntegrationTests.Fixtures;

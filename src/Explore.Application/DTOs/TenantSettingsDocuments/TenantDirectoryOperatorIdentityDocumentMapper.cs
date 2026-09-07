@@ -1,6 +1,3 @@
-// ABOUTME: Maps tenant-owned directory-operator typed documents to their API-safe representation.
-// ABOUTME: Evaluates activation, public-disclosure, and paid-commerce readiness with immutable reason codes.
-
 namespace Explore.Application.DTOs.TenantSettingsDocuments;
 
 using Explore.Application.Contracts.Infrastructure;

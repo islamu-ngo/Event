@@ -1,6 +1,3 @@
-// ABOUTME: Orchestrates uniform recovery requests, single-use consumption, and resend rotation.
-// ABOUTME: Commits digest-only state before plaintext crosses the capability-to-delivery seam.
-
 using System.Collections.Concurrent;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Persistence;

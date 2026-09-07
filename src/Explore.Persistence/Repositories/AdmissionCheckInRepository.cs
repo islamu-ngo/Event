@@ -1,6 +1,3 @@
-// ABOUTME: Executes tenant-qualified admission decisions under ticket, capability, and state row fences.
-// ABOUTME: Resolves bounded credential digest pairs in one query and saves each fact with its projection atomically.
-
 using System.Linq.Expressions;
 using Explore.Application.Contracts.Admissions;
 using Explore.Domain;

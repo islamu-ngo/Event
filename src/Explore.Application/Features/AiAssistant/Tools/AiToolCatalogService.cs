@@ -1,6 +1,3 @@
-// ABOUTME: Builds route/workflow-scoped AI tool catalog views from registry metadata.
-// ABOUTME: Uses tenant, principal, route, workflow, context, and HAL inputs without granting execution authority.
-
 namespace Explore.Application.Features.AiAssistant.Tools;
 
 public sealed class AiToolCatalogService

@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for EventSessionLanguage junction rows.
-// ABOUTME: Keeps language lookup global while binding session membership through a tenant-scoped composite FK.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

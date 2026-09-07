@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning a paginated list of categories.
-// ABOUTME: Maps Category entities to CategoryListDto via AutoMapper.
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;

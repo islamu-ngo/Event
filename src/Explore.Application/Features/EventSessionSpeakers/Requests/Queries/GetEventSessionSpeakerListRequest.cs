@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query request for fetching all session-speaker links.
-// ABOUTME: Returns IEnumerable<EventSessionSpeakerDto>.
 using System.Collections.Generic;
 using Explore.Application.DTOs.EventSessionSpeaker;
 using Explore.Application.Responses;

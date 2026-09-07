@@ -1,6 +1,3 @@
-// ABOUTME: bUnit tests for EventDayManager verifying day list rendering, empty state, and manage controls.
-// ABOUTME: Tests view-only vs manage mode, day labels, and date formatting.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Events;
 using Microsoft.Extensions.Logging;

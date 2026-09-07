@@ -1,8 +1,6 @@
 ---
 description: Comprehensive reference for all baseline, advanced, and profile-specific environment variables.
 ---
-<!-- ABOUTME: Public operator reference for supported environment-backed configuration. -->
-<!-- ABOUTME: Distinguishes baseline settings, secret values, and optional deployment profiles. -->
 
 # Environment Variables Reference
 

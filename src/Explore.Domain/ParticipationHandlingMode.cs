@@ -1,6 +1,3 @@
-// ABOUTME: Normalized lookup describing which system owns an event's participation handling.
-// ABOUTME: Separates information-only, walk-in, external-managed, and platform-managed participation.
-
 namespace Explore.Domain;
 
 public sealed class ParticipationHandlingMode

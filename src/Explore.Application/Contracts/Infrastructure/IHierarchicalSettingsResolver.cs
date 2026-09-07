@@ -1,6 +1,3 @@
-// ABOUTME: Contract for the 5-tier hierarchical settings resolver (Instance → Tenant → Org → Group → User).
-// ABOUTME: Replaces the 2-tier ISettingsResolver with batch loading, typed groups, and lock semantics.
-
 namespace Explore.Application.Contracts.Infrastructure;
 
 using Explore.Application.Settings;

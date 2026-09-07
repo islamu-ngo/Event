@@ -1,6 +1,3 @@
-// ABOUTME: Regression coverage for custom-property option update lifecycle semantics.
-// ABOUTME: Uses EF Core in-memory storage to verify repositories preserve option identity instead of hard-replacing rows.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;

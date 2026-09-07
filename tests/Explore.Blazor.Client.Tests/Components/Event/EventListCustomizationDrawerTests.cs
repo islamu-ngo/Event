@@ -1,6 +1,3 @@
-// ABOUTME: bUnit tests for EventListCustomizationDrawer verifying section rendering and lock behavior.
-// ABOUTME: Tests browse mode, layout, card field switches, saving indicator, and reset button.
-
 using EventListCustomizationDrawerComponent = Explore.Blazor.Client.Pages.Events.Components.EventListCustomizationDrawer;
 
 namespace Explore.Blazor.Client.Tests.Components.Event;

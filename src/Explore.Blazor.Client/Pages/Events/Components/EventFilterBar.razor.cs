@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for the MangaDex-style advanced search filter bar component.
-// ABOUTME: Manages filter state, collapse/drawer toggle, and search invocation for the event list.
-
 using System.Globalization;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Models;

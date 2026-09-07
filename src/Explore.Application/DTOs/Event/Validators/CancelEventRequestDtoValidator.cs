@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation validator for CancelEventRequestDto, manually instantiated by handlers.
-// ABOUTME: Enforces the optimistic-concurrency stamp required for safe cancel transitions.
-
 using Explore.Application.DTOs.Event;
 using FluentValidation;
 

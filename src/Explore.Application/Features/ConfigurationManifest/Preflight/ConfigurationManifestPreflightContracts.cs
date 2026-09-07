@@ -1,6 +1,3 @@
-// ABOUTME: Safe read-only outcomes for configuration-manifest bootstrap preflight.
-// ABOUTME: Distinguishes wholesale existing-tenant skips from create candidates and ordered blockers.
-
 namespace Explore.Application.Features.ConfigurationManifest.Preflight;
 
 using System.Collections.Immutable;

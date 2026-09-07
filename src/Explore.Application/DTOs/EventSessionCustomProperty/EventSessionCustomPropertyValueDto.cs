@@ -1,6 +1,3 @@
-// ABOUTME: Read-only DTO for event session custom property values, the actual data stored per-session.
-// ABOUTME: Typed value columns are mutually exclusive based on the definition's PropertyType.
-
 namespace Explore.Application.DTOs.EventSessionCustomProperty;
 
 public sealed record EventSessionCustomPropertyValueDto

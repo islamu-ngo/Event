@@ -1,6 +1,3 @@
-// ABOUTME: Bounded, session-scoped circuit token store replacing the static ConcurrentDictionary token cache.
-// ABOUTME: Enforces per-authentication-session scope, deterministic cleanup, safe structured logging, and cross-user isolation.
-
 using System.Collections.Concurrent;
 using System.IdentityModel.Tokens.Jwt;
 

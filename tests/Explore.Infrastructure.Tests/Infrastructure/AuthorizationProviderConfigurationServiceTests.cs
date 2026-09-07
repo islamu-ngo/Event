@@ -1,6 +1,3 @@
-// ABOUTME: Tests Cerbos authorization provider configuration persistence and deployment-secret redaction.
-// ABOUTME: Verifies one-time Admin credentials never enter settings and unsafe endpoints fail before storage.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

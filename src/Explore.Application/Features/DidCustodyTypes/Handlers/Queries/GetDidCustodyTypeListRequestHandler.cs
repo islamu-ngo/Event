@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning all DID custody types.
-// ABOUTME: Maps entities to DidCustodyTypeDto list.
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;

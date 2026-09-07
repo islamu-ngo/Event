@@ -1,6 +1,3 @@
-// ABOUTME: Defines ordered immutable evidence revisions for a registration submission.
-// ABOUTME: Retains provider revision identifiers as nullable evidence without provider-specific runtime types.
-
 using Explore.Domain.Interfaces;
 namespace Explore.Domain;
 

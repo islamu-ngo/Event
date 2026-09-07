@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for Basic Dispatch Mode email outbox state, attempts, and receipts.
-// ABOUTME: Uses affected-row conditional updates for optimistic claims and durable retry/dead-letter transitions.
-
 using System.Data;
 using System.Data.Common;
 using Explore.Application.Contracts.Persistence;

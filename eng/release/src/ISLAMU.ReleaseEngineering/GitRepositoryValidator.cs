@@ -1,6 +1,3 @@
-// ABOUTME: Validates release Git objects through bounded provider-neutral Git CLI calls.
-// ABOUTME: Reads only immutable tag objects, commits, and ancestry; never resolves a mutable branch ref.
-
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.RegularExpressions;

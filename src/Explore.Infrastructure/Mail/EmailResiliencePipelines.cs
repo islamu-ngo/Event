@@ -1,4 +1,3 @@
-// ABOUTME: Polly v8 resilience pipelines for email send operations.
 // Retries transient SMTP failures (timeouts, 421/451) with exponential backoff.
 
 using Explore.Application.Models;

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies registration-form authoring route names and optimistic-concurrency metadata.
-// ABOUTME: Protects stable operation IDs, authenticated classification, and write-rate limits.
-
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 using Event.Api.IntegrationTests.Fixtures;

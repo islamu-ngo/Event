@@ -1,6 +1,3 @@
-// ABOUTME: Fast route, authorization, rate-limit, and response contracts for managed Event operations.
-// ABOUTME: Covers upgrade assessments plus async tenant provisioning schedule, status, and cancellation.
-
 using System.Reflection;
 using Explore.API.Attributes;
 using Explore.API.Authentication;

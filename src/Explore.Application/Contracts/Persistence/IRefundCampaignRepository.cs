@@ -1,6 +1,3 @@
-// ABOUTME: Defines entity-first persistence operations for durable refund campaign paging and fencing.
-// ABOUTME: Keeps bounded captured-payment queries and atomic cursor/outbox advancement behind Application.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

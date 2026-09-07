@@ -1,6 +1,3 @@
-// ABOUTME: Defines how multiple open docked panels on the same side share visible space.
-// ABOUTME: Keeps stack behavior explicit on descriptors instead of hard-coding it by side.
-
 namespace Explore.Blazor.Client.Services.Docking;
 
 public sealed record DockPanelStackStrategy

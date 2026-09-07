@@ -1,6 +1,3 @@
-// ABOUTME: Defines immutable value-safe CLI invocation, explicit I/O, and machine response contracts.
-// ABOUTME: Snapshots caller collections and provides source-generated JSON metadata without reflection fallback.
-
 using System.Collections.ObjectModel;
 using System.Text.Json.Serialization;
 

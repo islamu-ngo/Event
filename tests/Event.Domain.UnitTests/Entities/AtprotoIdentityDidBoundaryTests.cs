@@ -1,6 +1,3 @@
-// ABOUTME: Guards the AT Protocol DID semantic boundary, syntax rules, and privacy-erasure tombstone lifecycle.
-// ABOUTME: Enforces Scenario 3.5A-3.5C invariants: case-sensitivity, length bounds, and tombstone distinction.
-
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 

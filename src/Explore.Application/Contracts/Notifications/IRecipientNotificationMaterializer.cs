@@ -1,6 +1,3 @@
-// ABOUTME: Application boundary for atomically materializing one recipient's logical intent and selected channels.
-// ABOUTME: Separates caller-owned transaction use from an execution-strategy-owned transaction entrypoint.
-
 using Explore.Application.Notifications;
 using Explore.Domain;
 using Explore.Domain.Enums;

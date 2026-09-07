@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for EmailDispatchProcessorSettingsValidator.
-// ABOUTME: Verifies Basic Dispatch Mode startup validation rejects unsafe worker settings.
-
 using Explore.Infrastructure;
 
 namespace Explore.Infrastructure.Tests.Infrastructure;

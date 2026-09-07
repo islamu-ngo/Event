@@ -1,6 +1,3 @@
-// ABOUTME: Claims or reuses one active payment attempt for a payable registration order.
-// ABOUTME: Builds immutable recipient and idempotency facts locally, then persists only a post-commit dispatch effect.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Payments;
 using Explore.Application.Contracts.Services;

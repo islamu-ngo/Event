@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for provider-neutral external binding correlation records.
-// ABOUTME: Uses explicit scope predicates so nullable instance-scope bindings remain deterministic.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.References;

@@ -1,6 +1,3 @@
-// ABOUTME: Provides manual FluentValidation rules for organizer promotion management commands.
-// ABOUTME: Validates only request shape while handlers map domain lifecycle failures to stable responses.
-
 using Explore.Application.Features.Promotions.Requests.Commands;
 using FluentValidation;
 

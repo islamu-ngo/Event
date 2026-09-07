@@ -1,6 +1,3 @@
-// ABOUTME: Exercises the assembly-wide options boundary through raw, scoped, factory and pooled EF entry points.
-// ABOUTME: Guards shared InMemory stores, service replacements, schema diversity and child-process failure propagation.
-
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Schema;

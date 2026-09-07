@@ -1,6 +1,3 @@
-// ABOUTME: Service contract for managing tenant policy settings with instance-level delegation constraints.
-// ABOUTME: Resolves tenant overrides against instance defaults for onboarding and runtime configuration.
-
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.TenantPolicy;
 using Explore.Application.Notifications;

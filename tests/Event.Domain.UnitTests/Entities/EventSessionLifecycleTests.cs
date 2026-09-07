@@ -1,6 +1,3 @@
-// ABOUTME: Exercises EventSession semantic lifecycle methods through direct aggregate calls and fixed timestamps.
-// ABOUTME: Covers no-op retries, UTC validation, federation/moderation seams, atomic failures, and reschedule gating.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Scheduling;
 using Explore.Domain.ValueObjects;

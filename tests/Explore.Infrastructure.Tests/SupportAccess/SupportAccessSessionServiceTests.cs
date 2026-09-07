@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for support-access runtime context validation and write-mode governance.
-// ABOUTME: Verifies forwarded session IDs stay actor-bound, tenant-scoped, time-boxed, and policy-gated.
-
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;

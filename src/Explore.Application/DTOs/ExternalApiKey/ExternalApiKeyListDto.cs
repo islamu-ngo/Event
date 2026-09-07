@@ -1,6 +1,3 @@
-// ABOUTME: Safe management projection for external API keys with masked display and credit quota info.
-// ABOUTME: Excludes raw secret and hash material while exposing lifecycle, ownership, and credit metadata.
-
 namespace Explore.Application.DTOs.ExternalApiKey;
 
 public sealed record ExternalApiKeyListDto

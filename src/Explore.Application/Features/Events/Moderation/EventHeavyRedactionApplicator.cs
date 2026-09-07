@@ -1,6 +1,3 @@
-// ABOUTME: Applies irreversible heavy-moderation redaction sentinels to event-owned domain entities.
-// ABOUTME: Clears unsafe text/image/federation references without preserving original content in memory results or audit rows.
-
 using Explore.Application.Authorization;
 using Explore.Domain;
 using Explore.Domain.Enums;

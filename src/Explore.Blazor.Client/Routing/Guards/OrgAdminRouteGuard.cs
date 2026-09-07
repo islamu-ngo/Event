@@ -1,6 +1,3 @@
-// ABOUTME: Route guard that restricts organization settings to current persisted administrators.
-// ABOUTME: Resolves organization authority through the tenant-scoped BFF API and fails closed.
-
 using System.Text.RegularExpressions;
 using Blazouter.Interfaces;
 using Blazouter.Models;

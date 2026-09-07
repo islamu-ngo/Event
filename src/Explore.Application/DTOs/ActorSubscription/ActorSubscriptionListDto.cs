@@ -1,6 +1,3 @@
-// ABOUTME: List DTO for paginated actor subscription collections.
-// ABOUTME: Keeps subscription list responses compact while preserving HAL/action metadata inputs.
-
 namespace Explore.Application.DTOs.ActorSubscription;
 
 public sealed record ActorSubscriptionListDto

@@ -1,6 +1,3 @@
-// ABOUTME: Resolves persisted group authorization context for event-session group updates.
-// ABOUTME: Keeps the existing pessimistic lookup path read-only for authorization dispatch.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Infrastructure;

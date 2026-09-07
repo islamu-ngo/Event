@@ -1,6 +1,3 @@
-// ABOUTME: Application contract for the active support-access context on a request.
-// ABOUTME: Carries support metadata without replacing the real current user identity.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Contracts.Identity;

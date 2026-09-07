@@ -1,6 +1,3 @@
-// ABOUTME: Validates tenant creation naming and immediate-activation legal identity.
-// ABOUTME: Requires capability-valid directory identity only when Active is requested.
-
 using Explore.Application.DTOs.Tenant;
 using Explore.Application.DTOs.TenantSettings.Validators;
 using Explore.Domain.ValueObjects;

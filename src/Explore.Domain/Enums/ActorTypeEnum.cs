@@ -1,6 +1,3 @@
-// ABOUTME: Stable lookup identifiers for the concrete subject kinds owned by Actor.
-// ABOUTME: Includes the temporary external-unclassified kind used before verified promotion.
-
 namespace Explore.Domain.Enums;
 
 public enum ActorTypeEnum

@@ -1,6 +1,3 @@
-// ABOUTME: Relational model tests for EventLocation privacy mappings that do not require a live database.
-// ABOUTME: Proves mapped audit columns remain PII-free and tenant/concurrency filters are present.
-
 using Explore.Domain;
 using Explore.Persistence;
 using Microsoft.EntityFrameworkCore;

@@ -1,6 +1,3 @@
-// ABOUTME: Shared server-side action and reason input for global Actor and AT Protocol identity moderation.
-// ABOUTME: Validates only supported state transitions and bounded audit reason codes before aggregate lookup.
-
 using Explore.Domain.Enums;
 using FluentValidation;
 

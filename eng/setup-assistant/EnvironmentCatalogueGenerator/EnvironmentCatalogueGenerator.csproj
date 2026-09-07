@@ -1,5 +1,3 @@
-<!-- ABOUTME: Defines the repository-native environment catalogue generator and drift checker. -->
-<!-- ABOUTME: References compiled Core metadata and compiled Domain secret authority without package additions. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>

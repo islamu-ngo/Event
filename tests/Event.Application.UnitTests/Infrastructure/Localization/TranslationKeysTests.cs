@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for TranslationKeys — verifies MasterCode-based lookup key construction.
-// ABOUTME: Locks translation keys to stable lookup identity instead of IDs or localized labels.
-
 using Explore.Application.Localization;
 
 namespace Event.Application.UnitTests.Infrastructure.Localization;

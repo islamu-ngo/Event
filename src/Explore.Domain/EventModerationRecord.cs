@@ -1,6 +1,3 @@
-// ABOUTME: Safe tenant-scoped history record for event moderation actions.
-// ABOUTME: Stores moderation metadata only and never stores event text, URLs, image keys, or payloads.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

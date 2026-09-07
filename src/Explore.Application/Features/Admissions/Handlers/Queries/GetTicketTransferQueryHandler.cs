@@ -1,6 +1,3 @@
-// ABOUTME: Resolves one private ticket-transfer resource through holder or capability authority.
-// ABOUTME: Publishes bounded transfer state and server-owned action flags without PII.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;

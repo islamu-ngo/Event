@@ -1,6 +1,3 @@
-// ABOUTME: API contract tests for authenticated AI assistant conversation endpoints.
-// ABOUTME: Verifies thin MediatR dispatch, idempotency headers, ProblemDetails, and HAL payload shape.
-
 namespace Event.Api.IntegrationTests.Features;
 
 using System.Net;

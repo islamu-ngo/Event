@@ -1,6 +1,3 @@
-// ABOUTME: Persisted per-user (data-subject) consent grant for AI disclosure of a single classified field.
-// ABOUTME: Hierarchy enforced downstream: instance ∩ tenant ∩ user consent (user cannot override).
-
 using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Enums;

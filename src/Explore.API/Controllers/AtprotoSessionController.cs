@@ -1,6 +1,3 @@
-// ABOUTME: Hosts the authenticated server-private endpoint that exchanges a verified PDS session for a platform JWT.
-// ABOUTME: Excludes credential-bearing contracts from OpenAPI and disables response caching.
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text.Json;

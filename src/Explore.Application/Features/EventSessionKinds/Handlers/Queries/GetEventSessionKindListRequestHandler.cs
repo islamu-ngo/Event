@@ -1,6 +1,3 @@
-// ABOUTME: Query handler returning all available event session kinds.
-// ABOUTME: Maps EventSessionKind entities to EventSessionKindListDto list.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionKind;

@@ -1,6 +1,3 @@
-// ABOUTME: Handles queries for auth provider configuration used in setup and admin UI.
-// ABOUTME: Reads configuration from SystemSetting records through service layer with secrets redacted.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;

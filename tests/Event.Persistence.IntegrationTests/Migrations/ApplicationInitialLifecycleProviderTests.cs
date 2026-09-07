@@ -1,6 +1,3 @@
-// ABOUTME: Exercises generated application initials through apply, rollback-to-zero, and reapply.
-// ABOUTME: Covers schema-less SQLite and real SQL Server lifecycle behavior at the EF migrator seam.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Persistence;
 using Explore.Persistence.Database;

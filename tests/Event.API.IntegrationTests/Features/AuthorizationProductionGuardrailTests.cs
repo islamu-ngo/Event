@@ -1,7 +1,3 @@
-// ABOUTME: Enterprise-grade production guardrail tests proving that test-only authorization
-// ABOUTME: infrastructure (StubAuthorizationProvider, AuthorizationProviderOverride) cannot
-// ABOUTME: accidentally run in production environments.
-
 using System.Net.Security;
 using System.Net.Sockets;
 using Event.Api.IntegrationTests.Fixtures;

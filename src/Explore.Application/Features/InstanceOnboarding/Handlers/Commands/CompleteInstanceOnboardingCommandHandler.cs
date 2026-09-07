@@ -1,6 +1,3 @@
-// ABOUTME: Validates setup-secret-authorized interactive onboarding before atomic completion.
-// ABOUTME: Preserves interactive semantics while delegating all transaction work to one operation.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding.Validators;

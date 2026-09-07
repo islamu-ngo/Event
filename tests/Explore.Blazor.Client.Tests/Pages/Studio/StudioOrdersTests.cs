@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for actor and event Studio registration-order surfaces.
-// ABOUTME: Verifies event-level HAL gating and distinguishes unavailable order reads from a true empty collection.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.Shell.Workspaces;

@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL container fixture for persistence integration tests using Testcontainers.
-// ABOUTME: Provides container lifecycle, schema migration via MigrateAsync, lookup seeding, and Respawn-based reset.
-
 using System.Collections.Concurrent;
 using System.Data.Common;
 using Explore.Application.Contracts.Infrastructure;

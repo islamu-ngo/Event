@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL privacy proofs for semantic GeoCoordinate persistence through removable LocationPii scalars.
-// ABOUTME: Verifies tenant isolation, Private Home erasure, schema shape, database invariants, and zero-PII diagnostics.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;

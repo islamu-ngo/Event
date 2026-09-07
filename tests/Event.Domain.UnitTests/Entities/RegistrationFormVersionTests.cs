@@ -1,6 +1,3 @@
-// ABOUTME: Specifies the immutable registration-form aggregate and its draft-clone behavior.
-// ABOUTME: Covers graph freezing, stable identities, provenance, ordinals, governance, and language tags.
-
 using System.Text.Json;
 using Explore.Domain;
 using Explore.Domain.Enums;

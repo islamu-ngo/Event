@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped styles for the shared EventList-compatible event details sidebar. */
-/* ABOUTME: Preserves the original event-list drawer image and inline registration styling. */
-
 .event-details-sidebar {
     position: relative;
     min-block-size: 100%;

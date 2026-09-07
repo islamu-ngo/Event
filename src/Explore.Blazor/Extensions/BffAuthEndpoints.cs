@@ -1,6 +1,3 @@
-// ABOUTME: Auth-related BFF endpoints: challenge, login, signout, status, providers, debug, refresh-schemes.
-// ABOUTME: Includes multi-provider resolution, provider readiness checks, and OIDC metadata validation.
-
 using System.Diagnostics;
 using System.Security.Claims;
 using Event.Web.BffHosting.Authentication;

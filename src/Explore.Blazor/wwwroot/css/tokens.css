@@ -1,6 +1,3 @@
-/* ABOUTME: Design tokens — 3-tier architecture (primitives → semantic → component).
-   ABOUTME: Loaded into @layer tokens via layers.css. oklch color mixing for perceptual uniformity. */
-
 /* ═══════════════════════════════════════════════════════════════════════════
    TIER 1: PRIMITIVES — Raw values with no semantic meaning.
    Building blocks only. Prefer semantic (Tier 2) or component (Tier 3) tokens

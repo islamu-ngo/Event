@@ -1,6 +1,3 @@
-// ABOUTME: Defines the safe AI-proposed payload shape for structured draft event creation.
-// ABOUTME: Excludes privileged lifecycle fields while allowing the initial event graph captured from user-provided context.
-
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.EventAspects;
 using Explore.Application.DTOs.EventSession;

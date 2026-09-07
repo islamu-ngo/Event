@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped BEM styles for the public instance tenant lifecycle section. */
-/* ABOUTME: Keeps the inventory, actions, and destructive confirmation responsive. */
-
 .instance-tenants {
     display: grid;
     gap: var(--isl-space-4);

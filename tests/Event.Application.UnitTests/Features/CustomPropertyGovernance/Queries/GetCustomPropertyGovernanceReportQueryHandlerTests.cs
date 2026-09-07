@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the governance report query handler with Atlassian 4-question promotion matrix.
-// ABOUTME: Validates each PromotionRecommendation value is deterministically produced from flag combinations.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.CustomPropertyGovernance;

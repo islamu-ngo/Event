@@ -1,6 +1,3 @@
-// ABOUTME: Proves PostgreSQL ticketing contention and provider-neutral assignment/deletion races.
-// ABOUTME: Runs real handlers against tracked EF concurrency anchors with deterministic task gates.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Rehearses a primary-only SQLite restore while the embedded erasure authority remains untouched.
-// ABOUTME: Proves a restarted authority replays retained intent into restored primary state exactly once.
-
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Application.Services;

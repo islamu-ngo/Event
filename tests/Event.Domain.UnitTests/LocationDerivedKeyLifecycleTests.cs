@@ -1,6 +1,3 @@
-// ABOUTME: Verifies address and display derived keys follow aggregate writes, governance, promotion, and erasure.
-// ABOUTME: Covers stale-key repair and proves rejected transitions cannot partially materialize derived PII.
-
 using System.Reflection;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;

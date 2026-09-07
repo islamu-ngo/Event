@@ -1,6 +1,3 @@
-// ABOUTME: Resolves incoming webhook verifiers by provider name for callback intake flows.
-// ABOUTME: Fails closed when provider wiring is missing or duplicated.
-
 using Explore.Application.Contracts.Webhooks;
 
 namespace Explore.API.Services;

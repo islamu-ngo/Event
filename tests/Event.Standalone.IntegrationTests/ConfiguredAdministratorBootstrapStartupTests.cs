@@ -1,6 +1,3 @@
-// ABOUTME: Proves configured-administrator preparation is a synchronous pre-HTTP startup gate in both host topologies.
-// ABOUTME: Uses exact runtime signals to reject duplicate manifest ownership, retries, scheduling, and premature authority.
-
 using System.Collections.Concurrent;
 using System.Net;
 using Explore.API.Hosting;

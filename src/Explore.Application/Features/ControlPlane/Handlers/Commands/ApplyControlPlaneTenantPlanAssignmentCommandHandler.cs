@@ -1,6 +1,3 @@
-// ABOUTME: Applies a tenant plan assignment by copying version settings into tenant overrides.
-// ABOUTME: Preflights quotas and locks, coordinating guarded policy settings inside the assignment transaction.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ControlPlane.Plans;

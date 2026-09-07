@@ -1,4 +1,3 @@
-// ABOUTME: API controller for module governance and discovery.
 // Provides endpoints to list available modules and check tenant capabilities.
 
 using Asp.Versioning;

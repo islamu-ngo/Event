@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for EmailDispatchRabbitMqSettingsValidator.
-// ABOUTME: Verifies optional RabbitMQ Dispatch Mode rejects unsafe topology settings.
-
 using Explore.Infrastructure;
 using Explore.Infrastructure.Tests.Fixtures;
 

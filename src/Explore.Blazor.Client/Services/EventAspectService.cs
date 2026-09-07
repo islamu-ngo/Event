@@ -1,4 +1,3 @@
-// ABOUTME: Service for managing Event Aspects (Islamic and Tech) using the generated event client.
 // Wraps NSwag-generated client methods with application-specific error handling.
 
 using Explore.Blazor.Client.Clients;

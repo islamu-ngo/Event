@@ -1,6 +1,3 @@
-// ABOUTME: Query for exporting the current merged static localization bundle for one language.
-// ABOUTME: Reads offline bundle state only, avoiding live TMS provider calls.
-
 using MediatR;
 
 namespace Explore.Application.Features.Localization.Requests.Queries;

@@ -1,6 +1,3 @@
-// ABOUTME: Appends and replays retained privacy-erasure facts through the SQLite authority model.
-// ABOUTME: Supports dedicated EmbeddedSqlite storage and primary-file CoLocated storage.
-
 using System.Data;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.PrivacyErasure;

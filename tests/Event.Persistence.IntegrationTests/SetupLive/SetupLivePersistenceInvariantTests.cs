@@ -1,6 +1,3 @@
-// ABOUTME: Breaks Setup live model parity, tenant isolation, replay, lineage, and atomic persistence.
-// ABOUTME: Uses production repositories and named locks with real PostgreSQL contention and no secret fixtures.
-
 namespace Event.Persistence.IntegrationTests.SetupLive;
 
 using System.Data.Common;

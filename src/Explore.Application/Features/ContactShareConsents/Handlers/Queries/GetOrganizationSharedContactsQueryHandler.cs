@@ -1,6 +1,3 @@
-// ABOUTME: Handler for GetOrganizationSharedContactsQuery — returns paginated shared contacts for an org.
-// ABOUTME: Validates the actor is an approved organisation before returning results.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ContactShareConsent;
 using Explore.Application.Features.ContactShareConsents.Requests.Queries;

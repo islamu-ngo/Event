@@ -1,6 +1,3 @@
-// ABOUTME: Full admin-shape DTO for an event session custom-property projection row.
-// ABOUTME: Mirrors event projection DTO shape for session-scoped custom properties.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.DTOs.CustomPropertyProjection;

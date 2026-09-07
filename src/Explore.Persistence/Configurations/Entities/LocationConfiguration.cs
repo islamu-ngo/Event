@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for tenant-scoped event locations and location PII partitioning.
-// ABOUTME: Exposes a tenant-scoped alternate key for composite FKs from sessions, rooms, and agenda rows.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;

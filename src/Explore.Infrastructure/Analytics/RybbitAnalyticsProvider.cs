@@ -1,6 +1,3 @@
-// ABOUTME: Rybbit analytics provider implementation using Rybbit HTTP tracking API.
-// ABOUTME: Supports event/page tracking with tenant-safe fire-and-forget behavior.
-
 using System.Text.Json.Serialization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Models;

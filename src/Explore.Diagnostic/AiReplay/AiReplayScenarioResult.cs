@@ -1,6 +1,3 @@
-// ABOUTME: Represents one deterministic fake/replay AI usability scenario result.
-// ABOUTME: Stores only redacted summaries, diagnostics, and side-effect safety evidence.
-
 namespace Explore.Diagnostic.AiReplay;
 
 public sealed record AiReplayScenarioResult(

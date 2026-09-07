@@ -1,6 +1,3 @@
-// ABOUTME: Structured real-provider fixture for the shared primary database behavior contract.
-// ABOUTME: Reuses production provider composition without accepting raw connection strings from operators.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Persistence;
 using Explore.Persistence.Database;

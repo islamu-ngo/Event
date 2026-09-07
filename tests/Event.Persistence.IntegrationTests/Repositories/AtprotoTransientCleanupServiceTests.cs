@@ -1,6 +1,3 @@
-// ABOUTME: Exercises bounded ATProto cleanup against migrated PostgreSQL and native repositories.
-// ABOUTME: Protects live authentication state, replay acceptance retention, and concurrent sweep safety.
-
 using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: Exercises backend-independent ATProto challenge validation at the BFF HTTP boundary.
-// ABOUTME: Keeps antiforgery, rate limits and pre-readiness admission outside the relational login preflight tests.
-
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;

@@ -1,6 +1,3 @@
-// ABOUTME: CQRS requests for provider-neutral registration reconciliation, health, and organizer queue management.
-// ABOUTME: Authorizes against the parent event and carries only bounded metadata, never attendee answers.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.RegistrationProviders;
 using Explore.Application.Responses;

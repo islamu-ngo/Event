@@ -1,6 +1,3 @@
-// ABOUTME: Coordinates notification ownership resolution with durable notification intent persistence.
-// ABOUTME: Writes local delivery/delegation audit rows without calling external delivery providers.
-
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

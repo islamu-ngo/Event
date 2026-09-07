@@ -1,6 +1,3 @@
-// ABOUTME: Grouped PATCH contract for a session agenda item.
-// ABOUTME: Keeps identity server-owned while allowing sparse relationship, content, schedule, and location changes.
-
 using Explore.Application.Models.Common;
 
 namespace Explore.Application.DTOs.EventSessionAgendaItem;

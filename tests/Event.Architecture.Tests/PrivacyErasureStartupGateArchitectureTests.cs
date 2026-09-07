@@ -1,6 +1,3 @@
-// ABOUTME: Guards API startup ordering for retained platform privacy-erasure replay.
-// ABOUTME: Ensures the host is built, replayed, and only then started.
-
 using TUnit.Core;
 
 namespace Event.Architecture.Tests;

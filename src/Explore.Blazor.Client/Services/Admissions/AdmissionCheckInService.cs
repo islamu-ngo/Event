@@ -1,6 +1,3 @@
-// ABOUTME: Posts target-aware admission checks through authenticated staff or isolated scanner transport.
-// ABOUTME: Maps every non-public server outcome to a generic rejection without retaining credentials.
-
 using System.Net.Http.Json;
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;

@@ -1,6 +1,3 @@
-// ABOUTME: Describes one proposal-only step in an AI multi-step plan preview.
-// ABOUTME: Carries tool, payload, HAL, context freshness, and clarification metadata without executing anything.
-
 using Explore.Domain.Ai;
 
 namespace Explore.Application.Features.AiAssistant.Plans;

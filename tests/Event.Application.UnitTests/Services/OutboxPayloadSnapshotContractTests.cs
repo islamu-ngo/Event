@@ -1,6 +1,3 @@
-// ABOUTME: Characterizes immutable general-outbox payload snapshots and their replay identities.
-// ABOUTME: Locks event discriminators, version facts, safe JSON fields, and terminal registration intent.
-
 using System.Text.Json;
 using Explore.Application.Models.InternalEvents;
 using Explore.Application.Services;

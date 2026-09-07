@@ -1,6 +1,3 @@
-// ABOUTME: Applies private no-store headers before rate limiting and authorization can short-circuit.
-// ABOUTME: Extends PrivateNoStore endpoint metadata to success and every RFC 7807 error response.
-
 using Microsoft.Net.Http.Headers;
 
 namespace Explore.API.Filters;

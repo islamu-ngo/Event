@@ -1,6 +1,3 @@
-<!-- ABOUTME: Dated Microsoft Forms and Power Automate conformance evidence for the Phase 11 connector tuple. -->
-<!-- ABOUTME: Separates documented connector behavior from unsupported Forms API and correlation assumptions. -->
-
 # Microsoft Forms Conformance Evidence
 
 Verified: 2026-08-11

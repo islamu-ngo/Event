@@ -1,6 +1,3 @@
-// ABOUTME: Handles query for tenant user role grant details by ID.
-// ABOUTME: Returns null if the grant is not found.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.TenantUserRoleGrant;

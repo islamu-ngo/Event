@@ -1,6 +1,3 @@
-// ABOUTME: Guardrail tests for generated NSwag tag client contracts and DTOs.
-// ABOUTME: Asserts operation-id-derived method names are stable, unique, and free of NSwag collision fallbacks.
-
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Explore.Blazor.Client.Clients;

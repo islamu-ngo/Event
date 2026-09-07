@@ -1,6 +1,3 @@
-// ABOUTME: Validates bounded ES256 machine assertions against the existing instance OAuth signing authority.
-// ABOUTME: Rejects ambiguous JSON, key-source injection and byte/path/purpose confusion before durable replay admission.
-
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;

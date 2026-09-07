@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the event calendar download controller contract.
-// ABOUTME: Verifies .ics file responses, sanitized filenames, and missing calendar exports.
-
 using System.Reflection;
 using System.Text;
 using Explore.API.Controllers;

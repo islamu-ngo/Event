@@ -1,6 +1,3 @@
-// ABOUTME: Command request for deleting a session-local custom property definition and its values.
-// ABOUTME: Hard deletes the definition so namespace+key can be reused without stale-row conflicts.
-
 using Explore.Application.Authorization;
 using MediatR;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for GetNotificationByIdRequestHandler.
-// ABOUTME: Tests single notification retrieval with user ownership verification.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

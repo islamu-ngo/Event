@@ -1,6 +1,3 @@
-// ABOUTME: Centralizes all HttpClient registrations for the Blazor BFF server.
-// ABOUTME: Eliminates repeated ConfigurePrimaryHttpMessageHandler blocks for dev cert bypass.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Extensions;

@@ -1,6 +1,3 @@
-// ABOUTME: Applies validated grouped metadata updates to one route-identified tenant.
-// ABOUTME: Tenant lifecycle state remains owned by dedicated control-plane transition commands.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Tenant.Validators;

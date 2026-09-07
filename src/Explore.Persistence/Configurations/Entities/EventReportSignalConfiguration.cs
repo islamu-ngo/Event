@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for bounded moderation provider signals.
-// ABOUTME: Stores provider verdict metadata without raw payloads and links optional report evidence by tenant.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

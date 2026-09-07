@@ -1,6 +1,3 @@
-// ABOUTME: Command request for creating a shared Layer 3 custom-property definition for organization or group scopes.
-// ABOUTME: Uses tenant-level authorization semantics because shared definitions are tenant-governed catalogs.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.CustomPropertyDefinition;
 using Explore.Application.Responses;

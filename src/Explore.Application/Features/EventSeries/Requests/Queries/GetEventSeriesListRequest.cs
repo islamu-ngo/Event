@@ -1,6 +1,3 @@
-// ABOUTME: MediatR query for retrieving a paginated list of event series.
-// ABOUTME: Supports pagination and optional ActorId filter.
-
 using Explore.Application.DTOs.EventSeries;
 using Explore.Application.Responses;
 using MediatR;

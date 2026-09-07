@@ -1,6 +1,3 @@
-// ABOUTME: Generated-client backed service for outgoing webhook management UI.
-// ABOUTME: Normalizes HAL collections, maps command failures safely, and avoids direct API calls from Razor.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Webhooks;
 using Microsoft.Extensions.Logging;

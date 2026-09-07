@@ -1,6 +1,3 @@
-// ABOUTME: Defines the application-facing persistence port for ticketing recovery operator actions.
-// ABOUTME: Keeps recovery state and fixed-cardinality health independent from EF Core and scheduler libraries.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Recovery;

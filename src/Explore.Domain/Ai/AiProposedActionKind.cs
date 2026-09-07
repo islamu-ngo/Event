@@ -1,6 +1,3 @@
-// ABOUTME: Defines the allow-listed action kinds the AI assistant may propose.
-// ABOUTME: Keeps event mutation proposal kinds explicitly registered before persistence accepts them.
-
 namespace Explore.Domain.Ai;
 
 public enum AiProposedActionKind

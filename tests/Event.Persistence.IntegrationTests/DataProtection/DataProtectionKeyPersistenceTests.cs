@@ -1,6 +1,3 @@
-// ABOUTME: Regression tests for persisted ASP.NET Core Data Protection key rings.
-// ABOUTME: Verifies BFF session payloads survive a fresh provider using the shared key store.
-
 using Explore.Persistence;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;

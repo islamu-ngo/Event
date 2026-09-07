@@ -1,6 +1,3 @@
-// ABOUTME: Write DTO for shared Layer 3 custom-property definitions managed by tenant administrators.
-// ABOUTME: Captures namespaced identity, typed defaults, validation metadata, and optional option payloads.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.DTOs.CustomPropertyDefinition;

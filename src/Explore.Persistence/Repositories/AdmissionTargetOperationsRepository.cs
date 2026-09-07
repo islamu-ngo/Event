@@ -1,6 +1,3 @@
-// ABOUTME: Loads and updates exact tenant-event admission targets for operational controls.
-// ABOUTME: Returns only Domain targets so Application owns mapping and operational decisions.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Domain;
 using Explore.Persistence.Database;

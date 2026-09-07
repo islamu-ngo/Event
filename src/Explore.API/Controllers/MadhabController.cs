@@ -1,6 +1,3 @@
-// ABOUTME: API controller for madhab (Islamic school of thought) lookup table (read-only enumeration).
-// ABOUTME: Provides madhab options for event filtering in Islamic module.
-
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Asp.Versioning;

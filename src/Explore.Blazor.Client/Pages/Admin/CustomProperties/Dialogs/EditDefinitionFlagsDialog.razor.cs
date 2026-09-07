@@ -1,6 +1,3 @@
-// ABOUTME: Typed entry point for showing EditDefinitionFlagsDialog via IDialogService.
-// ABOUTME: Keeps dialog invocation boilerplate out of consuming Razor blocks.
-
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
 

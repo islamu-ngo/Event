@@ -1,4 +1,3 @@
-# ABOUTME: Cerbos policy test suite for tenant resources.
 # Tests cross-tenant isolation and instance-admin override.
 
 name: TenantPolicyTests

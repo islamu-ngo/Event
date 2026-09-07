@@ -1,6 +1,3 @@
-// ABOUTME: Setting definitions for the dedicated Control Plane Admin Portal runtime surface.
-// ABOUTME: Registers admin_portal.* keys with instance-only defaults and value types.
-
 namespace Explore.Domain.Settings.Definitions;
 
 using Explore.Domain.Constants;

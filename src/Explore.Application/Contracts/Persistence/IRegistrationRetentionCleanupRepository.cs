@@ -1,6 +1,3 @@
-// ABOUTME: Defines bounded registration answer and PII retention cleanup.
-// ABOUTME: Uses immutable row deadlines and returns only safe aggregate counts.
-
 namespace Explore.Application.Contracts.Persistence;
 
 public sealed record RegistrationRetentionCleanupResult(

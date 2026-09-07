@@ -1,6 +1,3 @@
-// ABOUTME: Creates one order and its capacity holds under a serializable transaction with retry-stable identities.
-// ABOUTME: Reserves capacity before PII, converts unavailable capacity to a waitlist, and performs no external I/O.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Scheduling;

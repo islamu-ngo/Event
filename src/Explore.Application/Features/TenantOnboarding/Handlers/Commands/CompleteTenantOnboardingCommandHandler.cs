@@ -1,6 +1,3 @@
-// ABOUTME: Completes tenant onboarding with policy, branding, and explicit directory identity.
-// ABOUTME: Refuses to mark Identity complete unless the tenant-owned payload is activation-ready.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

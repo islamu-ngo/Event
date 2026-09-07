@@ -1,6 +1,3 @@
-// ABOUTME: Maps ordered sections inside one tenant-scoped registration-form version.
-// ABOUTME: Enforces full composite lineage, unique active ordinals, and restrictive version history.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

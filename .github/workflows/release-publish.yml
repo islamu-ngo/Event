@@ -1,6 +1,3 @@
-# ABOUTME: Publishes the canonical release notes to the GitHub release page as a noncanonical projection.
-# ABOUTME: Runs only in the trusted environment-approved final lane and reports publication drift without repairing it.
-
 name: Release Publish Projection
 
 on:

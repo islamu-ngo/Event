@@ -1,6 +1,3 @@
-// ABOUTME: Request DTO for setup-time Keycloak realm and client bootstrap.
-// ABOUTME: Separates runtime OIDC settings from one-time bootstrap credentials that must not be persisted.
-
 namespace Explore.Application.DTOs.Onboarding;
 
 using Explore.Application.Onboarding;

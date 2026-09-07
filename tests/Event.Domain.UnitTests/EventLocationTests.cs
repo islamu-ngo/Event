@@ -1,6 +1,3 @@
-// ABOUTME: Verifies canonical EventLocation placement invariants and fail-closed disclosure defaults.
-// ABOUTME: Covers TBA publication, XOR, soft-delete freshness, carrier consistency, and policy identity.
-
 using Explore.Domain.Enums;
 
 namespace Event.Domain.UnitTests;

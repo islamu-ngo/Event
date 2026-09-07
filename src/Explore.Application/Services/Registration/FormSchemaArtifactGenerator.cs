@@ -1,6 +1,3 @@
-// ABOUTME: Generates canonical JSON Schema, UI, logic, and provider-mapping artifacts from a form version.
-// ABOUTME: Uses ordered System.Text.Json nodes and invariant values so identical relational graphs hash identically.
-
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;

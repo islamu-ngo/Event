@@ -1,4 +1,3 @@
-// ABOUTME: Custom exception for secret provider errors.
 // Provides structured error information for troubleshooting.
 
 namespace Explore.Secrets.Abstractions;

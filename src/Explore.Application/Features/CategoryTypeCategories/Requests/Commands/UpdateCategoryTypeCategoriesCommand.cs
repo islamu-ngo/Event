@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for updating a category-to-category-type link.
-// ABOUTME: Carries server-owned junction identity and grouped relationship changes.
 using Explore.Application.DTOs.CategoryTypeCategories;
 using Explore.Application.Responses;
 using MediatR;

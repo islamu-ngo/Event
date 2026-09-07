@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for the authenticated user profile page.
-// ABOUTME: Loads profile stats and delegates post-event card actions to the reusable preview workspace.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.Events;
 using Explore.Blazor.Client.Contracts.Services;

@@ -1,6 +1,3 @@
-// ABOUTME: Exercises fair-return waitlist state and mutations through typed rendered behavior.
-// ABOUTME: Protects HAL-only actions, bounded position output, pending state, stable retries, and focus.
-
 using AngleSharp.Dom;
 using Explore.Blazor.Client.Components.Waitlist;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;

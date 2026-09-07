@@ -1,5 +1,3 @@
-# ABOUTME: Validates release-impact and changelog evidence from pull request metadata.
-# ABOUTME: Uses trusted-base pull_request_target execution without running PR-head code.
 name: Release Impact Check
 
 on:

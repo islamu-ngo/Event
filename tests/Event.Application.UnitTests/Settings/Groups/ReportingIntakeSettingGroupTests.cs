@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the dedicated reporting-intake setting group.
-// ABOUTME: Guards the intake setting's default, JSON resolution, and separation from provider routing.
-
 namespace Event.Application.UnitTests.Settings.Groups;
 
 using Explore.Application.Contracts.Infrastructure;

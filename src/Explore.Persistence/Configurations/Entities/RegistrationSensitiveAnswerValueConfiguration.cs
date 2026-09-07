@@ -1,6 +1,3 @@
-// ABOUTME: Maps ciphertext-only sensitive registration values with versioned encryption metadata.
-// ABOUTME: Keeps plaintext absent and makes each ciphertext usable by at most one atomic answer.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

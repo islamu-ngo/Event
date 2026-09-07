@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for post-onboarding authorization provider updates and instance-admin enforcement.
-// ABOUTME: Verifies admin checks, validation, Cerbos verification, and local-provider updates.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Instance;

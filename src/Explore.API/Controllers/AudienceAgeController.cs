@@ -1,6 +1,3 @@
-// ABOUTME: API controller for audience age range lookup table (read-only enumeration).
-// ABOUTME: Provides age range options for event filtering and audience targeting.
-
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Asp.Versioning;

@@ -1,6 +1,3 @@
-// ABOUTME: Serializes ASP.NET Core health reports into bounded operator-safe JSON.
-// ABOUTME: Redacts raw exception text and sensitive health-check data at the shared endpoint boundary.
-
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Http;

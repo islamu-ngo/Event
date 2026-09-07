@@ -1,6 +1,3 @@
-// ABOUTME: Verifies Local Identity HTTP endpoints expose successful sessions and RFC 7807 failures.
-// ABOUTME: Proves credential failures remain generic while registration validation stays a bad request.
-
 using System.Security.Cryptography;
 using Explore.API.Controllers;
 using Explore.Application.Features.Authentication.Local.Models;

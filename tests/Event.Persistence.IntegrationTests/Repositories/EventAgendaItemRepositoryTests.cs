@@ -1,6 +1,3 @@
-// ABOUTME: Persistence integration tests for EventAgendaItemRepository verifying CRUD and event-scoped queries.
-// ABOUTME: Uses Testcontainers PostgreSQL with real schema via MigrateAsync and Respawn reset.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;

@@ -1,6 +1,3 @@
-// ABOUTME: Handles tenant onboarding step progress persistence with analytics tracking.
-// ABOUTME: Persists step-specific configuration and marks step complete.
-
 using System.Linq;
 using System.Text.Json;
 using Explore.Application.Analytics;

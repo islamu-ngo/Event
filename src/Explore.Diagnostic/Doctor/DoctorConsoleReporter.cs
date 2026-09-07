@@ -1,6 +1,3 @@
-// ABOUTME: Formats doctor output for humans and automation logs without printing secrets.
-// ABOUTME: Uses deterministic PASS/WARN/FAIL lines so operators can scan readiness quickly.
-
 namespace Explore.Diagnostic.Doctor;
 
 public static class DoctorConsoleReporter

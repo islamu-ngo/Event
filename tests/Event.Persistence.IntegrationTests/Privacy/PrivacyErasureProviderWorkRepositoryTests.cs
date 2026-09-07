@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL proofs for fenced privacy-erasure provider-work reconciliation.
-// ABOUTME: Verifies durable idempotency, atomic saga progress, and unrelated-saga preservation.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Persistence.Repositories;

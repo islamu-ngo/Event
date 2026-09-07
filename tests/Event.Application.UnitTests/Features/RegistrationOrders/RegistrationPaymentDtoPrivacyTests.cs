@@ -1,6 +1,3 @@
-// ABOUTME: Locks the public registration-payment projection to bounded operational fields only.
-// ABOUTME: Prevents provider, capability, idempotency, PII, and raw-error fields from entering generated contracts.
-
 using Explore.Application.DTOs.RegistrationOrders;
 
 namespace ApplicationUnitTests.Features.RegistrationOrders;

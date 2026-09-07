@@ -1,6 +1,3 @@
-// ABOUTME: Reconfigures one tenant-bound EventParticipationConfiguration with optimistic concurrency.
-// ABOUTME: Translates typed Domain validation errors into safe command failures and invalidates event read caches after persistence.
-
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

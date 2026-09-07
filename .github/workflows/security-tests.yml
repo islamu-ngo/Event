@@ -1,6 +1,3 @@
-# ABOUTME: CI workflow running security integration tests with containerized Keycloak and Cerbos.
-# ABOUTME: Always reports a status check, running tests only when security-relevant files change.
-
 name: Security Integration Tests
 
 permissions:

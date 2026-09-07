@@ -1,6 +1,3 @@
-// ABOUTME: Handles public event-report option reads for reportable published events.
-// ABOUTME: Caches the static reason taxonomy while checking event reportability live per tenant.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

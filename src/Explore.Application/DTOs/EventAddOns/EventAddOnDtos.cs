@@ -1,6 +1,3 @@
-// ABOUTME: Defines public add-on catalog, order summary, line, and lifecycle read contracts.
-// ABOUTME: Publishes exact commerce facts while keeping server authority JSON-hidden for HAL.
-
 using System.Text.Json.Serialization;
 
 namespace Explore.Application.DTOs.EventAddOns;

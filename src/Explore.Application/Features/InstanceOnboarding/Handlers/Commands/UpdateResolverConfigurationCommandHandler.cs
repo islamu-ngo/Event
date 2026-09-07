@@ -1,6 +1,3 @@
-// ABOUTME: Handles resolver-configuration updates for instance administrators.
-// ABOUTME: Persists system-only resolver settings and invalidates the dedicated resolver config cache.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Instance;

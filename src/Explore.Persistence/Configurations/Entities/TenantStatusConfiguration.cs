@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for TenantStatus lookup table entity.
-// ABOUTME: Uses ValueGeneratedNever for explicit int IDs matching TenantStatusEnum values.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

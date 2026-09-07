@@ -1,6 +1,3 @@
-// ABOUTME: ES module for safe browser actions invoked through typed Blazor JS interop.
-// ABOUTME: Uses browser APIs directly without eval or HTML injection sinks.
-
 export async function share(title, url) {
     if (!navigator.share || typeof url !== 'string' || url.trim().length === 0) {
         return false;

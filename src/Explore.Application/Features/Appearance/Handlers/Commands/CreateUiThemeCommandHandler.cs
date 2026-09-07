@@ -1,6 +1,3 @@
-// ABOUTME: Handles creation of platform and tenant UI themes with manual validation and scope-aware authorization.
-// ABOUTME: Clears existing defaults transactionally when a new default theme is created for a scope.
-
 namespace Explore.Application.Features.Appearance.Handlers.Commands;
 
 using Explore.Application.Contracts.Identity;

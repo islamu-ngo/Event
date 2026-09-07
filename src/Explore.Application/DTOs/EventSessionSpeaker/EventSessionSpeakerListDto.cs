@@ -1,6 +1,3 @@
-// ABOUTME: List DTO for event-session speaker relationship rows.
-// ABOUTME: Includes concurrency metadata for admin list update flows.
-
 using System;
 
 namespace Explore.Application.DTOs.EventSessionSpeaker;

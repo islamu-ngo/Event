@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for completing an event session through an explicit lifecycle transition.
-// ABOUTME: Carries the target session id and concurrency payload for authorization and conflict checks.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventSession;
 

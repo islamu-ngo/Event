@@ -1,6 +1,3 @@
-// ABOUTME: Verifies NotificationFanoutRunRepository tenant-filter bypasses are bounded by fanout source and worker status predicates.
-// ABOUTME: Proves notification fanout workers can poll pending cross-tenant runs without leaking normal tenant-filtered reads.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;

@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped payment, refund, dispute, and confirmed financial-action states in Studio. */
-/* ABOUTME: Uses semantic tokens, logical properties, and accessible status messaging. */
-
 .studio-payment-status {
     display: grid;
     gap: var(--isl-space-2);

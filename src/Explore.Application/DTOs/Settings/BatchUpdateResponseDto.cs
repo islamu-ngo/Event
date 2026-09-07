@@ -1,6 +1,3 @@
-// ABOUTME: Response DTO for batch setting updates with per-key result tracking.
-// ABOUTME: Supports BestEffort (partial success) and Strict (all-or-nothing) semantics.
-
 namespace Explore.Application.DTOs.Settings;
 
 /// <summary>

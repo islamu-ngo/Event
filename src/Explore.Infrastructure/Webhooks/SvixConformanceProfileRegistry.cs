@@ -1,6 +1,3 @@
-// ABOUTME: Immutable allow-list of Svix deployment profiles backed by executed conformance evidence.
-// ABOUTME: Centralizes provider/version lookup guarantees so startup and reconciliation fail closed.
-
 using Explore.Domain;
 
 namespace Explore.Infrastructure.Webhooks;

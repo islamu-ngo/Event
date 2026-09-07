@@ -1,6 +1,3 @@
-// ABOUTME: Authorization request interfaces for typed resource context and persisted owner binding.
-// ABOUTME: Lets a request name its resource and trusted facts without inventing provider policy inputs.
-
 namespace Explore.Application.Authorization;
 
 /// <summary>

@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped styles for the provider-neutral stored image component. */
-/* ABOUTME: Keeps placeholder, loading, error, and media states stable and accessible. */
-
 .storage-image {
     align-items: center;
     background-color: var(--mud-palette-background-grey);

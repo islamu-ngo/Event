@@ -1,6 +1,3 @@
-// ABOUTME: Grouped PATCH DTOs for updating EventDay fields independently.
-// ABOUTME: Nullable groups represent client intent; OptionalUpdate fields disambiguate explicit clears.
-
 using Explore.Application.Models.Common;
 
 namespace Explore.Application.DTOs.EventDay;

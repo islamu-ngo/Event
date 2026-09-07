@@ -1,6 +1,3 @@
-// ABOUTME: Persistence boundary for bounded tenant-scoped webhook retention cleanup.
-// ABOUTME: Returns aggregate counts while preserving terminal identities, hashes, outcomes, and held evidence.
-
 namespace Explore.Application.Contracts.Persistence;
 
 public sealed record WebhookRetentionCleanupResult(

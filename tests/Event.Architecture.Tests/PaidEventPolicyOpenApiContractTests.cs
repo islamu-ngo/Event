@@ -1,6 +1,3 @@
-// ABOUTME: Locks paid-policy authority facts into OpenAPI and HAL wrapper schemas.
-// ABOUTME: Prevents generated clients from losing manifest-owned or sovereign-lock metadata.
-
 using System.Text.Json;
 
 namespace Event.Architecture.Tests;

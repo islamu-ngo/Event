@@ -1,6 +1,3 @@
-// ABOUTME: Handles ticket catalog management reads for an event.
-// ABOUTME: Returns an explicit empty management resource for valid platform-managed events without a catalog.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventTicketing;

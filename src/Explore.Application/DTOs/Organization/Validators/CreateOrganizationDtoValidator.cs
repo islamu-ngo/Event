@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation validator for CreateOrganizationDto.
-// ABOUTME: Manually instantiated in CreateOrganizationCommandHandler (not DI-injected).
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.Organization.Validators;

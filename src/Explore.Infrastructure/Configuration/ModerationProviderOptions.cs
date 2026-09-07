@@ -1,6 +1,3 @@
-// ABOUTME: Runtime provider options for event-reporting moderation integrations.
-// ABOUTME: Defaults to LocalOnly so self-hosted deployments never require external providers.
-
 using Explore.Application.Features.EventReporting.Models;
 
 namespace Explore.Infrastructure.Configuration;

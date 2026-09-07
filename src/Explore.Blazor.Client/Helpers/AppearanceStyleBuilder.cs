@@ -1,6 +1,3 @@
-// ABOUTME: Unified appearance style builder replacing EventAppearanceMetadataHelper, OrganizationAppearanceMetadataHelper, and GroupBrandingMetadataHelper.
-// ABOUTME: Builds CSS inline styles from background color, image, and effect settings for banner/hero sections.
-
 using System.Globalization;
 
 namespace Explore.Blazor.Client.Helpers;

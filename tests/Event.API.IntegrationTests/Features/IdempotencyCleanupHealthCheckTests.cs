@@ -1,6 +1,3 @@
-// ABOUTME: Unit-style tests for the API IdempotencyCleanupHealthCheck.
-// ABOUTME: Verifies cleanup readiness reports enabled, dry-run, and disabled states safely.
-
 using Explore.API.HealthChecks;
 using Explore.Infrastructure;
 using Microsoft.Extensions.Diagnostics.HealthChecks;

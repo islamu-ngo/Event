@@ -1,6 +1,3 @@
-// ABOUTME: Stable lookup IDs for organizer payment-provider connection lifecycle state.
-// ABOUTME: Keeps readiness terminal states provider-neutral and persistence-friendly.
-
 namespace Explore.Domain.Enums;
 
 public enum OrganizerPaymentProviderConnectionStatusEnum

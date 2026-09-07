@@ -1,6 +1,3 @@
-// ABOUTME: Application-owned persistence contract for durable Web Push dispatch state.
-// ABOUTME: Exposes worker-safe claims, retry/dead-letter transitions, and stale-subscription cleanup.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

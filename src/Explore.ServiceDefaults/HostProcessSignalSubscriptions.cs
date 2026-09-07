@@ -1,6 +1,3 @@
-// ABOUTME: Owns process-wide signal delegates for one disposable application host.
-// ABOUTME: Detaches every registration on host disposal, including hosts that never started.
-
 namespace Explore.ServiceDefaults;
 
 public sealed class HostProcessSignalSubscriptions : IDisposable

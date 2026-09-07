@@ -1,6 +1,3 @@
-// ABOUTME: Orchestrates guarded AI assistant message sends after tenant and provider readiness checks.
-// ABOUTME: Persists user/assistant messages, runs, and proposed actions without executing tools or event side effects.
-
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;

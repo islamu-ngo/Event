@@ -1,6 +1,3 @@
-// ABOUTME: Contract for extracting typed authorization metadata from a resource (DTO) instance.
-// ABOUTME: Used by HATEOAS link policies and authorization evaluators to build provider-neutral checks.
-
 namespace Explore.Application.Authorization;
 
 /// <summary>

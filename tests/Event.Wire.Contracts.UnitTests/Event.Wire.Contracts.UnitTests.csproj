@@ -1,5 +1,3 @@
-<!-- ABOUTME: Runs isolated specifications for package-free server/client wire contracts. -->
-<!-- ABOUTME: Provides one shared test project for every feature family in Event.Wire.Contracts. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>

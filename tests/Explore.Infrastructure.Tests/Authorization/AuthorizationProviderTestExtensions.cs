@@ -1,6 +1,3 @@
-// ABOUTME: Test-only helpers that express provider scenarios in the historical attribute vocabulary.
-// ABOUTME: Translates each scenario into typed facts so production keeps a dictionary-free boundary.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Infrastructure.Tests.Authorization;

@@ -1,6 +1,3 @@
-// ABOUTME: Implements Local Identity registration, credential verification, and brute-force lockout.
-// ABOUTME: Uses ASP.NET Core Identity stores and exposes tokens only after secret-backed issuance succeeds.
-
 using System.Security.Cryptography;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Authentication.Local.Models;

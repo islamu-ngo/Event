@@ -1,6 +1,3 @@
-// ABOUTME: Resolved typed settings document payload plus source and version metadata.
-// ABOUTME: Returned by typed settings document resolvers without exposing persistence entities.
-
 namespace Explore.Application.Contracts.Infrastructure;
 
 public sealed record ResolvedSettingsDocument<TPayload>

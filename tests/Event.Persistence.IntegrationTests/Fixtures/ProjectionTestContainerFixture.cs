@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL container fixture for projection and event-location repository tests.
-// ABOUTME: Uses the current EF model plus canonical lookup seeding without migration-history coupling.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Persistence;
 using Explore.Persistence.Database;

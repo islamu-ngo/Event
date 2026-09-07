@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-scoped typed external action attached to an event.
-// ABOUTME: Persists normalized destinations, semantic kinds, ordering, health, and primary CTA state.
-
 using Explore.Domain.Interfaces;
 using Explore.Domain.ValueObjects;
 

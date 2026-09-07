@@ -1,6 +1,3 @@
-// ABOUTME: Verifies EF model and runtime-seeder parity for event-location privacy lookups.
-// ABOUTME: Covers exact IDs/codes, missing-row repair, idempotency, and the model HasData prohibition.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;

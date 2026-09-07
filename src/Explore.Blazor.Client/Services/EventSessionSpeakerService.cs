@@ -1,6 +1,3 @@
-// ABOUTME: Client service for managing speaker assignments on event sessions.
-// ABOUTME: Wraps generated session-scoped EventSessionSpeaker API methods for Blazor dialogs.
-
 using System;
 using System.Threading;
 using System.Threading.Tasks;

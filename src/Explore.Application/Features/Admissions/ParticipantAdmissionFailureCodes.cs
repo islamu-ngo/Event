@@ -1,6 +1,3 @@
-// ABOUTME: Defines stable machine-consumed failures for participant admission readiness commands.
-// ABOUTME: Keeps subject, evidence, approval, and revocation failures bounded and PII-free.
-
 namespace Explore.Application.Features.Admissions;
 
 public static class ParticipantAdmissionFailureCodes

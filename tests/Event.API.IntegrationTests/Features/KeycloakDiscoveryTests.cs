@@ -1,6 +1,3 @@
-// ABOUTME: Keycloak OIDC metadata discovery and realm configuration validation tests.
-// ABOUTME: Verifies the containerized Keycloak serves correct OIDC metadata, JWKS, and realm structure.
-
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
 using TUnit.Core;

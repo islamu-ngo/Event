@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos policy test suite for custom-property projection admin resources.
-# ABOUTME: Ensures projection status, rebuild, and dirty-scope controls are tenant-admin-only.
-
 name: CustomPropertyProjectionPolicyTests
 description: "Validates custom_property_projection operator permissions across admin hierarchy levels"
 

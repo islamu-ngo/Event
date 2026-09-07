@@ -1,6 +1,3 @@
-// ABOUTME: Architecture regression gates for the EF Core-first persistence capability ladder.
-// ABOUTME: Uses synthetic fixtures to prove forbidden raw EF APIs cannot enter repository code unnoticed.
-
 using System.Text.RegularExpressions;
 using System.Text.Json;
 using System.Security.Cryptography;

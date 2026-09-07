@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS link policy for event-session template sync affordances.
-// ABOUTME: Emits diff, apply, and history links from an API-layer sync resource descriptor using named routes.
-
 using System.Security.Claims;
 using Explore.API.Hateoas.Resources;
 using Explore.Application.Authorization;

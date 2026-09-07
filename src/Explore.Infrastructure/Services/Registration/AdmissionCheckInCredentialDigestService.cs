@@ -1,6 +1,3 @@
-// ABOUTME: Computes bounded retained-key ticket credential digests for online admission lookup.
-// ABOUTME: Uses the issuance digest domain and clears every resolved HMAC key after use.
-
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;

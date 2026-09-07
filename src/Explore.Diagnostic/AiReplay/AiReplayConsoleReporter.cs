@@ -1,6 +1,3 @@
-// ABOUTME: Prints fake/replay AI usability report summaries for local and CI diagnostics.
-// ABOUTME: Keeps console output redacted and limited to scenario codes, counts, and artifact paths.
-
 using System.Globalization;
 
 namespace Explore.Diagnostic.AiReplay;

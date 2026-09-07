@@ -1,6 +1,3 @@
-// ABOUTME: Verifies API startup never writes a raw setup secret to terminal output.
-// ABOUTME: Preserves setup validation through a synthetic unclaimed-instance secret provider.
-
 using System.Security.Cryptography;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Services;

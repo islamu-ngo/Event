@@ -1,6 +1,3 @@
-// ABOUTME: Stateless domain-service implementation converting UTC intervals to cached local projection fields using TimeZoneInfo.
-// ABOUTME: DST-aware and boundary-safe; handlers, validators, mappers, and seeders are forbidden from reimplementing this logic elsewhere.
-
 using System;
 
 namespace Explore.Domain.Services.Scheduling;

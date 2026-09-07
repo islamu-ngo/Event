@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for the public read-only tenant plan catalog and detail pages.
-// ABOUTME: Proves safe states, HAL-only navigation, nested plan rendering, bidi, and accessible overflow.
-
 using Blazouter.Enums;
 using Blazouter.Extensions;
 using Blazouter.Models;

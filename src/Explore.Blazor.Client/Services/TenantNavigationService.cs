@@ -1,6 +1,3 @@
-// ABOUTME: Manages tenant navigation links through the NSwag-generated Event API client.
-// ABOUTME: Returns generated contract models and preserves safe fallback results on API failures.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Organizations;
 using Microsoft.Extensions.Logging;

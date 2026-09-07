@@ -1,6 +1,3 @@
-// ABOUTME: Public checkout composition for selecting tickets from one published event catalog.
-// ABOUTME: Exposes only buyer-facing pricing and limit fields required to create an order.
-
 namespace Explore.Application.DTOs.RegistrationOrders;
 
 using Explore.Application.DTOs.PublicExperience;

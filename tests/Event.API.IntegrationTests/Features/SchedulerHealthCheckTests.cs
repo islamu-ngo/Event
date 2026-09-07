@@ -1,6 +1,3 @@
-// ABOUTME: Readiness contract tests for the background scheduler health check.
-// ABOUTME: Protects the rule that a paused or error-stuck scheduler is visible to operator monitoring.
-
 using Explore.API.Configuration;
 using Explore.API.HealthChecks;
 using Explore.Application.Contracts.Scheduling;

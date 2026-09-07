@@ -1,6 +1,3 @@
-// ABOUTME: Focused tests for storage-backed image reference eligibility at Application command boundaries.
-// ABOUTME: Covers missing, cross-tenant, inactive, unsafe metadata, non-public, and valid safe-raster references.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Services;
 using Explore.Domain;

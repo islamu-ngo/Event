@@ -1,6 +1,3 @@
-// ABOUTME: Exercises immutable offline portability workflows through public Core and Wire contracts.
-// ABOUTME: Proves closed sections, canonical output, typed legal drafts, and value-safe failures.
-
 namespace ISLAMU.Setup.Core.Tests.Portability;
 
 using System.Globalization;

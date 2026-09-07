@@ -1,6 +1,3 @@
-// ABOUTME: Resolves ticket entitlement targets before ticket catalog mutation.
-// ABOUTME: Preserves input order and enforces event and tenant ownership for day/session targets.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventTicketing;

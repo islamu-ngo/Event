@@ -1,6 +1,3 @@
-// ABOUTME: Typed client boundary for registration order payments, checkout tickets, and refund campaigns.
-// ABOUTME: Preserves capability authorization boundaries and delegates to generated payment clients.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services;

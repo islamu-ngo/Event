@@ -1,6 +1,3 @@
-// ABOUTME: Write DTO for creating event session templates, optionally includes nested definition payloads.
-// ABOUTME: Session templates are owned children of event templates, not standalone reusable catalogs.
-
 namespace Explore.Application.DTOs.EventSessionTemplate;
 
 public sealed record CreateEventSessionTemplateDto

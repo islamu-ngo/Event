@@ -1,6 +1,3 @@
-// ABOUTME: Lookup service for ScheduleItemKind read-only data.
-// ABOUTME: Thin wrapper around NSwag-generated client method.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Lookup;
 

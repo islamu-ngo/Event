@@ -1,6 +1,3 @@
-// ABOUTME: Controller contract tests for anonymous capability-scoped and authenticated registration-order APIs.
-// ABOUTME: Verifies canonical routes, PublicTransactional safeguards, and token-safe HTTP transport.
-
 using System.Reflection;
 using System.Text.Json;
 using Explore.API.Attributes;

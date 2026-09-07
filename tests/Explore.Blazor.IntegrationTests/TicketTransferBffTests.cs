@@ -1,6 +1,3 @@
-// ABOUTME: Defines RED trust-boundary contracts for browser ticket-transfer lifecycle operations.
-// ABOUTME: Pins generated-client forwarding, capability secrecy, cookie authority, antiforgery, and private caching.
-
 using System.Net;
 using System.Reflection;
 using Explore.Blazor.Client.Clients;

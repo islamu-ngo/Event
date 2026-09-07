@@ -1,6 +1,3 @@
-// ABOUTME: Persists instance-wide replay claims for private ATProto transient-service assertions.
-// ABOUTME: Uses insert-only unique claims and bounded integer-expiry cleanup across relational providers.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.Database;

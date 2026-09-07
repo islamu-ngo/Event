@@ -1,6 +1,3 @@
-// ABOUTME: Maps durable incoming webhook effect receipts with tenant-safe one-effect uniqueness.
-// ABOUTME: Enforces stable message identity, payload hash, processing generation, and bounded result references.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

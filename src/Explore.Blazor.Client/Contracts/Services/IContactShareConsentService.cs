@@ -1,4 +1,3 @@
-// ABOUTME: Interface for the client-side contact share consent service.
 // Wraps API calls for checking, listing, and withdrawing organizer email-sharing consents.
 
 namespace Explore.Blazor.Client.Contracts.Services;

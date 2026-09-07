@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS candidates for event ticket catalog management resources.
-// ABOUTME: Splits ticket-management and paid-commerce affordances against the parent event.
-
 using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;

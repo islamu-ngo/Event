@@ -1,6 +1,3 @@
-// ABOUTME: Tests tenant-scoped encrypted OAuth session repository tracking and concurrency behavior.
-// ABOUTME: Proves the central IConcurrencyAware interceptor rejects stale session writers.
-
 using System.Text;
 using CarpaNet.OAuth;
 using CarpaNet.OAuth.Crypto;

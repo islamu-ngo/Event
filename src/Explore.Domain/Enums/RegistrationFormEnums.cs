@@ -1,6 +1,3 @@
-// ABOUTME: Stable enum mirrors for registration-form lifecycle, field types, and organizer visibility.
-// ABOUTME: Keeps portable authoring rules independent from persistence lookup rows and providers.
-
 namespace Explore.Domain.Enums;
 
 public enum RegistrationFormStatusEnum

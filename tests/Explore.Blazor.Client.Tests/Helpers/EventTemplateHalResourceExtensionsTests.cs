@@ -1,6 +1,3 @@
-// ABOUTME: Regression tests for event-template HAL collection mapping.
-// ABOUTME: Verifies collection and row affordance links survive NSwag-to-UI model conversion.
-
 namespace Explore.Blazor.Client.Tests.Helpers;
 
 public sealed class EventTemplateHalResourceExtensionsTests

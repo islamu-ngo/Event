@@ -1,6 +1,3 @@
-// ABOUTME: Exercises the actual Standalone composition and registered in-process transient bridge over PostgreSQL.
-// ABOUTME: Verifies machine-only API identity and cookie isolation without replacing the internal HTTP dispatcher.
-
 extern alias bff;
 extern alias standalone;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Reserved Layer 2 semantic identifiers that Layer 3 custom properties must not redefine.
-// ABOUTME: Gives future validators and handlers a single source for collision prevention with typed sector schema.
-
 namespace Explore.Domain.Constants;
 
 public static class CustomPropertySemanticReservations

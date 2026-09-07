@@ -1,6 +1,3 @@
-// ABOUTME: EF repository for tenant-scoped event moderation history records.
-// ABOUTME: Returns moderation entities ordered for audit/history views without exposing DTOs.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;

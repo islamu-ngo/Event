@@ -1,6 +1,3 @@
-// ABOUTME: Persists reviewed managed-apply windows and authorizes their use inside configuration import transactions.
-// ABOUTME: Binds uploader, reviewer, applier, artifact, preview plan, target authority, and stale revision fencing.
-
 namespace Explore.Application.Features.ConfigurationManifest.Managed;
 
 using Explore.Application.Contracts.Infrastructure;

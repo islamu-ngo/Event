@@ -1,6 +1,3 @@
-// ABOUTME: Governs scheduled managed configuration apply with separated uploader, reviewer, and applier roles.
-// ABOUTME: Fences stale target revisions and keeps approval, cancellation, and completion evidence append-only.
-
 namespace Explore.Domain;
 
 public enum ConfigurationManagedApplyScheduleStatus

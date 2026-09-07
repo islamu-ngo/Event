@@ -1,6 +1,3 @@
-// ABOUTME: Application contract for resolving registration-based access to requested EventLocations.
-// ABOUTME: Supports pure facts and validated entity batches without making repositories return authority DTOs.
-
 using System.Collections.Immutable;
 using Explore.Domain;
 using Explore.Domain.Enums;

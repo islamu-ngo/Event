@@ -1,6 +1,3 @@
-// ABOUTME: Represents the PII-free high-water and retained-floor state of the erasure authority.
-// ABOUTME: Rejects negative or inverted watermarks before replay or maintenance performs I/O.
-
 namespace Explore.Domain;
 
 public sealed record PrivacyErasureAuthorityState

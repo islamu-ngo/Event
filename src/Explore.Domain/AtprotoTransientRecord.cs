@@ -1,6 +1,3 @@
-// ABOUTME: Models an immutable encrypted ATProto authentication value with tenant and expiry binding.
-// ABOUTME: Keeps locator digests and health probes closed while accepting only bounded opaque payloads.
-
 using System.Text;
 
 namespace Explore.Domain;

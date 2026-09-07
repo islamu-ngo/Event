@@ -1,6 +1,3 @@
-// ABOUTME: Tests fail-closed parsing of the generated extension-data ticket catalog HAL resource.
-// ABOUTME: Verifies exact root relations and item-ID-bound edit/delete presentation affordances.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Pages.Studio;

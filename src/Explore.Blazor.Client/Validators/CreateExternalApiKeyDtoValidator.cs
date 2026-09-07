@@ -1,6 +1,3 @@
-// ABOUTME: Client-side validation rules for the external API key creation dialog.
-// ABOUTME: Mirrors server-side length, control-character, and scope requirements for immediate form feedback.
-
 using Explore.Blazor.Client.Clients;
 using FluentValidation;
 

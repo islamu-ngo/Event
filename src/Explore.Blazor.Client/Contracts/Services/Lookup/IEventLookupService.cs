@@ -1,6 +1,3 @@
-// ABOUTME: Contract for event domain reference lookups (types, formats, statuses, session kinds, modes, visibility).
-// ABOUTME: Encapsulates read-only event taxonomy queries for UI forms and catalog filters.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.Lookup;

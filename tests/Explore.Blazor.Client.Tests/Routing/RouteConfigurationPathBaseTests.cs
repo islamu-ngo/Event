@@ -1,6 +1,3 @@
-// ABOUTME: Verifies configured Blazouter paths honor the document base path.
-// ABOUTME: Covers tenant-prefix behavior through the compiled route transformation.
-
 using Blazouter.Models;
 using Explore.Blazor.Client.Routing;
 

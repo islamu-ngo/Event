@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for StorageReconciliationSettingsValidator.
-// ABOUTME: Verifies reconciliation cadence, batch, and safety grace settings are structurally valid.
-
 using Explore.Infrastructure;
 
 namespace Explore.Infrastructure.Tests.Infrastructure;

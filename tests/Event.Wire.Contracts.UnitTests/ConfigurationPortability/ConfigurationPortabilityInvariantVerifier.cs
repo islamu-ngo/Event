@@ -1,6 +1,3 @@
-// ABOUTME: Verifies portable public closures and diagnostics reject authority-bearing or leaked values.
-// ABOUTME: Supplies synthetic bad fixtures proving the extraction verifier fails closed independently.
-
 namespace ISLAMU.Wire.Contracts.UnitTests.ConfigurationPortability;
 
 using System.Collections;

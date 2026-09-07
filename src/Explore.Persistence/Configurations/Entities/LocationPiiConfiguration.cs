@@ -1,6 +1,3 @@
-// ABOUTME: Configures the location_pii extension table with strict 1:1 PK/FK to locations.
-// ABOUTME: Stores removable precise address and coordinates outside the core location table.
-
 namespace Explore.Persistence.Configurations.Entities;
 
 using Explore.Domain;

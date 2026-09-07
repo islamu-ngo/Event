@@ -1,6 +1,3 @@
-// ABOUTME: Repository implementation for TenantLifecycleLog audit entity.
-// ABOUTME: Provides query methods for tenant lifecycle transition history, ordered by most recent first.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

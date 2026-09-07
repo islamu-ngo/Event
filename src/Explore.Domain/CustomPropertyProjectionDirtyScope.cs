@@ -1,6 +1,3 @@
-// ABOUTME: Pending drain request created when an inline projection write skipped due to rebuild advisory-lock contention.
-// ABOUTME: Rebuild worker drains pending rows before releasing the lock so no write written during rebuild is silently lost.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;

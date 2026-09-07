@@ -1,6 +1,3 @@
-// ABOUTME: Provides Change-Id allocation, fragment creation, hook preflight, and commit-bound repair commands.
-// ABOUTME: Prevents target collisions before commit or merge while preserving immutable Git provenance.
-
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;

@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for tenant-scoped event report intake metadata.
-// ABOUTME: Enforces tenant-safe event/report relationships, state bounds, indexes, and soft-delete metadata.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

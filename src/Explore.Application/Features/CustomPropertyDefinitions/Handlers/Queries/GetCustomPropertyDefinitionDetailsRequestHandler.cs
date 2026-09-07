@@ -1,6 +1,3 @@
-// ABOUTME: Handles retrieval of one shared Layer 3 custom-property definition with options.
-// ABOUTME: Keeps read behavior aligned with existing repo patterns by mapping entities returned from repositories.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.CustomPropertyDefinition;

@@ -1,6 +1,3 @@
-// ABOUTME: Real PostgreSQL acceptance tests for EventLocation dual-write carrier behavior.
-// ABOUTME: Proves races, physical-key integrity, final detach, fresh reattach, moves, and rollback.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;

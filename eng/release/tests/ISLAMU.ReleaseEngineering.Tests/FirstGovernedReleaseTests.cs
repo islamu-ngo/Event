@@ -1,6 +1,3 @@
-// ABOUTME: Executes the complete first-governed-release flow from a signed non-SemVer baseline tag.
-// ABOUTME: Proves every Task 8.2 acceptance criterion against a disposable repository, offline and branchless.
-
 using System.Text.Json;
 using ISLAMU.ReleaseEngineering;
 

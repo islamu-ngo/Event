@@ -1,6 +1,3 @@
-// ABOUTME: HAL assembler for one tenant's effective Control Plane configuration.
-// ABOUTME: Keeps tenant configuration affordances behind the shared authorization-aware link pipeline.
-
 namespace Explore.API.Hateoas.Assemblers;
 
 using Explore.API.Hateoas.Policies;

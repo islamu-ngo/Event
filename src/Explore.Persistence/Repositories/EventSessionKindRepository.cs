@@ -1,6 +1,3 @@
-// ABOUTME: EF implementation of IEventSessionKindRepository for the EventSessionKind lookup table.
-// ABOUTME: Delegates all operations to GenericRepository.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 

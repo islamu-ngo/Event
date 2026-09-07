@@ -1,6 +1,3 @@
-// ABOUTME: Authorized CQRS commands for OrganizationTenant legitimacy-evidence submission and review.
-// ABOUTME: Keeps organization-admin submission separate from tenant-admin review.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.OrganizationTenantEvidence;
 using Explore.Application.DTOs.StorageObject;

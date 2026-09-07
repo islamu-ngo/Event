@@ -1,6 +1,3 @@
-// ABOUTME: Defines string constants identifying each test host profile used for fixture configuration.
-// ABOUTME: Contract (fast, InMemory), RealRuntime (PostgreSQL), Stress, and Security (real JWT+Cerbos).
-
 namespace Event.Api.IntegrationTests.Fixtures;
 
 /// <summary>

@@ -1,6 +1,3 @@
-// ABOUTME: Returns sanitized payment state or a separately access-guarded hosted checkout target.
-// ABOUTME: Reuses canonical account ownership and guest capability guards for anti-enumerating behavior.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

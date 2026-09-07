@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for organizer promotion definition and code management.
-// ABOUTME: Stores digest metadata as shadow columns and returns only Domain entities.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Domain;

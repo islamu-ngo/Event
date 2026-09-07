@@ -1,6 +1,3 @@
-// ABOUTME: WCAG 2.2 AA, localization, and RTL guards for the EventLocation privacy UI surface.
-// ABOUTME: Covers announced status regions, alert roles, decorative icons, and direction-neutral styling.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.Events;
 using Explore.Blazor.Client.Localization;

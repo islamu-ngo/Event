@@ -1,6 +1,3 @@
-// ABOUTME: Applies grouped route-ID updates to session agenda items.
-// ABOUTME: Rejects cross-event moves and invalidates the owning event cache after one transactional write.
-
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionAgendaItem.Validators;

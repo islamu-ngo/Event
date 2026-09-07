@@ -1,6 +1,3 @@
-// ABOUTME: Runs one bounded registration-provider subscription renewal and sweep pass under Quartz.
-// ABOUTME: Leaves tenant scope, provider-handoff barriers, leases, and checkpoint settlement in Application.
-
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Services.Registration;
 using Quartz;

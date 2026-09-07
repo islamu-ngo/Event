@@ -1,6 +1,3 @@
-// ABOUTME: Defines transport-only ticket-transfer request and one-time secret response envelopes.
-// ABOUTME: Wraps bounded HAL resources while redacting claim capabilities and admission credentials from diagnostics.
-
 using Explore.API.Hateoas;
 using Explore.Application.DTOs.Admissions;
 using Explore.Application.Hateoas;

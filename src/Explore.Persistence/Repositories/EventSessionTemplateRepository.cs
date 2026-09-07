@@ -1,6 +1,3 @@
-// ABOUTME: Repository implementation for EventSessionTemplate CRUD with nested definitions and options.
-// ABOUTME: Supports versioned session-template management owned by EventTemplate, transactional definition persistence.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;

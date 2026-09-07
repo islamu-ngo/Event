@@ -1,5 +1,3 @@
-<!-- ABOUTME: Contains bundled Arabic text for the Terminal.Gui Setup Assistant. -->
-<!-- ABOUTME: Localizes labels and errors while retaining the documented RTL-shaping limitation. -->
 <root>
   <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
   <resheader name="version"><value>2.0</value></resheader>

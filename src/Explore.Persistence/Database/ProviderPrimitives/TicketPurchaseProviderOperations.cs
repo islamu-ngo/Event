@@ -1,6 +1,3 @@
-// ABOUTME: Owns provider-neutral serializable execution and canonical purchase lock leases.
-// ABOUTME: Keeps transaction and relational lock mechanics outside ticket purchase repositories.
-
 using System.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;

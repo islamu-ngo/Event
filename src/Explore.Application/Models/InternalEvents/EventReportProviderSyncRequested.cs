@@ -1,6 +1,3 @@
-// ABOUTME: Internal outbox payload requesting provider synchronization for a submitted event report.
-// ABOUTME: Contains safe report metadata only and intentionally excludes reporter text and raw hashes.
-
 namespace Explore.Application.Models.InternalEvents;
 
 public sealed record EventReportProviderSyncRequested

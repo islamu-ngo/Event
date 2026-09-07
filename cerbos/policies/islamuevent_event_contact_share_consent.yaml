@@ -1,4 +1,3 @@
-# ABOUTME: Cerbos resource policy for event_contact_share_consent resources.
 # Controls who can view and export shared contact emails from consented registrants.
 
 apiVersion: api.cerbos.dev/v1

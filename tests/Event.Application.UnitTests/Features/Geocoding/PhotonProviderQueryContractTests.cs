@@ -1,6 +1,3 @@
-// ABOUTME: RED contracts for semantic optional provider composition at the Application response boundary.
-// ABOUTME: Specifies local preservation, typed outcomes, attribution, and browser-safe merged suggestions.
-
 using Explore.Application.DTOs.Geocoding;
 using Explore.Application.Features.Geocoding.Handlers.Queries;
 using TUnit.Assertions.Enums;

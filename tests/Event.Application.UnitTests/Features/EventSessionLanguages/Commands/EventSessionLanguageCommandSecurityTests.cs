@@ -1,6 +1,3 @@
-// ABOUTME: Verifies session-language commands bind authorization to persisted session resources.
-// ABOUTME: Caller-supplied tenant and event attributes are intentionally unavailable.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventSessionLanguage;
 using Explore.Application.Features.EventSessionLanguages.Requests.Commands;

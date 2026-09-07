@@ -1,6 +1,3 @@
-// ABOUTME: Setting definitions for organization verification policies.
-// ABOUTME: Controls whether organizations require verification before operating.
-
 namespace Explore.Domain.Settings.Definitions;
 
 public static class OrganizationSettingDefinitions

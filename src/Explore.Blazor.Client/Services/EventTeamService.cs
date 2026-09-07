@@ -1,6 +1,3 @@
-// ABOUTME: Event team service that delegates to the NSwag-generated event-team client.
-// ABOUTME: Lists team members and performs event-role writes through BFF endpoints.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Events;
 using Microsoft.Extensions.Logging;

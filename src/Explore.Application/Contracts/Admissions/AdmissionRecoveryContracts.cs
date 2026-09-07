@@ -1,6 +1,3 @@
-// ABOUTME: Defines provider-neutral admission recovery capability, persistence, and delivery contracts.
-// ABOUTME: Keeps public receipts uniform and redacts every capability or digest-bearing diagnostic shape.
-
 namespace Explore.Application.Contracts.Admissions;
 
 public enum AdmissionRecoveryPurpose

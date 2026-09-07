@@ -1,4 +1,3 @@
-// ABOUTME: Handler that returns all tags grouped by tag type for the tri-state tag filter dropdown.
 // Queries the TagTypeTags junction table and groups results by TagType.
 
 using AutoMapper;

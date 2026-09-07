@@ -1,6 +1,3 @@
-// ABOUTME: Adapts the native browser QR detector to typed fail-closed Blazor outcomes.
-// ABOUTME: Validates transient detections through the shared admission codec and never logs raw browser material.
-
 using System.Text.Json;
 using ISLAMU.Wire.Contracts.Admissions;
 using Explore.Blazor.Client.Contracts.Interop;

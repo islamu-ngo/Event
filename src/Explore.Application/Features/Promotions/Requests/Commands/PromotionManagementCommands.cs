@@ -1,6 +1,3 @@
-// ABOUTME: Defines organizer promotion management commands for draft, publish, revoke, and code rotation flows.
-// ABOUTME: Carries paid-commerce authorization metadata while keeping promotion codes as transient command input.
-
 using Explore.Application.Authorization;
 using Explore.Application.Features.Promotions;
 using Explore.Application.Responses;

@@ -1,6 +1,3 @@
-// ABOUTME: Persists complete legal document aggregates behind explicit target coordinates.
-// ABOUTME: Returns Domain entities and never treats portable source identity as target authority.
-
 namespace Explore.Persistence.Repositories;
 
 using Explore.Application.Contracts.Persistence;

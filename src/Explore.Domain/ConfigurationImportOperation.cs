@@ -1,6 +1,3 @@
-// ABOUTME: Records value-minimized configuration import receipts and forward-rollback relationships.
-// ABOUTME: Keeps protected snapshot locations and configuration values outside Domain evidence.
-
 namespace Explore.Domain;
 
 public enum ConfigurationImportOperationKind

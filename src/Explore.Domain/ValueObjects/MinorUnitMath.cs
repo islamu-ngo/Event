@@ -1,6 +1,3 @@
-// ABOUTME: Provides checked integer minor-unit arithmetic for ticketing and platform monetization.
-// ABOUTME: Uses Int128 intermediates for checked overflow and midpoint-away-from-zero minor-unit rounding.
-
 namespace Explore.Domain.ValueObjects;
 
 public static class MinorUnitMath

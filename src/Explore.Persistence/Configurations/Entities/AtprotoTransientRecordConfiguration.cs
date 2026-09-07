@@ -1,6 +1,3 @@
-// ABOUTME: Maps immutable instance-owned ATProto transient records to portable relational storage.
-// ABOUTME: Enforces bounded ciphertext, closed purpose values, tenant binding, uniqueness, and expiry indexing.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;

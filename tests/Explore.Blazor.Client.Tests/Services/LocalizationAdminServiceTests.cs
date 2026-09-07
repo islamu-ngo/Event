@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for LocalizationAdminService delegation through the generated Event API client.
-// ABOUTME: Covers generated operation mapping, command responses, request DTOs, and failure fallbacks.
-
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Explore.Blazor.Client.Tests.Services;

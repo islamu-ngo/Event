@@ -1,6 +1,3 @@
-// ABOUTME: Pins the payment start/status/retry HTTP contract for guest, account, and Studio callers.
-// ABOUTME: Verifies transactional safeguards, private caching, and named route stability before implementation.
-
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using Explore.API.Attributes;

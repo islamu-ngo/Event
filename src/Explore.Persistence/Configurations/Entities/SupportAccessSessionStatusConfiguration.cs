@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for support-access session status lookup rows.
-// ABOUTME: Uses stable int IDs that map to SupportAccessSessionStatusEnum.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

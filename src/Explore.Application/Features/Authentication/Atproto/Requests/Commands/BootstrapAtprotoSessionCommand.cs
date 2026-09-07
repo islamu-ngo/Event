@@ -1,6 +1,3 @@
-// ABOUTME: Requests independent PDS verification and local session bootstrap for one ATProto identity.
-// ABOUTME: Receives only server-private bridge material after bootstrap assertion authentication.
-
 using Explore.Application.Features.Authentication.Atproto.Models;
 using Explore.Domain.ValueObjects;
 using MediatR;

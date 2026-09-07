@@ -1,4 +1,3 @@
-// ABOUTME: Unit tests for TagService covering CRUD behavior, aliasing, and neutralized methods.
 // Verifies HAL conversion and resilient fallback contracts for all guarded error paths.
 
 namespace Explore.Blazor.Client.Tests.Services;

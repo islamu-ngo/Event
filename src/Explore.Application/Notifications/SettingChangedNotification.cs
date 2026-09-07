@@ -1,6 +1,3 @@
-// ABOUTME: MediatR notification published when a governance or policy setting is changed.
-// ABOUTME: Consumed by audit log handler for structured observability of configuration changes.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain.Settings;
 using MediatR;

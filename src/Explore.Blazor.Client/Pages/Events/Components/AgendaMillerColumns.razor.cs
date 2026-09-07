@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for AgendaMillerColumns with day/item selection and CRUD via DialogService.
-// ABOUTME: Manages column state, filtering, and management actions.
-
 namespace Explore.Blazor.Client.Pages.Events.Components;
 
 using Explore.Blazor.Client.Clients;

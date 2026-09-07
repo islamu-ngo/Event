@@ -1,6 +1,3 @@
-// ABOUTME: Repository implementation for tenant-local user role grants.
-// ABOUTME: Provides tenant/user scoped authority queries with role and tenant-user details.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

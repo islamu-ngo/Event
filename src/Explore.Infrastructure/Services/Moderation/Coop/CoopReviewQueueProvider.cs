@@ -1,6 +1,3 @@
-// ABOUTME: Coop review queue provider adapter over a configurable HTTP JSON ingest endpoint.
-// ABOUTME: Mirrors local report case metadata without exposing raw reporter evidence or provider payloads.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;

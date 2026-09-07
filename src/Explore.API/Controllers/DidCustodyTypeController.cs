@@ -1,6 +1,3 @@
-// ABOUTME: API controller for DID custody type lookup table (read-only enumeration).
-// ABOUTME: Provides DID custody options for federation identity management.
-
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Asp.Versioning;

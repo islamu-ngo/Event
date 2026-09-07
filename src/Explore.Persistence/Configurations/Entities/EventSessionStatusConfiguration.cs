@@ -1,5 +1,3 @@
-// ABOUTME: EF configuration for the EventSessionStatus lookup table.
-// ABOUTME: Mirrors EventStatusConfiguration with ValueGeneratedNever and lookup column constraints.
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

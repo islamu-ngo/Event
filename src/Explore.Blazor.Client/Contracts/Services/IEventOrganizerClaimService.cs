@@ -1,6 +1,3 @@
-// ABOUTME: Service contract for managing event organizer claims and claim withdrawals.
-// ABOUTME: Extracted from monolithic EventService to enforce single responsibility.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services;

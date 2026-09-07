@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-bound aggregate for restart-safe cancellation and material-change refund fanout.
-// ABOUTME: Owns a fenced processing lease, stable payment cursor, and non-PII outcome counters.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

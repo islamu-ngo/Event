@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for group member HAL action affordance gating.
-// ABOUTME: Verifies invite/edit/delete UI follows API-provided links instead of role inference.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Helpers;
 using Explore.Blazor.Client.Pages.Admin.Group.Components;

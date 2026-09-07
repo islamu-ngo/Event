@@ -1,6 +1,3 @@
-// ABOUTME: Converts durable buyer-refund success into cumulative provider-neutral admission facts.
-// ABOUTME: Replays safely from refund outbox delivery until exact ticket-line revocation converges.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

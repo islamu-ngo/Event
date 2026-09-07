@@ -1,6 +1,3 @@
-// ABOUTME: Ical.Net-backed serializer for RFC 5545-compatible event calendar downloads.
-// ABOUTME: Emits UTC VEVENT fields with stable event GUID UID and canonical URL metadata.
-
 using Explore.Application.DTOs.Event;
 using Ical.Net;
 using Ical.Net.CalendarComponents;

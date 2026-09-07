@@ -1,6 +1,3 @@
-@* ABOUTME: Renders server options as native radios or checkboxes according to single or multiple choice semantics. *@
-@* ABOUTME: Retains option order, retired-option filtering, keyboard activation, and field-level issue relationships. *@
-
 <fieldset class="choice-field" data-field-type="@(Multiple ? "MULTIPLE_CHOICE" : "SINGLE_CHOICE")" aria-describedby="@ErrorId">
     <legend>@Label @if (!Required) { <span>Optional</span> }</legend>
     @foreach (RegistrationFieldOptionView option in Options.Where(item => !item.IsRetired).OrderBy(item => item.Ordinal))

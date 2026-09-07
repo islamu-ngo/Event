@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for RabbitMQ EmailDispatch consumer pointer parsing and settlement decisions.
-// ABOUTME: Verifies manual ACK/NACK/reject policy without requiring a live RabbitMQ broker.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;

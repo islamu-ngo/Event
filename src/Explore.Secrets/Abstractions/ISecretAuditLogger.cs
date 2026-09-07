@@ -1,4 +1,3 @@
-// ABOUTME: Interface for audit logging of secret access and operations.
 // Enables compliance tracking and security monitoring.
 
 namespace Explore.Secrets.Abstractions;

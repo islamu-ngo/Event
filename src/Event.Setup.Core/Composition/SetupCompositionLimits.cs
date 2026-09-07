@@ -1,6 +1,3 @@
-// ABOUTME: Owns the exact positive resource ceilings for canonical Setup composition.
-// ABOUTME: Keeps parser, normalized-tree, and directory limits immutable and checked.
-
 namespace ISLAMU.Event.Setup.Core.Composition;
 
 public sealed record SetupCompositionLimits

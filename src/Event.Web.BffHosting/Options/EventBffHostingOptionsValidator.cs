@@ -1,6 +1,3 @@
-// ABOUTME: Validates static browser-BFF host configuration before request processing starts.
-// ABOUTME: Fails clearly for ambiguous dedicated admin-host configuration.
-
 using Event.Web.BffHosting.Security;
 using Microsoft.Extensions.Options;
 

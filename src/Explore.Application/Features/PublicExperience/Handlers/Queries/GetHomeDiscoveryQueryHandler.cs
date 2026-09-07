@@ -1,6 +1,3 @@
-// ABOUTME: Composes bounded tenant-local public home discovery sections through existing public event queries.
-// ABOUTME: Resolves coarse areas, keeps semantic sections independent, omits unsupported curation, and isolates failures.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

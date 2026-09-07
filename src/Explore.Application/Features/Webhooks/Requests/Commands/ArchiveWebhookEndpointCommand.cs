@@ -1,6 +1,3 @@
-// ABOUTME: Authorized command for archiving an outgoing webhook endpoint.
-// ABOUTME: Keeps endpoint history available while removing it from active endpoint management lists.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

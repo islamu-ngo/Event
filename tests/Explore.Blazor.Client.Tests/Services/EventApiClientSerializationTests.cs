@@ -1,6 +1,3 @@
-// ABOUTME: Regression coverage for JSON contracts consumed by the generated Event API client.
-// ABOUTME: Proves AOT extension data, HAL payloads, and nested string enums round-trip correctly.
-
 using System.Net;
 using System.Reflection;
 using System.Runtime.CompilerServices;

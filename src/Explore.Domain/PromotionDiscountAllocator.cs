@@ -1,6 +1,3 @@
-// ABOUTME: Allocates promotion discounts exactly across eligible order lines using largest remainder.
-// ABOUTME: Applies the frozen Phase 17 floor-plus-remainder formula with line-id tie-breaking.
-
 using Explore.Domain.ValueObjects;
 
 namespace Explore.Domain;

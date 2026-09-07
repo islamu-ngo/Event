@@ -1,6 +1,3 @@
-// ABOUTME: Hard-limit quota setting definitions for Layer 3 custom properties (Rule 16).
-// ABOUTME: Each quota has a tenant-overridable default and a platform maximum encoded in the description for governance review.
-
 namespace Explore.Domain.Settings.Definitions;
 
 public static class CustomPropertyQuotaSettingDefinitions

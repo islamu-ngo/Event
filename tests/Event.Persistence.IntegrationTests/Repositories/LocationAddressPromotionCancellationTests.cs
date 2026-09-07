@@ -1,6 +1,3 @@
-// ABOUTME: Deterministic PostgreSQL cancellation tests for promotion-specific Location repository operations.
-// ABOUTME: Blocks exact database commands, cancels in flight, and verifies durable governance state is unchanged.
-
 using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;

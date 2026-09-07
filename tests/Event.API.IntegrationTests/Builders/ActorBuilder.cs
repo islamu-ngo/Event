@@ -1,6 +1,3 @@
-// ABOUTME: Fluent builder for Actor domain entities in integration tests.
-// ABOUTME: Produces EF-compatible Actor instances with ActorPii for test data seeding.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

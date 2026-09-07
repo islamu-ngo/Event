@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning a single event-category link by ID.
-// ABOUTME: Maps junction entity to EventCategoriesDto.
 using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;

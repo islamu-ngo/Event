@@ -1,6 +1,3 @@
-// ABOUTME: Specifies D2-10 target binding, HAL gating, ephemeral expiry, and write-only transport behavior.
-// ABOUTME: Exercises the concrete generated client over HTTP without mirrors, reflection, or persisted authority.
-
 namespace Event.SetupAssistant.Tests;
 
 using System.Net;

@@ -1,6 +1,3 @@
-// ABOUTME: Validates local registration credentials and profile names before account creation.
-// ABOUTME: Enforces bounded input while leaving password hashing policy to ASP.NET Core Identity.
-
 using Explore.Application.Features.Authentication.Local.Models;
 using FluentValidation;
 

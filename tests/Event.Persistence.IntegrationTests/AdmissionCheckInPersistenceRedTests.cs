@@ -1,6 +1,3 @@
-// ABOUTME: Specifies Phase 21 admission-target, append-only check-in, and scanner-capability persistence.
-// ABOUTME: Proves portable model parity, tenant isolation, one-query lookup, and deterministic PostgreSQL races.
-
 using System.Data.Common;
 using System.Diagnostics;
 using System.Reflection;

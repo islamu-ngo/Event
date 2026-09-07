@@ -1,6 +1,3 @@
-// ABOUTME: Validated safety and scheduling settings for durable bounded webhook bulk replay.
-// ABOUTME: Caps operation size, tenant reservation, filter window, worker cadence, and work per pass.
-
 using Explore.Domain;
 using Microsoft.Extensions.Options;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Application-owned public experience posture vocabulary for anonymous shell rendering.
-// ABOUTME: Keeps organization-centric UX configuration out of Domain tenancy and scope entities.
-
 namespace Explore.Application.Models;
 
 /// <summary>

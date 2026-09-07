@@ -1,6 +1,3 @@
-// ABOUTME: Defines real PostgreSQL acceptance for typed atomic registration-answer storage.
-// ABOUTME: Requires relational value, subject, lineage, durable identity, sensitive-shape, and tenant constraints.
-
 using System.Security.Cryptography;
 using System.Text;
 using Event.Persistence.IntegrationTests.Fixtures;

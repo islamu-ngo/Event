@@ -1,6 +1,3 @@
-// ABOUTME: Configures the user_pii extension table with strict 1:1 PK/FK to users.
-// ABOUTME: Stores removable user-identifying fields separately from the core user record.
-
 namespace Explore.Persistence.Configurations.Entities;
 
 using Explore.Domain;

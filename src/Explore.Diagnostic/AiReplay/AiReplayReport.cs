@@ -1,6 +1,3 @@
-// ABOUTME: Aggregates deterministic fake/replay AI usability and e2e scenario results.
-// ABOUTME: Confirms normal CI can exercise assistant flows without live model calls or content artifacts.
-
 namespace Explore.Diagnostic.AiReplay;
 
 public sealed record AiReplayReport(

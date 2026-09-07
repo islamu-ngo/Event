@@ -1,6 +1,3 @@
-// ABOUTME: Persistence repository implementation for tracking synchronization state across services.
-// ABOUTME: Inherits standard generic CRUD operations and provides service-scoped query helpers.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

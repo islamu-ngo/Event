@@ -1,6 +1,3 @@
-// ABOUTME: Applies tenant-admin evidence-based recovery to one parked IntegrationSync provider outcome.
-// ABOUTME: Authorizes tenant scope and conditionally resolves only the exact ambiguous durable row.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

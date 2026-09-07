@@ -1,6 +1,3 @@
-// ABOUTME: Validates human-owned release.yaml descriptors and public change fragments.
-// ABOUTME: Exposes pure append-only snapshot comparison without reading Git history.
-
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;

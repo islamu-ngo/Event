@@ -1,6 +1,3 @@
-// ABOUTME: Authorized command for changing an owner-scoped webhook consumer provider mode.
-// ABOUTME: Carries optimistic concurrency and explicit pending-work governance metadata.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

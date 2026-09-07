@@ -1,6 +1,3 @@
-// ABOUTME: Verifies provider migration ownership and portable identifiers through configured EF Core models.
-// ABOUTME: Locks application and Data Protection assemblies, history tables, and Jetstream cursor mappings.
-
 using Explore.Domain.Federation;
 using Explore.Domain;
 using Explore.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines the validated persisted representation of a guest capability token SHA-256 hash.
-// ABOUTME: Accepts only canonical standard Base64 values that decode to exactly 32 bytes.
-
 namespace Explore.Domain.ValueObjects;
 
 public sealed record CapabilityTokenHash

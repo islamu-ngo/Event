@@ -1,6 +1,3 @@
-// ABOUTME: Exercises SecretBinding metadata-only and tenant-isolation invariants against PostgreSQL.
-// ABOUTME: Rejects inline value columns and proves concurrent repository reads remain tenant-qualified.
-
 namespace Event.Persistence.IntegrationTests.Settings;
 
 using Event.Persistence.IntegrationTests.Fixtures;

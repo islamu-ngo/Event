@@ -1,5 +1,3 @@
-<!-- ABOUTME: Hosts API HTTP, relational and cross-host authentication boundary integration tests. -->
-<!-- ABOUTME: Aliases the BFF composition root so backend dependencies never enter BFF runtime or test projects. -->
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- The provider-neutral parity corpus is declared once and linked into every lane that evaluates it,

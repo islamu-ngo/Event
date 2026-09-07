@@ -1,6 +1,3 @@
-// ABOUTME: Handler for declining an organization membership invitation.
-// ABOUTME: Validates invitation ownership before removing the pending membership.
-
 using System;
 using System.Threading;
 using System.Threading.Tasks;

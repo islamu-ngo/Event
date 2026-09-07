@@ -1,5 +1,3 @@
-# ABOUTME: Builds the Explore API container image with deterministic restore inputs and pinned bases.
-# ABOUTME: Supports dual-versioning (FOSS default / commercial Lucky Penny) and runtime secret injection.
 # Secrets are loaded at runtime via AddSecretManagement() - no CLI needed
 # Supports zero-downtime deployments with Coolify
 

@@ -1,6 +1,3 @@
-// ABOUTME: Validates bounded registration-order hold requests before a serializable transaction begins.
-// ABOUTME: Keeps request-shape validation manually invoked by the command handler.
-
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using FluentValidation;
 

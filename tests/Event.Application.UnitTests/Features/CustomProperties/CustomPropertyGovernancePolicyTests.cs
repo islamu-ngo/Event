@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the application-layer Layer 3 governance policy.
-// ABOUTME: Verifies reserved namespace enforcement, normalization, and Layer 2 semantic collision rejection.
-
 using Explore.Application.Services;
 
 namespace Event.Application.UnitTests.Features.CustomProperties;

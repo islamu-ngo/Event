@@ -1,6 +1,3 @@
-// ABOUTME: Defines provider-neutral admission revocation facts and entity-first persistence ports.
-// ABOUTME: Separates exact refund/cancellation authority from provider payment representations.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Admissions;

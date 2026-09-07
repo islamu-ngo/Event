@@ -1,6 +1,3 @@
-// ABOUTME: One-shot browser geolocation adapter used only after an explicit home discovery action.
-// ABOUTME: Requests coarse accuracy and returns coordinates without writing to browser or external side channels.
-
 export function getCurrentPosition() {
     if (!navigator.geolocation) {
         return Promise.resolve({ status: "unavailable" });

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the first-class Anthropic company AI chat provider adapter.
-// ABOUTME: Verifies default endpoint, headers, image mapping, and safe response handling.
-
 using System.Diagnostics.Metrics;
 using System.Net;
 using System.Text;

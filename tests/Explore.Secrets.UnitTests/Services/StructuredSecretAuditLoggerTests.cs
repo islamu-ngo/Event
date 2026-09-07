@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for StructuredSecretAuditLogger.
-// ABOUTME: Tests structured logging output for audit entries.
-
 using Explore.Secrets.Abstractions;
 using Explore.Secrets.Services;
 using Microsoft.Extensions.Logging;

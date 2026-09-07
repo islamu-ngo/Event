@@ -1,6 +1,3 @@
-// ABOUTME: Proves generated initials install semantic constraints on non-transactional DDL providers.
-// ABOUTME: Exercises fresh application and idempotent reapplication on MariaDB and MySQL.
-
 #nullable enable
 
 using System.Data.Common;

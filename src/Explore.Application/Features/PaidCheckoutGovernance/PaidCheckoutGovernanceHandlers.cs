@@ -1,6 +1,3 @@
-// ABOUTME: Applies sale-control and review lifecycle transitions inside serializable local transactions.
-// ABOUTME: Resolves actors and organizer/policy lineage server-side and enforces independent reviewers.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Payments;

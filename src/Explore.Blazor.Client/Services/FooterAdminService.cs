@@ -1,6 +1,3 @@
-// ABOUTME: Generated-client service for managing footer link groups, links, and tenant settings.
-// ABOUTME: Keeps API failures and logging behind the footer UI service boundary.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Footer;
 using Microsoft.Extensions.Logging;

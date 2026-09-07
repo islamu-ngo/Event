@@ -1,6 +1,3 @@
-// ABOUTME: Grouped PATCH payload for updating event-session language assignments.
-// ABOUTME: Uses nullable groups so clients can update the session or language independently.
-
 namespace Explore.Application.DTOs.EventSessionLanguage;
 
 public sealed record UpdateEventSessionLanguageDto

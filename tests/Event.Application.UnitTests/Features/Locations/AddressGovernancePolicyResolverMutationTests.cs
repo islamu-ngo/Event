@@ -1,6 +1,3 @@
-// ABOUTME: Focused mutation coverage for cancellation at the address-governance resolver boundary.
-// ABOUTME: Proves a pre-cancelled request performs no settings or authorization work.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Geocoding;
 using NSubstitute;

@@ -1,6 +1,3 @@
-// ABOUTME: Contract for the authenticated UI-shell context service.
-// ABOUTME: Caches the generated GetUiShellContextAsync response and invalidates on current-user changes.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.Shell;

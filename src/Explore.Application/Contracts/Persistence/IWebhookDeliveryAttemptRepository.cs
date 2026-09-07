@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for LocalProvider delivery attempt rows.
-// ABOUTME: Keeps HTTP attempt audit state entity-first and tenant-safe.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

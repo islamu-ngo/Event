@@ -1,5 +1,3 @@
-// ABOUTME: Generates a durable release evidence manifest from retained CI/CD artifacts.
-// ABOUTME: Keeps manual GitHub Release evidence bundling in repository-owned C# tooling.
 #:property RestorePackagesWithLockFile=false
 #pragma warning disable CA1050 // File-based CI scripts intentionally keep helper records in the script file.
 

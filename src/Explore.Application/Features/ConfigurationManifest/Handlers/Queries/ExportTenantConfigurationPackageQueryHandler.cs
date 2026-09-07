@@ -1,6 +1,3 @@
-// ABOUTME: Projects one authorized tenant from canonical export into a deterministic package.
-// ABOUTME: Keeps whole-instance bytes internal and returns only the route-selected tenant artifact.
-
 namespace Explore.Application.Features.ConfigurationManifest.Handlers.Queries;
 
 using Explore.Application.Contracts.Persistence;

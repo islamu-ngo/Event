@@ -1,6 +1,3 @@
-// ABOUTME: Test helper for populating generated NSwag HAL link dictionaries without binding to anonymous type numbers.
-// ABOUTME: Keeps client tests stable when OpenAPI schema additions renumber generated anonymous link classes.
-
 using System.Collections;
 using System.Reflection;
 

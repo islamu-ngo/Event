@@ -1,5 +1,3 @@
-// ABOUTME: Validates product dependency licenses against the ISLAMU Event allow/deny policy.
-// ABOUTME: Scans NuGet lock files and guards future npm/container dependency surfaces.
 #:property RestorePackagesWithLockFile=false
 
 using System.Text.Json.Nodes;

@@ -1,6 +1,3 @@
-// ABOUTME: Review lifecycle states for event reports.
-// ABOUTME: Tracks intake, triage, review, resolution, duplicate, escalation, and closure.
-
 namespace Explore.Domain.Enums;
 
 public enum EventReportStatus

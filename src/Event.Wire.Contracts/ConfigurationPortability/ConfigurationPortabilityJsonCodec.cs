@@ -1,6 +1,3 @@
-// ABOUTME: Parses and serializes bounded v1alpha2 portability artifacts with value-safe failures.
-// ABOUTME: Rejects malformed, ambiguous, authority-bearing, and wrong-scope JSON before orchestration.
-
 namespace ISLAMU.Wire.Contracts.ConfigurationPortability;
 
 using System.Text;

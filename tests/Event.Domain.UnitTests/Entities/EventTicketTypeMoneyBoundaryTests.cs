@@ -1,6 +1,3 @@
-// ABOUTME: Proves ticket-type pricing boundaries consume currency-qualified Money values.
-// ABOUTME: Preserves pricing-mode invariants while scalar properties remain persistence seams.
-
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 

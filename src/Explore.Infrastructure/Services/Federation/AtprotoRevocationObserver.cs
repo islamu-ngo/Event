@@ -1,6 +1,3 @@
-// ABOUTME: Observes only the status of CarpaNet's outbound OAuth revocation POST.
-// ABOUTME: Never reads or records credential bodies, endpoints, DIDs, or provider responses.
-
 namespace Explore.Infrastructure.Services.Federation;
 
 internal sealed class AtprotoRevocationObserver

@@ -1,6 +1,3 @@
-// ABOUTME: Stores bounded, payload-free evidence for rejected Jetstream envelopes at a specific cursor.
-// ABOUTME: Supports atomic quarantine without retaining raw content or trusting an invalid cursor as a checkpoint.
-
 namespace Explore.Domain.Federation;
 
 public sealed class AtprotoJetstreamQuarantine

@@ -1,6 +1,3 @@
-// ABOUTME: Proves two PostgreSQL refund reservations cannot exceed one payment's captured capacity.
-// ABOUTME: Uses independent DbContexts and the production repository transaction and row-lock path.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

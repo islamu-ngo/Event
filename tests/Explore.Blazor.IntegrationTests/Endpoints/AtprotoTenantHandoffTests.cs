@@ -1,6 +1,3 @@
-// ABOUTME: Guards malformed ATProto handoff input before any backend lookup occurs.
-// ABOUTME: Leaves persisted handoff and protected-cookie assertions to real API/PostgreSQL endpoint tests.
-
 using System.Net;
 using Explore.Blazor.IntegrationTests.Fixtures;
 

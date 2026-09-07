@@ -1,6 +1,3 @@
-// ABOUTME: Defines RED PostgreSQL contracts for fair-return supply, waitlist order, and replacement payment.
-// ABOUTME: Pins commercial equivalence, one-winner fences, crash replay, refund ordering, and PII minimization.
-
 using System.Data.Common;
 using System.Reflection;
 using System.Security.Cryptography;

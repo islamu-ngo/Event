@@ -1,6 +1,3 @@
-// ABOUTME: Default deadline dispatcher used when the host runs without a scheduler.
-// ABOUTME: Reports the deadline as unscheduled so callers fall back to their reconciliation sweep.
-
 using Explore.Application.Contracts.Scheduling;
 
 namespace Explore.Application.Services;

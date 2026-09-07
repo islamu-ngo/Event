@@ -1,6 +1,3 @@
-// ABOUTME: Specifies generated semantic-value check constraints across every primary database catalog.
-// ABOUTME: Proves valid scalar rows survive PostgreSQL upgrade, rollback, and idempotent reapplication without exposing PII.
-
 #nullable enable
 
 using Event.Persistence.IntegrationTests.Fixtures;

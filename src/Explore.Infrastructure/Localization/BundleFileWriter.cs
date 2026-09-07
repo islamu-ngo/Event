@@ -1,6 +1,3 @@
-// ABOUTME: Local-disk implementation of IBundleFileWriter — writes {ContentRoot}/App_Data/Localization/Bundles/{code}.json atomically.
-// ABOUTME: Single-instance / shared-volume deployments only; HA constraint documented in docs/LOCALIZATION.md (plan Phase 3.6).
-
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Microsoft.AspNetCore.Hosting;

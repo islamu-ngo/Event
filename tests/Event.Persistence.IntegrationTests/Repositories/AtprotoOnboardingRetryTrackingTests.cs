@@ -1,6 +1,3 @@
-// ABOUTME: Verifies EF tracking recovery for retryable ATProto tenant onboarding.
-// ABOUTME: Ensures reloaded User and Actor owners are not inserted again after tracking is cleared.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;

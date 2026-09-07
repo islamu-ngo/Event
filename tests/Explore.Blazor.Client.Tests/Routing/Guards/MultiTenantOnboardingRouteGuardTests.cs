@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for MultiTenantOnboardingRouteGuard onboarding routing decisions.
-// ABOUTME: Verifies first-run instance onboarding remains reachable until launch completes.
-
 using Blazouter.Models;
 using Explore.Blazor.Client.Routing.Guards;
 

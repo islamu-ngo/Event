@@ -1,6 +1,3 @@
-// ABOUTME: Quartz job that marks stale EmailDispatchOutbox processing leases as Unknown for operator review.
-// ABOUTME: Delegates execution to Application contracts so the scheduler never owns email delivery state.
-
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Contracts.Services;
 using Quartz;

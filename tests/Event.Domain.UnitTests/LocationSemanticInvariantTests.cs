@@ -1,6 +1,3 @@
-// ABOUTME: Distinguishes Location aggregate invariants across materialization, governance, and privacy transitions.
-// ABOUTME: Verifies state and typed failures without coupling tests to exception prose.
-
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using Explore.Domain.Enums;

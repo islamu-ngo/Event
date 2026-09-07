@@ -1,6 +1,3 @@
-// ABOUTME: Management projection for a reported target reference.
-// ABOUTME: Identifies the event-level or future sub-resource target without exposing unrelated entity payloads.
-
 namespace Explore.Application.DTOs.EventReporting;
 
 public sealed record ModerationReportTargetDto

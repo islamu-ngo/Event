@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for AnalyticsConfigResolver covering setting resolution and provider fallback behavior.
-// ABOUTME: Verifies runtime cache-backed resolver returns safe defaults for unsupported provider keys.
-
 using Explore.Application.Analytics;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Secrets;

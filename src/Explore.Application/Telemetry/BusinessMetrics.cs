@@ -1,6 +1,3 @@
-// ABOUTME: Defines custom OpenTelemetry business metrics for the platform.
-// ABOUTME: Tracks domain activity plus moderation, external API-key, email-dispatch, storage, notification fanout, and governance signals.
-
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.Scheduling;

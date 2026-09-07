@@ -1,6 +1,3 @@
-// ABOUTME: Safe per-check result for read-only Keycloak realm compatibility diagnostics.
-// ABOUTME: Carries operator-facing status and remediation without provider secrets or raw bodies.
-
 namespace Explore.Application.DTOs.Onboarding;
 
 public sealed record KeycloakRealmDoctorCheckDto

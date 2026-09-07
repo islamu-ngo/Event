@@ -1,6 +1,3 @@
-// ABOUTME: Normalized AI provider identifiers and operational defaults.
-// ABOUTME: String constants for governance settings; int IDs reference ai_provider_kinds lookup table.
-
 namespace Explore.Application.Contracts.Infrastructure.Ai;
 
 public static class AiProviderDefaults

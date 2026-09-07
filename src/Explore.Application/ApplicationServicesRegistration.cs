@@ -1,5 +1,3 @@
-// ABOUTME: Application layer service registration for DI container.
-// ABOUTME: Registers MediatR, AutoMapper, pipeline behaviors, and application services.
 using System.Reflection;
 using AutoMapper.Internal;
 using Explore.Application.Analytics;

@@ -1,4 +1,3 @@
-// ABOUTME: DelegatingHandler that propagates the current Activity/trace correlation ID as an HTTP header.
 // Attached to the CerbosClient HttpClient to enable end-to-end request tracing through the Cerbos PDP.
 
 using System.Diagnostics;

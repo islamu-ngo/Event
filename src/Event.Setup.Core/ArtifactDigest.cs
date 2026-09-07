@@ -1,6 +1,3 @@
-// ABOUTME: Computes and represents canonical SHA-256 digests over caller-supplied artifact bytes.
-// ABOUTME: Provides deterministic parse, format, and equality behavior without ambient input or I/O.
-
 namespace ISLAMU.Event.Setup.Core;
 
 using System.Security.Cryptography;

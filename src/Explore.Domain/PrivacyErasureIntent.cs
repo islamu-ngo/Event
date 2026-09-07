@@ -1,6 +1,3 @@
-// ABOUTME: Immutable platform privacy-erasure fact retained for idempotent replay.
-// ABOUTME: Carries only typed User authority, UUIDv7 identity, sequence, policy, and ordered UTC timestamps.
-
 namespace Explore.Domain;
 
 public sealed class PrivacyErasureIntent

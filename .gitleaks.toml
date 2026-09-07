@@ -1,6 +1,3 @@
-# ABOUTME: Gitleaks configuration extending default rules with repository-specific allowlists.
-# ABOUTME: Excludes mock secrets and token placeholders in documentation, design notes, and agent skills.
-
 [extend]
 useDefault = true
 

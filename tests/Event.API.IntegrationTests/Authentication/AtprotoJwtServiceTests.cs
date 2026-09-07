@@ -1,6 +1,3 @@
-// ABOUTME: Exercises the ATProto bootstrap/session JWT attack matrix and bounded MultiAuth selector.
-// ABOUTME: Proves purpose-separated ES256 validation, tenant binding, and Keycloak/API-key routing parity.
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;

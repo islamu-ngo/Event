@@ -1,8 +1,4 @@
-# ABOUTME: One-shot Keycloak realm bootstrap for synchronizing local realm auth settings and OIDC clients.
-# ABOUTME: Uses kcadm.sh idempotently and keeps admin credentials, tokens, and client secrets out of logs.
-
 #!/usr/bin/env bash
-
 set -euo pipefail
 
 KEYCLOAK_INTERNAL_URL="${KEYCLOAK_INTERNAL_URL:-http://keycloak:8080}"

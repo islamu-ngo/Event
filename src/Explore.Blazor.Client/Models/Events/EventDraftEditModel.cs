@@ -1,6 +1,3 @@
-// ABOUTME: Presentation model for editing Event draft shell fields.
-// ABOUTME: EventService translates this UI state into the generated grouped PATCH contract.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Models.Events;

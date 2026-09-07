@@ -1,6 +1,3 @@
-// ABOUTME: Manual validator for event-session template sync apply plans enforcing positive versions and platform-default payload limits.
-// ABOUTME: The sync service applies tenant-specific quota enforcement separately before opening its transaction.
-
 using Explore.Application.DTOs.EventSessionTemplateSync;
 using Explore.Domain.Settings.Definitions;
 using FluentValidation;

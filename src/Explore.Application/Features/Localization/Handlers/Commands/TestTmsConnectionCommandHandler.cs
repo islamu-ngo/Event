@@ -1,6 +1,3 @@
-// ABOUTME: Handler for TestTmsConnectionCommand that verifies TMS provider connectivity.
-// ABOUTME: Tests the configured TMS (Tolgee/Weblate) connection and returns success/failure.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Features.Localization.Requests.Commands;

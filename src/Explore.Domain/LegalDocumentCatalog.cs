@@ -1,6 +1,3 @@
-// ABOUTME: Defines the closed legal document taxonomy and its role-owned scope.
-// ABOUTME: Prevents imported artifacts or registry growth from granting publication authority.
-
 namespace Explore.Domain;
 
 using System.Collections.Frozen;

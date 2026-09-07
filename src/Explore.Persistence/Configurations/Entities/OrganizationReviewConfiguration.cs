@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for shared organization reviews and nullable reviewer identity.
-// ABOUTME: Keeps review content while allowing privacy erasure to sever the User relationship.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

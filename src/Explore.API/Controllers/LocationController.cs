@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for venue/location CRUD operations with HATEOAS support.
-// ABOUTME: Manages event venues, addresses, and geographic data for event discovery filtering.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Extensions;

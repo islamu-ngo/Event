@@ -1,4 +1,3 @@
-// ABOUTME: ASP.NET Core native OpenAPI schema transformer for HAL wrapper types.
 // Ensures OpenAPI schema generation includes the inner DTO properties for HalResource<T> and HalCollectionResource<T>.
 //
 // STATUS: DISABLED - historical native schema-transformer experiment kept for reference only.

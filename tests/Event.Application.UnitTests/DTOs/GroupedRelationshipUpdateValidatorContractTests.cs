@@ -1,6 +1,3 @@
-// ABOUTME: Consolidates grouped relationship-update validation into one contract matrix.
-// ABOUTME: Covers empty wrappers, valid groups, and required identifiers without prose assertions.
-
 using Explore.Application.DTOs.EventCategories;
 using Explore.Application.DTOs.EventCategories.Validators;
 using Explore.Application.DTOs.EventSessionLanguage;

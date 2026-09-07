@@ -1,6 +1,3 @@
-// ABOUTME: Defines tenant-scoped execution results for one persisted incoming webhook claim.
-// ABOUTME: Keeps worker coordination limited to durable claim identity and bounded processing outcomes.
-
 using Explore.Application.Contracts.Persistence;
 
 namespace Explore.Application.Contracts.Webhooks;

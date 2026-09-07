@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL-backed tests for sitemap event filtering in EventRepository.
-// ABOUTME: Verifies sitemap URLs only include published public events from the active tenant.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;

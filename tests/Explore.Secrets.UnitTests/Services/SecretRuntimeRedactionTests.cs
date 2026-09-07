@@ -1,6 +1,3 @@
-// ABOUTME: Injects hostile provider details into runtime secret failures and scans captured logs.
-// ABOUTME: Guards the zero-secret observability boundary for source and resolver error paths.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Secrets;

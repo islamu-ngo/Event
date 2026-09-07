@@ -1,6 +1,3 @@
-// ABOUTME: Defines prospective PostgreSQL contracts for ticketing restore authority and bearer rotation.
-// ABOUTME: Pins manifest validation, recovery-only reopening, tenant fences, replay, and ambiguity preservation.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Persistence;

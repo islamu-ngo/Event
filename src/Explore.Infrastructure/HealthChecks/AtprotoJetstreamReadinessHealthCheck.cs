@@ -1,6 +1,3 @@
-// ABOUTME: Reports whether capability-aware ATProto Jetstream ingestion is enabled and actually connected.
-// ABOUTME: Reports public-collection or DID-curated readiness without exposing source identities.
-
 using Explore.Infrastructure.Services.Federation;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;

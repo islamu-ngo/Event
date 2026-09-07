@@ -1,6 +1,3 @@
-// ABOUTME: Local moderation queue states for report cases.
-// ABOUTME: Separates open, assigned, waiting, decision-ready, and closed case work.
-
 namespace Explore.Domain.Enums;
 
 public enum EventReportCaseStatus

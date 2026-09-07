@@ -1,6 +1,3 @@
-// ABOUTME: Handles rebuilding projection rows for a single event session.
-// ABOUTME: Delegates to RefreshForEventSessionAsync for session-scoped projection repair.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.EventSessionCustomPropertyProjections.Requests.Commands;

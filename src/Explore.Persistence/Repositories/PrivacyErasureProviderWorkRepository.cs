@@ -1,6 +1,3 @@
-// ABOUTME: Claims and settles typed privacy-erasure provider work with exact lease fences.
-// ABOUTME: Uses serializable claims so concurrent workers cannot own the same provider operation.
-
 using System.Data;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: Maps versioned transfer policy, append-only transfer attempts, and pointer-only delivery intents.
-// ABOUTME: Enforces tenant-qualified lineage, one portable open slot, digest uniqueness, and bounded state.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

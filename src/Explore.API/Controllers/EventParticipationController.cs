@@ -1,6 +1,3 @@
-// ABOUTME: Thin API controller for configuring event participation.
-// ABOUTME: Dispatches the existing CQRS command and maps command failures to RFC 7807 responses.
-
 using System.ComponentModel.DataAnnotations;
 using Asp.Versioning;
 using Explore.API.Attributes;

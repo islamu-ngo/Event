@@ -1,6 +1,3 @@
-// ABOUTME: AutoMapper profile for User, UserAuthenticationToken, and UserExternalLogin entities.
-// ABOUTME: Split from monolithic MappingProfile.cs for domain-cohesion.
-
 using AutoMapper;
 using Explore.Application.DTOs.User;
 using Explore.Application.DTOs.UserAuthenticationToken;

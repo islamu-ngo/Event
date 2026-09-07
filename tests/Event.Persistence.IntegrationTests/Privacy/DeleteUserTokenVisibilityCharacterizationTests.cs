@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL characterization of the tenant-filtered token lookup used by current User deletion.
-// ABOUTME: Proves a second-tenant session remains outside the ordinary repository result for the same User.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
 using Explore.Domain.Enums;

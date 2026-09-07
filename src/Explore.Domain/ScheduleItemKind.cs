@@ -1,6 +1,3 @@
-// ABOUTME: Lookup classifying an agenda item (Intro, Talk, Q&A, Break, Prayer, Outro, Logistics, Custom).
-// ABOUTME: Shared by event-level EventAgendaItem and session-level EventSessionAgendaItem.
-
 namespace Explore.Domain;
 
 public class ScheduleItemKind

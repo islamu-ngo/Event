@@ -1,6 +1,3 @@
-// ABOUTME: AutoMapper profile for Notification and CustomPropertyProjection entities.
-// ABOUTME: Split from monolithic MappingProfile.cs for domain-cohesion.
-
 using AutoMapper;
 using Explore.Domain;
 

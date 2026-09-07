@@ -1,6 +1,3 @@
-// ABOUTME: Stores the rehydratable current projection for one tenant-ticket-target admission scope.
-// ABOUTME: Tracks active fact identity, entry count, sequence, and concurrency without event history or a Boolean.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

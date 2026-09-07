@@ -1,6 +1,3 @@
-// ABOUTME: Default scheduler audit sink writing structured operator-action records to the logging pipeline.
-// ABOUTME: Emits named properties so log stores and SIEMs can query scheduler accountability without parsing text.
-
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Telemetry;
 

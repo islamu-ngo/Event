@@ -1,6 +1,3 @@
-// ABOUTME: Immutable tenant-scoped business input for deferred notification fanout.
-// ABOUTME: Retains safe change snapshots while allowing only an explicit supersession transition.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

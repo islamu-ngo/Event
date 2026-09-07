@@ -1,6 +1,3 @@
-// ABOUTME: Read models for the multi-tenant control-plane domain and DNS checklist.
-// ABOUTME: Exposes operator guidance without performing external DNS lookups or leaking infrastructure secrets.
-
 namespace Explore.Application.DTOs.ControlPlane;
 
 public sealed record ControlPlaneDomainOverviewDto

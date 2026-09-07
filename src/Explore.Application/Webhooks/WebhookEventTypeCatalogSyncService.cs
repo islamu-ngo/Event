@@ -1,6 +1,3 @@
-// ABOUTME: Synchronizes the registry-defined outgoing webhook event catalog into persistence.
-// ABOUTME: Preserves stable database IDs for endpoint subscriptions while keeping schemas generated from the canonical registry.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: Centralizes BFF auth provider scheme resolution and readiness checks.
-// ABOUTME: Keeps provider discovery and minimal-config fallback logic out of auth endpoint handlers.
-
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.RegularExpressions;

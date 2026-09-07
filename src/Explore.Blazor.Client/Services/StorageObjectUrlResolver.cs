@@ -1,6 +1,3 @@
-// ABOUTME: Resolves stable metadata-backed storage object URLs for Blazor UI consumers.
-// ABOUTME: Keeps provider keys, bucket URLs, and local filesystem paths out of client components.
-
 namespace Explore.Blazor.Client.Services;
 
 public interface IStorageObjectUrlResolver

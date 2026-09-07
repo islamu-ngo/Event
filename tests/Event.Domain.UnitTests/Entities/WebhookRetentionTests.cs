@@ -1,6 +1,3 @@
-// ABOUTME: Tests normalized webhook retention holds and immutable evidence-horizon invariants.
-// ABOUTME: Proves holds are UTC-safe, idempotently releasable, and reject invalid classifications.
-
 using Explore.Domain;
 
 namespace Event.Domain.UnitTests.Entities;

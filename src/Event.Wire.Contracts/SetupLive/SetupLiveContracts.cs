@@ -1,6 +1,3 @@
-// ABOUTME: Declares immutable Setup live enrollment, readiness, and operation wire data.
-// ABOUTME: Excludes target authority, provider coordinates, raw values, and registration surfaces.
-
 namespace ISLAMU.Wire.Contracts.SetupLive;
 
 using System.Text.Json.Serialization;

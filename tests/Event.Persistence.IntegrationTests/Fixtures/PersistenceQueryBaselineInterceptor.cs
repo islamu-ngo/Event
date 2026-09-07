@@ -1,6 +1,3 @@
-// ABOUTME: Captures value-free command counts, projection widths, and durations for persistence baselines.
-// ABOUTME: Emits only operation codes and bounded numeric evidence, never SQL text or parameter values.
-
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 

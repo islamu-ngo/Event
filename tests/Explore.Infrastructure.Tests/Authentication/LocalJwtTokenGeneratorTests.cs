@@ -1,6 +1,3 @@
-// ABOUTME: Verifies local JWTs are secret-backed, signed, bounded, and carry normalized identity claims.
-// ABOUTME: Proves token generation fails closed when the configured signing authority is unavailable.
-
 using System.Security.Claims;
 using System.Security.Cryptography;
 using Explore.Application.Configuration;

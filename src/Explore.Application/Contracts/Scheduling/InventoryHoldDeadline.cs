@@ -1,6 +1,3 @@
-// ABOUTME: Builds the deadline identity and pointer for one registration order's inventory-hold expiry.
-// ABOUTME: Keeps the registering, cancelling, and servicing sides of the deadline on one shape.
-
 using System.Globalization;
 
 namespace Explore.Application.Contracts.Scheduling;

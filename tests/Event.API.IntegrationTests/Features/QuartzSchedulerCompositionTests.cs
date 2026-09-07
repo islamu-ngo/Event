@@ -1,6 +1,3 @@
-// ABOUTME: Guards scheduler-wide host composition independently from EmailDispatch mode.
-// ABOUTME: Prevents a hosted email fallback from disabling unrelated Quartz jobs and operator surfaces.
-
 using Explore.API.Hosting;
 using Explore.API.Scheduling;
 using Explore.API.Extensions;

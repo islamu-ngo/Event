@@ -1,6 +1,3 @@
-// ABOUTME: Encrypts and decrypts complete CarpaNet OAuth sessions with an instance AES-256 key ring.
-// ABOUTME: Authenticates tenant, user, provider, DID, PDS, client key, and envelope version as AAD.
-
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Security.Cryptography;

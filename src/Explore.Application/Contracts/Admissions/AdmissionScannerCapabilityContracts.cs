@@ -1,6 +1,3 @@
-// ABOUTME: Defines scoped scanner-capability issuance, digest-only persistence, read, and revocation contracts.
-// ABOUTME: Restricts plaintext disclosure to the issuance result and masks every subsequent descriptor.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Admissions;

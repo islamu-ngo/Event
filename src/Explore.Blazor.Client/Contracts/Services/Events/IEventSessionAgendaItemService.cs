@@ -1,6 +1,3 @@
-// ABOUTME: Blazor service contract for public and event-authorized session agenda reads.
-// ABOUTME: Separates redacted public presentation from exact management data flows.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.Events;

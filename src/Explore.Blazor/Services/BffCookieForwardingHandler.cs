@@ -1,6 +1,3 @@
-// ABOUTME: HTTP message handler that forwards the captured auth cookie to BFF self-endpoints.
-// ABOUTME: Required because BffSelfClient uses UseCookies=false for handler pooling hygiene.
-
 using Explore.Blazor.Services.Auth;
 
 using Microsoft.Net.Http.Headers;

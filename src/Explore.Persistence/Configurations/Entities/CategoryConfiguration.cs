@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for tenant-scoped event categories and parent category hierarchy.
-// ABOUTME: Composite self-FKs prevent categories from nesting under parents owned by another tenant.
-
 using Explore.Domain;
 using Explore.Persistence.Seed;
 using Explore.Persistence.ValueGenerators;

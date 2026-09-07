@@ -1,6 +1,3 @@
-// ABOUTME: Focused tests for event and session template-sync generated-client service wrappers.
-// ABOUTME: Verifies operation selection, identifiers, versions, requests, and generated result forwarding.
-
 using Explore.Blazor.Client.Services.EventSessionTemplateSync;
 using Explore.Blazor.Client.Services.EventTemplateSync;
 

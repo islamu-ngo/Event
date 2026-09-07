@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL tests for bounded tenant-scoped webhook retention cleanup.
-// ABOUTME: Proves dry-run, holds, terminal-state gates, payload redaction, audit expiry, and tenant isolation.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;

@@ -1,6 +1,3 @@
-// ABOUTME: Ratchets the Setup live Wire namespace to a package-free inner contract boundary.
-// ABOUTME: Rejects server dependencies and registration-provider surface reuse.
-
 namespace Event.Architecture.Tests;
 
 using System.Reflection;

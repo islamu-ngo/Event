@@ -1,6 +1,3 @@
-// ABOUTME: Exercises both private-home ownership writes through the real authenticated HTTP pipeline.
-// ABOUTME: Pins route, consent, and If-Match machine contracts while leaving ownership invariants to handlers.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;

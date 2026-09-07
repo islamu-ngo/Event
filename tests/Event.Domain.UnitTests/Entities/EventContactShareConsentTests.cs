@@ -1,6 +1,3 @@
-// ABOUTME: Verifies typed contact-share consent identity, lifecycle, and interface boundaries.
-// ABOUTME: Exercises the aggregate through its public grant, withdraw, and regrant operations.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;

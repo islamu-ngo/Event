@@ -1,6 +1,3 @@
-// ABOUTME: Bridges authenticated BFF browser sessions into the standalone host's existing API bearer pipeline.
-// ABOUTME: Fails closed for unusable session tokens while leaving independent external API credentials untouched.
-
 using System.Security.Claims;
 using Event.Web.BffHosting.Authentication;
 using Event.Web.BffHosting.Security;

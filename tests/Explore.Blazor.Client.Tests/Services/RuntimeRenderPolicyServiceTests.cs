@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for runtime render policy service route-group classification and fallback behavior.
-// ABOUTME: Verifies governance-based mode selection, SeoBalanced defaults, and onboarding guardrails.
-
 namespace Explore.Blazor.Client.Tests.Services;
 
 public class RuntimeRenderPolicyServiceTests

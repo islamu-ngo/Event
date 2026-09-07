@@ -1,6 +1,3 @@
-// ABOUTME: Configures the normalized authentication provider lookup table and stable identifiers.
-// ABOUTME: Prevents provider codes from being duplicated across persisted user identity relationships.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped shell styles for the active support-access banner.
-   ABOUTME: Uses design tokens, logical properties, and stable dimensions for header offset calculations. */
-
 .support-access-banner {
     min-block-size: 3.5rem;
     background: color-mix(in oklch, var(--isl-color-warning) 14%, var(--isl-color-surface));

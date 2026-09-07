@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for the public community guidelines page renderer.
-// ABOUTME: Proves tenant-customized guidelines content stays escaped despite MarkupString output.
-
 using Explore.Blazor.Client.Pages.Legal;
 using Explore.Blazor.Client.Services;
 

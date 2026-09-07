@@ -1,6 +1,3 @@
-// ABOUTME: Architecture guardrails for tenant query-filter and bypass conventions.
-// ABOUTME: Prevents permissive null-tenant filters and unreviewed full query-filter bypasses from returning.
-
 namespace Event.Architecture.Tests;
 
 using System.Text.RegularExpressions;

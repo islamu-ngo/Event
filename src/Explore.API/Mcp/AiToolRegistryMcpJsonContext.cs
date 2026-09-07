@@ -1,6 +1,3 @@
-// ABOUTME: Source-generated JSON metadata for MCP registry discovery responses.
-// ABOUTME: Keeps the adapter contract deterministic without reflection-based serializer fallback.
-
 using System.Text.Json.Serialization;
 
 namespace Explore.API.Mcp;

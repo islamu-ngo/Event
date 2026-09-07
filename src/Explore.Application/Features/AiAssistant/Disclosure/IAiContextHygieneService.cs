@@ -1,6 +1,3 @@
-// ABOUTME: Contract for AI transcript hygiene when consent is revoked or right-to-be-forgotten is invoked.
-// ABOUTME: Ensures PII-bearing summaries and messages are redacted in persisted AI conversation state.
-
 using System.Threading;
 using System.Threading.Tasks;
 

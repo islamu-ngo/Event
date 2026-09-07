@@ -1,6 +1,3 @@
-// ABOUTME: Admin API for inspecting and explicitly releasing quarantined registration file answers.
-// ABOUTME: Emits HAL release affordances only while release remains a valid server-authorized transition.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Authentication;

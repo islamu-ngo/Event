@@ -1,6 +1,3 @@
-// ABOUTME: Consent-backed Private Home classification and ownership acceptance commands.
-// ABOUTME: Ownership is always claimed by the authenticated actor, never assigned to a third party.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

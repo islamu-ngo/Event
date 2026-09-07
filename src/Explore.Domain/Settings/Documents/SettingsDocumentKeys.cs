@@ -1,6 +1,3 @@
-// ABOUTME: Canonical typed settings document keys for the additive JSONB foundation.
-// ABOUTME: Lists only non-secret governance/configuration documents approved for Phase 2 storage.
-
 namespace Explore.Domain.Settings.Documents;
 
 public static class SettingsDocumentKeys

@@ -1,6 +1,3 @@
-// ABOUTME: Result contract for Coop webhook raw-body signature validation.
-// ABOUTME: Carries either the verified JSON body or bounded ProblemDetails metadata.
-
 using Microsoft.AspNetCore.Http;
 
 namespace Explore.API.Services;

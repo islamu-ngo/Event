@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for Event entity soft-delete behavior on real PostgreSQL.
-// ABOUTME: Verifies that soft-delete query filter hides deleted events from normal queries.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;

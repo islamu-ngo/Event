@@ -1,6 +1,3 @@
-// ABOUTME: Domain tests for AI proposed action confirmation and execution state transitions.
-// ABOUTME: Verifies mutating AI proposals cannot execute before explicit human confirmation.
-
 namespace Event.Domain.UnitTests.Ai;
 
 using Explore.Domain.Ai;

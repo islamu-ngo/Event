@@ -1,6 +1,3 @@
-// ABOUTME: Probes the split Blazor BFF's generated-client boundary before serving any onboarding surface.
-// ABOUTME: Reuses one downstream API readiness contract for startup validation and health reporting.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.HealthChecks;

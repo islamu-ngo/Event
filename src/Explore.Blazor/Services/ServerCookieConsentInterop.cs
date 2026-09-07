@@ -1,6 +1,3 @@
-// ABOUTME: Server-side no-op for ICookieConsentInterop — JS interop unavailable during SSR.
-// ABOUTME: Returns null for reads, no-ops for writes. Paired with client CookieConsentInterop.
-
 using Explore.Blazor.Client.Contracts.Interop;
 
 namespace Explore.Blazor.Services;

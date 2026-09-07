@@ -1,6 +1,3 @@
-// ABOUTME: Command handler for drafting a new version of an existing SaaS tenant plan.
-// ABOUTME: Preserves existing tenant assignments until a later publish command chooses otherwise.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ControlPlane.Plans;
 using Explore.Application.Features.ControlPlane.Requests.Commands;

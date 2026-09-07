@@ -1,6 +1,3 @@
-// ABOUTME: Read-only DTO for event runtime custom property options, nested within definition DTOs.
-// ABOUTME: Includes SourceTemplateOptionId for provenance tracking from template instantiation.
-
 namespace Explore.Application.DTOs.EventCustomProperty;
 
 public sealed record EventCustomPropertyOptionDto

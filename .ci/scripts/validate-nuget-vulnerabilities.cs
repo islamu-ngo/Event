@@ -1,5 +1,3 @@
-// ABOUTME: Parses dotnet vulnerable-package JSON output and fails on unapproved advisories.
-// ABOUTME: Splits actionable and explicitly suppressed findings for deterministic CI evidence.
 #:property RestorePackagesWithLockFile=false
 
 using System.Text.Json;

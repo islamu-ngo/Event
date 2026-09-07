@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the Refit-backed Anthropic-compatible AI chat provider adapter.
-// ABOUTME: Verifies native Anthropic tool, tool result, header, and endpoint mapping semantics.
-
 using System.Diagnostics.Metrics;
 using System.Net;
 using System.Text;

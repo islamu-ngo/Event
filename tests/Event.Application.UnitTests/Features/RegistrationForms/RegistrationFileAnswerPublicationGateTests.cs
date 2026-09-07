@@ -1,6 +1,3 @@
-// ABOUTME: Verifies File fields remain unpublishable until the deployment enables the file-answer pipeline.
-// ABOUTME: Keeps publication capability fail-closed while malware scanner integration is deferred.
-
 using Explore.Application.Configuration;
 using Explore.Application.Services.Registration;
 using Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: Result contract for operator-initiated scheduler control actions.
-// ABOUTME: Models refusal reasons as data so handlers map them to HTTP semantics without exception control flow.
-
 namespace Explore.Application.Contracts.Scheduling;
 
 public enum SchedulerOperationOutcome

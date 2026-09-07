@@ -1,6 +1,3 @@
-// ABOUTME: Machine-readable registry for persisted PII and purpose-authorized derived AI projections.
-// ABOUTME: Keeps raw PII classifications separate from already-evaluated public EventLocation fields.
-
 using System.Collections.Generic;
 using Explore.Application.DTOs.Location;
 using Explore.Domain;

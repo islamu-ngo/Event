@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for event-session-level custom property definition and value operations.
-// ABOUTME: Manages session-local property definitions (ad-hoc or template-instantiated) and their values.
-
 using System.ComponentModel.DataAnnotations;
 using Asp.Versioning;
 using Explore.API.Attributes;

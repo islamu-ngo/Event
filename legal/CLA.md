@@ -1,6 +1,3 @@
-<!-- ABOUTME: Contributor License Agreement for inbound ISLAMU Event contributions. -->
-<!-- ABOUTME: Defines project-steward inbound rights, signature evidence, and AGPL alternative-licensing terms. -->
-
 # ISLAMU Event Contributor License Agreement
 
 > **Version:** 1.0

@@ -1,6 +1,3 @@
-// ABOUTME: Writes deterministic fake/replay AI usability reports as redacted JSON and Markdown artifacts.
-// ABOUTME: Ensures normal CI artifacts avoid prompts, responses, payloads, tenant IDs, and provider secrets.
-
 using System.Globalization;
 using System.Text;
 using System.Text.Json;

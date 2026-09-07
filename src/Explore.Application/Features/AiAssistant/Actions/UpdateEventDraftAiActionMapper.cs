@@ -1,6 +1,3 @@
-// ABOUTME: Maps untrusted AI UpdateEventDraft proposals into safe draft update DTOs.
-// ABOUTME: Rejects unknown, privileged, stale-concurrency, and invalid fields before confirmation.
-
 using System.Text.Json;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Features.AiAssistant.Prompting;

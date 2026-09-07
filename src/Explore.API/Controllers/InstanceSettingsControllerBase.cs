@@ -1,6 +1,3 @@
-// ABOUTME: Shared authorization mode and failure mapping for the instance-settings controller family.
-// ABOUTME: Encodes the instance-admin-or-active-setup-secret rule once so no settings surface can drift from it.
-
 using Explore.API.ExceptionHandling;
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Identity;

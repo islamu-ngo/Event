@@ -1,6 +1,3 @@
-// ABOUTME: Handles UpdateFooterLinkCommand — updates label, URL, and display options.
-// ABOUTME: Validates parent group ownership before persisting.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;

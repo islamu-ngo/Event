@@ -1,6 +1,3 @@
-// ABOUTME: Discovers add-on and fair-return BFF routes from runtime endpoint metadata.
-// ABOUTME: Verifies every unsafe route is cookie-authorized and antiforgery-protected.
-
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Routing;
 using System.Text.RegularExpressions;

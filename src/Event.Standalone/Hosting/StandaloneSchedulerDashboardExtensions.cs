@@ -1,6 +1,3 @@
-// ABOUTME: Conditionally mounts the first-party Quartz.NET Blazor dashboard in the combined standalone host.
-// ABOUTME: Uses the self-contained mapping so the dashboard never depends on this app's custom client router.
-
 using Explore.API.Configuration;
 using Quartz;
 

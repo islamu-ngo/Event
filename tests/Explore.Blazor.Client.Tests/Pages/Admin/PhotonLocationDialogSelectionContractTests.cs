@@ -1,6 +1,3 @@
-// ABOUTME: RED bUnit contracts for protected selections in Location create and edit dialogs.
-// ABOUTME: Submits tokens only while every supported visible token-bound field remains unchanged.
-
 using System.Reflection;
 using AngleSharp.Dom;
 using Explore.Blazor.Client.Pages.Admin.Dialogs;

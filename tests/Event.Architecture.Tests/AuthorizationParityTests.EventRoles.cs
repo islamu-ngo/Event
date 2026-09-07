@@ -1,6 +1,3 @@
-// ABOUTME: Architecture tests enforcing event-scoped role parity between Cerbos policies and local fallback.
-// ABOUTME: Validates that event-role derived roles, schemas, and test coverage stay aligned with the ESOR contract.
-
 namespace Event.Architecture.Tests;
 
 using System.Text.Json;

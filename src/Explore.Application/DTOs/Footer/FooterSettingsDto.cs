@@ -1,6 +1,3 @@
-// ABOUTME: DTO for the resolved tenant footer settings (settings-layer values only).
-// ABOUTME: Used internally by FooterConfigDto to carry the scalar/json setting values.
-
 namespace Explore.Application.DTOs.Footer;
 
 public sealed record FooterSettingsDto

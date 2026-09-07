@@ -1,6 +1,3 @@
-@* ABOUTME: Renders a labeled native multiline answer with server-authored length and pattern hints. *@
-@* ABOUTME: Preserves keyboard, zoom, and RTL behavior through the browser textarea control. *@
-
 <FormFieldShell @ref="_shell" ControlId="@ControlId" FieldKey="@FieldKey" FieldTypeCode="LONG_TEXT"
                 Label="@Label" Required="@Required" Issues="@Issues">
     <textarea id="@ControlId" name="@FieldKey" required="@Required" minlength="@MinLength" maxlength="@MaxLength"

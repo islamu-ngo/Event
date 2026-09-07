@@ -1,8 +1,6 @@
 ---
 description: Operate Local Identity, Keycloak, or passwordless AT Protocol authentication.
 ---
-<!-- ABOUTME: Operator guide for Local Identity, Keycloak, and AT Protocol primary providers. -->
-<!-- ABOUTME: Explains BFF sessions, passwordless JIT identity, storage, and safe provider switching. -->
 
 # Authentication Architecture
 

@@ -1,6 +1,3 @@
-// ABOUTME: Connects authorized apply and forward-rollback requests to the atomic import service.
-// ABOUTME: Keeps target scope explicit and leaves transaction ownership in one Application orchestrator.
-
 namespace Explore.Application.Features.ConfigurationManifest.Handlers.Commands;
 
 using Explore.Application.Features.ConfigurationManifest.Importing;

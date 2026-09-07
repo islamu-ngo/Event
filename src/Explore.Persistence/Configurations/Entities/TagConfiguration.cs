@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for tenant-scoped event tags.
-// ABOUTME: Exposes a tenant-scoped alternate key for composite FKs from event/session tag assignments.
-
 using Explore.Domain;
 using Explore.Persistence.Seed;
 using Explore.Persistence.ValueGenerators;

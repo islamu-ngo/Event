@@ -1,6 +1,3 @@
-// ABOUTME: Exposes authenticated and capability-based ticket-purchase authority reservations.
-// ABOUTME: Keeps purchase mapping and failures outside the registration checkout controllers.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

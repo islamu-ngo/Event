@@ -1,6 +1,3 @@
-// ABOUTME: DTO carrying the rendered theme data (name, palettes, editability, origin) within a resolved appearance.
-// ABOUTME: The UI uses IsSnapshot and IsUserEditable to decide which actions are available.
-
 namespace Explore.Application.DTOs.Appearance;
 
 public sealed record ResolvedThemeDto

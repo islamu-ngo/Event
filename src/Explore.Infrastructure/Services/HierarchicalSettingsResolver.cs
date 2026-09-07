@@ -1,6 +1,3 @@
-// ABOUTME: 5-tier hierarchical settings resolver with batch loading and lock semantics.
-// ABOUTME: Replaces the 2-tier SettingsResolver — Instance → Tenant → Org → Group → User cascade.
-
 namespace Explore.Infrastructure.Services;
 
 using System.Text.Json;

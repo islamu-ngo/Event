@@ -1,6 +1,3 @@
-// ABOUTME: Handles organizer-facing event session list reads without applying public visibility filters.
-// ABOUTME: Keeps entity retrieval in repositories and DTO mapping in the Application handler.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSession;

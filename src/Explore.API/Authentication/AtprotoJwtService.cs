@@ -1,6 +1,3 @@
-// ABOUTME: Validates ATProto bootstrap/session JWTs and issues first-party platform session JWTs.
-// ABOUTME: Resolves rotation-capable purpose-separated ES256 rings without logging token material.
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;

@@ -1,6 +1,3 @@
-// ABOUTME: Stable persisted identifiers for approval and registration lifecycle states.
-// ABOUTME: Cancelled and Revoked are terminal states that must never grant live attendee authority.
-
 namespace Explore.Domain.Enums;
 
 public enum ApprovalStatusEnum

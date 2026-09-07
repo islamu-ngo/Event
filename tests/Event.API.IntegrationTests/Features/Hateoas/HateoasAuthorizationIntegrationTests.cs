@@ -1,4 +1,3 @@
-// ABOUTME: Integration tests verifying HATEOAS link filtering based on authorization.
 // Tests that anonymous users see only public links, while authenticated users see auth-required links.
 // Auth state is per-request via X-Test-Auth header — no shared static state, safe for parallel execution.
 

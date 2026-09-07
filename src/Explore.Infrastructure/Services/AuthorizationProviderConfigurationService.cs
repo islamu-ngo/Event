@@ -1,6 +1,3 @@
-// ABOUTME: Manages application-owned and deployment-selected instance authorization provider configuration.
-// ABOUTME: Reconciles Cerbos intent without persisting Admin API credentials supplied for one request.
-
 using System.Text.Json;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;

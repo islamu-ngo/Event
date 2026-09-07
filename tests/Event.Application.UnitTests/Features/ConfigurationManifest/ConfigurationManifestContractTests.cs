@@ -1,6 +1,3 @@
-// ABOUTME: Specifies the sole v1alpha2 instance-and-tenant ConfigurationManifest contract.
-// ABOUTME: Fails while the tenant-only root, identity, or strict scope shape remains.
-
 namespace Event.Application.UnitTests.Features.ConfigurationManifest;
 
 using System.Reflection;

@@ -1,6 +1,3 @@
-// ABOUTME: Handles explicit Event Tech aspect creation and grouped partial updates.
-// ABOUTME: Validates merged competition state and converges parent event caches after persistence.
-
 using AutoMapper;
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Persistence;

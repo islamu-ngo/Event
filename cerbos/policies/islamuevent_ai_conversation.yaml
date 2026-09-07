@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos resource policy for private AI assistant conversation resources.
-# ABOUTME: Authenticated users reach handlers; handlers enforce current-user ownership and tenant isolation.
-
 apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   resource: "islamuevent_ai_conversation"

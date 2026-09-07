@@ -1,6 +1,3 @@
-// ABOUTME: Repository interface for idempotency replay persistence and atomic claims.
-// ABOUTME: Scopes lookup, claim, completion, and release operations by durable tenant-bound records.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for the dedicated event session details page.
-// ABOUTME: Verifies parent-event navigation and event-scoped moderation boundaries.
-
 using Explore.Blazor.Client.Contracts.Services.Events;
 using Explore.Blazor.Client.Pages.Events.Sessions;
 

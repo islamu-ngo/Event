@@ -1,6 +1,3 @@
-// ABOUTME: Creates tenant-authoritative Locations from validated manual address input.
-// ABOUTME: Constructs the aggregate explicitly so flattened mapping cannot bypass PII transitions.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Infrastructure.Geocoding;

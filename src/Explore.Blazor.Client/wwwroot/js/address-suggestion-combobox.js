@@ -1,6 +1,3 @@
-// ABOUTME: Prevents native input actions only for handled combobox navigation keys.
-// ABOUTME: Keeps free text and IME input native while results remain keyboard-operable.
-
 const listeners = new WeakMap();
 const navigationKeys = new Set(["ArrowDown", "ArrowUp", "Home", "End"]);
 

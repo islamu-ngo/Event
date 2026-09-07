@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for tenant links projected into the desktop rail and mobile bottom sheet.
-// ABOUTME: Verifies configured icons, favicon discovery, sheet dismissal, and same-tab navigation.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.Shell;
 using Explore.Blazor.Client.Contracts.Services;

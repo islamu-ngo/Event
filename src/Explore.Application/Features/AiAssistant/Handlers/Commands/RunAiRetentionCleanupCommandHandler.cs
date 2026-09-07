@@ -1,6 +1,3 @@
-// ABOUTME: Handles AI assistant retention cleanup by resolving tenant retention settings.
-// ABOUTME: Delegates tenant-filtered redaction to the AI conversation repository.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.AiAssistant.Requests.Commands;

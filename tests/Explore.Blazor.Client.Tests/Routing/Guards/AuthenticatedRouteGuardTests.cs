@@ -1,4 +1,3 @@
-// ABOUTME: Unit tests for AuthenticatedRouteGuard that restricts protected routes to authenticated users.
 // Verifies IsAuthenticated check and redirect path generation.
 
 using Blazouter.Models;

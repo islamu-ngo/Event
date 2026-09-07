@@ -1,6 +1,3 @@
-// ABOUTME: Limits development certificate bypasses to explicitly trusted local hosts.
-// ABOUTME: Prevents broad TLS validation bypass while preserving local/Aspire workflows.
-
 using System.Net;
 using System.Net.Sockets;
 using Microsoft.AspNetCore.Hosting;

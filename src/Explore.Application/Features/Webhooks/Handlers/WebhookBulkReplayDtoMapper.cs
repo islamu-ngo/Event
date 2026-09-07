@@ -1,6 +1,3 @@
-// ABOUTME: Maps durable webhook bulk replay operations into normalized management DTOs.
-// ABOUTME: Omits the internal request hash while preserving bounded filters, counts, and lifecycle evidence.
-
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Lookups;
 using Explore.Domain;

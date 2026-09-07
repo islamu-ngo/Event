@@ -1,6 +1,3 @@
-// ABOUTME: Setting definitions for analytics provider configuration (PostHog, Plausible, Rybbit, etc.).
-// ABOUTME: Overridable at Tenant scope so tenants can use their own analytics.
-
 namespace Explore.Domain.Settings.Definitions;
 
 public static class AnalyticsSettingDefinitions

@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for TenantLifecycleLog audit entity.
-// ABOUTME: Two FKs to TenantStatus (old/new) with Restrict delete and indexed for efficient queries.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

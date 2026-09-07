@@ -1,4 +1,3 @@
-// ABOUTME: DTO for the event session Islamic extension (vertical partition).
 // Captures prayer-relative scheduling and ritual requirements per session.
 
 namespace Explore.Application.DTOs.EventSession;

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies generated authenticated payment mutations transmit the required idempotency header.
-// ABOUTME: Prevents OpenAPI or NSwag drift from silently dropping payment replay protection.
-
 using System.Net;
 using System.Reflection;
 using Explore.Blazor.Client.Clients;

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for doctor output redaction.
-// ABOUTME: Protects passwords, tokens, cookies, authorization values, and URI credentials from CLI output.
-
 using Explore.Diagnostic.Doctor;
 
 namespace Explore.Diagnostic.UnitTests.Doctor;

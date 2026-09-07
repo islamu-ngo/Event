@@ -1,6 +1,3 @@
-// ABOUTME: Holds guest order capabilities for the active Blazor scope only.
-// ABOUTME: Loses access on scope end rather than persisting a bearer capability in browser storage.
-
 using Explore.Blazor.Client.Contracts.Services;
 
 namespace Explore.Blazor.Client.Services;

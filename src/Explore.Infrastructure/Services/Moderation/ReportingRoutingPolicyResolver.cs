@@ -1,6 +1,3 @@
-// ABOUTME: Resolves effective reporting provider routing from static options and hierarchical tenant settings.
-// ABOUTME: Preserves mandatory local reporting while allowing tenant providers only as unlocked additive targets.
-
 namespace Explore.Infrastructure.Services.Moderation;
 
 using Explore.Application.Contracts.Infrastructure;

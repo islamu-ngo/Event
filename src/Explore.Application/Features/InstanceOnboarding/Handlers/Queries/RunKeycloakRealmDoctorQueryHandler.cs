@@ -1,6 +1,3 @@
-// ABOUTME: Handles read-only Keycloak realm doctor queries for instance administration.
-// ABOUTME: Reads redacted auth configuration and delegates all provider I/O to Infrastructure.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;

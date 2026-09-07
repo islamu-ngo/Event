@@ -1,6 +1,3 @@
-// ABOUTME: Command handler for publishing tenant plan versions with explicit assignment policy.
-// ABOUTME: Supports pinning existing tenants or moving active assignments to the published version.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ControlPlane.Requests.Commands;
 using Explore.Application.Responses;

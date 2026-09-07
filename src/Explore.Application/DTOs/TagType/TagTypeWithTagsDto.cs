@@ -1,4 +1,3 @@
-// ABOUTME: DTO that groups tags by their tag type for the tri-state tag filter dropdown.
 // Used by GetTagsGroupedByTagTypeRequest to return tags organized by category.
 
 using Explore.Application.DTOs.Tag;

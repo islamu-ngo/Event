@@ -1,6 +1,3 @@
-// ABOUTME: Lookup-table entity for external API key credit renewal periods.
-// ABOUTME: Defines how often credit quotas reset (None, Daily, Weekly, Monthly, Yearly).
-
 namespace Explore.Domain;
 
 public class ExternalApiKeyCreditPeriod

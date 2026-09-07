@@ -1,6 +1,3 @@
-/* ABOUTME: Mobile bottom-sheet layout, touch targets, active states, and composited motion. */
-/* ABOUTME: Uses shell tokens, logical properties, and reduced-motion fallbacks for accessible navigation. */
-
 .tenant-nav-bottom-sheet {
     position: fixed;
     inset: 0;

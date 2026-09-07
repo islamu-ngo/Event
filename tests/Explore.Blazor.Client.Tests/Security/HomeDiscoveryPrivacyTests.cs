@@ -1,6 +1,3 @@
-// ABOUTME: Source and generated-client privacy guards for area-only browser home discovery.
-// ABOUTME: Prevents raw origin from entering API parameters, URL/storage/analytics code, logs, or persistent state.
-
 using System.Reflection;
 
 namespace Explore.Blazor.Client.Tests.Security;

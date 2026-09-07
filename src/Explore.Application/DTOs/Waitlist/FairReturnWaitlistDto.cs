@@ -1,6 +1,3 @@
-// ABOUTME: Publishes bounded fair-return waitlist state without commerce, participant, or seller identity.
-// ABOUTME: Keeps server-computed action and route facts JSON-hidden so HAL remains authoritative.
-
 using System.Text.Json.Serialization;
 
 namespace Explore.Application.DTOs.Waitlist;

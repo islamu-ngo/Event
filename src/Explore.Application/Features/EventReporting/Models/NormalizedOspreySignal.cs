@@ -1,6 +1,3 @@
-// ABOUTME: Internal normalized value object for Osprey callback signal processing.
-// ABOUTME: Keeps callback handler logic typed without leaking provider payload shapes across layers.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Features.EventReporting.Models;

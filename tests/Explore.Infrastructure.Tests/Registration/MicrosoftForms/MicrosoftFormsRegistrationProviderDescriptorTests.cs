@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the exact Microsoft Forms tuple, correlation launch URL, and Power Automate callback contract.
-// ABOUTME: Uses local fixtures only and makes no Microsoft Forms API or native webhook claim.
-
 using System.Text;
 using System.Text.Json;
 using Explore.Application.Contracts.Secrets;

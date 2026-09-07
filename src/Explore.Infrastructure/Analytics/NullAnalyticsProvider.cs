@@ -1,6 +1,3 @@
-// ABOUTME: No-op analytics provider used when analytics are disabled or provider resolution fails.
-// ABOUTME: Returns safe defaults for feature flags to keep callers stable across provider switches.
-
 using Explore.Application.Contracts.Infrastructure;
 using Microsoft.Extensions.Logging;
 

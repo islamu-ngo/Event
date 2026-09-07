@@ -1,6 +1,3 @@
-// ABOUTME: Verifies split reporter-consent columns in the rebased PostgreSQL baseline.
-// ABOUTME: Proves case-update and follow-up consent remain independent and legacy storage is absent.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Persistence;
 using Microsoft.EntityFrameworkCore;

@@ -1,6 +1,3 @@
-// ABOUTME: Deletes a fixed batch of expired ATProto lifecycle identities without provider retries.
-// ABOUTME: Keeps cleanup within its destructive-command budget even when a committed acknowledgement is lost.
-
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;

@@ -1,6 +1,3 @@
-// ABOUTME: Provider-agnostic contract for Translation Management System (TMS) integration.
-// ABOUTME: Implemented by TolgeeTranslationProvider, WeblateTranslationProvider, OfflineTranslationProvider, and NullTranslationProvider.
-
 using System.Collections.Immutable;
 
 namespace Explore.Application.Contracts.Infrastructure;

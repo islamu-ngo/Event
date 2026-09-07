@@ -1,6 +1,3 @@
-// ABOUTME: Adversarial SQLite controls proving tenant isolation depends on both named filters and exact predicates.
-// ABOUTME: Demonstrates that bypassing the tenant filter or deleting its replacement predicate exposes another tenant.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
 using Explore.Domain.Enums;

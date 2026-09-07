@@ -1,6 +1,3 @@
-// ABOUTME: API contract tests for manual authorization policy package ZIP download endpoints.
-// ABOUTME: Verifies setup/admin controllers return archive file responses through the provider-neutral query.
-
 using Explore.API.Controllers;
 using Explore.API.Hateoas;
 using Explore.Application.Authorization;

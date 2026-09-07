@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS policies for event-session language assignment resources.
-// ABOUTME: Authorizes edit affordances against each assignment's parent session.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Security.Claims;

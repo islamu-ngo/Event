@@ -1,6 +1,3 @@
-// ABOUTME: Rejects API requests that send conflicting direct-auth credentials.
-// ABOUTME: Keeps auth dispatch deterministic and fail-closed before authentication handlers run.
-
 using Explore.API.Authentication;
 using Explore.API.Configuration;
 using Microsoft.AspNetCore.Mvc;

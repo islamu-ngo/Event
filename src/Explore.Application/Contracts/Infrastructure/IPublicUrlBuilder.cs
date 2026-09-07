@@ -1,6 +1,3 @@
-// ABOUTME: Contract for generating absolute, tenant-aware public URLs for external sharing.
-// ABOUTME: Used by OG meta tags, share buttons, calendar links, and future federation.
-
 namespace Explore.Application.Contracts.Infrastructure;
 
 /// <summary>

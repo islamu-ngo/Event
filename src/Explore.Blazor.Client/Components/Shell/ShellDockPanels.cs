@@ -1,6 +1,3 @@
-// ABOUTME: Shell-owned dock panel descriptors for the workspace navigation and AI assistant.
-// ABOUTME: Keeps stable shell panel IDs near shell components without creating a central enum.
-
 using Explore.Blazor.Client.Services.Docking;
 
 namespace Explore.Blazor.Client.Components.Shell;

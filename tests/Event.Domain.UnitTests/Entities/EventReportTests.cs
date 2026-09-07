@@ -1,6 +1,3 @@
-// ABOUTME: Domain tests for event-reporting intake, evidence, case, and decision entities.
-// ABOUTME: Verifies privacy-safe metadata boundaries, validation, and review lifecycle transitions.
-
 using Explore.Domain.Enums;
 
 namespace Event.Domain.UnitTests.Entities;

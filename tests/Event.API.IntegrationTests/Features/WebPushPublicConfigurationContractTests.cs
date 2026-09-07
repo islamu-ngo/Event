@@ -1,6 +1,3 @@
-// ABOUTME: HTTP contract tests for the public Web Push configuration reads.
-// ABOUTME: Proves unconfigured instances degrade to an explicit disabled state and never leak signing material.
-
 using System.Net;
 using System.Security.Cryptography;
 using System.Text.Json;

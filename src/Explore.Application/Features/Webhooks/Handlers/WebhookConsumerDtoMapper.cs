@@ -1,6 +1,3 @@
-// ABOUTME: Maps webhook consumer domain entities into management API DTOs.
-// ABOUTME: Keeps Persistence entity-first while centralizing Application-owned projection rules.
-
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Lookups;

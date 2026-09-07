@@ -1,6 +1,3 @@
-// ABOUTME: EF model and source parity tests for normalized webhook lookup tables.
-// ABOUTME: Verifies stable enum IDs/codes, runtime seeds, literal migration rows, relational FKs, and DTO metadata.
-
 using System.Text;
 using System.Text.RegularExpressions;
 using Explore.Application.DTOs.Webhooks;

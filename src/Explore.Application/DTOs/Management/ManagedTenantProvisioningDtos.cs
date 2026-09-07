@@ -1,6 +1,3 @@
-// ABOUTME: Versioned public Event contracts for managed tenant provisioning, capacity, and operation status.
-// ABOUTME: Accepts only bounded tenant bootstrap intent and returns safe operation/result references.
-
 using System.Text.Json.Serialization;
 using Explore.Domain.Enums;
 

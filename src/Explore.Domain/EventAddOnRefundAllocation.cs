@@ -1,6 +1,3 @@
-// ABOUTME: Assigns an exact partial refund quantity and amount to one add-on order line.
-// ABOUTME: Preserves checked minor-unit conservation without mutating admission authority.
-
 using Explore.Domain.Interfaces;
 using Explore.Domain.ValueObjects;
 

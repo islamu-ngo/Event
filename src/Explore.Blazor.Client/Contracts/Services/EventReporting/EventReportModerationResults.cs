@@ -1,6 +1,3 @@
-// ABOUTME: Result models for moderator-facing event-report Blazor service calls.
-// ABOUTME: Captures queue filters and HAL-paged resources without polluting interface files.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.EventReporting;

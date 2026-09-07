@@ -1,6 +1,3 @@
-// ABOUTME: Owns the single configuration input for approved-registration reminder lead time.
-// ABOUTME: Provides startup-compatible range validation plus a defensive runtime conversion.
-
 namespace Explore.Application.Configuration;
 
 public sealed class EventReminderOptions

@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for AnalyticsInitializer covering bootstrap, consent state machine, and cookie interactions.
-// ABOUTME: Verifies initialization, banner visibility, accept/decline callbacks, footer reopen, and graceful degradation.
-
 using Bunit;
 using Explore.Blazor.Client.Models.Analytics;
 using Explore.Blazor.Client.Shared;

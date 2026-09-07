@@ -1,6 +1,3 @@
-// ABOUTME: EF repository for event-session speaker link entities and speaker/session lookup projections.
-// ABOUTME: Exposes duplicate-link reads used by grouped relationship update handlers.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

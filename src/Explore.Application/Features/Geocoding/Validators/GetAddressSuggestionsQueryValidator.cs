@@ -1,6 +1,3 @@
-// ABOUTME: Validates bounded private address-search intent before exact PII is queried.
-// ABOUTME: Rejects missing tenant context, invalid organization scope, and abusive search bounds.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Geocoding.Requests.Queries;
 using FluentValidation;

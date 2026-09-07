@@ -1,6 +1,3 @@
-// ABOUTME: Entity-first repository contract for durable organizer payment account-create fences.
-// ABOUTME: Lets handlers block unsafe provider retries without leaking EF query composition.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

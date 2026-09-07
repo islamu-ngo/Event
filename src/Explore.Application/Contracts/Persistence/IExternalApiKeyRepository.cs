@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for persisted external API key lookups (tenant-scoped and platform-scoped).
-// ABOUTME: Exposes explicit tenant-filter bypass paths for auth and platform (InstanceAdmin) key management.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

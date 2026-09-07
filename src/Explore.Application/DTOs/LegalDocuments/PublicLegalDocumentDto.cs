@@ -1,6 +1,3 @@
-// ABOUTME: Anonymous-safe projection of one role-labeled published legal document.
-// ABOUTME: Exposes deterministic rendered HTML and immutable publication facts without source authority.
-
 namespace Explore.Application.DTOs.LegalDocuments;
 
 public sealed record PublicLegalDocumentDto

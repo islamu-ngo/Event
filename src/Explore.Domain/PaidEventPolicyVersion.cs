@@ -1,6 +1,3 @@
-// ABOUTME: Defines one version of instance or tenant paid-event eligibility and currency policy.
-// ABOUTME: Keeps paid-event ceilings provider-neutral and immutable across active revisions.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 using Explore.Domain.ValueObjects;

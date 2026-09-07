@@ -1,6 +1,3 @@
-// ABOUTME: Handles reporter-scoped event-report status reads.
-// ABOUTME: Returns only own-report metadata and keeps sensitive evidence/review fields out of the projection.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventReporting;

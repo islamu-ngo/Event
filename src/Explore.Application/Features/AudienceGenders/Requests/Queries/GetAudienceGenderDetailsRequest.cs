@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query request for fetching a single audience gender option by ID.
-// ABOUTME: Returns AudienceGenderDto.
 using Explore.Application.DTOs.AudienceGender;
 using MediatR;
 

@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for the composed public home discovery experience and coarse-area actions.
-// ABOUTME: Verifies one payload, a consolidated browsing disclosure, transient geolocation, and event layouts.
-
 using Explore.Blazor.Client.Components.Discovery;
 using Explore.Blazor.Client.Contracts.Interop;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;

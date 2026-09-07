@@ -1,6 +1,3 @@
-<!-- ABOUTME: Defines the inclusion boundary for package-free server/client wire contracts. -->
-<!-- ABOUTME: Prevents Event.Wire.Contracts from becoming a generic shared-code dumping ground. -->
-
 # Event.Wire.Contracts
 
 `Event.Wire.Contracts` contains versioned, machine-consumed representations that must behave

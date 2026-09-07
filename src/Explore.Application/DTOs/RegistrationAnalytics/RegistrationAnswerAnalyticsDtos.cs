@@ -1,6 +1,3 @@
-// ABOUTME: Bounded organizer analytics DTOs for governed registration-answer aggregates.
-// ABOUTME: Exposes only field metadata and aggregate cells, never answer rows or subject identifiers.
-
 namespace Explore.Application.DTOs.RegistrationAnalytics;
 
 public sealed record RegistrationAnswerAnalyticsDto(

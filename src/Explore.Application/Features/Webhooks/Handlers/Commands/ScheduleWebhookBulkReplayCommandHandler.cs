@@ -1,6 +1,3 @@
-// ABOUTME: Queues an idempotent bounded webhook bulk replay operation with mandatory operator audit.
-// ABOUTME: Serializes tenant capacity checks and rejects changed-key, empty, or over-limit schedules.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;

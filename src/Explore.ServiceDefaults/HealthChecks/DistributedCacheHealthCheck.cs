@@ -1,6 +1,3 @@
-// ABOUTME: Readiness probe for the effective IDistributedCache pipeline.
-// ABOUTME: Verifies cache operations and reports configured fallback backends as degraded.
-
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Diagnostics.HealthChecks;

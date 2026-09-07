@@ -1,6 +1,3 @@
-// ABOUTME: Stable integer identifiers for physical location privacy lifecycle states.
-// ABOUTME: Distinguishes absent PII, active PII, and irreversibly erased PII.
-
 namespace Explore.Domain.Enums;
 
 public enum LocationPrivacyStateEnum

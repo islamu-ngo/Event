@@ -1,6 +1,3 @@
-// ABOUTME: Verifies privacy-erasure composition keeps topology and maintenance boundaries explicit.
-// ABOUTME: Prevents fallback adapters, secret reads, and accidental Application-owned persistence registration.
-
 using Explore.Application;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.PrivacyErasure;

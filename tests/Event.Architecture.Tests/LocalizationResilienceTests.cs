@@ -1,6 +1,3 @@
-// ABOUTME: Architecture tests enforcing the single-retry-source rule for TMS provider resilience.
-// ABOUTME: Prevents handler-based retries from coexisting with Polly pipeline retries.
-
 using System.Reflection;
 using NetArchTest.Rules;
 

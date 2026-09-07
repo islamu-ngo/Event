@@ -1,6 +1,3 @@
-// ABOUTME: In-memory cache for lookup data (categories, tags, event types, etc.).
-// ABOUTME: Prevents redundant API calls for data that rarely changes.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Lookup;
 using Microsoft.Extensions.Logging;

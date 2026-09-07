@@ -1,6 +1,3 @@
-// ABOUTME: Repository implementation for idempotency replay persistence using ExploreDbContext.
-// ABOUTME: Claims keys atomically by tenant and completes responses only from the claim owner.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.Database;

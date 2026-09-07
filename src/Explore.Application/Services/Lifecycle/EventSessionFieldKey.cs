@@ -1,5 +1,3 @@
-// ABOUTME: Product-concept field keys for event session lifecycle validation.
-// ABOUTME: Keys are stable product concepts, not raw reflection property names.
 namespace Explore.Application.Services.Lifecycle;
 
 /// <summary>

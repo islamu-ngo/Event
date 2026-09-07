@@ -1,6 +1,3 @@
-// ABOUTME: Tests AnalyticsConsentBootstrapDto and PosthogClientBootstrapDto default values.
-// ABOUTME: Ensures privacy-first defaults and absence of sensitive data fields (Amendment 3 compliance).
-
 using Explore.Application.DTOs.Onboarding;
 
 namespace Event.Application.UnitTests.Analytics;

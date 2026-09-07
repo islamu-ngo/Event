@@ -1,6 +1,3 @@
-// ABOUTME: Applies the transition from manual or automatic pause to Active for one owned webhook endpoint.
-// ABOUTME: Fails closed for missing, archived, non-Local, active, or concurrently changed endpoints.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;

@@ -1,6 +1,3 @@
-// ABOUTME: Validates and creates immutable protected authentication state through the P1 repository.
-// ABOUTME: Checks the enabled target tenant without setting ambient tenant or fabricating a user principal.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Authentication.Atproto.Models;
 using Explore.Application.Features.Authentication.Atproto.Requests.Commands;

@@ -1,6 +1,3 @@
-// ABOUTME: Safe registration-provider management DTOs for organizer reconciliation and health views.
-// ABOUTME: Exposes bounded identifiers, status, issue codes, and timestamps without answers or provider payloads.
-
 namespace Explore.Application.DTOs.RegistrationProviders;
 
 public sealed record RegistrationProviderBindingHealthDto

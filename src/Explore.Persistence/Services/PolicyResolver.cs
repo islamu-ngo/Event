@@ -1,6 +1,3 @@
-// ABOUTME: Deterministic policy resolver walking Instance→Tenant→Organization hierarchy.
-// ABOUTME: Returns effective value, override permission, and source scope for each governed field.
-
 using System.Linq.Expressions;
 using Explore.Application.Contracts.Services;
 using Explore.Domain.Policies;

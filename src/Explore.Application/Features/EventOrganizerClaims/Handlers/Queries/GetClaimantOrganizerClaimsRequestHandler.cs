@@ -1,6 +1,3 @@
-// ABOUTME: Returns organizer claims only when the authenticated user controls the claimant actor.
-// ABOUTME: Fails closed before repository disclosure for personal, organization, and group actors.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

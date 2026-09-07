@@ -1,5 +1,3 @@
-<!-- ABOUTME: Isolates the exact Phase 8 YamlDotNet candidate graph from every product restore. -->
-<!-- ABOUTME: Produces a private non-shipping lock and compile probe with no activation authority. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>

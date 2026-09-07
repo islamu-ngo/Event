@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for the single global fenced Jetstream lease and atomic cursor materialization.
-// ABOUTME: Applies records or quarantine atomically while allowing invalid cursor evidence to retain the last safe checkpoint.
-
 using Explore.Application.Features.Federation.Atproto.Models;
 using Explore.Application.Models.Storage;
 using Explore.Domain;

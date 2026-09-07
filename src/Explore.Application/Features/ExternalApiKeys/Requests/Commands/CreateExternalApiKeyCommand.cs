@@ -1,6 +1,3 @@
-// ABOUTME: Command for issuing a new persisted external API key.
-// ABOUTME: Wraps the creation DTO so the handler can enforce tenant and owner context centrally.
-
 using Explore.Application.DTOs.ExternalApiKey;
 using Explore.Application.Responses;
 using MediatR;

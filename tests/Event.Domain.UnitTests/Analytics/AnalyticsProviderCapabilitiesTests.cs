@@ -1,6 +1,3 @@
-// ABOUTME: Tests the provider capability matrix used by the runtime profile resolver.
-// ABOUTME: Verifies each provider returns correct capability flags (cookieless, consent transitions, etc.).
-
 using Explore.Domain.Analytics;
 using Explore.Domain.Enums;
 

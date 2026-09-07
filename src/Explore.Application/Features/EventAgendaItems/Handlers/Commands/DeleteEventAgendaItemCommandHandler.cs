@@ -1,6 +1,3 @@
-// ABOUTME: Handler for soft-deleting an event-level agenda item by Id.
-// ABOUTME: Follows the pattern where delete returns BaseCommandResponse<Guid>.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventAgendaItems.Requests.Commands;
 using Explore.Application.Responses;

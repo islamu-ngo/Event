@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped layout for tenant plan version governance, settings, and quota tables. */
-/* ABOUTME: Provides responsive actions, editors, confirmations, and keyboard-focusable tables. */
-
 .instance-plan-detail {
     display: grid;
     gap: var(--isl-space-8);

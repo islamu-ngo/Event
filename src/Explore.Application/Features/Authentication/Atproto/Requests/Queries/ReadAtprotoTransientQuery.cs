@@ -1,6 +1,3 @@
-// ABOUTME: Requests a non-consuming protected lookup before OAuth tenant recovery or with an expected tenant.
-// ABOUTME: Only initial OAuth-state read permits an absent tenant; handoff never does.
-
 using Explore.Domain;
 using Explore.Application.Features.Authentication.Atproto.Models;
 using MediatR;

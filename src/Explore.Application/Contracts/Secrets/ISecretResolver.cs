@@ -1,6 +1,3 @@
-// ABOUTME: Primary abstraction for resolving a secret from its declared single source.
-// ABOUTME: No fallback chains — the SecretBinding row dictates exactly which source is consulted.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Contracts.Secrets;

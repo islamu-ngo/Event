@@ -1,6 +1,3 @@
-// ABOUTME: Loads exact confirmed free or reconciled-paid authority and atomically stages ticket delivery intents.
-// ABOUTME: Replay resolves persisted aggregate identities without regenerating credential material.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Domain;
 using Explore.Domain.Enums;

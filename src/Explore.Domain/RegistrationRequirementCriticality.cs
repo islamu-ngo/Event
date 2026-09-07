@@ -1,6 +1,3 @@
-// ABOUTME: Normalized lookup row for registration-requirement criticality.
-// ABOUTME: Keeps stable criticality IDs separate from their enum convenience mirror.
-
 namespace Explore.Domain;
 
 public sealed class RegistrationRequirementCriticality

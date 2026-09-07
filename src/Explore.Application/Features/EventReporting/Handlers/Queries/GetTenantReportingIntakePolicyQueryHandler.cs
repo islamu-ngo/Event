@@ -1,6 +1,3 @@
-// ABOUTME: Projects the current tenant's effective reporting-intake setting and publication-safety metadata.
-// ABOUTME: Treats the returned CanDisable value as advisory while mutation safety remains transactionally authoritative.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.EventReporting;

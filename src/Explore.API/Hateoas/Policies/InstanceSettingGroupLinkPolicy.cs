@@ -1,6 +1,3 @@
-// ABOUTME: Authorization-aware HAL links for the ATProto instance-governance setting group.
-// ABOUTME: Advertises allowlisted update and lock transitions only when server metadata permits them.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Security.Claims;

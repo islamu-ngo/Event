@@ -1,6 +1,3 @@
-// ABOUTME: Exercises configuration import containment through the real HTTP pipeline.
-// ABOUTME: Proves auth and provider failures remain no-store ProblemDetails without capability leakage.
-
 namespace Event.API.IntegrationTests.Features;
 
 using System.Net;

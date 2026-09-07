@@ -1,6 +1,3 @@
-// ABOUTME: Specifies the sole v1alpha2 instance document and canonical paid-policy revision authority.
-// ABOUTME: Proves sovereign fields, caller-selected revisions, and cross-scope broadening fail safely.
-
 namespace Event.Application.UnitTests.Features.ConfigurationManifest;
 
 using System.Reflection;

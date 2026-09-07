@@ -1,6 +1,3 @@
-// ABOUTME: Owns non-PII subject completion and approval authority for one ticket assignment.
-// ABOUTME: Provides the sole readiness decision used before credential issuance and check-in.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

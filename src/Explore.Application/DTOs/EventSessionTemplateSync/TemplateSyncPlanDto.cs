@@ -1,6 +1,3 @@
-// ABOUTME: Operator-selected subset of an event-session template diff specifying exactly which keys to apply in the sync transaction.
-// ABOUTME: Uses normalized namespace/key strings so the server can re-resolve and validate against a freshly computed diff.
-
 namespace Explore.Application.DTOs.EventSessionTemplateSync;
 
 public sealed record class TemplateSyncPlanDto

@@ -1,6 +1,3 @@
-// ABOUTME: Holds shared browser-BFF hosting options derived from host configuration.
-// ABOUTME: Carries profile and API proxy settings without referencing app-specific layers.
-
 using Event.Web.BffHosting.Authentication;
 
 namespace Event.Web.BffHosting.Options;

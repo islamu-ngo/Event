@@ -1,6 +1,3 @@
-/* ABOUTME: Responsive account admission ticket list layout. */
-/* ABOUTME: Uses tokenized surfaces, logical spacing, and resilient card grids. */
-
 .tickets-page {
     display: grid;
     gap: var(--isl-space-section);

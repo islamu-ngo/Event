@@ -1,6 +1,3 @@
-// ABOUTME: Audit contract for privileged scheduler control actions performed by instance operators.
-// ABOUTME: Records who did what to which job with what outcome, without job payloads or tenant content.
-
 namespace Explore.Application.Contracts.Scheduling;
 
 /// <summary>

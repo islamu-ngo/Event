@@ -1,6 +1,3 @@
-// ABOUTME: Maps encrypted admission recovery request intents for uniform asynchronous processing.
-// ABOUTME: Stores no identity plaintext and applies tenant/concurrency lifecycle controls.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

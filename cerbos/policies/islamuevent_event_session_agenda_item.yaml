@@ -1,4 +1,3 @@
-# ABOUTME: Cerbos resource policy for event_session_agenda_item resources.
 # Session agenda items are event-scoped child resources governed by event operational roles.
 
 apiVersion: api.cerbos.dev/v1

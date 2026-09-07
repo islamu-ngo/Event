@@ -1,6 +1,3 @@
-// ABOUTME: Verifies catalog-derived public ticket price summaries for event DTO mapping.
-// ABOUTME: Uses valid domain ticket catalogs to lock price codes, lowest selectable amount, and currency handling.
-
 using System.Reflection;
 using Explore.Application.Services;
 using Explore.Domain;

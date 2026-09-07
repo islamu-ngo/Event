@@ -1,6 +1,3 @@
-// ABOUTME: Setting definitions for brand identity (display name, logo, favicon, custom CSS).
-// ABOUTME: Overridable at Tenant scope for white-label support.
-
 namespace Explore.Domain.Settings.Definitions;
 
 public static class BrandingSettingDefinitions

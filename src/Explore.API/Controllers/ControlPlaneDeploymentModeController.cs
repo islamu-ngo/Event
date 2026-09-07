@@ -1,6 +1,3 @@
-// ABOUTME: Control Plane API surface for deliberate deployment-mode migration runbooks.
-// ABOUTME: Exposes mode transitions outside casual settings while enforcing server-side tenant safeguards.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

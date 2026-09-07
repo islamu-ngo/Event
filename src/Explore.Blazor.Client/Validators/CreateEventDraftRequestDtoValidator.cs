@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation validator for CreateEventDraftRequestDto used in the Create Event form.
-// ABOUTME: Validates required fields and selection constraints for event creation.
-
 using Explore.Blazor.Client.Clients;
 using FluentValidation;
 

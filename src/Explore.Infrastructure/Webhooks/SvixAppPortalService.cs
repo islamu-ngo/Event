@@ -1,6 +1,3 @@
-// ABOUTME: Svix-backed provider portal access service for webhook endpoint management.
-// ABOUTME: Generates short-lived backend-only App Portal URLs without exposing Svix API tokens to clients.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Domain;

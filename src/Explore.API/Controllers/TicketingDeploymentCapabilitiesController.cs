@@ -1,6 +1,3 @@
-// ABOUTME: Publishes the read-only machine ticketing deployment capability matrix.
-// ABOUTME: Exposes status codes only and provides no mutation or protected payout operation.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Filters;

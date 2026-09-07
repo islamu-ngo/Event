@@ -1,6 +1,3 @@
-// ABOUTME: Focused tests for the paid-event policy Blazor edit model.
-// ABOUTME: Verifies generated DTO boundary mapping, mandatory refund floors, and tenant ceiling validation.
-
 using Explore.Blazor.Client.Pages.Admin.Components;
 
 namespace Explore.Blazor.Client.Tests.Pages.Admin;

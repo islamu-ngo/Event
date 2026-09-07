@@ -1,6 +1,3 @@
-// ABOUTME: Application boundary for mandatory, normalized webhook administrative audit writes.
-// ABOUTME: Carries only credential-free metadata and permits explicit system principals for workers.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Webhooks;

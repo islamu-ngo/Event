@@ -1,6 +1,3 @@
-// ABOUTME: Provides manual FluentValidation rules for organizer promotion management queries.
-// ABOUTME: Keeps query handlers responsible for boundary validation before repository access.
-
 using Explore.Application.Features.Promotions.Requests.Queries;
 using FluentValidation;
 

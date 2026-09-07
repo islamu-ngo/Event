@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for per-period API key credit quota tracking.
-// ABOUTME: Supports lazy period provisioning, atomic credit decrement, and current period lookup.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

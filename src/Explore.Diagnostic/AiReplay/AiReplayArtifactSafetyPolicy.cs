@@ -1,6 +1,3 @@
-// ABOUTME: Detects content-bearing markers that must not appear in AI fake/replay artifacts.
-// ABOUTME: Provides one redaction guard shared by report generation and artifact tests.
-
 namespace Explore.Diagnostic.AiReplay;
 
 public static class AiReplayArtifactSafetyPolicy

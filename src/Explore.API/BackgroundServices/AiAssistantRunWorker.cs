@@ -1,6 +1,3 @@
-// ABOUTME: Background worker that processes queued AI assistant provider runs after send returns 202.
-// ABOUTME: Binds tenant context per queued run so EF tenant filters and settings resolution stay isolated.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.AiAssistant.Requests.Commands;
 using MediatR;

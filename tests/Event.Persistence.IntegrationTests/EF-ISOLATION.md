@@ -1,6 +1,3 @@
-<!-- ABOUTME: Documents test-owned EF service providers and fresh-process factory contracts. -->
-<!-- ABOUTME: Keeps provider isolation, intentional store sharing, and child failure propagation explicit. -->
-
 # EF test isolation
 
 EF Core 10's uncached provider build still checks the process-wide provider cache.

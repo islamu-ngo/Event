@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for concrete session admissions from registration orders.
-// ABOUTME: Preserves tenant-safe order, participant, and session lineage for admissions.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;

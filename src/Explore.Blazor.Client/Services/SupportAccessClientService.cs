@@ -1,6 +1,3 @@
-// ABOUTME: BFF-backed client service for support-access current state, start, and stop commands.
-// ABOUTME: Provides shell/UI state while preserving the API and BFF as authorization boundaries.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.SupportAccess;

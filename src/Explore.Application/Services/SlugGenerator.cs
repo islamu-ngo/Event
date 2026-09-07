@@ -1,5 +1,3 @@
-// ABOUTME: Generates URL-friendly slugs from titles for events and sessions.
-// ABOUTME: Stateless utility — lowercase, hyphenated, alphanumeric-only, max 50 chars.
 using System;
 using System.Text.RegularExpressions;
 

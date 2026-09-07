@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos policy test suite for event_session creation and tenant isolation.
-# ABOUTME: Covers parent-event pre-create checks used before a session row exists.
-
 name: EventSessionPolicyTests
 description: "Validates event-session create permissions for admins and event-team roles"
 

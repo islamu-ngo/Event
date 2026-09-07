@@ -1,6 +1,3 @@
-// ABOUTME: Persistence contract for support-access audit event entity queries.
-// ABOUTME: Keeps tenant and session audit reads bounded by explicit predicates.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

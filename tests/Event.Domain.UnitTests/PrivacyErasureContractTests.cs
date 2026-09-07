@@ -1,6 +1,3 @@
-// ABOUTME: Specifies the platform-wide typed privacy-erasure fact, counter, and replay checkpoint invariants.
-// ABOUTME: Rejects malformed identities, kinds, reasons, versions, timestamps, checkpoint chains, and instruction fields.
-
 using System.Security.Cryptography;
 using System.Text.Json;
 using Explore.Domain;

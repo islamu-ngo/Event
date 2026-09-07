@@ -1,6 +1,3 @@
-// ABOUTME: Builds complete typed paid-acceptance evidence for payment application tests.
-// ABOUTME: Keeps fixtures explicit about all three operator roles, provider lineage, and line money.
-
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Domain;
 

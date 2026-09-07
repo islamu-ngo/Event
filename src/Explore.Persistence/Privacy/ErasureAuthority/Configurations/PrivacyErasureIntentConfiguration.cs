@@ -1,6 +1,3 @@
-// ABOUTME: Maps typed platform privacy-erasure facts to the shared authority schema contract.
-// ABOUTME: Enforces UUIDv7, opaque-id, reason, sequence, timestamp, and uniqueness invariants.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

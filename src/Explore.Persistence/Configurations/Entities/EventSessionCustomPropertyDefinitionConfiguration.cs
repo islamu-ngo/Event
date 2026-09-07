@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for session-local custom-property definitions used at runtime.
-// ABOUTME: Enforces session-scoped namespaced keys plus session template provenance metadata.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

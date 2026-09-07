@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for actor and event Studio attendee HAL gates.
-// ABOUTME: Verifies navigation, sections, rows, and order operations fail closed without view-participants.
-
 using System.Text.Json;
 using Blazouter.Services;
 using Explore.Blazor.Client.Clients;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines one currency-qualified fixed minor-unit component of an instance platform fee policy.
-// ABOUTME: Prevents ambiguous fixed fees when an instance hosts catalogs in multiple currencies.
-
 using Explore.Domain.ValueObjects;
 
 namespace Explore.Domain;

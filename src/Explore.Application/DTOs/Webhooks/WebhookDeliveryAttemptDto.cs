@@ -1,6 +1,3 @@
-// ABOUTME: API DTO for LocalProvider webhook delivery attempt audit rows.
-// ABOUTME: Surfaces safe HTTP outcome metadata for operations without exposing secrets or full bodies.
-
 namespace Explore.Application.DTOs.Webhooks;
 
 public sealed record WebhookDeliveryAttemptDto

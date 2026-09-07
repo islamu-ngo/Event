@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for RabbitMQ EmailDispatch dead-letter replay safety decisions.
-// ABOUTME: Verifies DLQ replay validates PostgreSQL truth before replaying or parking pointer messages.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
 using Explore.Infrastructure.Messaging;

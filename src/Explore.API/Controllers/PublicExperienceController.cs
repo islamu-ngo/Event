@@ -1,6 +1,3 @@
-// ABOUTME: Anonymous-safe API surface for effective tenant public experience settings.
-// ABOUTME: Exposes home-page routing and white-label values resolved from cascading policies.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Hateoas;

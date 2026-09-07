@@ -1,6 +1,3 @@
-// ABOUTME: Redacted tenant moderation-reporting dashboard DTOs for queue and provider sync health.
-// ABOUTME: Exposes aggregate counts only so tenant dashboards never render report payloads or provider secrets.
-
 namespace Explore.Application.DTOs.EventReporting;
 
 public sealed record TenantModerationReportingDashboardDto

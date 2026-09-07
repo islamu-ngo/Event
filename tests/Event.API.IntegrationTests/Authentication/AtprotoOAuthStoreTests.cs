@@ -1,6 +1,3 @@
-// ABOUTME: Exercises protected OAuth state and tenant handoffs through the real API and PostgreSQL.
-// ABOUTME: Proves browser and origin rejection precedes consumption across independent BFF adapters.
-
 extern alias bff;
 
 using System.Security.Cryptography;

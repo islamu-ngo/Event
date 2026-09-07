@@ -1,6 +1,3 @@
-// ABOUTME: Strategy for the deterministic fake AI provider used in tests and local workflows.
-// ABOUTME: Delegates to FakeAiChatProvider and reports healthy_fake status.
-
 using Explore.Application.Contracts.Infrastructure.Ai;
 
 namespace Explore.Infrastructure.Ai;

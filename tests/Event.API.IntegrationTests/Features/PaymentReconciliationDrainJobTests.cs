@@ -1,6 +1,3 @@
-// ABOUTME: Verifies Quartz drains durable Checkout work around authoritative payment reconciliation.
-// ABOUTME: Proves new attempts and Unknown same-key replays progress without manual service calls.
-
 using Explore.API.Scheduling;
 using Explore.Application.Contracts.Payments;
 using Explore.Application.Contracts.Persistence;

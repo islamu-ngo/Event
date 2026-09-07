@@ -1,6 +1,3 @@
-// ABOUTME: Executes provider-neutral S3-compatible storage preflight checks using standard S3 APIs.
-// ABOUTME: Classifies bounded diagnostics and cleans up optional zero-byte write probes without leaking provider details.
-
 using System.Net;
 using Amazon.Runtime;
 using Amazon.S3;

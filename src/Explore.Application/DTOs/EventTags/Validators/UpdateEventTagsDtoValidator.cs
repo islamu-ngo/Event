@@ -1,6 +1,3 @@
-// ABOUTME: Validator for grouped event-tag link updates.
-// ABOUTME: Validates group presence and required group fields; handlers validate references.
-
 using System;
 using FluentValidation;
 

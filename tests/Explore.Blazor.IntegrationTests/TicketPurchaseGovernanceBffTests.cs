@@ -1,6 +1,3 @@
-// ABOUTME: Defines RED security contracts for browser-to-API ticket-purchase governance.
-// ABOUTME: Covers antiforgery, cookie auth, tenant spoofing, server idempotency, and capability secrecy.
-
 using System.Net;
 using System.Net.Http.Json;
 using Explore.Blazor.Client.Clients;

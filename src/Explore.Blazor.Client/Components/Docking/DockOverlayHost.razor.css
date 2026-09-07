@@ -1,6 +1,3 @@
-/* ABOUTME: Viewport overlay placement for non-docked panels in a dock scope.
-   ABOUTME: Uses logical inset properties and tokenized motion for smooth RTL-safe panels. */
-
 .dock-overlay-host {
     position: fixed;
     inset: 0;

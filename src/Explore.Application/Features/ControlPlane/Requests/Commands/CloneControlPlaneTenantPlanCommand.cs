@@ -1,6 +1,3 @@
-// ABOUTME: Secured command for cloning a tenant plan version into a new draft SaaS tier.
-// ABOUTME: Copies pricing, setting, and quota template rows without assigning tenants.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

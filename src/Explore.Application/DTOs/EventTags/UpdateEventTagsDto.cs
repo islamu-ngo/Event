@@ -1,6 +1,3 @@
-// ABOUTME: Grouped update DTO for event-to-tag link mutations.
-// ABOUTME: Nullable groups allow callers to update the event side or tag side independently.
-
 using System;
 
 namespace Explore.Application.DTOs.EventTags;

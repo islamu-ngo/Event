@@ -1,6 +1,3 @@
-// ABOUTME: Loads publication-scoped schedule and admission entities under the ambient transaction.
-// ABOUTME: Stages reusable target and policy additions for the catalog repository's atomic save.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Domain;
 using Explore.Persistence.Database;

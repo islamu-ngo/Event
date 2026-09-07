@@ -1,6 +1,3 @@
-// ABOUTME: Focus management service using JS interop to accessibility.js module.
-// ABOUTME: Handles focus-on-navigate (replacing FocusOnNavigate for Blazouter) and save/restore for dialogs.
-
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Microsoft.JSInterop;
 

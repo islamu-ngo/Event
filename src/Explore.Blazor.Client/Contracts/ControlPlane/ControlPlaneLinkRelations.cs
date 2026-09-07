@@ -1,6 +1,3 @@
-// ABOUTME: Defines stable HAL link relation names used by shared control-plane UI.
-// ABOUTME: Avoids duplicated action strings across embedded and separate Blazor hosts.
-
 namespace Explore.Blazor.Client.Contracts.ControlPlane;
 
 public static class ControlPlaneLinkRelations

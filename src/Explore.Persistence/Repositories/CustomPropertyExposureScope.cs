@@ -1,6 +1,3 @@
-// ABOUTME: Shared exposure-ceiling helper for custom-property projection queries.
-// ABOUTME: Keeps projection discovery aligned with the product exposure hierarchy, not enum numeric order.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Persistence.Repositories;

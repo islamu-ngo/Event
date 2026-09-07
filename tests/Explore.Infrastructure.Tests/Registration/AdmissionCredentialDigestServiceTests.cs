@@ -1,6 +1,3 @@
-// ABOUTME: Proves admission bearer entropy, versioned HMAC restore behavior, scope separation, and redaction.
-// ABOUTME: Uses exact secret-resolution contracts without persisting or printing one-time material.
-
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;

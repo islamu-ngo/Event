@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for tenant onboarding delegation through the generated Event API client.
-// ABOUTME: Verifies generated contract mapping, command results, and resilient failure behavior.
-
 using Explore.Blazor.Client.Helpers;
 
 namespace Explore.Blazor.Client.Tests.Services;

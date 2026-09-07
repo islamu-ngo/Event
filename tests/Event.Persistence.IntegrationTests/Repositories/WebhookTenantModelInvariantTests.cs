@@ -1,6 +1,3 @@
-// ABOUTME: EF model invariants for tenant-owned webhook authority and delivery evidence.
-// ABOUTME: Verifies named isolation filters, composite relationships, Restrict behavior, indexes, and concurrency tokens.
-
 using Explore.Domain;
 using Explore.Domain.Interfaces;
 using Explore.Persistence;

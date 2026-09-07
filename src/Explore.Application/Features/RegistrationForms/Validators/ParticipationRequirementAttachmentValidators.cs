@@ -1,6 +1,3 @@
-// ABOUTME: Validates Task 7.7 attachment command shapes before repository access.
-// ABOUTME: Enforces paired standalone form identity and non-empty concurrency boundaries.
-
 using Explore.Application.Features.RegistrationForms.Requests.Commands;
 using FluentValidation;
 

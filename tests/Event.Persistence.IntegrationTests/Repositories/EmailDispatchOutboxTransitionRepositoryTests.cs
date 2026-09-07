@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL-backed tests for EmailDispatch operator replay and parking transitions.
-// ABOUTME: Verifies durable state-machine changes that future RabbitMQ consumers and admin actions reuse.
-
 using System.Data.Common;
 using System.Diagnostics;
 using Event.Persistence.IntegrationTests.Fixtures;

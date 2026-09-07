@@ -1,6 +1,3 @@
-// ABOUTME: Normalized lookup row for registration-requirement subject applicability.
-// ABOUTME: Keeps stable subject IDs separate from their enum convenience mirror.
-
 namespace Explore.Domain;
 
 public sealed class RegistrationRequirementSubjectType

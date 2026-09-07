@@ -1,6 +1,3 @@
-// ABOUTME: Defines the governed Tech aspect delete AI tool contract for MCP proposals.
-// ABOUTME: Requires destructive confirmation metadata while aspect deletion remains proposal-first.
-
 using Explore.Application.Authorization;
 using Explore.Application.Features.AiAssistant.Actions;
 using Explore.Domain.Ai;

@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for event template sync diff/apply/history endpoints.
-// ABOUTME: Adds the HTTP boundary over existing Application-layer event template sync workflows.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

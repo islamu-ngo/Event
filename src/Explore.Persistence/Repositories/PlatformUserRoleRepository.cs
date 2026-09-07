@@ -1,6 +1,3 @@
-// ABOUTME: Repository implementation for global user-role assignments.
-// ABOUTME: Resolves instance-admin authority from platform-scoped admin roles.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

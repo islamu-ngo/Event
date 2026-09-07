@@ -1,6 +1,3 @@
-// ABOUTME: Handles the read-only lookup of one durable managed tenant provisioning operation.
-// ABOUTME: Maps the tenant provisioning entity to its bounded management DTO in the Application layer.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Management;
 using Explore.Application.Features.Management.Requests.Queries;

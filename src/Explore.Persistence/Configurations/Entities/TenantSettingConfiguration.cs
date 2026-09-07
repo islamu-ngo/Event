@@ -1,4 +1,3 @@
-// ABOUTME: EF Core configuration for TenantSetting entity with UUID v7 generation
 // and composite unique constraint on (TenantId, Key).
 
 namespace Explore.Persistence.Configurations.Entities;

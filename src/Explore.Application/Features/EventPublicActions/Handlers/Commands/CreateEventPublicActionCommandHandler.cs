@@ -1,6 +1,3 @@
-// ABOUTME: Creates a tenant-scoped public action after authorization and URL validation.
-// ABOUTME: New organizer-managed destinations enter pending review and enforce one primary action.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventPublicAction.Validators;

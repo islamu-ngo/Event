@@ -1,6 +1,3 @@
-// ABOUTME: Maps same-origin add-on catalog, order, management, fulfillment, and refund BFF routes.
-// ABOUTME: Uses generated clients, antiforgery, opaque capability forwarding, and private no-store responses.
-
 using Explore.Blazor.Client.Clients;
 using Microsoft.AspNetCore.Mvc;
 

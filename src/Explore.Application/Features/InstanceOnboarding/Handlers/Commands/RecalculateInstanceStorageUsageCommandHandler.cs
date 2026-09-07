@@ -1,6 +1,3 @@
-// ABOUTME: Handles instance-wide storage usage reconciliation commands.
-// ABOUTME: Keeps cross-tenant counter recalculation in Application instead of API controllers.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;

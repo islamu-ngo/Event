@@ -1,6 +1,3 @@
-// ABOUTME: Payload-free failure raised when tenant creation cannot satisfy legal-identity readiness.
-// ABOUTME: Carries stable machine codes without echoing names, contacts, identifiers, or URLs.
-
 namespace Explore.Application.Exceptions;
 
 using System.Collections.Immutable;

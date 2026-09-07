@@ -1,6 +1,3 @@
-// ABOUTME: Builds bounded AI chat requests from persisted assistant conversation state.
-// ABOUTME: Keeps provider prompt packing separate from send orchestration and persistence updates.
-
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.DTOs.Ai;
 using Explore.Application.Features.AiAssistant;

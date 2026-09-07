@@ -1,6 +1,3 @@
-// ABOUTME: Checks Docker and Compose CLI availability without starting containers.
-// ABOUTME: Keeps self-hosting diagnostics non-mutating by using version commands only.
-
 using Explore.Diagnostic.Doctor.Infrastructure;
 
 namespace Explore.Diagnostic.Doctor.Checks;

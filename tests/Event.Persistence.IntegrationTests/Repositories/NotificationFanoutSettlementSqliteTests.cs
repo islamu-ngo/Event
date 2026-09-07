@@ -1,6 +1,3 @@
-// ABOUTME: File-backed SQLite contract for tenant-safe superseded notification fanout run settlement.
-// ABOUTME: Proves mapped tables, terminal evidence, lease clearing, timestamps, and affected-row counts.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;

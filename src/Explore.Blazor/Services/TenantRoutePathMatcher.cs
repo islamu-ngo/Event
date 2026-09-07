@@ -1,6 +1,3 @@
-// ABOUTME: Matches configured tenant path prefixes and extracts normalized tenant route context.
-// ABOUTME: Shares identical path semantics between HTTP middleware and Interactive Server circuits.
-
 using Microsoft.AspNetCore.Http;
 
 namespace Explore.Blazor.Services;

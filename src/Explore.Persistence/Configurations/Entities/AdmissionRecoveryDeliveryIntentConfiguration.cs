@@ -1,6 +1,3 @@
-// ABOUTME: Maps restart-safe encrypted admission recovery delivery intent state.
-// ABOUTME: Enforces one intent per capability generation and receipt-bearing handoff coherence.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

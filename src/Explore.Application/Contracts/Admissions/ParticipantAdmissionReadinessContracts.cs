@@ -1,6 +1,3 @@
-// ABOUTME: Defines the tenant-qualified persistence and shared evaluation seam for admission readiness.
-// ABOUTME: Keeps participant PII out of issuance and check-in authority decisions.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Admissions;

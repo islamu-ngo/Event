@@ -1,6 +1,3 @@
-// ABOUTME: Data taxonomy definitions and classification attributes for framework-level telemetry redaction.
-// ABOUTME: Integrates with Microsoft.Extensions.Compliance.Redaction to classify PII and sensitive data.
-
 using Microsoft.Extensions.Compliance.Classification;
 
 namespace Explore.ServiceDefaults.Compliance;

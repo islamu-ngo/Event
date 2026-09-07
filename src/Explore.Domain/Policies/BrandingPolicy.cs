@@ -1,6 +1,3 @@
-// ABOUTME: Typed policy for instance branding — display name, logo, favicon, and custom CSS.
-// ABOUTME: Each field is a PolicySlot allowing instance admins to lock tenant branding overrides.
-
 namespace Explore.Domain.Policies;
 
 public sealed class BrandingPolicy

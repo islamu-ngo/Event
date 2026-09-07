@@ -1,6 +1,3 @@
-// ABOUTME: Unit-level contract tests for deterministic PostgreSQL setting advisory-lock keys.
-// ABOUTME: Verifies canonical normalization, deduplication, and ordering without a container runtime.
-
 using Explore.Persistence;
 
 namespace Event.Persistence.IntegrationTests.UnitOfWork;

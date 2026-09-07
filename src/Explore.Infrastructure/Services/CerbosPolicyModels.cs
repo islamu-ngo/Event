@@ -1,6 +1,3 @@
-// ABOUTME: Typed serialization models for Cerbos Admin API policy and schema push payloads.
-// ABOUTME: Replaces anonymous objects in Cerbos sync services for compile-time safety and testability.
-
 using System.Text.Json.Serialization;
 
 namespace Explore.Infrastructure.Services;

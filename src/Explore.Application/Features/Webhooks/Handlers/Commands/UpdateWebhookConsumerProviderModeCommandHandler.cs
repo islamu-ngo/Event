@@ -1,6 +1,3 @@
-// ABOUTME: Applies governed webhook consumer provider-mode transitions with frozen pending-work semantics.
-// ABOUTME: Validates target capabilities and bindings, records a safe audit, and uses optimistic concurrency.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;

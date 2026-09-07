@@ -1,6 +1,3 @@
-// ABOUTME: Integration test verifying soft-delete EF query filter for TenantNavigationLink entity.
-// ABOUTME: Confirms that deleting a nav link sets IsDeleted=true and excludes it from normal queries.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

@@ -1,5 +1,3 @@
-// ABOUTME: Handler for grouped route-ID updates to session-language links.
-// ABOUTME: Validates references before mutation, checks concurrency, saves once, and invalidates parent event caches.
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;

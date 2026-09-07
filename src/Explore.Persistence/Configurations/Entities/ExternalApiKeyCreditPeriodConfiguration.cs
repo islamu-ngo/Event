@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for ExternalApiKeyCreditPeriod lookup table entity.
-// ABOUTME: Uses ValueGeneratedNever for explicit int IDs matching ExternalApiKeyCreditPeriodEnum values.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

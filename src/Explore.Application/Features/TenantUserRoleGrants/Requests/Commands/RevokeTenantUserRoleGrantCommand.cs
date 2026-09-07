@@ -1,6 +1,3 @@
-// ABOUTME: CQRS command for revoking a tenant-scoped user role grant.
-// ABOUTME: Requires tenant_user_role_grant Delete permission via AuthorizeResource.
-
 using Explore.Application.Authorization;
 using MediatR;
 

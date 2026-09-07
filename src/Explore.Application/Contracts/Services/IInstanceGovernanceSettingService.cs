@@ -1,6 +1,3 @@
-// ABOUTME: Service contract for reading and applying instance-level governance settings.
-// ABOUTME: Uses focused sub-resource DTOs instead of a monolithic god object.
-
 using Explore.Application.DTOs.Instance;
 using Explore.Application.Notifications;
 using Explore.Application.Settings;

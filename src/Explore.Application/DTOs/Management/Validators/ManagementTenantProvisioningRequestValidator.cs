@@ -1,6 +1,3 @@
-// ABOUTME: Validates the versioned managed tenant provisioning request at Event's trust boundary.
-// ABOUTME: Enforces bounded closed bootstrap inputs before mode, capacity, and catalog policy evaluation.
-
 using System.Text.Json;
 using FluentValidation;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Registers API services that need shared Swagger and authentication-aware contract configuration.
-// ABOUTME: Keeps transitional Swashbuckle output aligned with the canonical native OpenAPI document.
-
 using Explore.API.OpenApi;
 using Explore.Application.Constants;
 using Microsoft.OpenApi;

@@ -1,6 +1,3 @@
-// ABOUTME: Represents a single hyperlink within a TenantFooterLinkGroup.
-// ABOUTME: Isolation is inherited from its parent group; no separate tenant filter needed.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

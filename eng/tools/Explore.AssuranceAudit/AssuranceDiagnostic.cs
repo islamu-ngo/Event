@@ -1,6 +1,3 @@
-// ABOUTME: Defines bounded, value-free diagnostics emitted by the repository assurance audit.
-// ABOUTME: Keeps category and syntax location stable without including source excerpts.
-
 namespace Explore.AssuranceAudit;
 
 public sealed record AssuranceDiagnostic(

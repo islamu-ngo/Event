@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for instance monetization HAL affordance gating.
-// ABOUTME: Proves settings stay visible read-only and editing requires the exact edit relation.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;

@@ -1,6 +1,3 @@
-// ABOUTME: Persistence integration tests for EventRepository CRUD and aggregate loading.
-// ABOUTME: Seeds required tenant, actor, and lookup relationships against PostgreSQL.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;

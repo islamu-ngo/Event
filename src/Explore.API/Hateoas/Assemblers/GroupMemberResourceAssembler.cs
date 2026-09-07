@@ -1,6 +1,3 @@
-// ABOUTME: HAL resource assembler for GroupMember entities.
-// ABOUTME: Adds group-scoped collection create affordances while preserving item-level member links.
-
 namespace Explore.API.Hateoas.Assemblers;
 
 using Explore.Application.Authorization;

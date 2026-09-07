@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for structured database bootstrap doctor checks.
-// ABOUTME: Blocks raw default connection strings and incomplete role credentials in Compose.
-
 using Explore.Diagnostic.Doctor;
 using Explore.Diagnostic.Doctor.Checks;
 

@@ -1,6 +1,3 @@
-# ABOUTME: Runs scheduled OpenSSF Scorecard analysis for repository supply-chain posture evidence.
-# ABOUTME: Retains SARIF and artifact output without publishing public Scorecard results.
-
 name: OpenSSF Scorecard
 
 permissions:

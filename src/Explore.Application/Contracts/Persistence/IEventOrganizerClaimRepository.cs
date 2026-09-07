@@ -1,6 +1,3 @@
-// ABOUTME: Persistence contract for tenant-filtered event organizer claims.
-// ABOUTME: Supports claimant replay detection, curator review, and entity-first query mapping.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Validates webhook provider runtime settings before provider selection starts.
-// ABOUTME: Rejects unsupported modes and unsafe LocalProvider delivery limits.
-
 using Explore.Domain;
 using Explore.Domain.Secrets;
 using Explore.Infrastructure.Webhooks;

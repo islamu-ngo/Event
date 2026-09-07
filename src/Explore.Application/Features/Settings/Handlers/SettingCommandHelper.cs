@@ -1,6 +1,3 @@
-// ABOUTME: Shared static helpers for setting command handlers — validation, serialization, scope mapping.
-// ABOUTME: Extracted to avoid duplication across Update, BatchUpdate, Reset, Lock, and Unlock handlers.
-
 namespace Explore.Application.Features.Settings.Handlers;
 
 using System.Text.Json;

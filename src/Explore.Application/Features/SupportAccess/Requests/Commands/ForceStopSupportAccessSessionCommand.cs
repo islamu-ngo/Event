@@ -1,6 +1,3 @@
-// ABOUTME: Authorized command for force-stopping another active support-access session.
-// ABOUTME: Keeps operator revocation separate from the actor-owned stop workflow.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.SupportAccess;
 using MediatR;

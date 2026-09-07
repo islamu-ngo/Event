@@ -1,6 +1,3 @@
-// ABOUTME: Binds the dedicated embedded privacy-erasure authority file and bounded SQLite settings.
-// ABOUTME: Rejects non-local paths and multi-writer deployment before provider composition.
-
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;

@@ -1,6 +1,3 @@
-// ABOUTME: Maps stable normalized participant-type lookup rows.
-// ABOUTME: Keeps enum identifiers and unique master codes provider-neutral.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

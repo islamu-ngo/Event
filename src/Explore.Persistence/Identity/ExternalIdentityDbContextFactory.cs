@@ -1,6 +1,3 @@
-// ABOUTME: Design-time factory for provider-owned external Local Identity migrations.
-// ABOUTME: Resolves only approved Identity database configuration and secret authorities.
-
 using Explore.Secrets.Configuration;
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;

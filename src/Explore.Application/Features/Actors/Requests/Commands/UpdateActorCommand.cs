@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for grouped actor PATCH updates.
-// ABOUTME: Carries route authority, If-Match concurrency, and the wrapper DTO.
-
 using System;
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Actor;

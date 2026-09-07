@@ -1,6 +1,3 @@
-// ABOUTME: Defines admission-target publication orchestration and entity-returning persistence operations.
-// ABOUTME: Keeps target and policy materialization inside the catalog publication transaction.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Admissions;

@@ -1,6 +1,3 @@
-// ABOUTME: Immutable global moderation evidence for one AT Protocol credential identity.
-// ABOUTME: Allows a compromised DID credential to be suspended without suspending its represented Actor.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Domain;

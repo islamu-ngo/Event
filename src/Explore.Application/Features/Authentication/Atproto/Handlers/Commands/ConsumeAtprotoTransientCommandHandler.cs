@@ -1,6 +1,3 @@
-// ABOUTME: Consumes one tenant-bound transient without a transaction wrapper or destructive retry.
-// ABOUTME: Invalid, disabled, mismatched, expired and losing-race candidates share the same not-found result.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Authentication.Atproto.Models;
 using Explore.Application.Features.Authentication.Atproto.Requests.Commands;

@@ -1,6 +1,3 @@
-// ABOUTME: ARIA live region announcer using JS interop to accessibility.js module.
-// ABOUTME: Polite announcements for status updates, assertive for critical alerts.
-
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Microsoft.JSInterop;
 

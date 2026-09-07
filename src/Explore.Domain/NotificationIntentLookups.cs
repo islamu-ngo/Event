@@ -1,6 +1,3 @@
-// ABOUTME: Normalized lookup rows for notification ownership, category, recipient, and delegation state.
-// ABOUTME: These tables keep durable notification-intent persistence stable and queryable without string enums.
-
 namespace Explore.Domain;
 
 public class NotificationCategory

@@ -1,6 +1,3 @@
-// ABOUTME: Defines the immutable package-free environment catalogue, activation, and generation contracts.
-// ABOUTME: Keeps configuration metadata value-safe and independent of files, processes, providers, and adapters.
-
 namespace ISLAMU.Event.Setup.Core.Environment;
 
 [Flags]

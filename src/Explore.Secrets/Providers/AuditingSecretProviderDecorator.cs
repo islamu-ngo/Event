@@ -1,6 +1,3 @@
-// ABOUTME: Audits provider initialization and refresh mutations without recording reads.
-// ABOUTME: Emits bounded failure codes and never persists values, keys, paths, or provider diagnostics.
-
 using System.Diagnostics;
 using Explore.Application.Authentication;
 using Explore.Secrets.Abstractions;

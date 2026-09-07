@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query request for fetching a paginated agenda item list.
-// ABOUTME: Returns IEnumerable<EventSessionAgendaItemListDto>.
 using System.Collections.Generic;
 using Explore.Application.DTOs.EventSessionAgendaItem;
 using Explore.Application.Responses;

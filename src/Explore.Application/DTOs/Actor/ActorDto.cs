@@ -1,6 +1,3 @@
-// ABOUTME: Full actor detail DTO returned by actor read endpoints.
-// ABOUTME: Includes concurrency metadata needed for PATCH If-Match updates.
-
 using System;
 using System.Text.Json.Serialization;
 

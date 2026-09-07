@@ -1,6 +1,3 @@
-// ABOUTME: Architecture guardrails for mutating MediatR requests and anonymous mutation surfaces.
-// ABOUTME: Enforces the authorization surface directly from compiled reflection discovery without session artifacts.
-
 namespace Event.Architecture.Tests;
 
 using System.Reflection;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines an instance-directed positive platform contribution selected for a registration order.
-// ABOUTME: Stores the contribution setting and basis-point snapshots separately from organizer-directed ticket totals.
-
 using Explore.Domain.Interfaces;
 using Explore.Domain.ValueObjects;
 

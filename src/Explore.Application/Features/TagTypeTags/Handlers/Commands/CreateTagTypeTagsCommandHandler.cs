@@ -1,5 +1,3 @@
-// ABOUTME: Handler for creating a tag-to-tag-type link record with validation.
-// ABOUTME: Validates input, creates the junction entity, persists.
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

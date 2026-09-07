@@ -1,6 +1,3 @@
-// ABOUTME: Provides manual FluentValidation rules for promotion redemption Application commands.
-// ABOUTME: Validates only boundary input shape while handlers keep promotion availability generic.
-
 using Explore.Application.Features.Promotions.Requests.Commands;
 using FluentValidation;
 

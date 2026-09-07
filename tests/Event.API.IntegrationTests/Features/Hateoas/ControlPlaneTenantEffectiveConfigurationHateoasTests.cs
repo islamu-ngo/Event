@@ -1,6 +1,3 @@
-// ABOUTME: Link-policy contract tests for tenant effective-configuration HAL affordances.
-// ABOUTME: Protects tenant plan assignment actions from drifting away from server authorization metadata.
-
 using System.Security.Claims;
 using System.Text.Json;
 using Explore.API.Hateoas;

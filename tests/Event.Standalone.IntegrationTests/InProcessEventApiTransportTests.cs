@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the Combined in-process HTTP transport preserves request semantics and isolation.
-// ABOUTME: Covers headers, paths, bodies, cancellation, empty principals, and cookie stripping.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Claims;

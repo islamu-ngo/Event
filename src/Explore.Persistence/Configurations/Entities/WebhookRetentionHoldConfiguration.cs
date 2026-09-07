@@ -1,6 +1,3 @@
-// ABOUTME: Maps tenant-scoped webhook retention holds with normalized subject kinds and cleanup indexes.
-// ABOUTME: Preserves independent hold history while allowing efficient active-hold exclusion by subject.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

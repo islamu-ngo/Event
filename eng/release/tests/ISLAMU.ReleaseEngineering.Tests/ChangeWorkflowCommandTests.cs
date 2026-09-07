@@ -1,6 +1,3 @@
-// ABOUTME: Proves collision-resistant Change-Id allocation, creation, preflight, and repair workflows.
-// ABOUTME: Uses disposable Git repositories to verify collisions fail before commits or merges.
-
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using ISLAMU.ReleaseEngineering;

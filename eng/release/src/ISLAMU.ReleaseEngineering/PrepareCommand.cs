@@ -1,6 +1,3 @@
-// ABOUTME: Loads bounded prepare inputs and verifies the promoted renderer bundle before composition.
-// ABOUTME: Composes the release range from the checked-out HEAD, never from a branch derived off the line label.
-
 using System.Text;
 using System.Text.RegularExpressions;
 

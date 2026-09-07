@@ -1,6 +1,3 @@
-// ABOUTME: Drains native integration sync outbox rows and dispatches them to provider services.
-// ABOUTME: Applies at-least-once retry/dead-letter transitions around generated Listmonk client calls.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Domain;

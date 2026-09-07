@@ -1,6 +1,3 @@
-// ABOUTME: Secured query for reading a control-plane tenant plan and version history.
-// ABOUTME: Returns normalized SaaS tier settings and quotas without exposing tenant data.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.ControlPlane;
 using MediatR;

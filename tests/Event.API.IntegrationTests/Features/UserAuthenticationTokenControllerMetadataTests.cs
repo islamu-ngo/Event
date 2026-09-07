@@ -1,6 +1,3 @@
-// ABOUTME: Contract tests for safe user authentication-session metadata and revocation routes.
-// ABOUTME: Proves raw credential mutations are absent while authenticated idempotent deletion remains.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;

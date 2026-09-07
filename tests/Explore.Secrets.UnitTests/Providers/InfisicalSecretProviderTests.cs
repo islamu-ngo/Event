@@ -1,5 +1,3 @@
-// ABOUTME: Unit tests for InfisicalSecretProvider.
-// ABOUTME: Tests configuration validation, key mapping, and error handling.
 // Note: Does not test actual Infisical SDK calls (requires integration tests).
 
 using Explore.Secrets.Abstractions;

@@ -1,8 +1,6 @@
 ---
 description: Practical troubleshooting guide, symptom matrix, and step-by-step recovery recipes.
 ---
-<!-- ABOUTME: Provides operator recovery steps and sanitized health interpretation. -->
-<!-- ABOUTME: Covers deployment, authentication, database, and dependency failures. -->
 
 # Troubleshooting & Operational Health
 

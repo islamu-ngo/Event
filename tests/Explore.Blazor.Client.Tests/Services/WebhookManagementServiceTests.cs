@@ -1,6 +1,3 @@
-// ABOUTME: Unit coverage for typed-owner webhook management client queries.
-// ABOUTME: Proves all five normalized scopes and collection HAL capabilities cross the generated API boundary exactly.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Webhooks;
 using Explore.Blazor.Client.Services.Webhooks;

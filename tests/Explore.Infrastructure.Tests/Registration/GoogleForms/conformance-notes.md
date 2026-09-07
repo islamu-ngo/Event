@@ -1,6 +1,3 @@
-<!-- ABOUTME: Dated conformance evidence for the Google Forms registration provider adapter. -->
-<!-- ABOUTME: Pins the REST v1 and Pub/Sub boundaries used by the fail-closed implementation tests. -->
-
 # Google Forms conformance notes
 
 Date: 2026-08-11

@@ -1,6 +1,3 @@
-// ABOUTME: Delegates instance platform monetization settings reads and updates to the generated API client.
-// ABOUTME: Preserves generated HAL resources, update DTOs, cancellation, and API failures for bounded UI handling.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 

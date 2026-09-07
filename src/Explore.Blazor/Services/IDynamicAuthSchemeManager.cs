@@ -1,6 +1,3 @@
-// ABOUTME: Contract for runtime authentication scheme registration in the BFF server.
-// ABOUTME: Enables adding/removing OIDC and custom auth schemes without app restart.
-
 namespace Explore.Blazor.Services;
 
 /// <summary>

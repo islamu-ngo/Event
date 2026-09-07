@@ -1,6 +1,3 @@
-// ABOUTME: Persistence repository for scoped notification channel preference rows.
-// ABOUTME: Provides tenant-safe hierarchy reads for the notification preference resolver.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

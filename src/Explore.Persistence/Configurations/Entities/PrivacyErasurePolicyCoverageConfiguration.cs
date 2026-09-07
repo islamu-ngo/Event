@@ -1,6 +1,3 @@
-// ABOUTME: Maps immutable local policy coverage for replayed privacy-erasure intents.
-// ABOUTME: Keys every row by intent, User subject kind, and applied policy version.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

@@ -1,6 +1,3 @@
-// ABOUTME: Repository implementation for notification queries and bulk operations.
-// ABOUTME: Uses ExecuteUpdateAsync for bulk mark-all-as-read, partial index for unread count.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.References;

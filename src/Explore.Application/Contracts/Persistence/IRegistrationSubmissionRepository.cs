@@ -1,6 +1,3 @@
-// ABOUTME: Defines entity-first persistence operations for registration attempts, submissions, and revisions.
-// ABOUTME: Returns typed no-op outcomes for expected deduplication and conditional-claim races.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

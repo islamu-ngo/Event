@@ -1,6 +1,3 @@
-// ABOUTME: Proves global AT Protocol credential moderation changes current state and immutable evidence.
-// ABOUTME: Covers suspend/reinstate idempotency, validation, deletion rejection, and activity preservation.
-
 namespace Event.Domain.UnitTests.Entities;
 
 using Explore.Domain.Enums;

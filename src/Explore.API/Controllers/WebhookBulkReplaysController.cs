@@ -1,6 +1,3 @@
-// ABOUTME: Management API for previewing, scheduling, polling, and cancelling bounded webhook bulk replays.
-// ABOUTME: Uses handler authorization, tenant-scoped operations, HAL affordances, and asynchronous 202 scheduling.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Extensions;

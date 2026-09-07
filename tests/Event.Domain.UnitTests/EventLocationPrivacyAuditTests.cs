@@ -1,6 +1,3 @@
-// ABOUTME: Verifies EventLocation privacy audits and erasure replay facts are immutable and PII-free.
-// ABOUTME: Covers policy deltas, exact-read evidence, UUIDv7 idempotency, and contiguous authority sequences.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

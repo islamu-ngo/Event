@@ -1,6 +1,3 @@
-// ABOUTME: Defines validated security and token settings for the embedded local Identity provider.
-// ABOUTME: Keeps signing material deployment-supplied while bounding lockout and token lifetimes.
-
 namespace Explore.Application.Configuration;
 
 public sealed class LocalIdentityOptions

@@ -1,6 +1,3 @@
-// ABOUTME: Resolves event creation context from tenant policy and publisher permissions.
-// ABOUTME: Keeps publishing-mode eligibility out of Blazor and aligned with create authorization.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

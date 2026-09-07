@@ -1,4 +1,3 @@
-# ABOUTME: Cerbos derived roles for the ISLAMU Event platform's 3-level admin hierarchy.
 # Maps principal attributes from CerbosPrincipalBuilder to context-aware derived roles.
 # Principal structure (from CerbosPrincipalBuilder.BuildAsync):
 #   roles: ["islamuevent_authenticated_user"]

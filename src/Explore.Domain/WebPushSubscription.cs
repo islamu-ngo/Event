@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-scoped browser Web Push subscription owned by one authenticated user device.
-// ABOUTME: Stores endpoint/key material and enforces active, touch, unsubscribe, and stale-deactivation transitions.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

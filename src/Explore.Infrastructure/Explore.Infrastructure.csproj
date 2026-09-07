@@ -1,5 +1,3 @@
-<!-- ABOUTME: Composes infrastructure integrations and their generated protocol clients. -->
-<!-- ABOUTME: Exposes internal transport seams only to owning hosts and integration-test assemblies. -->
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>

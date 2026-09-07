@@ -1,6 +1,3 @@
-// ABOUTME: Verifies notification preference matrix persistence, lookup seeding, and tenant filtering.
-// ABOUTME: Covers the effective resolver defaults, required locks, hierarchy overrides, and global mute behavior.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;

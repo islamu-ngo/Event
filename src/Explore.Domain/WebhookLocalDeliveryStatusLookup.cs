@@ -1,6 +1,3 @@
-// ABOUTME: Stable relational lookup rows for Local webhook delivery lifecycle states.
-// ABOUTME: Keeps mutable Local target state independent from append-only HTTP attempt outcomes.
-
 namespace Explore.Domain;
 
 public sealed class WebhookLocalDeliveryStatusLookup

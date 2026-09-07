@@ -1,6 +1,3 @@
-// ABOUTME: Registers server-specific services on top of the shared application services.
-// ABOUTME: Shared services live in Explore.Blazor.Client.Extensions.ServiceCollectionExtensions.
-
 using CarpaNet.OAuth.Storage;
 using Explore.Blazor.Authentication;
 using Explore.Blazor.Client.Configuration;

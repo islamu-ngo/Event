@@ -1,6 +1,3 @@
-// ABOUTME: Tenant public-experience settings payload for typed document storage.
-// ABOUTME: Contains non-secret governance defaults only.
-
 namespace Explore.Domain.Settings.Documents.Payloads;
 
 public sealed record PublicExperienceSettings

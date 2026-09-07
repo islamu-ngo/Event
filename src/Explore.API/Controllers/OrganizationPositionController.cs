@@ -1,6 +1,3 @@
-// ABOUTME: API controller for organization position lookup table (read-only enumeration).
-// ABOUTME: Provides role/position options for organization member assignments.
-
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Asp.Versioning;

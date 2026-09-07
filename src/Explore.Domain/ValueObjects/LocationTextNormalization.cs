@@ -1,6 +1,3 @@
-// ABOUTME: Validates complete location source text and derives invariant-uppercase NFC search text.
-// ABOUTME: Rejects malformed or nonportable scalars before mutation without trimming or truncating accepted values.
-
 using System.Buffers;
 using System.Text;
 

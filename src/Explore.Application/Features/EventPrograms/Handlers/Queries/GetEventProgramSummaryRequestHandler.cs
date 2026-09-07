@@ -1,6 +1,3 @@
-// ABOUTME: Handler assembling the server-backed event program summary from event sessions and groups.
-// ABOUTME: Applies local-day grouping and readiness guidance inside Application layer boundaries.
-
 using System.Collections.Immutable;
 using System.Globalization;
 using Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for EventModerationService covering light, heavy, and unmoderation flows.
-// ABOUTME: Verifies moderation client delegation, reason metadata, and error handling with TUnit and NSubstitute.
-
 using System.Diagnostics.CodeAnalysis;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Services;

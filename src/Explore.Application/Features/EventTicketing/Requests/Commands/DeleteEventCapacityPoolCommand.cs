@@ -1,5 +1,3 @@
-// ABOUTME: Deletes an unused event-scoped capacity pool.
-// ABOUTME: Authorizes against the parent event ticket-management action.
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

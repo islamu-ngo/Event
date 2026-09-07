@@ -1,6 +1,3 @@
-// ABOUTME: Domain coverage for the durable event-report decision execution state machine.
-// ABOUTME: Verifies lease fencing, exact enforcement receipts, resumability, and completion.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

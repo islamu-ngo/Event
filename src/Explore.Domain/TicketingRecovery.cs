@@ -1,6 +1,3 @@
-// ABOUTME: Owns tenant-qualified restore facts, recovery-only reopening, and bearer rotation authority.
-// ABOUTME: Keeps manifests immutable and creates digest-free credential reissue intent after validation.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: Resolves current attendee location disclosure for an explicit background recipient authority.
-// ABOUTME: Reuses the interactive evaluator and discards all current mutable values before returning.
-
 using System.Collections.Immutable;
 using Explore.Application.Contracts.LocationPrivacy;
 using Explore.Application.Contracts.Persistence;

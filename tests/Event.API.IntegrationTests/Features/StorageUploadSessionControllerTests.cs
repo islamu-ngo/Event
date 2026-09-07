@@ -1,6 +1,3 @@
-// ABOUTME: API contract tests for provider-neutral storage upload session endpoints.
-// ABOUTME: Verifies thin MediatR dispatch, route metadata, and RFC 7807 failure mapping.
-
 using System.Net;
 using System.Reflection;
 using System.Security.Claims;

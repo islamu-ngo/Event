@@ -1,6 +1,3 @@
-// ABOUTME: Application contract for resolving a tenant's effective event-reporting intake policy.
-// ABOUTME: Keeps report reads and submissions independent from external provider routing.
-
 namespace Explore.Application.Contracts.Services;
 
 public sealed record EventReportingIntakeDecision(

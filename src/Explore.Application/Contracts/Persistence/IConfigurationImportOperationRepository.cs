@@ -1,6 +1,3 @@
-// ABOUTME: Persists append-only configuration import receipts behind trusted target coordinates.
-// ABOUTME: Returns Domain operations and never exposes protected snapshot bytes or source authority.
-
 namespace Explore.Application.Contracts.Persistence;
 
 using Explore.Domain;

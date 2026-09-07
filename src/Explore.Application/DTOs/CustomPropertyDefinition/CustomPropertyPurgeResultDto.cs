@@ -1,6 +1,3 @@
-// ABOUTME: Result contract for explicit audited custom-property purge attempts.
-// ABOUTME: Exposes dependency counts so blocked irreversible purges are operator-actionable.
-
 namespace Explore.Application.DTOs.CustomPropertyDefinition;
 
 public sealed record CustomPropertyPurgeResultDto(

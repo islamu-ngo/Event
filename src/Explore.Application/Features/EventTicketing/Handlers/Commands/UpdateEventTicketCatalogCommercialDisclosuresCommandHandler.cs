@@ -1,6 +1,3 @@
-// ABOUTME: Handles draft ticket catalog commercial disclosure updates.
-// ABOUTME: Persists one draft mutation after platform-managed event and domain text validation pass.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventTicketing.Requests.Commands;

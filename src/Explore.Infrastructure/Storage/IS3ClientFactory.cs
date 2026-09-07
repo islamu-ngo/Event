@@ -1,6 +1,3 @@
-// ABOUTME: Internal factory abstraction for creating configured S3 SDK clients.
-// ABOUTME: Allows S3 provider tests to substitute clients without reaching external storage.
-
 using Amazon.S3;
 using Explore.Application.Models;
 

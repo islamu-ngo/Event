@@ -1,6 +1,3 @@
-// ABOUTME: Contract-host tests for event ticket catalog HAL resources and RFC 7807 failures.
-// ABOUTME: Covers stateful affordances, batched authorization, serialization, caching, and Prefer minimal.
-
 using System.Net;
 using System.Text;
 using System.Text.Json;

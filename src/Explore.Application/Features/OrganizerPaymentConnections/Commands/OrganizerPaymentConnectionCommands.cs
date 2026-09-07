@@ -1,6 +1,3 @@
-// ABOUTME: Minimal local-state CQRS commands for actor-bound organizer payment connections.
-// ABOUTME: Carries explicit organizer actor identity so session or admin status never selects a recipient.
-
 using Explore.Application.Responses;
 using Explore.Application.Authorization;
 using MediatR;

@@ -1,6 +1,3 @@
-// ABOUTME: Application-layer orchestration for provider-provisioned tenant, user actor, and tenant-admin role grant creation.
-// ABOUTME: Keeps tenant roles, optional organizers, and required invitation delivery in one managed-provisioning transaction.
-
 using System.Net;
 using System.Text.Json;
 using Explore.Application.Authentication;

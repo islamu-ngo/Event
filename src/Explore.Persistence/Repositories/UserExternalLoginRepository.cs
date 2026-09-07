@@ -1,6 +1,3 @@
-// ABOUTME: Repository implementation for linked external identity-provider login records.
-// ABOUTME: Resolves provider subjects to global users before tenant authorization is evaluated.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Authentication;
 using Explore.Domain;

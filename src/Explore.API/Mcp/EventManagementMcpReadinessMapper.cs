@@ -1,6 +1,3 @@
-// ABOUTME: Maps event publish-readiness DTOs into bounded MCP descriptors.
-// ABOUTME: Centralizes truncation so MCP tools and resources expose the same safe readiness shape.
-
 using Explore.Application.DTOs.Event;
 
 namespace Explore.API.Mcp;

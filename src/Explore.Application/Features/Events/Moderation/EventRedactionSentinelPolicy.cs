@@ -1,6 +1,3 @@
-// ABOUTME: Defines constraint-safe sentinel values and field classes for heavy event redaction.
-// ABOUTME: Keeps unsafe original event text out of audit, notifications, logs, and rebuilt projections.
-
 using System.Text;
 
 namespace Explore.Application.Features.Events.Moderation;

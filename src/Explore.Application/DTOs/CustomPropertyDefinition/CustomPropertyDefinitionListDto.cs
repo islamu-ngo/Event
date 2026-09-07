@@ -1,6 +1,3 @@
-// ABOUTME: Lightweight read DTO for paginated shared Layer 3 custom-property definition lists.
-// ABOUTME: Keeps admin list screens efficient while still exposing machine identity and governance flags.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.DTOs.CustomPropertyDefinition;

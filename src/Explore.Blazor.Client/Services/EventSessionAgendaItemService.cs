@@ -1,6 +1,3 @@
-// ABOUTME: Blazor API wrapper for public and event-authorized session agenda operations.
-// ABOUTME: Routes management pages through exact event-scoped reads without weakening public reads.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Events;
 using Microsoft.Extensions.Logging;

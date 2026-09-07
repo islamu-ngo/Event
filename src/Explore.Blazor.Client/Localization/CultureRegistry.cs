@@ -1,6 +1,3 @@
-// ABOUTME: Defines the Blazor client's supported culture metadata and validation allowlist.
-// ABOUTME: Keeps localization presentation behavior independent from API implementation layers.
-
 using System.Collections.Frozen;
 
 namespace Explore.Blazor.Client.Localization;

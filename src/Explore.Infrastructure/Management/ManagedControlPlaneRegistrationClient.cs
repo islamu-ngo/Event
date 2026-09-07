@@ -1,6 +1,3 @@
-// ABOUTME: Sends idempotent Event managed-registration attempts to the configured private Control Plane API.
-// ABOUTME: Uses bounded HTTPS requests without redirects and never logs registration or credential payloads.
-
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;

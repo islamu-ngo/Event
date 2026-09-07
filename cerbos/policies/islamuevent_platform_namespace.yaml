@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos resource policy for platform_namespace resources.
-# ABOUTME: Default deny — only instance admins (platform operators) can write to the 'platform' namespace.
-
 apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   resource: "islamuevent_platform_namespace"

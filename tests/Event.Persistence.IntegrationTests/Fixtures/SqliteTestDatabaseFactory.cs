@@ -1,6 +1,3 @@
-// ABOUTME: Factory for isolated in-memory SQLite database connections and connection strings.
-// ABOUTME: Employs unique URI filenames (mode=memory&cache=shared) to guarantee parallel test run isolation.
-
 using Microsoft.Data.Sqlite;
 
 namespace Event.Persistence.IntegrationTests.Fixtures;

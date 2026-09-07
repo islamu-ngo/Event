@@ -1,4 +1,3 @@
-// ABOUTME: Configuration options for secret refresh background service.
 // Controls refresh intervals, backoff behavior, and jitter.
 
 namespace Explore.Secrets.Configuration;

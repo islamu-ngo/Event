@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning a paginated list of actors.
-// ABOUTME: Maps actor entities to ActorListDto via AutoMapper.
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

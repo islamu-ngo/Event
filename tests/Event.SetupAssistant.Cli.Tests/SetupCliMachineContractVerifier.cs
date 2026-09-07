@@ -1,6 +1,3 @@
-// ABOUTME: Provides a small source-free verifier for the checked command schema and fixed machine fixtures.
-// ABOUTME: Detects closure, bounds, canonical framing, status, digest, coverage, and readiness violations.
-
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;

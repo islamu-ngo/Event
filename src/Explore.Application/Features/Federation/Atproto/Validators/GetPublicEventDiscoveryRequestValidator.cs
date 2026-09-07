@@ -1,6 +1,3 @@
-// ABOUTME: Enforces a bounded offset window for merged local and ATProto public event discovery.
-// ABOUTME: Prevents later-page requests from creating unbounded top-window allocations.
-
 using Explore.Application.Features.Federation.Atproto.Requests.Queries;
 using FluentValidation;
 

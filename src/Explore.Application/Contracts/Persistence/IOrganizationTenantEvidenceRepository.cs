@@ -1,6 +1,3 @@
-// ABOUTME: Persistence contract for retained OrganizationTenant legitimacy evidence.
-// ABOUTME: Supports tenant-scoped submission replay, review, and safe detail projections.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Loads non-sensitive tenant resolver configuration through the generated Event API client.
-// ABOUTME: Caches bootstrap routing settings so request path rewriting never reaches API persistence directly.
-
 using Explore.Blazor.Client.Clients;
 using Microsoft.Extensions.Caching.Memory;
 

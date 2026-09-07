@@ -1,6 +1,3 @@
-// ABOUTME: Command to delete a single footer link from a group.
-// ABOUTME: Validates the link's parent group belongs to the current tenant.
-
 using Explore.Application.Authorization;
 using MediatR;
 

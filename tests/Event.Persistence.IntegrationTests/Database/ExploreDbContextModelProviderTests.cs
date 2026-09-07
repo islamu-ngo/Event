@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the shared Explore EF Core model builds for every supported primary provider.
-// ABOUTME: Asserts configurable schema or fixed-prefix naming and PostgreSQL-only model defenses.
-
 using System.Text.RegularExpressions;
 using System.Security.Cryptography;
 using Explore.Persistence;

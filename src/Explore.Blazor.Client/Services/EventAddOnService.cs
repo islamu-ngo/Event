@@ -1,6 +1,3 @@
-// ABOUTME: Calls private same-origin add-on BFF endpoints through the browser credential pipeline.
-// ABOUTME: Uses generated HAL contracts and stable idempotency without exposing bearer authority.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Services.Http;

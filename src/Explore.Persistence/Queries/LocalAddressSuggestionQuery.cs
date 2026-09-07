@@ -1,6 +1,3 @@
-// ABOUTME: Executes one bounded SQL query for tenant-safe reusable local addresses.
-// ABOUTME: Applies authority predicates before projecting bounded exact fields and governance labels.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;

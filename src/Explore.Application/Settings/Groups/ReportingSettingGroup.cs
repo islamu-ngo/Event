@@ -1,6 +1,3 @@
-// ABOUTME: Strongly-typed reporting moderation provider settings resolved through the hierarchical settings engine.
-// ABOUTME: Captures tenant Osprey and Coop provider endpoints, credentials, and enablement flags.
-
 namespace Explore.Application.Settings.Groups;
 
 using Explore.Application.Contracts.Infrastructure;

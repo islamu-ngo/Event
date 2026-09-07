@@ -1,6 +1,3 @@
-// ABOUTME: Pure RabbitMQ consumer settlement decisions for EmailDispatch pointer deliveries.
-// ABOUTME: Keeps ACK/NACK/reject policy testable without requiring a live broker.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;

@@ -1,6 +1,3 @@
-// ABOUTME: Hosts server-private pre-authentication transient operations and a synthetic operational probe.
-// ABOUTME: Excludes protected results from public discovery, HAL, output caching and generic idempotency replay.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Authentication;

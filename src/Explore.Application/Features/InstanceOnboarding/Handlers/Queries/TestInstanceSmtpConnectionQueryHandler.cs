@@ -1,6 +1,3 @@
-// ABOUTME: Handles instance email provider connection tests through a narrow Application contract.
-// ABOUTME: Propagates safe diagnostics and cancellation without exposing SMTP transport types.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 using Explore.Application.Models;

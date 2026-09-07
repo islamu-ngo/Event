@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for tenant branding settings mapping through the generated Event API client.
-// ABOUTME: Verifies HAL/capability gating, isolated leaf requests, concurrency, and safe failures.
-
 namespace Explore.Blazor.Client.Tests.Services;
 
 public sealed class TenantBrandingSettingsAdminServiceTests

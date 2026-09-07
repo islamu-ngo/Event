@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for FallbackAuthorizationService verifying DB-driven authorization logic.
-// ABOUTME: Tests the Instance > Tenant > Organization hierarchy and lock semantics.
-
 using Explore.Infrastructure.Tests.Authorization;
 using Explore.Infrastructure.Tests.Infrastructure;
 using Explore.Application.Authorization;

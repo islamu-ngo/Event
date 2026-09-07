@@ -1,6 +1,3 @@
-// ABOUTME: Specifies Phase 20 admission-ticket, child-credential, and delivery-intent persistence behavior.
-// ABOUTME: Proves provider parity, real PostgreSQL collisions, and public Application issuance replay.
-
 using System.Data.Common;
 using Event.Persistence.IntegrationTests;
 using Event.Persistence.IntegrationTests.Fixtures;

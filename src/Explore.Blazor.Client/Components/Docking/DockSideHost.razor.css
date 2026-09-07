@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped side-host layout for open docked panels.
-   ABOUTME: Uses grid areas and logical dimensions to avoid page-level compensation hacks. */
-
 .dock-side-host {
     display: flex;
     flex-direction: column;

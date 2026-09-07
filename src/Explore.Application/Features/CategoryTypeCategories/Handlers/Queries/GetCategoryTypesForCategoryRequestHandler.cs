@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning all category types that contain a given category.
-// ABOUTME: Inverse of GetCategoriesByCategoryType — used for breadcrumb resolution.
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.CategoryType;

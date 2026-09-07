@@ -1,6 +1,3 @@
-// ABOUTME: Wrapper DTO for partial actor updates using nullable logical groups.
-// ABOUTME: Body IDs and tenant IDs are absent because PATCH routes use route/context authority.
-
 using Explore.Application.Models.Common;
 
 namespace Explore.Application.DTOs.Actor;

@@ -1,6 +1,3 @@
-// ABOUTME: Secured query for the multi-tenant control-plane overview snapshot.
-// ABOUTME: Uses instance-setting authorization metadata so the API remains the authority.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.ControlPlane;
 using MediatR;

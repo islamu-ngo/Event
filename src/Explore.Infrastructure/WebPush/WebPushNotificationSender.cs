@@ -1,6 +1,3 @@
-// ABOUTME: Official WebPush client adapter for encrypted browser Push API delivery.
-// ABOUTME: Classifies provider status codes without logging subscription secrets or payload contents.
-
 using System.Net;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Models;

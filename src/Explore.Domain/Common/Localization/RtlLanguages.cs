@@ -1,6 +1,3 @@
-// ABOUTME: Single source of truth for "is this language written right-to-left?".
-// ABOUTME: Thin shim over CultureRegistry — adding a new RTL language means updating the registry, not this file.
-
 namespace Explore.Domain.Common.Localization;
 
 /// <summary>

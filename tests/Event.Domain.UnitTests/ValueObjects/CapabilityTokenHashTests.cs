@@ -1,6 +1,3 @@
-// ABOUTME: Tests canonical validation and round-tripping for persisted guest capability-token hashes.
-// ABOUTME: Ensures only standard Base64 representations of exactly 32 SHA-256 bytes are accepted.
-
 using Explore.Domain.ValueObjects;
 
 namespace Event.Domain.UnitTests.ValueObjects;

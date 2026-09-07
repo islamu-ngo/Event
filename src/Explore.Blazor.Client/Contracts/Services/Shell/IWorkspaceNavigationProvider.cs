@@ -1,6 +1,3 @@
-// ABOUTME: Contract for components that supply contextual navigation content to a workspace.
-// ABOUTME: The host renders the component type stored in WorkspaceDescriptor.NavigationProviderType.
-
 namespace Explore.Blazor.Client.Contracts.Services.Shell;
 
 /// <summary>

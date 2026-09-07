@@ -1,6 +1,3 @@
-// ABOUTME: Maps tenant-scoped registration participants and their restrictive order, guardian, and user lineage.
-// ABOUTME: Keeps participant identity separate from its removable one-to-one PII extension.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

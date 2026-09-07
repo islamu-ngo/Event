@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral incoming webhook verification and processing contracts.
-// ABOUTME: Requires processors to use persisted claim identity and declare one stable receipt effect kind.
-
 namespace Explore.Application.Contracts.Webhooks;
 
 public sealed record IncomingWebhookContext(

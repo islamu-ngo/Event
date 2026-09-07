@@ -1,6 +1,3 @@
-// ABOUTME: Defines source-independent canonical bytes and adversarial vectors for portability extraction.
-// ABOUTME: Pins checked-schema identities, limits, diagnostics, and legal rendering without old owners.
-
 namespace ISLAMU.Wire.Contracts.UnitTests.ConfigurationPortability;
 
 using System.Text;

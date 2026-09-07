@@ -1,6 +1,3 @@
-// ABOUTME: Unit-style tests for the API EmailDispatchHealthCheck.
-// ABOUTME: Verifies Basic Dispatch Mode health reports enabled and intentionally disabled states safely.
-
 using System.Diagnostics.Metrics;
 using System.Text;
 using System.Text.Json.Nodes;

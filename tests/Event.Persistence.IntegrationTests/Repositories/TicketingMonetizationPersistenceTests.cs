@@ -1,6 +1,3 @@
-// ABOUTME: Source-only EF metadata, runtime seed, and tenant-isolation tests for ticketing monetization persistence.
-// ABOUTME: Uses design-time Npgsql metadata and InMemory repositories without Docker or Testcontainers.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;

@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-admin service for editing public experience governance settings through the BFF API.
-// ABOUTME: Wraps generic tenant settings endpoints with a typed model for post-onboarding public UX controls.
-
 using System.Globalization;
 using Explore.Blazor.Client.Clients;
 using Microsoft.Extensions.Logging;

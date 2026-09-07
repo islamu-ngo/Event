@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for tenant-scoped inventory holds used by registration order reservation.
-// ABOUTME: Adds active-hold accounting indexes and restrictive relationships for safe expiry processing.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

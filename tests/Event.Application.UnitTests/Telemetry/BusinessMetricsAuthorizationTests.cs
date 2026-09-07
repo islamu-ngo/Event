@@ -1,6 +1,3 @@
-// ABOUTME: Verifies authorization decision metrics carry bounded operational dimensions only.
-// ABOUTME: Guards against resource/tenant/user identifiers or the policy revision becoming metric tags.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Telemetry;
 using NSubstitute;

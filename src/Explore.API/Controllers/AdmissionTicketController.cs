@@ -1,6 +1,3 @@
-// ABOUTME: Exposes authenticated account-owned ticket detail and credential delivery surfaces.
-// ABOUTME: Emits QR/print HAL affordances only when their direct endpoints can authorize the ticket.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines stable failure codes for AI proposal-only plan validation.
-// ABOUTME: Lets UI, API, MCP, diagnostics, and tests share non-content-bearing plan failure semantics.
-
 namespace Explore.Application.Features.AiAssistant.Plans;
 
 public static class AiPlanValidationFailureCodes

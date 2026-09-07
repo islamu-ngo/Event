@@ -1,6 +1,3 @@
-// ABOUTME: Applies presence-aware grouped patches to tenant-scoped footer scalar settings.
-// ABOUTME: Validates before writing, silently skips locked leaves, and invalidates once on success.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Footer.Validators;

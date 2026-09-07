@@ -1,6 +1,3 @@
-// ABOUTME: Reconciles ambiguous or non-terminal refunds from authoritative provider evidence.
-// ABOUTME: Retrieves known refunds and repeats only the same idempotent create when handoff returned no identity.
-
 using Explore.Application.Contracts.Payments;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

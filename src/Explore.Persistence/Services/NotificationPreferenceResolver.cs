@@ -1,6 +1,3 @@
-// ABOUTME: Resolves effective notification channel preferences across the scope hierarchy.
-// ABOUTME: Applies category required metadata, scoped overrides, locks, defaults, and global mute state.
-
 using Explore.Application.Contracts.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;

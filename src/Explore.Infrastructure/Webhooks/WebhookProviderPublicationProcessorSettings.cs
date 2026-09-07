@@ -1,6 +1,3 @@
-// ABOUTME: Bounded settings for the disabled-by-default asynchronous provider publication processor.
-// ABOUTME: Controls claims, leases, publication attempts, retry delays, and unknown reconciliation timing.
-
 using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure.Webhooks;

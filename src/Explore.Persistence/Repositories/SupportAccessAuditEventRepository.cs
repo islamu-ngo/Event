@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for support-access audit evidence.
-// ABOUTME: Exposes bounded session and tenant audit queries without cross-tenant generic listing.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

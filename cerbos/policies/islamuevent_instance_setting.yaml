@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos resource policy for instance-level settings.
-# ABOUTME: Restricts every instance-setting action to the instance-admin derived role.
-
 apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   resource: "islamuevent_instance_setting"

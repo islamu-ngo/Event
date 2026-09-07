@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for account-authority identity lifecycle email delegation service.
-// ABOUTME: Verifies safe disabled, provider-not-configured, and local delegation audit outcomes.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Notifications;

@@ -1,6 +1,3 @@
-// ABOUTME: Handles deletion of an unused event-scoped capacity pool.
-// ABOUTME: Guards active ticket references before applying the audited domain transition.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventTicketing.Requests.Commands;

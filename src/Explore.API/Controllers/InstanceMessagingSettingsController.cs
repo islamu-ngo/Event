@@ -1,6 +1,3 @@
-// ABOUTME: Instance messaging settings endpoints for SMTP delivery configuration and resolver selection.
-// ABOUTME: Secrets are stored through the settings service; test endpoints report status without echoing credentials.
-
 using Explore.Application.Authentication;
 using Asp.Versioning;
 using Explore.API.Attributes;

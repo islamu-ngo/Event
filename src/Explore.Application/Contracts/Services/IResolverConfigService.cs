@@ -1,6 +1,3 @@
-// ABOUTME: Contract for reading and writing tenant resolver configuration from system settings only.
-// ABOUTME: Keeps tenant resolution bootstrapping independent from tenant-aware settings cascades.
-
 using Explore.Application.DTOs.Instance;
 using Explore.Application.DTOs.Onboarding;
 

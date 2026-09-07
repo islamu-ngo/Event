@@ -1,6 +1,3 @@
-// ABOUTME: Produces safe authentication diagnostic codes and correlation IDs for browser redirects.
-// ABOUTME: Prevents OIDC provider failures, client secrets, and token details from reaching browser-visible URLs.
-
 using System.Diagnostics;
 using System.Security.Cryptography;
 

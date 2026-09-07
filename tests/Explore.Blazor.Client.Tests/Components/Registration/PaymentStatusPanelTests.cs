@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for authoritative attendee payment state rendering and exact HAL actions.
-// ABOUTME: Verifies every bounded status, same-origin checkout filtering, and no blind retry behavior.
-
 using AngleSharp.Dom;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.Registration;

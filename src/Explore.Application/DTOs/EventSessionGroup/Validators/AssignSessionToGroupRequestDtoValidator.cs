@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for assigning sessions to event session groups.
-// ABOUTME: Enforces same-event consistency between Event, EventSessionGroup, and EventSession.
-
 using Explore.Application.Contracts.Persistence;
 using FluentValidation;
 

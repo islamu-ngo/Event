@@ -1,6 +1,3 @@
-// ABOUTME: Exercises Stripe hosted Checkout through a deterministic recording HTTP transport.
-// ABOUTME: Proves connected-account, idempotency, money, metadata, mapping, and ambiguity semantics.
-
 using System.Net;
 using Explore.Application.Contracts.Payments;
 using Explore.Application.Contracts.Secrets;

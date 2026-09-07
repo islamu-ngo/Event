@@ -1,6 +1,3 @@
-// ABOUTME: Reads protected OAuth state before tenant recovery or a strictly tenant-bound handoff.
-// ABOUTME: Maps immutable repository entities to private results and rejects disabled tenants without a filter bypass.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Authentication.Atproto.Models;
 using Explore.Application.Features.Authentication.Atproto.Requests.Queries;

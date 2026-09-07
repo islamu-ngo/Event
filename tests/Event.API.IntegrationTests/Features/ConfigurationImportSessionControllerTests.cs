@@ -1,6 +1,3 @@
-// ABOUTME: Verifies scope-safe import routes, authorization facts, HAL affordances, and HTTP failures.
-// ABOUTME: Ensures target authority and capability tokens never enter request bodies or URLs.
-
 namespace Event.Api.IntegrationTests.Features;
 
 using System.Net;

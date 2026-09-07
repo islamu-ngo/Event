@@ -1,6 +1,3 @@
-// ABOUTME: Test-only builder that expresses a provider scenario in the historical attribute vocabulary.
-// ABOUTME: Produces a real AuthorizationRequest whose only policy input is the closed typed fact catalog.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 

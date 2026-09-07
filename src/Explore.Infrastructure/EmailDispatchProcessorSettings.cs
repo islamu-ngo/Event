@@ -1,6 +1,3 @@
-// ABOUTME: Runtime settings for Basic Dispatch Mode email processing over PostgreSQL plus SMTP.
-// ABOUTME: Keeps RabbitMQ optional by controlling the local polling dispatcher separately from broker settings.
-
 namespace Explore.Infrastructure;
 
 public class EmailDispatchProcessorSettings

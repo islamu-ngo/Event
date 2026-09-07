@@ -1,6 +1,3 @@
-// ABOUTME: PATCH wrapper DTO for property-level Event shell updates using nullable logical groups.
-// ABOUTME: Route ID owns identity; nullable fields use OptionalUpdate for explicit set-or-clear semantics.
-
 using System;
 using Explore.Application.Models.Common;
 

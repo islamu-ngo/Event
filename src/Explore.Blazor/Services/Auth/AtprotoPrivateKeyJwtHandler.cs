@@ -1,6 +1,3 @@
-// ABOUTME: Adapts the BFF private OAuth key ring to the shared strict assertion transport policy.
-// ABOUTME: Creates a fresh CarpaNet ES256 client assertion with the session-pinned kid per send.
-
 using CarpaNet.OAuth.Crypto;
 using Explore.Atproto.Transport;
 

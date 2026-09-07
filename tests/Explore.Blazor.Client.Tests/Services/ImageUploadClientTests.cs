@@ -1,6 +1,3 @@
-// ABOUTME: Focused tests for the image upload transport client seam.
-// ABOUTME: Verifies provider-neutral BFF upload-session and proxy behavior.
-
 using System.Net;
 using System.Net.Http.Json;
 using Explore.Blazor.Client.Services.Http;

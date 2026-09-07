@@ -1,6 +1,3 @@
-// ABOUTME: List DTO for notification collections (paginated listing).
-// ABOUTME: Used in GET /api/notification response.
-
 namespace Explore.Application.DTOs.Notification;
 
 public sealed record NotificationListDto

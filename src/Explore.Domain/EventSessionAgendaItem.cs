@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-scoped timed session segment with authoritative event-local placement.
-// ABOUTME: Derives its retained physical consistency key only from a matching EventLocation.
-
 using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;

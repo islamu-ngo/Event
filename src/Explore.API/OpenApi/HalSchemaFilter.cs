@@ -1,4 +1,3 @@
-// ABOUTME: Swashbuckle schema filter that properly exposes DTOs from generic HAL wrapper types.
 // NOTE: This is for Swashbuckle (AddSwaggerGen). Native ASP.NET Core OpenAPI (AddOpenApi)
 // uses HalDtoSchemaTransformer with the same catalog and mutation helpers.
 

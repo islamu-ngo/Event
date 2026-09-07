@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for Docker Compose topology doctor checks.
-// ABOUTME: Detects service-name drift without starting Docker containers.
-
 using Explore.Diagnostic.Doctor;
 using Explore.Diagnostic.Doctor.Checks;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Creates the real ATProto publication planner with federation disabled for unrelated handler unit tests.
-// ABOUTME: Keeps lifecycle tests focused while preserving the planner's fail-closed governance behavior.
-
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

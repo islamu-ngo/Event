@@ -1,6 +1,3 @@
-// ABOUTME: Classifies dotenv readiness from relevant catalogue requirements and value-state metadata only.
-// ABOUTME: Returns ordinal key lists and stable diagnostics without projecting any supplied values.
-
 namespace ISLAMU.Event.Setup.Core.Environment;
 
 public enum DotenvReadinessState

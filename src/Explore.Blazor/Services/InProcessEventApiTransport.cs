@@ -1,6 +1,3 @@
-// ABOUTME: Carries Combined-profile Event API HttpClient requests through the existing in-process API pipeline.
-// ABOUTME: Preserves HTTP semantics while isolating synthetic requests from browser cookies and principals.
-
 using System.Collections.Immutable;
 using System.Net;
 using System.Security.Claims;

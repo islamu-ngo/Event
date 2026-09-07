@@ -1,6 +1,3 @@
-// ABOUTME: Persists tenant-filtered registration workflow and form authoring aggregate graphs.
-// ABOUTME: Keeps reads detached, mutation graphs tracked, and converts EF concurrency failures at the boundary.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
 using Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: EF Core lookup mappings for normalized AI assistant lifecycle and classifier values.
-// ABOUTME: Keeps AI enum-backed foreign keys stable with unique master codes and bounded metadata.
-
 using Explore.Domain.Ai;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

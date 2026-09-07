@@ -1,6 +1,3 @@
-// ABOUTME: Verifies location-privacy writes stay on the authenticated generic settings API boundary.
-// ABOUTME: Proves tenant changes dispatch the existing authorized CQRS command without a parallel route.
-
 using System.Reflection;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;

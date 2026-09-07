@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL-backed tests for tenant-scoped composite FKs across the event graph.
-// ABOUTME: Writes invalid rows directly so database constraints prove cross-tenant/event links are rejected.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;

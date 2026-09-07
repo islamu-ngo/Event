@@ -1,6 +1,3 @@
-// ABOUTME: Shares internal add-on authorization and DTO mapping across command and query handlers.
-// ABOUTME: Keeps feature policy independent of either CQRS handler namespace.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

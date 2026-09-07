@@ -1,6 +1,3 @@
-// ABOUTME: Exact-tuple Google Forms REST v1 descriptor and adapter for OAuth-backed registration forms.
-// ABOUTME: Fails closed around publication, file uploads, read-only responses, and Pub/Sub-only watches.
-
 using System.Buffers;
 using System.Net;
 using System.Net.Http.Headers;

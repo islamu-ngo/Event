@@ -1,6 +1,3 @@
-// ABOUTME: Maps optional Event managed-mode registration trust and dedicated machine-credential hashes.
-// ABOUTME: Enforces one registration per managed instance with restrictive secret ownership and lifecycle checks.
-
 using Explore.Domain;
 using Explore.Domain.Secrets;
 using Explore.Persistence.ValueGenerators;

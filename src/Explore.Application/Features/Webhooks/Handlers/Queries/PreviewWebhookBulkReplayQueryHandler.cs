@@ -1,6 +1,3 @@
-// ABOUTME: Builds bounded tenant-scoped webhook bulk replay eligibility and exclusion previews.
-// ABOUTME: Applies configured safety ceilings before delegating set-based classification to persistence.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.DTOs.Webhooks;

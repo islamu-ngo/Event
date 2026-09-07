@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the standalone host exposes one explicitly owned API, BFF, UI, and health graph.
-// ABOUTME: Exercises referenced static assets and guards against duplicate controllers or YARP self-routing.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;

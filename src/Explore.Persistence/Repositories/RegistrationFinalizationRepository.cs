@@ -1,6 +1,3 @@
-// ABOUTME: Persists requirement evidence and claims order-finalization effects with database fencing.
-// ABOUTME: Atomically creates one effect only after every mandatory requirement has fulfillment evidence.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

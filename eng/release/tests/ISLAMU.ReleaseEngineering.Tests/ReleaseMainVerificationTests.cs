@@ -1,6 +1,3 @@
-// ABOUTME: Proves verify-main validates stable-main topology without mutating Git refs.
-// ABOUTME: Covers newest stable, older lines, prereleases, CAS races, stale tags, and deterministic output.
-
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;

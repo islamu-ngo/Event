@@ -1,6 +1,3 @@
-// ABOUTME: Defines versioned ticket-purchase ceilings, stable enforcement dimensions, and durable operation identity.
-// ABOUTME: Keeps name-only limits honest while pinning server-owned account, contact, and actor context.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

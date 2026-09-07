@@ -1,6 +1,3 @@
-// ABOUTME: Query handler resolving tenant redirection targets for a user based on active memberships.
-// ABOUTME: Checks for LastActiveTenantId priority in multi-tenant memberships.
-
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies custom-property projection mutation commands expose resource authorization metadata.
-// ABOUTME: Covers tenant-wide rebuild/drain and single event/session repair command contexts.
-
 using System.Reflection;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Services;

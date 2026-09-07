@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS link policies for organization review detail and collection resources.
-// ABOUTME: Emits review and organization affordances backed by registered API route names.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Collections.Generic;

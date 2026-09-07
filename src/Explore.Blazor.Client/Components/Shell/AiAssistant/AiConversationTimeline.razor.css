@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped visual treatment for reusable AI conversation messages. */
-/* ABOUTME: Preserves the existing rail timeline geometry in dock and workspace hosts. */
-
 .ai-rail__timeline {
     display: flex;
     flex-direction: column;

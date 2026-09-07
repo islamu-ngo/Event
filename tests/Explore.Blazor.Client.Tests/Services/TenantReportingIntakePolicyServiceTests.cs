@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the generated-client-backed reporting-intake policy adapter.
-// ABOUTME: Verifies API versioning, cancellation, and exact tenant update payloads.
-
 namespace Explore.Blazor.Client.Tests.Services;
 
 public sealed class TenantReportingIntakePolicyServiceTests

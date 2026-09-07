@@ -1,6 +1,3 @@
-// ABOUTME: Handles idempotent current-user subscriptions to organization/group actors.
-// ABOUTME: Reactivates durable rows without emitting fanout or other external side effects.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ActorSubscription.Validators;

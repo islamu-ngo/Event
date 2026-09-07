@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL-backed tests for DB-enforced group hierarchy invariants.
-// ABOUTME: Verifies same-tenant parent FKs, parent exclusivity, self-parent checks, and bounded ancestry helpers.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;

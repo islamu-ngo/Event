@@ -1,6 +1,3 @@
-// ABOUTME: Reflection bridge for RED Photon runtime configuration and composition contracts.
-// ABOUTME: Keeps deployment evidence outside application options while exercising safe executable settings.
-
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.Configuration;

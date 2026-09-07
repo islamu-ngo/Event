@@ -1,6 +1,3 @@
-// ABOUTME: Short-TTL cached onboarding status probe shared by middleware, cookie events, and admin enrichment.
-// ABOUTME: Fetches GET /api/InstanceOnboarding/status (AllowAnonymous, fast) and caches the result to avoid request storms.
-
 using Explore.Blazor.Client.Clients;
 using Microsoft.Extensions.Caching.Memory;
 

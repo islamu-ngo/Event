@@ -1,6 +1,3 @@
-// ABOUTME: Explicit API-owned catalog of DTOs whose HAL OpenAPI schemas are public contract surface.
-// ABOUTME: Keeps HAL schema opt-in out of Application DTOs and avoids broad namespace reflection.
-
 namespace Explore.API.OpenApi;
 
 internal static class HalOpenApiSchemaCatalog

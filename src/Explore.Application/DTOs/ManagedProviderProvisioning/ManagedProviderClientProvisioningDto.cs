@@ -1,6 +1,3 @@
-// ABOUTME: Request DTO for trusted provider automation that provisions an external customer into the platform.
-// ABOUTME: Separates tenant creation, external identity linking, and optional organizer actor creation.
-
 namespace Explore.Application.DTOs.ManagedProviderProvisioning;
 
 using Explore.Application.DTOs.TenantSettings;

@@ -1,6 +1,3 @@
-// ABOUTME: API readiness health check for launch-critical SMTP connectivity.
-// ABOUTME: Uses the narrow diagnostic contract so SMTP transport stays behind Infrastructure.
-
 using Explore.Application.Contracts.Infrastructure;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 

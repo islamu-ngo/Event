@@ -1,6 +1,3 @@
-// ABOUTME: Executes retained Coop decisions and atomically settles their durable effect pointers.
-// ABOUTME: Revalidates pointer identity before command dispatch and stores only bounded safe failure metadata.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;

@@ -1,4 +1,3 @@
-// ABOUTME: EF Core configuration for EventTechAspect using shared primary key pattern.
 // The aspect's Id is both its PK and the FK to Event.Id (1:1 relationship).
 
 namespace Explore.Persistence.Configurations.Entities;

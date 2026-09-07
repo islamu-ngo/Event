@@ -1,6 +1,3 @@
-// ABOUTME: Verifies bounded binary and collection contracts snapshot caller-owned mutable inputs.
-// ABOUTME: Guards immutable publication and byte/base64 wire compatibility for the affected records.
-
 using System.Text.Json;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;

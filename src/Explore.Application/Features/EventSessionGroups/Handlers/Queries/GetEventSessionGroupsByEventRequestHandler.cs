@@ -1,6 +1,3 @@
-// ABOUTME: Handler for publicly listing program sections/tracks/devrooms belonging to an event.
-// ABOUTME: Maps published groups while redacting exact physical location and room fields.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

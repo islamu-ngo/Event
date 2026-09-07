@@ -1,6 +1,3 @@
-// ABOUTME: Binds Terminal.Gui controls to CommunityToolkit commands and value-free observable workspace state.
-// ABOUTME: Owns masked input, paste refusal, focus order, non-color status, teardown, and accessibility limitations.
-
 namespace ISLAMU.Event.SetupAssistant.Terminal;
 
 using System.ComponentModel;

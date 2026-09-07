@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for the explicit household-consent gate on private home ownership.
-// ABOUTME: Proves nothing is submitted without an affirmative tick and that the consent version travels.
-
 using System.Reflection;
 using Explore.Blazor.Client.Contracts.Services.Events;
 using Explore.Blazor.Client.Pages.Events.Components;

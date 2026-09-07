@@ -1,6 +1,3 @@
-// ABOUTME: TUnit fixture for authenticated API integration tests that require single-tenant resolution.
-// ABOUTME: Reuses the test-auth header flow while forcing the API host into single-tenant mode.
-
 using Explore.Application.Contracts.Infrastructure;
 using TUnit.Core.Interfaces;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies bounded cross-tenant ATProto presentation resolution with instance lock semantics.
-// ABOUTME: Proves only active tenants with an effective enabled capability receive Jetstream presentations.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Services.Federation;
 using Explore.Domain;

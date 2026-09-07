@@ -1,6 +1,3 @@
-// ABOUTME: Verifies machine-consumed deployment ownership and container paths for ConfigurationManifest.
-// ABOUTME: Prevents split API replicas or non-owning Aspire resources from applying bootstrap state.
-
 namespace Event.Architecture.Tests;
 
 public sealed class ConfigurationManifestDeploymentContractTests

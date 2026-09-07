@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos resource policy for custom_property_governance resources.
-# ABOUTME: Governance reporting (Rule 12 promotion recommendations) is read-only for tenant admins.
-
 apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   resource: "islamuevent_custom_property_governance"

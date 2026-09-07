@@ -1,6 +1,3 @@
-// ABOUTME: Focused tests for the paid-event policy service seam over the generated API client.
-// ABOUTME: Verifies exact generated method delegation for instance, tenant, and cancellation flows.
-
 using Explore.Blazor.Client.Contracts.Services.PaidEventPolicies;
 
 namespace Explore.Blazor.Client.Tests.Services;

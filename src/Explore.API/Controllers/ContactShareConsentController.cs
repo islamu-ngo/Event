@@ -1,6 +1,3 @@
-// ABOUTME: API controller for contact-sharing consent operations.
-// ABOUTME: User endpoints (view/withdraw own consents) and organisation endpoints (view/export shared contacts).
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

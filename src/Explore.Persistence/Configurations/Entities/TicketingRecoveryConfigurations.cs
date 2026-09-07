@@ -1,6 +1,3 @@
-// ABOUTME: Maps tenant-qualified ticketing recovery checkpoints and credential reissue intents.
-// ABOUTME: Enforces durable manifest replay, concurrency, and one reissue effect per ticket.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

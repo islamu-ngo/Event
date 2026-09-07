@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for the EventsWorkspaceNavigation shell navigation content.
-// ABOUTME: Protects legacy MainLayout drawer links before dock host migration.
-
 using Explore.Blazor.Client.Components.Shell.Workspaces;
 using MudBlazor;
 

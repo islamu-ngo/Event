@@ -1,6 +1,3 @@
-// ABOUTME: Compiles every database lock identity needed by one configuration-manifest invocation.
-// ABOUTME: Orders the instance manifest, scoped resources, tenant slugs, and governance reads deterministically.
-
 namespace Explore.Application.Features.ConfigurationManifest.Application;
 
 using System.Collections.Immutable;

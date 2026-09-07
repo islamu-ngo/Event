@@ -1,6 +1,3 @@
-// ABOUTME: Unit-style tests for safe BFF forwarding response translation helpers.
-// ABOUTME: Protects generic ProblemDetails and JSON/content passthrough behavior used by preference endpoints.
-
 using System.Net;
 using System.Text;
 using Explore.Blazor.Services.Preferences;

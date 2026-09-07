@@ -1,6 +1,3 @@
-// ABOUTME: Runs SecretBinding metadata and tenant-isolation invariants on every primary database provider.
-// ABOUTME: Proves concurrent reads cannot cross tenant scope and the model has no secret-value columns.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;

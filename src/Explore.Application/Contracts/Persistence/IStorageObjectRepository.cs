@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for storage object metadata queries.
-// ABOUTME: Returns domain entities with explicit detail-loading methods for handler-side DTO mapping.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

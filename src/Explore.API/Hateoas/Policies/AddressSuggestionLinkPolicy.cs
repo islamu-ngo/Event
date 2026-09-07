@@ -1,6 +1,3 @@
-// ABOUTME: Defines HAL links for private local address-suggestion resources.
-// ABOUTME: Gates tenant approval by server authorization and omits it for approved rows.
-
 using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;

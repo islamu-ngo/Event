@@ -1,6 +1,3 @@
-// ABOUTME: Maps exact organizer-facing event agenda reads from tenant-safe repositories.
-// ABOUTME: Detail reads verify parent-event ownership before returning physical location fields.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventAgendaItem;

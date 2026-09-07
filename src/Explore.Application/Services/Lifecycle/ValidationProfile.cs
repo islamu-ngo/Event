@@ -1,5 +1,3 @@
-// ABOUTME: Controlled validation profile identifiers for event and session lifecycle commands.
-// ABOUTME: Each profile binds a command/source/state to a specific required-field strictness level.
 namespace Explore.Application.Services.Lifecycle;
 
 /// <summary>

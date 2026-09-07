@@ -1,6 +1,3 @@
-// ABOUTME: Exposes rate-limited anonymous Local Identity login and registration endpoints.
-// ABOUTME: Delegates all validation and credential behavior to MediatR and returns RFC 7807 failures.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

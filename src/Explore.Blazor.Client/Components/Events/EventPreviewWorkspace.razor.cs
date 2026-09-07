@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for the reusable event preview dock workspace.
-// ABOUTME: Centralizes tenant click behavior, detail loading, sharing, and HAL-gated management actions.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;

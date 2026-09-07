@@ -1,6 +1,3 @@
-// ABOUTME: Safe result DTO for setup-time Keycloak bootstrap outcomes.
-// ABOUTME: Reports realm/client status without echoing admin credentials, tokens, secrets, or provider response bodies.
-
 namespace Explore.Application.DTOs.Onboarding;
 
 using Explore.Application.Onboarding;

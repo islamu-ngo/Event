@@ -1,6 +1,3 @@
-// ABOUTME: HAL link policy for the authenticated tenant footer settings admin resource.
-// ABOUTME: Reuses tenant update authorization metadata for the grouped PATCH edit affordance.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Security.Claims;

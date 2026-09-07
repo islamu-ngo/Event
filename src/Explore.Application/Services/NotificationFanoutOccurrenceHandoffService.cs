@@ -1,6 +1,3 @@
-// ABOUTME: Validates durable fanout pointers and ensures resumable recipient work exists.
-// ABOUTME: Keeps general-outbox completion separate from later fanout run claiming.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

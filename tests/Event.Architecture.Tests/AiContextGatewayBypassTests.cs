@@ -1,6 +1,3 @@
-// ABOUTME: Architecture tests enforcing the AI Context Disclosure Gateway choke point.
-// ABOUTME: Prevents direct PII entity references or raw-event-property emissions in AI/MCP layers.
-
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;

@@ -1,6 +1,3 @@
-// ABOUTME: Resolves the effective tenant setting that controls event-reporting intake.
-// ABOUTME: Fails closed and records resolver faults without coupling intake to provider routing.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.EventReporting;

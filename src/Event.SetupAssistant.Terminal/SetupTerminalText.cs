@@ -1,6 +1,3 @@
-// ABOUTME: Resolves bundled Terminal UI text through the BCL resource manager and current UI culture.
-// ABOUTME: Falls back to stable resource keys if a satellite resource is incomplete.
-
 namespace ISLAMU.Event.SetupAssistant.Terminal;
 
 using System.Globalization;

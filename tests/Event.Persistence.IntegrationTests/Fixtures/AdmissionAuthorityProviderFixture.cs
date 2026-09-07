@@ -1,6 +1,3 @@
-// ABOUTME: Hosts real SQL Server, MariaDB, and MySQL engines for admission authority lock contracts.
-// ABOUTME: Uses runtime-generated credentials and production provider composition without repository secrets.
-
 using System.Security.Cryptography;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;

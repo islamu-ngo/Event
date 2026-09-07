@@ -1,6 +1,3 @@
-// ABOUTME: Image upload transport client for provider-neutral BFF upload sessions and proxy forwarding.
-// ABOUTME: Keeps upload-specific raw multipart/streaming HTTP isolated from ImageStorageService orchestration.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;

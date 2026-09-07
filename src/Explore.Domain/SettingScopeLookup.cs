@@ -1,6 +1,3 @@
-// ABOUTME: Lookup-table entity for configuration and settings hierarchy scope levels.
-// ABOUTME: Includes System plus cascading settings scopes used by audit and secret bindings.
-
 namespace Explore.Domain;
 
 public class SettingScopeLookup

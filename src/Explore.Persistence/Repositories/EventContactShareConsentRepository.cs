@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for EventContactShareConsent with scoped lookups.
-// ABOUTME: Queries include navigation properties needed for display (Event, Actor with Org/Pii).
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

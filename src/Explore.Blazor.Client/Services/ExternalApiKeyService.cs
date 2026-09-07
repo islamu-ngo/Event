@@ -1,6 +1,3 @@
-// ABOUTME: Service layer for external API key management across all 5 owner types.
-// ABOUTME: Anti-Corruption Layer over NSwag-generated IExternalApiKeyClient methods.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;
 using Microsoft.Extensions.Logging;

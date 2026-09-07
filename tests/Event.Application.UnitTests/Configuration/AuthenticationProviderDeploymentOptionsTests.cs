@@ -1,6 +1,3 @@
-// ABOUTME: Verifies fail-closed deployment option validation for the two-axis authentication model.
-// ABOUTME: Keeps ATProto independent from the mutually exclusive Local and Keycloak primary providers.
-
 using Explore.Application.Configuration;
 
 namespace Event.Application.UnitTests.Configuration;

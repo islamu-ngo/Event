@@ -1,6 +1,3 @@
-// ABOUTME: Shared cleanup helpers for WebApplicationFactory test hosts.
-// ABOUTME: Removes background hosted services that add network calls or shutdown races unrelated to API assertions.
-
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.Api.IntegrationTests.Fixtures;

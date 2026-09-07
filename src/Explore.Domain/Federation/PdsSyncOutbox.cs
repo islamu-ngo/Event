@@ -1,6 +1,3 @@
-// ABOUTME: Stores immutable tenant-owned AT Protocol delivery intent after the local lifecycle transaction commits.
-// ABOUTME: Carries fenced lease, supersession, dependency, and URI/CID settlement state for safe PDS retries.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain.Federation;

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies admission target materialization persistence returns tenant-bound Domain entities.
-// ABOUTME: Proves repeated publication reuses the same target and policy rows without test seeding.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Services.Registration;
 using Explore.Domain;

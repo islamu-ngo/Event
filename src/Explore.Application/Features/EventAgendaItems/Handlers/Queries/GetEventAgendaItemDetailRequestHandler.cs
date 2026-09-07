@@ -1,6 +1,3 @@
-// ABOUTME: Handler for retrieving a single public event-level agenda item by Id.
-// ABOUTME: Returns published data while redacting exact physical location and room IDs.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

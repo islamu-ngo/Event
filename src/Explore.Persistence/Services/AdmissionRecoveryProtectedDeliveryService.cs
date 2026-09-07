@@ -1,6 +1,3 @@
-// ABOUTME: Atomically stages encrypted recovery delivery envelopes and identifier-only outbox pointers.
-// ABOUTME: Resolves only verified order email authority and never persists recipient or capability plaintext.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Admissions;
 using Explore.Domain;

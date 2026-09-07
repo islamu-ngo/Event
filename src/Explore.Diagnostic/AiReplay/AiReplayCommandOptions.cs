@@ -1,6 +1,3 @@
-// ABOUTME: Parses fake/replay AI usability report CLI options without adding a parser dependency.
-// ABOUTME: Keeps replay report generation explicit and safe for normal CI execution.
-
 namespace Explore.Diagnostic.AiReplay;
 
 public sealed record AiReplayCommandOptions(

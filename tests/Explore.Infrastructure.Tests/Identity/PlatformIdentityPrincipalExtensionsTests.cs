@@ -1,6 +1,3 @@
-// ABOUTME: Exercises platform identity resolution with hostile and purpose-bound principals.
-// ABOUTME: Pins the canonical fallback order and exposes the remaining duplicated caller divergence.
-
 using System.Security.Claims;
 using Explore.Application.Authentication;
 using Explore.Application.Constants;

@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL proofs for the owner-bounded cross-tenant Private Home erasure query.
-// ABOUTME: Prevents global account deletion from enumerating unrelated owners or non-Home locations.
-
 using DotNet.Testcontainers.Containers;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Configuration;

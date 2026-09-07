@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for RBAC role scope lookup values.
-// ABOUTME: Uses explicit IDs matching RoleScopeEnum values.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

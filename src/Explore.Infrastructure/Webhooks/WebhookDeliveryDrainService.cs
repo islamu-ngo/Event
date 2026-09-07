@@ -1,6 +1,3 @@
-// ABOUTME: Drains canonical LocalProvider target snapshots into signed outbound HTTP POST requests.
-// ABOUTME: Applies SSRF checks, fenced leases, retries, append-only attempt evidence, and endpoint governance.
-
 using System.Diagnostics;
 using System.Net;
 using System.Text.Json;

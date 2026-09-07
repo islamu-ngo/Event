@@ -1,6 +1,3 @@
-// ABOUTME: Resolves the normalized primary authentication provider for new login flows.
-// ABOUTME: Applies deployment precedence, one-minute caching, explicit invalidation, and fail-closed parsing.
-
 using System.Text.Json;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Infrastructure;

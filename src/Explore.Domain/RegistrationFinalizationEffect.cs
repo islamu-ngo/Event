@@ -1,6 +1,3 @@
-// ABOUTME: Models the durable fenced request that advances one fulfilled registration order toward checkout.
-// ABOUTME: Provides retry-safe lease claims so native and provider completion paths share one finalizer.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

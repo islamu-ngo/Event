@@ -1,6 +1,3 @@
-// ABOUTME: Append-only safe evidence for one provider publication or reconciliation action.
-// ABOUTME: Records fences, outcomes, and bounded failure metadata without payloads or raw provider errors.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

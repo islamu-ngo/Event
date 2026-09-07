@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for current-user actor subscription state.
-// ABOUTME: Exposes authenticated HAL endpoints for subscribe, update, unsubscribe, and list operations.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

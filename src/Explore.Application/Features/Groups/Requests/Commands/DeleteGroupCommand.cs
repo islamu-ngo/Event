@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command request for soft-deleting a Group entity.
-// ABOUTME: Carries the Group ID and UserId for authorization checks.
-
 using Explore.Application.Responses;
 using MediatR;
 

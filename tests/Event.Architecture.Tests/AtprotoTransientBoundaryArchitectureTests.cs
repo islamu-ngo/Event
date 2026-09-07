@@ -1,6 +1,3 @@
-// ABOUTME: Inspects actual MVC route metadata for the private transient machine capability.
-// ABOUTME: Guards the closed route set, dedicated authorization and generic replay suppression without reading source text.
-
 using Explore.API.Attributes;
 using Explore.API.Authentication;
 using Explore.API.Controllers;

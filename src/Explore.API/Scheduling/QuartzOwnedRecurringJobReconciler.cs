@@ -1,6 +1,3 @@
-// ABOUTME: Removes disabled or retired platform-owned Quartz jobs and triggers at host startup.
-// ABOUTME: Reconciles an exact key allowlist and never enumerates or mutates foreign scheduler entries.
-
 using Quartz;
 
 namespace Explore.API.Scheduling;

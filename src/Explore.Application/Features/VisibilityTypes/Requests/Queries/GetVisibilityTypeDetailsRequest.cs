@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query request for fetching a single visibility type by ID.
-// ABOUTME: Returns VisibilityTypeDto.
 using Explore.Application.DTOs.VisibilityType;
 using MediatR;
 

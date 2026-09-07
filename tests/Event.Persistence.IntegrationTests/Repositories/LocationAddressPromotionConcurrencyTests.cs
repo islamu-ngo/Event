@@ -1,6 +1,3 @@
-// ABOUTME: Proves real PostgreSQL optimistic concurrency permits one address-promotion winner.
-// ABOUTME: Synchronizes independent contexts without timing waits and verifies provenance and PII preservation.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Exceptions;
 using Explore.Domain;

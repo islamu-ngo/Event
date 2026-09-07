@@ -1,6 +1,3 @@
-// ABOUTME: Handles projection status query for event session custom-property projections.
-// ABOUTME: Mirrors event projection status handler for session scope.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL proofs for tenant-scoped membership removal isolation and atomicity.
-// ABOUTME: Verifies profiles and grants change only in one tenant while global identity and Homes remain intact.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.TenantUsers.Handlers.Commands;
 using Explore.Application.Features.TenantUsers.Requests.Commands;

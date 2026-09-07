@@ -1,6 +1,3 @@
-// ABOUTME: Verifies provider switching cannot remove every sign-in path for the current administrator.
-// ABOUTME: Covers missing bindings, AT Protocol primary authority, and unrelated linked providers.
-
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Services;
 using Explore.Domain;

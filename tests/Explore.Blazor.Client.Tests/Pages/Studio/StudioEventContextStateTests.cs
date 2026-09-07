@@ -1,6 +1,3 @@
-// ABOUTME: Unit coverage for the scoped Studio event-detail load coordinator.
-// ABOUTME: Proves sibling shell consumers share one in-flight event request.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Pages.Studio;
 using Explore.Blazor.Client.Services;

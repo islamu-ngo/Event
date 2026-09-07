@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for opaque time-limited unsubscribe tokens.
-// ABOUTME: Verifies valid, tampered, and expired DataProtection payload handling.
-
 using Explore.Application.Contracts.Services;
 using Explore.Domain.Constants;
 using Explore.Infrastructure.Mail.Unsubscribe;

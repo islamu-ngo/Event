@@ -1,6 +1,3 @@
-// ABOUTME: Event-local Layer 3 custom-property value stored with explicit ordering for multi-value fields.
-// ABOUTME: Values remain typed while the event-local definition provides validation and exposure semantics.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

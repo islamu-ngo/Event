@@ -1,6 +1,3 @@
-// ABOUTME: Handler for grouped Location PATCH updates with optimistic concurrency.
-// ABOUTME: Applies manual address changes atomically and clears any stale provider coordinate.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Infrastructure.Geocoding;

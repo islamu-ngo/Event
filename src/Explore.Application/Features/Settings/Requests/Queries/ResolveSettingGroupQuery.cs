@@ -1,6 +1,3 @@
-// ABOUTME: Generic query for resolving all effective settings within a category at a given scope.
-// ABOUTME: Returns EffectiveSettingDto list with CanEdit/Reason metadata for client-side rendering.
-
 namespace Explore.Application.Features.Settings.Requests.Queries;
 
 using Explore.Application.DTOs.Settings;

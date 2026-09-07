@@ -1,6 +1,3 @@
-// ABOUTME: Unit-style tests for deployment-selected authorization reconciliation at API startup.
-// ABOUTME: Verifies successful delegation, bounded retries, and non-fatal failure behavior.
-
 using Explore.API.BackgroundServices;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Services;

@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command that streams bytes into the selected provider and finalizes a reserved upload session.
-// ABOUTME: Keeps browser/API upload transport provider-neutral while preserving storage-object authorization metadata.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.StorageObject;
 using Explore.Application.Responses;

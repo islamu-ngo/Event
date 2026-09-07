@@ -1,6 +1,3 @@
-// ABOUTME: Runs one bounded incoming-webhook durable-effect drain pass under Quartz.
-// ABOUTME: Delegates claim fencing, tenant execution, and atomic effect settlement to Infrastructure.
-
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Contracts.Webhooks;
 using Quartz;

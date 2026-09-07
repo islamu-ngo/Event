@@ -1,6 +1,3 @@
-// ABOUTME: Verifies explicit Environment/Infisical/User Secrets selection and bootstrap validation.
-// ABOUTME: Rejects unspecified mode without retaining unused provider scaffolding.
-
 using Explore.Secrets.Abstractions;
 using Explore.Secrets.Configuration;
 using Explore.Secrets.Validation;

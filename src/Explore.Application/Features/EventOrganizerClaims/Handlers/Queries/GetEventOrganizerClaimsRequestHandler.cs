@@ -1,6 +1,3 @@
-// ABOUTME: Maps curator-authorized event organizer claims to normalized DTOs.
-// ABOUTME: Tenant and soft-delete isolation remain enforced by repository query filters.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventOrganizerClaim;

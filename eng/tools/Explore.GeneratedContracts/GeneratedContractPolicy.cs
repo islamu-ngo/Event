@@ -1,6 +1,3 @@
-// ABOUTME: Defines the structural eligibility policy for generated nominal record contracts.
-// ABOUTME: Protects mutable protocol bodies, HAL resources, inheritance, and file infrastructure.
-
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Explore.GeneratedContracts;

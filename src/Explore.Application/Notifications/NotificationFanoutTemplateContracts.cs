@@ -1,6 +1,3 @@
-// ABOUTME: Strict version-one JSON contracts for immutable event and session fanout occurrences.
-// ABOUTME: Rejects unknown members so queued template payloads fail closed on contract drift.
-
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Serialization;

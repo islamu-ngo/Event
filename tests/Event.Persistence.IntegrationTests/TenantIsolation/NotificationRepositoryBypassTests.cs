@@ -1,6 +1,3 @@
-// ABOUTME: Verifies NotificationRepository tenant-filter bypasses are bounded by exact notification predicates.
-// ABOUTME: Proves deduplication checks cannot leak or match rows outside the requested tenant-user-key tuple.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;

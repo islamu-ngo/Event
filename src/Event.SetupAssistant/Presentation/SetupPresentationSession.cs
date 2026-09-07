@@ -1,6 +1,3 @@
-// ABOUTME: Owns one injected messenger, monotonic generation authority, and transient workspace graph.
-// ABOUTME: Terminates every workspace fail-closed when allocation exhausts or violates ordering.
-
 namespace ISLAMU.Event.SetupAssistant.Presentation;
 
 using CommunityToolkit.Mvvm.Messaging;

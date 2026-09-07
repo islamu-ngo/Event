@@ -1,6 +1,3 @@
-// ABOUTME: HAL policies for reviewed event public-action detail and collection resources.
-// ABOUTME: Emits stored-action redirects and permission-filtered organizer mutation affordances.
-
 using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;

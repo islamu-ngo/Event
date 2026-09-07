@@ -1,6 +1,3 @@
-// ABOUTME: Specifies the breaking v1alpha2 manifest and tenant-package schema identities.
-// ABOUTME: Rejects coexistence with v1alpha1 contracts, schemas, or generator routing.
-
 namespace Event.Architecture.Tests;
 
 public sealed class ConfigurationManifestSchemaArtifactTests

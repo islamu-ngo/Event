@@ -1,6 +1,3 @@
-// ABOUTME: Failing-first API contracts for Stage-A event location privacy containment.
-// ABOUTME: Proves physical venue data is protected while public event output stays location-free and cache-safe.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;

@@ -1,6 +1,3 @@
-// ABOUTME: Persistence contract for durable sale controls, review approvals, and conservative paid exposure.
-// ABOUTME: Keeps activation decisions tenant-qualified and provider-neutral.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

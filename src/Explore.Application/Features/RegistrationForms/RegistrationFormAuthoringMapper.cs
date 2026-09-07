@@ -1,6 +1,3 @@
-// ABOUTME: Maps registration workflow and form Domain graphs into authoring response contracts.
-// ABOUTME: Supplies normalized lookup identity, code, and name metadata at the Application boundary.
-
 using Explore.Application.DTOs.RegistrationForms;
 using Explore.Domain;
 using Explore.Domain.Enums;

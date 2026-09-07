@@ -1,6 +1,3 @@
-// ABOUTME: Handles tenant branding typed settings document reads through the typed resolver.
-// ABOUTME: Provisions missing tenant branding documents on authenticated admin reads with no scalar fallback.
-
 namespace Explore.Application.Features.TenantSettingsDocuments.Handlers.Queries;
 
 using System.Text.Json;

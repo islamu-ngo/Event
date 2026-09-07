@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for the top navigation shell and profile dropdown state.
-// ABOUTME: Loads BFF/API-backed public experience and shell context for menu affordances.
-
 using System.Security.Claims;
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;

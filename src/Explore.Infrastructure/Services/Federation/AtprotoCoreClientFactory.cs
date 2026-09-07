@@ -1,6 +1,3 @@
-// ABOUTME: Restores OAuth tokens and builds hardened CarpaNet core clients for PDS XRPC operations.
-// ABOUTME: Avoids CarpaNet's implicit PDS transport and owns every authenticated client lifetime.
-
 using CarpaNet;
 using CarpaNet.Http;
 using CarpaNet.OAuth;

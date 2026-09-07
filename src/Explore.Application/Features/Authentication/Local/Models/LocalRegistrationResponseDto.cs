@@ -1,6 +1,3 @@
-// ABOUTME: Represents local Identity registration with an immediately usable authenticated session.
-// ABOUTME: Keeps registration failures machine-readable without exposing account-existence details.
-
 namespace Explore.Application.Features.Authentication.Local.Models;
 
 public sealed record LocalRegistrationResponseDto

@@ -1,6 +1,3 @@
-// ABOUTME: Scheduled event content with UTC truth, cached local projections, and mediated EventLocation placement.
-// ABOUTME: Domain methods own schedule projection and derive retained physical room keys from event-local authority.
-
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;

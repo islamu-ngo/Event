@@ -1,6 +1,3 @@
-// ABOUTME: Query for exporting the current authorization policy package as a manual fallback archive.
-// ABOUTME: Keeps controllers independent from provider-specific packaging and archive construction details.
-
 using Explore.Application.Authorization;
 using MediatR;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Contract for strongly-typed setting groups that map multiple setting keys to C# properties.
-// ABOUTME: Resolved via IHierarchicalSettingsResolver.ResolveGroupAsync<T>() for batch loading.
-
 namespace Explore.Application.Contracts.Infrastructure;
 
 /// <summary>

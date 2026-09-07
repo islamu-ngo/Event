@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the canonical outgoing webhook event catalog.
-// ABOUTME: Verifies event names, descriptors, JSON schemas, and example payload generation.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.Webhooks;

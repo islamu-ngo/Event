@@ -1,6 +1,3 @@
-// ABOUTME: API-level integration tests for /api/event temporal filtering.
-// ABOUTME: Verifies the EventList page's default query returns only upcoming/ongoing events.
-
 using System.Net;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Builders;

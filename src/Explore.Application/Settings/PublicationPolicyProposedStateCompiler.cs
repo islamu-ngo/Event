@@ -1,6 +1,3 @@
-// ABOUTME: Purely compiles current hierarchical rows and guarded mutations into effective policy states.
-// ABOUTME: Validates the complete input before applying overlays and never evaluates or persists policy safety.
-
 namespace Explore.Application.Settings;
 
 using System.Collections.Immutable;

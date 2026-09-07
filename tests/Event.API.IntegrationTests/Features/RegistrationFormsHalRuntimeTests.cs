@@ -1,6 +1,3 @@
-// ABOUTME: Exercises registration-form authoring through the real PostgreSQL-backed TestServer stack.
-// ABOUTME: Verifies fallback authorization, HAL, publication artifacts, and persisted concurrency.
-
 using System.Net;
 using System.Text;
 using System.Text.Json;

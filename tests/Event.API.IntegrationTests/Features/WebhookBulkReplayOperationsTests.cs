@@ -1,6 +1,3 @@
-// ABOUTME: API and HAL contract tests for durable webhook bulk replay operations.
-// ABOUTME: Verifies handler-authorized reads, 202 scheduling, command mapping, and queued-only cancellation.
-
 using System.Reflection;
 using System.Security.Claims;
 using Explore.API.Attributes;

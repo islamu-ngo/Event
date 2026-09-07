@@ -1,6 +1,3 @@
-// ABOUTME: Tests event-role assignment lifecycle and effective authorization predicate behavior.
-// ABOUTME: Guards against soft-delete or background-expiry assumptions leaking into event authorization.
-
 using Explore.Domain.Enums;
 
 namespace Event.Domain.UnitTests.Entities;

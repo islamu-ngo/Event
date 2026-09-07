@@ -1,6 +1,3 @@
-// ABOUTME: Signed Stripe Connect payment-webhook verifier fixtures for Phase 18 reconciliation intake.
-// ABOUTME: Proves strict raw-body verification, bounded identities, event allowlisting, and normalized retention.
-
 using System.Text;
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for session templates owned by event templates.
-// ABOUTME: Enforces stable session template keys, version uniqueness, and cascade delete from parent event template.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

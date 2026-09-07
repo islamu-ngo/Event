@@ -1,6 +1,3 @@
-// ABOUTME: Strongly-typed Routing setting group for tenant resolution configuration.
-// ABOUTME: Keys align to RoutingSettingDefinitions (non-render-policy routing keys).
-
 namespace Explore.Application.Settings.Groups;
 
 using Explore.Application.Contracts.Infrastructure;

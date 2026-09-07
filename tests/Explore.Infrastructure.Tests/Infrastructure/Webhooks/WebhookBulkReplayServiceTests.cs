@@ -1,6 +1,3 @@
-// ABOUTME: Tests bounded webhook bulk replay worker orchestration and mandatory system audit.
-// ABOUTME: Proves queued operations re-evaluate Local targets and close atomically without direct delivery.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: Reads browser-selected files into stable byte buffers for client upload flows.
-// ABOUTME: Isolates IBrowserFile stream handling from ImageStorageService orchestration.
-
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.Extensions.Logging;
 

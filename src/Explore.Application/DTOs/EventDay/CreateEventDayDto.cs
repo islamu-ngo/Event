@@ -1,6 +1,3 @@
-// ABOUTME: DTO for creating a new EventDay - the first-class event-local day aggregate.
-// ABOUTME: EventId scopes the day to a parent event; LocalDate is the event-local calendar date.
-
 namespace Explore.Application.DTOs.EventDay;
 
 public sealed record CreateEventDayDto

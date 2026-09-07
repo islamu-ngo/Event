@@ -1,6 +1,3 @@
-// ABOUTME: File-backed SQLite regression for portable external API key quota mutations.
-// ABOUTME: Proves concurrent provisioners create one period row and credit use remains bounded.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
 using Explore.Domain.Enums;

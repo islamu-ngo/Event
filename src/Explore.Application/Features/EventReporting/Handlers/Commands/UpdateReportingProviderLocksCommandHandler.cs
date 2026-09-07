@@ -1,6 +1,3 @@
-// ABOUTME: Persists instance-level moderation reporting provider lock flags for tenant delegation.
-// ABOUTME: Writes existing governance keys through the hierarchical settings resolver at instance scope.
-
 namespace Explore.Application.Features.EventReporting.Handlers.Commands;
 
 using Explore.Application.Contracts.Identity;

@@ -1,6 +1,3 @@
-// ABOUTME: Query-boundary tests for display-safe Control Plane tenant setting values.
-// ABOUTME: Verifies storage JSON is normalized once before API and UI clients receive it.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

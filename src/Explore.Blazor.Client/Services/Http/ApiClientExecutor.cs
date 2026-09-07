@@ -1,6 +1,3 @@
-// ABOUTME: Low-level client HTTP executor that centralizes status checks and JSON deserialization.
-// ABOUTME: Wraps HttpResponseExtensions so feature services can consume explicit ApiResult values.
-
 using Explore.Blazor.Client.Exceptions;
 using Explore.Blazor.Client.Extensions;
 

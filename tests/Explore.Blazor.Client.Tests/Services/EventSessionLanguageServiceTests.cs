@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for EventSessionLanguageService diff-based synchronization.
-// ABOUTME: Verifies composer language selections are translated into generated API calls.
-
 namespace Explore.Blazor.Client.Tests.Services;
 
 public class EventSessionLanguageServiceTests

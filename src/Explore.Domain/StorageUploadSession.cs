@@ -1,6 +1,3 @@
-// ABOUTME: Tenant/user-scoped upload reservation created before accepting file bytes.
-// ABOUTME: Tracks policy, quota reservation, provider key, expiry, finalization, and failure state.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

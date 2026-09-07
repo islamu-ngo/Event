@@ -1,6 +1,3 @@
-// ABOUTME: Declares tenant-authorized deterministic configuration package export.
-// ABOUTME: Selects target authority from the route and returns no instance or other-tenant values.
-
 namespace Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 
 using Explore.Application.Authorization;

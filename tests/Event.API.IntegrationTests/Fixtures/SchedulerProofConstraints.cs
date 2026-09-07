@@ -1,6 +1,3 @@
-// ABOUTME: Shared wiring for tests that start a real Quartz scheduler inside the test process.
-// ABOUTME: Works around Quartz process-wide statics that make several in-process schedulers interfere.
-
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;

@@ -1,6 +1,3 @@
-// ABOUTME: Describes the short-lived privacy-erasure receipt header in native and Swashbuckle OpenAPI documents.
-// ABOUTME: Applies the receipt-only security requirement only to endpoints explicitly selecting its authentication scheme.
-
 using Explore.Application.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.OpenApi;

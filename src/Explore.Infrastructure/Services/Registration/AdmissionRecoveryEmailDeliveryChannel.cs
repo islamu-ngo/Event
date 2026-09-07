@@ -1,6 +1,3 @@
-// ABOUTME: Hands recovery capabilities to the verified side-channel email transport.
-// ABOUTME: Uses the durable delivery-intent ID as the provider idempotency lineage.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Models;

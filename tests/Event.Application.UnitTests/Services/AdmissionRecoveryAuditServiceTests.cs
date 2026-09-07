@@ -1,6 +1,3 @@
-// ABOUTME: Verifies admission recovery audit persistence contains only PII-free lifecycle facts.
-// ABOUTME: Excludes identity, recipient, capability, digest, and admission credential material.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Services.Registration;

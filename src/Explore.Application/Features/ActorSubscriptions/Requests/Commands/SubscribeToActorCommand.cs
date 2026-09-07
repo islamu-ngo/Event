@@ -1,6 +1,3 @@
-// ABOUTME: CQRS command for subscribing the current tenant user to an actor.
-// ABOUTME: Idempotently reactivates an existing durable subscription row.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.ActorSubscription;
 using Explore.Application.Responses;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines one validated, provider-neutral refund allocation fact consumed by admission.
-// ABOUTME: Carries only assignment lineage, admission relevance, and accepted/refunded minor units.
-
 namespace Explore.Domain;
 
 public sealed record AdmissionRefundLineAllocation

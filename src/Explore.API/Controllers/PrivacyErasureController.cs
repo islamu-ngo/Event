@@ -1,6 +1,3 @@
-// ABOUTME: Exposes bounded receipt-authorized privacy-erasure status after login removal.
-// ABOUTME: Prevents caching and returns no subject, provider target, or free-text failure data.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Authentication;

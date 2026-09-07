@@ -1,6 +1,3 @@
-// ABOUTME: API contract tests for event-session agenda-item update routes.
-// ABOUTME: Verifies canonical PATCH identity and grouped DTO forwarding without a legacy PUT contract.
-
 using System.Reflection;
 using Explore.API.Attributes;
 using Explore.API.Controllers;

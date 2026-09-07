@@ -1,6 +1,3 @@
-// ABOUTME: First-class command for transferring direct EventOwner authority to another user.
-// ABOUTME: Creates the new owner assignment and revokes the previous owner in one transaction.
-
 using Explore.Application.Responses;
 using MediatR;
 

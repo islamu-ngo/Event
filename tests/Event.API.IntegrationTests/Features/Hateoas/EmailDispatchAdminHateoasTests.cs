@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS contract tests for EmailDispatch operator status affordances.
-// ABOUTME: Protects replay and park links from drifting away from durable dispatch state rules.
-
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;

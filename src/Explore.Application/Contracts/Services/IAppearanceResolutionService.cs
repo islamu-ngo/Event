@@ -1,6 +1,3 @@
-// ABOUTME: Service contract for resolving the effective appearance for the current user context.
-// ABOUTME: Owns the full fallback chain: user tenant profile → user global profile → tenant default → instance default → system fallback.
-
 namespace Explore.Application.Contracts.Services;
 
 using Explore.Application.DTOs.Appearance;

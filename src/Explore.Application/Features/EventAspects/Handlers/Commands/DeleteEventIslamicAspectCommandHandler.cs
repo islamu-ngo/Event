@@ -1,6 +1,3 @@
-// ABOUTME: Command handler to delete the Islamic aspect from an event.
-// ABOUTME: Permanently removes the aspect data (hard delete).
-
 namespace Explore.Application.Features.EventAspects.Handlers.Commands;
 
 using System.Threading;

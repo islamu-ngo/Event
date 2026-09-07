@@ -1,6 +1,3 @@
-// ABOUTME: Performs defensive publication checks over a complete registration-form version graph.
-// ABOUTME: Rejects incomplete choice fields, broken condition references, and missing consent metadata.
-
 using Explore.Application.DTOs.RegistrationForms;
 using Explore.Application.Configuration;
 using Explore.Domain;

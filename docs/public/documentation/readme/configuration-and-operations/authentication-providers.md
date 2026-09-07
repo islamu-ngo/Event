@@ -1,8 +1,6 @@
 ---
 description: Configure Local Identity, Keycloak, or passwordless AT Protocol authentication.
 ---
-<!-- ABOUTME: Public operator guide for selecting and switching authentication providers. -->
-<!-- ABOUTME: Covers passwordless AT Protocol onboarding, provider states, and lockout-safe recovery. -->
 
 # Authentication Providers
 

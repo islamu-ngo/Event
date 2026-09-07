@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for shared storage presentation URL resolution.
-// ABOUTME: Verifies projection helpers use API-owned or external URLs without signing raw object keys.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Services;
 using Microsoft.Extensions.Logging.Abstractions;

@@ -1,4 +1,3 @@
-// ABOUTME: Repository implementation for SystemSetting entity providing data access
 // for system-wide configuration settings with caching support.
 
 namespace Explore.Persistence.Repositories;

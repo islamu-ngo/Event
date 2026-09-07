@@ -1,6 +1,3 @@
-// ABOUTME: EF repository for conditional report-decision enforcement and completion claims.
-// ABOUTME: Uses one-statement leases so concurrent executors cannot repeat decision side effects.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

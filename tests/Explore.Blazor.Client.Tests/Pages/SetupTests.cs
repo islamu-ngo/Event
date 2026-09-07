@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for Setup page setup-secret restoration and validation behavior.
-// ABOUTME: Verifies status display, secret input, provider quick actions, and BFF JS interop integration.
-
 using Explore.Blazor.Client.Models.Responses;
 using Explore.Blazor.Client.Pages;
 

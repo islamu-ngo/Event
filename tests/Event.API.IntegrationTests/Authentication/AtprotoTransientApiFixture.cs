@@ -1,6 +1,3 @@
-// ABOUTME: Hosts the real API authentication pipeline and P1 stores on migrated PostgreSQL.
-// ABOUTME: Supplies ephemeral signing authority through the external secret resolver and restores production auth dispatch.
-
 extern alias bff;
 
 using System.Security.Cryptography;

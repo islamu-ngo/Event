@@ -1,6 +1,3 @@
-// ABOUTME: Runs one bounded queued webhook bulk-replay pass under Quartz.
-// ABOUTME: Leaves reservation limits, atomic scheduling, tenant isolation, and audit in Infrastructure.
-
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Contracts.Webhooks;
 using Quartz;

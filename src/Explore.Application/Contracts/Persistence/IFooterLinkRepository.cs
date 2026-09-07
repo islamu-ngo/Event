@@ -1,6 +1,3 @@
-// ABOUTME: Repository interface for TenantFooterLink with domain-specific query operations.
-// ABOUTME: Links are isolated through their parent group; no direct TenantId filtering needed.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

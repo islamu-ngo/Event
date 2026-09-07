@@ -1,6 +1,3 @@
-// ABOUTME: Global concrete owner for an Actor whose represented subject is not yet classified.
-// ABOUTME: Preserves one stable subject identity across tenant observations until verified promotion.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

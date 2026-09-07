@@ -1,5 +1,3 @@
-// ABOUTME: Handler for adding a language to an event session with validation.
-// ABOUTME: Validates input, creates the session-language junction entity.
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;

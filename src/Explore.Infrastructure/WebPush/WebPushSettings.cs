@@ -1,6 +1,3 @@
-// ABOUTME: Runtime settings for browser Web Push VAPID delivery and durable dispatch processing.
-// ABOUTME: Keeps server-only private key material separate from the browser-safe public key surface.
-
 namespace Explore.Infrastructure.WebPush;
 
 public sealed record WebPushSettings

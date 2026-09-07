@@ -1,6 +1,3 @@
-// ABOUTME: Maps durable managed-apply review windows with optimistic concurrency and target-qualified indexes.
-// ABOUTME: Persists digests and actor evidence only; configuration values and bearer capabilities remain absent.
-
 namespace Explore.Persistence.Configurations.Entities;
 
 using Explore.Domain;

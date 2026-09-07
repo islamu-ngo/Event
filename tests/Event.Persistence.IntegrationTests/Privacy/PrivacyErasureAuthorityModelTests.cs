@@ -1,6 +1,3 @@
-// ABOUTME: Verifies generalized privacy-erasure EF models, retained composition, and function-only ACL contracts.
-// ABOUTME: Pins User-only fact retention, replay coverage keys, receipt hashing, and topology isolation.
-
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Domain;
 using Explore.Infrastructure;

@@ -1,6 +1,3 @@
-// ABOUTME: Shared lifecycle and HAL-authorized action behavior for Studio event pages.
-// ABOUTME: Loads the active actor safely, rejects stale results, and unsubscribes on disposal.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Contracts.Services.Shell;

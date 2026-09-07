@@ -1,6 +1,3 @@
-// ABOUTME: Verifies invalid Unicode search intent is rejected before invoking any persistence or provider dependency.
-// ABOUTME: Protects the Application validation response and prevents rejected text from reaching external geocoders.
-
 using Explore.Application.DTOs.Geocoding;
 using Explore.Application.Features.Geocoding.Handlers.Queries;
 using Explore.Application.Features.Geocoding.Requests.Queries;

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for EventSessionService covering sessions, session groups, and lifecycle operations.
-// ABOUTME: Verifies session client delegation, management merge behavior, and error handling with TUnit and NSubstitute.
-
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;

@@ -1,6 +1,3 @@
-// ABOUTME: Caches tenant slug and domain mappings for tenant resolvers using application-layer lookup data.
-// ABOUTME: Loads data lazily through a scoped lookup source so Infrastructure stays decoupled from Persistence.
-
 using System.Collections.Concurrent;
 using Explore.Application.Contracts.Services;
 using Microsoft.Extensions.DependencyInjection;

@@ -1,6 +1,3 @@
-// ABOUTME: Serializes and emits the sole bounded machine envelope through generated JSON metadata.
-// ABOUTME: Provides deterministic pre-dispatch fallback objects without banners, stderr, or reflection serialization.
-
 using System.Text;
 using System.Text.Json;
 

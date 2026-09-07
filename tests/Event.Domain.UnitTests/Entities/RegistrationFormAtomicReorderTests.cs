@@ -1,6 +1,3 @@
-// ABOUTME: Pins current ordinal uniqueness and specifies atomic registration-form reordering.
-// ABOUTME: Proves adjacent swaps require one aggregate operation over the complete active membership.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

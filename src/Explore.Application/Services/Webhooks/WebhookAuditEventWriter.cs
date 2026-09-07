@@ -1,6 +1,3 @@
-// ABOUTME: Resolves user, machine, or explicit system principals and appends safe webhook audit evidence.
-// ABOUTME: Fails closed when no authenticated principal can own a mandatory administrative audit event.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

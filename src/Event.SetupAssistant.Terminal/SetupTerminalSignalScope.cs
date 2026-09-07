@@ -1,6 +1,3 @@
-// ABOUTME: Clears target-owned secret state before process cancellation or supported POSIX termination signals.
-// ABOUTME: Requests orderly Terminal.Gui shutdown without logging signal or secret-derived state.
-
 namespace ISLAMU.Event.SetupAssistant.Terminal;
 
 using System.Runtime.InteropServices;

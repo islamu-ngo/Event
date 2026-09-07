@@ -1,6 +1,3 @@
-// ABOUTME: Enforces endpoint route-name coverage against the Explore.API.Hateoas.RouteNames registry.
-// ABOUTME: Keeps controller route names catalog-backed and verifies constants resolve to registered endpoints.
-
 using System.Reflection;
 
 using Event.Api.IntegrationTests.Fixtures;

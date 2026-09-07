@@ -1,6 +1,3 @@
-// ABOUTME: Negative-assertion audit that no outbound producer serializes raw physical venue PII.
-// ABOUTME: Covers email, notification, webhook, calendar, ticketing, MCP/AI, federation, and export surfaces.
-
 using System.Text.Json;
 using Explore.Application.Contracts.LocationPrivacy;
 using Explore.Application.Contracts.Services;

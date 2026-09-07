@@ -1,6 +1,3 @@
-// ABOUTME: Verifies generated application/data-protection migrations and the retained authority chain.
-// ABOUTME: Pins runtime lookup/schema application, receipt-linkage primitives, rollback safety, and authority ACLs.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Persistence;

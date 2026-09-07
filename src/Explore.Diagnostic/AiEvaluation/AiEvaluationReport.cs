@@ -1,6 +1,3 @@
-// ABOUTME: Aggregates advisory AI evaluation scenario outcomes for trend reports.
-// ABOUTME: Marks the report non-gating so normal CI remains free of live provider calls.
-
 namespace Explore.Diagnostic.AiEvaluation;
 
 public sealed record AiEvaluationReport(

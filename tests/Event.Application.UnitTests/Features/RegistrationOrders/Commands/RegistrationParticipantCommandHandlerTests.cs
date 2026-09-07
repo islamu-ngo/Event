@@ -1,6 +1,3 @@
-// ABOUTME: Exercises group-booking participant commands through concrete handlers and lifecycle finalization.
-// ABOUTME: Covers family assignments, bulk company payloads, and confirmed-order assignment amendments.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Persistence;

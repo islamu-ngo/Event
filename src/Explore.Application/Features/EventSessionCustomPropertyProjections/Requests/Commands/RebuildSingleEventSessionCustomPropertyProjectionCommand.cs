@@ -1,6 +1,3 @@
-// ABOUTME: Command to rebuild projection rows for a single event session.
-// ABOUTME: Used by operators to repair individual session projection state.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

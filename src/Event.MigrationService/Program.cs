@@ -1,6 +1,3 @@
-// ABOUTME: Migration service composition root for database bootstrap, DbContexts, and hosted migration work.
-// ABOUTME: Configures runtime EF Core behavior separately from design-time migration generation.
-
 using Event.MigrationService.Extensions;
 using Explore.Application.Configuration;
 using Explore.Application.Features.ConfigurationManifest.Application;

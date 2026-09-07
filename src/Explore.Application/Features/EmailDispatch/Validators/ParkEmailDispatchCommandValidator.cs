@@ -1,6 +1,3 @@
-// ABOUTME: Validator for operator EmailDispatch park commands.
-// ABOUTME: Requires tenant and outbox identifiers plus a bounded audit reason before state mutation.
-
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using FluentValidation;
 

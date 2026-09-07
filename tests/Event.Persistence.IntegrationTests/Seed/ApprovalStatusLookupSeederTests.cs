@@ -1,6 +1,3 @@
-// ABOUTME: Verifies runtime-seeder parity for the complete registration approval lifecycle vocabulary.
-// ABOUTME: Locks stable IDs and codes while proving missing terminal rows are repaired idempotently.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Centralized upsert logic for SystemSetting records with audit trail.
-// ABOUTME: Replaces copy-pasted UpsertSystemSettingAsync methods across 3+ services.
-
 namespace Explore.Application.Settings;
 
 using Explore.Application.Contracts.Infrastructure;

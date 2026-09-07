@@ -1,6 +1,3 @@
-// ABOUTME: Defines provider-neutral versioned promotion definitions for event ticket catalogs.
-// ABOUTME: Owns draft-publish-revise-revoke lifecycle, eligibility, windows, and redemption limits.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

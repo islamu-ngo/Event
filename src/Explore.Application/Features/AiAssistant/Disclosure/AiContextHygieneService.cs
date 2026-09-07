@@ -1,6 +1,3 @@
-// ABOUTME: Implements AI transcript hygiene by redacting PII from persisted conversation state.
-// ABOUTME: Uses AiContextRedactor for field-level + embedded-PII scrubbing on references and messages.
-
 using System;
 using System.Collections.Generic;
 using System.Linq;

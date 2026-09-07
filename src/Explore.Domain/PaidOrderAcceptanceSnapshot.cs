@@ -1,6 +1,3 @@
-// ABOUTME: Immutable tenant-bound evidence of the exact commercial and operator facts a buyer accepted before payment.
-// ABOUTME: Owns normalized acceptance-line rows and never fabricates evidence for historical payment attempts.
-
 using Explore.Domain.Interfaces;
 using Explore.Domain.ValueObjects;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Hosted producer loop for optional RabbitMQ EmailDispatch pointer publishing.
-// ABOUTME: Runs only when RabbitMQ Dispatch Mode is enabled and keeps each pass scoped for EF services.
-
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;

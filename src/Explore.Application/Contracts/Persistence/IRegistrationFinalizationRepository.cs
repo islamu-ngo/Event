@@ -1,6 +1,3 @@
-// ABOUTME: Persistence contract for requirement evidence and fenced registration-finalization effects.
-// ABOUTME: Keeps tenant-scoped deduplication and worker claims behind the Application boundary.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

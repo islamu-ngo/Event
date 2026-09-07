@@ -1,6 +1,3 @@
-// ABOUTME: Append-only, owner-scoped administrative audit evidence for webhook operations.
-// ABOUTME: Stores normalized scope classifications and rejects unsafe secret, payload, URL, and provider errors.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics;
 using System.Text.Json;

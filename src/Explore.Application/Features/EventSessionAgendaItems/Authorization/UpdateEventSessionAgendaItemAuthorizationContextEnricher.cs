@@ -1,6 +1,3 @@
-// ABOUTME: Resolves persisted agenda-item authorization context for event-session agenda updates.
-// ABOUTME: Keeps authorization lookup read-only so command mutation stays inside the handler.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Infrastructure;

@@ -1,6 +1,3 @@
-// ABOUTME: Exercises structural, semantic, sensitivity, paid-policy, and cross-policy manifest validation.
-// ABOUTME: Proves sovereign fields fail closed with stable safe codes and no supplied-value reflection.
-
 namespace Event.Application.UnitTests.Features.ConfigurationManifest;
 
 using System.Text.Json;

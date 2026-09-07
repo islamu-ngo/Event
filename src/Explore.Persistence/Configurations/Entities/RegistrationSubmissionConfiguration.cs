@@ -1,6 +1,3 @@
-// ABOUTME: Maps immutable registration evidence with independent native and provider business uniqueness.
-// ABOUTME: Enforces provider tuple shape, attempt lineage, dedicated claim persistence, and finalization state.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Microsoft.EntityFrameworkCore;

@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for ModuleDefinition entity.
-// ABOUTME: Includes seed data for Core, Islamic, and Tech modules.
-
 using Explore.Domain.Modules;
 using Explore.Persistence.Seed;
 using Microsoft.EntityFrameworkCore;

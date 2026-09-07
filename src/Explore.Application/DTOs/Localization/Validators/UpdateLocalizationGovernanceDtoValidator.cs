@@ -1,6 +1,3 @@
-// ABOUTME: Validates UpdateLocalizationGovernanceDto — provider rules, culture membership, kill-switch consistency.
-// ABOUTME: Manually instantiated by the handler (repo convention: no DI for validators).
-
 namespace Explore.Application.DTOs.Localization.Validators;
 
 using Explore.Domain.Common.Localization;

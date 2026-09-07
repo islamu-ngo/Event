@@ -1,6 +1,3 @@
-// ABOUTME: Enum mirror for stable payment-attempt status lookup identities.
-// ABOUTME: Keeps provider evidence reconciliation states explicit and provider-neutral.
-
 namespace Explore.Domain.Enums;
 
 public enum PaymentAttemptStatusEnum

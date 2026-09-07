@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL persistence tests for webhook canonical tables and repository behavior.
-// ABOUTME: Verifies tenant isolation, endpoint subscription filtering, idempotency, and payload cleanup.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

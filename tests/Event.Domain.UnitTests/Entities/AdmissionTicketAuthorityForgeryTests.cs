@@ -1,6 +1,3 @@
-// ABOUTME: Reproduces detached authority-row forgery and cross-tenant graph mutation attacks.
-// ABOUTME: Specifies aggregate membership, write-once tenant identity, and post-confirmation graph freezing.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

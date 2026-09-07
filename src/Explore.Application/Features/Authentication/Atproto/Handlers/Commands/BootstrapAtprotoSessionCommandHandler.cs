@@ -1,6 +1,3 @@
-// ABOUTME: Verifies a PDS session, enforces provider admission, and atomically stores local ATProto identity.
-// ABOUTME: Issues a platform JWT after commit and persists refresh state once the target tenant exists.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

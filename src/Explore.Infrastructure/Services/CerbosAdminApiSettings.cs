@@ -1,6 +1,3 @@
-// ABOUTME: Configuration settings for Cerbos Admin API access (policy push, instance reload).
-// ABOUTME: Bound from "Cerbos:AdminApi" configuration section in appsettings.json.
-
 namespace Explore.Infrastructure.Services;
 
 /// <summary>

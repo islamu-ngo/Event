@@ -1,6 +1,3 @@
-// ABOUTME: Verifies transient-store and cleanup telemetry through real API and persistence operations.
-// ABOUTME: Rejects locator, assertion, payload and caller-controlled values in native metric dimensions.
-
 using System.Collections.Concurrent;
 using System.Diagnostics.Metrics;
 using System.Net;

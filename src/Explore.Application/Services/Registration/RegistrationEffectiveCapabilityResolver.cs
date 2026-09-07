@@ -1,6 +1,3 @@
-// ABOUTME: Resolves effective registration-provider capabilities by intersecting proof, config, governance, mapping, drift, and authorization.
-// ABOUTME: Fails automatic finalization closed for unknown tuples while preserving explicit redirect/manual availability.
-
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Domain;
 

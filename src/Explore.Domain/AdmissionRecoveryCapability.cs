@@ -1,6 +1,3 @@
-// ABOUTME: Owns one tenant- and ticket-bound admission recovery capability lifecycle.
-// ABOUTME: Stores keyed digest metadata only and enforces expiry, single use, and monotonic rotation.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

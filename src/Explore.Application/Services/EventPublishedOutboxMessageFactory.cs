@@ -1,6 +1,3 @@
-// ABOUTME: Shared factory for event publish notification fanout outbox messages.
-// ABOUTME: Generates internal fanout payloads so publish handlers avoid duplicate serialization logic.
-
 using System;
 using System.Text.Json;
 using Explore.Application.Models.InternalEvents;

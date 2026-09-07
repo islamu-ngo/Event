@@ -1,6 +1,3 @@
-// ABOUTME: User-scoped settings for personal AI assistant shell preferences.
-// ABOUTME: Kept separate from tenant AI integration settings to avoid exposing sensitive provider settings in user preferences.
-
 namespace Explore.Domain.Settings.Definitions;
 
 public static class AiAssistantPreferenceSettingDefinitions

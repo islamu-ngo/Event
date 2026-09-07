@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for protected Location API routing and authorization behavior.
-// ABOUTME: Verifies authenticated reads plus protected PATCH route and If-Match contracts.
-
 using System.Net;
 using System.Net.Http.Json;
 using Event.Api.IntegrationTests.Fixtures;

@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped BEM styles for the moderation report detail panel. */
-/* ABOUTME: Uses compact operational sections without nested card containers. */
-
 .moderation-report-detail-panel {
     background: var(--mud-palette-surface);
     border: 1px solid var(--mud-palette-lines-default);

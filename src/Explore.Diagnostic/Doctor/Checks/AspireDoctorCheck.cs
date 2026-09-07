@@ -1,6 +1,3 @@
-// ABOUTME: Verifies Aspire CLI availability without starting an AppHost.
-// ABOUTME: Keeps Aspire diagnosis read-only by checking version output only.
-
 using Explore.Diagnostic.Doctor.Infrastructure;
 
 namespace Explore.Diagnostic.Doctor.Checks;

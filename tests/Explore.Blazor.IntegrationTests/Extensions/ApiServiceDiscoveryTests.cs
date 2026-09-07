@@ -1,6 +1,3 @@
-// ABOUTME: Regression tests for Aspire service-discovery URL resolution in the Blazor BFF.
-// ABOUTME: Ensures BFF HTTP clients prefer AppHost references over standalone localhost defaults.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Extensions;
 using Explore.Blazor.Services;

@@ -1,6 +1,3 @@
-// ABOUTME: Blazor JS interop wrapper for provider-agnostic analytics bridge functions.
-// ABOUTME: Initializes provider adapter from public settings payload and safely no-ops on JS failures.
-
 using Explore.Blazor.Client.Contracts.Interop;
 using Explore.Blazor.Client.Models.Analytics;
 using Microsoft.JSInterop;

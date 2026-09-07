@@ -1,6 +1,3 @@
-// ABOUTME: Executes the real event-setup entry point with bounded event-driven process completion.
-// ABOUTME: Proves pre-dispatch and adapter failures retain one machine object and silent stderr.
-
 using System.Diagnostics;
 
 namespace ISLAMU.SetupAssistant.Cli.Tests;

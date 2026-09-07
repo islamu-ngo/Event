@@ -1,6 +1,3 @@
-// ABOUTME: Strongly-typed AT Protocol Decentralized Identifier (DID) value object.
-// ABOUTME: Enforces strict syntax, length, and method validation while preserving scalar wire/storage equality.
-
 using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
 

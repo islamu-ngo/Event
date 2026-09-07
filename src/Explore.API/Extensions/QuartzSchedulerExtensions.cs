@@ -1,6 +1,3 @@
-// ABOUTME: Registers Quartz.NET as the API host scheduler, persistence, and operator status surface.
-// ABOUTME: Confines every Quartz dependency to the API layer so Application contracts stay scheduler-neutral.
-
 using System.Globalization;
 using Explore.API.Configuration;
 using Explore.API.Scheduling;

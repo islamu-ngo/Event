@@ -1,6 +1,3 @@
-// ABOUTME: Executes bounded local address search using trusted tenant and user context.
-// ABOUTME: Maps the persistence projection to a private provider-neutral Application contract.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Infrastructure.Geocoding;

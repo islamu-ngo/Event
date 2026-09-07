@@ -1,6 +1,3 @@
-// ABOUTME: Defines the purpose-separated transient machine transport and its exact private route set.
-// ABOUTME: Route aliases are guarded but only canonical POST paths can authenticate.
-
 namespace Explore.API.Authentication;
 
 public static class AtprotoTransientAuthenticationDefaults

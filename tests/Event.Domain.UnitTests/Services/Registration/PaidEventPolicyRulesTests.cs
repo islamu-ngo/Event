@@ -1,6 +1,3 @@
-// ABOUTME: Proves paid-event policy versions narrow instance ceilings without provider dependencies.
-// ABOUTME: Covers currency ordering, organizer eligibility, explicit confirmation, and risk ceiling rules.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;
 

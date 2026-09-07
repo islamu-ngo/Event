@@ -1,6 +1,3 @@
-// ABOUTME: Defines fixed-minor and basis-point promotion discount formulas.
-// ABOUTME: Caps discounts in minor units using checked integer arithmetic and monetary currency metadata.
-
 using Explore.Domain.ValueObjects;
 
 namespace Explore.Domain;

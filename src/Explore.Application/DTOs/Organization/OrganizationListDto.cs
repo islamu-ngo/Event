@@ -1,6 +1,3 @@
-// ABOUTME: Organization list read DTO for admin/list views including concurrency metadata.
-// ABOUTME: List-driven editors use ConcurrencyStamp when issuing route-authoritative PATCH updates.
-
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;

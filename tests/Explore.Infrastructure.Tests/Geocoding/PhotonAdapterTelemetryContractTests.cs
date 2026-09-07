@@ -1,6 +1,3 @@
-// ABOUTME: RED observability contract proving Photon telemetry is bounded and location-PII-free.
-// ABOUTME: Scans logs, metrics, and activities without pinning human-readable message prose.
-
 using System.Globalization;
 using System.Net;
 

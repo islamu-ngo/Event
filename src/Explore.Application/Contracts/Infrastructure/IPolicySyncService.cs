@@ -1,6 +1,3 @@
-// ABOUTME: Legacy contract for triggering authorization policy package publishing after role mutations.
-// ABOUTME: Keeps role handlers provider-neutral while Infrastructure owns the concrete publisher.
-
 using Explore.Application.Authorization;
 
 namespace Explore.Application.Contracts.Infrastructure;

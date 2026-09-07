@@ -1,6 +1,3 @@
-// ABOUTME: Specifies immutable buyer-acceptance evidence required before any new paid Checkout handoff.
-// ABOUTME: Covers typed lines, exact schedule/operator/provider facts, tenant binding, and historical truth.
-
 using Explore.Domain;
 using TUnit.Assertions;
 using TUnit.Core;

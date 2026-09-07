@@ -1,6 +1,3 @@
-// ABOUTME: API request body for signed Coop moderation decision callbacks.
-// ABOUTME: Carries item/action/policy metadata plus explicit local report identifiers.
-
 using System.Text.Json.Serialization;
 
 namespace Explore.Application.DTOs.EventReporting;

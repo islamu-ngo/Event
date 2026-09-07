@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral structured database settings for one role.
-// ABOUTME: Created separately for runtime and migrator composition without raw connection strings.
-
 namespace Explore.Secrets.Database;
 
 public sealed record PrimaryDatabaseConnectionOptions

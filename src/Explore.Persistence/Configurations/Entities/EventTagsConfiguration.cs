@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for event-to-tag assignments with tenant-scoped relational integrity.
-// ABOUTME: Composite FKs prevent assigning an event to a tag owned by another tenant.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

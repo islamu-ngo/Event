@@ -1,6 +1,3 @@
-// ABOUTME: Protects first-party ATProto sessions behind tenant- and browser-bound one-time relational handoffs.
-// ABOUTME: Validates decrypted metadata and proof before requesting candidate-bound consumption from the private API.
-
 using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection;

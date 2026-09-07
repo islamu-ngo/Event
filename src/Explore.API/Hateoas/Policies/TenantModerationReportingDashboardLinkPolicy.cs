@@ -1,6 +1,3 @@
-// ABOUTME: HAL policy for tenant moderation-reporting dashboard links.
-// ABOUTME: Links dashboards to routing-state actions while keeping all affordances server-authorized.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Security.Claims;

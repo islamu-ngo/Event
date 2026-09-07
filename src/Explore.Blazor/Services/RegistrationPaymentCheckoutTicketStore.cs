@@ -1,6 +1,3 @@
-// ABOUTME: Protects stateless checkout destinations bound to the request audience and browser session.
-// ABOUTME: Enforces a bounded cookie payload and five-minute expiry without per-ticket storage.
-
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;

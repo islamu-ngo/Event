@@ -1,6 +1,3 @@
-// ABOUTME: V1 scope catalog for external API keys following the {resource}:{action} convention.
-// ABOUTME: Defines the complete set of grantable scopes and helper methods for validation.
-
 namespace Explore.Domain.Constants;
 
 /// <summary>

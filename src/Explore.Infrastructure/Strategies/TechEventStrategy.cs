@@ -1,4 +1,3 @@
-// ABOUTME: Strategy for tech events providing validation and business logic
 // for GitHub repositories, skill levels, and hackathon features.
 
 using Explore.Application.Contracts.Strategies;

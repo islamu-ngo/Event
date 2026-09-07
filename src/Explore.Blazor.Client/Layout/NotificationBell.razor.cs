@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for NotificationBell, managing unread count refresh and notification routing.
-// ABOUTME: Uses SSE hints when available while retaining 60s polling as a fallback.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Notifications;
 using Explore.Blazor.Client.Helpers;

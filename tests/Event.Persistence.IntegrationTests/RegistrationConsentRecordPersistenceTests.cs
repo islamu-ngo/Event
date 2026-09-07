@@ -1,6 +1,3 @@
-// ABOUTME: Proves PostgreSQL rejects orphan or cross-tenant consent subjects and rolls back native evidence graphs.
-// ABOUTME: Builds an isolated current-model schema so constraints are tested without altering migration artifacts.
-
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Domain;

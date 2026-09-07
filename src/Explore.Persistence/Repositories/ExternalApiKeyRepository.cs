@@ -1,6 +1,3 @@
-// ABOUTME: Persistence repository for external API keys with tenant-scoped and platform-scoped query paths.
-// ABOUTME: Uses explicit tenant-filter bypasses for authentication and InstanceAdmin platform key management.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

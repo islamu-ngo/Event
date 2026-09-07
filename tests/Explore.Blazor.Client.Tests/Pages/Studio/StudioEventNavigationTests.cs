@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for HAL-driven event-level Studio navigation.
-// ABOUTME: Verifies relation mapping, actor-navigation replacement, and the actor-level back link.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.Shell.Workspaces;

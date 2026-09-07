@@ -1,6 +1,3 @@
-// ABOUTME: Contract for transactional session-template-to-event-session instantiation and provenance matching.
-// ABOUTME: Creates in-memory runtime definitions/options from a session template; handler persists via IUnitOfWork.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Services;

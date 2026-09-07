@@ -1,6 +1,3 @@
-// ABOUTME: Defines RED PostgreSQL races for stable ticket-purchase authority and durable business replay.
-// ABOUTME: Covers literal ceiling precedence, context switching, name-only honesty, rollback, and tenant isolation.
-
 using System.Security.Cryptography;
 using System.Text;
 using Event.Persistence.IntegrationTests.Fixtures;

@@ -1,6 +1,3 @@
-// ABOUTME: Retains only signed Stripe refund evidence required to advance one pinned refund attempt.
-// ABOUTME: Excludes descriptions, reasons, card, customer, billing, and other provider payload fields.
-
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Explore.Application.Contracts.Payments;

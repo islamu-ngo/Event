@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for assigning event sessions to one or more event session groups.
-// ABOUTME: Supports ordered group membership reads without leaking EF concerns upward.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL-backed tests for shared generic repository behavior.
-// ABOUTME: Verifies existence checks do not materialize tracked entities.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: Runs one bounded, tenant-fair pass over durable fair-return orchestration effects.
-// ABOUTME: Reclaims expired leases and delegates scheduler-neutral effect handling to Application.
-
 using Explore.Application.Contracts.Waitlist;
 using Explore.Application.Telemetry;
 using Microsoft.Extensions.Options;

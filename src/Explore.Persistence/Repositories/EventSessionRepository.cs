@@ -1,6 +1,3 @@
-// ABOUTME: EventSession repository with friendly same-room overlap checks backed by a PostgreSQL exclusion constraint.
-// ABOUTME: Validators use read checks, command writes re-check, and DB exclusion violations map to domain-facing conflicts.
-
 using System.Data;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;

@@ -1,6 +1,3 @@
-// ABOUTME: Creates organizer claims only for actors controlled by the authenticated user.
-// ABOUTME: Serializable replay detection returns the existing claim for retry-idempotent submissions.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventOrganizerClaim.Validators;

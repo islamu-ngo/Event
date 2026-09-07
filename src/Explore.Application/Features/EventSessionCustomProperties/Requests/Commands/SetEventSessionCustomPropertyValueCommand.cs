@@ -1,6 +1,3 @@
-// ABOUTME: Command request for setting a single session custom property value (upsert by definition+session+ordinal).
-// ABOUTME: Single-value definitions use Ordinal=0; multi-value definitions use ascending ordinals.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventSessionCustomProperty;
 using Explore.Application.Responses;

@@ -1,7 +1,3 @@
-// ABOUTME: Appearance setting definitions for theme selection behavior resolved through the hierarchical settings engine.
-// ABOUTME: Stores only references and mode flags; theme catalog rows live in first-class UiThemePreset entities.
-// ABOUTME: User scope uses active_profile_id; tenant/instance scope uses default_preset_id — semantically distinct.
-
 namespace Explore.Domain.Settings.Definitions;
 
 public static class AppearanceSettingDefinitions

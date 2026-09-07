@@ -1,6 +1,3 @@
-// ABOUTME: DTO contracts for instance and tenant paid-event policy revisions.
-// ABOUTME: Exposes provider-neutral policy ceilings without leaking persistence row entities.
-
 using System.Text.Json.Serialization;
 
 namespace Explore.Application.DTOs.PaidEventPolicies;

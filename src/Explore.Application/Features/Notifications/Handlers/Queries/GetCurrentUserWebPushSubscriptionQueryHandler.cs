@@ -1,6 +1,3 @@
-// ABOUTME: Handles authenticated-user Web Push subscription status reads.
-// ABOUTME: Maps subscription entities to safe DTOs without endpoint or key material.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Notification;

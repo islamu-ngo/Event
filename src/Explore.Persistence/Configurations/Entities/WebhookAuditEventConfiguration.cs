@@ -1,6 +1,3 @@
-// ABOUTME: Maps append-only webhook audit evidence with normalized owner-scope classifications.
-// ABOUTME: Uses database time, scope consistency checks, and tenant or instance leading indexes.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

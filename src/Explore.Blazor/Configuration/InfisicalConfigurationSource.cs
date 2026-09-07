@@ -1,6 +1,3 @@
-// ABOUTME: Defines the Blazor-local Infisical source used during BFF configuration bootstrap.
-// ABOUTME: Keeps startup secret loading inside the isolated Blazor server project.
-
 namespace Explore.Blazor.Configuration;
 
 using Microsoft.Extensions.Configuration;

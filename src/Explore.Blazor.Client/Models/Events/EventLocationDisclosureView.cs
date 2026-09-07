@@ -1,6 +1,3 @@
-// ABOUTME: Purpose-agnostic presentation projection over an EventLocation disclosure response.
-// ABOUTME: Renders only what the server already released; it never widens or infers a withheld field.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Models.Events;

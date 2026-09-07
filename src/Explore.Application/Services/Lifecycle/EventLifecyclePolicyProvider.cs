@@ -1,5 +1,3 @@
-// ABOUTME: Composes lifecycle hard invariants with governed tenant and instance publication policy.
-// ABOUTME: Community validation may relax publication fields but never ownership, tenancy, status, or persistence safety.
 using System;
 using System.Collections.Generic;
 using System.Linq;

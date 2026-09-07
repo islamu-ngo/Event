@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the fanout general-outbox pointer is source-generated and PII-free.
-// ABOUTME: Locks the pointer contract to tenant, occurrence, and schema-version identifiers only.
-
 using System.Text.Json;
 using Explore.Application.Models.InternalEvents;
 using Explore.Application.Services;

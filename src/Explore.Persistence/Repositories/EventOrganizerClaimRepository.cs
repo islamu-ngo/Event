@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for tenant-scoped event organizer claims.
-// ABOUTME: Loads claim status and claimant details while preserving entity-first CQRS mapping.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

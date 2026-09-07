@@ -1,6 +1,3 @@
-// ABOUTME: Focused API controller for current-tenant storage administration settings.
-// ABOUTME: Exposes effective storage policy and presence-aware tenant override patches through CQRS.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

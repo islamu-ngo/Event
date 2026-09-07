@@ -1,6 +1,3 @@
-// ABOUTME: Maps durable managed tenant provisioning operations and their optimistic concurrency token.
-// ABOUTME: Enforces request idempotency, terminal-state consistency, and bounded instance-scoped metadata.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

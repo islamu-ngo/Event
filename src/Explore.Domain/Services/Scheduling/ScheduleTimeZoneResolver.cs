@@ -1,6 +1,3 @@
-// ABOUTME: Central timezone resolver for event scheduling so invalid timezone ids fail before projections are persisted.
-// ABOUTME: Keeps UTC as the explicit fallback for blank timezone input while preserving TimeZoneInfo-based DST behavior.
-
 using System;
 
 namespace Explore.Domain.Services.Scheduling;

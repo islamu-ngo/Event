@@ -1,6 +1,3 @@
-// ABOUTME: HAL policy for provider-neutral registration health and parked queue resources.
-// ABOUTME: Emits management affordances through event-scoped authorization without attendee data checks.
-
 using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;

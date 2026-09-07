@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning all organizations the user belongs to.
-// ABOUTME: Filters by user ID, maps to OrganizationListDto.
 using AutoMapper;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;

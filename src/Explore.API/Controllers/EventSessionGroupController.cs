@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for event program sections/tracks/devrooms.
-// ABOUTME: Provides read-only HATEOAS endpoints for grouping event sessions into program sections.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

@@ -1,6 +1,3 @@
-// ABOUTME: Stable lifecycle and enforcement-receipt identifiers for report-decision execution.
-// ABOUTME: Separates side-effect claiming from atomic business and notification completion.
-
 namespace Explore.Domain.Enums;
 
 public enum EventReportDecisionExecutionState

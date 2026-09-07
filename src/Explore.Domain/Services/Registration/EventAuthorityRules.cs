@@ -1,6 +1,3 @@
-// ABOUTME: Resolves event authority categories from typed provenance and organizer state.
-// ABOUTME: Fails closed so listing contributors never inherit organizer or commercial powers.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Domain.Services.Registration;

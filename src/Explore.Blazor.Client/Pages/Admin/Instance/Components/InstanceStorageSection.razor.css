@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped layout styles for the instance storage dashboard. */
-/* ABOUTME: Provides stable metric tiles, provider panels, and responsive action layout. */
-
 .storage-section {
     display: flex;
     flex-direction: column;

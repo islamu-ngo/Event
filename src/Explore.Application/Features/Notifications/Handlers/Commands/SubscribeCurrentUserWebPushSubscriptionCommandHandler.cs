@@ -1,6 +1,3 @@
-// ABOUTME: Handles current-user browser Web Push subscription registration.
-// ABOUTME: Uses trusted tenant/user context and hides endpoint/key details from command failures.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Notifications.Requests.Commands;

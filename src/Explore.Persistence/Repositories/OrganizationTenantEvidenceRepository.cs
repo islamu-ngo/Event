@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for retained OrganizationTenant legitimacy evidence.
-// ABOUTME: Loads only safe review, participation, and document metadata for handler-side DTO mapping.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

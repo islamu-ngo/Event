@@ -1,6 +1,3 @@
-// ABOUTME: RED deterministic contracts for Photon retry, budget, and cancellation behavior.
-// ABOUTME: Uses explicit timer and transport signals with no fixed sleeps, polling, real time, or network.
-
 using System.Net;
 
 namespace Explore.Infrastructure.Tests.Geocoding;

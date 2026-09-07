@@ -1,6 +1,3 @@
-// ABOUTME: Thin orchestrator for instance-level governance settings using typed setting groups.
-// ABOUTME: Reads via IHierarchicalSettingsResolver batch resolution, writes via SettingUpsertService.
-
 using System.Collections.Immutable;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Infrastructure.Ai;

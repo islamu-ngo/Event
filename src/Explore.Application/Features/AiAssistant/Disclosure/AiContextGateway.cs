@@ -1,6 +1,3 @@
-// ABOUTME: Concrete AI Context Gateway that enforces the disclosure policy end-to-end.
-// ABOUTME: Fail-closed by design; uses the registry, consent grants, and provider-trust evidence.
-
 using System;
 using System.Collections.Generic;
 using Explore.Domain.Enums;

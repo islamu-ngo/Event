@@ -1,6 +1,3 @@
-// ABOUTME: Browser-to-server analytics relay payload for relay transport mode.
-// ABOUTME: Keeps the public payload narrow so the server can re-apply tenant-aware governance rules.
-
 using System.Collections.ObjectModel;
 using System.Text.Json;
 

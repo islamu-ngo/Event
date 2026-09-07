@@ -1,6 +1,3 @@
-// ABOUTME: Defines validated machine-consumed delivery, operator, provider, and line facts accepted before paid Checkout.
-// ABOUTME: Keeps disclosure composition typed and deterministic instead of hiding commercial evidence in prose or JSON.
-
 using Explore.Domain.ValueObjects;
 
 namespace Explore.Domain;

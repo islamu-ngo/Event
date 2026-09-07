@@ -1,6 +1,3 @@
-// ABOUTME: Defines a canonical analytics event and the property keys it may emit.
-// ABOUTME: Keeps business handlers aligned with a shared taxonomy and property allowlist.
-
 namespace Explore.Application.Analytics;
 
 public sealed record AnalyticsEventDefinition(

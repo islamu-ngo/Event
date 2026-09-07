@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for assigning tenant-scoped actors as speakers on event sessions.
-// ABOUTME: Composite FKs prevent speaker/session links from crossing tenant boundaries.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

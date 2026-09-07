@@ -1,6 +1,3 @@
-// ABOUTME: Explicit context for typed settings document resolution requests.
-// ABOUTME: Keeps tenant, actor, route, and requested document inputs visible to resolver callers.
-
 namespace Explore.Application.Settings;
 
 /// <summary>

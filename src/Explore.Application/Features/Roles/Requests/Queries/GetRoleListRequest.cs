@@ -1,6 +1,3 @@
-// ABOUTME: Query request to get roles with optional scope filter.
-// ABOUTME: Replaces GetOrganizationRoleListRequest and GetUserRoleListRequest.
-
 using Explore.Application.DTOs.Role;
 using MediatR;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for shared custom-property definition API endpoints.
-// ABOUTME: Verifies basic route behavior and auth posture for the shared-definition governance surface.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;

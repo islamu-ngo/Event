@@ -1,5 +1,3 @@
-// ABOUTME: FluentValidation validator for CreateTenantNavigationLinkDto.
-// ABOUTME: Enforces URL allowlist (relative paths, http/https) and rejects dangerous schemes.
 using Explore.Application.Validation;
 using FluentValidation;
 

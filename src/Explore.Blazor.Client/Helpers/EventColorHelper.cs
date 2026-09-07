@@ -1,6 +1,3 @@
-// ABOUTME: Shared helper for mapping event types to display colors.
-// ABOUTME: Replaces 3 duplicate GetEventColor/GetEventColorCode methods across the codebase.
-
 namespace Explore.Blazor.Client.Helpers;
 
 /// <summary>

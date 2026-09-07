@@ -1,6 +1,3 @@
-// ABOUTME: API endpoint benchmark suite for representative anonymous and authenticated Explore API reads.
-// ABOUTME: Hosts the real API in-process so measurements include middleware, routing, HAL, caching, and JSON output.
-
 using BenchmarkDotNet.Attributes;
 using Event.Benchmarks.Api;
 using Event.Benchmarks.Configuration;

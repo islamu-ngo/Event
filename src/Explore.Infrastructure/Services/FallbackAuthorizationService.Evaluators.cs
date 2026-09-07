@@ -1,6 +1,3 @@
-// ABOUTME: Async resource-family evaluators for FallbackAuthorizationService.
-// ABOUTME: Tenant-scoped, org-scoped, and resource-specific access evaluation methods.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.StorageObjects.Requests.Commands;

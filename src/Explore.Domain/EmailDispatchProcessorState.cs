@@ -1,6 +1,3 @@
-// ABOUTME: Persists cross-replica coordination and operator state for an email dispatch processor.
-// ABOUTME: Keeps drain pause, SMTP rate override, and reminder hysteresis durable across replicas.
-
 namespace Explore.Domain;
 
 public sealed class EmailDispatchProcessorState

@@ -1,6 +1,3 @@
-// ABOUTME: API DTO for canonical outgoing webhook message audit rows.
-// ABOUTME: Exposes semantic message and retention metadata while omitting raw payload JSON.
-
 namespace Explore.Application.DTOs.Webhooks;
 
 public sealed record WebhookMessageDto

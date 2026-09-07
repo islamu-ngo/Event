@@ -1,6 +1,3 @@
-// ABOUTME: Readiness health check for Web Push dispatch backlog and terminal state.
-// ABOUTME: Reports safe counts and settings only, never VAPID private keys or notification payloads.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Infrastructure.WebPush;
 using Microsoft.Extensions.DependencyInjection;

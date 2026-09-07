@@ -1,6 +1,3 @@
-/* ABOUTME: Responsive shell for the onboarding main workspace, summary rail, and mobile menu. */
-/* ABOUTME: Uses project tokens, logical properties, and sticky navigation without owning workflow state. */
-
 .onboarding-workspace {
     display: grid;
     grid-template-columns: minmax(0, 1fr);

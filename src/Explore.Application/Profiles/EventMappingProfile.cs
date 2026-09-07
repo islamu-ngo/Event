@@ -1,6 +1,3 @@
-// ABOUTME: AutoMapper profile for Event, EventSeries, EventDay, EventAgendaItem, EventTags, EventCategories, and Aspect entities.
-// ABOUTME: Split from monolithic MappingProfile.cs for domain-cohesion.
-
 using AutoMapper;
 using Explore.Application.DTOs.AudienceAge;
 using Explore.Application.DTOs.AudienceGender;

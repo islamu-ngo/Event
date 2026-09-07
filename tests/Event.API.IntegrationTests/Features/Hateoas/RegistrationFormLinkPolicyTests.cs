@@ -1,6 +1,3 @@
-// ABOUTME: Verifies registration-form authoring HAL lifecycle and authorization metadata.
-// ABOUTME: Ensures published versions never advertise child mutation affordances.
-
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Assemblers;
 using Explore.API.Hateoas.Policies;

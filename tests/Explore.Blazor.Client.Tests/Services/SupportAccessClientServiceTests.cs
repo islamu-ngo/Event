@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for BFF-backed support-access client service behavior.
-// ABOUTME: Verifies HAL affordance preservation and force-stop forwarding contracts.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;

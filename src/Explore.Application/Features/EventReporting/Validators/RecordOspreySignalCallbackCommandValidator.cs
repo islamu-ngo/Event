@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for Osprey signal callback commands.
-// ABOUTME: Bounds provider metadata before it reaches domain signal persistence.
-
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Requests.Commands;
 using FluentValidation;

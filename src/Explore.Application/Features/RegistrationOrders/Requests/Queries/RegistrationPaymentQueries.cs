@@ -1,6 +1,3 @@
-// ABOUTME: Defines purchaser, Studio, and BFF-only registration payment status and checkout-target queries.
-// ABOUTME: Public status projections are sanitized while the checkout target remains separately access-guarded.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;

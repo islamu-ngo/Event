@@ -1,6 +1,3 @@
-// ABOUTME: Repository implementation for TenantSetting entity providing data access.
-// ABOUTME: Resolves tenant overrides and normalized cross-tenant domain-host ownership.
-
 namespace Explore.Persistence.Repositories;
 
 using Explore.Application.Contracts.Persistence;

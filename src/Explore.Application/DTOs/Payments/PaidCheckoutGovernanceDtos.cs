@@ -1,6 +1,3 @@
-// ABOUTME: Defines bounded operator contracts for durable sale controls, audits, and paid Checkout reviews.
-// ABOUTME: Excludes secrets, connected-account identifiers, and startup-owned official/activation mutation fields.
-
 namespace Explore.Application.DTOs.Payments;
 
 public sealed record PaidCheckoutSaleControlDto

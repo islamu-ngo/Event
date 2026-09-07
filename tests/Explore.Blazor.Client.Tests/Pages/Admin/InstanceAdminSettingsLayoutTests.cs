@@ -1,6 +1,3 @@
-// ABOUTME: bUnit tests for instance admin settings layout section reachability.
-// ABOUTME: Verifies single-tenant administration exposes tenant-level public experience controls.
-
 using Explore.Blazor.Client.Contracts.Services.ControlPlane;
 using Explore.Blazor.Client.Contracts.Services.Federation;
 using Explore.Blazor.Client.Contracts.Services.PaidEventPolicies;

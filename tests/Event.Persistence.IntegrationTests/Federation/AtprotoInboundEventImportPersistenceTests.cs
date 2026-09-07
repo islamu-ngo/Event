@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL acceptance tests for importing canonical inbound AT Protocol events into local Event aggregates.
-// ABOUTME: Proves canonical persistence, idempotent aggregate/session import, mapped updates, tombstones, and snapshot recovery.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;

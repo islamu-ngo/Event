@@ -1,6 +1,3 @@
-// ABOUTME: Validates grouped current-user appearance localization PATCH requests.
-// ABOUTME: Rejects empty wrappers and validates only supplied language or direction values.
-
 namespace Explore.Application.DTOs.Appearance.Validators;
 
 using Explore.Domain.Common.Localization;

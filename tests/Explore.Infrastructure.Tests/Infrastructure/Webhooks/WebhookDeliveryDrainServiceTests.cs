@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for LocalProvider webhook delivery attempt drainage.
-// ABOUTME: Verifies signed HTTP delivery, retries, SSRF blocking, and pre-I/O stale-claim fencing.
-
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Net;

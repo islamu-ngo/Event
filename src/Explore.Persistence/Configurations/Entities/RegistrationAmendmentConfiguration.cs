@@ -1,6 +1,3 @@
-// ABOUTME: Maps PII-free registration amendment audit rows for finalized assignment changes.
-// ABOUTME: Enforces exact tenant, event, order, line, and CSV lineage uniqueness for idempotent imports.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

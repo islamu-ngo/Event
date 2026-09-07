@@ -1,6 +1,3 @@
-// ABOUTME: Shared tenant context implementation consumed by application handlers and services.
-// ABOUTME: Preserves the existing ITenantContext.TenantId surface while delegating resolution to the new resolver service.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
 

@@ -1,6 +1,3 @@
-// ABOUTME: RED contracts for protected provider selections entering Location create and PATCH commands.
-// ABOUTME: Specifies trusted context binding, pre-write validation, private provenance, and manual invalidation.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Location;
 using Explore.Application.Features.Locations.Handlers.Commands;

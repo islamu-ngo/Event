@@ -1,6 +1,3 @@
-// ABOUTME: Builds onboarding preflight checks from existing setup, tenancy, auth, and settings state.
-// ABOUTME: Keeps launch blockers distinct from operational warnings without introducing new persistence.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

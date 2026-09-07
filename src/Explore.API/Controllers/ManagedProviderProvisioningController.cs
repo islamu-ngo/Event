@@ -1,6 +1,3 @@
-// ABOUTME: Instance-admin endpoint for trusted managed-provider client provisioning.
-// ABOUTME: Keeps provider automation at the platform boundary while delegating tenant/user creation to MediatR.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

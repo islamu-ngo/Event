@@ -1,6 +1,3 @@
-// ABOUTME: Image storage orchestration service for provider-neutral upload sessions and previews.
-// ABOUTME: Requires browser-originated record uploads to use server-issued BFF sessions and proxy upload.
-
 using Explore.Blazor.Client.Services.Http;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.Extensions.Logging;

@@ -1,6 +1,3 @@
-// ABOUTME: Handler for grouped EventSeries PATCH updates with validation and concurrency.
-// ABOUTME: Applies explicit groups, saves once, and invalidates affected event caches.
-
 using Explore.Application.Authorization;
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines one ordered bounded condition rule owned by an immutable registration-form version.
-// ABOUTME: Stores only stable field references, typed conditions, and visibility or requiredness effects.
-
 using Explore.Domain.Interfaces;
 using Explore.Domain.Services.Registration;
 

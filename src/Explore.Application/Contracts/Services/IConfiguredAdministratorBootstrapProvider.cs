@@ -1,6 +1,3 @@
-// ABOUTME: Resolves configured administrator data for an upstream-authenticated provider account.
-// ABOUTME: Keeps provider verification and secret-backed configuration outside claim orchestration.
-
 using Explore.Application.Authentication;
 using Explore.Application.Models;
 

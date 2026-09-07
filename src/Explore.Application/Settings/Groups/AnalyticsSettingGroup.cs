@@ -1,6 +1,3 @@
-// ABOUTME: Strongly-typed Analytics setting group resolved via batch loading.
-// ABOUTME: Replaces the N+1 pattern in AnalyticsConfigResolver with a single ResolveGroupAsync call.
-
 namespace Explore.Application.Settings.Groups;
 
 using Explore.Application.Contracts.Infrastructure;

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the scheduler administration read models.
-// ABOUTME: Verifies lifecycle/job state collapsing, summary counts, and the disabled-scheduler projection.
-
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Features.Scheduling.Handlers.Queries;
 using Explore.Application.Features.Scheduling.Requests.Queries;

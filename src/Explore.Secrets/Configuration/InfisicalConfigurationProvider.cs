@@ -1,6 +1,3 @@
-// ABOUTME: Configuration provider that loads secrets from Infisical into IConfiguration.
-// ABOUTME: Converts Infisical secrets to canonical .NET configuration keys.
-
 namespace Explore.Secrets.Configuration;
 
 using System.Net;

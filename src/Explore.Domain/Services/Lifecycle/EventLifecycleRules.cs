@@ -1,6 +1,3 @@
-// ABOUTME: Centralizes fixed Event lifecycle predicates for ordinary status transitions and draft edit checks.
-// ABOUTME: Keeps moderation restoration and federated overrides explicit on the aggregate instead of generic state-machine plumbing.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Domain.Services.Lifecycle;

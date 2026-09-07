@@ -1,6 +1,3 @@
-// ABOUTME: Specifies tenant-filtered digest-only admission recovery persistence metadata.
-// ABOUTME: Requires portable lineage uniqueness, concurrency, and no plaintext capability or identity fields.
-
 using Explore.Domain;
 using Explore.Persistence;
 using Explore.Persistence.QueryFilters;

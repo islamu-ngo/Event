@@ -1,6 +1,3 @@
-// ABOUTME: Validates bounded provider-binding repair input before any remote or persistence operation.
-// ABOUTME: Restricts audit reason codes to a safe machine-readable alphabet.
-
 using Explore.Application.Features.Webhooks.Requests.Commands;
 using FluentValidation;
 

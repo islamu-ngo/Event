@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for tenant paid-event policy ceiling filtering and HAL affordances.
-// ABOUTME: Verifies fail-closed scope, read-only rendering, narrowing validation, saves, and cancellation.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Contracts.Services.PaidEventPolicies;

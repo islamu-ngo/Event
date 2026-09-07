@@ -1,6 +1,3 @@
-// ABOUTME: Verifies primary authentication provider selection and independent ATProto controls.
-// ABOUTME: Guards target-provider preparation and administrator lockout warnings.
-
 using Explore.Blazor.Client.Contracts.Interop;
 using Explore.Blazor.Client.Pages.Admin.Instance.Components;
 using Explore.Blazor.Client.Tests.Common;

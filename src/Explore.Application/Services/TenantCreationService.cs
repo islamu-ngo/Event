@@ -1,6 +1,3 @@
-// ABOUTME: Creates a tenant and both mandatory typed documents inside the caller-owned transaction.
-// ABOUTME: Enforces Active identity readiness before writes without acquiring locks or dispatching notifications.
-
 namespace Explore.Application.Services;
 
 using System.Text.Json;

@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped styles for the multi-layout event card component.
-   ABOUTME: Supports CompactGrid, DetailedList, and SingleRow modes with icon badges, progressive disclosure, and organizer hover. */
-
 .event-card-root {
     width: 100%;
     container-type: inline-size;

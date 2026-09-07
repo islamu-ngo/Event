@@ -1,6 +1,3 @@
-// ABOUTME: Verifies normalized notification intent persistence and tenant isolation.
-// ABOUTME: Exercises lookup-backed ownership, delivery, and external delegation repository paths.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Notifications;

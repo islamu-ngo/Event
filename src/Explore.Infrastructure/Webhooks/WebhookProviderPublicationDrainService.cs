@@ -1,6 +1,3 @@
-// ABOUTME: Claims bounded provider-publication batches and dispatches each fenced item outside transactions.
-// ABOUTME: Keeps durable claim authority separate from provider I/O and reports only safe aggregate counts.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.Telemetry;

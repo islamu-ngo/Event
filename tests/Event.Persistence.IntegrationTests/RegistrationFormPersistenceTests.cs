@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the immutable registration-form EF model, lookup seeding, and named isolation filters.
-// ABOUTME: Covers composite graph boundaries, portable metadata, provider-neutral identity, and language persistence.
-
 using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;

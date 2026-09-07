@@ -1,6 +1,3 @@
-// ABOUTME: Application result for validated webhook bulk replay preview requests.
-// ABOUTME: Separates public preview DTOs from safe validation failure codes and messages.
-
 using Explore.Application.DTOs.Webhooks;
 
 namespace Explore.Application.Responses;

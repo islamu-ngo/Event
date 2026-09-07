@@ -1,6 +1,3 @@
-// ABOUTME: Verifies fanout audience execution schema in the rebased PostgreSQL baseline.
-// ABOUTME: Proves registration coverage, fenced-run constraints, and filtered uniqueness.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Persistence;
 using Microsoft.EntityFrameworkCore;

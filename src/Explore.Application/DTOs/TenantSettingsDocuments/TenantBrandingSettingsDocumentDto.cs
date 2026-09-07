@@ -1,6 +1,3 @@
-// ABOUTME: API-safe DTO for the tenant branding typed settings document.
-// ABOUTME: Exposes typed payload and resolver metadata without leaking persistence JSON.
-
 namespace Explore.Application.DTOs.TenantSettingsDocuments;
 
 using Explore.Application.Models.Common;

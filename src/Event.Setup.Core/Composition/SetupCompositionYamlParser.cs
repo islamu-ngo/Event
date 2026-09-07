@@ -1,6 +1,3 @@
-// ABOUTME: Adapts bounded YamlDotNet parser events into the repository-owned composition tree.
-// ABOUTME: Rejects YAML authority features and ambiguous scalar coercion without generic object conversion.
-
 namespace ISLAMU.Event.Setup.Core.Composition;
 
 using System.Globalization;

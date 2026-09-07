@@ -1,6 +1,3 @@
-// ABOUTME: Loads one webhook bulk replay operation through an explicit tenant predicate.
-// ABOUTME: Maps durable normalized lifecycle state into the payload-free management DTO.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Queries;

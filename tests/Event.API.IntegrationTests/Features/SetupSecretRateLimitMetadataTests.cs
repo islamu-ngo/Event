@@ -1,6 +1,3 @@
-// ABOUTME: Contract tests for setup-secret rate-limit endpoint metadata and provider-route classification.
-// ABOUTME: Guards bootstrap validation plus the shared setup-secret quota for canonical provider GET and PATCH requests.
-
 using System.Net;
 using System.Reflection;
 using System.Security.Claims;

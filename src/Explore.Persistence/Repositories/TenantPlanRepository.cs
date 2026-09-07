@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for normalized tenant plan SaaS tier aggregates.
-// ABOUTME: Provides no-tracking reads for plan keys, versions, and active tenant assignments.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

@@ -1,6 +1,3 @@
-// ABOUTME: Resolves target identity and composes the last immutable published legal version.
-// ABOUTME: Fails closed on unknown kinds, incomplete identity, unsafe rendering, or publication drift.
-
 namespace Explore.Application.Features.LegalDocuments.Handlers.Queries;
 
 using Explore.Application.Contracts.Infrastructure;

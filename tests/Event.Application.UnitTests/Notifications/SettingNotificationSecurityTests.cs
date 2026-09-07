@@ -1,6 +1,3 @@
-// ABOUTME: Security tests for redacted setting-change notifications and audit logs.
-// ABOUTME: Uses generated canary values to prove sensitive values never cross observability boundaries.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Notifications;
 using Explore.Application.Notifications.Handlers;

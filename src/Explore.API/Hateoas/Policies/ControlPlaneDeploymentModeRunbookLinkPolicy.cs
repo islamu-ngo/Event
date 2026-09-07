@@ -1,6 +1,3 @@
-// ABOUTME: HAL link policy for the Control Plane deployment-mode migration runbook.
-// ABOUTME: Emits transition affordances only when server-calculated preconditions allow them.
-
 using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;

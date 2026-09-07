@@ -1,6 +1,3 @@
-// ABOUTME: Covers registration-order PII separation, immutable participation snapshots, and totals snapshots.
-// ABOUTME: Proves free, approval, and paid-boundary paths preserve the explicit order state machine.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;
 using Explore.Domain.ValueObjects;

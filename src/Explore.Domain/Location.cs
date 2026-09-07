@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-scoped physical place with optional PII and an irreversible privacy lifecycle.
-// ABOUTME: Owns consent-backed Private Home identity, erasure tombstones, rooms, audit, and concurrency.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;

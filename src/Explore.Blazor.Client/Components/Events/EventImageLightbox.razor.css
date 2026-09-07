@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped hover, focus, and fullscreen-icon styling for event-image lightbox triggers. */
-/* ABOUTME: Uses the existing overlay, spacing, focus, and motion tokens across detail and sidebar images. */
-
 .event-image-lightbox {
     position: absolute;
     inset: 0;

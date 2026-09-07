@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for updating an agenda item.
-// ABOUTME: Carries route-owned identity, grouped PATCH data, and server-bound authorization context.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventSessionAgendaItem;
 using Explore.Application.Responses;

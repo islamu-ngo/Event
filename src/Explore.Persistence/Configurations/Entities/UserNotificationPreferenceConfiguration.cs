@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for per-user notification opt-in and opt-out preferences.
-// ABOUTME: Enforces one preference row per tenant, user, and notification category.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

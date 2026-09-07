@@ -1,6 +1,3 @@
-// ABOUTME: Verifies provider commands, failure results, transaction guards, and real SQLite named-lock leases.
-// ABOUTME: Covers the provider-neutral lock boundary without claiming unexecuted server-engine behavior.
-
 using System.Data.Common;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Persistence;

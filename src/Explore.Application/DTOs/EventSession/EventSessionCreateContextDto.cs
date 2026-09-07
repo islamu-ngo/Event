@@ -1,6 +1,3 @@
-// ABOUTME: Server-owned context for composing a new event program item.
-// ABOUTME: Carries inherited event defaults and selector options for the dedicated session composer.
-
 namespace Explore.Application.DTOs.EventSession;
 
 using System.Collections.Immutable;

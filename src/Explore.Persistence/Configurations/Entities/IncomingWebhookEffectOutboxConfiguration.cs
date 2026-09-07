@@ -1,6 +1,3 @@
-// ABOUTME: Maps pending incoming-webhook effect pointers with tenant-safe retention and idempotency constraints.
-// ABOUTME: Restricts inbox deletion and enforces one provider decision and one effect per retained callback.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

@@ -1,6 +1,3 @@
-// ABOUTME: Skips one optional native registration requirement through its pinned active attempt.
-// ABOUTME: Re-derives server-owned subjects, records auditable skips, and consumes the attempt capability.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.RegistrationSubmissions;

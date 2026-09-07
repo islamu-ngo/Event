@@ -1,6 +1,3 @@
-// ABOUTME: Configures tenant-scoped tag-to-type relationships and their uniqueness boundary.
-// ABOUTME: Prevents concurrent writes from creating duplicate tag/type assignments.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

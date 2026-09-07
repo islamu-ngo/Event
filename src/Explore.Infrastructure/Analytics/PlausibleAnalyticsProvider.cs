@@ -1,6 +1,3 @@
-// ABOUTME: Plausible analytics provider implementation using Plausible Events API.
-// ABOUTME: Implements event/page tracking with safe no-op behavior when config is incomplete.
-
 using System.Text.Json.Serialization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Models;

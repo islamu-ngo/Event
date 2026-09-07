@@ -1,6 +1,3 @@
-// ABOUTME: Runs one bounded Local-provider webhook delivery and stale-lease recovery pass under Quartz.
-// ABOUTME: Delegates HTTP delivery, tenant fairness, retry, and exact-fence settlement to Infrastructure.
-
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Contracts.Services;
 using Quartz;

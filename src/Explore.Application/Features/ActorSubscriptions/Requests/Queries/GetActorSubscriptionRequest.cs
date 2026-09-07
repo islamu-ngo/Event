@@ -1,6 +1,3 @@
-// ABOUTME: Query request for the current user's subscription to one actor.
-// ABOUTME: Handler resolves the caller through TenantUser before reading subscription state.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.ActorSubscription;
 using MediatR;

@@ -1,6 +1,3 @@
-// ABOUTME: Validates optional MCP adapter startup settings before endpoint registration.
-// ABOUTME: Keeps path/stateless startup-only while treating legacy SSE as a disabled runtime-governed ceiling.
-
 using Microsoft.Extensions.Options;
 
 namespace Explore.API.Configuration;

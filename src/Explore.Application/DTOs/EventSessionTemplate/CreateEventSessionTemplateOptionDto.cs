@@ -1,6 +1,3 @@
-// ABOUTME: Write DTO for creating session template property options, used nested within definition DTOs.
-// ABOUTME: Mirrors CreateEventTemplateOptionDto shape for consistency across the EAV system.
-
 namespace Explore.Application.DTOs.EventSessionTemplate;
 
 public sealed record CreateEventSessionTemplateOptionDto

@@ -1,6 +1,3 @@
-// ABOUTME: Authorized query for bounded tenant-scoped webhook bulk replay eligibility counts.
-// ABOUTME: Carries explicit UTC, consumer, endpoint, event-type, and selection-limit filters.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

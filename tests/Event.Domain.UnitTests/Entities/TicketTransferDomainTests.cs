@@ -1,6 +1,3 @@
-// ABOUTME: Exercises transfer policy, claim, holder, credential, and terminal-state invariants.
-// ABOUTME: Supplies phase-scoped mutation coverage for transfer and admission-ticket authority.
-
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;

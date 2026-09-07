@@ -1,6 +1,3 @@
-// ABOUTME: Exercises Unicode write rejection through real handlers, settings, repositories, and provider databases.
-// ABOUTME: Verifies manual, protected-provider, and retained-address failures preserve every tracked scalar and derived key.
-
 using System.Security.Claims;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;

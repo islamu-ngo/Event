@@ -1,6 +1,3 @@
-// ABOUTME: Default application service that materializes immutable outgoing webhook delivery plans.
-// ABOUTME: Resolves governed targets and atomically persists exact bytes without synchronous network dispatch.
-
 using System.Globalization;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;

@@ -1,6 +1,3 @@
-// ABOUTME: Specifies the instance-authorized whole-instance configuration manifest export query and bytes.
-// ABOUTME: Covers deterministic scope ordering, portable semantics, sovereign omission, and aggregate bounds.
-
 namespace Event.Application.UnitTests.Features.ConfigurationManifest;
 
 using System.Reflection;

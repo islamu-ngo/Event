@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped sizing for tenant navigation Material icons and discovered favicons. */
-/* ABOUTME: Keeps both icon sources aligned to the design system's 24px shell icon slot. */
-
 .tenant-navigation-link-icon {
     display: grid;
     place-items: center;

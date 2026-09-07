@@ -1,6 +1,3 @@
-// ABOUTME: Sub-DTO for creating event location venues within the scheduling graph.
-// ABOUTME: Uses a temp key for cross-referencing sessions and rooms before persistence.
-
 namespace Explore.Application.DTOs.Event;
 
 public sealed record CreateEventLocationDto

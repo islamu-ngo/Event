@@ -1,6 +1,3 @@
-// ABOUTME: Unit-style DelegatingHandler tests for tenant and forwarded-host propagation behavior.
-// ABOUTME: Verifies request header forwarding based on ITenantRouteContextAccessor and HttpContext host values.
-
 using Event.Web.BffHosting.Security;
 using Explore.Blazor.Services;
 using Microsoft.AspNetCore.Http;

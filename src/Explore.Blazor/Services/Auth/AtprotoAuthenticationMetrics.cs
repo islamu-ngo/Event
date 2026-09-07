@@ -1,6 +1,3 @@
-// ABOUTME: Emits bounded AT Protocol authentication operation metrics through the existing business meter.
-// ABOUTME: Normalizes every label so user, provider, URL, token, key, and exception values cannot become dimensions.
-
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 

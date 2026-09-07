@@ -1,6 +1,3 @@
-// ABOUTME: Defines the tenant-bound CQRS request for private local address suggestions.
-// ABOUTME: Carries server-supplied tenant authority separately from the browser request body.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Geocoding;
 using MediatR;

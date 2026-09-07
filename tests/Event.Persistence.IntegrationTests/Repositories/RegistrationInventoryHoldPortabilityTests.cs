@@ -1,6 +1,3 @@
-// ABOUTME: Proves inventory hold transitions use provider metadata and aggregate-owned portable mutations.
-// ABOUTME: Executes provider mapping plus contended expiry, consume, and release paths against SQLite.
-
 using Event.Persistence.IntegrationTests.Database;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;

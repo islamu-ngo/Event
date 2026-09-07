@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for browser notification SSE client event dispatch.
-// ABOUTME: Verifies refresh hints are surfaced and prerender-time JS interop failures fall back to polling.
-
 using Microsoft.JSInterop;
 
 namespace Explore.Blazor.Client.Tests.Services;

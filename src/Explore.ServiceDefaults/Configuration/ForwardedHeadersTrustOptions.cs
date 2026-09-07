@@ -1,6 +1,3 @@
-// ABOUTME: Defines validated explicit reverse-proxy trust shared by API and BFF hosts.
-// ABOUTME: Rejects malformed, unbounded, and trust-all proxy configuration before serving requests.
-
 using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.HttpOverrides;

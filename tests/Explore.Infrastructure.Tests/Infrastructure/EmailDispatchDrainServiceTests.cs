@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for broker-neutral EmailDispatch single-row drainage.
-// ABOUTME: Verifies RabbitMQ consumers can reuse SMTP state transitions without owning delivery logic.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Notifications;

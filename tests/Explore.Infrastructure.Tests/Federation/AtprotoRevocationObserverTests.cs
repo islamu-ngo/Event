@@ -1,6 +1,3 @@
-// ABOUTME: Tests bounded status observation around CarpaNet OAuth revocation transport calls.
-// ABOUTME: Proves success, non-success, and outage classification without inspecting credential bodies.
-
 using System.Net;
 using Explore.Infrastructure.Services.Federation;
 

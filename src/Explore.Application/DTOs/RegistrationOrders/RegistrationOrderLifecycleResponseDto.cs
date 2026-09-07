@@ -1,6 +1,3 @@
-// ABOUTME: Standard command response enriched with the safe post-transition order state.
-// ABOUTME: Enables duplicate lifecycle submissions to return the original durable result.
-
 using System.Text.Json.Serialization;
 using Explore.Application.Responses;
 

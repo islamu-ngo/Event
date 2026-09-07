@@ -1,6 +1,3 @@
-// ABOUTME: Defines entity-first persistence for target-scoped legal document aggregates.
-// ABOUTME: Requires trusted scope coordinates on every mutable or published read.
-
 namespace Explore.Application.Contracts.Persistence;
 
 using Explore.Domain;

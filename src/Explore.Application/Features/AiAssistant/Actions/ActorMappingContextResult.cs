@@ -1,6 +1,3 @@
-// ABOUTME: Carries validated actor-to-draft mapping context for AI event draft confirmation.
-// ABOUTME: Keeps command-handler helper state outside handler namespaces to satisfy architecture rules.
-
 namespace Explore.Application.Features.AiAssistant.Actions;
 
 internal sealed record ActorMappingContextResult(

@@ -1,6 +1,3 @@
-// ABOUTME: Defines hierarchical controls for governed manual address creation.
-// ABOUTME: Keeps the mode above user scope and the explicit grant at organization scope only.
-
 using Explore.Domain.Constants;
 
 namespace Explore.Domain.Settings.Definitions;

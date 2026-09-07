@@ -1,6 +1,3 @@
-// ABOUTME: Reflection helpers for provider vertical-slice RED contracts in Application tests.
-// ABOUTME: Converts absent contracts and invalid call ordering into explicit integration failures.
-
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using Explore.Application.DTOs.Geocoding;

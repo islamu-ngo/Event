@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning all actor types.
-// ABOUTME: Maps ActorType entities to ActorTypeDto list via AutoMapper.
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;

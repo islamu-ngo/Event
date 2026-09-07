@@ -1,6 +1,3 @@
-// ABOUTME: First-class capability matrix per analytics provider.
-// ABOUTME: Drives storage-mode-driven consent computation in the runtime profile resolver.
-
 namespace Explore.Domain.Analytics;
 
 using Explore.Domain.Enums;

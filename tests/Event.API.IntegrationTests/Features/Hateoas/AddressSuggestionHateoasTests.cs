@@ -1,6 +1,3 @@
-// ABOUTME: Verifies address-suggestion HAL actions are server-authorized capabilities.
-// ABOUTME: Proves approved rows omit promotion while scoped rows advertise the named write.
-
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.Authorization;

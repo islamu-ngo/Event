@@ -1,6 +1,3 @@
-// ABOUTME: Query request for paginated current-user actor subscriptions.
-// ABOUTME: Returns only subscription rows owned by the authenticated tenant user.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.ActorSubscription;
 using Explore.Application.Responses;

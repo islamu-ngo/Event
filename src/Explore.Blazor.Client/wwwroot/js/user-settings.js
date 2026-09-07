@@ -1,6 +1,3 @@
-// ABOUTME: localStorage-backed user settings for anonymous users (no auth session).
-// ABOUTME: Called via JS interop from UserSettingsService when user is not authenticated.
-
 const PREFIX = 'user_settings:';
 
 /**

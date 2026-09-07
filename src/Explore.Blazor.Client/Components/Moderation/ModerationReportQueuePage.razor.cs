@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for the event-scoped moderation report queue page.
-// ABOUTME: Coordinates filters, HAL-paged queue reads, and on-demand privileged detail reads.
-
 using System.Globalization;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;

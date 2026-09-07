@@ -1,6 +1,3 @@
-// ABOUTME: Defines bounded public UI outcomes for online admission check-in.
-// ABOUTME: Normalizes every non-public service result without retaining credential material.
-
 namespace Explore.Blazor.Client.Contracts.Services.Admissions;
 
 public sealed class AdmissionCheckInUiResult

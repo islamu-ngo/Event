@@ -1,6 +1,3 @@
-// ABOUTME: Adversarial tests for exact configured-administrator provider authority and replay fencing.
-// ABOUTME: Verifies mismatched claims remain bounded and produce no durable writes or post-commit effects.
-
 using Explore.Application.Authentication;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;

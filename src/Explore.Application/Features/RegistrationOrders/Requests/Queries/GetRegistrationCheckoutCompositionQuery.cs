@@ -1,6 +1,3 @@
-// ABOUTME: Requests the public ticket-selection composition for one eligible event.
-// ABOUTME: Carries only the route-owned event identifier into the query handler.
-
 using Explore.Application.DTOs.RegistrationOrders;
 using MediatR;
 

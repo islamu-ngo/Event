@@ -1,6 +1,3 @@
-// ABOUTME: Partial class containing all DbSet property declarations for the Explore platform.
-// ABOUTME: Organized by domain area: Tenancy, Users, Auth, Actors, Organizations, Groups, Events, etc.
-
 using Explore.Domain;
 using Explore.Domain.Ai;
 using Explore.Domain.Federation;

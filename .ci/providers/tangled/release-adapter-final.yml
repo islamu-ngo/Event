@@ -1,6 +1,3 @@
-# ABOUTME: Minimal Tangled final discovery workflow for manually reviewed external-control evidence.
-# ABOUTME: Keeps final protected-release reporting out of push and pull-request origins.
-
 name: Release Adapter Final Discovery
 
 on:

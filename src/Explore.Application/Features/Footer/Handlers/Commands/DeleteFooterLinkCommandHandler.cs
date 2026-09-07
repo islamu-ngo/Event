@@ -1,6 +1,3 @@
-// ABOUTME: Handles DeleteFooterLinkCommand — removes a single footer link.
-// ABOUTME: Validates parent group ownership before deletion.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;

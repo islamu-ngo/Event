@@ -1,6 +1,3 @@
-// ABOUTME: Configures bounded AT Protocol PDS outbox claims, leases, cadence, and concurrency.
-// ABOUTME: Keeps operational throughput controls independent from the API scheduling mechanism.
-
 using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure;

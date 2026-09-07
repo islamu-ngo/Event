@@ -1,6 +1,3 @@
-// ABOUTME: Authorized query for tenant-scoped incoming Coop effect status rows.
-// ABOUTME: Carries only a tenant boundary and bounded result limit into Application.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Responses;

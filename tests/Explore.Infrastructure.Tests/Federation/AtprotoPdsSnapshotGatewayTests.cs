@@ -1,6 +1,3 @@
-// ABOUTME: Tests hardened bounded ATProto repository snapshot retrieval and canonical materialization.
-// ABOUTME: Covers DID/PDS binding, CAR integrity, presence safety, and transport limits.
-
 using System.Formats.Cbor;
 using System.Net;
 using System.Net.Http.Headers;

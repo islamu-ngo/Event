@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for SecretProviderHealthCheck.
-// ABOUTME: Tests health check responses based on provider status.
-
 using Explore.Secrets.Abstractions;
 using Explore.Secrets.Observability;
 using Microsoft.Extensions.Diagnostics.HealthChecks;

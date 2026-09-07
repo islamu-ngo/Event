@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped structure for event-level Studio navigation metadata and states. */
-/* ABOUTME: Uses logical spacing and shared design tokens for RTL-safe shell rendering. */
-
 .studio-event-navigation__header {
     display: grid;
     gap: var(--isl-space-2);

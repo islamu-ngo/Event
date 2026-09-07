@@ -1,6 +1,3 @@
-// ABOUTME: Authenticated current-tenant API for reading and updating event-reporting intake policy.
-// ABOUTME: Derives tenant and actor authority server-side and returns lock-aware HAL administration state.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning a paginated list of tag-type/tag links.
-// ABOUTME: Maps entities to TagTypeTagsListDto.
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.TagTypeTags;

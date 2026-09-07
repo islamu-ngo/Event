@@ -1,6 +1,3 @@
-// ABOUTME: Typed model and helper API for the event moderation reason dialog.
-// ABOUTME: Returns a structured reason code result to EventDetail without role or claim inspection.
-
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
 

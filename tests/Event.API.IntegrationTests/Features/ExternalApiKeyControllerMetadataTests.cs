@@ -1,6 +1,3 @@
-// ABOUTME: Metadata contract tests for external API key management endpoints.
-// ABOUTME: Ensures API-key management stays authenticated, non-cacheable, and rate limited.
-
 using System.Reflection;
 using Explore.API.Attributes;
 using Explore.API.Controllers;

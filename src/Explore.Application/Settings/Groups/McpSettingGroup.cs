@@ -1,6 +1,3 @@
-// ABOUTME: Strongly-typed MCP adapter runtime governance setting group.
-// ABOUTME: Resolves MCP enablement and legacy-SSE requests through the hierarchical settings cascade.
-
 namespace Explore.Application.Settings.Groups;
 
 using Explore.Application.Contracts.Infrastructure;

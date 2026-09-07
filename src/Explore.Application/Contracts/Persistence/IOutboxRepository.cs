@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for generic outbox message persistence operations.
-// ABOUTME: Standalone interface (not IGenericRepository) with methods optimized for background processor polling.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Internal command for background AI provider processing of a previously queued run.
-// ABOUTME: Keeps request/response queuing separate from long-running provider orchestration.
-
 using Explore.Application.DTOs.Ai;
 using MediatR;
 

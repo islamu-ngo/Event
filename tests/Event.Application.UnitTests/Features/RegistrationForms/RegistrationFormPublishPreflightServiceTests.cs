@@ -1,6 +1,3 @@
-// ABOUTME: Verifies registration-form publication rejects invalid authoring graphs before artifacts are pinned.
-// ABOUTME: Covers incomplete options, missing consent metadata, and unresolved or forward rule references.
-
 using System.Reflection;
 using Explore.Application.Services.Registration;
 using Explore.Domain;

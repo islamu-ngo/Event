@@ -1,6 +1,3 @@
-// ABOUTME: Creates opaque one-time admission bearers and tenant/purpose-separated keyed lookup digests.
-// ABOUTME: Verifies persisted key versions after rotation through the dedicated admission secret family.
-
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;

@@ -1,6 +1,3 @@
-// ABOUTME: CQRS commands for provider-neutral schema revision import, draft mapping replacement, and binding publication.
-// ABOUTME: Keeps mapping immutability and drift blocking in Application without provider-specific adapters.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Application.Responses;

@@ -1,6 +1,3 @@
-// ABOUTME: Returns a registration order only to its currently authenticated account owner.
-// ABOUTME: Leaves organizer and broader order-management authorization to the later policy/HAL slice.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

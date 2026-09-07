@@ -1,6 +1,3 @@
-// ABOUTME: Write model for tenant policy updates — writable fields only.
-// ABOUTME: CanOverride* flags are NOT included; they are read-only and set by instance governance.
-
 using System.Text.Json.Serialization;
 
 namespace Explore.Application.DTOs.TenantPolicy;

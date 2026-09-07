@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for all portable native registration field semantics and HAL-driven form actions.
-// ABOUTME: Proves conditional visibility, progress, skip, consent copy, server issues, and keyboard submission.
-
 using Bunit;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.Registration.FormRenderer;

@@ -1,4 +1,3 @@
-// ABOUTME: Wraps Respawn to provide deterministic database reset between integration tests.
 // Preserves lookup tables and migration history; resets all other data to a clean state.
 
 using Npgsql;

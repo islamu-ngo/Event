@@ -1,6 +1,3 @@
-// ABOUTME: Shared EF Core shape plus concrete table mappings for normalized webhook lookup entities.
-// ABOUTME: Keeps each lookup relationally independent while enforcing identical stable-key and metadata constraints.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

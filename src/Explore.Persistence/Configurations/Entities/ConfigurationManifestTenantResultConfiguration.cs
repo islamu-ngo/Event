@@ -1,6 +1,3 @@
-// ABOUTME: Maps immutable tenant-scoped configuration-manifest results and changed key names.
-// ABOUTME: Uses restrictive foreign keys, tenant-leading indexes, and one result per operation tenant.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

@@ -1,6 +1,3 @@
-// ABOUTME: Endpoint-level coverage for event program section write routes.
-// ABOUTME: Verifies session-group mutations remain authenticated API operations.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;

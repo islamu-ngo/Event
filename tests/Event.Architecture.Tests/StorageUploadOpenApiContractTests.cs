@@ -1,6 +1,3 @@
-// ABOUTME: Verifies provider-neutral storage upload contracts and retired legacy mutation surfaces.
-// ABOUTME: Keeps browser writes session-bound and raster parsing centralized without removing safe server operations.
-
 using System.Text.Json;
 
 namespace Event.Architecture.Tests;

@@ -1,6 +1,3 @@
-// ABOUTME: Resolves provider-mode capabilities from instance governance and verified conformance profiles.
-// ABOUTME: Keeps Local and provider-native authority distinct while rejecting unavailable tenant overrides.
-
 using Explore.Application.Contracts.Webhooks;
 using Explore.Domain;
 using Explore.Infrastructure.Configuration;

@@ -1,6 +1,3 @@
-// ABOUTME: Default provider-trust resolver using endpoint evidence (CTO #6, no naming-based trust).
-// ABOUTME: Returns Unknown (most restrictive) when evidence is ambiguous or missing.
-
 using System;
 using Explore.Domain.Enums;
 

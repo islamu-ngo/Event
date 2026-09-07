@@ -1,6 +1,3 @@
-// ABOUTME: Maps canonical inbound ATProto event projections into validated tenant-scoped import plans.
-// ABOUTME: Persists canonical state, presentations, cursor, and local import intent through one atomic repository call.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Federation.Atproto.Models;

@@ -1,6 +1,3 @@
-// ABOUTME: Builds registration-scoped attendee calendar exports from purpose-limited location disclosure.
-// ABOUTME: Returns no export unless the current requester has attendee authority for the primary placement.
-
 using Explore.Application.Contracts.LocationPrivacy;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

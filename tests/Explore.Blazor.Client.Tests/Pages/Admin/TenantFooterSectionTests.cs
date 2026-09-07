@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for tenant footer HAL-gated grouped settings autosave.
-// ABOUTME: Verifies group isolation, debounce, serialization, accessible feedback, and link-operation separation.
-
 using System.Reflection;
 using Explore.Blazor.Client.Contracts.Services.Footer;
 using Explore.Blazor.Client.Pages.Admin.Tenant.Components;

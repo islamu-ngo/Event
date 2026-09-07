@@ -1,4 +1,3 @@
-// ABOUTME: Interface for EventAspect service wrapping the event tag client.
 // Provides application-layer abstraction over generated API client methods.
 
 using Explore.Blazor.Client.Clients;

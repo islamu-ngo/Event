@@ -1,6 +1,3 @@
-// ABOUTME: Signature boundary for Svix-compatible webhook signing and verification.
-// ABOUTME: Enables LocalProvider delivery and incoming callback verification to share one contract.
-
 namespace Explore.Application.Contracts.Webhooks;
 
 public interface IWebhookSignatureService

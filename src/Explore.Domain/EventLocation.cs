@@ -1,6 +1,3 @@
-// ABOUTME: Canonical tenant-scoped event-to-place aggregate and disclosure-policy authority.
-// ABOUTME: Enforces explicit physical-or-TBA identity, publication readiness, audit, and fresh reattachment.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;

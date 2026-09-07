@@ -1,6 +1,3 @@
--- ABOUTME: Idempotent SQLite DDL for the co-located Quartz.NET scheduler tables in the primary application database.
--- ABOUTME: {prefix} is substituted with the validated Scheduler:Quartz:TablePrefix; GO on its own line separates batches.
-
 CREATE TABLE IF NOT EXISTS {prefix}JOB_DETAILS (
     SCHED_NAME TEXT NOT NULL,
     JOB_NAME TEXT NOT NULL,

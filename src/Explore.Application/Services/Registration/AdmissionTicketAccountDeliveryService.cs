@@ -1,6 +1,3 @@
-// ABOUTME: Authorizes account-owned ticket delivery and explicitly reissues one active credential.
-// ABOUTME: Keeps account authority and credential rotation in one transaction before QR/print mapping.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;

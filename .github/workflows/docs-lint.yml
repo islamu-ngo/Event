@@ -1,6 +1,3 @@
-# ABOUTME: Automated documentation quality gate verifying link integrity, GitBook routing, and HTML purity.
-# ABOUTME: Ensures zero broken relative links, valid GitBook mappings in README.md, and no forbidden raw HTML tags.
-
 name: Documentation Quality & Integrity
 
 permissions:

@@ -1,6 +1,3 @@
-// ABOUTME: API controller for schedule item kind lookup table (read-only enumeration).
-// ABOUTME: Provides schedule item kind options (Break, Ceremony, Keynote, etc.) for agenda items.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Hateoas;

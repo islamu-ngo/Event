@@ -1,6 +1,3 @@
-// ABOUTME: Verifies participant reads include server-authored pinned ticket-line collection metadata.
-// ABOUTME: Keeps mode and guardian facts out of Blazor inference while preserving participant PII scope.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.RegistrationOrders.Handlers.Queries;

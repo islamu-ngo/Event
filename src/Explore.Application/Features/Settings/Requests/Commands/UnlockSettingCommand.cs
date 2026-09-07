@@ -1,6 +1,3 @@
-// ABOUTME: Command for unlocking a previously locked setting, restoring cascade resolution.
-// ABOUTME: Previously suppressed lower-scope overrides become effective again upon unlock.
-
 namespace Explore.Application.Features.Settings.Requests.Commands;
 
 using Explore.Application.Responses;

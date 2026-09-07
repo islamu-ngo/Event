@@ -1,6 +1,3 @@
-// ABOUTME: Settles, retries, parks, and requeues fenced checkout dispatch effects.
-// ABOUTME: Keeps payment-attempt state and reconciliation scheduling atomic with dispatch outcomes.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

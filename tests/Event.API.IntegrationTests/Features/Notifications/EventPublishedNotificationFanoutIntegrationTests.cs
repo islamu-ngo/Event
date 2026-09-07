@@ -1,6 +1,3 @@
-// ABOUTME: Integration coverage for internal event-published notification fanout dispatch.
-// ABOUTME: Verifies real DI routing creates durable notifications once per eligible subscription.
-
 using System.Security.Cryptography;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Builders;

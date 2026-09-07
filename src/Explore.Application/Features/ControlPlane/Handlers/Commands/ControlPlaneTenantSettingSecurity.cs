@@ -1,6 +1,3 @@
-// ABOUTME: Enforces registry-owned eligibility for direct Control Plane tenant setting mutations.
-// ABOUTME: Rejects unknown, out-of-scope, and sensitive settings before any repository access.
-
 namespace Explore.Application.Features.ControlPlane.Handlers.Commands;
 
 using Explore.Application.Responses;

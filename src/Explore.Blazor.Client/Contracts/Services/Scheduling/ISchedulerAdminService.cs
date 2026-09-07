@@ -1,6 +1,3 @@
-// ABOUTME: Defines scheduler administration access for shared Blazor admin pages.
-// ABOUTME: Uses generated HAL resources end to end so server-emitted affordances survive to the component.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.Scheduling;

@@ -1,6 +1,3 @@
-// ABOUTME: Advisory end-to-end dry run of the governed release flow against a disposable repository.
-// ABOUTME: Walks prepare, exact-B candidate, signed tag, final evidence, and main verification without mutating refs.
-
 using System.Text.Json;
 using ISLAMU.ReleaseEngineering;
 

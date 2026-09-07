@@ -1,6 +1,3 @@
-// ABOUTME: Covers stable order lookup identities and exhaustive registration-order transition rules.
-// ABOUTME: Proves terminal rejected orders cannot return to a mutable workflow state.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;
 

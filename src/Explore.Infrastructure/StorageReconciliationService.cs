@@ -1,6 +1,3 @@
-// ABOUTME: Bounded storage reconciliation workflow for metadata and backing-object drift.
-// ABOUTME: Runs dry by default, then applies explicit quarantine/delete policies idempotently.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

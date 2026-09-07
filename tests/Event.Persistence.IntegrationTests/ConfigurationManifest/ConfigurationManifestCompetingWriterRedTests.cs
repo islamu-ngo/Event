@@ -1,6 +1,3 @@
-// ABOUTME: Specifies real PostgreSQL collisions for every shared ConfigurationManifest authority.
-// ABOUTME: Proves pre-transaction lock hierarchy and all-scope atomic state without timing-based waits.
-
 namespace Event.Persistence.IntegrationTests.ConfigurationManifest;
 
 using System.Collections.Immutable;

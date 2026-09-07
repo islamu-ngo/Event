@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for the actor-level Studio registration-orders navigation affordance.
-// ABOUTME: Verifies the link is controlled exclusively by the private Studio HAL context.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.Shell.Workspaces;
 using Explore.Blazor.Client.Contracts.Services;

@@ -1,6 +1,3 @@
-// ABOUTME: Rejects AI-proposed actions without executing tool side effects.
-// ABOUTME: Enforces tenant and conversation ownership before mutating proposed-action state.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.AiAssistant.Requests.Commands;

@@ -1,6 +1,3 @@
-// ABOUTME: Benchmark-owned API seed data for non-empty representative endpoint measurements.
-// ABOUTME: Creates deterministic tenant, user, actor, and event rows without changing product seed behavior.
-
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;

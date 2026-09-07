@@ -1,6 +1,3 @@
-// ABOUTME: Verifies SSH-signed annotated release tags and writes deterministic final release evidence.
-// ABOUTME: Generates canonical tag messages from committed release sources and candidate manifests.
-
 using System.Diagnostics;
 using System.Globalization;
 using System.Security.Cryptography;

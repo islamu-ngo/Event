@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for canceling an upload session and releasing reserved quota.
-// ABOUTME: Uses storage-object delete authorization because cancellation removes the pending upload affordance.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.StorageObject;
 using Explore.Application.Responses;

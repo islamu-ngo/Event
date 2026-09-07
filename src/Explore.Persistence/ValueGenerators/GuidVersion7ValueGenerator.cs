@@ -1,4 +1,3 @@
-// ABOUTME: Value generator for UUID v7 GUIDs providing time-ordered unique identifiers
 // for improved database index performance compared to random UUID v4.
 
 namespace Explore.Persistence.ValueGenerators;

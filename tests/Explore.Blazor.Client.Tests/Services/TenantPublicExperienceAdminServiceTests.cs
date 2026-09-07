@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for tenant-admin public experience settings mapping and save behavior.
-// ABOUTME: Verifies generic setting endpoints are wrapped safely for post-onboarding public UX controls.
-
 namespace Explore.Blazor.Client.Tests.Services;
 
 public class TenantPublicExperienceAdminServiceTests

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the generic command-response mapper's success body and RFC 7807 failure mapping.
-// ABOUTME: Pins the status and problem shape for each shared failure code, including unmapped ones.
-
 using Explore.API.ExceptionHandling;
 using Explore.Application.DTOs.StorageObject;
 using Explore.Application.Features.EmailDispatch;

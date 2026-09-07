@@ -1,6 +1,3 @@
-// ABOUTME: Security regressions for authoritative storage raster-content inspection.
-// ABOUTME: Covers exact MIME binding, complete containers, progressive JPEG, and real animated WebP.
-
 using System.Text;
 using Explore.Application.Services;
 using Explore.Domain;

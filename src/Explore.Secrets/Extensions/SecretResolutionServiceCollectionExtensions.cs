@@ -1,6 +1,3 @@
-// ABOUTME: DI registration for the secret resolution pipeline (resolver + sources + health).
-// ABOUTME: Composition root for Phase 3 - called by Explore.API and Explore.Blazor Program.cs.
-
 namespace Explore.Secrets.Extensions;
 
 using Explore.Application.Contracts.Infrastructure;

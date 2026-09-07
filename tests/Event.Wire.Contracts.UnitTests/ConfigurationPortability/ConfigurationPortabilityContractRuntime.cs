@@ -1,6 +1,3 @@
-// ABOUTME: Discovers and invokes the final package-free portability contract through public reflection seams.
-// ABOUTME: Keeps Red compilable without Application, Domain, linked source, aliases, or compatibility shims.
-
 namespace ISLAMU.Wire.Contracts.UnitTests.ConfigurationPortability;
 
 using System.Reflection;

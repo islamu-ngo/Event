@@ -1,6 +1,3 @@
-// ABOUTME: Strategy for OpenAI-compatible AI providers using raw HTTP dispatch.
-// ABOUTME: Delegates to OpenAiCompatibleChatProvider and reports configured_no_probe status.
-
 using Explore.Application.Contracts.Infrastructure.Ai;
 
 namespace Explore.Infrastructure.Ai;

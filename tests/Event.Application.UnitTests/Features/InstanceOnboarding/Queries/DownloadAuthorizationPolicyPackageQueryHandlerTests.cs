@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for manual authorization policy package archive download query handling.
-// ABOUTME: Verifies the Application layer delegates archive construction through the provider-neutral package service seam.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.InstanceOnboarding.Handlers.Queries;

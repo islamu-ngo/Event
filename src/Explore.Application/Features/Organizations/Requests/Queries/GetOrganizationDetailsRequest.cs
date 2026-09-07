@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query request for fetching full organization details.
-// ABOUTME: Returns OrganizationDto.
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;

@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS policies for event-session speaker assignment resources.
-// ABOUTME: Emits only parent-session-authorized edit and delete affordances for management UI.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Collections.Generic;

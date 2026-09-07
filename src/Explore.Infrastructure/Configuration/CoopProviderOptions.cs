@@ -1,6 +1,3 @@
-// ABOUTME: Static configuration for the Coop review queue provider adapter.
-// ABOUTME: Keeps Coop endpoint, credentials, and transport choices inside Infrastructure.
-
 namespace Explore.Infrastructure.Configuration;
 
 public sealed class CoopProviderOptions

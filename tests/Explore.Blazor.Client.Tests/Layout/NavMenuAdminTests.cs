@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for NavMenu admin section visibility based on BFF-reported admin status.
-// ABOUTME: Verifies browser admin claims are not treated as navigation authority.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Shell;
 using Explore.Blazor.Client.Layout;

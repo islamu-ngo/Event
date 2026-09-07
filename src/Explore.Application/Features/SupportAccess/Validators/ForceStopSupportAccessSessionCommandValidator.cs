@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for administrative support-access revocation requests.
-// ABOUTME: Keeps force-stop session IDs and operator notes bounded before persistence.
-
 using Explore.Application.Features.SupportAccess.Requests.Commands;
 using Explore.Domain;
 using FluentValidation;

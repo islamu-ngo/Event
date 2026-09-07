@@ -1,6 +1,3 @@
-// ABOUTME: Resource assembler for EventAgendaItem entities.
-// ABOUTME: Converts EventAgendaItemDto and EventAgendaItemListDto to HAL resources with HATEOAS links.
-
 namespace Explore.API.Hateoas.Assemblers;
 
 using System.Security.Claims;

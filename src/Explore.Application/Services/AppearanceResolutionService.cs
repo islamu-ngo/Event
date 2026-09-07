@@ -1,6 +1,3 @@
-// ABOUTME: Central appearance resolution service that walks the fallback chain to determine the effective appearance for a user.
-// ABOUTME: Resolves: user tenant profile → user global profile → tenant default preset → instance default preset → system fallback.
-
 namespace Explore.Application.Services;
 
 using Explore.Application.Contracts.Infrastructure;

@@ -1,6 +1,3 @@
-# ABOUTME: Staging CI/CD — builds Docker images and deploys to Coolify staging on push to develop.
-# ABOUTME: Uses change detection to only build/test/deploy API or UI when their source code changes.
-
 name: Build and Deploy to Coolify (Develop)
 
 permissions:

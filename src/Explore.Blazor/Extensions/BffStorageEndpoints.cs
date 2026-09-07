@@ -1,6 +1,3 @@
-// ABOUTME: Storage BFF endpoints issue upload sessions and proxy files to server-approved destinations.
-// ABOUTME: Requires antiforgery or a protected same-process self-call token before accepting upload mutations.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Services;
 using Explore.Blazor.Services.Preferences;

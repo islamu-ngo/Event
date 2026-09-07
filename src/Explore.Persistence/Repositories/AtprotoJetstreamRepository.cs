@@ -1,6 +1,3 @@
-// ABOUTME: Implements the single global renewable Jetstream lease and fenced cursor ownership.
-// ABOUTME: Atomically applies canonical records, tombstones, tenant presentations, or quarantine before cursor advance.
-
 using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
 using Explore.Application.Authorization;

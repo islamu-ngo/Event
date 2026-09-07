@@ -1,6 +1,3 @@
-// ABOUTME: Canonical tenant-scoped event report aggregate for user and provider moderation intake.
-// ABOUTME: Stores safe report metadata only; reporter evidence content lives in EventReportEvidence.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

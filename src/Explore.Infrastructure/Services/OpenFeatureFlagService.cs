@@ -1,6 +1,3 @@
-// ABOUTME: OpenFeature-backed implementation of IFeatureFlagService.
-// ABOUTME: Delegates all flag evaluation to the injected IFeatureClient from the OpenFeature SDK.
-
 using Explore.Application.Contracts.Services;
 using OpenFeature;
 using OpenFeature.Model;

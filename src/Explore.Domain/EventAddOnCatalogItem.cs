@@ -1,6 +1,3 @@
-// ABOUTME: Defines one immutable event add-on offer with price, capacity, and buyer disclosures.
-// ABOUTME: Keeps optional commerce facts separate from ticket entitlement and admission authority.
-
 using Explore.Domain.Interfaces;
 using Explore.Domain.ValueObjects;
 

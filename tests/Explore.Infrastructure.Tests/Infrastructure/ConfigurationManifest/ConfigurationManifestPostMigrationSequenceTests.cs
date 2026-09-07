@@ -1,6 +1,3 @@
-// ABOUTME: Pins the shared post-migration configuration-manifest startup sequence.
-// ABOUTME: Proves ordering, failure short-circuiting, and cancellation without timing-based waits.
-
 namespace Explore.Infrastructure.Tests.Infrastructure.ConfigurationManifest;
 
 using Explore.Infrastructure.ConfigurationManifest;

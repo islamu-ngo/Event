@@ -1,6 +1,3 @@
-// ABOUTME: Current-baseline and persisted provider-authority tests for the webhook schema.
-// ABOUTME: Verifies deterministic schema SQL and that legacy-unverified bindings cannot grant portal capability.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;

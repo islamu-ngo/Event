@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL tests for storage-object deletion retry discovery queries.
-// ABOUTME: Verifies delete-requested image rows remain findable by tenant and owning resource after FKs are cleared.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Authorization;
 using Explore.Domain;

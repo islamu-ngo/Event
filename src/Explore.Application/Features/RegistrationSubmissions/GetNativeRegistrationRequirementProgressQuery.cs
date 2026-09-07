@@ -1,6 +1,3 @@
-// ABOUTME: Resolves attendee-safe launch descriptors for pending native order requirements.
-// ABOUTME: Fails closed on ambiguous published forms and derives every subject from server-owned order state.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Application.DTOs.RegistrationSubmissions;

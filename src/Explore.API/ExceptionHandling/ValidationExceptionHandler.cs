@@ -1,6 +1,3 @@
-// ABOUTME: Handles validation-related exceptions and returns RFC 7807 responses.
-// ABOUTME: Emits safe validation payloads without stack traces or internal details.
-
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 

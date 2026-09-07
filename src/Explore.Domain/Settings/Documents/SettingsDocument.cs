@@ -1,6 +1,3 @@
-// ABOUTME: Typed wrapper for versioned non-secret settings document payloads.
-// ABOUTME: Keeps document metadata explicit before persistence-specific JSONB mapping.
-
 namespace Explore.Domain.Settings.Documents;
 
 /// <summary>

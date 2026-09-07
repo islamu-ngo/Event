@@ -1,6 +1,3 @@
-// ABOUTME: HTTP service for the localization admin endpoints — test connection, export, governance update.
-// ABOUTME: Uses the generated API client contract for every backend operation.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Specifies a dedicated server-only recovery capability HMAC secret definition.
-// ABOUTME: Prevents admission credential, promotion, or unrelated key-family reuse.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 

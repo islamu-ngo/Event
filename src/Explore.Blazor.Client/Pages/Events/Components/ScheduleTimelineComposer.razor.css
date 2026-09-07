@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped styles for the Create Event schedule timeline composer. */
-/* ABOUTME: Uses BEM classes and logical properties for accessible responsive layout. */
-
 .schedule-timeline {
     display: flex;
     flex-direction: column;

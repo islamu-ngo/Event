@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query request for fetching all DID custody types.
-// ABOUTME: Returns IEnumerable<DidCustodyTypeDto>.
 using System.Collections.Generic;
 using Explore.Application.DTOs.DidCustodyType;
 using MediatR;

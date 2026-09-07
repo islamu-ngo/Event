@@ -1,6 +1,3 @@
-// ABOUTME: Dispatches configuration import cache effects from the transactional outbox.
-// ABOUTME: Retries value-free operation identities without storing configuration values in messages.
-
 namespace Explore.Application.Features.ConfigurationManifest.Importing;
 
 using Explore.Application.Contracts.Infrastructure;

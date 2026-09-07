@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS link policies for category detail and collection resources.
-// ABOUTME: Emits only category affordances backed by registered API route names.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Collections.Generic;

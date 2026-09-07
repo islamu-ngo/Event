@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for LocalProvider webhook retry backoff scheduling.
-// ABOUTME: Locks bounded exponential full-jitter behavior used by delivery workers and manual retries.
-
 using Explore.Infrastructure.Configuration;
 using Explore.Infrastructure.Webhooks;
 using Microsoft.Extensions.Options;

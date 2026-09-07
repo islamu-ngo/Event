@@ -1,6 +1,3 @@
-/* ABOUTME: CSS isolation for the dedicated event session creation page. */
-/* ABOUTME: Keeps program-item authoring visually aligned with the progressive-disclosure event composer. */
-
 .create-session {
     min-height: 100%;
     background: var(--isl-color-surface-subtle, transparent);

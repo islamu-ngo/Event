@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL integration tests for durable location-privacy correction outbox transitions.
-// ABOUTME: Uses the current EF model to prove retry, dead-letter visibility, reconciliation, and completion.
-
 using System.Text.Json;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Caching;

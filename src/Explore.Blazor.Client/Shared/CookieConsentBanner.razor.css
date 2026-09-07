@@ -1,5 +1,3 @@
-/* ABOUTME: Scoped CSS for CookieConsentBanner. Non-blocking fixed-bottom banner with BEM naming. */
-
 .cookie-consent-banner {
     position: fixed;
     bottom: 0;

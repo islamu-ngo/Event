@@ -1,6 +1,3 @@
-// ABOUTME: Generates only approved repository-owned opaque dotenv material from fresh BCL cryptographic entropy.
-// ABOUTME: Owns clearable character buffers and exposes no generated material through diagnostics or string projections.
-
 namespace ISLAMU.Event.Setup.Core.Environment;
 
 using System.Security.Cryptography;

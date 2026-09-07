@@ -1,6 +1,3 @@
-/* ABOUTME: Event attendee route layout using the established Studio token rhythm. */
-/* ABOUTME: Keeps loading and denied states legible across responsive widths. */
-
 .studio-event-attendees,
 .studio-event-attendees__header {
     display: flex;

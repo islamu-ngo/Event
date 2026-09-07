@@ -1,6 +1,3 @@
-// ABOUTME: Manages access token storage for Blazor Server circuits and token forwarding to API requests.
-// ABOUTME: Contains CircuitAccessTokenService (scoped token store) and AccessTokenForwardingHandler (HTTP message handler).
-
 using System.Collections.Concurrent;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;

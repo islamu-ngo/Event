@@ -1,4 +1,3 @@
-// ABOUTME: EF Core configuration for OrganizationSetting entity with UUID v7 generation
 // and composite unique constraint on (OrganizationId, SettingKey).
 
 namespace Explore.Persistence.Configurations.Entities;

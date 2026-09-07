@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the native integration sync drain service around Listmonk outbox rows.
-// ABOUTME: Verifies claim, complete, retry, and dead-letter outcomes without a live Listmonk instance.
-
 using System.Net;
 using System.Text;
 using Explore.Application.Contracts.Infrastructure;

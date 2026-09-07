@@ -1,6 +1,3 @@
-// ABOUTME: Maps exact partial-refund allocations against immutable add-on lines.
-// ABOUTME: Enforces tenant-qualified replay identity, currency, quantity, and value constraints.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

@@ -1,6 +1,3 @@
-// ABOUTME: S3 runtime configuration composed from governance and external secret authority.
-// ABOUTME: Supports project-approved S3-compatible providers without persisting credentials.
-
 namespace Explore.Application.Models;
 
 /// <summary>

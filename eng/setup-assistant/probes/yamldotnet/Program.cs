@@ -1,6 +1,3 @@
-// ABOUTME: Compiles the approved syntax-tree-only YAML role against one bounded in-memory document.
-// ABOUTME: Exercises no generic deserializer, emitter, remote source, file I/O, or product authority.
-
 using YamlDotNet.RepresentationModel;
 
 var stream = new YamlStream();

@@ -1,6 +1,3 @@
-// ABOUTME: HAL policies for provider publication operations and append-only evidence resources.
-// ABOUTME: Emits reconcile and abandon links only for exact normalized states and provider authority.
-
 using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;

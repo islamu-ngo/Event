@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for tenant-scoped event templates used to instantiate Layer 3 runtime definitions.
-// ABOUTME: Enforces stable template keys, version uniqueness, and optional event-type scoping.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

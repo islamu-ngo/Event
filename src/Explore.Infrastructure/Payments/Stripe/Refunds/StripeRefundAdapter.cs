@@ -1,6 +1,3 @@
-// ABOUTME: Executes Stripe refunds and retrievals in the original connected-account context.
-// ABOUTME: Maps Stripe refund state and transport ambiguity into bounded provider-neutral results.
-
 using System.Net;
 using Explore.Application.Contracts.Payments;
 using Explore.Application.Contracts.Secrets;

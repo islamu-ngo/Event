@@ -1,6 +1,3 @@
-// ABOUTME: Tests for UiShellState.ReconcileAvailability revocation reconciliation.
-// ABOUTME: Verifies revoked workspaces fall back to Events and invalid stored routes are removed.
-
 using Explore.Blazor.Client.Services.Shell;
 
 namespace Explore.Blazor.Client.Tests.Services.Shell;

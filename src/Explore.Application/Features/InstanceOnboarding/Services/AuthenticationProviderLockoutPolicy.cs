@@ -1,6 +1,3 @@
-// ABOUTME: Evaluates whether a provider update preserves a usable sign-in path for the current administrator.
-// ABOUTME: Fails closed for missing account bindings and treats primary AT Protocol as an enabled authority.
-
 using Explore.Application.DTOs.Onboarding;
 using Explore.Domain;
 using Explore.Domain.Enums;

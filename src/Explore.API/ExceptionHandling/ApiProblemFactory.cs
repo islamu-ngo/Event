@@ -1,6 +1,3 @@
-// ABOUTME: Creates RFC 7807 ProblemDetails payloads for API-owned response mapping.
-// ABOUTME: Centralizes standard trace, timestamp, correlation, and content-type behavior.
-
 using Microsoft.AspNetCore.Mvc;
 
 namespace Explore.API.ExceptionHandling;

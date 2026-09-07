@@ -1,6 +1,3 @@
-// ABOUTME: Scheduler-neutral envelope describing one future instant at which platform work must wake up.
-// ABOUTME: Constrains its payload to string identifiers so no domain object can reach scheduler storage.
-
 namespace Explore.Application.Contracts.Scheduling;
 
 /// <summary>

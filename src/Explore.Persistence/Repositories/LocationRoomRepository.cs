@@ -1,6 +1,3 @@
-// ABOUTME: EF implementation of ILocationRoomRepository with bounded and location-scoped queries.
-// ABOUTME: Disclosure and query-handler reads are tenant-filtered and AsNoTracking.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

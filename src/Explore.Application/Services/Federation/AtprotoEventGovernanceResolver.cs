@@ -1,6 +1,3 @@
-// ABOUTME: Resolves effective ATProto event capability/profile and current-user publication consent.
-// ABOUTME: Uses tenant-only context for administrator policy so stale user rows cannot override it.
-
 namespace Explore.Application.Services.Federation;
 
 using Explore.Application.Contracts.Infrastructure;

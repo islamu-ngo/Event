@@ -1,6 +1,3 @@
-// ABOUTME: Secured Control Plane command for deliberate deployment-mode transitions.
-// ABOUTME: Prevents casual settings toggles by requiring target-mode confirmation and update permission.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.ControlPlane;
 using Explore.Application.Responses;

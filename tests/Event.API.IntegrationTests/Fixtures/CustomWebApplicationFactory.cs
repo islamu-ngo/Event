@@ -1,6 +1,3 @@
-// ABOUTME: Configures the API integration host with deterministic in-memory infrastructure.
-// ABOUTME: Supplies non-secret startup identity so runtime validation remains active in tests.
-
 using System.Threading.Channels;
 using Explore.Domain.Constants;
 using Explore.Persistence;

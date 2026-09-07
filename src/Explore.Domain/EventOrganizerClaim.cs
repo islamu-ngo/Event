@@ -1,6 +1,3 @@
-// ABOUTME: Auditable claim by an actor seeking future organizer authority over an event.
-// ABOUTME: Encapsulates review transitions and preserves provenance and historical attendee-data boundaries.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Regression tests for antiforgery enforcement on authenticated and anonymous unsafe BFF API proxy mutations.
-// ABOUTME: Proves missing tokens fail, valid tokens proxy, and safe reads remain unblocked.
-
 using System.Net;
 using System.Text;
 using Explore.Blazor.IntegrationTests.Fixtures;

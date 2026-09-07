@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for moderation-provider integration callbacks.
-// ABOUTME: Authenticates Osprey callbacks and delegates persistence to Application commands.
-
 using System.Text.Json;
 using Asp.Versioning;
 using Explore.API.Attributes;

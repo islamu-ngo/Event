@@ -1,6 +1,3 @@
-// ABOUTME: Red contract for a bounded secret-authority status in the existing control-plane overview.
-// ABOUTME: Rejects value, source-coordinate, binding, and provider-diagnostic fields at the API boundary.
-
 using Explore.Application.Features.ControlPlane.Handlers.Queries;
 
 namespace Event.Application.UnitTests.Features.ConfigurationManifest;

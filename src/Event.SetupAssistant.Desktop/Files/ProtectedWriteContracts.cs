@@ -1,6 +1,3 @@
-// ABOUTME: Defines value-free protected-write requests, results, and platform writer contracts.
-// ABOUTME: Separates prepare from commit so target changes are detected before atomic installation.
-
 namespace ISLAMU.Event.SetupAssistant.Desktop.Files;
 
 public enum ProtectedWriteDisposition

@@ -1,6 +1,3 @@
-// ABOUTME: Query request for the current tenant's redacted moderation-reporting dashboard health.
-// ABOUTME: Uses tenant settings authorization so dashboard reads follow the same policy as routing-state reads.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventReporting;
 using MediatR;

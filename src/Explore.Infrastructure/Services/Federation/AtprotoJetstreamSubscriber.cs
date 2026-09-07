@@ -1,6 +1,3 @@
-// ABOUTME: Runs the one globally leased reconnecting Jetstream v2 consumer for community event and RSVP records.
-// ABOUTME: Reconnects on DID filter changes and invokes governed PDS recovery under the active global lease fence.
-
 using System.Diagnostics.Metrics;
 using System.Runtime.ExceptionServices;
 using System.Threading.Channels;

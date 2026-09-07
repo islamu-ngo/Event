@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for webhook provider startup configuration validation.
-// ABOUTME: Covers Svix feature flags, auth-token secret refs, and self-hosted base URL safety.
-
 using Explore.Domain.Secrets;
 using Explore.Infrastructure.Configuration;
 using Explore.Infrastructure.Webhooks;

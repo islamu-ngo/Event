@@ -1,6 +1,3 @@
-// ABOUTME: Operator settings for scheduled AI assistant retention cleanup passes.
-// ABOUTME: Controls dry-run mode, startup delay, polling cadence, and tenant batch bounds.
-
 namespace Explore.Infrastructure;
 
 public sealed class AiRetentionCleanupSettings

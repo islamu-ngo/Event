@@ -1,6 +1,3 @@
-// ABOUTME: Authorized command for starting an actor-bound support-access session.
-// ABOUTME: Carries target tenant, mode, duration, reason, and ticket metadata into the Application layer.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.SupportAccess;
 using Explore.Domain.Enums;

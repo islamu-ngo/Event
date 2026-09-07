@@ -1,6 +1,3 @@
-// ABOUTME: Converts bounded CarpaNet Jetstream v2 envelopes into canonical records or payload-free quarantine outcomes.
-// ABOUTME: Enforces exact collections, operations, DIDs, record types, generated lexicon shape, and encoded sizes.
-
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;

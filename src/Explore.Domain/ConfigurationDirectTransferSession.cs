@@ -1,6 +1,3 @@
-// ABOUTME: Models an opt-in, mutually approved, resumable configuration transfer without source deletion.
-// ABOUTME: Binds destination proof, nonce, artifact digest, offsets, expiry, cancellation, and replay-safe completion.
-
 namespace Explore.Domain;
 
 public enum ConfigurationDirectTransferStatus

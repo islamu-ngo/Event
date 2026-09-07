@@ -1,6 +1,3 @@
-// ABOUTME: Route guard that restricts instance admin routes to platform-scoped instance administrators.
-// ABOUTME: Uses DB-backed BFF admin authority before falling back to onboarding status.
-
 using Blazouter.Interfaces;
 using Blazouter.Models;
 using Explore.Blazor.Client.Services;

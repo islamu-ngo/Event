@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for event session CRUD operations with multi-language and speaker support.
-// ABOUTME: Manages event sessions, agendas, speakers, and session-level registration with HATEOAS.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

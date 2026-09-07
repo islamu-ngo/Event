@@ -1,6 +1,3 @@
-// ABOUTME: Maps versioned event add-on catalogs with tenant-safe event ownership.
-// ABOUTME: Enforces immutable publication lineage and one active catalog per event.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

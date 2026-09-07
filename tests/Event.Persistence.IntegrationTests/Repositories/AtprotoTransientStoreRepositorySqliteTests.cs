@@ -1,6 +1,3 @@
-// ABOUTME: Exercises ATProto transient storage through independent file-backed SQLite contexts.
-// ABOUTME: Specifies insert-only creation, tenant binding, expiry, and exactly-one-winner consumption.
-
 using Explore.Domain;
 using Explore.Persistence;
 using Explore.Persistence.Database;

@@ -1,6 +1,3 @@
-// ABOUTME: Shared RabbitMQ connection factory for EmailDispatch publisher and consumer adapters.
-// ABOUTME: Centralizes connection-string resolution so broker endpoints never leak into handlers.
-
 using Microsoft.Extensions.Configuration;
 using RabbitMQ.Client;
 

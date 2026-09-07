@@ -1,6 +1,3 @@
-// ABOUTME: Plans every outbound event lifecycle operation through one network-free governed outbox gate.
-// ABOUTME: Requires capability, self-consent, an exact encrypted session, exhaustive valid payload, and existing ownership for mutations.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Authentication;

@@ -1,6 +1,3 @@
-// ABOUTME: Test-only translator from the historical attribute vocabulary into closed authorization facts.
-// ABOUTME: Keeps the provider behavioural corpus intact without giving production code a dictionary input.
-
 using Explore.Application.Authorization;
 using Explore.Domain;
 

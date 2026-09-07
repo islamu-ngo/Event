@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for converting untrusted AI UpdateEventDraft proposals into safe draft DTOs.
-// ABOUTME: Verifies required concurrency, hidden fields, validation bounds, and DTO mapping output.
-
 using Explore.Application.Features.AiAssistant.Actions;
 using Explore.Application.Features.AiAssistant.Prompting;
 using Explore.Domain.Ai;

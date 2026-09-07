@@ -1,6 +1,3 @@
-// ABOUTME: Applies bounded provider refund observations to durable provider-neutral attempt state.
-// ABOUTME: Marks success only from exact identity, amount, currency, and explicit provider success evidence.
-
 using Explore.Application.Contracts.Payments;
 using Explore.Domain;
 using Explore.Domain.Enums;

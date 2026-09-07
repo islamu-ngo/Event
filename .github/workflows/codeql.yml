@@ -1,6 +1,3 @@
-# ABOUTME: CodeQL security scanning for C#, JS/TS, and GitHub Actions.
-# ABOUTME: Always reports checks, running analysis only when CodeQL-relevant files change.
-
 name: "CodeQL Advanced"
 
 concurrency:

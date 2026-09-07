@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for ImportEventRequestDto, manually instantiated by the handler.
-// ABOUTME: Enforces non-empty title, valid tenant/owner ids, and required provenance metadata.
-
 using Explore.Application.DTOs.Event;
 using FluentValidation;
 

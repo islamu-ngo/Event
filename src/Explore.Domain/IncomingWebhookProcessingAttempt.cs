@@ -1,6 +1,3 @@
-// ABOUTME: Append-only bounded evidence for each incoming webhook claim and processing outcome.
-// ABOUTME: Carries generation and fence values so concurrent or stale executions remain distinguishable.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

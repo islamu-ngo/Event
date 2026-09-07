@@ -1,6 +1,3 @@
-// ABOUTME: Requests one published legal document by its closed public kind code.
-// ABOUTME: Carries locale preference only; trusted runtime context supplies tenant authority.
-
 namespace Explore.Application.Features.LegalDocuments.Requests.Queries;
 
 using Explore.Application.DTOs.LegalDocuments;

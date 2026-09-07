@@ -1,6 +1,3 @@
-// ABOUTME: Enforces complete isolation between Blazor projects and API-owned Clean Architecture layers.
-// ABOUTME: Requires Blazor runtime and test code to use generated API contracts instead of backend assemblies.
-
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 

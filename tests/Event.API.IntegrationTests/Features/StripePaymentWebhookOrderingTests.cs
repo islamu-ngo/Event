@@ -1,6 +1,3 @@
-// ABOUTME: Signed end-to-end ordering fixtures for Stripe Connect payment webhook intake.
-// ABOUTME: Exercises exact raw verification, durable dedupe, handler scheduling, and monotonic reconciliation.
-
 using System.Text;
 using System.Text.Json;
 using Explore.API.Services;

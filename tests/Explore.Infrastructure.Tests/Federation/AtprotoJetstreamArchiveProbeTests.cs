@@ -1,6 +1,3 @@
-// ABOUTME: Tests sealed-archive change probing that narrows governed PDS recovery to active repositories.
-// ABOUTME: Proves every uncertain path reports inconclusive so recovery scope is never silently reduced.
-
 using CarpaNet.Jetstream;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Infrastructure.Services.Federation;

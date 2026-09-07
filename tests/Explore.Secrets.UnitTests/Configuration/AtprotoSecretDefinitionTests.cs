@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the three purpose-separated AT Protocol secret definitions.
-// ABOUTME: Proves the canonical registry uses instance-only non-bootstrap bindings under the ATProto path.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 

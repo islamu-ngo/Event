@@ -1,6 +1,3 @@
-// ABOUTME: Centralized Include chain for Notification queries to eliminate duplication across NotificationRepository methods.
-// ABOUTME: Only includes navigation properties — callers control tracking strategy (AsNoTracking).
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 

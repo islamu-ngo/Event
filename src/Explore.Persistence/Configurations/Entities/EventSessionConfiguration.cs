@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for EventSession rows, scheduling constraints, and tenant-safe event graph links.
-// ABOUTME: Composite FKs bind sessions to same-tenant events, days, locations, and rooms at the database boundary.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Schema;

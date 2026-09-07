@@ -1,6 +1,3 @@
-// ABOUTME: Readiness health check for storage reconciliation posture.
-// ABOUTME: Reports bounded safety-mode settings without exposing paths, object keys, or tenant data.
-
 using Explore.Infrastructure;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;

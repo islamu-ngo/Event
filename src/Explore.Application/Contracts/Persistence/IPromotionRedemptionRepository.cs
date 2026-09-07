@@ -1,6 +1,3 @@
-// ABOUTME: Application persistence contract for promotion lookup and reservation lifecycle orchestration.
-// ABOUTME: Returns Domain entities only so promotion CQRS handlers keep DTO mapping and EF concerns out.
-
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Domain;
 

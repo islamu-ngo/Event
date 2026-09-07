@@ -1,6 +1,3 @@
-// ABOUTME: Canonical registration lifecycle classification for approval status values.
-// ABOUTME: Defines capacity-bearing, live-disclosure, terminal, and transition semantics fail closed.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Domain.Services.Registration;

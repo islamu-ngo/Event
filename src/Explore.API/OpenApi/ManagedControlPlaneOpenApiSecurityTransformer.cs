@@ -1,6 +1,3 @@
-// ABOUTME: Documents the isolated X-Control-Plane-Key apiKey scheme on protected management operations.
-// ABOUTME: Overrides global security for anonymous management capabilities and directional machine policies.
-
 using Explore.API.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Explore.Application.Constants;

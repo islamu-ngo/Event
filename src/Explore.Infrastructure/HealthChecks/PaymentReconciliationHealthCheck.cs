@@ -1,6 +1,3 @@
-// ABOUTME: Bounded readiness projection for durable payment-reconciliation work.
-// ABOUTME: Reports aggregate due, unknown, and parked counts without tenant or payment identifiers.
-
 using Explore.Application.Contracts.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;

@@ -1,6 +1,3 @@
-<!-- ABOUTME: Canonical vulnerability disclosure and security policy for ISLAMU Event. -->
-<!-- ABOUTME: Outlines responsible disclosure procedures, reporting channels, scope, and response commitments. -->
-
 # Security Policy
 
 This document outlines the security protocols and vulnerability reporting guidelines for the ISLAMU Event project. Ensuring the security of our systems is a top priority, and while we work diligently to maintain robust protection, vulnerabilities may still occur. We highly value the community’s role in identifying and reporting security concerns to uphold the integrity of our systems and safeguard our users.

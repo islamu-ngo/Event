@@ -1,6 +1,3 @@
-// ABOUTME: Provides the bounded system prompt and structured action schema for AI assistant runs.
-// ABOUTME: Centralizes tool allow-list text so provider output stays proposal-only and non-mutating.
-
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Features.AiAssistant.Tools;
 using Explore.Application.Settings.Groups;

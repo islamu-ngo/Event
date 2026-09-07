@@ -1,6 +1,3 @@
-// ABOUTME: Maps the singleton monotonic platform privacy-erasure sequence allocator.
-// ABOUTME: Enforces one true-key row and a non-negative last allocated sequence.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

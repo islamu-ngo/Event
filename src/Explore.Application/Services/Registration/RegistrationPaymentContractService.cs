@@ -1,6 +1,3 @@
-// ABOUTME: Builds the authoritative registration-payment contract from durable order, attempt, and dispatch state.
-// ABOUTME: Starts and retries only local durable work; provider retrieval is isolated to checkout navigation resolution.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Payments;
 using Explore.Application.DTOs.RegistrationOrders;

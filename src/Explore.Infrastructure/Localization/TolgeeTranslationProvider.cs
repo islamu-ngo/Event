@@ -1,6 +1,3 @@
-// ABOUTME: Tolgee TMS provider implementation using Tolgee REST API v2.
-// ABOUTME: Supports import, export, language listing with X-API-Key authentication.
-
 using System.Net.Http.Headers;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Secrets;

@@ -1,6 +1,3 @@
-// ABOUTME: Specifies the final package-free environment catalogue, activation, and machine parity contract.
-// ABOUTME: Proves independent cycle, collision, default, relevance, secret, and leakage breakers fail closed.
-
 namespace ISLAMU.Setup.Core.EnvironmentTests;
 
 using System.Reflection;

@@ -1,6 +1,3 @@
-// ABOUTME: Locks outgoing webhook messages to immutable exact-byte payload authority.
-// ABOUTME: Rejects provider state, mutable semantic setters, and JSON-string payload ownership.
-
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Contracts.Webhooks;

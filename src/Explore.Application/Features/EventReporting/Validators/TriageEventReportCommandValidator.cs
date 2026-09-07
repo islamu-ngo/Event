@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for local event-report triage commands.
-// ABOUTME: Performs syntactic checks before tenant, status, and concurrency checks run in the handler.
-
 using Explore.Application.Features.EventReporting.Requests.Commands;
 using Explore.Domain;
 using FluentValidation;

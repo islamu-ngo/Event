@@ -1,6 +1,3 @@
-// ABOUTME: Contract for composing S3 governance with externally resolved credentials.
-// ABOUTME: Supports tenant governance without allowing database-backed credential overrides.
-
 using Explore.Application.Models;
 
 namespace Explore.Application.Contracts.Infrastructure;

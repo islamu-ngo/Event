@@ -1,6 +1,3 @@
-// ABOUTME: Closes Setup live schemas, media types, issuance headers, and binary writes in OpenAPI.
-// ABOUTME: Keeps generated clients typed and write-only without exposing authority in response bodies.
-
 namespace Explore.API.OpenApi;
 
 using Explore.API.Hateoas;

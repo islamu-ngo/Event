@@ -1,6 +1,3 @@
-// ABOUTME: Safe registration-order read model for lifecycle commands and future API assembly.
-// ABOUTME: Excludes purchaser PII, guest capabilities, answers, and participant data by design.
-
 using System.Text.Json.Serialization;
 using Explore.Domain;
 using Explore.Domain.Enums;

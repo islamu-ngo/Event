@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for tenant-owned typed settings documents.
-// ABOUTME: Supports additive typed JSONB resolution without changing legacy scalar setting repositories.
-
 namespace Explore.Application.Contracts.Persistence;
 
 using Explore.Domain.Settings.Documents;

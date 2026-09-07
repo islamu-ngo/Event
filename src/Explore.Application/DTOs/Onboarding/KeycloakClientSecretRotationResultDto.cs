@@ -1,6 +1,3 @@
-// ABOUTME: Safe result contract for Keycloak client-secret rotation attempts.
-// ABOUTME: Reports ownership/action status without returning secret values, tokens, or raw provider responses.
-
 namespace Explore.Application.DTOs.Onboarding;
 
 public sealed record KeycloakClientSecretRotationResultDto

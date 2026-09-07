@@ -1,6 +1,3 @@
-// ABOUTME: Validates bounded inbound community-calendar content before tenant-local persistence is attempted.
-// ABOUTME: Requires only name and createdAt while failing closed for malformed optional fields.
-
 using Explore.Application.Features.Federation.Atproto.Models;
 using Explore.Application.Services.Federation;
 using FluentValidation;

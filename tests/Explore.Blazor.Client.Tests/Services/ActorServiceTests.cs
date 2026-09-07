@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for ActorService covering HAL-based actor reads and conversion behavior.
-// ABOUTME: Verifies global/contextual retrieval, HAL mapping, null handling, and exception propagation.
-
 using Explore.Blazor.Client.Constants;
 using Explore.Blazor.Client.Helpers;
 

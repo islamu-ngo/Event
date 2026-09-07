@@ -1,6 +1,3 @@
-// ABOUTME: Resolves the effective appearance preferences for the authenticated user.
-// ABOUTME: Uses the hierarchical settings engine so tenant defaults and user overrides share one precedence path.
-
 namespace Explore.Application.Features.Appearance.Handlers.Queries;
 
 using Explore.Application.Contracts.Infrastructure;

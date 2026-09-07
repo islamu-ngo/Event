@@ -1,6 +1,3 @@
-// ABOUTME: Setting definitions for tenant-scoped native integration provider configuration.
-// ABOUTME: Registers Listmonk sync controls plus secret-backed API credential placeholders.
-
 namespace Explore.Domain.Settings.Definitions;
 
 using Explore.Domain.Constants;

@@ -1,6 +1,3 @@
-// ABOUTME: Persistence boundary for atomic recipient intent, channel, in-app, and email graphs.
-// ABOUTME: Exposes exact deduplication recovery without widening the legacy notification-intent repository.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

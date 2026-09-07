@@ -1,6 +1,3 @@
-// ABOUTME: Guards generated browser contracts from ATProto credentials and private bridge operations.
-// ABOUTME: Proves removed raw-token and direct-record mutation symbols stay out of client and serializer sources.
-
 namespace Explore.Blazor.Client.Tests.Security;
 
 public sealed class AtprotoCredentialIsolationTests

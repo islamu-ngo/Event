@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the EF boundary for participation requirement attachments.
-// ABOUTME: Pins tenant/event lineage, active uniqueness, standalone uniqueness, and concurrency metadata.
-
 using Explore.Domain;
 using Explore.Persistence;
 using Explore.Persistence.QueryFilters;

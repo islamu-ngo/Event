@@ -1,6 +1,3 @@
-// ABOUTME: Unit-style tests for the API AiRetentionCleanupHealthCheck.
-// ABOUTME: Verifies scheduled AI cleanup readiness reports safe bounded configuration data.
-
 using Explore.API.HealthChecks;
 using Explore.Infrastructure;
 using Microsoft.Extensions.Diagnostics.HealthChecks;

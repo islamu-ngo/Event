@@ -1,6 +1,3 @@
-// ABOUTME: Table-driven tests for route-derived workspace classification.
-// ABOUTME: Covers the current Blazouter route inventory and segment-boundary fallback behavior.
-
 namespace Explore.Blazor.Client.Tests.Services.Shell;
 
 using Explore.Blazor.Client.Services.Shell;

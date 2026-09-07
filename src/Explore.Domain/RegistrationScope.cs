@@ -1,6 +1,3 @@
-// ABOUTME: Lookup describing the three legacy registration scopes retained as workflow vocabulary.
-// ABOUTME: Enforced against EventRegistrationPolicy on the parent Event without owning registration authority.
-
 namespace Explore.Domain;
 
 public class RegistrationScope

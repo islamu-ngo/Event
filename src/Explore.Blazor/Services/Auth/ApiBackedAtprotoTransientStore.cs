@@ -1,6 +1,3 @@
-// ABOUTME: Owns the server-private BFF transient transport without exposing backend implementation types.
-// ABOUTME: Binds protected records to purpose, digest, tenant and candidate identity for single-use consumption.
-
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;

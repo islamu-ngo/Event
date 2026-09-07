@@ -1,6 +1,3 @@
-// ABOUTME: Client service for authenticated user profile, sync, account, and admin-authority calls.
-// ABOUTME: Wraps generated BFF API client failures into nullable/command response contracts for UI use.
-
 using System.Net.Http.Json;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Helpers;

@@ -1,6 +1,3 @@
-// ABOUTME: Handles manual webhook delivery retry scheduling commands.
-// ABOUTME: Converts drain-service retry outcomes into safe command responses for API callers.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

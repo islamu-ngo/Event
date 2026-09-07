@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for assigning a session/program item to a program section or track.
-// ABOUTME: Ensures assignments use EventSession rather than child Event hierarchy.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventSessionGroup;
 using Explore.Application.Responses;

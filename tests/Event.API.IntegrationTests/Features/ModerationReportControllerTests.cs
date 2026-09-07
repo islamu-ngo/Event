@@ -1,6 +1,3 @@
-// ABOUTME: API contract tests for moderator-facing event-report queue endpoints.
-// ABOUTME: Verifies route metadata and CQRS command/query mapping for moderation workflows.
-
 using System.Diagnostics.Metrics;
 using System.Reflection;
 using Explore.API.Attributes;

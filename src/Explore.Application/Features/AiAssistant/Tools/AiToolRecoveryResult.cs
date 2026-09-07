@@ -1,6 +1,3 @@
-// ABOUTME: Carries safe structured recovery metadata for AI tool validation and execution failures.
-// ABOUTME: Supports clarification, warnings, next actions, stable codes, and bounded machine output without raw payload echo.
-
 namespace Explore.Application.Features.AiAssistant.Tools;
 
 public sealed record AiToolRecoveryResult(

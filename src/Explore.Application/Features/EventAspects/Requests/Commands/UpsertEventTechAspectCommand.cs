@@ -1,6 +1,3 @@
-// ABOUTME: Explicit commands for creating and partially updating an event Tech aspect.
-// ABOUTME: Keeps create and update semantics separate for every caller, including AI proposals.
-
 namespace Explore.Application.Features.EventAspects.Requests.Commands;
 
 using System;

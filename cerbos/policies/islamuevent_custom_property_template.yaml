@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos resource policy for custom_property_template resources.
-# ABOUTME: Template CRUD and sync operations are tenant-scoped; tenant admins manage, all authenticated can view.
-
 apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   resource: "islamuevent_custom_property_template"

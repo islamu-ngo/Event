@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for tenant-bound ticket catalog graphs and event-owned child lookups.
-// ABOUTME: Applies exact event and tenant predicates so child IDs cannot cross event boundaries.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
 using Explore.Domain;

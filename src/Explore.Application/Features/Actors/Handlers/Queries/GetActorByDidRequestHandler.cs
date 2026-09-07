@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning an actor by their DID (Decentralized Identifier).
-// ABOUTME: Used for AT Protocol identity resolution.
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

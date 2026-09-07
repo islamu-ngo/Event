@@ -1,6 +1,3 @@
-// ABOUTME: Repository for tenant-owned typed settings document JSONB rows.
-// ABOUTME: Uses explicit tenant/document predicates so resolver calls stay deterministic and batch-friendly.
-
 namespace Explore.Persistence.Repositories;
 
 using Explore.Application.Contracts.Persistence;

@@ -1,7 +1,3 @@
-// ABOUTME: Tests verifying FallbackAuthorizationService (Local RBAC) works correctly when the operator
-// ABOUTME: chooses "local" authorization mode during onboarding. Uses real JWT auth + mocked role resolution
-// ABOUTME: to exercise the full RuntimeAuthorizationProvider → FallbackAuthorizationService pipeline.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Security;

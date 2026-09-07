@@ -1,6 +1,3 @@
-// ABOUTME: Creates and parses the PII-free general-outbox pointer for a fanout occurrence.
-// ABOUTME: Uses source-generated JSON metadata so producer and worker share one durable contract.
-
 using System.Text.Json;
 using Explore.Application.Models.InternalEvents;
 using Explore.Application.Serialization;

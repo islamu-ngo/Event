@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for the Luma-inspired Edit Event page.
-// ABOUTME: Loads existing event data, pre-fills the form, handles session management, image upload, and event update.
-
 using System.Globalization;
 using System.Linq;
 using Blazouter.Services;

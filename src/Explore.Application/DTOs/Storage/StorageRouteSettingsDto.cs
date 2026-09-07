@@ -1,6 +1,3 @@
-// ABOUTME: Safe DTO for storage route-matrix administration and effective policy display.
-// ABOUTME: Exposes route keys, provider choices, byte ceilings, and source metadata without destinations or credentials.
-
 using Explore.Domain;
 
 namespace Explore.Application.DTOs.Storage;

@@ -1,6 +1,3 @@
-// ABOUTME: Handles tenant-wide rebuild of event session custom-property projection rows.
-// ABOUTME: Mirrors event projection rebuild handler for session scope.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Application.DTOs.CustomPropertyProjection.Validators;

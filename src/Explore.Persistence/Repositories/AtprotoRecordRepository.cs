@@ -1,6 +1,3 @@
-// ABOUTME: Implements tenant-visible reads over globally canonical AT Protocol records.
-// ABOUTME: Uses presentation and outbound-ownership joins so canonical storage never bypasses tenant isolation.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Federation;

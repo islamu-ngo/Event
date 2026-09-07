@@ -1,6 +1,3 @@
-// ABOUTME: Test doubles for read-only doctor file and process abstractions.
-// ABOUTME: Lets unit tests verify doctor decisions without invoking external tools or touching real files.
-
 using Explore.Diagnostic.Doctor.Infrastructure;
 
 namespace Explore.Diagnostic.UnitTests.Doctor;

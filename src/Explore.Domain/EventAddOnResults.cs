@@ -1,6 +1,3 @@
-// ABOUTME: Defines stable add-on inventory, fulfillment, and refund outcomes.
-// ABOUTME: Keeps replay and failure states explicit without leaking persistence exceptions.
-
 namespace Explore.Domain;
 
 public enum EventAddOnInventoryOutcome

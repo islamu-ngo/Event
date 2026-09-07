@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for event-role authority ceiling delegation rules.
-// ABOUTME: Verifies same-event permission subset checks and non-delegable permission exclusion.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

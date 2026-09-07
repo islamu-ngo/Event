@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for assigning a local event-report case to an active tenant moderator.
-// ABOUTME: Carries an expected case concurrency stamp so stale queue updates fail closed.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

@@ -1,6 +1,3 @@
-// ABOUTME: Persists tenant-scoped admission recovery entities with atomic lifecycle mutations.
-// ABOUTME: Uses conditional writes and concurrency stamps for single-use capability transitions.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

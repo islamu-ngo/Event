@@ -1,6 +1,3 @@
-// ABOUTME: Request DTO for creating a tenant-scoped outgoing webhook endpoint.
-// ABOUTME: Accepts a secret reference only; raw endpoint signing secrets are resolved server-side by provider code.
-
 namespace Explore.Application.DTOs.Webhooks;
 
 public sealed record CreateWebhookEndpointRequestDto

@@ -1,6 +1,3 @@
-// ABOUTME: Repository implementation for TenantInvitation entity.
-// ABOUTME: Provides token-based lookup, pending invitation queries, and active invitation existence checks.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the retained privacy-erasure SQL contract is complete, callable, and least-privileged.
-// ABOUTME: Correlates active function definitions, repository signatures, ownership, ACLs, and append-only guards.
-
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Explore.Persistence.Privacy.ErasureAuthority;

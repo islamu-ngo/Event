@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for EventSessionGroup tracks/devrooms/program sections.
-// ABOUTME: Enforces tenant/event scoped uniqueness and ordering for conference-style program grouping.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

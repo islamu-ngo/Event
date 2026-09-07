@@ -1,6 +1,3 @@
-// ABOUTME: Defines one ticket-unit assignment against a concrete registration order line.
-// ABOUTME: Makes assigned, unassigned, and deadline-bound deferred states explicit and valid by construction.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

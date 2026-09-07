@@ -1,6 +1,3 @@
-// ABOUTME: Authorization provider wrapper that delegates to Cerbos or Local provider based on SystemSetting.
-// ABOUTME: Supports BYO (Bring Your Own) Cerbos per tenant with configurable failure modes.
-
 using System.Diagnostics;
 using System.Text.Json;
 using Explore.Application.Authorization;

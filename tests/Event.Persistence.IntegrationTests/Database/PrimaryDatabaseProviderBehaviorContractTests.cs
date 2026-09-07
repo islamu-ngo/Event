@@ -1,6 +1,3 @@
-// ABOUTME: Shared behavioral contract executed against every supported real primary database provider.
-// ABOUTME: Covers runtime persistence semantics and Data Protection key survival across provider recreation.
-
 using System.Data.Common;
 using System.Diagnostics;
 using System.Text.Json;

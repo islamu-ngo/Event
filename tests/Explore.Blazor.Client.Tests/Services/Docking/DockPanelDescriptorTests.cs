@@ -1,6 +1,3 @@
-// ABOUTME: Contract tests for dock panel descriptor metadata and validation rules.
-// ABOUTME: Guards responsive policy defaults so dock behavior stays explicit and safe.
-
 using Explore.Blazor.Client.Services.Docking;
 
 namespace Explore.Blazor.Client.Tests.Services.Docking;

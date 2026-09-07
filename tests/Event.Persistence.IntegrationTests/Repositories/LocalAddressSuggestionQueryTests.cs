@@ -1,6 +1,3 @@
-// ABOUTME: Red real-provider matrix for bounded, deterministic, tenant-safe local address suggestions.
-// ABOUTME: Requires authorization predicates before narrow exact projection with cancellation and no tracking.
-
 using System.Data.Common;
 using System.Reflection;
 using Event.Persistence.IntegrationTests.Fixtures;

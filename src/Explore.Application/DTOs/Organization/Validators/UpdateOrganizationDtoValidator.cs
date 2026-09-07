@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation validator for grouped Organization PATCH profile updates.
-// ABOUTME: Manually instantiated in UpdateOrganizationCommandHandler rather than DI-injected.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.Organization.Validators;

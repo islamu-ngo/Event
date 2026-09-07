@@ -1,6 +1,3 @@
-// ABOUTME: Defines canonical cross-path mutation lock identities for tenant aggregates.
-// ABOUTME: Makes ordinary creation and manifest bootstrap serialize on the same normalized slug.
-
 namespace Explore.Application.Features.Tenants;
 
 public static class TenantMutationLockKeys

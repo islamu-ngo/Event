@@ -1,6 +1,3 @@
-// ABOUTME: Freezes package-free Setup live transport vocabulary and value-safe public shapes.
-// ABOUTME: Rejects authority smuggling, provider-coordinate reuse, and non-canonical capabilities.
-
 namespace ISLAMU.Wire.Contracts.UnitTests.SetupLive;
 
 using System.Collections;

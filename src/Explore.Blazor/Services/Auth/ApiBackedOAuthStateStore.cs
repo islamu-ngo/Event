@@ -1,6 +1,3 @@
-// ABOUTME: Adapts protected CarpaNet OAuth state to the instance-private relational transient transport.
-// ABOUTME: Validates issuer, tenant, origin and browser binding before candidate-bound consumption.
-
 using System.Text.Json;
 using System.Security.Cryptography;
 using CarpaNet.OAuth.Storage;

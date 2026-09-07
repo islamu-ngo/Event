@@ -1,6 +1,3 @@
-// ABOUTME: Application-facing contract for opaque email unsubscribe tokens.
-// ABOUTME: Infrastructure supplies DataProtection-backed implementation without leaking crypto dependencies inward.
-
 namespace Explore.Application.Contracts.Services;
 
 public interface IEmailUnsubscribeTokenService

@@ -1,6 +1,3 @@
-// ABOUTME: Exposes the effective instance-and-tenant ceiling for EventLocation disclosure.
-// ABOUTME: Returns only conservative values when stored governance cannot be resolved safely.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Contracts.Services;

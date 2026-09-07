@@ -1,6 +1,3 @@
-// ABOUTME: Read model for the multi-tenant instance control-plane overview.
-// ABOUTME: Exposes safe operational summary fields without provider secrets or browser-side authority.
-
 namespace Explore.Application.DTOs.ControlPlane;
 
 public sealed record ControlPlaneOverviewDto

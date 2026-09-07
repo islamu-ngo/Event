@@ -1,6 +1,3 @@
-// ABOUTME: Derives public event price summaries from active published ticket catalog versions.
-// ABOUTME: Centralizes the five-mode summary matrix without treating draft or deleted tickets as selectable.
-
 using Explore.Application.DTOs.Event;
 using Explore.Domain;
 using Explore.Domain.Enums;

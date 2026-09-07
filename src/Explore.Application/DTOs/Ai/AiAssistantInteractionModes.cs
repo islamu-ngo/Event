@@ -1,6 +1,3 @@
-// ABOUTME: Defines the public AI assistant send-message interaction modes used by API and UI contracts.
-// ABOUTME: Keeps Ask text-only behavior distinct from Build tool-proposal behavior at the DTO boundary.
-
 namespace Explore.Application.DTOs.Ai;
 
 public static class AiAssistantInteractionModes

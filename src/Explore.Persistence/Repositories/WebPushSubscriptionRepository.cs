@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for user/device browser Web Push subscription ownership.
-// ABOUTME: Uses active endpoint and user-device uniqueness to keep one owner per browser subscription.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;

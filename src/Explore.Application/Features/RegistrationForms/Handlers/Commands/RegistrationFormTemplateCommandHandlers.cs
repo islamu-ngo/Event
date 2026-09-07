@@ -1,6 +1,3 @@
-// ABOUTME: Handles registration-form template catalog write requests with manual validation.
-// ABOUTME: Delegates mutations to the template command service so handlers remain single-purpose.
-
 using Explore.Application.Features.RegistrationForms.Requests.Commands;
 using Explore.Application.Features.RegistrationForms.Validators;
 using Explore.Application.Responses;

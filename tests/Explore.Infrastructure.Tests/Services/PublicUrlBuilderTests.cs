@@ -1,6 +1,3 @@
-// ABOUTME: Verifies public URL generation uses the middleware-normalized request scheme.
-// ABOUTME: Prevents direct forwarded-proto headers from changing public URL and cache identity.
-
 using Explore.Infrastructure.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;

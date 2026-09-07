@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for owner-scoped endpoint event type subscription rows.
-// ABOUTME: Enforces one instance-or-tenant query scope while event type definitions remain global.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;

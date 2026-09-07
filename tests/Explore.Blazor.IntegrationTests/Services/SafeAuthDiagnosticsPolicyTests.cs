@@ -1,6 +1,3 @@
-// ABOUTME: Regression tests for safe auth/OIDC diagnostics emitted by the Blazor BFF.
-// ABOUTME: Ensures browser redirects and auth failure handling never expose secret-derived details.
-
 using Event.Web.BffHosting.Authentication;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;

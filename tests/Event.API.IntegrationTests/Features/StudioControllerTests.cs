@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the private Studio context endpoint preserves the optional actor hint through MediatR.
-// ABOUTME: Guards the authenticated HAL contract without exposing role or tenant context fields.
-
 using Explore.API.Controllers;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Hateoas;

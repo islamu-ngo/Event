@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for event tag CRUD operations with HATEOAS support.
-// ABOUTME: Manages event tags used for categorization and discovery filtering.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

@@ -1,6 +1,3 @@
-// ABOUTME: Specifies the canonical whole-instance configuration manifest HTTP download contract.
-// ABOUTME: Covers trusted instance authority, no-store buffering, stable failures, and tenant-route removal.
-
 namespace Event.Api.IntegrationTests.Features.ConfigurationManifest;
 
 using System.Net;

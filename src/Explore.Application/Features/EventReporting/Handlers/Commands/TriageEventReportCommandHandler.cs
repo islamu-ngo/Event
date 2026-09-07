@@ -1,6 +1,3 @@
-// ABOUTME: Handles local moderation triage by moving an open report case to a queue and priority.
-// ABOUTME: Enforces tenant isolation, report-event matching, status rules, and optimistic case concurrency.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventReporting.Requests.Commands;

@@ -1,6 +1,3 @@
-// ABOUTME: Reads one authenticated tenant/user/DID-scoped ATProto OAuth session through Infrastructure.
-// ABOUTME: Manually validates the identity tuple before any encrypted storage access.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Authentication.Atproto.Models;
 using Explore.Application.Features.Authentication.Atproto.Requests.Queries;

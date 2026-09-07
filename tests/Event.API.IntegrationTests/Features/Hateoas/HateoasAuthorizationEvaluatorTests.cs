@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for HateoasAuthorizationEvaluator verifying dedup, fail-closed, and static check behavior.
-// ABOUTME: Uses NSubstitute to mock IAuthorizationProvider and validates the 4-phase authorization pipeline.
-
 namespace Event.Api.IntegrationTests.Features.Hateoas;
 
 using System.Security.Claims;

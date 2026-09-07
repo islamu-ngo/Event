@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for the AI assistant reference picker component.
-// ABOUTME: Verifies debounce search behavior and keyboard-removable selected chips.
-
 using Explore.Blazor.Client.Components.Shell.AiAssistant;
 
 namespace Explore.Blazor.Client.Tests.Components.Shell;

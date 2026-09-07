@@ -1,6 +1,3 @@
-<!-- ABOUTME: Defines the provider-neutral release adapter contract for forge transport lanes. -->
-<!-- ABOUTME: Keeps canonical release bytes independent from provider metadata and native workflow syntax. -->
-
 # Release Adapter Contract
 
 This contract is prospective release transport only. The release engine owns canonical release identity; adapters move explicit inputs, retained artifacts, and protected-ref actions without reinterpreting them.

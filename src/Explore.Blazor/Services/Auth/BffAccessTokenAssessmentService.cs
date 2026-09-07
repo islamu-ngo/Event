@@ -1,6 +1,3 @@
-// ABOUTME: Assesses BFF-held access tokens without exposing token material to the browser.
-// ABOUTME: Returns stable token outcomes and purpose-bound identity partitions for refresh flows.
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 

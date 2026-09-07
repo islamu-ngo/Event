@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-scoped event-to-category link entity for event classification.
-// ABOUTME: Carries audit and optimistic concurrency metadata for grouped relationship updates.
-
 using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for shared event detail projection enrichment.
-// ABOUTME: Verifies moderation eligibility, tags, and categories stay centralized for event details.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

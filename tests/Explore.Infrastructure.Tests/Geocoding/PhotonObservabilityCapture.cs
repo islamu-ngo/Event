@@ -1,6 +1,3 @@
-// ABOUTME: Captures Photon logs, metrics, and activities synchronously for leakage assertions.
-// ABOUTME: Keeps observability checks event-driven and avoids polling or timing assumptions.
-
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using Microsoft.Extensions.Logging;

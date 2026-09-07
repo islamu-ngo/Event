@@ -1,6 +1,3 @@
-// ABOUTME: Contract for transactional template-to-event instantiation and provenance matching.
-// ABOUTME: Creates in-memory runtime definitions/options from a template; handler persists via IUnitOfWork.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Services;

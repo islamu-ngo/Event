@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for the EventSessionKind lookup (talk, workshop, panel, activity, etc.).
-// ABOUTME: Ids are assigned manually and seed data is populated at runtime by LookupTableSeeder.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

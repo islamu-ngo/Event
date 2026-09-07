@@ -1,6 +1,3 @@
-// ABOUTME: Orchestrates closed event-setup parsing, Core-backed handlers, and bounded result emission.
-// ABOUTME: Maps adapter and validation failures to stable categories without ambient access or exception text.
-
 using System.Text.Json;
 
 namespace ISLAMU.Event.SetupAssistant.Cli;

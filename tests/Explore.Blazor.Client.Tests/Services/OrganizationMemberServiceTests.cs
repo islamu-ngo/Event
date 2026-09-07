@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for OrganizationMemberService covering HAL membership affordances and write error behavior.
-// ABOUTME: Ensures organization member collection/item links survive compatibility mapping.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Helpers;
 

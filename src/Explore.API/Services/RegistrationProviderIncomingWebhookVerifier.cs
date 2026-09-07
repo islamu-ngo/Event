@@ -1,6 +1,3 @@
-// ABOUTME: Adapts provider-neutral registration callback verification to the shared incoming-webhook intake service.
-// ABOUTME: Produces one stable registration.provider_submission effect identity for durable outbox processing.
-
 using System.Security.Cryptography;
 using System.Text.Json;
 using Explore.API.Controllers;

@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for HAL-gated Studio promotion management workflows.
-// ABOUTME: Proves exact relations, complete requests, transient codes, cancellation, and sanitized evidence.
-
 using System.Net;
 using System.Text.RegularExpressions;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;

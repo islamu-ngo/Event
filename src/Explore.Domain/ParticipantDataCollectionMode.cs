@@ -1,6 +1,3 @@
-// ABOUTME: Stable lookup row for whether ticket holders must provide participant details.
-// ABOUTME: Separates participant-data requirements from the later registration workflow model.
-
 namespace Explore.Domain;
 
 public sealed class ParticipantDataCollectionMode

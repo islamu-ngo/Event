@@ -1,6 +1,3 @@
-// ABOUTME: Setting definitions for Cerbos authorization engine configuration.
-// ABOUTME: Sensitive keys (admin credentials) are flagged with IsSensitive = true.
-
 namespace Explore.Domain.Settings.Definitions;
 
 public static class CerbosSettingDefinitions

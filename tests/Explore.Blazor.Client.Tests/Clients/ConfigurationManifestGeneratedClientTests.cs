@@ -1,6 +1,3 @@
-// ABOUTME: Guards generated configuration manifest export and import-session client contracts.
-// ABOUTME: Pins binary upload streams, required header capabilities, and canonical operation names.
-
 namespace Explore.Blazor.Client.Tests.Clients;
 
 using System.Reflection;

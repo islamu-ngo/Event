@@ -1,6 +1,3 @@
-// ABOUTME: Defines D2-3 Application contracts for Setup secret writes and commitments.
-// ABOUTME: Freezes one-way, cancellation-aware ports before handlers or providers exist.
-
 namespace Event.Application.UnitTests.Features.SetupLive;
 
 using System.Diagnostics;

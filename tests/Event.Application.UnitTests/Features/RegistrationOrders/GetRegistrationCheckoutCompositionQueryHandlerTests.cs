@@ -1,6 +1,3 @@
-// ABOUTME: Tests public registration checkout composition and server-authored sliding-scale amounts.
-// ABOUTME: Verifies public eligibility and organizer earnings remain Application-owned.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Fluent builder for Tenant domain entities in integration tests.
-// ABOUTME: Produces EF-compatible Tenant instances with sensible defaults for test data seeding.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

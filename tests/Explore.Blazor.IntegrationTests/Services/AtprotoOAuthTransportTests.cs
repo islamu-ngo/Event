@@ -1,6 +1,3 @@
-// ABOUTME: Security tests for AT Protocol OAuth discovery, confidential-client assertions, and outbound policy.
-// ABOUTME: Proves strict metadata capability validation, issuer/key pinning, DPoP nonce enforcement, and SSRF rejection.
-
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;

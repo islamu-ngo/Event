@@ -1,6 +1,3 @@
-// ABOUTME: Classifies API-owned controller endpoints and non-controller host surfaces before endpoint routing.
-// ABOUTME: Lets a combined host reuse API route ownership without maintaining a duplicate controller path list.
-
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.Routing.Template;

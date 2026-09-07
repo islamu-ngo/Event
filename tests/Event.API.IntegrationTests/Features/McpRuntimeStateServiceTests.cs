@@ -1,6 +1,3 @@
-// ABOUTME: Unit-style tests for MCP runtime effective-state resolution.
-// ABOUTME: Proves startup ceilings and tenant lock decisions shape MCP availability without exposing route settings.
-
 using Explore.API.Configuration;
 using Explore.API.Mcp;
 using Explore.Application.Contracts.Infrastructure;

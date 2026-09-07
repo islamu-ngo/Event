@@ -1,6 +1,3 @@
-// ABOUTME: Maps untrusted AI CreateEventDraft proposals into safe draft event DTOs.
-// ABOUTME: Rejects unknown, privileged, out-of-scope, and invalid fields before confirmation can create events.
-
 using System.Text.Json;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.EventAspects;

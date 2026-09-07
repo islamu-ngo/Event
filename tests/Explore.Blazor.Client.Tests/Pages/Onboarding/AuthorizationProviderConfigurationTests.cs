@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for the single-column authorization-provider onboarding flow.
-// ABOUTME: Verifies Local defaults, progressive Cerbos disclosure, deployment skips, and remediation.
-
 using Bunit.TestDoubles;
 using Explore.Blazor.Client.Pages.Onboarding;
 using Explore.Blazor.Client.Pages.Onboarding.Components;

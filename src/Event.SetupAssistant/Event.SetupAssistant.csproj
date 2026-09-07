@@ -1,5 +1,3 @@
-<!-- ABOUTME: Defines the framework-neutral shared Setup Assistant presentation model. -->
-<!-- ABOUTME: References Setup Core and the approved Toolkit without owning a runtime target. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>

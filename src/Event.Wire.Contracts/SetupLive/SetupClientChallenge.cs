@@ -1,6 +1,3 @@
-// ABOUTME: Enforces canonical SHA-256 Base64url syntax for Setup client challenges.
-// ABOUTME: Keeps challenge material behind explicit wire access and redacted diagnostics.
-
 namespace ISLAMU.Wire.Contracts.SetupLive;
 
 using System.Diagnostics;

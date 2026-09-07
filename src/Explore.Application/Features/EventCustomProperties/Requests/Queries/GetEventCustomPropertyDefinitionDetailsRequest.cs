@@ -1,6 +1,3 @@
-// ABOUTME: Query request for retrieving one event-local custom property definition with options.
-// ABOUTME: Used by organizer detail views for event-specific property configuration.
-
 using Explore.Application.DTOs.EventCustomProperty;
 using MediatR;
 

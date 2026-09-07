@@ -1,6 +1,3 @@
-// ABOUTME: Compile-time allowlist of cultures the codebase can serve.
-// ABOUTME: NEVER touches the DB or TMS; neutral source of truth for startup, middleware, picker, validation.
-
 using System.Collections.Frozen;
 
 namespace Explore.Domain.Common.Localization;

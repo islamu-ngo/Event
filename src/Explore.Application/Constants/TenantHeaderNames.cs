@@ -1,6 +1,3 @@
-// ABOUTME: Centralizes trusted tenant-related HTTP header names shared between hosts.
-// ABOUTME: Keeps BFF forwarding and API resolution aligned on the same header contract.
-
 namespace Explore.Application.Constants;
 
 public static class TenantHeaderNames

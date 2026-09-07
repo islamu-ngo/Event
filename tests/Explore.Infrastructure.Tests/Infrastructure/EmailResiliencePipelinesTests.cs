@@ -1,4 +1,3 @@
-// ABOUTME: Unit tests for EmailResiliencePipelines verifying transient error classification.
 // Tests that timeouts, connection errors, and SMTP 421/451/452 are retryable while permanent errors are not.
 
 using Explore.Infrastructure.Mail;

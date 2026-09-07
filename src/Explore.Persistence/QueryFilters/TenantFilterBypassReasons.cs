@@ -1,6 +1,3 @@
-// ABOUTME: Centralizes approved tenant-filter bypass reason strings for persistence queries.
-// ABOUTME: Keeps system, admin, authentication, and worker cross-tenant reads auditable in code review.
-
 namespace Explore.Persistence.QueryFilters;
 
 public static class TenantFilterBypassReasons

@@ -1,6 +1,3 @@
-// ABOUTME: Request DTO for importing an event from an external source or backfill.
-// ABOUTME: Requires provenance metadata so the imported event can be traced to its origin.
-
 namespace Explore.Application.DTOs.Event;
 
 public sealed record ImportEventRequestDto

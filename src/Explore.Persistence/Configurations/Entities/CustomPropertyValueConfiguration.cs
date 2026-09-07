@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for shared Layer 3 values attached to organization or group instances.
-// ABOUTME: Enforces deterministic ordinal ordering for explicit multi-value semantics.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

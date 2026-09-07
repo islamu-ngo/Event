@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query request for fetching a paginated actor list.
-// ABOUTME: Returns IEnumerable<ActorListDto>.
 using Explore.Application.DTOs.Actor;
 using Explore.Application.Responses;
 using MediatR;

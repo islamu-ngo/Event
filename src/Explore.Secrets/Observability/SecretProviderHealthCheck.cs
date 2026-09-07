@@ -1,4 +1,3 @@
-// ABOUTME: Health check for secret provider status.
 // Integrates with ASP.NET Core health check system for /health endpoints.
 
 using Explore.Secrets.Abstractions;

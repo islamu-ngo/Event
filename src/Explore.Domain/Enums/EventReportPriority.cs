@@ -1,6 +1,3 @@
-// ABOUTME: Queue priority levels for report review and provider signals.
-// ABOUTME: Keeps moderation triage urgency bounded to stable values.
-
 namespace Explore.Domain.Enums;
 
 public enum EventReportPriority

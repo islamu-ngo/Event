@@ -1,6 +1,3 @@
-// ABOUTME: Immutable record describing one field classification in the AI disclosure registry.
-// ABOUTME: Covers persisted PII and purpose-authorized derived projections before AI/MCP output.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Features.AiAssistant.Disclosure;

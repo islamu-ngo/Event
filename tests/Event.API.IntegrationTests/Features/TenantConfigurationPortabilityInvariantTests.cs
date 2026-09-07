@@ -1,6 +1,3 @@
-// ABOUTME: Proves tenant-package provenance never selects target authority and fidelity stays machine-readable.
-// ABOUTME: Keeps tenant migration isolated from whole-instance, secret, operational, and source-deletion authority.
-
 namespace Event.Api.IntegrationTests.Features;
 
 using System.Text.Json;

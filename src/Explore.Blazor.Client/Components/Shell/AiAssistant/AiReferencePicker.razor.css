@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped styles for reusable AI reference search and selection. */
-/* ABOUTME: Keeps picker loading, empty, result, and selected-list states host-independent. */
-
 .ai-rail__reference-search { display: flex; flex-direction: column; gap: 8px; }
 .ai-rail__label { color: var(--mud-palette-text-secondary); font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
 .ai-rail__input { width: 100%; border: 1px solid color-mix(in srgb, var(--mud-palette-lines-default) 40%, transparent); border-radius: 10px; background: color-mix(in srgb, var(--mud-palette-background-gray) 30%, var(--mud-palette-surface)); color: var(--mud-palette-text-primary); font: inherit; font-size: 0.82rem; padding: 8px 12px; transition: border-color 150ms ease; }

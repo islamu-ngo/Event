@@ -1,6 +1,3 @@
-// ABOUTME: Parses bounded untrusted Photon GeoJSON into provider-neutral geocoding suggestions.
-// ABOUTME: Rejects malformed features independently and maps GeoJSON longitude before latitude.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure.Geocoding;
 

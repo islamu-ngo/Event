@@ -1,6 +1,3 @@
-// ABOUTME: Source-generated System.Text.Json metadata for application DTO and HAL payload types.
-// ABOUTME: Keeps AOT-friendly serialization coverage aligned with public API contracts.
-
 using System.Text.Json.Serialization;
 using Explore.Application.DTOs.Actor;
 using Explore.Application.DTOs.ActorType;

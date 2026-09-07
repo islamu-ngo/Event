@@ -1,5 +1,3 @@
-// ABOUTME: Maps one canonical provider account key to its linked internal user id.
-// ABOUTME: Rejects email and raw-subject fallback so identity resolution remains authority-qualified.
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Users.Requests.Queries;

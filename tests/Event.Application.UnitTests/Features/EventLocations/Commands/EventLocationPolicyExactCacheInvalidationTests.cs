@@ -1,6 +1,3 @@
-// ABOUTME: Proves EventLocation policy writes evict only the exact evaluator cache entry.
-// ABOUTME: Keeps broad tenant, event, and global cache tags untouched after a committed mutation.
-
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;

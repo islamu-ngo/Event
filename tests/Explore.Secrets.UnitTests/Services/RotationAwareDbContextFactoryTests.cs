@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for RotationAwareDbContextFactory.
-// ABOUTME: Tests context creation, connection string rotation, and redaction.
-
 using Explore.Secrets.Configuration;
 using Explore.Secrets.Services;
 using Microsoft.EntityFrameworkCore;

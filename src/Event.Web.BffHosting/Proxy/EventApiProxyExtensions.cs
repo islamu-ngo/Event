@@ -1,6 +1,3 @@
-// ABOUTME: Registers the shared YARP API proxy and server-owned BFF request transforms.
-// ABOUTME: Strips browser-controlled privileged headers before adding trusted token, tenant, setup, and support context.
-
 using Event.Web.BffHosting.Abstractions;
 using Event.Web.BffHosting.Authentication;
 using Event.Web.BffHosting.Security;

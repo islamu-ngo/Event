@@ -1,6 +1,3 @@
-// ABOUTME: Persistence contract for Event-owned managed tenant provisioning operations.
-// ABOUTME: Supports idempotent request lookup, bounded status reads, capacity reservations, and entity-first updates.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

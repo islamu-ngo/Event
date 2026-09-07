@@ -1,6 +1,3 @@
-// ABOUTME: Characterizes current order authority and pins Phase 20 admission route metadata.
-// ABOUTME: Reflection is limited to machine-consumed HTTP operation contracts.
-
 using System.Reflection;
 using Explore.API.Attributes;
 using Explore.API.Controllers;

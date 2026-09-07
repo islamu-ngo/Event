@@ -1,6 +1,3 @@
-// ABOUTME: Defines the application boundary for versioned protection of sensitive registration values.
-// ABOUTME: Keeps plaintext transient while exposing only opaque ciphertext and purpose-version metadata.
-
 namespace Explore.Application.Contracts.Services;
 
 public interface IRegistrationSensitiveValueProtector

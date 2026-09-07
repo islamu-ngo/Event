@@ -1,6 +1,3 @@
-// ABOUTME: Specification filter for custom property projection-backed discovery queries (Layer 3).
-// ABOUTME: Applied as DbContext-level subqueries against EventCustomPropertyProjections table.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Specifications.Events;

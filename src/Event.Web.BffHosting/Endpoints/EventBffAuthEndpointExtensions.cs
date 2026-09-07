@@ -1,6 +1,3 @@
-// ABOUTME: Maps minimal shared login, challenge, signout, status, and forbidden endpoints for BFF hosts.
-// ABOUTME: Provides safe return-url handling without exposing tokens, secrets, or raw OIDC diagnostics.
-
 using Event.Web.BffHosting.Authentication;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;

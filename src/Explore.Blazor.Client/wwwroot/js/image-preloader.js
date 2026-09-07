@@ -1,6 +1,3 @@
-// ABOUTME: Preloads a batch of image URLs into the browser cache.
-// ABOUTME: Returns a promise that resolves when all images are loaded (or errored).
-
 export function preloadImages(urls) {
     if (!urls || urls.length === 0) return Promise.resolve();
 

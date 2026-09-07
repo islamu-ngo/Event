@@ -1,6 +1,3 @@
-// ABOUTME: Output record describing one field emitted by the AI context disclosure gateway.
-// ABOUTME: Captures the field name, the disclosed (possibly redacted) value, and the applied rule.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Features.AiAssistant.Disclosure;

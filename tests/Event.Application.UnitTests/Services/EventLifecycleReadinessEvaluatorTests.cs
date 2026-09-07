@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for policy-aware event and session lifecycle readiness evaluation.
-// ABOUTME: Verifies machine-readable field errors, session profiles, and transition hard invariants.
-
 using Explore.Application.Services.Lifecycle;
 using Explore.Domain;
 using Explore.Domain.Enums;

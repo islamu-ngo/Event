@@ -1,6 +1,3 @@
-// ABOUTME: Resolves immutable webhook bulk replay safety limits from validated runtime settings.
-// ABOUTME: Versions effective limits so every schedule and completion audit records its governing policy.
-
 using Explore.Application.Contracts.Webhooks;
 using Microsoft.Extensions.Options;
 

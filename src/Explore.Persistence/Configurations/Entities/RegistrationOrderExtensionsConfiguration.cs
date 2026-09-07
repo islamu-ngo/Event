@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for registration-order PII and platform-contribution extension rows.
-// ABOUTME: Keeps removable buyer data and platform-directed money separate from the aggregate root table.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

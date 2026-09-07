@@ -1,6 +1,3 @@
-// ABOUTME: Defines same-origin BFF reads and HAL-gated fair-return waitlist mutations.
-// ABOUTME: Keeps registration-order capabilities out of URLs and stable operation IDs explicit.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.Waitlist;

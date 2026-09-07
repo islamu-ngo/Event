@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for webhook delivery-plan resolution and materialization behavior.
-// ABOUTME: Ensures dry-run plans persist canonical messages without provider publications or local targets.
-
 using System.Diagnostics.Metrics;
 using System.Text;
 using Explore.Application.Contracts.Persistence;

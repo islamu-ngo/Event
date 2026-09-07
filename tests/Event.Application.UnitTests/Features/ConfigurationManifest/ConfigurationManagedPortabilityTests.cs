@@ -1,6 +1,3 @@
-// ABOUTME: Breaks extension, managed-ownership, scheduling, and direct-transfer invariants.
-// ABOUTME: Proves untrusted executable input, implicit takeover, replay, and stale apply fail closed.
-
 namespace Event.Application.UnitTests.Features.ConfigurationManifest;
 
 using System.Net;

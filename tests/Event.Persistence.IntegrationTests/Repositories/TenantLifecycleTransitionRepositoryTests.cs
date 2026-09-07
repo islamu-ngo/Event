@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL integration tests for atomic tenant lifecycle status transitions.
-// ABOUTME: Proves CAS race safety plus atomic status-and-audit commit and rollback behavior.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;

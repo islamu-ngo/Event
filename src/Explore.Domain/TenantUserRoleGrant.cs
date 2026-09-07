@@ -1,6 +1,3 @@
-// ABOUTME: Auditable tenant-scoped role grant for a tenant-local user.
-// ABOUTME: Replaces TenantMember as authority evidence rooted in TenantUser lifecycle state.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

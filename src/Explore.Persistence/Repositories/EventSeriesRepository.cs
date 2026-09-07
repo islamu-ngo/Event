@@ -1,6 +1,3 @@
-// ABOUTME: Concrete EF Core repository for EventSeries with domain-specific query implementations.
-// ABOUTME: Provides paged queries, slug lookups, eager-loaded detail, and top-series discovery.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

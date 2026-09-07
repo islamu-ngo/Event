@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral endpoint management boundary for webhook endpoints.
-// ABOUTME: Keeps endpoint creation, update, and disable behavior behind application contracts.
-
 namespace Explore.Application.Contracts.Webhooks;
 
 public interface IWebhookEndpointManager

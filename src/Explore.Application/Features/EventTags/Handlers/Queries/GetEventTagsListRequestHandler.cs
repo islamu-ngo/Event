@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning a paginated list of event-tag links.
-// ABOUTME: Maps junction entities to EventTagsListDto.
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;

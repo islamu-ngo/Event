@@ -1,6 +1,3 @@
-// ABOUTME: Orchestrates subject-owned completion and organizer admission decisions under one fence.
-// ABOUTME: Revocation invalidates any issued credential in the same local transaction.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Exercises real HTTP pre-crypto admission limits, dependency failure mapping and machine-only logging.
-// ABOUTME: Uses external secret authority faults and actual unavailable PostgreSQL relations, never mocked repositories.
-
 using System.Collections.Concurrent;
 using System.Net;
 using System.Text;

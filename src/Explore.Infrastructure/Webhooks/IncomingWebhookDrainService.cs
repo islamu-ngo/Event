@@ -1,6 +1,3 @@
-// ABOUTME: Claims bounded incoming webhook batches and executes each item through an isolated tenant scope.
-// ABOUTME: Renews fenced leases during processing and reports safe aggregate outcomes without payload data.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.Services.Webhooks;

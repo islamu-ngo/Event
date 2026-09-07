@@ -1,6 +1,3 @@
-// ABOUTME: Manually validates closed transient purposes, lowercase digests, tenant bindings and lifetime ceilings.
-// ABOUTME: Applies UTF-8 payload bounds and injected time independently of the HTTP adapter.
-
 using System.Text;
 using Explore.Domain;
 using Explore.Application.Features.Authentication.Atproto.Requests.Commands;

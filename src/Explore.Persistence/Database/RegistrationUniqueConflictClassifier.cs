@@ -1,6 +1,3 @@
-// ABOUTME: Identifies only expected registration identity races from supported database providers.
-// ABOUTME: Keeps provider exception details inside Persistence while rejecting unrelated constraints.
-
 using Explore.Domain;
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;

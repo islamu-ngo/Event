@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query request for fetching a single madhab by ID.
-// ABOUTME: Returns MadhabDto.
 using Explore.Application.DTOs.Madhab;
 using MediatR;
 

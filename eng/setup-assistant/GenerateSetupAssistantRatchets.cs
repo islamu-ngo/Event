@@ -1,5 +1,3 @@
-// ABOUTME: Generates the deterministic Setup Assistant architecture and release-capability ratchets.
-// ABOUTME: Supports write and non-mutating check modes from repository-owned contract facts.
 #:property RestorePackagesWithLockFile=false
 
 using System.Text.Json;

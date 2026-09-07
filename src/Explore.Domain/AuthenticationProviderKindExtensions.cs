@@ -1,6 +1,3 @@
-// ABOUTME: Converts authentication provider boundary codes to the canonical Domain lookup enum.
-// ABOUTME: Centralizes protocol normalization so persisted entities never carry provider-name strings.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Domain;

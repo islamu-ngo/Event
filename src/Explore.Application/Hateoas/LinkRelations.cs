@@ -1,6 +1,3 @@
-// ABOUTME: Central link-relation catalog for HAL resources emitted by the API.
-// ABOUTME: Separates standard IANA relations from platform custom action relations.
-
 namespace Explore.Application.Hateoas;
 
 /// <summary>

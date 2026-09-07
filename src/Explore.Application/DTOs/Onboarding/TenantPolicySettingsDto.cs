@@ -1,6 +1,3 @@
-// ABOUTME: DTO for tenant-level onboarding and runtime policy settings.
-// ABOUTME: Contains actionable policy values and delegation constraints from instance governance.
-
 namespace Explore.Application.DTOs.Onboarding;
 
 public sealed record TenantPolicySettingsDto

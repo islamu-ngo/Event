@@ -1,6 +1,3 @@
-// ABOUTME: Locks semantic Money, GeoCoordinate, and range owners to their existing scalar EF leaves.
-// ABOUTME: Requires four portable value checks without changing provider storage, indexes, tenancy, or privacy metadata.
-
 using Explore.Domain;
 using Explore.Domain.ValueObjects;
 using Explore.Persistence;

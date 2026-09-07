@@ -1,5 +1,3 @@
-<!-- ABOUTME: Builds the package-free shared ATProto OAuth transport security boundary. -->
-<!-- ABOUTME: Lets BFF and Infrastructure consume one registry, parser, metadata, and SSRF policy. -->
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>

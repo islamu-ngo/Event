@@ -1,6 +1,3 @@
-// ABOUTME: Contract tests for structured primary database options and native builders.
-// ABOUTME: Exercise runtime/migrator roles, validation matrices, redaction, and provider-specific connection-string output.
-
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Secrets.Bootstrap;

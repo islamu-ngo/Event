@@ -1,6 +1,3 @@
-// ABOUTME: Validates storage reconciliation safety and scheduling settings.
-// ABOUTME: Fails startup for invalid batch, cadence, or grace-period configuration.
-
 using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure;

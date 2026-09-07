@@ -1,6 +1,3 @@
-// ABOUTME: Handler for listing permissions with scope, group, and filter options.
-// ABOUTME: Uses PermissionRegistryService for cached lookups.
-
 using AutoMapper;
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Permission;

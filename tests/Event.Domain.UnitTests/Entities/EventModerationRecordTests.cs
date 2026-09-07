@@ -1,6 +1,3 @@
-// ABOUTME: Domain tests for safe event moderation history records.
-// ABOUTME: Verifies reversible light moderation, irreversible redaction, and unsafe-content field exclusion.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;

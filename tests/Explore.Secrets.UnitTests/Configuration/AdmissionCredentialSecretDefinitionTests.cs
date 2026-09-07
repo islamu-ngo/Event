@@ -1,6 +1,3 @@
-// ABOUTME: Proves admission credential HMAC keys have a dedicated Infisical/environment secret definition.
-// ABOUTME: Prevents accidental reuse of promotion or unrelated signing-key families.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 

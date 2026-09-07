@@ -1,6 +1,3 @@
-// ABOUTME: Façade that maps all BFF server endpoints by delegating to bounded-context endpoint groups.
-// ABOUTME: Keeps Program.cs stable while auth, preference, storage, and setup-secret endpoints live in dedicated files.
-
 namespace Explore.Blazor.Extensions;
 
 public static class BffEndpointExtensions

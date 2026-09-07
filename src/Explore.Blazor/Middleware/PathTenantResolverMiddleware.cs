@@ -1,6 +1,3 @@
-// ABOUTME: Extracts tenant slugs from configured path prefixes and rewrites the request path for Blazor routing.
-// ABOUTME: Keeps tenant authority out of the UI host by storing only slug context, not resolved tenant identity.
-
 using Explore.Blazor.Services;
 
 namespace Explore.Blazor.Middleware;

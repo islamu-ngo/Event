@@ -1,4 +1,3 @@
-# ABOUTME: Cerbos resource policy for notification resources.
 # Notifications are personal data: all authenticated users can manage their own notifications.
 
 apiVersion: api.cerbos.dev/v1

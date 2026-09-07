@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL proofs for bounded privacy-erasure receipt and locator credential cleanup.
-// ABOUTME: Verifies dry-run immutability, expired-only destruction, and no executable work claiming.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Persistence.Repositories;

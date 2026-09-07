@@ -1,6 +1,3 @@
-// ABOUTME: Instance authorization settings endpoints for provider configuration and policy package sync.
-// ABOUTME: Provider selection is fail-closed; a configured provider never silently falls back to a looser path.
-
 using Explore.Application.Authentication;
 using Asp.Versioning;
 using Explore.API.Attributes;

@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped Studio actor identity and native switcher styles. */
-/* ABOUTME: Preserves visible focus, minimum targets, and logical RTL-safe spacing. */
-
 .studio-actor-switcher,
 .studio-actor-switcher__identity {
     margin-inline: var(--isl-space-4);

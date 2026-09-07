@@ -1,5 +1,3 @@
-# ABOUTME: Registers public release-note scopes separately from valid engineering-only scopes.
-# ABOUTME: Lets release policy reject unknown scopes without using code-layer or forge labels.
 schemaVersion: 1
 publicScopes:
   - events

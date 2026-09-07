@@ -1,6 +1,3 @@
-// ABOUTME: Handles updates to existing UI themes with scope-aware authorization and deterministic stale-write checks.
-// ABOUTME: Preserves a single default theme per scope by clearing competing defaults inside one transaction.
-
 namespace Explore.Application.Features.Appearance.Handlers.Commands;
 
 using Explore.Application.Contracts.Identity;

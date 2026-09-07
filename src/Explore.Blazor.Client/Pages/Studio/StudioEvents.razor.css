@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped layout for the actor-scoped Studio managed-event list. */
-/* ABOUTME: Keeps rows responsive, tokenized, keyboard-safe, and RTL-neutral. */
-
 .studio-page {
     container-type: inline-size;
     display: grid;

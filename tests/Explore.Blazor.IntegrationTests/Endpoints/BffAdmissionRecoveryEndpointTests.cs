@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the anonymous admission recovery BFF bridge protects one-time bearer material.
-// ABOUTME: Covers antiforgery, downstream handoff, redacted failures, and private response headers.
-
 using System.Net.Http.Json;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Extensions;

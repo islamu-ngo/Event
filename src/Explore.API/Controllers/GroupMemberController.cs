@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for group member CRUD operations with role-based access control.
-// ABOUTME: Manages user membership in groups and associated permissions via CQRS/MediatR.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

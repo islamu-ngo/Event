@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for tenant AT Protocol event-federation governance controls.
-// ABOUTME: Verifies server-authoritative editability and exact tenant setting writes.
-
 using System.Text.Json;
 using AngleSharp.Dom;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;

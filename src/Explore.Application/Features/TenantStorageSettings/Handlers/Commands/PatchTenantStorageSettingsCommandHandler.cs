@@ -1,6 +1,3 @@
-// ABOUTME: Handles tenant storage override patches under instance delegation policy.
-// ABOUTME: Merges supplied leaves for validation, then persists only those leaves transactionally.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

@@ -1,4 +1,3 @@
-// ABOUTME: Contract for resolving the current user's administrative authority across the full hierarchy.
 // DB-first authority model: identity from claims, authority from role assignments and memberships.
 
 namespace Explore.Application.Contracts.Identity;

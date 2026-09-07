@@ -1,5 +1,3 @@
-// ABOUTME: Rich readiness error record carrying code, field path, message, severity, source, and profile.
-// ABOUTME: Replaces the simpler EventPublishReadinessErrorDto with a policy-aware diagnostic model.
 namespace Explore.Application.Services.Lifecycle;
 
 /// <summary>

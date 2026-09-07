@@ -1,6 +1,3 @@
-// ABOUTME: Verifies operational ATProto health over the real BFF, private API and PostgreSQL store.
-// ABOUTME: Uses an injected clock and reversible database outage to separate readiness from liveness.
-
 extern alias bff;
 
 using System.Net;

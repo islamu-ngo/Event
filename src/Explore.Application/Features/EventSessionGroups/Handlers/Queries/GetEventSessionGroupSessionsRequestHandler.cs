@@ -1,6 +1,3 @@
-// ABOUTME: Handles ordered read of sessions assigned to a published event session group.
-// ABOUTME: Returns session DTOs so program-section pages can render talks/workshops without leaking join entities.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

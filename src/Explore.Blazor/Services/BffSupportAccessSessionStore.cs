@@ -1,6 +1,3 @@
-// ABOUTME: BFF-owned support-access session reference store for browser and circuit requests.
-// ABOUTME: Binds trusted support sessions to the authenticated user and OIDC session before header forwarding.
-
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;

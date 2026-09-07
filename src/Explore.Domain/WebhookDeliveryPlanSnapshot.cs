@@ -1,6 +1,3 @@
-// ABOUTME: Immutable tenant-scoped delivery-plan authority captured when an outgoing webhook message is materialized.
-// ABOUTME: Freezes consumer mode, contract, configuration, and retention decisions so later settings cannot reroute queued work.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

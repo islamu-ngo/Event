@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for relocated control-plane overview, domain, and operations pages.
-// ABOUTME: Proves fail-closed adapters, HAL navigation, and operational status rendering.
-
 using Explore.Blazor.Client.Contracts.ControlPlane;
 using Explore.Blazor.Client.Contracts.Services.ControlPlane;
 using Explore.Blazor.Client.Extensions;

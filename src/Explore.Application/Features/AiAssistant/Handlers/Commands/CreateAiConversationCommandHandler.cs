@@ -1,6 +1,3 @@
-// ABOUTME: Creates private AI assistant conversation shells after tenant governance checks pass.
-// ABOUTME: Persists only conversation metadata and never calls provider chat/send infrastructure.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Ai.Validators;

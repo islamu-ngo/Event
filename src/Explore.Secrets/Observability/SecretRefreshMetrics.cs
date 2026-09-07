@@ -1,4 +1,3 @@
-// ABOUTME: Prometheus-compatible metrics for secret refresh operations.
 // Uses System.Diagnostics.Metrics for OpenTelemetry integration with PLG stack.
 
 using System.Diagnostics;

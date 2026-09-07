@@ -1,6 +1,3 @@
-// ABOUTME: Builds repository-native confirmed admission authority graphs for focused Domain tests.
-// ABOUTME: Uses real catalog, order-line, participant, and assignment factories without bypass setters.
-
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 

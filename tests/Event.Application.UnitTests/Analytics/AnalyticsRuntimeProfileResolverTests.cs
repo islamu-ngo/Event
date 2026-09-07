@@ -1,6 +1,3 @@
-// ABOUTME: Tests the core consent policy engine (AnalyticsRuntimeProfileResolver).
-// ABOUTME: Covers global kill switch, provider capabilities, PostHog modes, consent computation, and resolve reason codes.
-
 using Explore.Application.Analytics;
 using Explore.Application.Settings.Groups;
 using Explore.Domain.Enums.Analytics;

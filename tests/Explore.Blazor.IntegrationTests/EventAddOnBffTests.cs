@@ -1,6 +1,3 @@
-// ABOUTME: Exercises event add-on BFF routes through the browser and generated-client HTTP boundaries.
-// ABOUTME: Covers canonical forwarding, antiforgery, cookie authority, token containment, and trusted headers.
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using System.Text.Json;

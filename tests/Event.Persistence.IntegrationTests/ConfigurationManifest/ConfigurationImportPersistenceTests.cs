@@ -1,6 +1,3 @@
-// ABOUTME: Verifies encrypted durable import bytes, target-isolated sessions, and expiry cleanup.
-// ABOUTME: Proves plaintext never reaches storage and every provider model includes generated metadata.
-
 namespace Event.Persistence.IntegrationTests.ConfigurationManifest;
 
 using System.Text;

@@ -1,6 +1,3 @@
-<!-- ABOUTME: Root-level pointer to the ISLAMU Event Contributor License Agreement at legal/CLA.md. -->
-<!-- ABOUTME: Provides discoverability for contributors, GitHub community health tools, and compliance scanners. -->
-
 # ISLAMU Event Contributor License Agreement
 
 The full Contributor License Agreement text is maintained at [`legal/CLA.md`](legal/CLA.md).

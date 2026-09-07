@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the application migration seam and MigrationService topology orchestration.
-// ABOUTME: Proves retry safety and one authority migration path without requiring every provider runtime.
-
 #nullable enable
 
 using Event.Persistence.IntegrationTests.Fixtures;

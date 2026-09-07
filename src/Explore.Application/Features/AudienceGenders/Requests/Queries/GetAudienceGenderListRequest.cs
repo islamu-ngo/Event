@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query request for fetching the full list of audience gender options.
-// ABOUTME: Returns IEnumerable<AudienceGenderDto>.
 using System;
 using System.Collections.Generic;
 using System.Text;

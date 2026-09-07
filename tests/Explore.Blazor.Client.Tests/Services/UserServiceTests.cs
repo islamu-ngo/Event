@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for UserService covering user sync, current-user retrieval, update, and delete operations.
-// ABOUTME: Validates retry/sync edge cases, API error handling, and return contracts for user workflows.
-
 namespace Explore.Blazor.Client.Tests.Services;
 
 /// <summary>

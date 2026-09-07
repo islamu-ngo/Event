@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests verifying correlation ID middleware propagation behavior.
-// ABOUTME: Tests incoming correlation ID preservation, auto-generation, and response header echo.
-
 using System.Net;
 using Event.Api.IntegrationTests.Fixtures;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Tests immutable instance-plus-consumer provider identity and fenced ownership repair.
-// ABOUTME: Proves tenant-only identities and cross-consumer ownership substitution fail closed.
-
 using Explore.Domain;
 using TUnit.Core;
 

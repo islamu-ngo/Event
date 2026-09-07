@@ -1,6 +1,3 @@
-// ABOUTME: HAL policies for retained OrganizationTenant legitimacy evidence.
-// ABOUTME: Exposes protected document and tenant-admin review affordances only through authorization checks.
-
 using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;

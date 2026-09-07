@@ -1,6 +1,3 @@
-// ABOUTME: Handles post-onboarding auth provider updates by authorized instance administrators.
-// ABOUTME: Prevents admin lockout by ensuring the current admin keeps at least one enabled linked provider.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

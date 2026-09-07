@@ -1,6 +1,3 @@
-// ABOUTME: Captures API-key authentication logs through isolated Microsoft and Serilog providers.
-// ABOUTME: Proves every configured and persisted outcome emits bounded metadata without credential identifiers.
-
 using System.Collections.Concurrent;
 using System.Diagnostics.Metrics;
 using System.Globalization;

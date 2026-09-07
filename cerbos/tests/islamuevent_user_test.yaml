@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos policy test suite for user profile resources.
-# ABOUTME: Covers self-service profile updates while keeping other user mutation denied.
-
 name: UserPolicyTests
 description: "Validates user profile self-update permissions"
 

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the explicit privacy-erasure authority topology configuration contract.
-// ABOUTME: Defaults to EmbeddedSqlite and rejects legacy mode keys without owning database credentials.
-
 using Explore.Application.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;

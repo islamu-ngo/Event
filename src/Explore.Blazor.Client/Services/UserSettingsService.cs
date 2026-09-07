@@ -1,6 +1,3 @@
-// ABOUTME: User settings service with auth-branching: authenticated users use BFF-proxied settings API,
-// ABOUTME: anonymous users fall back to browser localStorage. SSR-safe (returns null during prerender).
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Microsoft.AspNetCore.Components.Authorization;

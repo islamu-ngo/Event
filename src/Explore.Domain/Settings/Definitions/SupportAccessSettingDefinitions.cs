@@ -1,6 +1,3 @@
-// ABOUTME: Setting definitions for enterprise support-access and break-glass controls.
-// ABOUTME: Defaults are instance-only and fail closed until explicitly enabled by an operator.
-
 using Explore.Domain.Constants;
 
 namespace Explore.Domain.Settings.Definitions;

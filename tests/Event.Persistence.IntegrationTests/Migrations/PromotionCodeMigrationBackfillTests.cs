@@ -1,6 +1,3 @@
-// ABOUTME: Verifies generated initial migrations contain the final registration money snapshot schema.
-// ABOUTME: Guards the development rebaseline across every supported primary database provider.
-
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Secrets.Database;

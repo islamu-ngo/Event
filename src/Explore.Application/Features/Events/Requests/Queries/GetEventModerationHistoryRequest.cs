@@ -1,6 +1,3 @@
-// ABOUTME: Secured MediatR query for reading event moderation audit history.
-// ABOUTME: Uses event view-management authorization so only management-capable principals can inspect moderation records.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Event;
 using MediatR;

@@ -1,6 +1,3 @@
-// ABOUTME: Restores nullable quota metadata semantics for immutable command-response OpenAPI schemas.
-// ABOUTME: Keeps the shared quota component browser-safe while preserving a canonical component reference.
-
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Maps authenticated-account admission ticket entities to transport DTOs.
-// ABOUTME: Resolves tenant and account authority from server contexts rather than request data.
-
 using System.Collections.Immutable;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Identity;

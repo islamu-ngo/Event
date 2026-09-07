@@ -1,6 +1,3 @@
-// ABOUTME: Builds paid-order disclosure exclusively from persisted order, schedule, catalog, policy, and startup-governance facts.
-// ABOUTME: Creates immutable acceptance only for an exact current revision with normalized typed acceptance lines.
-
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;

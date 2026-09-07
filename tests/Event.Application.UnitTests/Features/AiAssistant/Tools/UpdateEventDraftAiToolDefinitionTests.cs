@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the registry-backed UpdateEventDraft AI tool definition.
-// ABOUTME: Locks schema, mapper, authorization, exposure, and forbidden-field metadata.
-
 using System.Text.Json;
 using Explore.Application.Authorization;
 using Explore.Application.Features.AiAssistant.Actions;

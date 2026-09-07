@@ -1,6 +1,3 @@
-// ABOUTME: Repository implementation for TenantFooterLink.
-// ABOUTME: Tenant isolation flows through the parent group; no TenantId filter needed here.
-
 namespace Explore.Persistence.Repositories;
 
 using Explore.Application.Contracts.Persistence;

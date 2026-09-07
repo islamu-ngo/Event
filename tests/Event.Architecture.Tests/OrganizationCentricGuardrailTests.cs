@@ -1,6 +1,3 @@
-// ABOUTME: Architecture guardrails for organization-centric public UX boundaries.
-// ABOUTME: Prevents scope-model drift, resolver coupling, and Domain business-default leakage.
-
 namespace Event.Architecture.Tests;
 
 using System.Reflection;

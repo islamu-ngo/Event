@@ -1,6 +1,3 @@
-// ABOUTME: Hosted RabbitMQ dead-letter replay worker for EmailDispatch pointer messages.
-// ABOUTME: Replays only database-validated pointers and parks unsafe DLQ payloads for operator review.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

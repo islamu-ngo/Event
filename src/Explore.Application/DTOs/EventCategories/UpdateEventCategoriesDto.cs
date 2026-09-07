@@ -1,6 +1,3 @@
-// ABOUTME: Grouped update DTO for event-to-category link mutations.
-// ABOUTME: Nullable groups allow callers to update the event side or category side independently.
-
 using System;
 
 namespace Explore.Application.DTOs.EventCategories;

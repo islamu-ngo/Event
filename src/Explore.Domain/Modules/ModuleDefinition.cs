@@ -1,6 +1,3 @@
-// ABOUTME: Defines an available module (aspect category) in the system.
-// ABOUTME: Controls which aspect features are available to tenants.
-
 namespace Explore.Domain.Modules;
 
 /// <summary>

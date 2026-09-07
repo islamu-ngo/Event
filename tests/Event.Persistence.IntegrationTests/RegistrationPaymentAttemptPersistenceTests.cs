@@ -1,6 +1,3 @@
-// ABOUTME: Proves payment-attempt active-slot and checkout-dispatch effect persistence semantics.
-// ABOUTME: Uses SQLite for deterministic duplicate, tenant isolation, terminal release, and lease-fence checks.
-
 using System.Data.Common;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

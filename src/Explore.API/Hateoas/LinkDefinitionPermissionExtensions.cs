@@ -1,6 +1,3 @@
-// ABOUTME: Extension methods that add permission requirements to HATEOAS link definitions.
-// ABOUTME: Resolves resource kinds from DTO types via registry and attaches actions with typed facts.
-
 namespace Explore.API.Hateoas;
 
 using Explore.Application.Authorization;

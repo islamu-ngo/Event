@@ -1,6 +1,3 @@
-// ABOUTME: Persistence contract for tenant reads, counts, and atomic lifecycle transitions.
-// ABOUTME: Keeps tenant lifecycle compare-and-swap operations entity-first and cancellation-aware.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

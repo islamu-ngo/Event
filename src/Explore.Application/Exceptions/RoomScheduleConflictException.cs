@@ -1,6 +1,3 @@
-// ABOUTME: Thrown when an EventSession insert/update would place a session in the same room as an existing session whose time range overlaps.
-// ABOUTME: Raised by Layer B (serializable transaction re-check) when a racing write slipped past Layer A's async validator.
-
 using System;
 using System.Collections.Generic;
 

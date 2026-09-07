@@ -1,6 +1,3 @@
-// ABOUTME: Typed webhook consumer that owns endpoint subscriptions and provider mapping state.
-// ABOUTME: Enforces one Instance, Tenant, Organization, Group, or User ownership scope.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

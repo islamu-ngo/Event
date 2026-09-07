@@ -1,6 +1,3 @@
-// ABOUTME: Defines immutable source, result, failure, and publication-barrier contracts for Setup composition.
-// ABOUTME: Exposes only typed artifacts and closed value-free outcomes across the hostile-source boundary.
-
 namespace ISLAMU.Event.Setup.Core.Composition;
 
 using ISLAMU.Wire.Contracts.ConfigurationPortability;

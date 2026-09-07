@@ -1,6 +1,3 @@
-// ABOUTME: Pins the properties the Cerbos store revision fold must have to be usable as a drift signal.
-// ABOUTME: Order independence, sensitivity to any change, and an explicit null for an unidentifiable set.
-
 using Explore.Infrastructure.Services;
 
 namespace Explore.Infrastructure.Tests.Authorization;

@@ -1,6 +1,3 @@
-// ABOUTME: Architecture fitness functions for Blazor (Explore.Blazor host + Explore.Blazor.Client WASM).
-// ABOUTME: File-scanning tests — the arch project does not reference Blazor assemblies, so patterns are string-matched.
-
 using System.Text.RegularExpressions;
 
 namespace Event.Architecture.Tests;

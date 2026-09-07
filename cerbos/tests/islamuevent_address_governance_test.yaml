@@ -1,6 +1,3 @@
-# ABOUTME: Verifies exact manual-address governance actions without widening normal location creation.
-# ABOUTME: Covers tenant management, organization creation grants, moderation approval, and regular-user denial.
-
 name: AddressGovernancePolicyTests
 description: "Validates provider policy for governed manual addresses"
 

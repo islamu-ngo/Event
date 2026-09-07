@@ -1,6 +1,3 @@
-// ABOUTME: Returns ordered event public actions with normalized lookup metadata.
-// ABOUTME: Repository query filters keep public reads tenant-scoped and soft-delete-aware.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Event;

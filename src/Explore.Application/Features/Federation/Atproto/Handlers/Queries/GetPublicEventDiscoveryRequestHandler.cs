@@ -1,6 +1,3 @@
-// ABOUTME: Merges local event cards with tenant-visible typed ATProto projections using deterministic bounded top-K.
-// ABOUTME: Resolves governance before federation reads, excludes unsupported filters, and lets local echoes win.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.PublicExperience;

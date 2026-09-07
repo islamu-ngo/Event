@@ -1,6 +1,3 @@
-// ABOUTME: Configures global and tenant-owned event type lookup records.
-// ABOUTME: Enforces scoped master-code uniqueness through filtered indexes.
-
 using System;
 using System.Collections.Generic;
 using System.Text;

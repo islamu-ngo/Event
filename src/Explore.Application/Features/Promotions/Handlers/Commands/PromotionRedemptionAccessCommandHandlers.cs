@@ -1,6 +1,3 @@
-// ABOUTME: Gates promotion apply/remove commands through guest capability or current-account order access.
-// ABOUTME: Reuses the shared registration-order access guard before dispatching promotion redemption CQRS.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

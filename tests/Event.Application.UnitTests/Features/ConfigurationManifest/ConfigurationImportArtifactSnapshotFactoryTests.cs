@@ -1,6 +1,3 @@
-// ABOUTME: Verifies server-derived import sections and revision digests are deterministic.
-// ABOUTME: Proves manifest and tenant-package previews share canonical section identities.
-
 namespace Event.Application.UnitTests.Features.ConfigurationManifest;
 
 using System.Text.Json;

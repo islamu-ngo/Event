@@ -1,6 +1,3 @@
-// ABOUTME: Strongly-typed S3/Object Storage setting group resolved via batch loading.
-// ABOUTME: Contains governance-only S3 settings; credentials resolve through ISecretResolver.
-
 namespace Explore.Application.Settings.Groups;
 
 using Explore.Application.Contracts.Infrastructure;

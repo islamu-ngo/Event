@@ -1,6 +1,3 @@
-// ABOUTME: Failing public-contract specifications for governed Location address writes.
-// ABOUTME: Locks raw-coordinate contraction, atomic finite pairs, tenancy, construction, consent, and erasure.
-
 using System.Reflection;
 using AutoMapper;
 using Explore.Application.Contracts.Identity;

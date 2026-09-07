@@ -1,6 +1,3 @@
-// ABOUTME: Dependency-count contract used before irreversible custom-property hard purges.
-// ABOUTME: Keeps purge eligibility decisions in Application without leaking DbContext details.
-
 namespace Explore.Application.Contracts.Persistence;
 
 public sealed record CustomPropertyPurgeDependencySummary(

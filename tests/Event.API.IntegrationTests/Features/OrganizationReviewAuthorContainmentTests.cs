@@ -1,6 +1,3 @@
-// ABOUTME: Regression tests for server-authoritative organization review authorship.
-// ABOUTME: Proves authenticated review creation cannot persist a caller-supplied reviewer user id.
-
 using System.Net;
 using System.Net.Http.Json;
 using Event.Api.IntegrationTests.Fixtures;

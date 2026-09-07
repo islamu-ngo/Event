@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the external-unclassified Actor lookup, backfill migration, and ownership/type constraint in PostgreSQL.
-// ABOUTME: Proves legacy BOT classification cannot be reintroduced for an Actor owned by ExternalActorSubject.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Persistence;
 using Microsoft.EntityFrameworkCore;

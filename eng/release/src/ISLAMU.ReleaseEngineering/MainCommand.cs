@@ -1,6 +1,3 @@
-// ABOUTME: Verifies stable-main release topology and emits provider-neutral protected-ref actions.
-// ABOUTME: Uses local Git object/ref checks only and never mutates, fetches, pushes, or executes candidates.
-
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;

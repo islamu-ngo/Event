@@ -1,6 +1,3 @@
-// ABOUTME: Handles setting a single custom property value for an event (upsert by definition+event+ordinal).
-// ABOUTME: Validates the value DTO and delegates persistence to the repository's upsert operation.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

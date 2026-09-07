@@ -1,6 +1,3 @@
-// ABOUTME: Registers the exact Formbricks Phase 10 conformance tuples and proven capabilities.
-// ABOUTME: Keeps cloud and self-hosted support explicit so unknown tuple variants fail closed.
-
 using Explore.Application.Contracts.Services.Registration;
 
 namespace Explore.Infrastructure.Services.Registration.Providers.Formbricks;

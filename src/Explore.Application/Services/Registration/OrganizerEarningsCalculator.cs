@@ -1,6 +1,3 @@
-// ABOUTME: Computes organizer earnings exactly from integer minor-unit totals and the versioned platform fee policy.
-// ABOUTME: Excludes platform contributions because they are instance-directed money rather than organizer revenue.
-
 using Explore.Application.Contracts.Services;
 using Explore.Domain;
 using Explore.Domain.ValueObjects;

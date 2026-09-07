@@ -1,6 +1,3 @@
-// ABOUTME: Table-driven bUnit matrix for implemented workspace-shell profile, authority, and viewport scenarios.
-// ABOUTME: Verifies rail order, contextual Events navigation, Settings scopes, preference fallback, and revocation.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.Shell;
 using Explore.Blazor.Client.Components.Shell.Workspaces;

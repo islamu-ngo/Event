@@ -1,6 +1,3 @@
-// ABOUTME: Defines and evaluates the closed typed condition language for registration forms.
-// ABOUTME: Keeps all nine operators pure, culture-invariant, and bounded to normalized answer snapshots.
-
 using System.Text.Json.Serialization;
 
 namespace Explore.Domain.Services.Registration;

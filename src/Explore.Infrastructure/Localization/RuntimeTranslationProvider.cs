@@ -1,6 +1,3 @@
-// ABOUTME: Runtime TMS provider wrapper that resolves active provider from tenant settings at runtime.
-// ABOUTME: None → OfflineTranslationProvider, Tolgee → TolgeeTranslationProvider, Weblate → WeblateTranslationProvider.
-
 using System.Diagnostics;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Telemetry;

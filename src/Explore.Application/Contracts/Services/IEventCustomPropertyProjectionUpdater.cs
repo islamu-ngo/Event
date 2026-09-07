@@ -1,6 +1,3 @@
-// ABOUTME: Transactional updater contract for the atomic event custom-property projection read model.
-// ABOUTME: Writers call UpdateFor*/RemoveFor* inside command handler transactions; operators call Rebuild/Drain for recovery.
-
 namespace Explore.Application.Contracts.Services;
 
 public interface IEventCustomPropertyProjectionUpdater

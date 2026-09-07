@@ -1,6 +1,3 @@
-// ABOUTME: Versioned session blueprint owned by an event template that defines reusable Layer 3 custom-property definitions.
-// ABOUTME: Session templates are tenant-scoped and instantiate session-local runtime definitions during event session creation.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

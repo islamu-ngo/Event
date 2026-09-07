@@ -1,6 +1,3 @@
-# ABOUTME: Names generated response contracts that intentionally remain mutable UI or service state.
-# ABOUTME: Every entry has observed post-construction mutation and is ratcheted as a protected class.
-
 # Instance administration and onboarding edit state.
 AiAssistantGovernanceSettingsDto
 AnalyticsGovernanceSettingsDto

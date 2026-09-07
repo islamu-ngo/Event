@@ -1,6 +1,3 @@
-// ABOUTME: Verifies immutable local authentication contracts and their credential boundary validation.
-// ABOUTME: Rejects malformed credentials before Identity access and snapshots issued role collections.
-
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Features.Authentication.Local.Validators;
 using Explore.Application.Features.Authentication.Local.Requests.Commands;

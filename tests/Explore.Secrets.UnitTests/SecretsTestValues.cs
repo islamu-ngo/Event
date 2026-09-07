@@ -1,6 +1,3 @@
-// ABOUTME: Generates ephemeral secret material and fixed timestamps for Secrets tests.
-// ABOUTME: Prevents credentials, tokens, and connection strings from being embedded in source.
-
 using System.Security.Cryptography;
 using Npgsql;
 

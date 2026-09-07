@@ -1,6 +1,3 @@
-// ABOUTME: HAL authority tests for the verified Svix provider portal affordance.
-// ABOUTME: Proves persisted eligibility and authorization are both required while clients receive only a link.
-
 using System.Security.Claims;
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Assemblers;

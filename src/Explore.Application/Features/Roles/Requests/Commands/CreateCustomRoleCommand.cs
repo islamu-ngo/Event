@@ -1,6 +1,3 @@
-// ABOUTME: Command to create a custom (non-system) role with initial permissions.
-// ABOUTME: Enforces capability ceiling — caller can only grant permissions they have.
-
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
 using MediatR;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines registration workflow and form-authoring HAL link candidates.
-// ABOUTME: Applies exact event/form permissions and suppresses published-version mutations.
-
 using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;

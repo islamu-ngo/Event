@@ -1,6 +1,3 @@
-// ABOUTME: localStorage-backed dock layout persistence for browser-only dock preferences.
-// ABOUTME: Stores schema-versioned snapshots behind IDockLayoutPersistence and fails soft during prerender or corrupt data.
-
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Explore.Blazor.Client.Services;

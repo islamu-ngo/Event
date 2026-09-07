@@ -1,6 +1,3 @@
-// ABOUTME: Verifies S3 governance and credentials remain separated by authority.
-// ABOUTME: Guards optional unconfigured behavior and fail-closed provider failures.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Settings;

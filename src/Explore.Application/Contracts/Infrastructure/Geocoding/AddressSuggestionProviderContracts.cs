@@ -1,6 +1,3 @@
-// ABOUTME: Defines the Application-owned semantic boundary for optional address providers.
-// ABOUTME: Keeps outbound search intent free of tenant data, local rows, and concrete provider mode.
-
 using Explore.Application.DTOs.Geocoding;
 
 namespace Explore.Application.Contracts.Infrastructure.Geocoding;

@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for durable cross-replica email processor coordination state.
-// ABOUTME: Enforces one state row per processor code for global controls and reminder hysteresis.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

@@ -1,5 +1,3 @@
-// ABOUTME: Handler for grouped Category PATCH updates with optimistic concurrency.
-// ABOUTME: Validates groups, loads the entity once, applies explicit field updates, and invalidates category caches after save.
 using System;
 using System.Linq;
 using System.Threading;

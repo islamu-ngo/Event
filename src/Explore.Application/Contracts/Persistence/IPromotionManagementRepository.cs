@@ -1,6 +1,3 @@
-// ABOUTME: Persistence contract for organizer promotion definition management workflows.
-// ABOUTME: Returns Domain entities only so Application handlers own validation and DTO mapping.
-
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Domain;
 

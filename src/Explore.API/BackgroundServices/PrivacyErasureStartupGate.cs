@@ -1,6 +1,3 @@
-// ABOUTME: Blocks API startup until external platform privacy-erasure intents are replayed.
-// ABOUTME: Preserves caller cancellation and exposes only sanitized fail-closed errors.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.Exceptions;
 

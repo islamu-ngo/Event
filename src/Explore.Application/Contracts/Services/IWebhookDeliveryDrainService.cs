@@ -1,6 +1,3 @@
-// ABOUTME: Application contract for draining canonical Local-provider webhook targets.
-// ABOUTME: Exposes batch, recovery, and evidence-based manual-retry boundaries.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Services;

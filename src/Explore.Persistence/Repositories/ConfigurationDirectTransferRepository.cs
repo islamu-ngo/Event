@@ -1,6 +1,3 @@
-// ABOUTME: Persists target-qualified direct-transfer sessions and encrypted resumable chunks.
-// ABOUTME: Verifies duplicate ranges and assembled plaintext before returning an artifact to Application.
-
 namespace Explore.Persistence.Repositories;
 
 using System.Security.Cryptography;

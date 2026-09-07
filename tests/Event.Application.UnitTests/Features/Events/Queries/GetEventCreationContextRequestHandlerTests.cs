@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for resolving event creation context from tenant policy and publisher permissions.
-// ABOUTME: Verifies server-owned publisher affordances before Blazor composes an event draft.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Command for setting group-scoped notification preference global mute.
-// ABOUTME: Preserves saved channel choices while writing the scoped profile row transactionally.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

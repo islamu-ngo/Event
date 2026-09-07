@@ -1,6 +1,3 @@
-// ABOUTME: Atomically reserves captured refund capacity and stores independent dispute projections.
-// ABOUTME: Locks the tenant payment authority before every duplicate, exposure, and capacity decision.
-
 using System.Data;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

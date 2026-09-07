@@ -1,6 +1,3 @@
-// ABOUTME: Command handler for locking a setting at Instance or Tenant scope.
-// ABOUTME: Validates IsLockable, scope support, and admin authorization before delegating to resolver.
-
 namespace Explore.Application.Features.Settings.Handlers.Commands;
 
 using Explore.Application.Contracts.Identity;

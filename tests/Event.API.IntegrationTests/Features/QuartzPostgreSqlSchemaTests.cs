@@ -1,6 +1,3 @@
-// ABOUTME: Executes the shipped PostgreSQL Quartz DDL against a real PostgreSQL engine, not just a string scan.
-// ABOUTME: Proves the Tier 2/3 default provider creates every job-store table, re-applies safely, and really fires.
-
 using Event.Api.IntegrationTests.Fixtures;
 using Microsoft.Extensions.DependencyInjection;
 using Quartz;

@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for LocationRoom - conference-style rooms under a Location.
-// ABOUTME: Provides bounded disclosure reads plus location-scoped room management queries.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Provides the bounded shared cache used by AT Protocol handle and DID resolution.
-// ABOUTME: Preserves CarpaNet identity TTLs while enforcing independent hard size limits.
-
 using CarpaNet.Identity;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Internal;

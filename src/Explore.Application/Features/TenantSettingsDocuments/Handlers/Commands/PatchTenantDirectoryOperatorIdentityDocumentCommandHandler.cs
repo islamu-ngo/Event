@@ -1,6 +1,3 @@
-// ABOUTME: Applies tenant-bound, presence-aware patches to directory-operator identity drafts.
-// ABOUTME: Enforces exact concurrency and structural validity before atomic persistence and cache invalidation.
-
 namespace Explore.Application.Features.TenantSettingsDocuments.Handlers.Commands;
 
 using System.Text.Json;

@@ -1,6 +1,3 @@
-// ABOUTME: Coordinates create/edit event-session save calls without owning Razor page lifecycle or UI state.
-// ABOUTME: Keeps session save orchestration testable while preserving page-level validation, navigation, and submit UX.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Services;

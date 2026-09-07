@@ -1,6 +1,3 @@
-<!-- ABOUTME: Describes the standalone release-engineering command and trusted local tool-bundle boundary. -->
-<!-- ABOUTME: Documents pinned git-cliff verification without runtime downloads or provider coupling. -->
-
 # Release Engineering
 
 `ISLAMU.ReleaseEngineering` is a standalone `net10.0` console project for

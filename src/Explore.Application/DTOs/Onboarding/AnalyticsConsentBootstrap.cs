@@ -1,6 +1,3 @@
-// ABOUTME: Slim public DTO for browser analytics bootstrap — effective runtime config only.
-// ABOUTME: No admin governance inputs, no tenantSlug, no PersonalApiKey. Amendment 3 compliant.
-
 namespace Explore.Application.DTOs.Onboarding;
 
 /// <summary>

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies tenant role-grant bypasses are bounded by tenant/user or user-membership predicates.
-// ABOUTME: Proves authorization membership lookups do not leak ambient tenant or unrelated user grants.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;

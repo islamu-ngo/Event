@@ -1,6 +1,3 @@
-// ABOUTME: Normalized lookup describing how an event entered the platform.
-// ABOUTME: Separates historical provenance from publishing and organizer authority.
-
 namespace Explore.Domain;
 
 public sealed class EventProvenanceType

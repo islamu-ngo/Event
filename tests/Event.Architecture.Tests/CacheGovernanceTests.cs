@@ -1,6 +1,3 @@
-// ABOUTME: Architecture guardrails for HybridCache key taxonomy and telemetry safety.
-// ABOUTME: Keeps cache observability aggregate-only until runtime telemetry semantics are ADR-approved.
-
 namespace Event.Architecture.Tests;
 
 using System.Text.RegularExpressions;

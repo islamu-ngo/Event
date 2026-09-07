@@ -1,6 +1,3 @@
-// ABOUTME: Architecture tests enforcing that every public HTTP action carries an EndpointClassification.
-// ABOUTME: Fails the build when a controller or action is not tagged with a valid endpoint class.
-
 namespace Event.Architecture.Tests;
 
 using System.Linq;

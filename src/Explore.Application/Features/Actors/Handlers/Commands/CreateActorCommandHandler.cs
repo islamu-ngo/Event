@@ -1,5 +1,3 @@
-// ABOUTME: Handler for creating a new actor entity with validation.
-// ABOUTME: Validates input, maps DTO, sets TenantId, persists via repository.
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

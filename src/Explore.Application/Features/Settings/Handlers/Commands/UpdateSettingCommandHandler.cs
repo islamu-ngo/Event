@@ -1,6 +1,3 @@
-// ABOUTME: Command handler for updating a single setting value at a specific scope.
-// ABOUTME: User scope writes via IUserPreferenceRepository; other scopes via IHierarchicalSettingsResolver.
-
 namespace Explore.Application.Features.Settings.Handlers.Commands;
 
 using Explore.Application.Contracts.Identity;

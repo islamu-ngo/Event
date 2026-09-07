@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL/Testcontainers API endpoint benchmark suite for data-access-faithful measurements.
-// ABOUTME: Keeps container startup outside measured methods and reuses benchmark endpoint scenarios.
-
 using System.Threading.Channels;
 using BenchmarkDotNet.Attributes;
 using Event.Benchmarks.Api;

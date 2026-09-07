@@ -1,6 +1,3 @@
-// ABOUTME: Unified translation resolver — single entry point for all translation needs.
-// ABOUTME: Cache keys vary on (tenantId, languageCode, providerMode) so live/offline slots never collide.
-
 using System.Collections.Concurrent;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain.Enums;

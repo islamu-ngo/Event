@@ -1,6 +1,3 @@
-// ABOUTME: Drains durable provider-submission write effects after native submissions commit.
-// ABOUTME: Rebuilds provider payloads from persisted canonical answers and typed mappings only after claim.
-
 using System.Globalization;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

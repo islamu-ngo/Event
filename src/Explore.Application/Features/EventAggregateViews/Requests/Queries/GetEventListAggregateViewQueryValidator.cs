@@ -1,6 +1,3 @@
-// ABOUTME: Manual FluentValidation validator for the aggregate list query request.
-// ABOUTME: Enforces non-null filters and sane pagination before view access.
-
 using Explore.Application.DTOs.EventAggregateView;
 using Explore.Application.Responses;
 using FluentValidation;

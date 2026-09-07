@@ -1,6 +1,3 @@
-// ABOUTME: Verifies registration file answers begin quarantined and require an explicit manual release.
-// ABOUTME: Covers storage tenant containment and immutable upload metadata snapshots.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for event CRUD operations with advanced filtering, pagination, and HATEOAS support.
-// ABOUTME: Supports specification-based queries, soft-delete recovery, and complex event discovery with multiple filter dimensions.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

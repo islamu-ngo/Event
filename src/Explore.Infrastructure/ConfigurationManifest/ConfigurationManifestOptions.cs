@@ -1,6 +1,3 @@
-// ABOUTME: Defines exact environment-backed options for configuration-manifest discovery and execution mode.
-// ABOUTME: Validates mode and path syntax without touching the filesystem or weakening Off semantics.
-
 namespace Explore.Infrastructure.ConfigurationManifest;
 
 using Explore.Application.Features.ConfigurationManifest.Ingestion;

@@ -1,6 +1,3 @@
-// ABOUTME: Closed enumeration of supported secret authority types.
-// ABOUTME: Environment and Infisical are deployment modes; User Secrets is Development/Testing only.
-
 namespace Explore.Secrets.Abstractions;
 
 /// <summary>

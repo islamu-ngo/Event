@@ -1,6 +1,3 @@
-// ABOUTME: Classifies image/storage content types for client-side upload metadata.
-// ABOUTME: Keeps file-type and extension defaults out of ImageStorageService orchestration.
-
 namespace Explore.Blazor.Client.Services;
 
 public interface IImageContentClassifier

@@ -1,6 +1,3 @@
-// ABOUTME: Command for updating a single setting value at a specific scope.
-// ABOUTME: Handler validates key existence, value type, AllowedValues, lock state, and scope authorization.
-
 namespace Explore.Application.Features.Settings.Requests.Commands;
 
 using Explore.Application.Responses;

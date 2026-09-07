@@ -1,6 +1,3 @@
-// ABOUTME: Narrow seam over the CarpaNet Jetstream v2 sealed-archive endpoints used by recovery scoping.
-// ABOUTME: Exposes plan and decoded-block reads so probe branch logic is testable without network access.
-
 using CarpaNet.Jetstream;
 using Microsoft.Extensions.Options;
 

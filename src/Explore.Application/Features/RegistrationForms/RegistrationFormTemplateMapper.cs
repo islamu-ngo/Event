@@ -1,6 +1,3 @@
-// ABOUTME: Maps registration-form template Domain rows into API-facing catalog DTOs.
-// ABOUTME: Keeps Application responsible for projection while repositories return entities.
-
 using Explore.Application.DTOs.RegistrationForms;
 using Explore.Domain;
 

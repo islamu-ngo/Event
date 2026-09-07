@@ -1,6 +1,3 @@
-// ABOUTME: Computes bounded Event-owned tenant provisioning capacity for preview and scheduling.
-// ABOUTME: Counts active tenants plus durable pending reservations without exposing tenant business records.
-
 using Explore.Application.DTOs.Management;
 using Explore.Domain.Enums;
 

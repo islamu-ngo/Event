@@ -1,6 +1,3 @@
-// ABOUTME: Normalized quota limit row belonging to a tenant plan version.
-// ABOUTME: Stores supported plan quota keys separately from setting override rows.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

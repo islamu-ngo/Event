@@ -1,6 +1,3 @@
-// ABOUTME: Command request for creating an ad-hoc event-local custom property definition.
-// ABOUTME: Used when organizers add properties directly to an event without a template (task 6.3).
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventCustomProperty;
 using Explore.Application.Responses;

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies guest ticket recovery renders request and consumed capability states safely.
-// ABOUTME: Proves fragment material is handed once to the service and never appears in markup.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Interop;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;

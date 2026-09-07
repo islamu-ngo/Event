@@ -1,6 +1,3 @@
-// ABOUTME: Executes registration-form template catalog creation and event-scoped instantiation.
-// ABOUTME: Enforces tenant/platform authority while reusing immutable published form-version clone semantics.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

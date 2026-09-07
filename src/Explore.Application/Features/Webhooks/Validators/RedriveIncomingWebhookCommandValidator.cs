@@ -1,6 +1,3 @@
-// ABOUTME: Validates tenant-scoped incoming webhook redrive requests before state mutation.
-// ABOUTME: Requires a positive expected generation and a bounded non-empty operator reason.
-
 using Explore.Application.Features.Webhooks.Requests.Commands;
 using Explore.Domain;
 using FluentValidation;

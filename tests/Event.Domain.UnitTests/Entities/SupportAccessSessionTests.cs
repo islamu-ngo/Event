@@ -1,6 +1,3 @@
-// ABOUTME: Domain tests for support-access session lifecycle and audit evidence.
-// ABOUTME: Verifies time-boxed support access preserves actor identity and terminal state rules.
-
 using Explore.Domain.Enums;
 
 namespace Event.Domain.UnitTests.Entities;

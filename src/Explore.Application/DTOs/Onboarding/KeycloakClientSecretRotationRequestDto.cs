@@ -1,6 +1,3 @@
-// ABOUTME: Request DTO for explicit Keycloak confidential-client secret rotation.
-// ABOUTME: Keeps new client secrets and temporary admin credentials request-scoped and out of persisted responses.
-
 namespace Explore.Application.DTOs.Onboarding;
 
 public sealed record KeycloakClientSecretRotationRequestDto

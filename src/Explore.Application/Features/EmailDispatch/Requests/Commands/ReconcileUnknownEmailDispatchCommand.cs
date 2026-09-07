@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-scoped command for explicitly resolving an Unknown SMTP outcome.
-// ABOUTME: Carries a delivered/not-delivered decision and bounded evidence into one atomic ledger transition.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Responses;

@@ -1,6 +1,3 @@
-// ABOUTME: Captures public-safe promotion scope facts independent of plaintext promotion codes.
-// ABOUTME: Pins tenant, event, catalog version, and currency metadata for later digest lookup integration.
-
 using Explore.Domain.ValueObjects;
 
 namespace Explore.Domain;

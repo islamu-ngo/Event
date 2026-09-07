@@ -1,6 +1,3 @@
-// ABOUTME: Authorized command for creating an owner-inherited outgoing endpoint and subscriptions.
-// ABOUTME: Resolves ownership from the persisted consumer without exposing raw signing secret values.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

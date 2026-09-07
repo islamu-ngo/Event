@@ -1,6 +1,3 @@
-// ABOUTME: Handles persisted-owner webhook message detail reads for management APIs.
-// ABOUTME: Returns safe metadata DTOs without raw payload JSON.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Queries;

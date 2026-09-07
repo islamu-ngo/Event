@@ -1,6 +1,3 @@
-// ABOUTME: Publishes the infrastructure geocoding probe through the API readiness surface.
-// ABOUTME: Preserves bounded provider categories without adding address or endpoint data.
-
 using Explore.Infrastructure.Geocoding;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Test helper for assigning generated HAL link dictionaries without anonymous type coupling.
-// ABOUTME: Keeps NSwag anonymous link type ordinal changes from breaking unrelated component tests.
-
 using System.Collections;
 
 namespace Explore.Blazor.Client.Tests.Common;

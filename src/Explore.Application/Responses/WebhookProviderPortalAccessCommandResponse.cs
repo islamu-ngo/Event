@@ -1,6 +1,3 @@
-// ABOUTME: Command response for webhook provider portal access creation.
-// ABOUTME: Extends the standard command response with retryability for provider failure mapping.
-
 using Explore.Application.DTOs.Webhooks;
 
 namespace Explore.Application.Responses;

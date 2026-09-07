@@ -1,6 +1,3 @@
-// ABOUTME: Mailpit Testcontainers fixture for infrastructure SMTP integration tests.
-// ABOUTME: Exposes SMTP wiring and bounded HTTP polling without logging email bodies or secrets.
-
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using DotNet.Testcontainers.Builders;

@@ -1,4 +1,3 @@
-// ABOUTME: Factory for creating pre-configured mock services for common testing scenarios.
 // All mocks use NSubstitute and return sensible defaults using HAL resource types.
 
 namespace Explore.Blazor.Client.Tests.Common;

@@ -1,6 +1,3 @@
-// ABOUTME: Handles promotion code apply/remove orchestration for registration orders at Application boundaries.
-// ABOUTME: Uses entity repositories, manual validators, serializable units, and generic failures to avoid code enumeration.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services.Registration;

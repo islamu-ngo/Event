@@ -1,6 +1,3 @@
-// ABOUTME: Canonical namespace rules for Layer 3 custom-property machine identity.
-// ABOUTME: Centralizes reserved namespace prefixes so future validators and handlers enforce one policy.
-
 namespace Explore.Domain.Constants;
 
 public static class CustomPropertyNamespaces

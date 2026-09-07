@@ -1,6 +1,3 @@
-// ABOUTME: Adapts the instance secret-backed key ring to the shared strict OAuth assertion policy.
-// ABOUTME: Produces a fresh issuer-bound CarpaNet assertion with the persisted session kid per send.
-
 using CarpaNet.OAuth.Crypto;
 using Explore.Atproto.Transport;
 

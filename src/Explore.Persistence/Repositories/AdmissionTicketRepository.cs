@@ -1,6 +1,3 @@
-// ABOUTME: Persists and resolves tenant-scoped admission tickets by assignment or active keyed digest.
-// ABOUTME: Repository methods return aggregates and never surface raw credential material.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;

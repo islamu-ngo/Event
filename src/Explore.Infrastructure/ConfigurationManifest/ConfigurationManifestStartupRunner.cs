@@ -1,6 +1,3 @@
-// ABOUTME: Runs bounded configuration-manifest discovery through the canonical Application boundary at startup.
-// ABOUTME: Emits only stable identifiers and counts while converting failed application results into startup failure.
-
 namespace Explore.Infrastructure.ConfigurationManifest;
 
 using Explore.Application.Features.ConfigurationManifest.Application;

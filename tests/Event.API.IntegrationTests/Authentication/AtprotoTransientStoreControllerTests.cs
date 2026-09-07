@@ -1,6 +1,3 @@
-// ABOUTME: Exercises private create/read/consume through real controllers, MediatR and P1 PostgreSQL stores.
-// ABOUTME: Proves tenant binding, collision, expiry, health-purpose exclusion and no generic response replay.
-
 using System.Net;
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Proves verify-tag accepts only trusted SSH-signed annotated release tags.
-// ABOUTME: Exercises deterministic final evidence, canonical tag messages, and local drift failures.
-
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;

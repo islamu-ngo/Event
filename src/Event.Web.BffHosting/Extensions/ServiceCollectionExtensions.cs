@@ -1,6 +1,3 @@
-// ABOUTME: Exposes shared browser-BFF hosting registration helpers for Event web hosts.
-// ABOUTME: Keeps host profile and API proxy defaults consistent across public and control-plane hosts.
-
 using Event.Web.BffHosting.Abstractions;
 using Event.Web.BffHosting.Authentication;
 using Event.Web.BffHosting.Options;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines the inclusive UTC admission window and configured entry limit for one target.
-// ABOUTME: Binds policy authority to an exact tenant-owned target and rejects malformed windows.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

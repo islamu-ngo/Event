@@ -1,6 +1,3 @@
-// ABOUTME: Records bounded PII-free audit facts for post-finalization registration-order changes.
-// ABOUTME: Captures actor, reason, change kind, and before/after assignment identifiers for organizer review.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

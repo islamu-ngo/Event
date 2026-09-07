@@ -1,6 +1,3 @@
-// ABOUTME: Exposes one private line-scoped fair-return waitlist resource and authenticated lifecycle writes.
-// ABOUTME: Keeps capability in headers, delegates all authority to CQRS, and returns server-owned HAL links.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped layout styles for tenant storage policy and override controls. */
-/* ABOUTME: Keeps policy summary, usage counters, and provider fields responsive. */
-
 .tenant-storage-section {
     display: flex;
     flex-direction: column;

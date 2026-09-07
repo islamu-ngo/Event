@@ -1,6 +1,3 @@
-// ABOUTME: Exhaustive pure-policy tests for contextual EventLocation disclosure decisions.
-// ABOUTME: Proves ordered fail-closed gates, server-time reveal, field selection, and Private Home redaction.
-
 using System.Collections.Immutable;
 using System.Reflection;
 using Explore.Application.Contracts.LocationPrivacy;

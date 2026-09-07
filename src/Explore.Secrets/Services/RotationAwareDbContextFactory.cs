@@ -1,6 +1,3 @@
-// ABOUTME: DbContext factory that validates connection candidates before process-local activation.
-// ABOUTME: Returns value-free local acknowledgements and never exposes connection coordinates.
-
 using Explore.Secrets.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;

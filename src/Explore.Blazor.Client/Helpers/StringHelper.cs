@@ -1,6 +1,3 @@
-// ABOUTME: Shared helper for text truncation and string manipulation.
-// ABOUTME: Replaces 3 duplicate TruncateText/GetTruncatedDescription methods across the codebase.
-
 namespace Explore.Blazor.Client.Helpers;
 
 /// <summary>

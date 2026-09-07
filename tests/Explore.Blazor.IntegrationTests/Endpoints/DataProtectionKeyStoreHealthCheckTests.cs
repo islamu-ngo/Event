@@ -1,6 +1,3 @@
-// ABOUTME: Covers the Blazor BFF readiness check for persisted Data Protection keys.
-// ABOUTME: Proves key-store failures become safe unhealthy health results.
-
 using Explore.Blazor.Extensions;
 using Explore.Blazor.HealthChecks;
 using Microsoft.AspNetCore.DataProtection;

@@ -1,6 +1,3 @@
-// ABOUTME: Query request for paginated user notifications with optional filters.
-// ABOUTME: Supports filtering by read status and notification type ID.
-
 using Explore.Application.DTOs.Notification;
 using Explore.Application.Responses;
 using MediatR;

@@ -1,6 +1,3 @@
-// ABOUTME: Generated-client backed service for Listmonk integration settings UI operations.
-// ABOUTME: Maps command responses safely and keeps plaintext credentials write-only in the browser.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Contracts.Services.Webhooks;

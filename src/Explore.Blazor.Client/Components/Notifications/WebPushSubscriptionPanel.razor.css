@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped layout for the browser Web Push consent and subscription panel. */
-/* ABOUTME: Uses existing design tokens for responsive, accessible status and action alignment. */
-
 .web-push-subscription-panel {
     display: block;
 }

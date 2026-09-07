@@ -1,6 +1,3 @@
-// ABOUTME: Shared constants for organization and entity approval statuses.
-// ABOUTME: Matches backend ApprovalStatusEnum identifiers.
-
 namespace Explore.Blazor.Client.Constants;
 
 /// <summary>

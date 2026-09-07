@@ -1,6 +1,3 @@
-// ABOUTME: Handles tenant user role grant revocation by ID.
-// ABOUTME: Records revocation audit fields instead of mutating roles in place.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.TenantUserRoleGrants.Requests.Commands;

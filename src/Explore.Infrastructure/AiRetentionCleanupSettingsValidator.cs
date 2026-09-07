@@ -1,6 +1,3 @@
-// ABOUTME: Startup validator for scheduled AI assistant retention cleanup settings.
-// ABOUTME: Fails fast when scheduling or tenant batch bounds are unsafe.
-
 using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure;

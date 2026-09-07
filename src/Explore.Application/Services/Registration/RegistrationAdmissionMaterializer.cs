@@ -1,6 +1,3 @@
-// ABOUTME: Materializes order-line ticket entitlements into per-session participant admissions.
-// ABOUTME: Shares one application-owned expansion path between finalization and post-confirm assignment amendments.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

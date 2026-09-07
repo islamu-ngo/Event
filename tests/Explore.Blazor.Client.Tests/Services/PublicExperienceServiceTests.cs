@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for PublicExperienceService generated-client delegation and home route resolution.
-// ABOUTME: Verifies public settings and shell fallback, caching, and generated enum route rules.
-
 namespace Explore.Blazor.Client.Tests.Services;
 
 public class PublicExperienceServiceTests

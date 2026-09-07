@@ -1,6 +1,3 @@
-// ABOUTME: Machine-checks the test-only User-PII inventory against EF and designated provider surfaces.
-// ABOUTME: Rejects omissions, malformed classifications, and any attempt to turn governance metadata into deletion SQL.
-
 using Explore.Application.Features.Federation.Atproto.Services;
 using Explore.Persistence;
 using Explore.Persistence.Privacy.ErasureAuthority;

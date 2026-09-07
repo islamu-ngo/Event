@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for external API key owner type lookup values.
-// ABOUTME: Maps ExternalApiKeyOwnerTypeLookup to the external_api_key_owner_types table.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation validator for CreateEventSeriesDto.
-// ABOUTME: Manually instantiated in CreateEventSeriesCommandHandler (not DI-injected).
-
 using Explore.Application.DTOs.EventSeries;
 using FluentValidation;
 

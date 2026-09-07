@@ -93,7 +93,7 @@ ISLAMU Event is architected for sovereign self-hosting across diverse hardware r
 | **[PaaS Deployment (Coolify)](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/coolify-cerbos-traefik)** | Self-hosted PaaS deployment behind Traefik with an external Cerbos PDP container. | 📖 **[Coolify with Cerbos & Traefik](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/coolify-cerbos-traefik)** |
 | **[Developer Orchestration](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/dotnet-aspire-and-cloud)** | Local development and cloud-native adaptation via .NET Aspire AppHost. | 📖 **[.NET Aspire & Cloud](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/dotnet-aspire-and-cloud)** |
 
-For hardware sizing benchmarks, real-world Hetzner CX22 performance metrics, and capacity planning, consult the **[Deployment Tiers & Sizing Guide](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/deployment-tiers)** and the master **[Environment Variables Reference](https://islamu.gitbook.io/islamu-event/documentation/readme/configuration-and-operations/environment-variables)**.
+For hardware sizing benchmarks, real-world Hetzner CPX32 reference metrics, and capacity planning, consult the **[Deployment Tiers & Sizing Guide](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/deployment-tiers)** and the master **[Environment Variables Reference](https://islamu.gitbook.io/islamu-event/documentation/readme/configuration-and-operations/environment-variables)**.
 
 ---
 

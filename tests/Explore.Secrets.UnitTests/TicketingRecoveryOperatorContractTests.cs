@@ -1,6 +1,3 @@
-// ABOUTME: Verifies fail-closed ticketing recovery configuration, disabled controls, and health output.
-// ABOUTME: Restores the Phase 8 operator contract without mocking persistence or scheduler internals.
-
 using Explore.Domain;
 using Explore.Domain.Secrets;
 using Explore.Infrastructure.Recovery;

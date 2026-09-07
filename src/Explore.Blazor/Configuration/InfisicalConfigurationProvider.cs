@@ -1,6 +1,3 @@
-// ABOUTME: Loads Blazor startup secrets directly from the Infisical REST API.
-// ABOUTME: Maps provider secret names into the configuration keys consumed by the BFF host.
-
 namespace Explore.Blazor.Configuration;
 
 using System.Net;

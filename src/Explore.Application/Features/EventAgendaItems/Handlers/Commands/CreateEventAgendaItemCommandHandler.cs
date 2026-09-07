@@ -1,6 +1,3 @@
-// ABOUTME: Handler for creating a new event-level agenda item with validation and local projection.
-// ABOUTME: Validates input, maps DTO, computes cached local projections via Reschedule(), auto-links EventDayId.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventAgendaItem.Validators;

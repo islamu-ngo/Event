@@ -1,6 +1,3 @@
-// ABOUTME: Strongly-typed Module enablement setting group resolved via batch loading.
-// ABOUTME: Keys align to ModuleSettingDefinitions via GovernanceSettingKeys.Modules.
-
 namespace Explore.Application.Settings.Groups;
 
 using Explore.Application.Contracts.Infrastructure;

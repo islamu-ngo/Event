@@ -1,6 +1,3 @@
-// ABOUTME: Exercises the shared onboarding completion operation through public interactive and configured seams.
-// ABOUTME: Uses a rollback-capable state fake to prove atomic persistence and post-commit effect ordering.
-
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;

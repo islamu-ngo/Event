@@ -1,6 +1,3 @@
-// ABOUTME: Explicit two-phase managed Svix conformance lane using environment-only credentials.
-// ABOUTME: Persists a private expiry probe, cleans disposable applications, and emits only sanitized results.
-
 using System.Text.Json;
 using Explore.Infrastructure.Tests.Fixtures;
 using Explore.Infrastructure.Webhooks;

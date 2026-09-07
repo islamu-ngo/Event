@@ -1,6 +1,3 @@
-// ABOUTME: Maps notification entity metadata to Blazor routes used by notification inbox surfaces.
-// ABOUTME: Centralizes entity deep-link behavior so bell and inbox stay aligned with Routes.razor.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Helpers;

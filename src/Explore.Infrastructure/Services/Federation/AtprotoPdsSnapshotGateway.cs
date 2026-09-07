@@ -1,6 +1,3 @@
-// ABOUTME: Fetches complete bounded ATProto repository snapshots over hardened public egress.
-// ABOUTME: Verifies DID/PDS binding and CAR integrity before reusing canonical record materialization.
-
 using System.Diagnostics.CodeAnalysis;
 using System.Formats.Cbor;
 using System.Security.Cryptography;

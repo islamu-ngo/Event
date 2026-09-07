@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL integration tests for atomic provider-publication claims and fenced completion.
-// ABOUTME: Verifies entity-returning claims, bounded concurrency, tenant isolation, and immutable uniqueness.
-
 using System.Diagnostics;
 using System.Text;
 using Event.Persistence.IntegrationTests.Fixtures;

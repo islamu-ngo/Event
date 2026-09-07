@@ -1,6 +1,3 @@
-// ABOUTME: Locks ActorMerge immutable proof construction and evidence-reference validation.
-// ABOUTME: Ensures consolidation evidence identifies distinct source and canonical Actors.
-
 namespace Event.Domain.UnitTests.Entities;
 
 using Explore.Domain.Enums;

@@ -1,6 +1,3 @@
-// ABOUTME: EF mapping for stable registration booking-party lookup rows.
-// ABOUTME: Enforces runtime-seeded IDs, codes, and display metadata.
-
 using Explore.Domain;
 
 namespace Explore.Persistence.Configurations.Entities;

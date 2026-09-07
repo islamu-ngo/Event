@@ -1,6 +1,3 @@
-// ABOUTME: Registers bounded multi-scheme authentication and authorization for the API.
-// ABOUTME: Dispatches exact setup, API-key, ATProto, privacy-receipt, and Keycloak bearer credentials.
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Net.Security;

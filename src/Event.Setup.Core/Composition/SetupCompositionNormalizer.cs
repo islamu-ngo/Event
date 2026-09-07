@@ -1,6 +1,3 @@
-// ABOUTME: Builds and merges the single bounded immutable tree used by every Setup composition source.
-// ABOUTME: Enforces key identity, node budgets, deterministic ordering, and authority exclusion before Wire parsing.
-
 namespace ISLAMU.Event.Setup.Core.Composition;
 
 using System.Buffers;

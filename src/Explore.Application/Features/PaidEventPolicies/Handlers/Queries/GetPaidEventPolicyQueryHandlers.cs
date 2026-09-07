@@ -1,6 +1,3 @@
-// ABOUTME: Handles paid-event policy read requests for instance and tenant scopes.
-// ABOUTME: Projects active policy revisions into DTOs for management clients.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.PaidEventPolicies;
 using Explore.Application.Features.PaidEventPolicies.Requests.Queries;

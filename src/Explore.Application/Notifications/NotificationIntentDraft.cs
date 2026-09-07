@@ -1,6 +1,3 @@
-// ABOUTME: Captures the safe metadata needed to resolve notification ownership.
-// ABOUTME: Excludes provider clients, raw evidence, and delivery transport details by design.
-
 namespace Explore.Application.Notifications;
 
 public sealed record NotificationIntentDraft(

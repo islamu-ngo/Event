@@ -1,6 +1,3 @@
-// ABOUTME: Readiness health check for expired idempotency replay-cache cleanup settings.
-// ABOUTME: Exposes bounded operator-safe cleanup posture without leaking idempotency keys.
-
 using Explore.Infrastructure;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;

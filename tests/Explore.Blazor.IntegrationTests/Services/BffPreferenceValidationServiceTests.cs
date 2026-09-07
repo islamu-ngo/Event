@@ -1,6 +1,3 @@
-// ABOUTME: Unit-style tests for BFF preference query normalization rules.
-// ABOUTME: Protects endpoint decomposition from drifting validation/defaulting behavior.
-
 using Explore.Blazor.Services.Preferences;
 
 namespace Explore.Blazor.IntegrationTests.Services;

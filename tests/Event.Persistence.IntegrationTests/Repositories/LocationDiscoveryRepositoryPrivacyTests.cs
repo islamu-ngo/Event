@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL query-shape tests for tenant location validation used by anonymous discovery.
-// ABOUTME: Proves exact LocationPii columns are never materialized by the area-validation read path.
-
 using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;

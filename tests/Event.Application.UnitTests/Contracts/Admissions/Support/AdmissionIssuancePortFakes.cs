@@ -1,6 +1,3 @@
-// ABOUTME: Implements only the exact planned issuance repository, digest, and delivery port calls.
-// ABOUTME: Unknown calls fail immediately instead of being fabricated by a catch-all proxy.
-
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Contracts.Admissions;

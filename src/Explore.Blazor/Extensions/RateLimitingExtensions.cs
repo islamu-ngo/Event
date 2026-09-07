@@ -1,6 +1,3 @@
-// ABOUTME: Registers BFF-specific rate limiting policies for sensitive browser-facing endpoints.
-// ABOUTME: Keys setup-secret attempts by session context and anonymous ATProto OAuth endpoints by source IP.
-
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;

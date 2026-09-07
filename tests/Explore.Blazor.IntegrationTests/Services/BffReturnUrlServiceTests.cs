@@ -1,6 +1,3 @@
-// ABOUTME: Unit-style tests for BFF auth return URL validation and non-diagnostic redirect helpers.
-// ABOUTME: Protects auth endpoint decomposition from changing local-return-url safety rules.
-
 using Explore.Blazor.Services.Auth;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;

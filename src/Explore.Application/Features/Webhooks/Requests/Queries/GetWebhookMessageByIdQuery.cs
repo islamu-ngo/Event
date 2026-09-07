@@ -1,6 +1,3 @@
-// ABOUTME: Authorized query for one persisted-owner webhook message audit row.
-// ABOUTME: Uses webhook delivery authorization and omits raw payload data from the response DTO.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Webhooks;
 using MediatR;

@@ -1,5 +1,3 @@
-// ABOUTME: Validates GitHub Actions cache usage stays out of privileged deploy/publish paths.
-// ABOUTME: Prevents fork PR cache writes from becoming trusted release or deployment inputs.
 #:property RestorePackagesWithLockFile=false
 
 var root = args.Length > 0 ? args[0] : ".github/workflows";

@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-local participation state for a global user account.
-// ABOUTME: Stores status and moderation lifecycle without mutating the global User record.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

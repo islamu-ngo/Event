@@ -1,6 +1,3 @@
-// ABOUTME: Direct HAL policy contract tests for event and session lifecycle affordances.
-// ABOUTME: Verifies lifecycle links are emitted from server-owned state and route-name constants.
-
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.Authorization;

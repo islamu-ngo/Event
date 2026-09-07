@@ -1,6 +1,3 @@
-// ABOUTME: Notification service wrapping generated notification, group, and organization clients.
-// ABOUTME: Follows EventRegistrationService pattern: try-catch with logging, ApiException handling.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Constants;
 using Explore.Blazor.Client.Contracts.Services.Notifications;

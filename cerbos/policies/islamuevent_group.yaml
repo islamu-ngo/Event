@@ -1,4 +1,3 @@
-# ABOUTME: Cerbos resource policy for group resources.
 # Groups are org-scoped: org admins manage their groups, tenant admins manage all groups in their tenant.
 
 apiVersion: api.cerbos.dev/v1

@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning a single event-tag link by ID.
-// ABOUTME: Maps junction entity to EventTagsDto.
 using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;

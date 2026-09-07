@@ -1,6 +1,3 @@
-// ABOUTME: Runs one bounded integration-sync outbox drain pass under Quartz.
-// ABOUTME: Leaves tenant binding, provider ambiguity, retries, and fenced settlement in Infrastructure.
-
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Contracts.Services;
 using Quartz;

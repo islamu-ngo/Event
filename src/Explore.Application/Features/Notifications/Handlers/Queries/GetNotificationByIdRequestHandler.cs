@@ -1,6 +1,3 @@
-// ABOUTME: Handles retrieval of a single notification by ID for the authenticated user.
-// ABOUTME: Returns null if the notification doesn't exist or doesn't belong to the user.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

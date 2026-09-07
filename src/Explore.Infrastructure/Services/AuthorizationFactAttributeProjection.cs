@@ -1,6 +1,3 @@
-// ABOUTME: Projects the closed trusted authorization fact records into provider wire attributes.
-// ABOUTME: This is the only place a policy attribute name exists; Application never authors provider dictionaries.
-
 using Explore.Application.Authorization;
 
 namespace Explore.Infrastructure.Services;

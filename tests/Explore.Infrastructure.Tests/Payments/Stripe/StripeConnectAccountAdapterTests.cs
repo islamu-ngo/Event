@@ -1,6 +1,3 @@
-// ABOUTME: Deterministic Stripe Connect adapter tests using the SDK over a fake HTTP handler.
-// ABOUTME: Verifies request shaping, readiness mapping, bounded failures, and no global API key use.
-
 using System.Net;
 using System.Text;
 using Explore.Application.Contracts.Persistence;

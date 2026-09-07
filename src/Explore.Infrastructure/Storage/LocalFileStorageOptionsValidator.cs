@@ -1,6 +1,3 @@
-// ABOUTME: Startup validation for deployment-managed local filesystem storage options.
-// ABOUTME: Rejects blank or structurally invalid roots before local provider operations run.
-
 using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure.Storage;

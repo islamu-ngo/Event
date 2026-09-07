@@ -1,6 +1,3 @@
-// ABOUTME: Handler for retrieving all rooms belonging to a specific location.
-// ABOUTME: Returns a sorted list via the repository; mapping is handled by AutoMapper.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.LocationRoom;

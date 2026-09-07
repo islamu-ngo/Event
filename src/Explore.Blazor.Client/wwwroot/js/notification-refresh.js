@@ -1,6 +1,3 @@
-// ABOUTME: Browser EventSource bridge for authenticated notification refresh hints.
-// ABOUTME: Keeps payloads minimal and lets the browser reconnect while polling stays as fallback.
-
 let notificationRefreshSource = null;
 let serviceWorkerMessageHandler = null;
 

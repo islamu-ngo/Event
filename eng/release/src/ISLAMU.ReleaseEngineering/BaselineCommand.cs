@@ -1,6 +1,3 @@
-// ABOUTME: Verifies SSH-signed annotated non-SemVer changelog baseline tags.
-// ABOUTME: Writes deterministic baseline evidence without creating, moving, or mutating Git tags.
-
 using System.Diagnostics;
 using System.Globalization;
 using System.Security.Cryptography;

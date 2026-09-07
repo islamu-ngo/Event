@@ -1,6 +1,3 @@
-// ABOUTME: Tenant creation input with optional immediate activation and explicit legal identity.
-// ABOUTME: Keeps cosmetic tenant naming separate from directory-operator accountability facts.
-
 using Explore.Application.DTOs.TenantSettings;
 
 namespace Explore.Application.DTOs.Tenant;

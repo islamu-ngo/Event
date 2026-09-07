@@ -1,6 +1,3 @@
-// ABOUTME: EF Core entity-type configuration for AiConsentGrant aggregates.
-// ABOUTME: Maps keys, indexes, navigation, and audit columns per ExploreDbContext conventions.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

@@ -1,6 +1,3 @@
-// ABOUTME: Loads authorized Studio actors and reconciles session-only actor selection.
-// ABOUTME: Pinned and single-actor contexts remain read-only; multi-actor contexts can switch.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Shell;
 using Explore.Blazor.Client.Services.Shell;

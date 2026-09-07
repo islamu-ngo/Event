@@ -1,6 +1,3 @@
-// ABOUTME: Centralized Include chain for Event queries to eliminate duplication across EventRepository methods.
-// ABOUTME: Only includes navigation properties — callers control tracking strategy (AsNoTracking, AsSplitQuery).
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Microsoft.EntityFrameworkCore;

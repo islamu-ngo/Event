@@ -1,6 +1,3 @@
-// ABOUTME: Shared cache tag names for HybridCache and output cache invalidation.
-// ABOUTME: Keeps invalidation logic consistent across API, Application, and query handlers.
-
 namespace Explore.Application.Caching;
 
 public static class CacheTags

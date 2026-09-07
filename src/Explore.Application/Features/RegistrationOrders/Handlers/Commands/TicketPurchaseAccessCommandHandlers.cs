@@ -1,6 +1,3 @@
-// ABOUTME: Applies account ownership or guest capability checks before purchase-governance CQRS.
-// ABOUTME: Fixes access mode server-side and preserves indistinguishable capability failures.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

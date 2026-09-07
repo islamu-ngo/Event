@@ -1,6 +1,3 @@
-// ABOUTME: Readiness health check for optional RabbitMQ EmailDispatch transport topology.
-// ABOUTME: Reports disabled RabbitMQ mode as healthy so Basic Dispatch Mode stays independent.
-
 using Explore.Application.Contracts.Infrastructure;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 

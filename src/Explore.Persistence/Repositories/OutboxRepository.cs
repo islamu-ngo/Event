@@ -1,6 +1,3 @@
-// ABOUTME: Repository implementation for generic outbox message persistence.
-// ABOUTME: Uses ExecuteUpdateAsync for atomic optimistic-lock transitions; mirrors PdsSyncOutboxRepository patterns.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.ConfigurationManifest.Importing;

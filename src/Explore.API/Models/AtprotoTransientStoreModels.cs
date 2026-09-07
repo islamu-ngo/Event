@@ -1,6 +1,3 @@
-// ABOUTME: Defines private, bounded transient wire contracts excluded from public discovery and client generation.
-// ABOUTME: Maps authenticated target metadata into immutable Application requests without creating user authority.
-
 using System.Text.Json.Serialization;
 using Explore.Application.Features.Authentication.Atproto.Models;
 using Explore.Application.Features.Authentication.Atproto.Requests.Commands;

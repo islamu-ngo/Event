@@ -1,6 +1,3 @@
-// ABOUTME: Architecture tests for governance setting key structural integrity and ISettingGroup coverage.
-// ABOUTME: Guards key naming, nested class organization, and setting group ↔ registry alignment.
-
 namespace Event.Architecture.Tests;
 
 using System.Reflection;

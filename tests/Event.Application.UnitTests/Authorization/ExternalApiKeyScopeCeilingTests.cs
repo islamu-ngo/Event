@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for ExternalApiKeyScopeCeiling per-owner-type scope enforcement.
-// ABOUTME: Verifies each owner type's ceiling, privilege escalation blocking, and "exceeding" reporting.
-
 using Explore.Application.Features.ExternalApiKeys;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;

@@ -1,6 +1,3 @@
-// ABOUTME: Authorized CQRS request for replacing an event public action safely.
-// ABOUTME: Carries optimistic concurrency through the action input contract.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventPublicAction;
 using Explore.Application.Responses;

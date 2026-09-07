@@ -1,6 +1,3 @@
-// ABOUTME: Request and result contracts for effective registration-provider capability resolution.
-// ABOUTME: Makes every intersection dimension explicit for tests, HAL policy, and callback processing.
-
 namespace Explore.Application.Contracts.Services.Registration;
 
 public sealed record RegistrationEffectiveCapabilityRequest(

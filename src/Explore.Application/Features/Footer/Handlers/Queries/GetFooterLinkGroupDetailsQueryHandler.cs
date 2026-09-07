@@ -1,6 +1,3 @@
-// ABOUTME: Handles GetFooterLinkGroupDetailsQuery — returns a group with child links for admin edit.
-// ABOUTME: Returns null response (NotFoundException) when the group is not owned by the current tenant.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

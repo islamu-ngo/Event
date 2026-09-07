@@ -1,6 +1,3 @@
-// ABOUTME: Stable relational lookup rows for publicly exposed Local delivery-attempt outcomes.
-// ABOUTME: Separates immutable attempt evidence from the Local target delivery lifecycle.
-
 namespace Explore.Domain;
 
 public sealed class WebhookDeliveryAttemptOutcomeLookup

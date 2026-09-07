@@ -1,6 +1,3 @@
-// ABOUTME: Exercises standalone persistence defaults, provider overrides, and replica safety at the composition boundary.
-// ABOUTME: Uses real EF Core provider registration and a temporary SQLite file without external database infrastructure.
-
 using Event.Standalone.Hosting;
 using Event.Standalone.IntegrationTests.Fixtures;
 using Explore.Persistence;

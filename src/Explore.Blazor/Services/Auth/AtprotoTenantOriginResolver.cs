@@ -1,6 +1,3 @@
-// ABOUTME: Resolves an ATProto login origin to an explicitly configured tenant id and trusted API tenant slug.
-// ABOUTME: Keeps browser-controlled tenant values out of OAuth state, bootstrap assertions, and handoff routing.
-
 using Explore.Atproto.Transport;
 using Explore.Blazor.Authentication;
 using Explore.Blazor.Client.Configuration;

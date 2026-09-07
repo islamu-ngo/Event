@@ -1,6 +1,3 @@
-// ABOUTME: Proves git-cliff stays an offline renderer over trusted normalized context only.
-// ABOUTME: Exercises argument, environment, output, configuration, and real-binary boundaries.
-
 using System.Security.Cryptography;
 using System.Text.Json;
 using ISLAMU.ReleaseEngineering;

@@ -1,6 +1,3 @@
-// ABOUTME: Singleton deployment mode provider using IOptionsMonitor + IDistributedCache + DB fallback.
-// ABOUTME: Replaces the static volatile cache in ApiTenantResolutionMiddleware with a proper DI-managed pattern.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Domain.Enums;

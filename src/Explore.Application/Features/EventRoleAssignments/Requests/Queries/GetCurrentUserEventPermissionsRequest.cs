@@ -1,6 +1,3 @@
-// ABOUTME: CQRS query for current user's effective event permissions for HAL affordance gating.
-// ABOUTME: Returns role codes and permission codes from the event authority snapshot service.
-
 using MediatR;
 
 namespace Explore.Application.Features.EventRoleAssignments.Requests.Queries;

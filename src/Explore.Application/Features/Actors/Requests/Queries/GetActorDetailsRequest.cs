@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query for one canonical or tenant-contextual public Actor profile.
-// ABOUTME: Carries optional tenant context while returning null for unavailable profiles.
 using Explore.Application.DTOs.Actor;
 using MediatR;
 

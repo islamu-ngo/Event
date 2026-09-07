@@ -1,6 +1,3 @@
-// ABOUTME: Verifies configuration manifests compile into deterministic, value-complete atomic apply plans.
-// ABOUTME: Covers defense-in-depth validation, guarded-write routing, and final branding composition.
-
 using System.Text.Json;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.ConfigurationManifest.Compilation;

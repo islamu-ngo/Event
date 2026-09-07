@@ -1,6 +1,3 @@
-// ABOUTME: Exercises production PostgreSQL replay consumption for ATProto bootstrap assertions.
-// ABOUTME: Proves concurrent requests across independent DbContexts produce exactly one winner per tenant and jti.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Persistence.Repositories;
 

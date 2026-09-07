@@ -1,6 +1,3 @@
-// ABOUTME: Builds one canonical URL client identifier and callback URI for ATProto OAuth consumers.
-// ABOUTME: Rejects ambiguous public authorities and callback paths before a transport is constructed.
-
 using System.Net;
 
 namespace Explore.Atproto.Transport;

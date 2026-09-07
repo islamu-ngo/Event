@@ -1,4 +1,3 @@
-// ABOUTME: Enum defining the scope level at which a configuration change occurs.
 // Used by ConfigurationChangeLog to track where settings were modified in the hierarchy.
 
 namespace Explore.Domain.Enums;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines immutable CQRS commands for private ticket-transfer lifecycle writes.
-// ABOUTME: Carries resource IDs while tenant, user, policy, and credential state stay server-owned.
-
 using Explore.Application.DTOs.Admissions;
 using MediatR;
 

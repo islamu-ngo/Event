@@ -1,8 +1,6 @@
 ---
 description: Deploy and operate the single-container standalone distribution with durable SQLite storage.
 ---
-<!-- ABOUTME: Operator runbook for the single-process ISLAMU Event distribution. -->
-<!-- ABOUTME: Covers persistent storage, Local Identity defaults, first-run setup, proxying, and backup. -->
 
 # Docker Standalone Self-Hosting
 

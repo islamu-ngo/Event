@@ -1,6 +1,3 @@
-// ABOUTME: Batch update handler supporting BestEffort (skip locked, apply rest) and Strict (reject all) modes.
-// ABOUTME: Validates each key independently, then applies valid updates with single cache invalidation.
-
 namespace Explore.Application.Features.Settings.Handlers.Commands;
 
 using System.Collections.Immutable;

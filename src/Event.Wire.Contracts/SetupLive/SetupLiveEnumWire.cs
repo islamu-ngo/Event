@@ -1,6 +1,3 @@
-// ABOUTME: Maps Setup live enum values to exact reviewed wire strings.
-// ABOUTME: Centralizes closed ordinal parsing without numeric or compatibility aliases.
-
 namespace ISLAMU.Wire.Contracts.SetupLive;
 
 using System.Text.Json;

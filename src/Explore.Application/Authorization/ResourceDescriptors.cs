@@ -1,6 +1,3 @@
-// ABOUTME: Static catalog of concrete resource descriptors for DTOs and bounded authorization targets.
-// ABOUTME: Each descriptor extracts closed typed authorization facts and scope from its source instance.
-
 using Explore.Application.DTOs.ActorSubscription;
 using Explore.Application.DTOs.Ai;
 using Explore.Application.DTOs.Category;

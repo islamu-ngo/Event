@@ -1,6 +1,3 @@
-// ABOUTME: Contract tests for paid-event policy settings API routes and HAL metadata.
-// ABOUTME: Protects admin/private/no-store boundaries and route-owned tenant policy revision identity.
-
 using System.Reflection;
 using Explore.API.Attributes;
 using Explore.API.Controllers;

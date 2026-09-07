@@ -1,6 +1,3 @@
-// ABOUTME: Lightweight list DTO for session template property definitions.
-// ABOUTME: Includes OptionCount instead of full options to reduce payload size.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.DTOs.EventSessionTemplate;

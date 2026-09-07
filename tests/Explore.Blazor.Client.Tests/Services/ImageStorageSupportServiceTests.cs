@@ -1,6 +1,3 @@
-// ABOUTME: Focused tests for ImageStorageService support seams extracted during Phase 3.
-// ABOUTME: Covers file reading, preview generation, content-type classification, and URL resolution behavior.
-
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.Extensions.Logging.Abstractions;
 

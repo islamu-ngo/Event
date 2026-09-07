@@ -1,6 +1,3 @@
-// ABOUTME: Applies generated Event API idempotency and capability-capture transport behavior.
-// ABOUTME: Shares operation hooks across the monolithic and all per-tag NSwag clients.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Services.Http;

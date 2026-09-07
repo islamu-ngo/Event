@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for the reusable AI conversation timeline.
-// ABOUTME: Verifies messages and HAL-gated proposed actions retain deterministic conversation order.
-
 using Explore.Blazor.Client.Components.Shell.AiAssistant;
 using Explore.Blazor.Client.Tests;
 

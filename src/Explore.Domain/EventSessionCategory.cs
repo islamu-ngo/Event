@@ -1,6 +1,3 @@
-// ABOUTME: Session-level category junction distinct from event-level EventCategories for program-grain precision.
-// ABOUTME: Unique per (TenantId, EventSessionId, CategoryId); event-level umbrella taxonomy is enforced separately on Event.
-
 using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;

@@ -1,6 +1,3 @@
-// ABOUTME: Write DTO for creating session template property definitions, includes all property fields and nested options.
-// ABOUTME: Used both nested within CreateEventSessionTemplateDto and standalone for adding definitions.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.DTOs.EventSessionTemplate;

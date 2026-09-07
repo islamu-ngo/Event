@@ -1,6 +1,3 @@
-// ABOUTME: Issues and validates protected BFF self-call tokens for InteractiveServer mutations.
-// ABOUTME: Lets server-originated BFF calls prove same-process origin without weakening browser CSRF checks.
-
 using System.Security.Claims;
 using System.Security.Cryptography;
 using Event.Web.BffHosting.Security;

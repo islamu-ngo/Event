@@ -1,6 +1,3 @@
-// ABOUTME: Defines state-transition tests for registration inventory holds.
-// ABOUTME: Ensures expiry and consumption cannot silently oversell capacity.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

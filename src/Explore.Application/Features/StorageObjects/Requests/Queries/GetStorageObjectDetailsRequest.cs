@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query request for fetching a single storage object by ID.
-// ABOUTME: Returns StorageObjectDto.
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.StorageObject;
 using MediatR;

@@ -1,6 +1,3 @@
-// ABOUTME: Machine-readable failure codes for BaseCommandResponse structured error handling.
-// ABOUTME: Used by API consumers and UI to branch on specific failure scenarios without string-matching.
-
 namespace Explore.Application.Responses;
 
 /// <summary>

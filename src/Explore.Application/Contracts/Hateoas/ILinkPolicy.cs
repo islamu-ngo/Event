@@ -1,6 +1,3 @@
-// ABOUTME: Contracts for defining resource and collection HAL link candidates.
-// ABOUTME: Supports optional canonical authorization context for owner-scoped empty collections.
-
 namespace Explore.Application.Contracts.Hateoas;
 
 using System.Security.Claims;

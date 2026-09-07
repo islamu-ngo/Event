@@ -1,6 +1,3 @@
-// ABOUTME: Persists idempotent instance-wide SMTP processor pause and resume commands.
-// ABOUTME: Leaves queued outbox work untouched so a later resume continues normal admission.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using Explore.Application.Features.EmailDispatch.Validators;

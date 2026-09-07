@@ -1,6 +1,3 @@
-// ABOUTME: Handles Coop decision callbacks by recording provider decisions idempotently.
-// ABOUTME: Persists decisions before dispatching execution so moderation audit FKs stay valid.
-
 using System.Text;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

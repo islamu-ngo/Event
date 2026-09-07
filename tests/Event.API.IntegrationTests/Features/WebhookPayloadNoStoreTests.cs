@@ -1,6 +1,3 @@
-// ABOUTME: End-to-end API contract tests for sensitive outgoing webhook payload access.
-// ABOUTME: Verifies anonymous denial still carries mandatory no-store response headers.
-
 using System.Net;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Controllers;

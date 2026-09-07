@@ -1,6 +1,3 @@
-// ABOUTME: Defines deterministic fake/replay AI usability scenario statuses.
-// ABOUTME: Keeps report semantics stable without requiring live provider credentials.
-
 namespace Explore.Diagnostic.AiReplay;
 
 public enum AiReplayScenarioStatus

@@ -1,6 +1,3 @@
-// ABOUTME: Supplies deterministic non-secret instance operator identity to ad hoc API test hosts.
-// ABOUTME: Keeps runtime ValidateOnStart active without duplicating host-specific production bypasses.
-
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 

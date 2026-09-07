@@ -1,6 +1,3 @@
-// ABOUTME: Carries one typed organizer mutation of an EventLocation disclosure policy.
-// ABOUTME: Requires both observed aggregate concurrency and policy-version tokens.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Location;
 using Explore.Application.Responses;

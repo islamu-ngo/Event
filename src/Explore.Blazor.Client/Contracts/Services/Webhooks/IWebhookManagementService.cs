@@ -1,6 +1,3 @@
-// ABOUTME: Blazor service contract for outgoing webhook management screens.
-// ABOUTME: Keeps webhook Razor components behind generated-client snapshots and HAL-aware action results.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.Webhooks;

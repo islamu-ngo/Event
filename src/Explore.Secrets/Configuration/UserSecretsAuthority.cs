@@ -1,6 +1,3 @@
-// ABOUTME: Isolated reader for the shared .NET User Secrets store.
-// ABOUTME: Rejects every environment except Development and Testing before returning values.
-
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 

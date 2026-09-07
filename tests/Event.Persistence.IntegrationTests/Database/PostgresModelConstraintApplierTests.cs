@@ -1,6 +1,3 @@
-// ABOUTME: Verifies PostgreSQL model constraints against the real post-migration application schema.
-// ABOUTME: Guards schema-qualified preflight and catalog lookup behavior after namespace cutovers.
-
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Schema;

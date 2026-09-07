@@ -1,6 +1,3 @@
-// ABOUTME: Validates shared Layer 3 custom-property definition payload shape before governance and persistence checks run.
-// ABOUTME: Keeps validation focused on payload correctness rather than policy ownership or duplicate detection.
-
 using Explore.Domain.Enums;
 using Explore.Domain.References;
 using FluentValidation;

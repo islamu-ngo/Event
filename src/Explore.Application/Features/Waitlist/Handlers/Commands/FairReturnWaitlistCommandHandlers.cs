@@ -1,6 +1,3 @@
-// ABOUTME: Orchestrates fair-return waitlist writes through server-owned policy.
-// ABOUTME: Enforces identity, stop controls, zero paid priority, bounded output, and settlement-before-finalization.
-
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Contracts.Infrastructure;

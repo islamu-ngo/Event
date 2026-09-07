@@ -1,6 +1,3 @@
-// ABOUTME: Defines guest-capability and authenticated registration-order entry and lifecycle commands.
-// ABOUTME: Keeps caller identity and opaque bearer capability inputs separate from persistence commands.
-
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Features.RegistrationSubmissions.Commands;
 using Explore.Application.Responses;

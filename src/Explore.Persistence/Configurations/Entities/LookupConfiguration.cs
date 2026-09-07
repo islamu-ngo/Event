@@ -1,6 +1,3 @@
-// ABOUTME: Shared EF mapping for normalized integer lookup rows.
-// ABOUTME: Keeps runtime seeding authoritative while enforcing stable codes and display metadata.
-
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

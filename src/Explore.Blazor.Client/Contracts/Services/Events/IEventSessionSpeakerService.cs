@@ -1,6 +1,3 @@
-// ABOUTME: Client service contract for managing speaker assignments on event sessions.
-// ABOUTME: Keeps session speaker UI flows on typed generated API client DTOs.
-
 using System;
 using System.Threading;
 using System.Threading.Tasks;

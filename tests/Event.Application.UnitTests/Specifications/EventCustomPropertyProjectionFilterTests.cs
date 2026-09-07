@@ -1,6 +1,3 @@
-// ABOUTME: Verifies event custom property projection filter factory methods and payload shapes.
-// ABOUTME: Ensures Layer 3 projection filter tuples are created with the expected filter types and values.
-
 using Explore.Application.Specifications.Events;
 using Explore.Domain.Enums;
 

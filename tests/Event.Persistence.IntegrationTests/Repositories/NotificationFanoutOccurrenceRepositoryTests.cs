@@ -1,6 +1,3 @@
-// ABOUTME: Verifies tenant-safe immutable fanout occurrence persistence and PII-free outbox pointers.
-// ABOUTME: Covers wrong-tenant relationships, recipient deduplication, and transaction rollback.
-
 using System.Diagnostics;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;

@@ -1,6 +1,3 @@
-// ABOUTME: Loads exact-commit Change-Id corrections without mutating immutable Git history.
-// ABOUTME: Applies a replacement only when the bound commit still carries the recorded old footer.
-
 using System.Text;
 
 namespace ISLAMU.ReleaseEngineering;

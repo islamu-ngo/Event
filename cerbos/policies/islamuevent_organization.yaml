@@ -1,4 +1,3 @@
-# ABOUTME: Cerbos resource policy for organization resources.
 # Org admins manage their organizations; tenant admins manage all orgs within their tenant.
 
 apiVersion: api.cerbos.dev/v1

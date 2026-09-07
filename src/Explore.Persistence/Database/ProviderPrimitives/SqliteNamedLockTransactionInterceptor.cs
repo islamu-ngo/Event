@@ -1,6 +1,3 @@
-// ABOUTME: Holds SQLite process named locks until their caller-owned EF transaction completes.
-// ABOUTME: Releases tracked semaphores on commit, rollback, failure, or connection cleanup.
-
 using System.Collections.Concurrent;
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore.Diagnostics;

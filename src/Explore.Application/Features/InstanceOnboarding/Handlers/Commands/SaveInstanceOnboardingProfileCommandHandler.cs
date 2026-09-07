@@ -1,6 +1,3 @@
-// ABOUTME: Saves the non-secret instance onboarding profile settings.
-// ABOUTME: Validates manually and writes only the established system settings in one transaction.
-
 using System.Linq;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

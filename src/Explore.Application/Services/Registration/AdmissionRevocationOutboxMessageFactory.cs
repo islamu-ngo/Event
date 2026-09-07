@@ -1,6 +1,3 @@
-// ABOUTME: Creates and reads identifier-only durable event-cancellation admission triggers.
-// ABOUTME: Keeps cancellation revocation replayable without attendee or credential material.
-
 using System.Text.Json;
 using Explore.Domain;
 

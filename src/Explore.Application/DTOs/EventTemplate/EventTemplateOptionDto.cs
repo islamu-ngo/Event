@@ -1,6 +1,3 @@
-// ABOUTME: Read-only DTO for template property options, returned nested within EventTemplateDefinitionDto.
-// ABOUTME: Mirrors CustomPropertyOptionDto shape for consistency across the EAV system.
-
 namespace Explore.Application.DTOs.EventTemplate;
 
 public sealed record EventTemplateOptionDto

@@ -1,6 +1,3 @@
-// ABOUTME: Captures a single explicit session-template sync field delta using string-rendered values for deterministic diff output.
-// ABOUTME: Shared by session definition and option modified DTOs in the event-session template sync workflow.
-
 namespace Explore.Application.DTOs.EventSessionTemplateSync;
 
 public sealed record FieldChangeDto(

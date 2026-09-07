@@ -1,6 +1,3 @@
-// ABOUTME: Usage report projection for instance-admin metadata reporting.
-// ABOUTME: Aggregates per-key request counts and credit usage without exposing secret material.
-
 namespace Explore.Application.DTOs.ExternalApiKey;
 
 public sealed record ExternalApiKeyUsageReportDto

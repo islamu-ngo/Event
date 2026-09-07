@@ -1,6 +1,3 @@
-// ABOUTME: Exercises the shared browser YARP surface against a real upstream listener.
-// ABOUTME: Proves private transient routes are denied outright and privileged assertions are stripped elsewhere.
-
 using System.Net;
 using System.Security.Cryptography;
 using Event.Web.BffHosting.Proxy;

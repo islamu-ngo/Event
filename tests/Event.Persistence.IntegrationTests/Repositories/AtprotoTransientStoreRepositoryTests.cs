@@ -1,6 +1,3 @@
-// ABOUTME: Exercises ATProto transient storage against migrated PostgreSQL with independent contexts.
-// ABOUTME: Proves single-winner deletion, ABA safety, and no retry after an ambiguous destructive commit.
-
 using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;

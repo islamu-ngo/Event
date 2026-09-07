@@ -1,6 +1,3 @@
-// ABOUTME: Authorized query for webhook endpoints belonging to one canonical typed owner.
-// ABOUTME: Supports a bounded consumer filter inside the selected persisted ownership scope.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Webhooks;
 using MediatR;

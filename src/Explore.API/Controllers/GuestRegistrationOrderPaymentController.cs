@@ -1,6 +1,3 @@
-// ABOUTME: Guest registration-payment start, status, retry, and BFF target endpoints use the order capability header.
-// ABOUTME: Anonymous writes are PublicTransactional, idempotent, private, and never accept provider destinations.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Extensions;

@@ -1,6 +1,3 @@
-// ABOUTME: Revokes persisted external API keys visible to the current caller.
-// ABOUTME: Checks owner authority across all five owner types and hides unauthorized keys behind a false result.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ExternalApiKeys.Requests.Commands;

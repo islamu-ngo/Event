@@ -1,6 +1,3 @@
-// ABOUTME: Stores one globally canonical AT Protocol record observation across inbound and outbound federation.
-// ABOUTME: Keeps tenant presentation and local outbound ownership in separate scoped entities.
-
 namespace Explore.Domain;
 
 public class AtprotoRecord

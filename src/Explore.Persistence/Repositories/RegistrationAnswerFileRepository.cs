@@ -1,6 +1,3 @@
-// ABOUTME: Persists tenant-scoped registration-file release transitions and append-only audits atomically.
-// ABOUTME: Treats repeated release requests as idempotent reads of the immutable first-release record.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

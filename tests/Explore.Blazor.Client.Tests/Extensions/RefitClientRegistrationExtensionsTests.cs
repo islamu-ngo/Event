@@ -1,6 +1,3 @@
-// ABOUTME: Covers shared BFF Refit client registration behavior for Blazor onboarding/API calls.
-// ABOUTME: Verifies typed Refit clients receive host-supplied same-origin BaseAddress values.
-
 using System.Net;
 using Explore.Blazor.Client.Extensions;
 using Explore.Blazor.Client.Services.Http;

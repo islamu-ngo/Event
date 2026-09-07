@@ -1,6 +1,3 @@
-// ABOUTME: Suppresses occurrence-linked in-app and email work while transport remains before SMTP handoff.
-// ABOUTME: Uses one bounded PostgreSQL statement and preserves provider-fenced and terminal SMTP evidence.
-
 using System.Data;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

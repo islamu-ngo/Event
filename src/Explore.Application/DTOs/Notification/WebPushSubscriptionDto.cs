@@ -1,6 +1,3 @@
-// ABOUTME: Safe Web Push subscription DTO for authenticated-user subscription status.
-// ABOUTME: Omits browser endpoint and key material so API and UI responses never echo secrets.
-
 namespace Explore.Application.DTOs.Notification;
 
 public sealed record WebPushSubscriptionDto

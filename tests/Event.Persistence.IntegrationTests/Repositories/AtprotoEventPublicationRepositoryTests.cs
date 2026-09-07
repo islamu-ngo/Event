@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL-backed contract tests for the bounded ATProto event publication graph query.
-// ABOUTME: Proves exact tenant selection, entity-first results, no tracking, and a fixed SQL command budget.
-
 using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;

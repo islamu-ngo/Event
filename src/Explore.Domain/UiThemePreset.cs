@@ -1,7 +1,3 @@
-// ABOUTME: First-class theme preset aggregate for platform-owned and tenant-owned UI theme templates.
-// ABOUTME: Presets are selectable templates — users receive snapshots (UserAppearanceProfile), not mutable references.
-// ABOUTME: System presets are immutable; tenant presets are soft-deletable but never hard-deleted to protect user profiles.
-
 namespace Explore.Domain;
 
 using Explore.Domain.Interfaces;

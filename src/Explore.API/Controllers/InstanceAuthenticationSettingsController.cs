@@ -1,6 +1,3 @@
-// ABOUTME: Instance authentication settings endpoints for provider configuration and Keycloak realm operations.
-// ABOUTME: Realm sync is preview-then-apply so an operator sees the diff before it is written.
-
 using Explore.Application.Authentication;
 using Asp.Versioning;
 using Explore.API.Attributes;

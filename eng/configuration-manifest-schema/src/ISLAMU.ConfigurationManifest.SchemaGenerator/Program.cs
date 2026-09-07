@@ -1,6 +1,3 @@
-// ABOUTME: Provides write and drift-check commands for the governed ConfigurationManifest schema.
-// ABOUTME: Returns nonzero without mutating files when checked bytes differ from deterministic output.
-
 namespace ISLAMU.ConfigurationManifest.SchemaGenerator;
 
 internal static class Program

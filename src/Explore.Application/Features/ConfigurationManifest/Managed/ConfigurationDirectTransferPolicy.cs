@@ -1,6 +1,3 @@
-// ABOUTME: Validates fixed-origin direct-transfer destinations against SSRF and rebinding risks.
-// ABOUTME: Requires HTTPS, a root origin, public resolved addresses, and a fixed protocol endpoint.
-
 namespace Explore.Application.Features.ConfigurationManifest.Managed;
 
 using System.Net;

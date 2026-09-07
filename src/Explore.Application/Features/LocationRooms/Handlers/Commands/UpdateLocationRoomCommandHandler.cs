@@ -1,6 +1,3 @@
-// ABOUTME: Handler for grouped LocationRoom PATCH updates with optimistic concurrency.
-// ABOUTME: Preserves tenant-safe parent location checks and applies explicit room field updates.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.LocationRoom;
 using Explore.Application.DTOs.LocationRoom.Validators;

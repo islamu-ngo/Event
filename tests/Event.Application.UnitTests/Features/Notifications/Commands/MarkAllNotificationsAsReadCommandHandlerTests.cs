@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for MarkAllNotificationsAsReadCommandHandler.
-// ABOUTME: Tests bulk mark-all-as-read with user scoping and auth checks.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Notifications.Handlers.Commands;

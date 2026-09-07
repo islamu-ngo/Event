@@ -1,6 +1,3 @@
-// ABOUTME: In-memory EmailDispatch outbox repository for infrastructure drain and consumer tests.
-// ABOUTME: Models the success-path state transitions needed by Mailpit and RabbitMQ runtime tests.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Domain;

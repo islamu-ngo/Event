@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for tenant-scoped immutable ticket catalog revisions.
-// ABOUTME: Preserves composite event keys, publication indexes, and restrictive history relationships.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

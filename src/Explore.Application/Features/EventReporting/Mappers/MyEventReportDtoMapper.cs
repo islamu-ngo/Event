@@ -1,6 +1,3 @@
-// ABOUTME: Maps event-report domain entities into limited reporter-owned status projections.
-// ABOUTME: Centralizes privacy-safe MyEventReportDto shaping for single and paged reads.
-
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Policies;
 using Explore.Domain;

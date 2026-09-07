@@ -1,6 +1,3 @@
-// ABOUTME: bUnit tests for EventListPagination component verifying summary text and controls.
-// ABOUTME: Tests page range display, MudPagination rendering, and page size selector.
-
 using EventListPaginationComponent = Explore.Blazor.Client.Pages.Events.Components.EventListPagination;
 
 namespace Explore.Blazor.Client.Tests.Components.Event;

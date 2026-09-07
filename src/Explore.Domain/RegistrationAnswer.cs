@@ -1,6 +1,3 @@
-// ABOUTME: Defines one immutable typed atomic value in a pinned registration submission lineage.
-// ABOUTME: Snapshots declared field applicability and uses exactly one strongly typed subject identity.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

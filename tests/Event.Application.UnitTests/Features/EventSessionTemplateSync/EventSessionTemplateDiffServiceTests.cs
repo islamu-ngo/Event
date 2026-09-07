@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for EventSessionTemplateDiffService covering explicit add/retire/local-warning behavior.
-// ABOUTME: Keeps session-template diff coverage aligned with the event-template sync family.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Services;
 using Explore.Domain;

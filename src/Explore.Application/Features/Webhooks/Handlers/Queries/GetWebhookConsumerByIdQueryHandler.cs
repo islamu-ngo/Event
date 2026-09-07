@@ -1,6 +1,3 @@
-// ABOUTME: Handles persisted-owner webhook consumer detail reads for management APIs.
-// ABOUTME: Uses the owner-operation boundary after authorization and maps entities in Application.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.DTOs.Webhooks;

@@ -1,8 +1,6 @@
 ---
 description: Operate primary or linked AT Protocol login, governed publication, exact-collection ingestion, and tenant-gated discovery.
 ---
-<!-- ABOUTME: Guides operators through AT Protocol login, publication and governed event ingestion. -->
-<!-- ABOUTME: Explains database-backed login state, browser binding and key-persistence recovery requirements. -->
 
 # AT Protocol & Bluesky Jetstream
 

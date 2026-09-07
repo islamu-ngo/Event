@@ -1,6 +1,3 @@
-// ABOUTME: Lookup-table entity for RBAC role and permission scope levels.
-// ABOUTME: IDs mirror RoleScopeEnum values and are referenced by Role and Permission.
-
 namespace Explore.Domain;
 
 public class RoleScope

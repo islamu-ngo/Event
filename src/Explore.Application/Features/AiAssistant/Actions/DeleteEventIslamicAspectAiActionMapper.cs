@@ -1,6 +1,3 @@
-// ABOUTME: Maps untrusted AI Islamic aspect deletion proposals into safe delete commands.
-// ABOUTME: Requires event concurrency, edit affordance context, and explicit destructive confirmation.
-
 using System.Text.Json;
 using Explore.Application.Features.AiAssistant.Prompting;
 using Explore.Application.Features.AiAssistant.Tools;

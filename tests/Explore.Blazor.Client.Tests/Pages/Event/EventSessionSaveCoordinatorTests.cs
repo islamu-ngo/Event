@@ -1,6 +1,3 @@
-// ABOUTME: Verifies EventSessionSaveCoordinator preserves create/edit service orchestration semantics.
-// ABOUTME: Covers program-section assignment and unassignment without rendering Razor pages.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Pages.Events.Sessions;
 using Explore.Blazor.Client.Services;

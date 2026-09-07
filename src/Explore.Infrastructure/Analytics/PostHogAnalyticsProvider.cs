@@ -1,6 +1,3 @@
-// ABOUTME: PostHog analytics provider implementation using HTTP API endpoints.
-// ABOUTME: Implements thin abstraction methods and PostHog feature-flag capability with safe defaults.
-
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;

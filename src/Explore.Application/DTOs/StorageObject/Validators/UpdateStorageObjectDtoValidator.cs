@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for storage metadata updates.
-// ABOUTME: Validates provider-neutral lifecycle, policy, and checksum fields before handlers persist changes.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using FluentValidation;

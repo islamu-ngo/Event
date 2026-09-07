@@ -1,5 +1,3 @@
-// ABOUTME: Handler for deleting a tag-to-tag-type link record.
-// ABOUTME: Fetches junction record and delegates deletion.
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.TagTypeTags.Requests.Commands;
 using MediatR;

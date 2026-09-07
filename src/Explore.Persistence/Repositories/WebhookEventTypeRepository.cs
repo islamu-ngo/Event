@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for the global webhook event type catalog.
-// ABOUTME: Persists provider-neutral event schemas used by Local and Svix synchronization.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

@@ -1,6 +1,3 @@
-// ABOUTME: Grouped PATCH DTO for shared Layer 3 custom-property definition updates.
-// ABOUTME: Route identity and tenant remain server-owned while relation and field groups preserve omitted state.
-
 using Explore.Application.Models.Common;
 using Explore.Domain.Enums;
 

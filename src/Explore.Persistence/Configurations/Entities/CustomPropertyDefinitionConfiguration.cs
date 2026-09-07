@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for shared tenant-scoped Layer 3 custom-property definitions.
-// ABOUTME: Enforces namespaced machine-key uniqueness plus typed validation and exposure metadata.
-
 using Explore.Domain;
 using Explore.Domain.References;
 using Explore.Persistence.ValueGenerators;

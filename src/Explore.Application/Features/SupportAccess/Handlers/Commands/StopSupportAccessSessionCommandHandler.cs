@@ -1,6 +1,3 @@
-// ABOUTME: Handles actor-owned support-access stop transitions with lifecycle audit evidence.
-// ABOUTME: Prevents one actor from stopping another actor's session through repository predicates.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.SupportAccess;

@@ -1,6 +1,3 @@
-// ABOUTME: Drains active event admissions in bounded order batches after durable cancellation.
-// ABOUTME: Uses idempotent per-order transactions so outbox replay converges after partial progress.
-
 using Explore.Application.Contracts.Admissions;
 
 namespace Explore.Application.Services.Registration;

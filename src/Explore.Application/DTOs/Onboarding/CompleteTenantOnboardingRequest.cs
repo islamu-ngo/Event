@@ -1,6 +1,3 @@
-// ABOUTME: Dedicated HTTP request for atomically completing tenant onboarding.
-// ABOUTME: Keeps mandatory legal identity and its revision separate from general policy updates.
-
 using Explore.Application.DTOs.TenantPolicy;
 using Explore.Application.DTOs.TenantSettings;
 

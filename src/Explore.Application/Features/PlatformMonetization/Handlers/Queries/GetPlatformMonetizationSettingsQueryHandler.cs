@@ -1,6 +1,3 @@
-// ABOUTME: Reads the active immutable platform fee and contribution singleton revisions for instance administrators.
-// ABOUTME: Maps aggregate data to a flat deterministic settings document and fails closed before repository access.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;

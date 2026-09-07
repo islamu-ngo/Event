@@ -1,6 +1,3 @@
-// ABOUTME: Reports notification fanout processor readiness from durable aggregate state.
-// ABOUTME: Exposes bounded counts and booleans without tenant, event, or recipient identifiers.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Telemetry;
 using Explore.Infrastructure.NotificationFanout;

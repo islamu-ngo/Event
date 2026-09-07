@@ -1,6 +1,3 @@
-// ABOUTME: Immutable instance-authority moderation evidence for a global Actor.
-// ABOUTME: Separates platform-wide subject action history from tenant participation and content moderation.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Domain;

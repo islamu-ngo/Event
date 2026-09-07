@@ -1,6 +1,3 @@
-// ABOUTME: Immutable metadata for one route-addressable application workspace.
-// ABOUTME: Supplies shell labels, icons, canonical routes, authentication posture, availability policy, and optional navigation provider.
-
 namespace Explore.Blazor.Client.Services.Shell;
 
 using Explore.Blazor.Client.Clients;

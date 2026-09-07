@@ -1,6 +1,3 @@
-// ABOUTME: Exposes authenticated paid-event policy settings for instance and tenant administrators.
-// ABOUTME: Keeps paid policy routes separate from platform monetization and delegates revisions to CQRS handlers.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

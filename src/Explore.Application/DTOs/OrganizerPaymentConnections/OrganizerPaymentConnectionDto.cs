@@ -1,6 +1,3 @@
-// ABOUTME: Safe bounded DTO for organizer payment-provider connection local state.
-// ABOUTME: Exposes actor/provider readiness and replacement metadata without secrets or raw provider payloads.
-
 namespace Explore.Application.DTOs.OrganizerPaymentConnections;
 
 public sealed record OrganizerPaymentConnectionDto

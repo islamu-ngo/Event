@@ -1,6 +1,3 @@
-// ABOUTME: Atomically redrives a dead-lettered Coop effect pointer with operator audit evidence.
-// ABOUTME: Rejects stale generations, unavailable retained callbacks, and unauthenticated actors.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;

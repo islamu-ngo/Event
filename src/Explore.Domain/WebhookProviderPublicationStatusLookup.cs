@@ -1,6 +1,3 @@
-// ABOUTME: Stable relational lookup rows for provider publication lifecycle states.
-// ABOUTME: Mirrors WebhookProviderPublicationStatus identifiers owned exclusively by provider publications.
-
 namespace Explore.Domain;
 
 public sealed class WebhookProviderPublicationStatusLookup

@@ -1,6 +1,3 @@
-// ABOUTME: Authorized command for resuming a Local webhook endpoint after manual or automatic pause.
-// ABOUTME: Carries persisted endpoint identity into the owner-aware authorization pipeline.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies payment-reconciliation health exposes only bounded aggregate operational evidence.
-// ABOUTME: Prevents tenant, account, event, payment, and buyer identifiers from entering health output.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Infrastructure.HealthChecks;
 using Microsoft.Extensions.DependencyInjection;

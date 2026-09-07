@@ -1,6 +1,3 @@
-// ABOUTME: Safe Application result for server-authoritative paid catalog publication readiness.
-// ABOUTME: Returns stable blocker codes and bounded explanations without provider secrets or account identifiers.
-
 using System.Text.Json.Serialization;
 
 namespace Explore.Application.DTOs.EventTicketing;

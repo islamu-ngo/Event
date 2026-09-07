@@ -1,6 +1,3 @@
-// ABOUTME: Privileged MediatR command for approving and publishing a draft event.
-// ABOUTME: Declares the distinct approval-publication authorization action with trusted event resource facts.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Responses;

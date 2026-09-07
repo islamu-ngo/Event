@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL integration tests for persisted webhook provider-binding authority.
-// ABOUTME: Verifies tenant ownership, normalized identities, lookup parity, and fenced writes.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;

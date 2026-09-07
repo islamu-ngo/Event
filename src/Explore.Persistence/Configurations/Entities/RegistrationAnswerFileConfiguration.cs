@@ -1,6 +1,3 @@
-// ABOUTME: Maps quarantined registration file metadata to tenant-contained storage objects.
-// ABOUTME: Enforces bounded metadata, release-state shape, and one file row per submission field and object.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Microsoft.EntityFrameworkCore;

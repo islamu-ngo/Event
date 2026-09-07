@@ -1,6 +1,3 @@
-// ABOUTME: Versioned SaaS tenant plan content with pricing and provisioning metadata.
-// ABOUTME: Owns normalized setting override and quota rows applied during tenant provisioning.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

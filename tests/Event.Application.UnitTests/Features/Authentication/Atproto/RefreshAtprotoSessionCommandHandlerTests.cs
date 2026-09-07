@@ -1,6 +1,3 @@
-// ABOUTME: Tests tenant/user/DID-scoped ATProto session refresh and replacement JWT ordering.
-// ABOUTME: Proves refresh failures never issue a platform token and successful rotation precedes issuance.
-
 using System;
 using System.Threading;
 using System.Threading.Tasks;

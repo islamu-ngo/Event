@@ -1,6 +1,3 @@
-// ABOUTME: Builds and publishes provider-neutral manifests from bundled Cerbos policy and schema artifacts.
-// ABOUTME: Keeps tenant-aware publishing separate from deployment bootstrap against the instance Admin API.
-
 using System.IO.Compression;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;

@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for notification fanout idempotency and progress tracking.
-// ABOUTME: Enforces one fanout run per tenant/source/event tuple and worker-friendly polling indexes.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

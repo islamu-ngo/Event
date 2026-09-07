@@ -1,6 +1,3 @@
-// ABOUTME: Configures global Actor identity, external-owner, merge, and moderation persistence.
-// ABOUTME: Enforces exact-DID uniqueness and immutable evidence relationships without tenant scope.
-
 using Explore.Domain;
 using Explore.Persistence.Schema;
 using Explore.Persistence.ValueGenerators;

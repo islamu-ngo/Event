@@ -1,6 +1,3 @@
-// ABOUTME: Command contract for creating an AI proposed action from a governed tool payload.
-// ABOUTME: External adapters use this to persist proposals without executing mutating side effects.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

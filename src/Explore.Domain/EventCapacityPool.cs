@@ -1,6 +1,3 @@
-// ABOUTME: Defines an event-owned capacity resource that multiple ticket types may consume.
-// ABOUTME: Keeps capacity scope explicit before atomic inventory holds are introduced.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

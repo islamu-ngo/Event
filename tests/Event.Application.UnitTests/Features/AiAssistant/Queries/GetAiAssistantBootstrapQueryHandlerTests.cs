@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for AI assistant bootstrap query settings resolution.
-// ABOUTME: Verifies safe availability, disabled reasons, limits, and model metadata without secrets.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.DTOs.Ai;

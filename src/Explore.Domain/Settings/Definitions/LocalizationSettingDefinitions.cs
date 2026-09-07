@@ -1,6 +1,3 @@
-// ABOUTME: Setting definitions for the localization / TMS governance keys.
-// ABOUTME: Registered in SettingRegistry so the generic upsert path can find metadata automatically.
-
 namespace Explore.Domain.Settings.Definitions;
 
 public static class LocalizationSettingDefinitions

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for reading authorization provider configuration for setup and admin flows.
-// ABOUTME: Verifies endpoint presence never overrides the provider intent resolved by the server.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Handlers.Queries;

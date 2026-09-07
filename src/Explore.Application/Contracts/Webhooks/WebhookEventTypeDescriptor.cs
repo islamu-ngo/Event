@@ -1,6 +1,3 @@
-// ABOUTME: Describes canonical webhook event types, schemas, and payload fields.
-// ABOUTME: Gives providers and APIs a stable event catalog without coupling to persistence.
-
 namespace Explore.Application.Contracts.Webhooks;
 
 public static class WebhookJsonSchemaTypes

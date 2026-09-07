@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the registry-backed CreateEventDraft AI tool definition.
-// ABOUTME: Locks schema, mapper, authorization, and payload-field metadata against silent drift.
-
 using System.Text.Json;
 using Explore.Application.Authorization;
 using Explore.Application.Features.AiAssistant.Actions;

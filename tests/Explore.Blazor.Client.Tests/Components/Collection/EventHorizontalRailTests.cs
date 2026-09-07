@@ -1,6 +1,3 @@
-// ABOUTME: Focused bUnit coverage for the native horizontal event discovery rail.
-// ABOUTME: Verifies production-card reuse, semantic navigation, RTL, and explicit loading states.
-
 using Explore.Blazor.Client.Components.Collection;
 using Explore.Blazor.Client.Models;
 using ProductionEventCard = Explore.Blazor.Client.Pages.Events.Components.EventCard;

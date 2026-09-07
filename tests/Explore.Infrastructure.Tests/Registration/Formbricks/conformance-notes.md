@@ -1,6 +1,3 @@
-<!-- ABOUTME: Dated Formbricks API and webhook conformance evidence for the Phase 10 adapter tuple. -->
-<!-- ABOUTME: Separates proven capabilities from stale schema claims so runtime dispatch fails closed. -->
-
 # Formbricks Conformance Evidence
 
 Verified: 2026-08-10

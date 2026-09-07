@@ -1,6 +1,3 @@
-// ABOUTME: Public query for retrieving an event's calendar export payload.
-// ABOUTME: Returns only published, public events so calendar downloads cannot expose drafts.
-
 using Explore.Application.DTOs.Event;
 using MediatR;
 

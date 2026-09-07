@@ -1,6 +1,3 @@
-// ABOUTME: Records execution metadata for confirmed AI-assisted tool actions.
-// ABOUTME: Keeps tool execution audit separate from provider output and proposed action state.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain.Ai;

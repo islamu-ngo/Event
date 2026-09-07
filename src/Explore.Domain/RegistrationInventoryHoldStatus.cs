@@ -1,6 +1,3 @@
-// ABOUTME: Normalized lookup row for the lifecycle of a registration inventory hold.
-// ABOUTME: Preserves explicit reservation outcomes for later capacity processing.
-
 namespace Explore.Domain;
 
 public sealed class RegistrationInventoryHoldStatus

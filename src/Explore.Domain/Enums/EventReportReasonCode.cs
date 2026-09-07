@@ -1,6 +1,3 @@
-// ABOUTME: Stable event-report reason taxonomy for local-first moderation intake.
-// ABOUTME: Provides enum-backed codes while handlers persist normalized string reason codes.
-
 namespace Explore.Domain.Enums;
 
 public enum EventReportReasonCode

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the scheduler-neutral job registry.
-// ABOUTME: Guards stable job names and pointer-only scheduling metadata for future operator surfaces.
-
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Services;
 using TUnit.Core;

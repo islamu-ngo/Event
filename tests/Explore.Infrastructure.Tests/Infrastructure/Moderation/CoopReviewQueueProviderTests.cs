@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the Coop review queue HTTP adapter.
-// ABOUTME: Verifies safe mirror payloads, provider response mapping, and retry classification.
-
 using System.Net;
 using System.Text;
 using Explore.Application.Features.EventReporting.Models;

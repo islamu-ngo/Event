@@ -1,6 +1,3 @@
-// ABOUTME: Runs AI assistant retention cleanup across active tenants with explicit tenant scoping.
-// ABOUTME: Emits bounded metrics and logs aggregate counts without prompt, payload, provider, or tenant content.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

@@ -1,6 +1,3 @@
-// ABOUTME: Organizer payment readiness reconciliation scheduling and execution tests.
-// ABOUTME: Proves the sweep stays off in Testing and that one job pass drives the scoped reconciliation service.
-
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Scheduling;
 using Explore.Application.Contracts.Persistence;

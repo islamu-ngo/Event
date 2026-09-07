@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for explicit Cerbos endpoint verification in the onboarding flow.
-// ABOUTME: Verifies invalid input rejection, endpoint normalization, and health-check result mapping.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.InstanceOnboarding.Handlers.Commands;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;

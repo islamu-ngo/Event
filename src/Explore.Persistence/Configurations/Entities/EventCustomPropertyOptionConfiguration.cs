@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for event-local custom-property options.
-// ABOUTME: Preserves stable machine identity and source-template provenance per runtime definition.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

@@ -1,6 +1,3 @@
-// ABOUTME: Applies location-governance writes with transactional EventLocation correction records.
-// ABOUTME: Rejects tenant widening and evicts global, tenant, event, and association cache tags after commit.
-
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

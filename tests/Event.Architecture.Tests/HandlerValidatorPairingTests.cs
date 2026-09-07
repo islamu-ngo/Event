@@ -1,6 +1,3 @@
-// ABOUTME: Uses compiled handler constructors to keep FluentValidation out of Application-layer DI.
-// ABOUTME: Leaves validator execution outcomes to owning handler and public-seam behavioral tests.
-
 using FluentValidation;
 using MediatR;
 

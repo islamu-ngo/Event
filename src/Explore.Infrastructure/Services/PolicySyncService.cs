@@ -1,6 +1,3 @@
-// ABOUTME: Legacy policy sync facade that delegates publishing to the provider-neutral package service.
-// ABOUTME: Prevents dynamic role mutations from bypassing resolver-driven Admin API endpoint safety and redaction.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Microsoft.Extensions.Logging;

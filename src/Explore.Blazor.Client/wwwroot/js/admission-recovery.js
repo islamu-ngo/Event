@@ -1,6 +1,3 @@
-// ABOUTME: Extracts a one-time admission recovery capability from the client-only URI fragment.
-// ABOUTME: Replaces browser history immediately and never stores, transmits, or logs the fragment.
-
 export function takeCapability() {
     const fragment = new URLSearchParams(window.location.hash.slice(1));
     const capability = fragment.get("capability");

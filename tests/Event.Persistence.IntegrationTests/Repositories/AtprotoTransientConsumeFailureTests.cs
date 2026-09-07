@@ -1,6 +1,3 @@
-// ABOUTME: Exercises committed-delete ambiguity against real SQLite with an enabled retry strategy.
-// ABOUTME: Ensures uncertain consumption withholds ciphertext and never repeats a destructive command.
-
 using System.Data.Common;
 using Explore.Domain;
 using Explore.Persistence;

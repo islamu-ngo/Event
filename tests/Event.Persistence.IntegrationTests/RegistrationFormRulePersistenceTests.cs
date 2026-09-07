@@ -1,6 +1,3 @@
-// ABOUTME: Verifies typed registration-form rule mapping and PostgreSQL enforcement.
-// ABOUTME: Covers AST round-trip, tenant filters, composite ownership, ordinal uniqueness, and cleanup.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;

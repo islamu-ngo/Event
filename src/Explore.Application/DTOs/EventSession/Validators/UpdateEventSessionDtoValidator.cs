@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for grouped EventSession PATCH payloads.
-// ABOUTME: Validates explicit field operations, lookup references, and schedule group consistency.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

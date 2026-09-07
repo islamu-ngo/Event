@@ -1,6 +1,3 @@
-// ABOUTME: Publishes a form version by generating and pinning its canonical schema artifact bundle.
-// ABOUTME: Keeps artifact bytes and hashes Application-owned so callers cannot supply publication content.
-
 using Explore.Application.Contracts.Services;
 using Explore.Domain;
 

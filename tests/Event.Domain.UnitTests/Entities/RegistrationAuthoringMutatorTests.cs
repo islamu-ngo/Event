@@ -1,6 +1,3 @@
-// ABOUTME: Specifies aggregate-owned mutation routes used by registration-form authoring commands.
-// ABOUTME: Covers draft immutability, ownership, ordering, references, and soft deletion.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;

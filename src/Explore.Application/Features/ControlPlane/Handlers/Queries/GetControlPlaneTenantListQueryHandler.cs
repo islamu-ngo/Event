@@ -1,6 +1,3 @@
-// ABOUTME: Query handler for the control-plane tenant lifecycle list.
-// ABOUTME: Maps tenant entities to a bounded instance-operator read model without tenant business data.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ControlPlane;
 using Explore.Application.Features.ControlPlane.Requests.Queries;

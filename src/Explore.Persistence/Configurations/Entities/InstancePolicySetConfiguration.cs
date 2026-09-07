@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for InstancePolicySet — the root governance policy aggregate.
-// ABOUTME: Each sub-policy section uses table-splitting (flattened columns) for relational querying.
-
 using Explore.Domain.Policies;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

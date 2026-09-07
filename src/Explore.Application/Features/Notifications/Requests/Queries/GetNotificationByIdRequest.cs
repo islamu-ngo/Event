@@ -1,6 +1,3 @@
-// ABOUTME: Query request for a single notification by ID.
-// ABOUTME: Handler verifies the notification belongs to the authenticated user.
-
 using Explore.Application.DTOs.Notification;
 using MediatR;
 

@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for tenant-scoped promotion definitions, codes, reservations, and lookups.
-// ABOUTME: Uses portable constraints and shadow digest metadata without filtered unique indexes.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;

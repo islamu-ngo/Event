@@ -1,6 +1,3 @@
-// ABOUTME: Validates the five ticket pricing modes and buyer-selected minor-unit prices.
-// ABOUTME: Centralizes field-shape and minimum-bound invariants without Domain rounding.
-
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 

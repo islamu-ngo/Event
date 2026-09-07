@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for shared Layer 3 custom-property definitions for organization and group scopes.
-// ABOUTME: Supports CQRS read/write flows with namespaced machine-key uniqueness and option payload persistence.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

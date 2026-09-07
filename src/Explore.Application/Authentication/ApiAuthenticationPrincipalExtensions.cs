@@ -1,6 +1,3 @@
-// ABOUTME: Shared claim-reading helpers for direct JWT and API-key authenticated principals.
-// ABOUTME: Centralizes API-key principal parsing so middleware, controllers, and later authorization code use one contract.
-
 using System.Security.Claims;
 using Explore.Application.Constants;
 using Explore.Domain.Enums;

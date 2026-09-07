@@ -1,6 +1,3 @@
-// ABOUTME: Binds independent ATProto login flows to one fixed-expiry, origin-protected browser proof cookie.
-// ABOUTME: Keeps raw proof out of flow state and reserves the handoff lifetime before state expires.
-
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.WebUtilities;
 using System.Security.Cryptography;

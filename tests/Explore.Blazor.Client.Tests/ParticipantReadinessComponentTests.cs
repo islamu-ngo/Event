@@ -1,6 +1,3 @@
-// ABOUTME: Exercises participant readiness through its public component and typed service contract.
-// ABOUTME: Protects HAL-only actions, bounded dignified state, deterministic pending behavior, and focus.
-
 using AngleSharp.Dom;
 using Explore.Blazor.Client.Components.Admissions;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies event moderation metrics use bounded, safe OpenTelemetry tags.
-// ABOUTME: Guards against exposing event IDs, moderation case text, image paths, object keys, or exception details.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Telemetry;
 using NSubstitute;

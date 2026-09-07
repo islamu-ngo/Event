@@ -1,6 +1,3 @@
-// ABOUTME: Validates ticket catalog publication, event-scoped pool binding, and entitlement legality.
-// ABOUTME: Enforces the invariant graph before a draft becomes an immutable published catalog.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Domain.Services.Registration;

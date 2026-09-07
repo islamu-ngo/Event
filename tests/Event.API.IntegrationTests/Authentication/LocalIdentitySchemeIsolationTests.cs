@@ -1,6 +1,3 @@
-// ABOUTME: Verifies Local Identity and Keycloak bearer handlers remain registered and cryptographically isolated.
-// ABOUTME: Proves each authority rejects tokens signed for the other while MultiAuth routes by bounded issuer.
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;

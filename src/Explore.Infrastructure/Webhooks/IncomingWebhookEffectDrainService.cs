@@ -1,6 +1,3 @@
-// ABOUTME: Claims bounded Coop effect-pointer batches and executes them in tenant-isolated scopes.
-// ABOUTME: Renews fenced leases during processing and emits only safe aggregate failure logs.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.Services.Webhooks;

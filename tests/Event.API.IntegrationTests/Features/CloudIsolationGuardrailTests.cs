@@ -1,6 +1,3 @@
-// ABOUTME: Configuration guardrail tests ensuring test environments never reference cloud endpoints.
-// ABOUTME: Fails the test suite if any configuration value contains cloud-specific URLs.
-
 using Event.Api.IntegrationTests.Fixtures;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped guest admission recovery request and delivery layout. */
-/* ABOUTME: Supports mobile, keyboard, RTL, and print-safe sensitive credential presentation. */
-
 .ticket-recovery {
     display: grid;
     gap: var(--isl-space-section);

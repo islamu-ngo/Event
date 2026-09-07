@@ -1,6 +1,3 @@
-// ABOUTME: Immutable public event projection used to create one community calendar event record.
-// ABOUTME: Contains only federatable values after tenant, lifecycle, storage, and location-disclosure filtering.
-
 using System.Collections.Immutable;
 using Explore.Application.Contracts.LocationPrivacy;
 

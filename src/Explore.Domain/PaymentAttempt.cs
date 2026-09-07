@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral payment attempt aggregate for registration-order checkout attempts.
-// ABOUTME: Pins recipient, money composition, idempotency, and monotonic provider evidence separately from order state.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 using Explore.Domain.ValueObjects;

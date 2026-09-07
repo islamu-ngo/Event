@@ -1,6 +1,3 @@
-// ABOUTME: Builds stable RFC 7807 quota-exceeded responses from Application-layer quota metadata.
-// ABOUTME: Keeps HTTP shape in API while preserving Clean Architecture boundaries for quota enforcement.
-
 using Explore.Application.Responses;
 using Microsoft.AspNetCore.Mvc;
 

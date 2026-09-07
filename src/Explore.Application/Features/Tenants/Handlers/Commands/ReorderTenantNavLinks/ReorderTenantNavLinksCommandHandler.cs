@@ -1,5 +1,3 @@
-// ABOUTME: Handler for reordering the tenant navigation links.
-// ABOUTME: Applies the new ordering to all nav link records.
 using System;
 using System.Collections.Generic;
 using System.Linq;

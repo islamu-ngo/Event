@@ -1,6 +1,3 @@
-// ABOUTME: Stores the typed lifecycle and fingerprint evidence for instance bootstrap generations.
-// ABOUTME: Enforces correction fencing, replay safety, completion finality, and typed deployment transitions.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Domain;

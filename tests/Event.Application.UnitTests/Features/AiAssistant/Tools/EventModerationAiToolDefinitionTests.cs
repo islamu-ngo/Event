@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for registry-backed event moderation AI tool definitions.
-// ABOUTME: Locks moderation authorization, HAL affordance requirements, schemas, and forbidden fields.
-
 using System.Text.Json;
 using Explore.Application.Authorization;
 using Explore.Application.Features.AiAssistant.Actions;

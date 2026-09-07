@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for IdempotencyMiddleware covering key validation, replay, and passthrough.
-// ABOUTME: Verifies the full middleware pipeline: invalid keys return ProblemDetails, valid keys cache and replay.
-
 using System.Net;
 using System.Security.Claims;
 using System.Text;

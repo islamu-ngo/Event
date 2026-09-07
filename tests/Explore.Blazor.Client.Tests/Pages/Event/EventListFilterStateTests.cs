@@ -1,6 +1,3 @@
-// ABOUTME: Verifies EventListFilterState preserves EventFilterBar-to-service query mapping.
-// ABOUTME: Covers date range conversion, search fallback, ownership filters, and service forwarding.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Models;
 using Explore.Blazor.Client.Pages.Events;

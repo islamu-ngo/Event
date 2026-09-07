@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for AiRetentionCleanupSettingsValidator.
-// ABOUTME: Verifies scheduled AI retention cleanup rejects unsafe scheduling and tenant bounds.
-
 using Explore.Infrastructure;
 
 namespace Explore.Infrastructure.Tests.Infrastructure;

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the AI provider readiness health check adapter.
-// ABOUTME: Verifies disabled mode is healthy and unhealthy provider settings are safely surfaced.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Telemetry;

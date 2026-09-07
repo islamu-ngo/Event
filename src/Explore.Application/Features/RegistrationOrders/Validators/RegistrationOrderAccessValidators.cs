@@ -1,6 +1,3 @@
-// ABOUTME: Validates bounded registration-order access identifiers and opaque capability input.
-// ABOUTME: Lets handlers reject malformed guest access attempts with the same generic absence result.
-
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using FluentValidation;
 

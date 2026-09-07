@@ -1,6 +1,3 @@
-// ABOUTME: Proves organization setting operations use tenant participation plus global organization identity.
-// ABOUTME: Runs with tenant filters bypassed so explicit repository predicates are the tested authority.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;

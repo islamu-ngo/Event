@@ -1,6 +1,3 @@
-// ABOUTME: Typed policy for Blazor render mode governance — presets, per-context modes, and prerender flags.
-// ABOUTME: Controls both global and per-page-context render strategies with tenant override locks.
-
 namespace Explore.Domain.Policies;
 
 public sealed class RenderPolicy

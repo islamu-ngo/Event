@@ -1,6 +1,3 @@
-// ABOUTME: Command to replace all permissions for an existing custom role.
-// ABOUTME: Enforces capability ceiling and triggers policy sync to Cerbos.
-
 using Explore.Application.Responses;
 using MediatR;
 

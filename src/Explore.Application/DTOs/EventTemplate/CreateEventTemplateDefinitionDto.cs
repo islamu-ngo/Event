@@ -1,6 +1,3 @@
-// ABOUTME: Write DTO for creating template property definitions, includes all property fields and nested options.
-// ABOUTME: Used both nested within CreateEventTemplateDto and standalone for adding definitions to existing templates.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.DTOs.EventTemplate;

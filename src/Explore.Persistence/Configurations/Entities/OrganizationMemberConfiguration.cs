@@ -1,6 +1,3 @@
-// ABOUTME: Configures organization memberships and their tenant-safe relationships.
-// ABOUTME: Enforces one membership per organization and user through model metadata.
-
 using System;
 using System.Collections.Generic;
 using System.Text;

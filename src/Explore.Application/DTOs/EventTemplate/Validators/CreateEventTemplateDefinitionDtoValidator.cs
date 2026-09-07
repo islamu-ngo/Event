@@ -1,6 +1,3 @@
-// ABOUTME: Validates template property definition payload shape with PropertyType-dependent rules.
-// ABOUTME: Mirrors CreateCustomPropertyDefinitionDtoValidator pattern without EntityTypeName check.
-
 using Explore.Domain.Enums;
 using FluentValidation;
 

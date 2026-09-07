@@ -1,4 +1,3 @@
-// ABOUTME: Unit tests for EventTypeService covering event type list retrieval behavior.
 // Verifies successful pass-through and exception propagation from the API client.
 
 namespace Explore.Blazor.Client.Tests.Services;

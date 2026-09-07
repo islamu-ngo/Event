@@ -1,6 +1,3 @@
-// ABOUTME: Query to list permissions with scope, group, and filtered visibility options.
-// ABOUTME: Used by admin UI for permission management and role assignment dropdowns.
-
 using Explore.Application.DTOs.Permission;
 using MediatR;
 

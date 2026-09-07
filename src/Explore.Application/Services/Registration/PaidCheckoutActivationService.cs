@@ -1,6 +1,3 @@
-// ABOUTME: Evaluates one authoritative persisted paid Checkout activation result for links, claims, and dispatch.
-// ABOUTME: Combines startup authority, durable sale controls, policy, review approval, and conservative exposure.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Domain;

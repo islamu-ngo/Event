@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the public ATProto discovery controller, safe source HAL policy, and cache eviction contract.
-// ABOUTME: Ensures the API exposes governed typed discovery without restoring the obsolete raw record surface.
-
 using Explore.API.Controllers;
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;

@@ -1,6 +1,3 @@
-// ABOUTME: Loads and validates the AT Protocol confidential-client ES256 key ring from server-only configuration.
-// ABOUTME: Exposes disposable signing-key copies and deterministic public JWK projections without private parameters.
-
 using System.Security.Cryptography;
 using System.Text.Json;
 using CarpaNet.OAuth;

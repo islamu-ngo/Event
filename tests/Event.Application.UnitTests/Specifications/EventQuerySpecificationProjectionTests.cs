@@ -1,6 +1,3 @@
-// ABOUTME: Verifies event query specification composition behavior for projection-backed filters.
-// ABOUTME: Covers immutable builder semantics, mixed filter composition, and cache key generation.
-
 using Explore.Application.Specifications.Events;
 
 namespace Event.Application.UnitTests.Specifications;

@@ -1,6 +1,3 @@
-// ABOUTME: Provides provider-neutral transaction and session named locks for relational persistence coordination.
-// ABOUTME: Preserves server-side cross-instance locking and uses a process semaphore only for single-instance SQLite.
-
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Data;

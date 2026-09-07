@@ -1,6 +1,3 @@
-// ABOUTME: Immutable audit item linking an export to a consent and exported field snapshot.
-// ABOUTME: Stores necessary exported values so audit evidence survives later consent or PII changes.
-
 namespace Explore.Domain;
 
 public sealed class EventContactShareExportItem

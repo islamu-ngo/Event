@@ -1,6 +1,3 @@
-// ABOUTME: Architecture guards for local Aspire infrastructure required by integrated services.
-// ABOUTME: Keeps local service endpoints and readiness sequencing explicit.
-
 namespace Event.Architecture.Tests;
 
 public sealed class AspireLocalInfrastructureArchitectureTests

@@ -1,6 +1,3 @@
-// ABOUTME: Handles tenant/event-bounded requirement attach and detach transactions.
-// ABOUTME: Preserves optimistic concurrency and never creates registration-order or participant state.
-
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

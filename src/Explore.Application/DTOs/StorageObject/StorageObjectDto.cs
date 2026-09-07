@@ -1,6 +1,3 @@
-// ABOUTME: Detailed storage object DTO with provider-neutral metadata for local-first file access.
-// ABOUTME: Exposes safe display and lifecycle fields while keeping provider paths internal.
-
 namespace Explore.Application.DTOs.StorageObject;
 
 public sealed record StorageObjectDto

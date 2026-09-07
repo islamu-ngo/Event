@@ -1,6 +1,3 @@
-// ABOUTME: Verifies primary-provider model namespace behavior through EF Core metadata.
-// ABOUTME: Ensures PostgreSQL-only constraints stay gated without inspecting implementation source.
-
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Schema;

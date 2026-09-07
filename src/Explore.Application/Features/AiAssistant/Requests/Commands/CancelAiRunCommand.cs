@@ -1,6 +1,3 @@
-// ABOUTME: Command contract for cancelling a queued or in-progress AI provider run.
-// ABOUTME: Keeps run cancellation authenticated and scoped to the owning AI conversation.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

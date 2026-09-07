@@ -1,5 +1,3 @@
-// ABOUTME: Service for managing location-related operations.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Constants;
 using Explore.Blazor.Client.Helpers;

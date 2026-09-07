@@ -1,6 +1,3 @@
-// ABOUTME: Defines an ordered stable option owned by one registration-form field version.
-// ABOUTME: Supports explicit retirement and independent cloning without provider identity.
-
 using Explore.Domain.Interfaces;
 using Explore.Domain.Services.Registration;
 

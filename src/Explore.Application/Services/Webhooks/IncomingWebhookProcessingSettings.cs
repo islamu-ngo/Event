@@ -1,6 +1,3 @@
-// ABOUTME: Configures bounded claim, lease, concurrency, retry, and polling behavior for incoming webhooks.
-// ABOUTME: Supplies conservative defaults while keeping every automatic processing loop operationally bounded.
-
 using System.ComponentModel.DataAnnotations;
 
 namespace Explore.Application.Services.Webhooks;

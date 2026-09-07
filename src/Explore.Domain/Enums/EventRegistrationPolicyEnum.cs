@@ -1,6 +1,3 @@
-// ABOUTME: Enum mirror of the EventRegistrationPolicy lookup controlling which registration scopes an organizer allows.
-// ABOUTME: Values are stable lookup ids; read alongside EventRegistration intent scopes (Event, Day, SessionSelection).
-
 namespace Explore.Domain.Enums;
 
 public enum EventRegistrationPolicyEnum

@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL certification for custom-property option lifecycle merge semantics.
-// ABOUTME: Verifies real schema behavior for namespace/key identity, revive, retire, reorder, and default remap.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Constants;

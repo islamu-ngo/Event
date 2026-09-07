@@ -1,6 +1,3 @@
-// ABOUTME: Maps incoming Coop effect entities to operator-safe lifecycle status DTOs.
-// ABOUTME: Preserves entity-first repository boundaries and excludes provider-sensitive fields.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Queries;

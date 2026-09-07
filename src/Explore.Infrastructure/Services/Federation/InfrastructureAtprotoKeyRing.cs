@@ -1,6 +1,3 @@
-// ABOUTME: Parses and validates the instance-scoped private ES256 ATProto OAuth signing-key ring.
-// ABOUTME: Enforces canonical bounded JWK material and exposes disposable CarpaNet signer copies by kid.
-
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;

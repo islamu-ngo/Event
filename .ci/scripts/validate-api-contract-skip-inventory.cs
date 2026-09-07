@@ -1,5 +1,3 @@
-// ABOUTME: Validates that skipped API contract tests are listed with owners and removal criteria.
-// ABOUTME: Keeps deferred OpenAPI/HATEOAS contract enforcement from becoming invisible test debt.
 #:property RestorePackagesWithLockFile=false
 
 using System.Text.RegularExpressions;

@@ -1,6 +1,3 @@
-// ABOUTME: Keycloak container fixture for BFF security integration tests.
-// ABOUTME: Starts a containerized Keycloak with the ISLAMU test realm for OIDC challenge tests.
-
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using TUnit.Core.Interfaces;

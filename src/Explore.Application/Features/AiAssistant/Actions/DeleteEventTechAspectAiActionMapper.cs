@@ -1,6 +1,3 @@
-// ABOUTME: Maps untrusted AI Tech aspect deletion proposals into safe delete commands.
-// ABOUTME: Reuses destructive aspect validation with the Tech module confirmation phrase.
-
 using Explore.Application.Features.AiAssistant.Prompting;
 using Explore.Application.Features.AiAssistant.Tools;
 using Explore.Application.Features.EventAspects.Requests.Commands;

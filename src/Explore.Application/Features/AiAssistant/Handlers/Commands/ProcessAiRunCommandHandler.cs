@@ -1,6 +1,3 @@
-// ABOUTME: Processes queued AI assistant runs outside the HTTP request path.
-// ABOUTME: Persists assistant text and proposal-only tool output while respecting Ask vs Build mode.
-
 using System.Globalization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Infrastructure.Ai;

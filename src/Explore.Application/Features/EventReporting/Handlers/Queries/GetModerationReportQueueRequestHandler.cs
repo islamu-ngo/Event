@@ -1,6 +1,3 @@
-// ABOUTME: Handles event-scoped moderation report queue reads.
-// ABOUTME: Maps report entities to management list DTOs after authorization and tenant scoping.
-
 using System.Text;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

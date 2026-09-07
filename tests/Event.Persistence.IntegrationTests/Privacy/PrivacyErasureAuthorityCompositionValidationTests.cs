@@ -1,6 +1,3 @@
-// ABOUTME: Verifies topology-specific privacy-erasure authority composition and connection validation.
-// ABOUTME: Proves EmbeddedSqlite is the default while malformed external provider settings fail closed.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.PrivacyErasure;

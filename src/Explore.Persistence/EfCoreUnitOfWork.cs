@@ -1,6 +1,3 @@
-// ABOUTME: EF Core implementation of IUnitOfWork using CreateExecutionStrategy for Npgsql retry compatibility.
-// ABOUTME: Clears failed-attempt tracking before retry and preserves original errors during rollback cleanup.
-
 using System.Data;
 using System.Data.Common;
 using Explore.Application.Contracts.Persistence;

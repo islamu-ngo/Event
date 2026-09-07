@@ -1,6 +1,3 @@
-// ABOUTME: Shallow list-item DTO for the EventWithSessions aggregate read view.
-// ABOUTME: Exposes key summary scalars plus a capped set of searchable public facets for discovery surfaces.
-
 using System.Collections.Immutable;
 using System.Text.Json.Serialization;
 using Explore.Application.Hateoas;

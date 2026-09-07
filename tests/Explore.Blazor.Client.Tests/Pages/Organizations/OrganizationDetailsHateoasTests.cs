@@ -1,6 +1,3 @@
-// ABOUTME: Component tests verifying OrganizationDetails page surfaces Edit controls only when the API
-// ABOUTME: returns an `_links.edit` HAL affordance, and never pre-fetches members data on load.
-
 using System.Reflection;
 using System.Text.Json;
 using Blazouter.Services;

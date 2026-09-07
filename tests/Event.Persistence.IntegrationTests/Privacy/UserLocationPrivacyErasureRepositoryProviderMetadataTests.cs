@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL proofs for provider-backed local user metadata erasure.
-// ABOUTME: Verifies exact-subject clearing, tombstones, and unrelated-row isolation across tenants.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

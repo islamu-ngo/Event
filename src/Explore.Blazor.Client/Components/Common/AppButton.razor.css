@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped styles for AppButton — absorbs global .mud-button-* overrides from Phase 1.
-   ABOUTME: Uses BEM .app-button block + ::deep to style MudButton internals. */
-
 .app-button {
     display: contents;
 }

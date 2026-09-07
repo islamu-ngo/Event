@@ -1,6 +1,3 @@
-// ABOUTME: Maps append-only registration submission revisions with parent and tenant containment.
-// ABOUTME: Enforces one immutable ordered revision number per submission.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

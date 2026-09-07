@@ -1,6 +1,3 @@
-// ABOUTME: Executes one bounded pass of durable registration Checkout dispatch effects.
-// ABOUTME: Keeps provider I/O between the claim and fenced tenant-scoped settlement transactions.
-
 using Explore.Application.Contracts.Payments;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

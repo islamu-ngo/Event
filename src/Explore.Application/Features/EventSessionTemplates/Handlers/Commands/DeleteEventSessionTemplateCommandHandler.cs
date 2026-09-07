@@ -1,6 +1,3 @@
-// ABOUTME: Handles deletion of event session templates with cascaded definition and option cleanup.
-// ABOUTME: Uses hard delete so session template keys can be reused without stale-row conflicts.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionTemplate;
 using Explore.Application.Features.EventSessionTemplates.Requests.Commands;

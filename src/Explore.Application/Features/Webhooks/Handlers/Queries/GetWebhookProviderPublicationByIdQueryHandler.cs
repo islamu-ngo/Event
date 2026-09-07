@@ -1,6 +1,3 @@
-// ABOUTME: Handles one tenant-scoped provider publication read with append-only attempt evidence.
-// ABOUTME: Maps the canonical aggregate to a credential-free operations DTO in Application.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Queries;

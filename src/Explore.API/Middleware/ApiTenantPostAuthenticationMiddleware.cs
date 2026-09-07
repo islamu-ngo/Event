@@ -1,6 +1,3 @@
-// ABOUTME: Completes split-phase tenant handling after authentication for API-key callers and mismatch checks.
-// ABOUTME: Sets tenant context from authenticated machine principals and fail-closes when tenant hints conflict.
-
 using Explore.API.Authentication;
 using Explore.API.Configuration;
 using Explore.API.ExceptionHandling;

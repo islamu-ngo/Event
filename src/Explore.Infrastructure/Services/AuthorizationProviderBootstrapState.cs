@@ -1,6 +1,3 @@
-// ABOUTME: Thread-safe process state for deployment-selected authorization reconciliation.
-// ABOUTME: Projects pending, ready, and safe failure details without retaining provider secrets.
-
 using Explore.Application.Authorization;
 
 namespace Explore.Infrastructure.Services;

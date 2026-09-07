@@ -1,6 +1,3 @@
-// ABOUTME: Maps governed registration fields inside one tenant-scoped form section and version.
-// ABOUTME: Enforces composite lineage, stable machine keys, ordinals, constraints, and lookup relationships.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

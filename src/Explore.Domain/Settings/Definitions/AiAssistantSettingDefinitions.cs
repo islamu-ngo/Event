@@ -1,6 +1,3 @@
-// ABOUTME: Setting definitions for AI assistant integration and feature enablement at instance/tenant scope.
-// ABOUTME: Enables hierarchical governance with tenant overrides when instance delegation allows it.
-
 namespace Explore.Domain.Settings.Definitions;
 
 using Explore.Domain.Constants;

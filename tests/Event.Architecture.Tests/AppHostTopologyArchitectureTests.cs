@@ -1,6 +1,3 @@
-// ABOUTME: Topology-selection architecture guardrails for Explore.AppHost.
-// ABOUTME: Proves split-by-default behavior and mutually exclusive split/standalone composition registration.
-
 using System.Xml.Linq;
 
 namespace Event.Architecture.Tests;

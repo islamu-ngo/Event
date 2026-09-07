@@ -1,6 +1,3 @@
-// ABOUTME: Builds reusable OpenID Connect options for Event browser-BFF hosts.
-// ABOUTME: Centralizes PKCE, token persistence, safe auth diagnostics, cookie, and backchannel defaults.
-
 using System.Net;
 using System.Net.Sockets;
 using Microsoft.AspNetCore.Authentication.Cookies;

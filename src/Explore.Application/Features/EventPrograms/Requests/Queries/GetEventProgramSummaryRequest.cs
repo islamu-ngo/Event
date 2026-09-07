@@ -1,6 +1,3 @@
-// ABOUTME: Query contract for the server-backed event program summary.
-// ABOUTME: Keeps program grouping/readiness rules in Application instead of Blazor shells.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventProgram;
 using MediatR;

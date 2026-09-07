@@ -1,6 +1,3 @@
-// ABOUTME: Focused tests for BFF session refresh orchestration after extraction from auth endpoints.
-// ABOUTME: Verifies refresh-session response shape and circuit token cleanup without exposing bearer tokens.
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Cryptography;
 using System.Text.Json;

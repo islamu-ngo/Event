@@ -1,6 +1,3 @@
-// ABOUTME: Handles updates to event-local custom property definitions with governance and option replacement.
-// ABOUTME: Preserves provenance fields (read-only) while allowing organizer customization of instantiated definitions.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

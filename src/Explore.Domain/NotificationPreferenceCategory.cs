@@ -1,6 +1,3 @@
-// ABOUTME: Lookup row for one user-facing notification preference matrix category.
-// ABOUTME: Stores required/default channel metadata used by the effective preference resolver.
-
 namespace Explore.Domain;
 
 public class NotificationPreferenceCategory

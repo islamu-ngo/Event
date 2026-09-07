@@ -1,6 +1,3 @@
-// ABOUTME: Tests for HierarchicalSettingsResolver covering cascade, locks, batch loading, and scope validation.
-// ABOUTME: Uses NSubstitute mocks for repository dependencies.
-
 namespace Explore.Infrastructure.Tests.Settings;
 
 using Explore.Application.Contracts.Infrastructure;

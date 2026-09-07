@@ -1,6 +1,3 @@
-// ABOUTME: Management projection for explicitly requested report evidence.
-// ABOUTME: Decrypts reporter text only on detail reads and labels evidence sensitivity for operator handling.
-
 namespace Explore.Application.DTOs.EventReporting;
 
 public sealed record ModerationReportEvidenceDto

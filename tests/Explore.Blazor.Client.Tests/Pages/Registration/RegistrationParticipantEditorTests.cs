@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for server-authored participant data-collection modes in registration recovery.
-// ABOUTME: Verifies required, deferred, and buyer-copy behavior without exposing purchaser PII.
-
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Explore.Blazor.Client.Clients;

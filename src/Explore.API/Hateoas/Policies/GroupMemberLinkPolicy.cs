@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS link policies for GroupMember detail and collection views.
-// ABOUTME: Mirrors OrganizationMemberLinkPolicy — provides self, group, edit, delete links.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Collections.Generic;

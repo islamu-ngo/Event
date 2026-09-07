@@ -1,6 +1,3 @@
-// ABOUTME: Projects the API readiness graph into a bounded managed-mode health observation.
-// ABOUTME: Exposes only aggregate status and observation time without individual dependency details.
-
 using Explore.Application.Contracts.Infrastructure;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 

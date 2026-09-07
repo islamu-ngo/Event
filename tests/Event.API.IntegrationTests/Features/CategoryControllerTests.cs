@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for public Category API routing and authorization behavior.
-// ABOUTME: Verifies read endpoints plus authenticated PATCH route and If-Match contracts.
-
 using System.Net;
 using System.Net.Http.Json;
 using Event.Api.IntegrationTests.Fixtures;

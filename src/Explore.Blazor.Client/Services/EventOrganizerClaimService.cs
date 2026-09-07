@@ -1,6 +1,3 @@
-// ABOUTME: Implements event organizer claim operations via generated IEventOrganizerClaimClient.
-// ABOUTME: Extracted from monolithic EventService to maintain single responsibility.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 

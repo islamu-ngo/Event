@@ -1,6 +1,3 @@
-// ABOUTME: Persists import sessions behind explicit trusted target coordinates.
-// ABOUTME: Supports tracking lifecycle reads and bounded expiry batches without exposing artifact bytes.
-
 namespace Explore.Persistence.Repositories;
 
 using Explore.Application.Features.ConfigurationManifest.Importing;

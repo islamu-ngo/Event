@@ -1,6 +1,3 @@
-// ABOUTME: Persistence regression tests for EventSeries nested event graph loading.
-// ABOUTME: Proves published ticket pricing reaches the application summary mapper without Docker.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Services;
 using Explore.Domain;

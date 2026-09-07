@@ -1,6 +1,3 @@
-// ABOUTME: Validates and evaluates the canonical environment catalogue with fail-closed diagnostics.
-// ABOUTME: Provides ordinal lookup and relevance snapshots without exposing configuration values.
-
 namespace ISLAMU.Event.Setup.Core.Environment;
 
 public sealed record EnvironmentCatalogueResult

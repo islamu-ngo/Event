@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-scoped durable subscription cursor for registration provider change feeds.
-// ABOUTME: Fences watch renewal and response-sweep workers with UTC leases and generation checks.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

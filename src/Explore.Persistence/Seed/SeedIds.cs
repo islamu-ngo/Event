@@ -1,6 +1,3 @@
-// ABOUTME: Static deterministic GUIDs for seed data (lookup tables + dev business entities).
-// ABOUTME: Used by LookupTableSeeder (all environments) and DatabaseSeeder (Development only).
-
 namespace Explore.Persistence.Seed;
 
 /// <summary>

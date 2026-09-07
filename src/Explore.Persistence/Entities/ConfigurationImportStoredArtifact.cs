@@ -1,6 +1,3 @@
-// ABOUTME: Persistence-private encrypted byte envelope for one configuration import artifact.
-// ABOUTME: Stores only protected payload plus bounded integrity and expiry metadata.
-
 namespace Explore.Persistence.Entities;
 
 public sealed class ConfigurationImportStoredArtifact

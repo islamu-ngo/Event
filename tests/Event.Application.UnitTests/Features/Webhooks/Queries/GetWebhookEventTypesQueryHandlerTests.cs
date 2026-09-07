@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the webhook event catalog query handler.
-// ABOUTME: Verifies provider-neutral catalog mapping includes schema, examples, retention, and fields.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;

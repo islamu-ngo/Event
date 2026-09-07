@@ -1,6 +1,3 @@
-// ABOUTME: Persistence contract for governed registration-answer aggregate projections.
-// ABOUTME: Keeps raw answer rows behind the repository boundary and returns Domain-owned projections only.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

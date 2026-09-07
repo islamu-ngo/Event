@@ -1,6 +1,3 @@
-// ABOUTME: Stable lookup identifiers and codes for the notification preference matrix.
-// ABOUTME: Keeps category and channel metadata independent from notification intent taxonomy.
-
 namespace Explore.Domain.Enums;
 
 public enum NotificationPreferenceCategoryEnum

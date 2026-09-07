@@ -1,6 +1,3 @@
-// ABOUTME: Security-focused BFF WebApplicationFactory that uses real OIDC against containerized Keycloak.
-// ABOUTME: Does NOT use TestAuthHandler — exercises the actual Cookie + OIDC authentication pipeline.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Services;
 using Microsoft.AspNetCore.DataProtection;

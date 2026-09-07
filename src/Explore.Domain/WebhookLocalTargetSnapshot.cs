@@ -1,6 +1,3 @@
-// ABOUTME: Immutable Local-provider endpoint target captured for one outgoing webhook delivery plan.
-// ABOUTME: Freezes destination, endpoint configuration, signing-key reference, and delivery limits without storing secret values.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

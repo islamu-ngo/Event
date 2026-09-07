@@ -1,6 +1,3 @@
-// ABOUTME: Defines bounded public Event management contracts for discovery, registration, status, health, and version.
-// ABOUTME: Carries no Event business data and exposes credential material only in the one-time registration callback.
-
 using System.ComponentModel.DataAnnotations;
 using Explore.Domain.Enums;
 

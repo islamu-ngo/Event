@@ -1,6 +1,3 @@
-// ABOUTME: Defines the thin Studio registration-form authoring client boundary.
-// ABOUTME: Keeps Razor components on generated BFF contracts and HAL-authorized mutations.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.Events;

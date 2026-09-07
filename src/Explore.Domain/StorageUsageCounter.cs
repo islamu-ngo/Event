@@ -1,6 +1,3 @@
-// ABOUTME: Tenant/provider storage usage aggregate used for quota checks before bytes are accepted.
-// ABOUTME: Tracks used, reserved, and quarantined byte counts without scanning every storage object.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

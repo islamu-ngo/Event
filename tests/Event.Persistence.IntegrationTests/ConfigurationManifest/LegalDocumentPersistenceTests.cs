@@ -1,6 +1,3 @@
-// ABOUTME: Specifies portable persistence for legal aggregate and publication evidence.
-// ABOUTME: Verifies entity-returning boundaries, graph fidelity, and five-provider model parity.
-
 namespace Event.Persistence.IntegrationTests.ConfigurationManifest;
 
 using Explore.Domain;

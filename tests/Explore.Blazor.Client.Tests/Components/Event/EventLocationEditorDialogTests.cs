@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for the HAL-gated EventLocation disclosure editor dialog.
-// ABOUTME: Proves the save affordance exists only with an "edit" link and that concurrency tokens round-trip.
-
 using System.Reflection;
 using Explore.Blazor.Client.Contracts.Services.Events;
 using Explore.Blazor.Client.Pages.Events.Components;

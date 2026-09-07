@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for deleting an actor by ID.
-// ABOUTME: Carries the target actor ID.
 using MediatR;
 
 namespace Explore.Application.Features.Actors.Requests.Commands;

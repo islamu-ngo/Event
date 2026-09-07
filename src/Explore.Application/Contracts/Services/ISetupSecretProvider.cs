@@ -1,6 +1,3 @@
-// ABOUTME: Interface for the setup secret provider that gates instance onboarding.
-// ABOUTME: Implementation generates or reads secret, validates with timing-safe comparison, and locks after completion.
-
 namespace Explore.Application.Contracts.Services;
 
 public enum SetupSecretValidationOutcome

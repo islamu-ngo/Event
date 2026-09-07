@@ -1,6 +1,3 @@
-// ABOUTME: Application contract for retry-stable fanout occurrence coordination inputs and outcomes.
-// ABOUTME: Keeps candidate and outbox identities caller-owned while priority and timing remain closed policy.
-
 using Explore.Domain;
 
 namespace Explore.Application.Notifications;

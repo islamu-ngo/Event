@@ -1,6 +1,3 @@
-// ABOUTME: Input model for composing Keycloak realm desired state from project contracts.
-// ABOUTME: Keeps module contributors independent from Infrastructure Admin API details.
-
 namespace Explore.Application.DTOs.Onboarding;
 
 public sealed record KeycloakRealmDesiredStateBuildRequestDto

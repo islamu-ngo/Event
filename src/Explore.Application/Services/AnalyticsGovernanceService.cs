@@ -1,6 +1,3 @@
-// ABOUTME: Sanitizes analytics payloads and applies consent-aware identity handling.
-// ABOUTME: Prevents raw PII drift and provider misuse before events leave the Application layer.
-
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Analytics;

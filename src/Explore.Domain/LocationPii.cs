@@ -1,6 +1,3 @@
-// ABOUTME: Stores precise location-identifying fields in a dedicated extension table.
-// ABOUTME: Restricts address and coordinate mutation to atomic Location aggregate transitions.
-
 using Explore.Domain.ValueObjects;
 
 namespace Explore.Domain;

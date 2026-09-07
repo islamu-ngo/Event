@@ -1,6 +1,3 @@
-// ABOUTME: Factory for durable event moderation outbox messages.
-// ABOUTME: Keeps attendee notification fanout payloads centralized and safe by moderation severity.
-
 using System.Text.Json;
 using Explore.Application.Models.InternalEvents;
 using Explore.Domain;

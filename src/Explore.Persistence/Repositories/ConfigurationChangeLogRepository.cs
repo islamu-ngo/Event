@@ -1,4 +1,3 @@
-// ABOUTME: Repository implementation for ConfigurationChangeLog audit entity.
 // Provides query methods for audit trail retrieval, ordered by most recent first.
 
 using Explore.Application.Contracts.Persistence;

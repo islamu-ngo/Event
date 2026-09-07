@@ -1,6 +1,3 @@
-// ABOUTME: Instance moderation reporting settings endpoints for provider delegation locks.
-// ABOUTME: Keeps instance-admin reporting governance separate from tenant-scoped routing updates.
-
 namespace Explore.API.Controllers;
 
 using Asp.Versioning;

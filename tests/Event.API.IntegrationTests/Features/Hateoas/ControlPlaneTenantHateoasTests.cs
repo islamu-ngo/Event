@@ -1,6 +1,3 @@
-// ABOUTME: Link-policy contract tests for control-plane tenant HAL affordances.
-// ABOUTME: Protects tenant lifecycle actions from drifting away from server authorization metadata.
-
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.Authorization;

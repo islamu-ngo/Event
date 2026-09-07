@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for notification scope lookup values.
-// ABOUTME: Maps NotificationScopeType to the notification_scope_types table.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

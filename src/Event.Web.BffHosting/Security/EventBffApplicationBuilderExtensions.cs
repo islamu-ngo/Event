@@ -1,6 +1,3 @@
-// ABOUTME: Provides shared forwarded-header, browser security header, and antiforgery token middleware.
-// ABOUTME: Lets BFF hosts keep the same browser boundary without depending on a specific UI app.
-
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;

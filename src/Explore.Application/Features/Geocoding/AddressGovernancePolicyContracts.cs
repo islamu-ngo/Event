@@ -1,6 +1,3 @@
-// ABOUTME: Defines the trusted-input contract and typed result for effective address governance.
-// ABOUTME: Excludes caller-authored authority, grant, source, and visibility booleans.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Features.Geocoding;

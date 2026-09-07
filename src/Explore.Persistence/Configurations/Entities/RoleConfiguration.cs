@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for unified Role entity with Scope, IsSystem, and unique MasterCode index.
-// ABOUTME: Covers all role scopes and exposes alternate keys for scope-constrained grants.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

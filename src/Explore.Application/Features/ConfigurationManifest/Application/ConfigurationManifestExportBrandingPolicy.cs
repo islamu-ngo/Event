@@ -1,6 +1,3 @@
-// ABOUTME: Revalidates persisted branding URLs at the whole-instance export boundary.
-// ABOUTME: Prevents stale unsafe branding data from being emitted by trusted export reads.
-
 namespace Explore.Application.Features.ConfigurationManifest.Application;
 
 using System.Text.Json;

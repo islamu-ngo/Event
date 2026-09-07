@@ -1,6 +1,3 @@
-// ABOUTME: Defines the maximum scope ceiling per external API key owner type.
-// ABOUTME: Prevents privilege escalation by ensuring each owner type can only grant scopes within its ceiling.
-
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 

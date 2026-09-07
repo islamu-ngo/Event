@@ -1,6 +1,3 @@
-// ABOUTME: Proves scanner capabilities use bounded rotation, dedicated key material, and bearer-only digests.
-// ABOUTME: Uses runtime-generated secrets and verifies cancellation, redaction, and generic failures.
-
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Configuration;

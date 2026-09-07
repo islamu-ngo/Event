@@ -1,6 +1,3 @@
-// ABOUTME: Proves prepare composes canonical three-layer notes and preserves human-owned release inputs.
-// ABOUTME: Exercises idempotency, impact coverage, renderer failure, and generated-file collision behavior.
-
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;

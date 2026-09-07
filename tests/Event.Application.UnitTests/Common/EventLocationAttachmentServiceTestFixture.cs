@@ -1,6 +1,3 @@
-// ABOUTME: Shared EventLocation attachment service setup for Application command-handler tests.
-// ABOUTME: Supplies event-scoped placements without mocking the sealed production coordinator.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

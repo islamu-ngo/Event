@@ -1,6 +1,3 @@
-// ABOUTME: Registers only the options, reader, Application boundary, and sequence needed for manifest startup.
-// ABOUTME: Supports runtime-immediate effects and split-host durable deferral through one composition method.
-
 namespace Explore.Infrastructure.ConfigurationManifest;
 
 using Explore.Application.Features.ConfigurationManifest.Application;

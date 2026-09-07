@@ -1,6 +1,3 @@
-// ABOUTME: Handler for GetUserContactShareConsentsQuery — returns user's own consents.
-// ABOUTME: Delegates to IContactShareConsentService which includes organisation display names.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.ContactShareConsent;
 using Explore.Application.Features.ContactShareConsents.Requests.Queries;

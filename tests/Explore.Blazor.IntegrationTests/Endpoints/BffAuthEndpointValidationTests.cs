@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for browser-facing BFF auth endpoint sanitization.
-// ABOUTME: Verifies auth provider failures and browser-supplied auth headers stay safe.
-
 using Explore.Blazor.IntegrationTests.Fixtures;
 using Explore.Blazor.Constants;
 using Explore.Blazor.Services;

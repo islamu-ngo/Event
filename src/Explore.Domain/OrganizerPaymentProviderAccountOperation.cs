@@ -1,6 +1,3 @@
-// ABOUTME: Durable tenant-scoped fence for organizer payment provider account creation.
-// ABOUTME: Persists the provider idempotency key before remote I/O and blocks unsafe retries.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Implements setup-time Keycloak realm and client bootstrap through the Keycloak Admin API.
-// ABOUTME: Keeps admin credentials and provider response bodies out of persisted state, logs, and result DTOs.
-
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;

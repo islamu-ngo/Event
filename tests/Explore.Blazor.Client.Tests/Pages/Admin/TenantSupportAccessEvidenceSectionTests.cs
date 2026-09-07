@@ -1,6 +1,3 @@
-// ABOUTME: bUnit tests for tenant-facing support-access evidence review.
-// ABOUTME: Verifies tenant scoping, read-only UX, and HAL-gated audit affordances.
-
 using System.Text.Json;
 using AngleSharp.Dom;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;

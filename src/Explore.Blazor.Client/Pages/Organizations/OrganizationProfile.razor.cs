@@ -1,6 +1,3 @@
-// ABOUTME: Luma-inspired organization profile page with banner, avatar, events timeline.
-// ABOUTME: Loads org details, reviews, and public events split into upcoming vs past.
-
 using Blazouter.Services;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Helpers;

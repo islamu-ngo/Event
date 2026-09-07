@@ -1,6 +1,3 @@
-// ABOUTME: Client contract for reporter-facing event-report submission and status reads.
-// ABOUTME: Keeps generated API exceptions behind explicit service result models for UI components.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.EventReporting;

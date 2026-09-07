@@ -1,6 +1,3 @@
-# ABOUTME: Tangled publication projection definition for a provider without a documented release API.
-# ABOUTME: Declares the recorded no-op path and the operator evidence required instead of a published page.
-
 name: Release Publish Projection
 
 on:

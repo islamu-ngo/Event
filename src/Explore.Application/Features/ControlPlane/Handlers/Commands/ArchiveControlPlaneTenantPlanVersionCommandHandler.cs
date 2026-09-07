@@ -1,6 +1,3 @@
-// ABOUTME: Command handler for archiving a tenant plan version template.
-// ABOUTME: Stops future provisioning from the version without moving existing assignments.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ControlPlane.Requests.Commands;
 using Explore.Application.Responses;

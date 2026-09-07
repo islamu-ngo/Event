@@ -1,4 +1,3 @@
-// ABOUTME: Repository implementation for SecretBinding - reads use AsNoTracking for
 // resolver hot path; inherits Create/Update/Delete/Exists semantics from GenericRepository.
 
 namespace Explore.Persistence.Repositories;

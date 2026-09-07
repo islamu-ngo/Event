@@ -1,6 +1,3 @@
-// ABOUTME: API request payload for creating an organization review.
-// ABOUTME: Excludes reviewer user identity because the server derives it from the authenticated principal.
-
 namespace Explore.Application.DTOs.OrganizationReview;
 
 public sealed record CreateOrganizationReviewDto

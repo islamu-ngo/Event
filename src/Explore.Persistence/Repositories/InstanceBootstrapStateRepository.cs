@@ -1,6 +1,3 @@
-// ABOUTME: Repository implementation for instance bootstrap state persistence.
-// ABOUTME: Provides current bootstrap marker access for first-run onboarding logic.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.Database.ProviderPrimitives;

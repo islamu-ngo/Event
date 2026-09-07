@@ -1,6 +1,3 @@
-// ABOUTME: Defines tenant-filtered reads over typed ATProto event projections for public discovery.
-// ABOUTME: Returns domain projections and excludes local event echoes before pagination and counting.
-
 using Explore.Domain.Federation;
 
 namespace Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for storage object query authorization metadata.
-// ABOUTME: Prevents storage metadata and download reads from bypassing MediatR resource authorization.
-
 using System.Reflection;
 using Explore.Application.Authorization;
 using Explore.Application.Features.StorageObjects.Requests.Queries;

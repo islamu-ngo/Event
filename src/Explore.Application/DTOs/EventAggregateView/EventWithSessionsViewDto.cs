@@ -1,6 +1,3 @@
-// ABOUTME: Detail DTO for the EventWithSessions aggregate read view consumed by app-layer queries.
-// ABOUTME: Combines core event scalars, module-gated nullable aspect fields, summary metrics, and filtered facets.
-
 using System.Collections.Immutable;
 using System.Text.Json.Serialization;
 using Explore.Application.Hateoas;

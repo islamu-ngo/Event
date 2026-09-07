@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL persistence tests for event-reporting moderation intake records.
-// ABOUTME: Verifies tenant filters, soft-delete graph hiding, and composite tenant FK enforcement.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

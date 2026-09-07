@@ -1,6 +1,3 @@
-// ABOUTME: Quartz jobs for the platform's periodic maintenance sweeps.
-// ABOUTME: Each job owns one iteration; the scheduler owns enablement, cadence, cancellation, and containment.
-
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Webhooks;

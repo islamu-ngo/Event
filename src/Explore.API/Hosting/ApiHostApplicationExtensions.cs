@@ -1,6 +1,3 @@
-// ABOUTME: Applies the reusable ordered API middleware pipeline and maps API-owned endpoints.
-// ABOUTME: Preserves OpenAPI, MCP, controllers, health routes, caching, tenancy, and authorization order.
-
 using Explore.API.Authentication;
 using Explore.API.Configuration;
 using Explore.API.Extensions;

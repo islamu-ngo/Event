@@ -1,6 +1,3 @@
-// ABOUTME: Runs reusable API lifetime registration and ordered pre-start initialization.
-// ABOUTME: Preserves migrations, privacy gating, setup-secret initialization, and 25-second shutdown behavior.
-
 using Explore.API.BackgroundServices;
 using Explore.API.Extensions;
 using Explore.Application.Contracts.Services;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines the Application boundary for atomic tenant and instance publication-policy mutations.
-// ABOUTME: Returns committed setting changes as deferred notifications for the caller to publish later.
-
 namespace Explore.Application.Settings;
 
 public interface IPublicationPolicyMutationBoundary

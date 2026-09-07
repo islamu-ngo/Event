@@ -1,5 +1,3 @@
-<!-- ABOUTME: Dedicated mutation lane for ticketing recovery manifest and reopening authority. -->
-<!-- ABOUTME: Isolates recovery invariants from unrelated solution-wide test discovery. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="..\..\src\Explore.Domain\Explore.Domain.csproj" />

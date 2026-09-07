@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for instance admins to update moderation reporting provider lock flags.
-// ABOUTME: Uses the instance-setting authorization resource so lock changes stay server-authorized.
-
 namespace Explore.Application.Features.EventReporting.Requests.Commands;
 
 using Explore.Application.Authorization;

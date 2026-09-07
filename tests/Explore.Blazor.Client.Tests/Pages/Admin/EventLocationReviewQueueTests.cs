@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for the manager EventLocation privacy-review dashboard.
-// ABOUTME: Proves remediation controls appear per row strictly from that row's HAL relation.
-
 using System.Reflection;
 using Explore.Blazor.Client.Contracts.Services.Events;
 using Explore.Blazor.Client.Pages.Admin;

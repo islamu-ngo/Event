@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the BFF accepts forwarded client IP data only from explicitly trusted proxies.
-// ABOUTME: Prevents direct X-Forwarded-For spoofing from changing RemoteIpAddress and rate-limit identity.
-
 using Microsoft.AspNetCore.Http;
 using System.Net;
 using Explore.Blazor.IntegrationTests.Fixtures;

@@ -1,5 +1,3 @@
-// ABOUTME: Creates an event-scoped capacity pool for ticket authoring.
-// ABOUTME: Authorizes against the parent event ticket-management action.
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventTicketing;
 using Explore.Application.Responses;

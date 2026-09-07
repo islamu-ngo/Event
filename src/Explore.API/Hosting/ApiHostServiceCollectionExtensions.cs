@@ -1,6 +1,3 @@
-// ABOUTME: Registers the complete reusable Explore API host service graph and host options.
-// ABOUTME: Keeps worker, health, persistence, authentication, caching, and tooling ownership in Explore.API.
-
 using System.IO.Compression;
 using Explore.API.BackgroundServices;
 using Explore.API.Configuration;

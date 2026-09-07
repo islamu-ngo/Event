@@ -1,6 +1,3 @@
-// ABOUTME: Query handler that securely prepares a public event Open Graph image render request.
-// ABOUTME: Uses public event eligibility, effective tenant branding, and trusted public-image storage only.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;

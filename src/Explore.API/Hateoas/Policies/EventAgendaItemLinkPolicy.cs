@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS link policies for EventAgendaItem detail and collection views.
-// ABOUTME: Provides self, parent event, edit, and delete links with Cerbos authorization.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Collections.Generic;

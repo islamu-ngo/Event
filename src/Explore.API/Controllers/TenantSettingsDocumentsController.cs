@@ -1,6 +1,3 @@
-// ABOUTME: Authenticated API controller for tenant branding and directory-operator typed documents.
-// ABOUTME: Exposes HAL-gated reads and optimistic patches without scalar fallback or read-time provisioning.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

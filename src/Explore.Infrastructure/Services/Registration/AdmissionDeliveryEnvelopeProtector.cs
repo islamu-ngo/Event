@@ -1,6 +1,3 @@
-// ABOUTME: Protects recoverable admission delivery envelopes with the shared persistent Data Protection key ring.
-// ABOUTME: Keeps recipient and bearer encrypted at rest and maps cryptographic failures to a redacted boundary.
-
 using System.Security.Cryptography;
 using System.Text.Json;
 using Explore.Application.Contracts.Admissions;

@@ -1,6 +1,3 @@
-// ABOUTME: Event-scoped organizer promotion management endpoints for platform-managed paid commerce.
-// ABOUTME: Keeps controllers thin by dispatching Application CQRS and assembling HAL resources.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

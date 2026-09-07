@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped CSS for compact event option summary rows. */
-/* ABOUTME: Keeps helper copy in info tooltips so rows stay short on desktop and mobile. */
-
 .event-option-row {
     display: grid;
     grid-template-columns: minmax(12rem, 0.36fr) minmax(0, 1fr);

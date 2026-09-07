@@ -1,6 +1,3 @@
-// ABOUTME: Proves final attestation trusts only promoted, byte-exact bundles and authorized SSH signers.
-// ABOUTME: Proves restricted security input crosses into public artifacts only through approved dispositions.
-
 using System.Security.Cryptography;
 using System.Diagnostics;
 using System.Text;

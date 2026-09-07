@@ -1,6 +1,3 @@
-// ABOUTME: Handler for grouped EventAgendaItem PATCH updates with validation and local projection.
-// ABOUTME: Applies explicit groups, checks concurrency, re-links EventDayId, and invalidates parent event caches.
-
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventAgendaItem;

@@ -1,6 +1,3 @@
-// ABOUTME: Persistence contract for service synchronization state repository operations.
-// ABOUTME: Extends generic repository with service-lookup and existence queries.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

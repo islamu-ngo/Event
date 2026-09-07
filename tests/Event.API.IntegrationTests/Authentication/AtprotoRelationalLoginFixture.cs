@@ -1,6 +1,3 @@
-// ABOUTME: Hosts real PostgreSQL/API authentication and independent Production BFF replicas without Redis.
-// ABOUTME: Substitutes only external ATProto transports and secret authority while sharing persistent Data Protection keys.
-
 extern alias bff;
 
 using System.Net;

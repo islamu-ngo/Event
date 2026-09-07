@@ -1,6 +1,3 @@
-// ABOUTME: Contract tests for the four authenticated global Actor moderation actions.
-// ABOUTME: Verifies route metadata, server-selected CQRS actions, and ProblemDetails mapping.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;

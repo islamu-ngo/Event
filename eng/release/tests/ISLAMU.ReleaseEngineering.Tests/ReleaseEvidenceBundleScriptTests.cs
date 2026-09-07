@@ -1,6 +1,3 @@
-// ABOUTME: Proves the durable CI release bundle consumes the final canonical manifest as identity.
-// ABOUTME: Characterizes retained evidence categories and checksum coverage for .ci bundle scripts.
-
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;

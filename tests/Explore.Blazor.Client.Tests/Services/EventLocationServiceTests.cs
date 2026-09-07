@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for EventLocationService consuming the generated purpose-specific contracts.
-// ABOUTME: Proves purpose separation, HAL link preservation, fail-closed reads, and cancellation.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Helpers;
 

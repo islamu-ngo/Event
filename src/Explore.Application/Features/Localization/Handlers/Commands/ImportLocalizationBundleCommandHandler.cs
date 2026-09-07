@@ -1,6 +1,3 @@
-// ABOUTME: Handles admin static bundle imports through validated bundle writer persistence.
-// ABOUTME: Invalidates runtime translation cache after a successful same-process bundle write.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Features.Localization.Requests.Commands;

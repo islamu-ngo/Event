@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command to test the connection to the configured TMS provider.
-// ABOUTME: Returns success/failure indicating whether the TMS is reachable with current settings.
-
 using Explore.Application.Responses;
 using MediatR;
 

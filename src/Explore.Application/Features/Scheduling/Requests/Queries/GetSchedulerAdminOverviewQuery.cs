@@ -1,6 +1,3 @@
-// ABOUTME: Secured query for the instance scheduler administration snapshot.
-// ABOUTME: Authorizes scheduler visibility through instance-setting metadata before the handler runs.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Scheduling;
 using MediatR;

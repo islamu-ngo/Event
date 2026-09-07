@@ -1,6 +1,3 @@
-// ABOUTME: Handles group-scoped notification preference cell saves.
-// ABOUTME: Includes parent organization context before writing group overrides transactionally.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

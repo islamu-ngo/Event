@@ -1,6 +1,3 @@
-// ABOUTME: Handles management-authorized event moderation audit history reads.
-// ABOUTME: Maps moderation entities to safe DTOs without event text, URLs, image identifiers, or storage paths.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Features.Events.Requests.Queries;

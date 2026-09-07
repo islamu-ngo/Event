@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for route-ID EventDay PATCH updates.
-// ABOUTME: Carries If-Match concurrency stamp and grouped update payload.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventDay;
 using Explore.Application.Responses;

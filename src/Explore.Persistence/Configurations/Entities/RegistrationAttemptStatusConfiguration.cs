@@ -1,6 +1,3 @@
-// ABOUTME: Maps stable registration-attempt lifecycle lookup rows without migration-owned seed data.
-// ABOUTME: Keeps integer identities and master codes unique for runtime seeding.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query request for fetching a paginated session list.
-// ABOUTME: Supports custom property projection filters gated behind tenant feature flag.
 using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Application.DTOs.EventSession;
 using Explore.Application.Responses;

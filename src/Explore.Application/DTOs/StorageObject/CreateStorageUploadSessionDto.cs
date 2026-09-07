@@ -1,6 +1,3 @@
-// ABOUTME: Client payload for reserving tenant storage quota before accepting upload bytes.
-// ABOUTME: Carries provider-neutral metadata used to validate and create an upload session.
-
 using Explore.Domain;
 
 namespace Explore.Application.DTOs.StorageObject;

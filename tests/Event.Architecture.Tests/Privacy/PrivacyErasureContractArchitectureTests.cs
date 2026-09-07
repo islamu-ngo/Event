@@ -1,6 +1,3 @@
-// ABOUTME: Guards the platform privacy-erasure contracts against location-specific and interpreter-shaped data.
-// ABOUTME: Requires one executable User subject kind and bounded typed Domain/Application contract surfaces.
-
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Domain;
 

@@ -1,6 +1,3 @@
-// ABOUTME: API mapping coverage for tenant onboarding completion identity input.
-// ABOUTME: Proves the dedicated request maps identity and its optimistic revision to the command.
-
 using System.Security.Claims;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;

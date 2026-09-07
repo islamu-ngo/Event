@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for analytics provider edge-case behavior including defaults and payload parsing.
-// ABOUTME: Verifies PostHog/Plausible providers degrade safely when config or API responses are incomplete.
-
 using System.Net;
 using System.Text;
 using Explore.Application.Contracts.Infrastructure;

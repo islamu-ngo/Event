@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for LocalFileStorageOptionsValidator.
-// ABOUTME: Verifies deployment-managed local storage root settings are structurally valid.
-
 using Explore.Infrastructure.Storage;
 
 namespace Explore.Infrastructure.Tests.Infrastructure;

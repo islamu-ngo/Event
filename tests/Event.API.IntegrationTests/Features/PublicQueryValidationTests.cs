@@ -1,6 +1,3 @@
-// ABOUTME: Contract tests for public API query DTO validation rules.
-// ABOUTME: Verifies abusive public discovery query inputs fail before repository access.
-
 using System.ComponentModel.DataAnnotations;
 using System.Net;
 using System.Text.Json;

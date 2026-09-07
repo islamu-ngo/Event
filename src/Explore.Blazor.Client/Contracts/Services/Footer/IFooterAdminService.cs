@@ -1,6 +1,3 @@
-// ABOUTME: Contract for managing footer link groups and links through the generated API client.
-// ABOUTME: Uses generated request and response DTOs as the only backend contract models.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.Footer;

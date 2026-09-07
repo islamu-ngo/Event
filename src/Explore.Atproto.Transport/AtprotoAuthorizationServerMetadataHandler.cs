@@ -1,6 +1,3 @@
-// ABOUTME: Validates bounded ATProto authorization-server metadata before publishing endpoint trust.
-// ABOUTME: Requires the complete confidential-client capability profile and canonical safe endpoints.
-
 using System.Net;
 using System.Text.Json;
 

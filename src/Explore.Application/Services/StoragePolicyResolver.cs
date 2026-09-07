@@ -1,6 +1,3 @@
-// ABOUTME: Resolves effective storage policy from hierarchical settings.
-// ABOUTME: Keeps provider choice, route policy, tenant delegation, quotas, and upload ceilings server-authoritative.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Models.Storage;
 using Explore.Application.Settings;

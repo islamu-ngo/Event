@@ -1,6 +1,3 @@
-// ABOUTME: Stable relational lookup rows for authoritative incoming webhook settlement sources.
-// ABOUTME: Distinguishes a newly committed effect receipt from settlement proven by an existing receipt.
-
 namespace Explore.Domain;
 
 public sealed class IncomingWebhookSettlementSourceLookup

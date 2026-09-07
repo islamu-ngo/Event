@@ -1,6 +1,3 @@
-// ABOUTME: Handles tenant module enablement through the application authorization pipeline.
-// ABOUTME: Delegates persistence to IModuleService after resolving the current user for audit.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Modules.Requests.Commands;

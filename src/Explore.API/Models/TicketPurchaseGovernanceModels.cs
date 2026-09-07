@@ -1,6 +1,3 @@
-// ABOUTME: Defines public purchase-governance input and honest enforcement-scope response fields.
-// ABOUTME: Excludes tenant, account, enforcement-key, contact-hash, and quantity authority from JSON input.
-
 using Explore.Domain;
 
 namespace Explore.API.Models;

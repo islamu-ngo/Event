@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for BFF storage upload proxy destination binding.
-// ABOUTME: Proves browser-supplied upload destinations are rejected unless bound to a server-issued session.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Claims;

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies SMTP governance and credentials remain separated by authority.
-// ABOUTME: Guards anonymous SMTP and fail-closed authority failure behavior.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Models;

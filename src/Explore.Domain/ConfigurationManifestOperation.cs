@@ -1,6 +1,3 @@
-// ABOUTME: Immutable deployment-wide outcome evidence for one tenant-configuration manifest invocation.
-// ABOUTME: Stores only bounded manifest identity, aggregate counts, safe reasons, and UTC timestamps.
-
 namespace Explore.Domain;
 
 public enum ConfigurationManifestAuditMode

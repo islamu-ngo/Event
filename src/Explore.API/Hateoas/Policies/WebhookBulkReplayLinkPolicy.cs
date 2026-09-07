@@ -1,6 +1,3 @@
-// ABOUTME: HAL policies for durable webhook bulk replay management resources.
-// ABOUTME: Emits cancellation only for queued state and gates every affordance through replay authorization.
-
 using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;

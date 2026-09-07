@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for irreversible heavy event redaction field application.
-// ABOUTME: Verifies event-owned text, federation pointers, child content, projections, and image metadata are scrubbed.
-
 using Explore.Application.Authorization;
 using Explore.Application.Features.Events.Moderation;
 using Explore.Domain;

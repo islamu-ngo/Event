@@ -1,6 +1,3 @@
-// ABOUTME: Composes mutually exclusive API-owned and Blazor-owned middleware over one endpoint graph.
-// ABOUTME: Keeps bridge, tooling, health, BFF, Razor, SignalR, and static asset ownership explicit.
-
 using Event.Standalone.Middleware;
 using Explore.API.Configuration;
 using Explore.API.Hosting;

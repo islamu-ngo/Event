@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for the active instance-scoped platform fee policy version.
-// ABOUTME: Loads immutable fixed-charge history as Domain entities without tenant-filter bypasses.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

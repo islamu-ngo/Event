@@ -1,6 +1,3 @@
-// ABOUTME: Characterizes Phase 8.1 registration persistence identities, containment, and retry behavior.
-// ABOUTME: Proves tenant-safe replay classification and existing-row-safe PostgreSQL model derivation.
-
 using System.Security.Cryptography;
 using System.Text;
 using Event.Persistence.IntegrationTests.Fixtures;

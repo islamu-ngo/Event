@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for provider-backed deletion of delete-requested storage objects.
-// ABOUTME: Verifies success, retryable failure, and missing-key metadata behavior without external storage.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;

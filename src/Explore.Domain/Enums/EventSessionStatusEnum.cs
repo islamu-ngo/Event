@@ -1,5 +1,3 @@
-// ABOUTME: Canonical integer identifiers for EventSession lifecycle status lookups.
-// ABOUTME: Values must match the EventSessionStatus lookup seed data and database rows.
 namespace Explore.Domain.Enums;
 
 public enum EventSessionStatusEnum

@@ -1,6 +1,3 @@
-// ABOUTME: Defines same-origin BFF reads and HAL-gated ticket-transfer lifecycle mutations.
-// ABOUTME: Keeps claim capabilities and one-time credentials out of URLs and diagnostic contracts.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.Admissions;

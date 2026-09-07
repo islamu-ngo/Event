@@ -1,6 +1,3 @@
-// ABOUTME: Tests RegistrationPolicyRules.IsScopeAllowed() which maps organizer policies to allowed registration scopes.
-// ABOUTME: Covers all 6 policy variants × 3 scope values, null policy fallback, and unknown policy edge case.
-
 namespace Event.Domain.UnitTests.Services.Registration;
 
 using Explore.Domain.Enums;

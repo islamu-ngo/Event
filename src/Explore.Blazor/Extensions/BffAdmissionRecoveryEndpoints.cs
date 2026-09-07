@@ -1,6 +1,3 @@
-// ABOUTME: Bridges one-time admission recovery capabilities from the browser to the downstream API.
-// ABOUTME: Enforces antiforgery, redacted failures, and private no-referrer delivery responses.
-
 using Explore.Blazor.Client.Clients;
 using Microsoft.Net.Http.Headers;
 

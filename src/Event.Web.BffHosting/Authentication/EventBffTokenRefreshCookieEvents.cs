@@ -1,6 +1,3 @@
-// ABOUTME: Cookie authentication events that refresh OIDC access tokens for browser-BFF hosts.
-// ABOUTME: Keeps refresh-token grant handling shared while delegating host-specific session cleanup and claim enrichment.
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text.Json;

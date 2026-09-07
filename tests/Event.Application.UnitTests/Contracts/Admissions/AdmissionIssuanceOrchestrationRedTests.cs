@@ -1,6 +1,3 @@
-// ABOUTME: Executes the exact planned AdmissionIssuanceService.IssueConfirmedAsync public contract.
-// ABOUTME: Covers free replay, paid authority, canonical credential children, and atomic delivery intent persistence.
-
 using ApplicationUnitTests.Contracts.Admissions.Support;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Services.Registration;

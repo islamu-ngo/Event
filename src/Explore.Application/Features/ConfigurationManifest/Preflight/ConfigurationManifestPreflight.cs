@@ -1,6 +1,3 @@
-// ABOUTME: Performs complete side-effect-free configuration-manifest preflight before transaction entry.
-// ABOUTME: Classifies immutable instance bootstrap state and aggregates all tenant authority blockers.
-
 namespace Explore.Application.Features.ConfigurationManifest.Preflight;
 
 using System.Collections.Immutable;

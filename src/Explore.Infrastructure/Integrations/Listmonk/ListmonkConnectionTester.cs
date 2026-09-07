@@ -1,6 +1,3 @@
-// ABOUTME: Infrastructure implementation for testing the configured Listmonk API connection.
-// ABOUTME: Uses the NSwag-generated Listmonk client through tenant-scoped settings and secrets.
-
 using System.Net.Http.Headers;
 using System.Text;
 using Explore.Application.Contracts.Infrastructure;

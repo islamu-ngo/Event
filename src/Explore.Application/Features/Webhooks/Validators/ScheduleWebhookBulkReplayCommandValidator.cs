@@ -1,6 +1,3 @@
-// ABOUTME: Validates webhook bulk replay scheduling identity, filters, limits, and operator evidence.
-// ABOUTME: Applies the same normalized reason-code alphabet accepted by the replay aggregate.
-
 using Explore.Application.Features.Webhooks.Requests.Commands;
 using Explore.Domain;
 using FluentValidation;

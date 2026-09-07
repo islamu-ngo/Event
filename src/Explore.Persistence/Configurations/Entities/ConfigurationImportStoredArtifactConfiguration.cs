@@ -1,6 +1,3 @@
-// ABOUTME: Maps encrypted temporary import bytes and bounded expiry/integrity metadata.
-// ABOUTME: Keeps plaintext, target authority, and bearer-token material outside persistence.
-
 namespace Explore.Persistence.Configurations.Entities;
 
 using Explore.Application.Features.ConfigurationManifest.Importing;

@@ -1,6 +1,3 @@
-<!-- ABOUTME: Reserves the read-only host directory mounted for configuration bootstrap manifests. -->
-<!-- ABOUTME: Directs operators to the canonical schema and self-hosting recovery procedure. -->
-
 # Configuration Manifest Mount
 
 Place `configuration-manifest.json` in this directory only when

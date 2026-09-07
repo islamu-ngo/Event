@@ -1,6 +1,3 @@
-// ABOUTME: Untrusted payload for creating a Location with a manual address.
-// ABOUTME: Tenant identity and provider coordinates are intentionally absent from this boundary.
-
 namespace Explore.Application.DTOs.Location;
 
 public sealed record CreateLocationDto

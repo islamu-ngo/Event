@@ -1,6 +1,3 @@
-// ABOUTME: Verifies payment success can requeue the shared registration finalization effect safely.
-// ABOUTME: Ensures an interrupted worker loses its lease while the monotonic fence remains intact.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

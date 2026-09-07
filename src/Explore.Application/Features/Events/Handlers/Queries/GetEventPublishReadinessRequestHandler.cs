@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning policy-aware publish readiness for a single event.
-// ABOUTME: Maps the internal LifecycleReadinessResult to the API-facing EventPublishReadinessDto.
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Features.Events.Requests.Queries;

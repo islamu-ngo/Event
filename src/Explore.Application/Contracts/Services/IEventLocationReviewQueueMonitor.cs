@@ -1,6 +1,3 @@
-// ABOUTME: Read-only probe contract for the instance-wide EventLocation privacy remediation backlog.
-// ABOUTME: Returns aggregate counts only so readiness and metrics never surface tenant or venue identity.
-
 namespace Explore.Application.Contracts.Services;
 
 /// <summary>

@@ -1,6 +1,3 @@
-// ABOUTME: Builds one recipient's intent, channel decisions, in-app row, and SMTP work as one persistence graph.
-// ABOUTME: Owns exact deduplication recovery only after the failed transaction has rolled back.
-
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;

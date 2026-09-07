@@ -1,6 +1,3 @@
-// ABOUTME: Tests the EventAgendaItem entity covering interface compliance, Reschedule/ReprojectLocalTimes behavior, and defaults.
-// ABOUTME: Mirrors EventSessionRescheduleTests for the agenda-item aggregate which shares the same projection pattern.
-
 namespace Event.Domain.UnitTests.Entities;
 
 using Explore.Domain.Services.Scheduling;

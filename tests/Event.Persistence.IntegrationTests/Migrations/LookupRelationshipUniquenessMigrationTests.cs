@@ -1,6 +1,3 @@
-// ABOUTME: Verifies lookup-relationship uniqueness is declared by the EF Core model.
-// ABOUTME: Keeps generated migrations correct without coupling tests to a migration class.
-
 using Explore.Domain;
 using Explore.Persistence;
 using Microsoft.EntityFrameworkCore;

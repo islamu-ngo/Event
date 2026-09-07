@@ -1,6 +1,3 @@
-// ABOUTME: Shared ProblemDetails and HAL assembly for registration-order payment controller capabilities.
-// ABOUTME: Keeps provider checkout targets out of payment resources and exposes only same-origin BFF navigation.
-
 using Explore.API.ExceptionHandling;
 using Explore.API.Hateoas;
 using Explore.Application.DTOs.RegistrationOrders;

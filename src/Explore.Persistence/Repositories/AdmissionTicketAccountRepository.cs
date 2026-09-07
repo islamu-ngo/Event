@@ -1,6 +1,3 @@
-// ABOUTME: Resolves current admission tickets through tenant-qualified registration account ownership.
-// ABOUTME: Uses account user IDs exclusively and never treats email or display references as authority.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Domain;
 using Explore.Domain.Enums;

@@ -1,6 +1,3 @@
-// ABOUTME: Attribute that declares the audience/protection class of an API endpoint.
-// ABOUTME: Applied at controller level (default for all actions) or action level (override).
-
 using System;
 
 namespace Explore.API.Attributes;

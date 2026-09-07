@@ -1,6 +1,3 @@
-// ABOUTME: Performs allocation-bounded lexical validation of configuration-manifest UTF-8 JSON.
-// ABOUTME: Rejects duplicate properties recursively, excessive structures, and trailing roots before deserialization.
-
 namespace Explore.Infrastructure.ConfigurationManifest;
 
 using System.Text;

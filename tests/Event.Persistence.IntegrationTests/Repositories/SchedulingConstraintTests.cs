@@ -1,6 +1,3 @@
-// ABOUTME: Persistence integration tests for DB-enforced constraints on scheduling entities.
-// ABOUTME: Covers unique, check, and exclusion constraints for event days, rooms, sessions, and aspects.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;

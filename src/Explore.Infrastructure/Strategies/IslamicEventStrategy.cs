@@ -1,4 +1,3 @@
-// ABOUTME: Strategy for Islamic events providing validation and business logic
 // for Madhab, prayer times, and gender segregation features.
 
 using Explore.Application.Contracts.Strategies;

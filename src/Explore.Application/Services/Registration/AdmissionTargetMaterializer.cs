@@ -1,6 +1,3 @@
-// ABOUTME: Materializes reusable admission targets and single-entry policies from published catalog entitlements.
-// ABOUTME: Uses exact schedule bounds as the conservative default window and fails closed without complete UTC bounds.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Domain;
 using Explore.Domain.Enums;

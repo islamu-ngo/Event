@@ -1,6 +1,3 @@
-// ABOUTME: Builds deterministic advisory AI evaluation reports over registry-governed assistant behavior.
-// ABOUTME: Uses fake/local checks so normal report generation never calls a live AI provider.
-
 using Explore.Application.DTOs.Ai;
 using Explore.Application.Features.AiAssistant.Actions;
 using Explore.Application.Features.AiAssistant.Prompting;

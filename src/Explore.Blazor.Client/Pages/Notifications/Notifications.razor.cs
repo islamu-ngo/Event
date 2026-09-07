@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for Notifications inbox page — manages notification list, scope/reason filters, and archive/snooze toggles.
-// ABOUTME: Loads notifications on init with pagination; supports scope tabs, reason filter, unread-only, show-archived, and show-snoozed.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Notifications;
 using Explore.Blazor.Client.Helpers;

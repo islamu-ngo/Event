@@ -1,6 +1,3 @@
-// ABOUTME: Reconciles one durable fair-return payment pointer and stages refund dispatch after settlement.
-// ABOUTME: Preserves stable provider idempotency across Unknown replay, poison handling, and restart.
-
 using Explore.Application.Contracts.Waitlist;
 using Explore.Domain.Enums;
 

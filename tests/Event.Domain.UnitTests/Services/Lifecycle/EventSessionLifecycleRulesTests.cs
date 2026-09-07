@@ -1,6 +1,3 @@
-// ABOUTME: Exhaustively verifies the fixed EventSession lifecycle predicate matrix for downstream HAL reuse.
-// ABOUTME: Guards schedule, parent-status, same-target, and invalid-status behavior without generic state-machine plumbing.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Lifecycle;
 

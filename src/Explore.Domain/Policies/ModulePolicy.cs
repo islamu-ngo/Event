@@ -1,6 +1,3 @@
-// ABOUTME: Typed policy for module enablement — controls which optional modules are active.
-// ABOUTME: Module toggles are instance-level only; tenants cannot override module availability.
-
 namespace Explore.Domain.Policies;
 
 public sealed class ModulePolicy

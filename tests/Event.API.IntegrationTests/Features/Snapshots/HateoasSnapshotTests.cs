@@ -1,6 +1,3 @@
-// ABOUTME: Verify snapshots for stable HAL collection and ProblemDetails API contracts.
-// ABOUTME: Uses ContractApiFixture so snapshots run without Docker-backed runtime infrastructure.
-
 using System.Net;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;

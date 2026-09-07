@@ -1,6 +1,3 @@
-// ABOUTME: Locks the explicit Task 7.5 registration-form authoring CQRS surface.
-// ABOUTME: Prevents generic mutation endpoints from replacing named operations and preflight.
-
 using Explore.Application.Features.RegistrationForms.Requests.Commands;
 using Explore.Application.Features.RegistrationForms.Requests.Queries;
 

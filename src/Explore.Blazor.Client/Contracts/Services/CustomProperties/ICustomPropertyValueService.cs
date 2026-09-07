@@ -1,6 +1,3 @@
-// ABOUTME: Interface for retrieving and saving custom property values.
-// ABOUTME: Wraps IEventCustomPropertyClient and IEventSessionCustomPropertyClient for property values.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Models.CustomProperties;
 

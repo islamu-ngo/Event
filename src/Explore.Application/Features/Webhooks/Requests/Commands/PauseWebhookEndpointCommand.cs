@@ -1,6 +1,3 @@
-// ABOUTME: Authorized command for manually pausing an active Local webhook endpoint.
-// ABOUTME: Carries endpoint, actor, and normalized audit-reason evidence into owner-aware CQRS.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

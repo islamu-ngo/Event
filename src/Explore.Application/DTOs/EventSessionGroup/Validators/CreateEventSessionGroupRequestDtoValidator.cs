@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for creating event session groups under an existing event.
-// ABOUTME: Manually instantiated by handlers; repository checks stay tenant-filtered.
-
 using Explore.Application.Contracts.Persistence;
 using FluentValidation;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Covers immutable ticket catalog publication, cloning, capacity-pool scope, and entitlements.
-// ABOUTME: Proves Domain invariants before persistence, checkout, or inventory-hold behavior is introduced.
-
 using System.Reflection;
 
 using Explore.Domain.Enums;

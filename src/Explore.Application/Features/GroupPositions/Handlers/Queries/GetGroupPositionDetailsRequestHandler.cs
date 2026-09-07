@@ -1,6 +1,3 @@
-// ABOUTME: Handler for retrieving a single group position by ID.
-// ABOUTME: Maps entity to detail DTO via AutoMapper.
-
 using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;

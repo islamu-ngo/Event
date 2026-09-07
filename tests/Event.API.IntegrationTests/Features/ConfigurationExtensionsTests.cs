@@ -1,6 +1,3 @@
-// ABOUTME: Regression tests for API startup authority mapping and lower-source masking.
-// ABOUTME: Ensures selected deployment keys bind to canonical .NET configuration sections.
-
 using Explore.API.Extensions;
 using Explore.Infrastructure.Services;
 using Explore.Secrets.Database;

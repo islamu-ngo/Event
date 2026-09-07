@@ -1,6 +1,3 @@
-// ABOUTME: Specifies tenant directory-operator identity query mapping without read-time provisioning.
-// ABOUTME: Proves resolver metadata, normalized readiness, and missing-document behavior remain tenant-owned.
-
 namespace Event.Application.UnitTests.Features.TenantSettingsDocuments.Queries;
 
 using Explore.Application.Contracts.Infrastructure;

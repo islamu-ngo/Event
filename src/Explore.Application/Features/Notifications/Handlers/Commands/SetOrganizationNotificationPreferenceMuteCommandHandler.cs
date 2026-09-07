@@ -1,6 +1,3 @@
-// ABOUTME: Handles organization-scoped notification preference global mute updates.
-// ABOUTME: Writes organization profile state transactionally while preserving saved channel choices.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Notifications.Requests.Commands;

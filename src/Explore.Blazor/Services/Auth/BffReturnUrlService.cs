@@ -1,6 +1,3 @@
-// ABOUTME: Centralizes BFF-safe local return URL validation and non-diagnostic auth redirects.
-// ABOUTME: Keeps auth endpoint handlers thin without changing provider or diagnostic behavior.
-
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 

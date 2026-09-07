@@ -1,6 +1,3 @@
-// ABOUTME: Handler for replacing all permissions on a custom role with capability ceiling enforcement.
-// ABOUTME: Validates system immutability, enforces anti-escalation rules, triggers PolicySync.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

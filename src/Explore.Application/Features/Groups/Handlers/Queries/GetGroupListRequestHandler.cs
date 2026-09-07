@@ -1,6 +1,3 @@
-// ABOUTME: Handles retrieval of a paginated list of all Groups with details.
-// ABOUTME: Resolves profile picture storage object keys to presigned URLs for each group.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

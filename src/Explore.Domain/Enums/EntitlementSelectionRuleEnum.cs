@@ -1,6 +1,3 @@
-// ABOUTME: Enum mirror for stable EntitlementSelectionRule lookup identities.
-// ABOUTME: Identifies all-included, fixed, one-choice, and bounded-choice ticket selection.
-
 namespace Explore.Domain.Enums;
 
 public enum EntitlementSelectionRuleEnum

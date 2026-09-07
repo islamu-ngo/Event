@@ -1,4 +1,3 @@
-// ABOUTME: Configuration options for connection pool rotation.
 // Defines grace period and other settings for rotating HttpClient and DbContext connections.
 
 namespace Explore.Secrets.Configuration;

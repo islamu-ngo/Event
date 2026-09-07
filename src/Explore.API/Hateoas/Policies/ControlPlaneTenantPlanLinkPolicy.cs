@@ -1,6 +1,3 @@
-// ABOUTME: HAL link policies for control-plane tenant plan SaaS tier resources.
-// ABOUTME: Emits instance-setting permission metadata for plan template affordances.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Security.Claims;

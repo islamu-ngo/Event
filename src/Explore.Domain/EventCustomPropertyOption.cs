@@ -1,6 +1,3 @@
-// ABOUTME: Event-local option row for a materialized custom-property definition.
-// ABOUTME: Keeps template provenance so support can explain how runtime options diverged from the source template.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

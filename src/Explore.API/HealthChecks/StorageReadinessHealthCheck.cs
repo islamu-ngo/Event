@@ -1,6 +1,3 @@
-// ABOUTME: API readiness health check for the selected storage provider.
-// ABOUTME: Resolves instance storage policy and reports provider availability without exposing paths or secrets.
-
 using Explore.Application.Contracts.Infrastructure;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 

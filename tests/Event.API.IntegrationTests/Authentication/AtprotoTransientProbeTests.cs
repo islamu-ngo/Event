@@ -1,6 +1,3 @@
-// ABOUTME: Exercises the private synthetic storage probe through real machine authentication and PostgreSQL.
-// ABOUTME: Guards tenantless bounded round trips, purpose isolation, single-use assertions and redacted outages.
-
 extern alias bff;
 
 using System.Net;

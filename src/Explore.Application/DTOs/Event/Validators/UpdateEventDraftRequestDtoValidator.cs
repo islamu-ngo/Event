@@ -1,6 +1,3 @@
-// ABOUTME: Validates local event-draft workflow requests without lifecycle or program projection fields.
-// ABOUTME: Keeps the internal workflow narrower than the canonical public grouped Event PATCH contract.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain.Services.Scheduling;
 using FluentValidation;

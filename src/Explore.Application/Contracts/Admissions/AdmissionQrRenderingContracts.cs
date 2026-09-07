@@ -1,6 +1,3 @@
-// ABOUTME: Defines the Application-owned boundary for deterministic admission QR rendering.
-// ABOUTME: Carries bounded SVG geometry metadata while redacting the rendered representation from diagnostics.
-
 using ISLAMU.Wire.Contracts.Admissions;
 
 namespace Explore.Application.Contracts.Admissions;

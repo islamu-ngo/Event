@@ -1,6 +1,3 @@
-// ABOUTME: Canonical outgoing webhook event type catalog row with schema and retention metadata.
-// ABOUTME: Gives Local and Svix providers the same event taxonomy independent of delivery backend.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

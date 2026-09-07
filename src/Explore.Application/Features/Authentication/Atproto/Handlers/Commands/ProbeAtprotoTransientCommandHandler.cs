@@ -1,6 +1,3 @@
-// ABOUTME: Verifies actual transient create, read and single-use consumption with synthetic non-secret data.
-// ABOUTME: Restricts failed probes to tenantless records expiring after thirty seconds for bounded cleanup.
-
 using System.Security.Cryptography;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Authentication.Atproto.Requests.Commands;

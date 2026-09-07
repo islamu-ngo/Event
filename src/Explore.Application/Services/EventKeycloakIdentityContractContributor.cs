@@ -1,6 +1,3 @@
-// ABOUTME: Default Event module Keycloak identity contract contributor.
-// ABOUTME: Describes the platform Blazor/API clients, offline access scope, and audience mapper needs.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 

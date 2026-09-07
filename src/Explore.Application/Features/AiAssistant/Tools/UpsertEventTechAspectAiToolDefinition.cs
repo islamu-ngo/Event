@@ -1,6 +1,3 @@
-// ABOUTME: Defines the governed Tech aspect upsert AI tool contract for MCP proposals.
-// ABOUTME: Keeps tech aspect schema, permission context, and field allow-list centralized.
-
 using Explore.Application.Authorization;
 using Explore.Application.Features.AiAssistant.Actions;
 using Explore.Domain.Ai;

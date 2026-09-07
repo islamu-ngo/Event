@@ -1,6 +1,3 @@
-// ABOUTME: Delegates paid-event policy reads and writes to the generated API client.
-// ABOUTME: Preserves generated HAL resources, configuration payloads, and cancellation tokens.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.PaidEventPolicies;
 

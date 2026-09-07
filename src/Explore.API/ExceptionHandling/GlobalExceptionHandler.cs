@@ -1,6 +1,3 @@
-// ABOUTME: Handles non-validation exceptions and produces safe RFC 7807 responses.
-// ABOUTME: Maps known application exceptions to stable HTTP status codes.
-
 using Explore.API.Middleware;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.ConfigurationManifest.Requests.Queries;

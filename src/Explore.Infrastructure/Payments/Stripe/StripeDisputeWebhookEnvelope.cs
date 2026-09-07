@@ -1,6 +1,3 @@
-// ABOUTME: Retains only signed Stripe dispute identity, payment authority, money, and lifecycle evidence.
-// ABOUTME: Supports independent multiple disputes and later monotonic updates without raw payload retention.
-
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Explore.Domain.Enums;

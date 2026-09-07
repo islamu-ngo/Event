@@ -1,6 +1,3 @@
-// ABOUTME: Application-layer contract for provider-hosted webhook management portal access.
-// ABOUTME: Keeps backend portal URL generation provider-neutral and hides provider SDK details from API/UI layers.
-
 namespace Explore.Application.Contracts.Webhooks;
 
 public interface IWebhookProviderPortalService

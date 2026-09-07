@@ -1,5 +1,3 @@
-<!-- ABOUTME: Defines the standalone lightweight agent workflow guard CLI. -->
-<!-- ABOUTME: Keeps YAML syntax and literal commit-path validation isolated from product projects. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>

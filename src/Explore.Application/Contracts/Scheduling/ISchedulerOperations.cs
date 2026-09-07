@@ -1,6 +1,3 @@
-// ABOUTME: Application contract for reading and controlling live scheduler state from operator surfaces.
-// ABOUTME: Lets admin handlers manage background work without the Application layer depending on a scheduler library.
-
 namespace Explore.Application.Contracts.Scheduling;
 
 /// <summary>

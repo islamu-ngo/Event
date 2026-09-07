@@ -1,6 +1,3 @@
-// ABOUTME: Lookup entity for notification types (e.g., RegistrationConfirmed, ApprovalGranted).
-// ABOUTME: Follows the same pattern as ApprovalStatus — seeded via LookupTableSeeder.
-
 namespace Explore.Domain;
 
 public class NotificationType

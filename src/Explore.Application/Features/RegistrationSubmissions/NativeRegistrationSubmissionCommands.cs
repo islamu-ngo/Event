@@ -1,6 +1,3 @@
-// ABOUTME: Launches and submits native registration attempts after order-scoped access has been established.
-// ABOUTME: Pins current published lineage, keeps bearer tokens redacted, and returns only safe validation issues.
-
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;

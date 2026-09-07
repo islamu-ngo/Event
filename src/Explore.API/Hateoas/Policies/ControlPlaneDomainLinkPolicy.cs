@@ -1,6 +1,3 @@
-// ABOUTME: HAL link policy for the multi-tenant control-plane domain/DNS resource.
-// ABOUTME: Emits instance-setting permission metadata for DNS guidance and domain-settings affordances.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Security.Claims;

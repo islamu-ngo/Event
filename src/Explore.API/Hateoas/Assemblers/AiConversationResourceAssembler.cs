@@ -1,6 +1,3 @@
-// ABOUTME: HAL resource assembler for AI assistant conversation resources.
-// ABOUTME: Converts private conversation DTOs to HAL resources using AI link policies.
-
 namespace Explore.API.Hateoas.Assemblers;
 
 using Explore.API.Hateoas.Policies;

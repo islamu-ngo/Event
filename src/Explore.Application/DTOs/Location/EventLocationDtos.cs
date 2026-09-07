@@ -1,6 +1,3 @@
-// ABOUTME: Constrained public, attendee, management, policy, and update EventLocation DTO contracts.
-// ABOUTME: Materializes response shapes only from validated disclosure results to prevent contradictory states.
-
 using System.Text.Json.Serialization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.LocationPrivacy;

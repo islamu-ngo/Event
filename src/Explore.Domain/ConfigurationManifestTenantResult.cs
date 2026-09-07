@@ -1,6 +1,3 @@
-// ABOUTME: Immutable tenant-scoped result evidence for one successful configuration-manifest operation.
-// ABOUTME: Normalizes changed setting/document key names while accepting no configuration values.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

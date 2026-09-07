@@ -1,6 +1,3 @@
-// ABOUTME: Unit-style tests for the deadline-driven inventory-hold expiry job and its reconciliation sweep.
-// ABOUTME: Proves the deadline path handles one order punctually and the sweep still catches what it misses.
-
 using Explore.API.Scheduling;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Scheduling;

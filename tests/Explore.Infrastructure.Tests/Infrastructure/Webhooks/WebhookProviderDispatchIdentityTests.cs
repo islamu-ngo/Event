@@ -1,6 +1,3 @@
-// ABOUTME: Tests asynchronous provider publication dispatch from immutable persisted authority.
-// ABOUTME: Proves stable identity, bounded retry, ambiguous acceptance, and fenced completion.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Domain;

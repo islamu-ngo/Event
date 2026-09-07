@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-admin BFF service for provider-neutral tenant storage settings.
-// ABOUTME: Preserves HAL edit affordance semantics using generated API models directly.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Services;

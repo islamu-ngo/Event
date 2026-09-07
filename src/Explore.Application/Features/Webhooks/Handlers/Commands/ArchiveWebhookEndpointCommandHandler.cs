@@ -1,6 +1,3 @@
-// ABOUTME: Handles endpoint archive requests with persisted-owner not-found behavior.
-// ABOUTME: Archives instead of deleting rows so delivery history and provider links remain auditable.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;

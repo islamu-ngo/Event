@@ -1,6 +1,3 @@
-// ABOUTME: Validates AI multi-step plan previews against registry, HAL, freshness, and recovery rules.
-// ABOUTME: Guarantees plan previews remain proposal-only and dispatch no side-effecting commands.
-
 using Explore.Application.Features.AiAssistant.Tools;
 using Explore.Domain.Ai;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Immutable context identifying the scope chain for hierarchical setting resolution.
-// ABOUTME: Passed to the resolver to determine which scope tables to query and in what order.
-
 namespace Explore.Application.Settings;
 
 /// <summary>

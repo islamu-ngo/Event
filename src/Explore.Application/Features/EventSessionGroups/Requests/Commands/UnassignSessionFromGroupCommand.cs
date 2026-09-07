@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for soft-removing a session from a program section or track.
-// ABOUTME: Deletes only the join entity; EventSession remains intact.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

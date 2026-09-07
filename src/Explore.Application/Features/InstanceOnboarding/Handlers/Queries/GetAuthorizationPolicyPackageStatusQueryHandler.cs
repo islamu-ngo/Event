@@ -1,6 +1,3 @@
-// ABOUTME: Builds the operator view of authorization policy package health and observed store revision.
-// ABOUTME: Maps each issue code to the one concrete action that resolves it.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;

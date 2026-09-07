@@ -1,6 +1,3 @@
-// ABOUTME: Pure evaluator for reporting-intake publication-safety policy.
-// ABOUTME: Produces stable machine reason codes and operator-safe evaluation messages.
-
 namespace Explore.Application.Settings;
 
 public readonly record struct ReportingIntakePolicyState(

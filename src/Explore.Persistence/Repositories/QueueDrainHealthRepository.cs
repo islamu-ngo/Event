@@ -1,6 +1,3 @@
-// ABOUTME: Reads bounded cross-tenant readiness counts for scheduler-owned durable queue drains.
-// ABOUTME: Uses explicit system-worker bypass reasons and emits no row identity or content.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Federation;

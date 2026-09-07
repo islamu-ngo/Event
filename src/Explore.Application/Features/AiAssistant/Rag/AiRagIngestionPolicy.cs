@@ -1,6 +1,3 @@
-// ABOUTME: Validates future AI RAG ingestion candidates before embeddings or vector records are created.
-// ABOUTME: Enforces public-summary-only scope, tenant binding, bounded text, and citation requirements.
-
 namespace Explore.Application.Features.AiAssistant.Rag;
 
 public static class AiRagIngestionPolicy

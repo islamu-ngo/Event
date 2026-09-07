@@ -1,6 +1,3 @@
-// ABOUTME: Creates safe RFC 7807 validation payloads for API model binding failures.
-// ABOUTME: Normalizes framework validation into the same errors extension used by handler validation.
-
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 

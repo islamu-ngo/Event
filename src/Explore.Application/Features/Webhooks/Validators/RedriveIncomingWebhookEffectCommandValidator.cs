@@ -1,6 +1,3 @@
-// ABOUTME: Validates incoming Coop effect redrive identity, generation, and operator reason.
-// ABOUTME: Keeps malformed administrative requests outside transactional persistence work.
-
 using Explore.Application.Features.Webhooks.Requests.Commands;
 using FluentValidation;
 

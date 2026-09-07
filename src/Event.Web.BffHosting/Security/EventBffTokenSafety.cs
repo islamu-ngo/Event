@@ -1,6 +1,3 @@
-// ABOUTME: Validates whether server-held access tokens are safe to forward downstream.
-// ABOUTME: Rejects empty, malformed, expired JWTs while allowing opaque non-JWT tokens.
-
 using System.IdentityModel.Tokens.Jwt;
 
 namespace Event.Web.BffHosting.Security;

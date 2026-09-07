@@ -1,6 +1,3 @@
-// ABOUTME: Owns the explicit canonical key and per-surface order data for environment generation.
-// ABOUTME: Duplicates only secret classification needed to keep Core package-free from runtime Domain authority.
-
 namespace ISLAMU.Event.Setup.Core.Environment;
 
 public static partial class CanonicalEnvironmentCatalogue

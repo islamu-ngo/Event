@@ -1,6 +1,3 @@
-// ABOUTME: Runtime moderation provider resolver for event-report external integration modes.
-// ABOUTME: Routes LocalOnly, Disabled, and future composite modes without leaking provider details upward.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.EventReporting.Models;
 using Explore.Infrastructure.Configuration;

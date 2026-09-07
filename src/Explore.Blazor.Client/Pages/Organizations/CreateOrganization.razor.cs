@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for the organization creation wizard and logo upload workflow.
-// ABOUTME: Handles organization submission, upload state, preview synchronization, and step validation.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.Forms;
 using Explore.Blazor.Client.Helpers;

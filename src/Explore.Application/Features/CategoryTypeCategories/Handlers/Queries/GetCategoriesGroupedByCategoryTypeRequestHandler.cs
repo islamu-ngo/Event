@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning categories grouped by their category type.
-// ABOUTME: Used for building the full hierarchical category picker.
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Category;

@@ -1,6 +1,3 @@
-// ABOUTME: MCP prompt templates for external agents using the governed AI tool registry.
-// ABOUTME: Teaches proposal-first workflows without exposing tenant, provider, prompt, or secret data.
-
 using System.ComponentModel;
 using Microsoft.AspNetCore.Authorization;
 using ModelContextProtocol.Server;

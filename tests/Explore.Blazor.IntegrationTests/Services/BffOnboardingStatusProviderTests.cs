@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the BFF onboarding probe consumes the generated status resource contract.
-// ABOUTME: Locks fail-closed classification to canonical state, mode, provider, and generation fields.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Services;
 using Microsoft.Extensions.Caching.Memory;

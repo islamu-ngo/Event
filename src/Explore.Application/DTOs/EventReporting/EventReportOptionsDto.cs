@@ -1,6 +1,3 @@
-// ABOUTME: Reporter-facing event-report configuration returned before submission.
-// ABOUTME: Includes reportability state, safe reason options, and public input limits only.
-
 namespace Explore.Application.DTOs.EventReporting;
 
 public sealed record EventReportOptionsDto

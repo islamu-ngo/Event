@@ -1,6 +1,3 @@
-// ABOUTME: Maps tenant-qualified admission lineage, replay uniqueness, lifecycle concurrency, and lookup rows.
-// ABOUTME: Keeps credential digests in child rows and enforces one active slot without provider filters.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Domain;
 using Explore.Domain.Enums;

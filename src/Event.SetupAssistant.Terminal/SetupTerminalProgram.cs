@@ -1,6 +1,3 @@
-// ABOUTME: Builds one scoped Terminal.Gui presentation session without host, logging, configuration, or fallback UI.
-// ABOUTME: Emits only stable value-free failures when the target cannot safely start or restore.
-
 namespace ISLAMU.Event.SetupAssistant.Terminal;
 
 using CommunityToolkit.Mvvm.Messaging;

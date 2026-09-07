@@ -1,6 +1,3 @@
-// ABOUTME: Unit-style tests for validating optional MCP adapter startup settings.
-// ABOUTME: Locks endpoint/stateless constraints while allowing legacy SSE only as a startup ceiling.
-
 using Explore.API.Configuration;
 using TUnit.Core;
 

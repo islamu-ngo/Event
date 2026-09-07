@@ -1,6 +1,3 @@
-// ABOUTME: Stable reason identities for every admission-ticket lifecycle mutation.
-// ABOUTME: Distinguishes cancellation, refund revocation, transfer, expiry, and operator actions.
-
 namespace Explore.Domain.Enums;
 
 public enum AdmissionTicketTransitionReasonEnum

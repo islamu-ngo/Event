@@ -1,6 +1,3 @@
-// ABOUTME: Sources that can create report decisions before enforcement.
-// ABOUTME: Distinguishes local moderators from provider, automation, and system decisions.
-
 namespace Explore.Domain.Enums;
 
 public enum EventReportDecisionSource

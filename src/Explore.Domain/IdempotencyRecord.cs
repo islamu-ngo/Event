@@ -1,6 +1,3 @@
-// ABOUTME: Domain entity for idempotency key tracking to prevent duplicate write operations.
-// ABOUTME: Records bind each tenant key to a hashed principal/capability and resolved request identity for 24 hours.
-
 namespace Explore.Domain;
 
 public class IdempotencyRecord

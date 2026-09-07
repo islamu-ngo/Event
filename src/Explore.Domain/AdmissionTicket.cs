@@ -1,6 +1,3 @@
-// ABOUTME: Defines the tenant-scoped admission aggregate and its independently revocable lifecycle.
-// ABOUTME: Issues only from a validated confirmed-order graph and owns append-only digest-only credentials.
-
 using System.Security.Cryptography;
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;

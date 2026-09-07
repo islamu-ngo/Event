@@ -1,6 +1,3 @@
-// ABOUTME: Handles GetFooterConfigQuery — resolves the full footer config for public rendering.
-// ABOUTME: Combines hierarchical settings (scalars) with link groups from the DB.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

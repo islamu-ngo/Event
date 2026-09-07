@@ -1,6 +1,3 @@
-// ABOUTME: EF repository for ordered session-to-group assignments in event programs.
-// ABOUTME: Reads assignment entities with their related group/session while preserving tenant filters.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.Extensions;

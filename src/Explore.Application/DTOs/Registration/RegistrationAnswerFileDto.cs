@@ -1,6 +1,3 @@
-// ABOUTME: Safe administrative representation of registration-file quarantine and release audit state.
-// ABOUTME: Exposes no provider object key, raw URI, checksum, or downloadable credential.
-
 namespace Explore.Application.DTOs.Registration;
 
 public sealed record RegistrationAnswerFileDto(

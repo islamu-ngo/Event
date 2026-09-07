@@ -1,5 +1,3 @@
-// ABOUTME: DTO for list views of EventSessionStatus lookup rows.
-// ABOUTME: Mirrors EventStatusListDto shape: Id, MasterCode (i18n key), FullName fallback, optional Description.
 namespace Explore.Application.DTOs.EventSessionStatus;
 
 public sealed record EventSessionStatusListDto

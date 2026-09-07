@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the Blazor client TranslationService cache and fallback behavior.
-// ABOUTME: Verifies registry validation, API fetch boundaries, language-change events, and hot-path lookup safety.
-
 using System.Reflection;
 using Microsoft.Extensions.Logging.Abstractions;
 

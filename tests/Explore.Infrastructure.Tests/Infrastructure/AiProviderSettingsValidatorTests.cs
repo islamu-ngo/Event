@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for AI provider settings validation.
-// ABOUTME: Protects provider bootstrap from unsupported providers, missing credentials, and unsafe endpoints.
-
 using Explore.Infrastructure.Ai;
 using Microsoft.Extensions.Hosting;
 using NSubstitute;

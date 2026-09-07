@@ -1,6 +1,3 @@
-// ABOUTME: Hosted-service fallback processor for durable Web Push dispatch drainage.
-// ABOUTME: Polls the outbox service with cancellation-aware delays and stale-lease recovery.
-
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;

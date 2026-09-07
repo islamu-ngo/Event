@@ -1,6 +1,3 @@
-// ABOUTME: Query handler for public event detail lookup by slug-code URL token.
-// ABOUTME: Resolves by server-owned public code while keeping public visibility checks strict.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Features.Events.Requests.Queries;

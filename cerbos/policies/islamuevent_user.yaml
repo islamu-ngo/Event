@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos resource policy for user resources.
-# ABOUTME: Allows admins to manage users and signed-in users to update their own profile.
-
 apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   resource: "islamuevent_user"

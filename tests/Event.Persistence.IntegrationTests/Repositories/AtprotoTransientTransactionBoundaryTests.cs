@@ -1,6 +1,3 @@
-// ABOUTME: Exercises ambient-transaction rejection and cleanup contention on real PostgreSQL.
-// ABOUTME: Verifies live authentication payload ownership remains separate from expired-row cleanup.
-
 using System.Transactions;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;

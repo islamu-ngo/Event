@@ -1,4 +1,3 @@
-// ABOUTME: Domain entity representing a visibility type for content.
 // Defines visibility levels like Public, Private, Members-only, etc.
 
 using System;

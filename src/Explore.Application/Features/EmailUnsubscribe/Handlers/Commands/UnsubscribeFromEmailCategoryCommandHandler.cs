@@ -1,6 +1,3 @@
-// ABOUTME: Handler that idempotently records a per-user opt-out for an email notification category.
-// ABOUTME: Absence means subscribed; this creates or updates an explicit disabled preference row.
-
 namespace Explore.Application.Features.EmailUnsubscribe.Handlers.Commands;
 
 using Explore.Application.Contracts.Persistence;

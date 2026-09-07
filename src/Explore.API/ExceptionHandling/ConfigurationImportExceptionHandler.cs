@@ -1,6 +1,3 @@
-// ABOUTME: Maps configuration-import failures to value-safe RFC 7807 responses.
-// ABOUTME: Makes missing sessions, invalid capabilities, and wrong targets indistinguishable.
-
 namespace Explore.API.ExceptionHandling;
 
 using Explore.API.ConfigurationImport;

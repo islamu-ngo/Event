@@ -1,6 +1,3 @@
-// ABOUTME: Publishes AT Protocol OAuth client metadata and the rotation-aware public client JWKS.
-// ABOUTME: Enforces canonical-host access, bounded caching, bounded documents, and public-key-only serialization.
-
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Explore.Blazor.Authentication;

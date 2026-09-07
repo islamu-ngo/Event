@@ -1,6 +1,3 @@
-// ABOUTME: HAL link policies for storage object metadata and file access affordances.
-// ABOUTME: Emits content, update, create, and delete links through server-side authorization metadata.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Collections.Generic;

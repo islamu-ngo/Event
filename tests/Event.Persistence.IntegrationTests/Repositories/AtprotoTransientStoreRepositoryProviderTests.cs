@@ -1,6 +1,3 @@
-// ABOUTME: Runs the ATProto transient atomicity contract on SQL Server, MariaDB, and MySQL.
-// ABOUTME: Applies generated provider migrations and verifies payload bounds, insert uniqueness, and one consume winner.
-
 using System.Text;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;

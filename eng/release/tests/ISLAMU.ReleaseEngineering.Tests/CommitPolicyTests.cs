@@ -1,6 +1,3 @@
-// ABOUTME: Proves commit-message policy classification for release visibility, skips, and breaking changes.
-// ABOUTME: Uses deterministic fixtures so malformed or contradictory changelog metadata fails closed.
-
 using ISLAMU.ReleaseEngineering;
 
 namespace ISLAMU.ReleaseEngineering.Tests;

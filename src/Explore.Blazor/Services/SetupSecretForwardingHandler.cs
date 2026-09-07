@@ -1,6 +1,3 @@
-// ABOUTME: DelegatingHandler that forwards trusted setup secret headers to onboarding API endpoints.
-// ABOUTME: Strips client-controlled setup headers and resolves secrets through the BFF resolver only.
-
 namespace Explore.Blazor.Services;
 
 /// <summary>

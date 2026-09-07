@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-bound provider-neutral projection of inquiry and formal payment disputes.
-// ABOUTME: Supports multiple disputes per payment while preserving provider evidence identity.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

@@ -1,6 +1,3 @@
-// ABOUTME: API-owned JSON converter for OptionalUpdate<T> partial-update wrappers.
-// ABOUTME: Maps wrapper-level null to omission while preserving explicit set and clear operations.
-
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Explore.Application.Models.Common;

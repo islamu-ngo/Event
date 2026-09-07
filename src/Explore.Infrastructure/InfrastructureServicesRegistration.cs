@@ -1,6 +1,3 @@
-// ABOUTME: Registers Infrastructure services, providers, options, and validators for the platform.
-// ABOUTME: Keeps application contracts wired to concrete infrastructure implementations at composition time.
-
 using System.Net.Http;
 using System.Net.Sockets;
 using Amazon;

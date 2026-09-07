@@ -1,6 +1,3 @@
-// ABOUTME: EF repository for event-category link entities and category/event lookup projections.
-// ABOUTME: Exposes duplicate-link reads used by grouped relationship update handlers.
-
 using System;
 using System.Collections.Generic;
 using System.Text;

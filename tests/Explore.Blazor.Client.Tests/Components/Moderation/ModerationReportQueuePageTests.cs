@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for the event-scoped moderation report queue page.
-// ABOUTME: Verifies queue rows render and detail evidence is fetched only after opening a report.
-
 using System.Collections;
 using System.Reflection;
 using Explore.Blazor.Client.Components.Moderation;

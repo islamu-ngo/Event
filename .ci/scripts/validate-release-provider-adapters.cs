@@ -1,5 +1,3 @@
-// ABOUTME: Validates release provider definitions and writes transport-only adapter plans.
-// ABOUTME: Keeps canonical release checksums provider-neutral across Forgejo, Tangled, and GitHub.
 #:property RestorePackagesWithLockFile=false
 #pragma warning disable CA1050
 

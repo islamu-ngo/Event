@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for image storage orchestration around BFF upload sessions and previews.
-// ABOUTME: Covers provider-neutral proxy uploads plus metadata-backed public image URL helpers.
-
 using Microsoft.AspNetCore.Components.Forms;
 
 namespace Explore.Blazor.Client.Tests.Services;

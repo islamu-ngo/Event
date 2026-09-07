@@ -1,6 +1,3 @@
-// ABOUTME: Creates durable in-app notifications for attendees when moderation hides or redacts an event.
-// ABOUTME: Separates light contextual notifications from generic heavy-redaction fanout for privacy safety.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Models.InternalEvents;

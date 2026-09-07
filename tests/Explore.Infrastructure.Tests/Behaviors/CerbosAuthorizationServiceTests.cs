@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for CerbosAuthorizationService gRPC SDK request/response mapping and deny semantics.
-// ABOUTME: Verifies principal construction, missing-user fail-closed behavior, and gRPC error handling.
-
 using Explore.Infrastructure.Tests.Authorization;
 using Cerbos.Api.V1.Effect;
 using Cerbos.Sdk;

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the runtime AI provider selector.
-// ABOUTME: Verifies fail-closed behavior and routing to fake, OpenAI, and compatible adapters.
-
 using System.Diagnostics.Metrics;
 using System.Net;
 using System.Text;

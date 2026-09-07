@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for AT Protocol OAuth client metadata and public JWKS publication.
-// ABOUTME: Proves the BFF publishes canonical confidential-client documents without redirects or private key material.
-
 using System.Net;
 using System.Security.Cryptography;
 using System.Text.Json;

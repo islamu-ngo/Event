@@ -1,6 +1,3 @@
-// ABOUTME: Detail DTO for an event-session language assignment.
-// ABOUTME: Exposes concurrency metadata for route-ID PATCH If-Match preconditions.
-
 using System;
 
 namespace Explore.Application.DTOs.EventSessionLanguage;

@@ -1,6 +1,3 @@
-// ABOUTME: Shared binder, validator, and native builder for primary database composition.
-// ABOUTME: Validates structured runtime and migrator settings before any provider registration.
-
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Microsoft.Data.SqlClient;

@@ -1,6 +1,3 @@
-// ABOUTME: Authorized command for abandoning a terminal operator-owned provider publication.
-// ABOUTME: Requires tenant identity, optimistic version, actor, and normalized audit reason evidence.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

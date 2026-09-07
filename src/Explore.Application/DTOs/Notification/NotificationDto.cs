@@ -1,6 +1,3 @@
-// ABOUTME: Detail DTO for a single notification with all fields.
-// ABOUTME: Used in GET /api/notification/{id} response.
-
 namespace Explore.Application.DTOs.Notification;
 
 public sealed record NotificationDto

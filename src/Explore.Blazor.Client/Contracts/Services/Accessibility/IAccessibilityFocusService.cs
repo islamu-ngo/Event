@@ -1,6 +1,3 @@
-// ABOUTME: Contract for programmatic focus management and navigation focus handling.
-// ABOUTME: Wraps JS interop for focus set/save/restore and replaces FocusOnNavigate for Blazouter.
-
 namespace Explore.Blazor.Client.Contracts.Services.Accessibility;
 
 /// <summary>

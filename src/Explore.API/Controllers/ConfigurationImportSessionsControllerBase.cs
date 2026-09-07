@@ -1,6 +1,3 @@
-// ABOUTME: Shares bounded multipart reading and state-aware HAL links for import-session controllers.
-// ABOUTME: Keeps raw capability tokens out of URLs while preserving separate instance and tenant routes.
-
 namespace Explore.API.Controllers;
 
 using System.Buffers;

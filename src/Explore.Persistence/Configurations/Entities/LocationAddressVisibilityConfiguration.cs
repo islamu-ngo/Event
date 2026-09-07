@@ -1,6 +1,3 @@
-// ABOUTME: Maps stable Location address-visibility lookup rows without EF model seed data.
-// ABOUTME: Enforces immutable integer IDs and unique machine-readable visibility codes.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

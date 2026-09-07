@@ -1,6 +1,3 @@
-// ABOUTME: Centralized Quartz job and trigger keys derived from the Application scheduled-job catalog.
-// ABOUTME: Keeps scheduler identity stable across restarts so the persistent store recognizes existing rows.
-
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Contracts.Scheduling;

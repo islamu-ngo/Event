@@ -1,6 +1,3 @@
-// ABOUTME: Repository interface for TenantInvitation entity.
-// ABOUTME: Provides domain-specific query methods for token lookup, pending invitation retrieval, and active invitation checks.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

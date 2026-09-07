@@ -1,6 +1,3 @@
-// ABOUTME: Maps durable tenant/event sale controls, append-only transition audit, and independent review approvals.
-// ABOUTME: Uses portable tenant-qualified keys, bounded codes, and optimistic versions across every provider.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

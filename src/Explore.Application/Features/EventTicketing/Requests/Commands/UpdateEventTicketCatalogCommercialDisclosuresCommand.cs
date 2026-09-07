@@ -1,6 +1,3 @@
-// ABOUTME: Updates organizer-authored commercial disclosures on the current ticket catalog draft.
-// ABOUTME: Uses paid-commerce authorization and domain disclosure normalization.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

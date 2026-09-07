@@ -1,6 +1,3 @@
-// ABOUTME: Shared test HttpMessageHandler that captures outgoing requests from DelegatingHandler pipelines.
-// ABOUTME: Returns deterministic HTTP 200 responses so tests can assert forwarded headers.
-
 namespace Explore.Blazor.IntegrationTests.Handlers;
 
 internal sealed class CapturingHandler : HttpMessageHandler

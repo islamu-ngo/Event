@@ -1,6 +1,3 @@
-// ABOUTME: Structured logger implementation for setup-secret and bootstrap audit events.
-// ABOUTME: Emits bounded fields only, avoiding secrets, raw provider payloads, and endpoint values.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.Onboarding;
 using Microsoft.Extensions.Logging;

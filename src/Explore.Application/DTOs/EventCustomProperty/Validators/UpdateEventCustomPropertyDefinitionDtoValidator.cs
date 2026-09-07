@@ -1,6 +1,3 @@
-// ABOUTME: Validates grouped event-local custom-property definition PATCH payload shape.
-// ABOUTME: Rejects empty groups before the handler validates the merged persisted candidate.
-
 using Explore.Application.DTOs.CustomPropertyDefinition.Validators;
 using FluentValidation;
 

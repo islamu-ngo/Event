@@ -1,6 +1,3 @@
-// ABOUTME: Derives the active application workspace from the current route.
-// ABOUTME: Uses segment-aware longest-prefix matching with Events as the safe fallback.
-
 namespace Explore.Blazor.Client.Services.Shell;
 
 public sealed class WorkspaceRouteClassifier(IWorkspaceRegistry registry)

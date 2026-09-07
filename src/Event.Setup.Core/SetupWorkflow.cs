@@ -1,6 +1,3 @@
-// ABOUTME: Defines explicit pure setup workflow states and bounded transition outcomes.
-// ABOUTME: Returns value-safe diagnostics for expected invalid transitions instead of throwing exceptions.
-
 namespace ISLAMU.Event.Setup.Core;
 
 public enum SetupWorkflowState

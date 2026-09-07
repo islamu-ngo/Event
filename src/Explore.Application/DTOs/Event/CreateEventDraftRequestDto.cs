@@ -1,6 +1,3 @@
-// ABOUTME: Create Event draft contract used by API, AI confirmation, and MCP tool execution.
-// ABOUTME: Carries metadata plus the initial locations, days, rooms, sessions, agenda, and Islamic aspect graph.
-
 namespace Explore.Application.DTOs.Event;
 
 using System.Collections.Immutable;

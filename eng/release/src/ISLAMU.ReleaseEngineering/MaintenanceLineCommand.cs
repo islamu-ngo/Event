@@ -1,6 +1,3 @@
-// ABOUTME: Plans an idempotent maintenance-line branch sourced only from a verified signed stable release tag.
-// ABOUTME: Emits the exact operator command and compare-and-swap IDs without creating, moving, or deleting any ref.
-
 using System.Globalization;
 using System.Text;
 using System.Text.Json;

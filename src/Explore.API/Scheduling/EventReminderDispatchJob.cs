@@ -1,6 +1,3 @@
-// ABOUTME: Quartz job that wakes one pre-persisted event reminder EmailDispatchOutbox row at its due time.
-// ABOUTME: Resolves pointer-only scheduler payloads back into the durable EmailDispatchOutbox drain service.
-
 using System.Globalization;
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Contracts.Services;

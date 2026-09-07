@@ -1,6 +1,3 @@
-// ABOUTME: Decrypts staged recovery material only at the side-channel handoff boundary.
-// ABOUTME: Retains ciphertext on ambiguous delivery and erases it after a receipt-bearing success.
-
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Explore.Application.Contracts.Admissions;

@@ -1,6 +1,3 @@
-// ABOUTME: Enriches the BFF cookie principal with persisted administrative authority from the API.
-// ABOUTME: Projects instance, tenant, organization, and group scopes at trusted session boundaries.
-
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using Event.Web.BffHosting.Security;

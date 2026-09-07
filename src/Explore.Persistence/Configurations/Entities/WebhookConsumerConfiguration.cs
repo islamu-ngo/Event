@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for webhook consumers and their typed ownership references.
-// ABOUTME: Enforces one instance, tenant, organization, group, or tenant-user owner with scoped indexes.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;

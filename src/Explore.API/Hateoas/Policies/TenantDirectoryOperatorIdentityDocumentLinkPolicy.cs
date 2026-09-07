@@ -1,6 +1,3 @@
-// ABOUTME: HAL link policy for tenant directory-operator identity documents.
-// ABOUTME: Emits edit only from server capability state and permission-bound tenant-setting facts.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Security.Claims;

@@ -1,6 +1,3 @@
-// ABOUTME: Lookup entity describing support-access audit event categories.
-// ABOUTME: Backed by stable int IDs from SupportAccessAuditEventTypeEnum.
-
 namespace Explore.Domain;
 
 public class SupportAccessAuditEventType

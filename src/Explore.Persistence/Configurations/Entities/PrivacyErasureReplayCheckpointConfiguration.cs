@@ -1,6 +1,3 @@
-// ABOUTME: Maps immutable local checkpoints for monotonic erasure-authority replay.
-// ABOUTME: Enforces unique sequences, unique intents, and a non-forking append-only chain.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

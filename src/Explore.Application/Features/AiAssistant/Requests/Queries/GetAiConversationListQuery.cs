@@ -1,6 +1,3 @@
-// ABOUTME: Query request for the authenticated user's recent AI assistant conversations.
-// ABOUTME: Returns bounded private history metadata without provider secrets or message bodies.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Ai;
 using MediatR;

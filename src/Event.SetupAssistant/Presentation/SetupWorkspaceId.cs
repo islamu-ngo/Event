@@ -1,6 +1,3 @@
-// ABOUTME: Defines the bounded validated identity used by shared presentation workspaces.
-// ABOUTME: Rejects empty, whitespace-only, and oversized identifiers before session admission.
-
 namespace ISLAMU.Event.SetupAssistant.Presentation;
 
 public readonly record struct SetupWorkspaceId

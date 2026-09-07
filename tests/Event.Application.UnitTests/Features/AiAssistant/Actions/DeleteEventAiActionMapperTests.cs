@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for converting untrusted AI DeleteEvent proposals into safe deletion context.
-// ABOUTME: Verifies required concurrency, HAL delete context, destructive confirmation, and hidden-field rejection.
-
 using Explore.Application.Features.AiAssistant.Actions;
 using Explore.Application.Features.AiAssistant.Prompting;
 using Explore.Domain.Ai;

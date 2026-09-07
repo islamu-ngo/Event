@@ -1,6 +1,3 @@
-// ABOUTME: Generic persistence contract for entity-first CRUD repositories.
-// ABOUTME: Keeps shared repository operations soft-delete aware without exposing blanket hard-delete APIs.
-
 using System;
 using System.Collections.Generic;
 using System.Text;

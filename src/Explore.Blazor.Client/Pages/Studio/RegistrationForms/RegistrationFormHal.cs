@@ -1,6 +1,3 @@
-// ABOUTME: Reads nested generated-contract HAL links and validates exact mutation targets.
-// ABOUTME: Fails closed for absent, stale, mismatched-resource, or wrong-method affordances.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;
 

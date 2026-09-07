@@ -1,6 +1,3 @@
-// ABOUTME: MediatR query that resolves persisted administrative authority for a specific user.
-// ABOUTME: Supplies instance, tenant, organization, and group scopes to trusted BFF consumers.
-
 using Explore.Application.DTOs.User;
 using MediatR;
 

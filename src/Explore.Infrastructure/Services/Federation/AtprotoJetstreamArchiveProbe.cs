@@ -1,6 +1,3 @@
-// ABOUTME: Asks the Jetstream v2 sealed archive which repositories committed calendar records after a cursor.
-// ABOUTME: Bounds every scan and degrades to inconclusive so recovery never loses coverage when unsure.
-
 using System.Diagnostics.Metrics;
 using CarpaNet.Jetstream;
 using Explore.Application.Contracts.Infrastructure;

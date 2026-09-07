@@ -1,6 +1,3 @@
-// ABOUTME: Infrastructure-local contracts for the Svix SDK wrapper used by webhook delivery.
-// ABOUTME: Keeps provider tests deterministic while the production adapter owns Svix SDK calls.
-
 namespace Explore.Infrastructure.Webhooks;
 
 public interface ISvixWebhookClient

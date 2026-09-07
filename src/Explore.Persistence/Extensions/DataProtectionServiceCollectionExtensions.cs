@@ -1,6 +1,3 @@
-// ABOUTME: Wires ASP.NET Core Data Protection to persist the Blazor BFF key ring in the primary database.
-// ABOUTME: Uses a dedicated key context so auth cookies and anti-forgery tokens do not couple to ExploreDbContext.
-
 using Explore.Persistence.Database;
 using Explore.Secrets.Database;
 using Microsoft.AspNetCore.DataProtection;

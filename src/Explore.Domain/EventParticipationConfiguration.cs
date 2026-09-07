@@ -1,6 +1,3 @@
-// ABOUTME: Shared-primary-key event participation policy with explicit identity and recovery semantics.
-// ABOUTME: Enforces legal configuration before creation or atomic reconfiguration.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 using Explore.Domain.Services.Registration;

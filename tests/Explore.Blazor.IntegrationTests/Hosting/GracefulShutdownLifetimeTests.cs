@@ -1,6 +1,3 @@
-// ABOUTME: Exercises disposal of Split BFF process-signal registrations through the real host lifecycle.
-// ABOUTME: Detects retained shutdown state in both stopped and never-started hosts.
-
 using System.Runtime.CompilerServices;
 using Explore.Blazor.Extensions;
 using Microsoft.AspNetCore.Builder;

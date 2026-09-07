@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for provider-neutral S3-compatible storage preflight diagnostics.
-// ABOUTME: Covers bucket access mapping, optional zero-byte write cleanup, and safe failure reporting.
-
 using System.Net;
 using Amazon.S3;
 using Amazon.S3.Model;

@@ -1,6 +1,3 @@
-// ABOUTME: Maps the transactional incoming webhook inbox aggregate and its tenant-safe evidence relationships.
-// ABOUTME: Enforces persisted identity, payload-hash, generation, fence, settlement, and claim invariants.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

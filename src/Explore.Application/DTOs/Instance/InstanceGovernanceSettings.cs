@@ -1,6 +1,3 @@
-// ABOUTME: Composed response aggregating all instance governance sub-resource DTOs.
-// ABOUTME: Replaces the monolithic 66-property InstanceGovernanceSettingsDto with focused, domain-specific sections.
-
 namespace Explore.Application.DTOs.Instance;
 
 public sealed record InstanceGovernanceSettings

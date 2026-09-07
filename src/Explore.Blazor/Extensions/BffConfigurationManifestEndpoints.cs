@@ -1,6 +1,3 @@
-// ABOUTME: Proxies whole-instance configuration-manifest downloads through the authenticated BFF.
-// ABOUTME: Revalidates HAL authority and buffers only exact, bounded, canonical API file responses.
-
 using System.Net.Http.Headers;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.ControlPlane;

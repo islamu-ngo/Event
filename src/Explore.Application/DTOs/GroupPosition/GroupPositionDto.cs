@@ -1,6 +1,3 @@
-// ABOUTME: Detail DTO for GroupPosition lookup entity.
-// ABOUTME: MasterCode supports i18n via Tolgee; FullName is fallback display.
-
 namespace Explore.Application.DTOs.GroupPosition;
 
 public sealed record GroupPositionDto

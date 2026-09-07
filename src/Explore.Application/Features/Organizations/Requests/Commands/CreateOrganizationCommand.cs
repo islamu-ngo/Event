@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for creating a new organization.
-// ABOUTME: Carries the CreateOrganizationDto payload and pre-create authorization context.
 using System.Collections.Generic;
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Organization;

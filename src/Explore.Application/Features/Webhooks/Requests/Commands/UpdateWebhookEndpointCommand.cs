@@ -1,6 +1,3 @@
-// ABOUTME: Authorized command for updating an outgoing webhook endpoint and subscription set.
-// ABOUTME: Uses persisted endpoint ownership as authoritative authorization metadata.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Responses;

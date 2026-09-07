@@ -1,6 +1,3 @@
-// ABOUTME: Infrastructure registry for provider-neutral registration descriptors proven for this build.
-// ABOUTME: Resolves exact capability tuples and rejects duplicate tuple registrations at startup.
-
 using Explore.Application.Contracts.Services.Registration;
 
 namespace Explore.Infrastructure.Registration;

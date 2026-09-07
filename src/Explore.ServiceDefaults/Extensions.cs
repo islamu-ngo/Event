@@ -1,6 +1,3 @@
-// ABOUTME: Provides shared Aspire service defaults, health endpoints, and OpenTelemetry setup.
-// ABOUTME: Registers safe platform meters and activity sources used by API, workers, and infrastructure adapters.
-
 using Explore.ServiceDefaults.Compliance;
 using Explore.ServiceDefaults;
 using Explore.ServiceDefaults.HealthChecks;

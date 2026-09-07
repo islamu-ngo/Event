@@ -1,6 +1,3 @@
-// ABOUTME: Applies validated tenant Listmonk non-secret setting overrides.
-// ABOUTME: Reuses the settings authorization and serialization helpers without exposing credentials.
-
 using System.Globalization;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;

@@ -1,6 +1,3 @@
-// ABOUTME: Derives setup readiness solely from required, selected, and blocked portable section facts.
-// ABOUTME: Returns ordered value-safe missing and blocked keys without inspecting artifact values.
-
 namespace ISLAMU.Event.Setup.Core;
 
 public enum SetupReadinessState

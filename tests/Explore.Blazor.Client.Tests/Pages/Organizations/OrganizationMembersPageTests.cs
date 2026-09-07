@@ -1,6 +1,3 @@
-// ABOUTME: Page tests for organization member HAL action affordance gating.
-// ABOUTME: Verifies full organization members page does not infer authority from roles.
-
 using System.Text.Json;
 using Blazouter.Services;
 using Explore.Blazor.Client.Helpers;

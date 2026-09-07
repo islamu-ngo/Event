@@ -1,6 +1,3 @@
-// ABOUTME: Verifies EventFilter.Free against selectable zero-cost published ticket semantics.
-// ABOUTME: Covers pricing modes, catalog lifecycle, deletion, and platform-managed participation boundaries.
-
 using System.Reflection;
 using Explore.Application.Specifications.Events;
 using Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: Domain entity representing an informal community group that can publish events.
-// ABOUTME: Lighter alternative to Organization — no legal entity requirements (address, etc.).
-
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;

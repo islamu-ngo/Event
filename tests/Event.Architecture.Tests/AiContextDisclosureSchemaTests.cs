@@ -1,6 +1,3 @@
-// ABOUTME: TUnit architecture tests for the AI Context Disclosure registry and policy.
-// ABOUTME: Enforces that every persisted disclosure field is classified and registry semantics are honored.
-
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;

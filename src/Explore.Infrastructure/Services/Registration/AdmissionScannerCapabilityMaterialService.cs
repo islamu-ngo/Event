@@ -1,6 +1,3 @@
-// ABOUTME: Issues opaque scanner capabilities and computes bounded retained-key lookup candidates.
-// ABOUTME: Uses purpose-separated HMAC material and clears resolved key bytes after every operation.
-
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Contracts.Admissions;

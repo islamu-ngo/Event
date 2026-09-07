@@ -1,6 +1,3 @@
-// ABOUTME: Event-scoped organizer query for an exact event session management read.
-// ABOUTME: Resource authorization prevents public redaction bypass and cross-event identifier probing.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventSession;
 using MediatR;

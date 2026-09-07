@@ -1,6 +1,3 @@
-# ABOUTME: Defines the low-noise OpenAPI lint rules used by OpenAPI Contract Guard.
-# ABOUTME: Keeps advisory Spectral checks focused on invariants that are already clean.
-
 extends: []
 
 rules:

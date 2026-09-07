@@ -1,6 +1,3 @@
-// ABOUTME: Sanitizes browser-originated credential headers before BFF proxy forwarding.
-// ABOUTME: Ensures downstream API requests receive only server-owned privileged context.
-
 using Microsoft.Net.Http.Headers;
 namespace Event.Web.BffHosting.Security;
 

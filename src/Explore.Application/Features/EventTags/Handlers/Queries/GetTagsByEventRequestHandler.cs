@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning all tags assigned to a specific event.
-// ABOUTME: Used for event detail tag display.
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;

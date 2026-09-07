@@ -1,6 +1,3 @@
-// ABOUTME: Stores one opaque versioned AES-256-GCM ciphertext for a sensitive registration answer.
-// ABOUTME: Deliberately exposes no plaintext property or encryption implementation in the Domain layer.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

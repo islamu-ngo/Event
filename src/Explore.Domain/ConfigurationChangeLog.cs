@@ -1,4 +1,3 @@
-// ABOUTME: Audit entity that records every administrative configuration change.
 // Captures who changed what setting, the old and new values, and at which scope level.
 
 using Explore.Domain.Enums;

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies recovery recipient and capability material is encrypted and purpose-isolated.
-// ABOUTME: Covers round-trip protection, plaintext absence, redaction, and fail-closed versions.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Infrastructure.Services.Registration;
 using Microsoft.AspNetCore.DataProtection;

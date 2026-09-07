@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for PII-free location-erasure and external-correction outbox payloads.
-// ABOUTME: Proves UUIDv7 message identity and excludes identifying venue, address, and room values.
-
 using System.Text.Json;
 using Explore.Application.Services;
 using Explore.Domain;

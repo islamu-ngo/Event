@@ -1,6 +1,3 @@
-// ABOUTME: Loads tenant slug and domain lookup data from the database for runtime caches.
-// ABOUTME: Queries across tenants intentionally and normalizes JSON-backed tenant setting values.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.Models.Tenants;
 using Explore.Application.Settings;

@@ -1,4 +1,3 @@
-// ABOUTME: Base interface for module-specific event business logic.
 // Enables modular business logic that adapts at runtime based on tenant capabilities.
 
 using Explore.Application.DTOs.Event;

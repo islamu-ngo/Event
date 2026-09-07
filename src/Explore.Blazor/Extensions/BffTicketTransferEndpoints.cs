@@ -1,6 +1,3 @@
-// ABOUTME: Maps private ticket-transfer reads and antiforgery-protected lifecycle writes for browsers.
-// ABOUTME: Keeps claim capabilities in a dedicated header and forwards only through the generated API client.
-
 using Explore.Blazor.Client.Clients;
 using Microsoft.AspNetCore.Mvc;
 

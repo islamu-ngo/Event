@@ -1,6 +1,3 @@
-// ABOUTME: Defines the canonical tenant-scoped policy for accepting event reports.
-// ABOUTME: Keeps reporting-intake policy separate from external reporting-provider configuration.
-
 namespace Explore.Domain.Settings.Definitions;
 
 using Explore.Domain.Constants;

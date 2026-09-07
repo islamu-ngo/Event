@@ -1,6 +1,3 @@
-// ABOUTME: Verifies TenantCapabilityRepository bypasses tenant filters only for explicit tenant-module lookups.
-// ABOUTME: Proves module capability resolution is bounded by tenant ID and does not leak ambient tenant rows.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;

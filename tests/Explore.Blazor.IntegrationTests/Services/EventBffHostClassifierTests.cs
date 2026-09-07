@@ -1,6 +1,3 @@
-// ABOUTME: Tests configured browser-BFF admin-host classification and validation.
-// ABOUTME: Protects dedicated admin hosts from ambiguous public/tenant host handling.
-
 using Event.Web.BffHosting.Options;
 using Event.Web.BffHosting.Security;
 using Microsoft.AspNetCore.Http;

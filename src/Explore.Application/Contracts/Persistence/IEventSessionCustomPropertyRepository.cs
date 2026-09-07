@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for event-session-scoped runtime custom-property definitions, options, and values.
-// ABOUTME: Supports CQRS read/write flows with namespaced uniqueness, single/multi-value persistence, and provenance reads.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

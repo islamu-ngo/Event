@@ -1,6 +1,3 @@
-// ABOUTME: Root policy aggregate for instance-level governance — the top of the hierarchy.
-// ABOUTME: All sub-policies here are the system defaults that tenant/org policies inherit from.
-
 namespace Explore.Domain.Policies;
 
 public sealed class InstancePolicySet

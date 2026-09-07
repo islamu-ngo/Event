@@ -1,6 +1,3 @@
-// ABOUTME: Runs one bounded provider-publication dispatch and reconciliation pass under Quartz.
-// ABOUTME: Leaves provider identity, ambiguity parking, retries, and fenced settlement in Infrastructure.
-
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Contracts.Webhooks;
 using Quartz;

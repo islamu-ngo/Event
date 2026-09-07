@@ -1,5 +1,3 @@
-// ABOUTME: Handler for creating a new event session with validation and optional template instantiation.
-// ABOUTME: Validates input, maps DTO, sets defaults, persists via repository, instantiates session custom properties from template.
 using System;
 using System.Collections.Generic;
 using System.Linq;

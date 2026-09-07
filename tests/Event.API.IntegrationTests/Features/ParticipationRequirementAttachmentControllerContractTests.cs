@@ -1,6 +1,3 @@
-// ABOUTME: Pins the canonical Task 7.7 participation attachment and questionnaire routes.
-// ABOUTME: Verifies authenticated writes, anonymous read, strong If-Match, HAL relation, and response metadata.
-
 using System.Reflection;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;

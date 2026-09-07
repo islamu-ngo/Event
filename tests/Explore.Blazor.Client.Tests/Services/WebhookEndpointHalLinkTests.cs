@@ -1,6 +1,3 @@
-// ABOUTME: Client-side HAL affordance tests for generated webhook endpoint resources.
-// ABOUTME: Verifies the UI can gate endpoint actions from server-emitted links without role checks.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Tests.Services;

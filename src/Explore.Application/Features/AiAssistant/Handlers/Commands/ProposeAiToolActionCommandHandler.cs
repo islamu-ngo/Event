@@ -1,6 +1,3 @@
-// ABOUTME: Persists registry-validated AI tool proposals without executing their side effects.
-// ABOUTME: Keeps external adapters on the same proposal and confirmation path as provider output.
-
 using System.Text.Json;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;

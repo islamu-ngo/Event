@@ -1,6 +1,3 @@
-// ABOUTME: Secret provider that retrieves secrets from Infisical using Universal Auth.
-// ABOUTME: Emits bounded status codes without provider diagnostics or source coordinates.
-
 using System.Collections.Concurrent;
 using Explore.Secrets.Abstractions;
 using Explore.Secrets.Configuration;

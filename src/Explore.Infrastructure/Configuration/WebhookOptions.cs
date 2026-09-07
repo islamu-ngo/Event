@@ -1,6 +1,3 @@
-// ABOUTME: Runtime configuration model for outgoing webhook delivery providers.
-// ABOUTME: Defaults to Local so self-hosted deployments get webhooks without extra infrastructure.
-
 using Explore.Domain.Secrets;
 using Explore.Infrastructure.Webhooks;
 

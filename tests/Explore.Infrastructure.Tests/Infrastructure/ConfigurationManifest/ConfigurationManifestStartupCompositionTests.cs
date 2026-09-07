@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the one-shot migration host can resolve only the manifest startup dependency graph.
-// ABOUTME: Proves deferred effects remain durable without loading cache resolvers or unrelated runtime services.
-
 namespace Explore.Infrastructure.Tests.Infrastructure.ConfigurationManifest;
 
 using Explore.Application.Contracts.Persistence;

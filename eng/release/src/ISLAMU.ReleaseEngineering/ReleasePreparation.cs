@@ -1,6 +1,3 @@
-// ABOUTME: Composes validated release sources into one canonical three-layer release note.
-// ABOUTME: Calls only the trusted renderer and atomically creates the fully generated output.
-
 using System.Globalization;
 using System.Text;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Proves Redis-free Production OAuth login across BFF replicas with actual browser cookie jars and PostgreSQL.
-// ABOUTME: Covers same-origin cookies and unrelated-domain handoffs through real API session verification and persistence.
-
 extern alias bff;
 
 using System.Net;

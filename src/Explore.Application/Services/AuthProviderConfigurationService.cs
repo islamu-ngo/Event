@@ -1,6 +1,3 @@
-// ABOUTME: Service implementation for managing instance-level authentication provider configuration.
-// ABOUTME: Handles reading and writing auth provider settings (Keycloak, ATProto, Google SSO) via SystemSetting records.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

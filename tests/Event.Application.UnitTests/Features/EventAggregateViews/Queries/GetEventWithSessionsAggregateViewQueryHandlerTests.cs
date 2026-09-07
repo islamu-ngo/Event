@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the single-event aggregate view query handler.
-// ABOUTME: Verifies not-found handling, exposure filtering, safe JSON parsing, and nullable module-gated aspect fields.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventAggregateViews.Handlers.Queries;
 using Explore.Application.Features.EventAggregateViews.Requests.Queries;

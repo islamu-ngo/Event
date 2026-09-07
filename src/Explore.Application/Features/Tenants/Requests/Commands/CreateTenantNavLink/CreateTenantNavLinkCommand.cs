@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for creating a tenant navigation link.
-// ABOUTME: Carries the CreateTenantNavLinkDto payload.
 using System;
 using Explore.Application.DTOs.Tenant;
 using Explore.Application.Responses;

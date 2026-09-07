@@ -1,6 +1,3 @@
-// ABOUTME: Maps durable tenant-scoped webhook bulk replay operations and normalized lifecycle state.
-// ABOUTME: Enforces immutable filter evidence, bounded counts, coherent terminal timestamps, and optimistic concurrency.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

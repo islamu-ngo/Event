@@ -1,6 +1,3 @@
-// ABOUTME: Input DTO for creating a fully custom user appearance profile from natural + brand color inputs.
-// ABOUTME: The palette generation engine expands two colors into full 18-token light and dark palettes.
-
 namespace Explore.Application.DTOs.Appearance;
 
 public sealed record CreateCustomProfileRequestDto

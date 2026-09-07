@@ -1,6 +1,3 @@
-// ABOUTME: Defines PII-minimized participant and concrete ticket-assignment application contracts.
-// ABOUTME: Keeps normalized lookup identifiers and order-line ordinals explicit for group-booking clients.
-
 namespace Explore.Application.DTOs.RegistrationOrders;
 
 using System.Text.Json.Serialization;

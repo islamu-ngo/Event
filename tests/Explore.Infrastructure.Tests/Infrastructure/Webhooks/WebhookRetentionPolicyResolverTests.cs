@@ -1,6 +1,3 @@
-// ABOUTME: Tests immutable webhook retention-policy resolution and startup validation.
-// ABOUTME: Proves independent horizons, event-contract overrides, and unsafe ordering fail closed.
-
 using Explore.Infrastructure.Webhooks;
 using Microsoft.Extensions.Options;
 

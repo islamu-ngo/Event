@@ -1,6 +1,3 @@
-// ABOUTME: Central machine-readable failure codes for event-report Application responses.
-// ABOUTME: Lets API ProblemDetails mapping stay stable without duplicating string literals.
-
 namespace Explore.Application.Features.EventReporting;
 
 public static class EventReportFailureCodes

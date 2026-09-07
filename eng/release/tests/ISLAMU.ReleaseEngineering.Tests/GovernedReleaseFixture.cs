@@ -1,6 +1,3 @@
-// ABOUTME: Builds disposable multi-release Git repositories with a promoted bundle and signed release tags.
-// ABOUTME: Exposes branch mutation and tag-only clone helpers so attestation durability can be proven.
-
 using System.Diagnostics;
 using System.Globalization;
 using System.Security.Cryptography;

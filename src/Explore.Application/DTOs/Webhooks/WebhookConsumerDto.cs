@@ -1,6 +1,3 @@
-// ABOUTME: API DTO for typed owner-scoped webhook consumers and provider mappings.
-// ABOUTME: Exposes canonical owner references and normalized lookup metadata without endpoint secrets.
-
 namespace Explore.Application.DTOs.Webhooks;
 
 public sealed record WebhookConsumerDto

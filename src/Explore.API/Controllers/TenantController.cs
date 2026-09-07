@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for tenant CRUD operations and tenant-level configuration management.
-// ABOUTME: Handles tenant creation, updates, deletion, and cascading settings for multi-tenant deployments.
-
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;

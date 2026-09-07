@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for explicit Keycloak client-secret rotation requests.
-// ABOUTME: Blocks malformed ownership modes, missing confirmations, control characters, and oversized secret payloads.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.Onboarding.Validators;

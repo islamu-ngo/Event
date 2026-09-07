@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for actor-owned support-access stop requests.
-// ABOUTME: Keeps optional stop reason text bounded before Domain transition methods run.
-
 using Explore.Application.Features.SupportAccess.Requests.Commands;
 using Explore.Domain;
 using FluentValidation;

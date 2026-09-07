@@ -1,6 +1,3 @@
-// ABOUTME: Handler for streaming reserved upload-session bytes into provider storage and finalizing metadata.
-// ABOUTME: Separates long-running provider IO from short database transactions while preserving quota consistency.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.StorageObject;

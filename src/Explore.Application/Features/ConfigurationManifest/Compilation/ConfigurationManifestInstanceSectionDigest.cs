@@ -1,6 +1,3 @@
-// ABOUTME: Computes the canonical identity of the instance bootstrap section.
-// ABOUTME: Makes digest comparison independent of JSON object and dictionary insertion order.
-
 namespace Explore.Application.Features.ConfigurationManifest.Compilation;
 
 using System.Security.Cryptography;

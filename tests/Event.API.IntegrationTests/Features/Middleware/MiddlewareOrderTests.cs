@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests verifying middleware ordering and tenant-exempt path behavior.
-// ABOUTME: Ensures ForwardedHeaders is respected, tenant exemptions work, and exception handler catches errors.
-
 using System.Net;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;

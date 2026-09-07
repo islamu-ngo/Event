@@ -1,6 +1,3 @@
-// ABOUTME: Tests for the SettingRegistry ensuring all definitions are valid, unique, and properly categorized.
-// ABOUTME: Validates that every GovernanceSettingKey has a corresponding registry definition.
-
 namespace Event.Domain.UnitTests.Settings;
 
 using System.Reflection;

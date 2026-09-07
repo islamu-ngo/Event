@@ -1,6 +1,3 @@
-// ABOUTME: Carries one protected ATProto OAuth flow binding across CarpaNet state consumption and session storage.
-// ABOUTME: Prevents issuer, tenant, DID, PDS, origin, return-path, and signing-key substitution during callback.
-
 namespace Explore.Blazor.Services.Auth;
 
 public sealed record AtprotoOAuthFlowSeed(

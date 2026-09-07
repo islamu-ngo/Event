@@ -1,6 +1,3 @@
-// ABOUTME: Local filesystem implementation of the provider-neutral file storage contract.
-// ABOUTME: Generates internal object keys, streams bytes to disk, and enforces root path containment.
-
 using System.Buffers;
 using System.Globalization;
 using System.Runtime.CompilerServices;

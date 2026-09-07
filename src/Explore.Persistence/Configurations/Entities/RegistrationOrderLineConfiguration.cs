@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for immutable registration order ticket lines.
-// ABOUTME: Preserves the catalog and ticket snapshots with restrictive tenant-safe foreign keys.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

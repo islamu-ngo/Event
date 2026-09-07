@@ -1,6 +1,3 @@
-// ABOUTME: One-shot startup worker that synchronizes canonical webhook event types to Svix.
-// ABOUTME: Keeps provider catalog sync in the API host while the actual Svix implementation stays in Infrastructure.
-
 using Explore.Application.Contracts.Webhooks;
 
 namespace Explore.API.BackgroundServices;

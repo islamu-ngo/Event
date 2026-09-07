@@ -1,6 +1,3 @@
-// ABOUTME: Evaluates whether a resolved managed Actor may create events in one tenant.
-// ABOUTME: Separates global Actor state and tenant participation from caller-owned authority checks.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

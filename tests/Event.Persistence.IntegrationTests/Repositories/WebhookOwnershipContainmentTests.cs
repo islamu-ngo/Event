@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL integration tests for webhook typed-owner and child-scope containment.
-// ABOUTME: Writes substituted ownership references directly so composite database constraints prove rejection.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;

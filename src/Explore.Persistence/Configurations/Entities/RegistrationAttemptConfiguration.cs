@@ -1,6 +1,3 @@
-// ABOUTME: Maps tenant-contained registration attempts, capability hashes, lifecycle checks, and claim fencing.
-// ABOUTME: Enforces pinned order, workflow, requirement, channel, form, and version lineage with composite keys.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;

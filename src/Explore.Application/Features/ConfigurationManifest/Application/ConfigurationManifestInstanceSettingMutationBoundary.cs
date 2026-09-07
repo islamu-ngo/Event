@@ -1,6 +1,3 @@
-// ABOUTME: Dispatches approved instance-manifest settings to their canonical mutation owners.
-// ABOUTME: Runs inside a caller-owned transaction and returns deferred effects without nested locks.
-
 namespace Explore.Application.Features.ConfigurationManifest.Application;
 
 using System.Collections.Immutable;

@@ -1,6 +1,3 @@
-// ABOUTME: Discovers independent browser security owners without activating a browser runtime.
-// ABOUTME: Exposes structured public-shape checks and the generated fail-closed capability document.
-
 namespace Event.SetupAssistant.Browser.Tests;
 
 using System.Reflection;

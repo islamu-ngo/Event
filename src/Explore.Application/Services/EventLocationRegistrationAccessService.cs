@@ -1,6 +1,3 @@
-// ABOUTME: Resolves order-backed session admissions into fail-closed EventLocation access facts.
-// ABOUTME: Applies account ownership, order state, admission coverage, and audience rules without exposing persistence entities.
-
 using System.Collections.Immutable;
 using Explore.Application.Contracts.Services;
 using Explore.Domain;

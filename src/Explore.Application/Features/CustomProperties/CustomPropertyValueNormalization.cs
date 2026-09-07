@@ -1,6 +1,3 @@
-// ABOUTME: Normalizes runtime custom-property value payloads for service-level duplicate detection.
-// ABOUTME: Shared by event and session handlers so bulk replacement and single-value upsert rules stay aligned.
-
 using System.Globalization;
 using Explore.Application.DTOs.EventCustomProperty;
 using Explore.Application.DTOs.EventSessionCustomProperty;

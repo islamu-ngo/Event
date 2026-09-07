@@ -1,6 +1,3 @@
-// ABOUTME: Resource-authorized query for one tenant-owned directory-operator identity document.
-// ABOUTME: Carries exact tenant-setting facts so denied callers cannot reach document persistence.
-
 namespace Explore.Application.Features.TenantSettingsDocuments.Requests.Queries;
 
 using Explore.Application.Authorization;

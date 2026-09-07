@@ -1,6 +1,3 @@
-// ABOUTME: Uses compiled dependency metadata to keep request-specific authorization out of the shared pipeline.
-// ABOUTME: Leaves typed command-failure mapping to the HTTP ProblemDetails behavioral contract suite.
-
 using System.Reflection;
 using Explore.Application.Behaviors;
 using NetArchTest.Rules;

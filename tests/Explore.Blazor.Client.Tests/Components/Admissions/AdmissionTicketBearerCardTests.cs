@@ -1,6 +1,3 @@
-// ABOUTME: Verifies accessible and print-aware rendering of sensitive admission bearer material.
-// ABOUTME: Covers QR alternative text, manual-code semantics, warning, and print affordance gating.
-
 using Explore.Blazor.Client.Components.Admissions;
 using Explore.Blazor.Client.Clients;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Validates provider provisioning payloads before tenant/user/actor orchestration.
-// ABOUTME: Enforces stable external IDs and tenant slug shape while keeping organizer creation optional.
-
 using FluentValidation;
 using Explore.Application.DTOs.TenantSettings.Validators;
 using Explore.Domain.ValueObjects;

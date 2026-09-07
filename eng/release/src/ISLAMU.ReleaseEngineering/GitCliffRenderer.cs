@@ -1,6 +1,3 @@
-// ABOUTME: Invokes the pinned git-cliff binary only as an isolated offline Markdown renderer.
-// ABOUTME: Validates trusted inputs and rejects unsafe, unbounded, or noncanonical renderer output.
-
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;

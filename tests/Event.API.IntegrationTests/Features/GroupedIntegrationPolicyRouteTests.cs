@@ -1,6 +1,3 @@
-// ABOUTME: API metadata coverage for grouped integration-policy PATCH routes.
-// ABOUTME: Prevents Listmonk, localization, and external API-key updates from regressing to PUT aliases.
-
 using System.Reflection;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;

@@ -1,6 +1,3 @@
-// ABOUTME: EF mapping for one durable execution state row per event-report decision.
-// ABOUTME: Enforces tenant-safe ownership, lease consistency, and exact receipt shape.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

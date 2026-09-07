@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query request for fetching a paginated organization list.
-// ABOUTME: Returns PaginatedResult<OrganizationListDto>.
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;

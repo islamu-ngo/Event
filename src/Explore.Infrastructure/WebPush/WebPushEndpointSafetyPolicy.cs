@@ -1,6 +1,3 @@
-// ABOUTME: SSRF protection for browser-supplied Web Push subscription endpoints.
-// ABOUTME: Allows public HTTPS push services while blocking credentials, private networks, and metadata addresses.
-
 using System.Net;
 using System.Net.Sockets;
 

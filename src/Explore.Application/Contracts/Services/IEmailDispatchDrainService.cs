@@ -1,6 +1,3 @@
-// ABOUTME: Application boundary for draining durable EmailDispatchOutbox work.
-// ABOUTME: Lets hosted services and future schedulers trigger dispatch without owning email state transitions.
-
 namespace Explore.Application.Contracts.Services;
 
 public interface IEmailDispatchDrainService

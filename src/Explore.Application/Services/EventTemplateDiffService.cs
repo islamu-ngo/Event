@@ -1,6 +1,3 @@
-// ABOUTME: Computes explicit event template-to-runtime diffs using source-id-first matching with namespace/key fallback.
-// ABOUTME: Keeps the comparison logic fully hand-coded and deterministic so operators can review an explainable sync plan.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventTemplateSync;

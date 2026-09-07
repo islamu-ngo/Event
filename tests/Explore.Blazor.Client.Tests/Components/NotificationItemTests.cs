@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for notification item accessibility and subscription notification display.
-// ABOUTME: Verifies keyboard activation and explicit source/reason/context labels.
-
 using Explore.Blazor.Client.Layout;
 
 namespace Explore.Blazor.Client.Tests.Components;

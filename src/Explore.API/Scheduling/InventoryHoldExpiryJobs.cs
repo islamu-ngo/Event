@@ -1,6 +1,3 @@
-// ABOUTME: Quartz jobs that release expired registration capacity holds and recover the affected orders.
-// ABOUTME: A per-order deadline trigger provides punctuality; a low-frequency sweep provides the guarantee.
-
 using System.Globalization;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Scheduling;

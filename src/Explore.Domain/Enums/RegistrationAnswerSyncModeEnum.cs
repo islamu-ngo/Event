@@ -1,6 +1,3 @@
-// ABOUTME: Enum mirror for stable registration-answer synchronization lookup identities.
-// ABOUTME: Expresses no sync, verified completion, selected fields, canonical data, and mirror-only output.
-
 namespace Explore.Domain.Enums;
 
 public enum RegistrationAnswerSyncModeEnum

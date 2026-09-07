@@ -1,6 +1,3 @@
-// ABOUTME: Sub-DTO for creating an individual event day within the event creation graph.
-// ABOUTME: Carries the date, optional label/description, banner, and day-scope registration flag.
-
 using System;
 
 namespace Explore.Application.DTOs.Event;

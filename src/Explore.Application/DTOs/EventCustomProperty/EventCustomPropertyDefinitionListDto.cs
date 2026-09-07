@@ -1,6 +1,3 @@
-// ABOUTME: Lightweight list DTO for event runtime custom property definitions.
-// ABOUTME: Includes OptionCount and SourceTemplateId for quick provenance visibility.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.DTOs.EventCustomProperty;

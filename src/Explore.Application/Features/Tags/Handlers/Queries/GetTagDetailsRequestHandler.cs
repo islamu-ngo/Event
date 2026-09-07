@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning a single tag by ID.
-// ABOUTME: Maps Tag entity to TagDto.
 using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;

@@ -1,6 +1,3 @@
-// ABOUTME: Lookup entity for notification entity types (e.g., Event, Organization, Group).
-// ABOUTME: Follows the same pattern as ApprovalStatus — seeded via LookupTableSeeder.
-
 namespace Explore.Domain;
 
 public class NotificationEntityType

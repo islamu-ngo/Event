@@ -1,6 +1,3 @@
-// ABOUTME: Builds complete typed paid-acceptance evidence for API payment and scheduler fixtures.
-// ABOUTME: Avoids fabricated prose milestones and opaque line JSON in integration setup.
-
 using Explore.Domain;
 
 namespace Event.Api.IntegrationTests.Features;

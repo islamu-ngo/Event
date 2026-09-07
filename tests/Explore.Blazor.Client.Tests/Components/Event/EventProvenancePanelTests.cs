@@ -1,6 +1,3 @@
-// ABOUTME: bUnit tests for immutable community provenance facts and HAL-gated organizer actions.
-// ABOUTME: Proves correction, unsafe-link, claim, and withdrawal affordances never infer authorization locally.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Components.Events;
 using Explore.Blazor.Client.Services.Shell;

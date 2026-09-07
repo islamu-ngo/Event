@@ -1,6 +1,3 @@
-// ABOUTME: Runtime settings for native integration sync outbox processing.
-// ABOUTME: Controls hosted Listmonk subscriber synchronization retries and polling cadence.
-
 namespace Explore.Infrastructure;
 
 public sealed class IntegrationSyncProcessorSettings

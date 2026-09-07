@@ -1,6 +1,3 @@
-// ABOUTME: Stable operational job names for platform-owned scheduled work.
-// ABOUTME: Keeps scheduler identifiers centralized so scheduler job names do not drift from Application contracts.
-
 using System.Collections.Frozen;
 
 namespace Explore.Application.Contracts.Scheduling;

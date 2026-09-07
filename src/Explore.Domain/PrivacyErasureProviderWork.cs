@@ -1,6 +1,3 @@
-// ABOUTME: Models typed post-commit provider settlement for one privacy-erasure intent.
-// ABOUTME: Enforces lease fencing, bounded retries, explicit unknown outcomes, and reconciliation.
-
 namespace Explore.Domain;
 
 public sealed class PrivacyErasureProviderWork

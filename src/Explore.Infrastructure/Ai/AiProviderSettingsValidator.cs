@@ -1,6 +1,3 @@
-// ABOUTME: Validates resolved AI provider settings before Infrastructure adapters run.
-// ABOUTME: Rejects unknown provider IDs, missing model credentials, and unsafe provider endpoints.
-
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;

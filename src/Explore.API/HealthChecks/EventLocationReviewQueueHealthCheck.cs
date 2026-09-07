@@ -1,6 +1,3 @@
-// ABOUTME: Readiness probe for the EventLocation privacy remediation backlog and its operator threshold.
-// ABOUTME: Reports aggregate depth only, never tenant ids, event ids, venue names, or address data.
-
 using Explore.Application.Contracts.Services;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 

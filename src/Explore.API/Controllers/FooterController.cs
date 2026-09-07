@@ -1,6 +1,3 @@
-// ABOUTME: API controller for tenant footer configuration — link groups, links, and scalar settings.
-// ABOUTME: Keeps public config anonymous while tenant administration reads and writes require authentication.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

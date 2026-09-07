@@ -1,6 +1,3 @@
-// ABOUTME: Detail read-model DTO for Location responses.
-// ABOUTME: Includes concurrency metadata required by PATCH If-Match updates.
-
 namespace Explore.Application.DTOs.Location;
 
 public sealed record LocationDto

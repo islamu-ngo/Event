@@ -1,6 +1,3 @@
-// ABOUTME: Validator for grouped event-session speaker link updates.
-// ABOUTME: Validates group presence and required group fields; handlers validate references.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.EventSessionSpeaker.Validators;

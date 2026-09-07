@@ -1,6 +1,3 @@
-// ABOUTME: Lookup entities for normalized AI assistant lifecycle, role, reference, and action classifiers.
-// ABOUTME: Keep stable integer IDs and human-readable metadata for persisted AI assistant state fields.
-
 namespace Explore.Domain.Ai;
 
 public class AiConversationStatusLookup

@@ -1,6 +1,3 @@
-// ABOUTME: Resolves secrets via the Infisical Universal Auth API using the binding's environment/path/key metadata.
-// ABOUTME: Returns bounded outcomes on missing or failed reads without exposing provider diagnostics.
-
 using Explore.Application.Contracts.Secrets;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;

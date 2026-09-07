@@ -1,6 +1,3 @@
-// ABOUTME: Static factory producing standard DialogOptions presets for consistent dialog behavior.
-// ABOUTME: Replaces scattered `new DialogOptions { ... }` with named presets for forms, confirmations, and media.
-
 using MudBlazor;
 
 namespace Explore.Blazor.Client.Services;

@@ -1,6 +1,3 @@
-// ABOUTME: Lookup-table entity for tenant lifecycle statuses used by onboarding and lifecycle transitions.
-// ABOUTME: Stores metadata for each status including whether it represents an active tenant state.
-
 namespace Explore.Domain;
 
 public class TenantStatus

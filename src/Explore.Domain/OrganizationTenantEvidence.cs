@@ -1,6 +1,3 @@
-// ABOUTME: Retained tenant-local document evidence submitted for an Organization participation.
-// ABOUTME: Encapsulates pending-to-reviewed transitions without exposing stored document content or provider metadata.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for starting one idempotent asynchronous User erasure.
-// ABOUTME: Carries the authenticated subject and required UUIDv7 request identity.
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.PrivacyErasure;
 using MediatR;

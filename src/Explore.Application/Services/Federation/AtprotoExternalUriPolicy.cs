@@ -1,6 +1,3 @@
-// ABOUTME: Canonicalizes public ATProto source links while rejecting unsafe redirect targets.
-// ABOUTME: Accepts bounded credential-free HTTPS DNS hosts without fragments or IP-literal ambiguity.
-
 using System.Net;
 
 namespace Explore.Application.Services.Federation;

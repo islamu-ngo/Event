@@ -1,6 +1,3 @@
-// ABOUTME: Specifies recovery capability entropy, dedicated HMAC scope, retained keys, and expiry.
-// ABOUTME: Proves capability-bearing diagnostics redact plaintext and missing keys fail closed.
-
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Secrets;

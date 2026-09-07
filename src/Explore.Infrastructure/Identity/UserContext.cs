@@ -1,6 +1,3 @@
-// ABOUTME: Infrastructure user context for standard authenticated user id claim extraction.
-// ABOUTME: Delegates to the canonical principal extensions so one fallback chain serves every layer.
-
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
 using Microsoft.AspNetCore.Http;

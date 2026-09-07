@@ -1,6 +1,3 @@
-// ABOUTME: Verifies passive AT Protocol authentication health and bounded readiness telemetry.
-// ABOUTME: Proves disabled dormancy, safe failure reporting, and rejection of high-cardinality metric labels.
-
 using System.Diagnostics.Metrics;
 using Explore.Blazor.Constants;
 using Explore.Blazor.HealthChecks;

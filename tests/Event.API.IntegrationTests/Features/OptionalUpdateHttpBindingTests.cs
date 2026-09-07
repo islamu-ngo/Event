@@ -1,6 +1,3 @@
-// ABOUTME: Raw HTTP integration tests for OptionalUpdate<T> API binding semantics.
-// ABOUTME: Proves omitted, explicit set, nullable clear, and invalid wrapper payloads remain distinct.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;

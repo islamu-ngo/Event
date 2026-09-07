@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the BFF sends CarpaNet session material only through the server-private authenticated bridge.
-// ABOUTME: Proves bridge principal substitution fails closed before any cookie-ready flow result is captured.
-
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;

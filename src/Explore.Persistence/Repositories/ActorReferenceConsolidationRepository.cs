@@ -1,6 +1,3 @@
-// ABOUTME: Moves the six mutable operational Actor reference families during proof-gated consolidation.
-// ABOUTME: Preflights unique-scope collisions before issuing updates and leaves immutable source evidence untouched.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

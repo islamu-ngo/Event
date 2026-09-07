@@ -1,6 +1,3 @@
-// ABOUTME: Verifies fair-return equivalence, lifecycle transitions, leases, and retry bounds.
-// ABOUTME: Uses valid Domain factories so tests exercise the same invariants as PostgreSQL orchestration.
-
 using Explore.Domain;
 
 namespace Event.Domain.UnitTests.Entities;

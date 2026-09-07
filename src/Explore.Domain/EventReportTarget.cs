@@ -1,6 +1,3 @@
-// ABOUTME: Target reference row for an event report.
-// ABOUTME: Phase-one creates event-level targets while preserving future target kinds.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

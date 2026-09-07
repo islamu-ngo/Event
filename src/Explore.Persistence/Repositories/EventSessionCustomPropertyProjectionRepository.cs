@@ -1,6 +1,3 @@
-// ABOUTME: EF Core implementation for querying event session custom-property projection rows.
-// ABOUTME: Supports exposure-ceiling filtering for admin inspection and aggregate view composition.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

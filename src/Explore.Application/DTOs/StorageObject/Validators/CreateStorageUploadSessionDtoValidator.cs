@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for local-first upload session reservation payloads.
-// ABOUTME: Validates metadata, quota-safe byte counts, and idempotency before handlers mutate counters.
-
 using System.Net.Http.Headers;
 using Explore.Application.Services;
 using Explore.Domain;

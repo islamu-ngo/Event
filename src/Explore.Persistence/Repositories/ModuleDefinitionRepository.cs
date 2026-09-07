@@ -1,4 +1,3 @@
-// ABOUTME: Repository implementation for ModuleDefinition entity providing
 // data access for module governance and discovery.
 
 using Explore.Application.Contracts.Persistence;

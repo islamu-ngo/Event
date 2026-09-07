@@ -1,6 +1,3 @@
-// ABOUTME: Resolves AI provider responses into validated proposed actions with one bounded correction retry.
-// ABOUTME: Keeps provider retry policy separate from command persistence and domain state transitions.
-
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Features.AiAssistant.Tools;
 using Explore.Domain.Ai;

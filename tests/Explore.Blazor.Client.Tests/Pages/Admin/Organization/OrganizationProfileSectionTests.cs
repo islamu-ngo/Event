@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for the organization settings profile validation path.
-// ABOUTME: Verifies local validation, server ProblemDetails mapping, and safe update failure messages.
-
 using System.Reflection;
 using Explore.Blazor.Client.Pages.Admin.Organization.Components;
 using MudBlazor;

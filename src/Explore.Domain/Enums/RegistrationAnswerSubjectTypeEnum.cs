@@ -1,6 +1,3 @@
-// ABOUTME: Defines stable subject kinds for atomic registration answers.
-// ABOUTME: Distinguishes booking, purchaser, participant, ticket, and session-selection identity.
-
 namespace Explore.Domain.Enums;
 
 public enum RegistrationAnswerSubjectTypeEnum

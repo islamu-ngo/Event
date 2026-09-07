@@ -1,6 +1,3 @@
-// ABOUTME: Validation for the convention-first self-hosted onboarding profile.
-// ABOUTME: Keeps site identity input bounded before it is converted into governance settings.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.Onboarding.Validators;

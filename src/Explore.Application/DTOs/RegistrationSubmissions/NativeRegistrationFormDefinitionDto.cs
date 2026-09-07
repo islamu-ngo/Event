@@ -1,6 +1,3 @@
-// ABOUTME: Defines the attendee-safe pinned native registration form contract.
-// ABOUTME: Exposes render and validation metadata without tenant, authoring, or organizer-only state.
-
 using Explore.Application.DTOs.RegistrationForms;
 using Explore.Domain.Enums;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Cancels a queued webhook bulk replay under optimistic concurrency and mandatory audit.
-// ABOUTME: Loses safely to worker start so executing or terminal operations cannot be cancelled.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;

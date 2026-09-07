@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for EmergencyFallbackPalettes — verifies hardcoded fallback data integrity.
-// ABOUTME: Ensures all four fallback palettes have valid hex tokens and structural completeness.
-
 namespace Explore.Application.UnitTests.Services;
 
 using Explore.Application.Services;

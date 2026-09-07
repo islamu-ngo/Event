@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for instance onboarding governance endpoints and render-policy flows.
-// ABOUTME: Verifies save/retrieve behavior with setup-secret gating and preset validation rules.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;

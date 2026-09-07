@@ -1,6 +1,3 @@
-// ABOUTME: Handles onboarding status queries for startup gating and role-aware onboarding UX.
-// ABOUTME: Combines bootstrap completion state with current user instance admin membership.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

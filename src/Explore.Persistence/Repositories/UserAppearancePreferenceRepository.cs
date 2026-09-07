@@ -1,6 +1,3 @@
-// ABOUTME: Repository implementation for UserAppearancePreference — active profile selection per user/scope.
-// ABOUTME: Ensures uniqueness per (UserId, TenantId) and creates preferences on demand.
-
 namespace Explore.Persistence.Repositories;
 
 using Explore.Application.Contracts.Persistence;

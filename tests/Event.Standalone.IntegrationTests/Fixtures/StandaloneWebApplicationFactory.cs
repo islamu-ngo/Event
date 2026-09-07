@@ -1,6 +1,3 @@
-// ABOUTME: Hosts the real standalone entry assembly with deterministic in-memory test dependencies.
-// ABOUTME: Preserves the combined middleware and endpoint graph while removing external startup I/O.
-
 using System.Collections.Concurrent;
 using System.Net;
 using Event.Web.BffHosting.Abstractions;

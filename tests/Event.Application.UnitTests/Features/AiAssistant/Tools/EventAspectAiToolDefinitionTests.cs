@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for registry-backed event aspect AI tool definitions.
-// ABOUTME: Locks aspect schemas, mapper metadata, HAL requirements, and destructive hints.
-
 using System.Text.Json;
 using Explore.Application.Authorization;
 using Explore.Application.Features.AiAssistant.Actions;

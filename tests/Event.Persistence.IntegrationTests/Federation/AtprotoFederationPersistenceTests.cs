@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL integration tests for fenced AT Protocol outbox settlement and atomic Jetstream cursor application.
-// ABOUTME: Covers stale-worker rollback, idempotent replay, UUID allocation, and tenant presentation isolation.
-
 using System.Data.Common;
 using System.Text.Json;
 using Event.Persistence.IntegrationTests.Fixtures;

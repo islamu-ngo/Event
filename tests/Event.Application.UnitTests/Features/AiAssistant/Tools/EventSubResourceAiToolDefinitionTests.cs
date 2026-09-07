@@ -1,6 +1,3 @@
-// ABOUTME: Tests Phase 5 event sub-resource AI tool definitions.
-// ABOUTME: Locks proposal-only registry coverage for sessions, program structure, agenda, custom properties, teams, and templates.
-
 using System.Text.Json;
 using Explore.Application.Features.AiAssistant.Actions;
 using Explore.Application.Features.AiAssistant.Tools;

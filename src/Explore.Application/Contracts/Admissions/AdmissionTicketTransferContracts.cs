@@ -1,6 +1,3 @@
-// ABOUTME: Defines entity-returning persistence contracts for ticket-transfer offers and acceptance.
-// ABOUTME: Keeps tenant, capability digest, readiness, credential generation, and outbox inputs explicit.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Admissions;

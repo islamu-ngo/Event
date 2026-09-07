@@ -1,6 +1,3 @@
-// ABOUTME: Governance definitions for bounded Local webhook delivery and sustained-failure auto-pause.
-// ABOUTME: Instance values provide defaults while lockable tenant-scoped keys allow governed overrides.
-
 using Explore.Domain.Constants;
 
 namespace Explore.Domain.Settings.Definitions;

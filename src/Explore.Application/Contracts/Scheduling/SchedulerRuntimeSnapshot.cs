@@ -1,6 +1,3 @@
-// ABOUTME: Scheduler-neutral runtime view of the live scheduler, its jobs, and their triggers.
-// ABOUTME: Carries scheduling metadata only so operator surfaces never observe job payloads or tenant content.
-
 namespace Explore.Application.Contracts.Scheduling;
 
 /// <summary>

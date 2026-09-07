@@ -1,6 +1,3 @@
-// ABOUTME: Command for assigning a first-release operational role to a user for one event.
-// ABOUTME: Enforces same-event authority ceiling through the handler before persisting the assignment.
-
 using Explore.Application.Responses;
 using Explore.Application.Authorization;
 using Explore.Domain.Constants;

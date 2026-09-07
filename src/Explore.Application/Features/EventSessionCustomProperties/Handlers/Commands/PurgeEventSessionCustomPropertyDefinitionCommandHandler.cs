@@ -1,6 +1,3 @@
-// ABOUTME: Handles explicit audited hard purge for dependency-free session custom-property definitions.
-// ABOUTME: Blocks irreversible purge when values, projections, audit, or template provenance exist.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.CustomPropertyDefinition;

@@ -1,6 +1,3 @@
-// ABOUTME: Builds complete typed buyer-acceptance evidence for payment persistence scenarios.
-// ABOUTME: Keeps provider, policy, delivery, operator, and money fixtures explicit before dispatch.
-
 using Explore.Domain;
 
 namespace Event.Persistence.IntegrationTests;

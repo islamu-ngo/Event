@@ -1,6 +1,3 @@
-// ABOUTME: General startup-governed instance operator identity independent from payment activation.
-// ABOUTME: Exposes only non-secret public accountability facts for platform-level disclosure.
-
 namespace Explore.Application.Contracts.Services;
 
 public interface IInstanceOperatorIdentity

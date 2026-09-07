@@ -1,6 +1,3 @@
-// ABOUTME: HAL assembler for event-session speaker assignment resources.
-// ABOUTME: Adds the session-scoped create affordance after the management route has authorized access.
-
 namespace Explore.API.Hateoas.Assemblers;
 
 using Explore.Application.Contracts.Hateoas;

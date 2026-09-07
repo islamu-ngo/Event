@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for TenantInvitation entity.
-// ABOUTME: Enforces token uniqueness, composite index on TenantId+Email, and domain length constraints.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

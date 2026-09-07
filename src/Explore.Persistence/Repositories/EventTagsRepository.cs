@@ -1,6 +1,3 @@
-// ABOUTME: EF repository for event-tag link entities and tag/event lookup projections.
-// ABOUTME: Exposes duplicate-link reads used by grouped relationship update handlers.
-
 using System;
 using System.Collections.Generic;
 using System.Text;

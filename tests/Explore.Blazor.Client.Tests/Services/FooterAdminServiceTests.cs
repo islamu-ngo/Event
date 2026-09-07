@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for FooterAdminService generated-client delegation and fallback behavior.
-// ABOUTME: Verifies footer operation calls, generated DTO forwarding, and resilient command failures.
-
 namespace Explore.Blazor.Client.Tests.Services;
 
 public sealed class FooterAdminServiceTests

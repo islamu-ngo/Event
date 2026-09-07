@@ -1,6 +1,3 @@
-// ABOUTME: Handles single-event aggregate read-model queries against the EventWithSessions keyless view.
-// ABOUTME: Applies manual validation, HybridCache, safe facet JSON parsing, and exposure-ceiling filtering.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventAggregateViews.Requests.Queries;
 using Explore.Application.Responses;

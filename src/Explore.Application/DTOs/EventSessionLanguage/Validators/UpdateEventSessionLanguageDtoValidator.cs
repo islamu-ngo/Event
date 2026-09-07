@@ -1,6 +1,3 @@
-// ABOUTME: Validates grouped event-session language update payloads.
-// ABOUTME: Keeps lookup and tenant consistency checks in the command handler.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.EventSessionLanguage.Validators;

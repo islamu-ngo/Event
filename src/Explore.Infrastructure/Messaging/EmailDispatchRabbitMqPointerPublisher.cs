@@ -1,6 +1,3 @@
-// ABOUTME: Publishes pointer-only EmailDispatchOutbox rows into optional RabbitMQ Dispatch Mode.
-// ABOUTME: Records producer attempt metadata while PostgreSQL remains the source of delivery truth.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

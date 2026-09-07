@@ -1,6 +1,3 @@
-// ABOUTME: Reserves tenant storage quota for privacy-unfenced Users before bytes are uploaded.
-// ABOUTME: Resolves route policy and atomically creates idempotent sessions with quota counters.
-
 using System.Globalization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

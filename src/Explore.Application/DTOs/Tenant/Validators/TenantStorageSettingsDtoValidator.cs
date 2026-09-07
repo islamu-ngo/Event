@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for tenant-level storage admin settings.
-// ABOUTME: Enforces provider allow-listing, byte ceilings, quotas, and optional S3 URL shape.
-
 using Explore.Application.DTOs.Storage;
 using Explore.Domain;
 using FluentValidation;

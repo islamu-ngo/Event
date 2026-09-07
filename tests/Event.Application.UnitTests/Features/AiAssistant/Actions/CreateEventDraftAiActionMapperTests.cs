@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for converting untrusted AI CreateEventDraft proposals into safe draft DTOs.
-// ABOUTME: Verifies privileged fields, unknown fields, validation bounds, and owner-scope allow-lists are enforced.
-
 using Explore.Application.Features.AiAssistant.Actions;
 using Explore.Domain;
 

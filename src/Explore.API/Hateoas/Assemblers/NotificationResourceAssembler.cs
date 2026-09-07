@@ -1,6 +1,3 @@
-// ABOUTME: Resource assembler for Notification entities.
-// ABOUTME: Converts NotificationDto and NotificationListDto to HAL resources with links.
-
 namespace Explore.API.Hateoas.Assemblers;
 
 using Explore.Application.Contracts.Hateoas;

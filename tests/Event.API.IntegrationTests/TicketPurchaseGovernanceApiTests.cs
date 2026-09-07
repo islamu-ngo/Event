@@ -1,6 +1,3 @@
-// ABOUTME: Defines RED public-contract tests for authenticated and capability-scoped purchase governance.
-// ABOUTME: Covers auth, tenant fencing, idempotency, private failures, HAL affordances, and OpenAPI shape.
-
 using System.Net;
 using System.Reflection;
 using System.Text;

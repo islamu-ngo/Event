@@ -1,6 +1,3 @@
-// ABOUTME: Startup validation for API-hosted Quartz.NET scheduler settings.
-// ABOUTME: Fails fast on an unauthenticated status endpoint or structurally invalid scheduler options.
-
 using Microsoft.Extensions.Options;
 
 namespace Explore.API.Configuration;

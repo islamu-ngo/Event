@@ -1,6 +1,3 @@
-// ABOUTME: Maps tenant/event-owned registration forms and their stable machine identities.
-// ABOUTME: Enforces restrictive composite ownership and tenant-safe active-form uniqueness.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

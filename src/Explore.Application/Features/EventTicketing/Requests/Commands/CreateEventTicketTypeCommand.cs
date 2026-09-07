@@ -1,5 +1,3 @@
-// ABOUTME: Adds a ticket type to an event ticket catalog draft.
-// ABOUTME: Authorizes against the parent event ticket-management action.
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventTicketing;
 using Explore.Application.Responses;

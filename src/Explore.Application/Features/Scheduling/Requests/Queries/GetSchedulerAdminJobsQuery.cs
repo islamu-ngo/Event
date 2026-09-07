@@ -1,6 +1,3 @@
-// ABOUTME: Secured query listing every scheduled job with its trigger states for the operator surface.
-// ABOUTME: Shares the scheduler administration setting key so visibility matches the overview resource exactly.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Scheduling;
 using MediatR;

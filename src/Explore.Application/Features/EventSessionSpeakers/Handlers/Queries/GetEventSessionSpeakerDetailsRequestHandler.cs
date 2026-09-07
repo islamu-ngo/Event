@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning a single session-speaker link by ID.
-// ABOUTME: Maps junction entity to EventSessionSpeakerDto.
 using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;

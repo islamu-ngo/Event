@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for public event-action discovery and organizer management.
-// ABOUTME: Dispatches existing CQRS requests and assembles public-action HAL resources.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

@@ -1,6 +1,3 @@
-@* ABOUTME: Inline Studio form for shared ticket capacity, hold duration, and oversell policy. *@
-@* ABOUTME: Validates pool write fields before handing generated DTO conversion to the parent editor. *@
-
 <div class="capacity-pool-editor" data-testid="capacity-pool-editor">
     <MudTextField T="string" Label="Name" @bind-Value="Model.Name" Required="true" Variant="Variant.Outlined" Disabled="IsSaving" data-testid="capacity-pool-name" />
     <MudNumericField T="int?" Label="Maximum quantity" @bind-Value="Model.MaximumQuantity" Min="1" Variant="Variant.Outlined" Disabled="IsSaving" data-testid="capacity-pool-quantity" />

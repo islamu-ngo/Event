@@ -1,6 +1,3 @@
-// ABOUTME: Reproduces EF's uncached-build/global-cache interaction without contaminating the suite process.
-// ABOUTME: This is the sole deliberate raw-options exception to the assembly's test construction policy.
-
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Caching.Memory;

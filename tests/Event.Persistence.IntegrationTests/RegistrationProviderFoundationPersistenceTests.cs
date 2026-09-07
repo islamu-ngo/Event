@@ -1,6 +1,3 @@
-// ABOUTME: Verifies Phase 9 provider-neutral EF metadata, lookup seeding, filters, and credential references.
-// ABOUTME: Includes the manual-QA persistence driver for qualified SecretBinding credentials and connections.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: API-local SkiaSharp renderer for deterministic public event Open Graph PNG images.
-// ABOUTME: Shapes embedded-font text with HarfBuzz and safely falls back from optional artwork to title-derived gradients.
-
 using System.Buffers;
 using System.Globalization;
 using System.Reflection;

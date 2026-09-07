@@ -1,6 +1,3 @@
-// ABOUTME: Command to snooze a notification until a specified time for the authenticated user.
-// ABOUTME: Pass null SnoozedUntil to unsnooze.
-
 using Explore.Application.Responses;
 using MediatR;
 

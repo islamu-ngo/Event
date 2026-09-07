@@ -1,6 +1,3 @@
-// ABOUTME: Static helper providing social media platform-to-icon resolution for footer templates.
-// ABOUTME: Maps platform identifiers to MudBlazor icon constants (Facebook, Twitter/X, Instagram, etc.).
-
 namespace Explore.Blazor.Client.Helpers;
 
 using MudBlazor;

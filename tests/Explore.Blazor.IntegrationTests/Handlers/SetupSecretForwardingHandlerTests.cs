@@ -1,6 +1,3 @@
-// ABOUTME: Unit-style DelegatingHandler tests for forwarding setup secret headers to onboarding endpoints.
-// ABOUTME: Verifies cookie/session-source behavior and endpoint gating for X-Setup-Secret forwarding.
-
 using Explore.Blazor.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;

@@ -1,6 +1,3 @@
-// ABOUTME: Thin API executable composition root that delegates to reusable owning-assembly host modules.
-// ABOUTME: Retains Program-based WebApplicationFactory compatibility and caller-owned shutdown state.
-
 using Explore.API.Hosting;
 
 using var shutdownCts = new CancellationTokenSource();

@@ -1,6 +1,3 @@
-// ABOUTME: File-backed SQLite regressions for provider-portable email repository claims and suppression.
-// ABOUTME: Proves one-winner leases, provider fences, and reminder/fanout ledger alignment through public APIs.
-
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

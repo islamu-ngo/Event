@@ -1,6 +1,3 @@
-// ABOUTME: Validates the internal PDS recovery trust boundary before policy resolution or network access.
-// ABOUTME: Enforces UTC snapshot time, valid lease identity, bounded DID scope, and opaque fingerprint shape.
-
 using Explore.Application.Features.Federation.Atproto.Requests.Commands;
 using FluentValidation;
 

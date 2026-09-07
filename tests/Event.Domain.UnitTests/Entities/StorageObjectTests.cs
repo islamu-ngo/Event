@@ -1,6 +1,3 @@
-// ABOUTME: Domain tests for provider-neutral storage object lifecycle behavior.
-// ABOUTME: Verifies tenant/audit/soft-delete contracts plus quarantine and delete-request transitions.
-
 namespace Event.Domain.UnitTests.Entities;
 
 using Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines immutable participation-policy facts pinned when a registration order starts.
-// ABOUTME: Prevents later event participation reconfiguration from rewriting an in-flight order's authority context.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Domain;

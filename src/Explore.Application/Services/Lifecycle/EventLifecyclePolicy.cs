@@ -1,5 +1,3 @@
-// ABOUTME: Describes the effective required-field policy for a given lifecycle validation profile.
-// ABOUTME: Composed centrally by IEventLifecyclePolicyProvider from hard invariants and tenant/instance overrides.
 using System;
 using System.Collections.Generic;
 

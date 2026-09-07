@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for agenda rows owned by a specific EventSession.
-// ABOUTME: Composite FKs bind session-owned agenda items to same-tenant sessions and locations.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

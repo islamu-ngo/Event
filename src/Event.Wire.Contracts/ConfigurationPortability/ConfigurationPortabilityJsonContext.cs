@@ -1,6 +1,3 @@
-// ABOUTME: Provides source-generated JSON metadata for package-free v1alpha2 portability artifacts.
-// ABOUTME: Preserves strict camel-case, case-sensitive, compact, null-omitting wire behavior.
-
 namespace ISLAMU.Wire.Contracts.ConfigurationPortability;
 
 using System.Text.Json;

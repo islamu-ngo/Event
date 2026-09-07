@@ -1,6 +1,3 @@
-// ABOUTME: Grouped PATCH contract for tenant Listmonk non-secret integration settings.
-// ABOUTME: Credentials remain isolated behind the dedicated rotation endpoint.
-
 namespace Explore.Application.DTOs.Integrations;
 
 public sealed record UpdateListmonkIntegrationSettingsDto

@@ -1,6 +1,3 @@
-// ABOUTME: Captures the access token from the initial HTTP request into the circuit-scoped token service.
-// ABOUTME: Ensures Blazor Server circuit-dispatched events can resolve tokens even when HttpContext is null.
-
 using Event.Web.BffHosting.Security;
 using Microsoft.Net.Http.Headers;
 using Microsoft.AspNetCore.Authentication;

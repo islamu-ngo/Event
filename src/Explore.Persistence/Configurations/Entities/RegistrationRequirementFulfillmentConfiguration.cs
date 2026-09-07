@@ -1,6 +1,3 @@
-// ABOUTME: Maps durable subject-scoped registration requirement fulfillment and skip evidence.
-// ABOUTME: Enforces tenant-safe order, workflow, requirement, submission, and subject identity containment.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

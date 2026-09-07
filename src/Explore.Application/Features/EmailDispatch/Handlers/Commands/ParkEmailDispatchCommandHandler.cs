@@ -1,6 +1,3 @@
-// ABOUTME: Handles operator parking of EmailDispatch outbox rows through durable repository transitions.
-// ABOUTME: Enforces state-machine rules in Application before Persistence mutates PostgreSQL state.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using Explore.Application.Features.EmailDispatch.Validators;

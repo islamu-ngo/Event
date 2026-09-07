@@ -1,6 +1,3 @@
-// ABOUTME: One-pass authoritative payment reconciliation over durable fenced due effects.
-// ABOUTME: Retrieves Checkout and PaymentIntent outside transactions, then applies one local monotonic settlement.
-
 using Explore.Application.Contracts.Payments;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: Handler for assigning event-scoped operational roles.
-// ABOUTME: Enforces event existence, target user existence, duplicate-open prevention, and authority ceiling.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventRoleAssignments.Requests.Commands;

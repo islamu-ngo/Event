@@ -1,4 +1,3 @@
-// ABOUTME: Enum defining how multiple tag filters are combined (AND/OR logic).
 // Used by GetEventListRequest to control inclusion and exclusion query semantics.
 
 namespace Explore.Application.Specifications.Events;

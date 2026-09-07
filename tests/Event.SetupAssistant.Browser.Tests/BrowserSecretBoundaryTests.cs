@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the browser target remains ApprovedDisabled after the intentional SA-610 Red.
-// ABOUTME: Enforces false capabilities and complete absence of browser runtime owners, packages, and assets.
-
 namespace Event.SetupAssistant.Browser.Tests;
 
 using System.Text.Json;

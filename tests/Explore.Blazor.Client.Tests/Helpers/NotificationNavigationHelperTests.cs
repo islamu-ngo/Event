@@ -1,6 +1,3 @@
-// ABOUTME: Verifies notification entity deep links match the Blazouter route table.
-// ABOUTME: Covers event, organization, group, and unsupported notification entity targets.
-
 using Explore.Blazor.Client.Helpers;
 
 namespace Explore.Blazor.Client.Tests.Helpers;

@@ -1,6 +1,3 @@
-// ABOUTME: Host-backed API flow tests for AI assistant conversation and message endpoints.
-// ABOUTME: Exercises auth gates, fake-provider send flow, idempotency, and HAL over the in-memory test host.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;

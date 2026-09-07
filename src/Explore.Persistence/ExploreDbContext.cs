@@ -1,6 +1,3 @@
-// ABOUTME: Core DbContext for the Explore platform with pooled creation and property-injected scoped services.
-// ABOUTME: Split into partial classes and excludes dedicated authority configurations from the primary model.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;

@@ -1,6 +1,3 @@
-// ABOUTME: Proves canonical release bytes stay stable across platform-shaped inputs and ambient state.
-// ABOUTME: Exercises the bounded untrusted-text boundary with multilingual and adversarial fixtures.
-
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;

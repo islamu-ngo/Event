@@ -1,6 +1,3 @@
-// ABOUTME: Specifies restart-safe, fenced cancellation-refund campaign state and counters.
-// ABOUTME: Proves stale workers cannot advance cursors or double-count generated refund intents.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

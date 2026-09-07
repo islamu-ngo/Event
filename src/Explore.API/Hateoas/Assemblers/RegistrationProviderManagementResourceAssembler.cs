@@ -1,6 +1,3 @@
-// ABOUTME: HAL assemblers for registration-provider health and parked reconciliation queue DTOs.
-// ABOUTME: Keeps Wave E Studio integration navigation server-generated and authorization-filtered.
-
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.DTOs.RegistrationProviders;
 

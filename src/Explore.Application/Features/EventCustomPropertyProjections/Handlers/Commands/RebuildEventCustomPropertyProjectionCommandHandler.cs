@@ -1,6 +1,3 @@
-// ABOUTME: Handles tenant-wide rebuild of event custom-property projection rows.
-// ABOUTME: Delegates to the projection updater which coordinates advisory locks, status tracking, and dirty-scope drain.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Application.DTOs.CustomPropertyProjection.Validators;

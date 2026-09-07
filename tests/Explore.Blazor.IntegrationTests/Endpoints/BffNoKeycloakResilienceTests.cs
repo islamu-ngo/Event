@@ -1,6 +1,3 @@
-// ABOUTME: Tests that the Blazor BFF gracefully handles the complete absence of Keycloak configuration.
-// ABOUTME: No crash, no fake login, provider list empty, auth status not authenticated.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.HealthChecks;

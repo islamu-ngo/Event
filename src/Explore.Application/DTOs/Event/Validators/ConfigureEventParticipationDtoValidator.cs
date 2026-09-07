@@ -1,6 +1,3 @@
-// ABOUTME: Validates explicit participation writes before Application handlers construct or reconfigure Domain state.
-// ABOUTME: Reuses typed Domain rules so every writer rejects illegal combinations without fallback defaults.
-
 using Explore.Domain.Services.Registration;
 using FluentValidation;
 

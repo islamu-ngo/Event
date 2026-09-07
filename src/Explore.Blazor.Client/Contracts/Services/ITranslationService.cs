@@ -1,6 +1,3 @@
-// ABOUTME: Client-side translation service contract for fetching, caching, and resolving translations.
-// ABOUTME: Provides T(key) accessor and language change notification for Blazor components.
-
 namespace Explore.Blazor.Client.Contracts.Services;
 
 /// <summary>

@@ -1,5 +1,3 @@
-// ABOUTME: Integration tests for EventSessionStatus lookup and nullable EventSession schedule constraints.
-// ABOUTME: Verifies Phase 1 persistence foundation: seeded statuses, Restrict FK, nullable schedule, partial GiST exclusion.
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;

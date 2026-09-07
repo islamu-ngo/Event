@@ -1,6 +1,3 @@
-// ABOUTME: Domain entity for tracking entity-level audit changes (create, update, delete).
-// ABOUTME: Captures who changed what, when, with old/new values for compliance and debugging.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

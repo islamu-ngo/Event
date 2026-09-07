@@ -1,6 +1,3 @@
-// ABOUTME: Handles explicit tenant storage provider tests for authorized administrators.
-// ABOUTME: Delegates provider resolution and secret-safe diagnostics to the tenant storage service.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;

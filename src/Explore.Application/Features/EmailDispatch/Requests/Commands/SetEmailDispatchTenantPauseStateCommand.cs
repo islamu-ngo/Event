@@ -1,6 +1,3 @@
-// ABOUTME: Command contract for idempotent tenant-level Basic Dispatch Mode pause and resume controls.
-// ABOUTME: Keeps operator write actions in Application while workers read durable PostgreSQL control state.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

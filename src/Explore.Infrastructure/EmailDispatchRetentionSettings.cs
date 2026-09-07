@@ -1,6 +1,3 @@
-// ABOUTME: Runtime settings for bounded email dispatch content retention and redaction.
-// ABOUTME: Controls scheduling, retention age, batch size, and dry-run safety mode.
-
 namespace Explore.Infrastructure;
 
 public sealed class EmailDispatchRetentionSettings

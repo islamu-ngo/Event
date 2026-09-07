@@ -1,6 +1,3 @@
-// ABOUTME: Verifies Web Push connections cannot bypass endpoint SSRF checks through DNS rebinding.
-// ABOUTME: Ensures connector-time resolution rejects private and mixed public/private address sets.
-
 using System.Net;
 using Explore.Infrastructure.WebPush;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Computes stable request identity metadata for Idempotency-Key replay validation.
-// ABOUTME: Canonicalizes JSON request bodies so equivalent formatting does not change fingerprints.
-
 using System.Buffers;
 using System.Security.Claims;
 using System.Security.Cryptography;

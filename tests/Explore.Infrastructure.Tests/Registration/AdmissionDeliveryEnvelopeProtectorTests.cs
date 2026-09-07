@@ -1,6 +1,3 @@
-// ABOUTME: Proves admission delivery bearer envelopes are recoverable across provider recreation and redact material.
-// ABOUTME: Covers malformed ciphertext and purpose-version failure without exposing plaintext.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Admissions;
 using Explore.Infrastructure.Services.Registration;

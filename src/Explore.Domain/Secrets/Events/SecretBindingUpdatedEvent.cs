@@ -1,6 +1,3 @@
-// ABOUTME: Domain event raised when a SecretBinding is created, updated, deleted, or has its source switched.
-// ABOUTME: Triggers cache invalidation and downstream resolver refreshes via Application-layer wrapper notifications.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Domain.Secrets.Events;

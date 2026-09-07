@@ -1,6 +1,3 @@
-// ABOUTME: Runs one bounded incoming-webhook intake drain pass under Quartz.
-// ABOUTME: Delegates claims, tenant execution, lease renewal, and settlement to Infrastructure.
-
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Contracts.Webhooks;
 using Quartz;

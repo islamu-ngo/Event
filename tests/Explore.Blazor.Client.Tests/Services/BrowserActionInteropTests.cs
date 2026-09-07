@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for typed browser action JS interop boundary.
-// ABOUTME: Verifies Blazor passes structured arguments to the ES module and fails closed.
-
 using Explore.Blazor.Client.Services;
 using Microsoft.JSInterop;
 

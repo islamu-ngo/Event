@@ -1,4 +1,3 @@
-// ABOUTME: Result type for email send and connection test operations.
 // Captures success/failure, error details, and timing diagnostics.
 
 namespace Explore.Application.Models;

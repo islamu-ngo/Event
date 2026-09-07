@@ -1,6 +1,3 @@
-// ABOUTME: Defines the atomic dispatch-time eligibility and provider-handoff boundary for email delivery.
-// ABOUTME: Returns only current authorized destination data and stable non-PII suppression outcomes.
-
 namespace Explore.Application.Contracts.Notifications;
 
 public interface IEmailDispatchEligibilityEvaluator

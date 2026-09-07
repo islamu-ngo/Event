@@ -1,6 +1,3 @@
-// ABOUTME: API contract tests for audited no-store Svix portal issuance.
-// ABOUTME: Ensures audit failures and safe metadata handling never expose a portal URL.
-
 using System.Net;
 using System.Net.Http.Json;
 using Event.Api.IntegrationTests.Fixtures;

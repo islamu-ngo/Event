@@ -1,6 +1,3 @@
-// ABOUTME: Stable relational lookup rows for provider publication and reconciliation evidence outcomes.
-// ABOUTME: Mirrors append-only publication attempt outcomes while keeping persisted identifiers normalized.
-
 namespace Explore.Domain;
 
 public sealed class WebhookProviderPublicationAttemptOutcomeLookup

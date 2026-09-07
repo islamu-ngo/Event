@@ -1,6 +1,3 @@
-// ABOUTME: Operator-safe status view of a durable incoming Coop effect pointer.
-// ABOUTME: Exposes lifecycle fields while excluding callback bytes, hashes, provider IDs, and raw errors.
-
 namespace Explore.Application.DTOs.Webhooks;
 
 public sealed record IncomingWebhookEffectStatusDto

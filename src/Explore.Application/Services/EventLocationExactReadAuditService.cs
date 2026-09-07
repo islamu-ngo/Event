@@ -1,6 +1,3 @@
-// ABOUTME: Persists PII-free exact EventLocation read audits in one append-only batch.
-// ABOUTME: Uses server UTC and trace fallback without accepting any physical-location values.
-
 using System.Diagnostics;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

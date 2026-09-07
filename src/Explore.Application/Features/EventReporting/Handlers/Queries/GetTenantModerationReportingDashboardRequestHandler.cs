@@ -1,6 +1,3 @@
-// ABOUTME: Handles tenant moderation-reporting dashboard reads with tenant-bounded aggregate counts.
-// ABOUTME: Maps queue and provider sync health without exposing report payloads, tenant lists, or provider secrets.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventReporting;

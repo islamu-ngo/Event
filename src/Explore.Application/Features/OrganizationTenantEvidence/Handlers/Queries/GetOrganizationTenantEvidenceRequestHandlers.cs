@@ -1,6 +1,3 @@
-// ABOUTME: Maps tenant-scoped Organization legitimacy evidence to safe authenticated DTOs.
-// ABOUTME: Returns document display metadata only and omits storage provider, key, URI, content, and reviewer identity.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.OrganizationTenantEvidence;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines bounded receipt, provider retry, and retained-authority lifecycle settings.
-// ABOUTME: Validates privacy-erasure timing and retention limits before runtime work begins.
-
 namespace Explore.Application.Configuration;
 
 public sealed class PrivacyErasureOptions

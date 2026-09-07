@@ -1,6 +1,3 @@
-// ABOUTME: Proves the catalogued sensitive collections disclose no rows, counts, or existence out of scope.
-// ABOUTME: Constraints must land before Count/Skip/Take, so an unauthorized caller cannot even read a total.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;

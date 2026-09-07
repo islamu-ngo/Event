@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for protected LocationRoom API routing and authorization behavior.
-// ABOUTME: Verifies authenticated reads plus PATCH route, If-Match precondition, and old PUT rejection.
-
 using System.Net;
 using System.Net.Http.Json;
 using Event.Api.IntegrationTests.Fixtures;

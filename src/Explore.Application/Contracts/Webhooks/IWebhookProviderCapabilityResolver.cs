@@ -1,6 +1,3 @@
-// ABOUTME: Application boundary for versioned webhook provider capability resolution.
-// ABOUTME: Separates platform-owned Local features from conformance-backed provider-native features.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Webhooks;

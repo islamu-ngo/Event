@@ -1,6 +1,3 @@
-// ABOUTME: Hosts isolated MariaDB and MySQL engines for semantic migration retry-safety tests.
-// ABOUTME: Builds structured migrator options with runtime-generated credentials and exact provider versions.
-
 using System.Security.Cryptography;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;

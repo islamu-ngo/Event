@@ -1,6 +1,3 @@
-// ABOUTME: Wrapper DTO for PATCH-based EventSession updates using nullable logical groups.
-// ABOUTME: Route ID targets the session while groups express independent field update intent.
-
 using Explore.Application.Models.Common;
 using Explore.Domain.Enums;
 

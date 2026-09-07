@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for grouped route-ID updates to a session-language link.
-// ABOUTME: Carries the route id, If-Match concurrency stamp, and grouped payload.
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventSessionLanguage;
 using Explore.Application.Responses;

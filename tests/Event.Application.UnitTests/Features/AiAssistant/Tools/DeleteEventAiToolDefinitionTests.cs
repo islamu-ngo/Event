@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the registry-backed DeleteEvent AI tool definition.
-// ABOUTME: Locks destructive metadata, schema requirements, authorization, and forbidden fields.
-
 using System.Text.Json;
 using Explore.Application.Authorization;
 using Explore.Application.Features.AiAssistant.Actions;

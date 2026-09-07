@@ -1,6 +1,3 @@
-// ABOUTME: Write DTO for creating event templates, optionally includes nested definition payloads.
-// ABOUTME: Templates can be created empty then populated, or with definitions in a single call.
-
 namespace Explore.Application.DTOs.EventTemplate;
 
 public sealed record CreateEventTemplateDto

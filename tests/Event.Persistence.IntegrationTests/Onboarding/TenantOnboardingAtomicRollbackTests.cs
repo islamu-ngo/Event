@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL failure-injection coverage for tenant onboarding's mandatory identity write.
-// ABOUTME: Proves policy, branding, onboarding, and identity persistence share one rollback boundary.
-
 using Explore.Domain;
 using Explore.Domain.Settings.Documents;
 using Explore.Domain.Settings.Documents.Payloads;

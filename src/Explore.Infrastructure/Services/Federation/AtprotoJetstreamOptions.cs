@@ -1,6 +1,3 @@
-// ABOUTME: Defines bounded fixed-endpoint configuration for the global ATProto Jetstream v2 subscriber.
-// ABOUTME: Validates lease, retry, message-size, and optional bounded DID filter entries at startup.
-
 using CarpaNet;
 using Explore.Domain.ValueObjects;
 using Microsoft.Extensions.Options;

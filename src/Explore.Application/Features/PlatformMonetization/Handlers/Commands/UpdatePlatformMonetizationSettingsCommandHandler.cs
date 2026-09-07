@@ -1,6 +1,3 @@
-// ABOUTME: Replaces platform fee and contribution singleton revisions through one retryable serializable transaction.
-// ABOUTME: Rechecks instance authority before repository access and preserves immutable revision ordering on every retry.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;

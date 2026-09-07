@@ -1,6 +1,3 @@
-// ABOUTME: Local authorization parity tests for account-scoped registration orders.
-// ABOUTME: Verifies fallback access is tenant-bound and never grants another buyer's order.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;

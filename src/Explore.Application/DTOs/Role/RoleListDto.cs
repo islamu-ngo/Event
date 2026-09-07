@@ -1,6 +1,3 @@
-// ABOUTME: Lightweight role DTO for list views. Replaces OrganizationRoleListDto and UserRoleListDto.
-// ABOUTME: Includes scope for filtering and display grouping in UI dropdowns.
-
 namespace Explore.Application.DTOs.Role;
 
 public sealed record RoleListDto

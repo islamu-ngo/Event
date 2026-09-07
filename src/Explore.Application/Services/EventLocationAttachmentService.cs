@@ -1,6 +1,3 @@
-// ABOUTME: Coordinates fail-closed EventLocation creation, reuse, and final-reference detachment.
-// ABOUTME: Keeps event-local placement policy server-owned while command handlers dual-write legacy physical keys.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

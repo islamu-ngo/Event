@@ -1,6 +1,3 @@
-// ABOUTME: Write DTO for creating event runtime custom property options.
-// ABOUTME: Used when adding options to event-local definitions created without a template.
-
 namespace Explore.Application.DTOs.EventCustomProperty;
 
 public sealed record CreateEventCustomPropertyOptionDto

@@ -1,6 +1,3 @@
-// ABOUTME: Grouped PATCH contract for a user-owned appearance profile's editable metadata and palettes.
-// ABOUTME: Route identity is authoritative and omitted groups preserve persisted profile values.
-
 namespace Explore.Application.DTOs.Appearance;
 
 public sealed record UpdateAppearanceProfileRequestDto

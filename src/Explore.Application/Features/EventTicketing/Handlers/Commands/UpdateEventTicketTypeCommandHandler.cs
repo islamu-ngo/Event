@@ -1,6 +1,3 @@
-// ABOUTME: Handles updating a ticket type in an event ticket catalog draft.
-// ABOUTME: Resolves scoped authoring inputs before replacing aggregate-owned ticket state.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventTicketing.Validators;

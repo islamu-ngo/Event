@@ -1,6 +1,3 @@
-// ABOUTME: Contract for analytics JS interop bridge abstraction.
-// ABOUTME: Enables testable analytics tracking independent of concrete interop implementation.
-
 using Explore.Blazor.Client.Models.Analytics;
 
 namespace Explore.Blazor.Client.Contracts.Interop;

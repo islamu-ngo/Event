@@ -1,6 +1,3 @@
-// ABOUTME: Regression-prevention tests for code hygiene patterns established during the clean code refactor.
-// ABOUTME: Guards: no controller-local GetCurrentUserId, identity-accessing controllers inherit EventControllerBase.
-
 namespace Event.Architecture.Tests;
 
 using System.Reflection;

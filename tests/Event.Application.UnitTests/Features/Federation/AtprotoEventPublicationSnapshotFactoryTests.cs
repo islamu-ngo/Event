@@ -1,6 +1,3 @@
-// ABOUTME: Verifies canonical event snapshot eligibility, tenant isolation, and raw-location fail-closed behavior.
-// ABOUTME: Ensures repositories remain entity-first while the Application projection excludes provider and private data.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.Federation.Atproto.Models;

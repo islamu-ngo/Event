@@ -1,6 +1,3 @@
-// ABOUTME: Centralizes the provider-neutral named-lock identity for event fanout precedence decisions.
-// ABOUTME: Keeps occurrence coordination and SMTP provider admission on one deadlock-safe transaction boundary.
-
 using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 

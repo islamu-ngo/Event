@@ -1,6 +1,3 @@
-// ABOUTME: Shared Layer 3 custom-property definition for tenant-scoped organization and group extensions.
-// ABOUTME: Uses namespaced machine keys, typed validation metadata, and explicit exposure/governance flags.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;

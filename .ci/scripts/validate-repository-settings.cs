@@ -1,5 +1,3 @@
-// ABOUTME: Validates release-critical GitHub repository settings through the REST API.
-// ABOUTME: Emits redacted evidence for branch protection, environments, security, and Actions policy drift.
 #:property RestorePackagesWithLockFile=false
 #pragma warning disable CA1050 // File-based CI scripts intentionally keep helper types in one file.
 

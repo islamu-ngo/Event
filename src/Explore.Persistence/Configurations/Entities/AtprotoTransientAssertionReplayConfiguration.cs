@@ -1,6 +1,3 @@
-// ABOUTME: Maps immutable instance-wide transient assertion replay claims to relational storage.
-// ABOUTME: Enforces digest uniqueness and an integer expiry index across all supported providers.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;

@@ -1,6 +1,3 @@
-// ABOUTME: API-host configuration for Quartz.NET scheduler persistence, clustering, and the operator status endpoint.
-// ABOUTME: Keeps scheduler operations separate from domain-owned outbox delivery state.
-
 namespace Explore.API.Configuration;
 
 public sealed class QuartzSchedulerSettings

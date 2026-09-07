@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for order-linked event admission coverage reads.
-// ABOUTME: Returns EventRegistration entities only for location-access evaluation.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

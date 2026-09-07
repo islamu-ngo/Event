@@ -1,6 +1,3 @@
-// ABOUTME: Tracks an AI provider run for a conversation message exchange.
-// ABOUTME: Encapsulates run state transitions so provider failures and cancellations are auditable.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Normalized lookup row for the party booking a registration order.
-// ABOUTME: Keeps booking semantics distinct from a purchaser account or participant assignment.
-
 namespace Explore.Domain;
 
 public sealed class BookingPartyType

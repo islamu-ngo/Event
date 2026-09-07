@@ -1,6 +1,3 @@
-// ABOUTME: BFF-safe Blazor service wrapping generated actor-subscription API client methods.
-// ABOUTME: Converts API failures into safe component defaults while logging non-sensitive diagnostics.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Notifications;
 using Explore.Blazor.Client.Helpers;

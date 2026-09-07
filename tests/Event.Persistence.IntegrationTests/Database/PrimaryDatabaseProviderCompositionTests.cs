@@ -1,6 +1,3 @@
-// ABOUTME: Verifies every supported primary provider uses the shared EF Core composition switch.
-// ABOUTME: Covers provider identity, migration ownership, server flavor, Data Protection, and design-time projection.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Persistence;
 using Explore.Persistence.Database;

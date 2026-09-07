@@ -1,6 +1,3 @@
-// ABOUTME: Calls the generated private address-suggestion API through the BFF client.
-// ABOUTME: Returns HAL resources intact so UI affordances remain server-authoritative.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Services;

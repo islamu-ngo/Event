@@ -1,4 +1,3 @@
-// ABOUTME: Group-specific setting override for the hierarchical settings engine.
 // Allows groups to customize settings unless locked at a higher scope.
 
 namespace Explore.Domain;

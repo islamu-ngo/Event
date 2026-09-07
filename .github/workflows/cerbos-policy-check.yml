@@ -1,6 +1,3 @@
-# ABOUTME: Validates Cerbos authorization policies on changes to policy files or authorization code.
-# ABOUTME: Always reports a status check, compiling policies only when authorization-relevant files change.
-
 name: Cerbos Policy Validation
 
 permissions:

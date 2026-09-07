@@ -1,6 +1,3 @@
-// ABOUTME: Contract-profile API tests for public event session visibility rules.
-// ABOUTME: Verifies draft/internal sessions and sessions under hidden events stay out of anonymous responses.
-
 using System.Net;
 using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;

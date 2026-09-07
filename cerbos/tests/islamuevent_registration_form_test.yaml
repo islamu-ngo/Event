@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos policy tests for registration-form authoring across verified and explicit event authority.
-# ABOUTME: Proves listing contributors, curators, machines, ambiguous actors, and unrelated assignments remain denied.
-
 name: RegistrationFormPolicyTests
 description: "Validates verified-organizer-only registration-form authoring"
 

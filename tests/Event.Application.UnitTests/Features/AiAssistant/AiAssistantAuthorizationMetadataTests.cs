@@ -1,6 +1,3 @@
-// ABOUTME: Authorization metadata tests for AI assistant MediatR requests.
-// ABOUTME: Ensures private AI conversation commands and queries carry resource/action parity data.
-
 namespace Event.Application.UnitTests.Features.AiAssistant;
 
 using System.Reflection;

@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for the organization creation wizard validation path.
-// ABOUTME: Verifies local syntactic validation, server ProblemDetails mapping, and safe error messages.
-
 using System.Reflection;
 using Explore.Blazor.Client.Pages.Organizations;
 using MudBlazor;

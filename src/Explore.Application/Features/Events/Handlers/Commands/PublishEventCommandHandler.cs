@@ -1,6 +1,3 @@
-// ABOUTME: Handles ordinary event publication while retaining tenant approval-policy enforcement.
-// ABOUTME: Delegates directly to the shared publication executor without nesting MediatR commands.
-
 using Explore.Application.Features.Events.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Services;

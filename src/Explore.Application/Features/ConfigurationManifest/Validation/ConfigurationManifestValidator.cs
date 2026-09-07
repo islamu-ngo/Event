@@ -1,6 +1,3 @@
-// ABOUTME: Validates configuration manifests against strict structure, explicit catalogs, and complete policy state.
-// ABOUTME: Rejects sensitive or malformed configuration without reflecting supplied values into diagnostics.
-
 namespace Explore.Application.Features.ConfigurationManifest.Validation;
 
 using System.Globalization;

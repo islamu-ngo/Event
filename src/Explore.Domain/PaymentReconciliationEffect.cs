@@ -1,6 +1,3 @@
-// ABOUTME: Durable identifiers-only trigger for authoritative payment-state reconciliation.
-// ABOUTME: Uses lease-token and fence checks so provider retrieval and local settlement remain restart-safe.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

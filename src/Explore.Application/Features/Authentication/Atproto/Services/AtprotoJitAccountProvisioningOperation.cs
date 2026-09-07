@@ -1,6 +1,3 @@
-// ABOUTME: Converges a verified unlinked ATProto DID into one passwordless platform account.
-// ABOUTME: Creates the User, personal Actor, and global provider binding inside its caller's transaction.
-
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

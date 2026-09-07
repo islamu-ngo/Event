@@ -1,6 +1,3 @@
-// ABOUTME: Protects registration callback verifier receipts with ASP.NET Core Data Protection.
-// ABOUTME: Binds worker re-verification to provider, binding, tuple, payload hash, submission id, and timestamp.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Services.Registration;
 using Microsoft.AspNetCore.DataProtection;

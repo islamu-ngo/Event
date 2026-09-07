@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for TenantAdminRouteGuard that restricts tenant settings routes to BFF-confirmed tenant admins.
-// ABOUTME: Verifies browser tenant-admin claims are not treated as route authority.
-
 using Blazouter.Models;
 using Explore.Blazor.Client.Routing.Guards;
 using Explore.Blazor.Client.Tests.Common.Authentication;

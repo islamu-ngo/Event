@@ -1,6 +1,3 @@
-// ABOUTME: Imports the minimal browser print module for admission ticket pages.
-// ABOUTME: Treats unavailable or disconnected browser interop as a safe no-op.
-
 using Explore.Blazor.Client.Contracts.Interop;
 using Microsoft.JSInterop;
 

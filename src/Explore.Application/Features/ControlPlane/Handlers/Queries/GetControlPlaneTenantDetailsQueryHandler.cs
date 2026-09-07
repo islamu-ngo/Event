@@ -1,6 +1,3 @@
-// ABOUTME: Query handler for one control-plane tenant lifecycle detail resource.
-// ABOUTME: Combines tenant metadata with recent lifecycle transition audit entries.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ControlPlane;
 using Explore.Application.Features.ControlPlane.Requests.Queries;

@@ -1,6 +1,3 @@
-// ABOUTME: Resolves ticket-purchase enforcement authority from current account and persisted order facts.
-// ABOUTME: Verifies actor ownership or membership server-side and hashes verified contact before returning it.
-
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Contracts.Infrastructure;

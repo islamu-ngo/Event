@@ -1,6 +1,3 @@
-// ABOUTME: Durable local notification intent recorded before any product email or external provider delegation runs.
-// ABOUTME: Stores only safe payload references/hashes and normalized ownership metadata for tenant-audited dispatch.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

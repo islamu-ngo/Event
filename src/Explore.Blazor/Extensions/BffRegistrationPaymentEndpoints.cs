@@ -1,6 +1,3 @@
-// ABOUTME: Maps server-resolved hosted checkout redirects and inert payment return navigation routes.
-// ABOUTME: Browser input supplies only order lineage and capability, never an external destination URL.
-
 using Microsoft.AspNetCore.WebUtilities;
 using System.Security.Cryptography;
 

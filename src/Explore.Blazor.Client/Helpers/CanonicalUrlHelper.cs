@@ -1,6 +1,3 @@
-// ABOUTME: Builds absolute canonical URLs for Blazor HeadContent metadata.
-// ABOUTME: Removes query strings/fragments and keeps URLs tenant-host aware through NavigationManager.
-
 using Microsoft.AspNetCore.Components;
 
 namespace Explore.Blazor.Client.Helpers;

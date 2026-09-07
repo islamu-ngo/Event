@@ -1,6 +1,3 @@
-// ABOUTME: Pins canonical instance and tenant import-session OpenAPI operations.
-// ABOUTME: Verifies binary uploads, required header capabilities, HAL bodies, and body-owned intent only.
-
 namespace Event.Api.IntegrationTests.Features.ConfigurationManifest;
 
 using System.Net;

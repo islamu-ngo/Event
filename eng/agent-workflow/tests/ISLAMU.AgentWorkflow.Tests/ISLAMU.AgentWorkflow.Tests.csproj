@@ -1,5 +1,3 @@
-<!-- ABOUTME: Defines focused TUnit checks for the lightweight repository guard. -->
-<!-- ABOUTME: Covers only intents YAML syntax and literal-file commit validation. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>

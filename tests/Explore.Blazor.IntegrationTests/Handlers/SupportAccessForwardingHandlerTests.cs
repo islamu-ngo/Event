@@ -1,6 +1,3 @@
-// ABOUTME: Unit-style DelegatingHandler tests for BFF support-access context forwarding.
-// ABOUTME: Verifies browser support headers are stripped and only active owned sessions are forwarded.
-
 using System.Security.Claims;
 using Event.Web.BffHosting.Security;
 using Explore.Blazor.Client.Clients;

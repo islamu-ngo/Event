@@ -1,6 +1,3 @@
-// ABOUTME: Option row for a versioned event-template custom-property definition.
-// ABOUTME: Retains machine identity and parent-child option hierarchy across template versions.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Maps immutable manual-release audits for quarantined registration files.
-// ABOUTME: Enforces one first-release record with tenant-contained file lineage and bounded reasons.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

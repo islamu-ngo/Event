@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for creating a new EventDay within a parent event.
-// ABOUTME: Secured via AuthorizeResource for the event_day resource kind.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventDay;
 using Explore.Application.Responses;

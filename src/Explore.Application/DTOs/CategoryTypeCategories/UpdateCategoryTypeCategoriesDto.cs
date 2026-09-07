@@ -1,6 +1,3 @@
-// ABOUTME: Grouped Application-only update contract for a category-to-category-type relationship.
-// ABOUTME: Keeps junction identity server-owned while allowing either relationship endpoint to change.
-
 namespace Explore.Application.DTOs.CategoryTypeCategories;
 
 public sealed record UpdateCategoryTypeCategoriesDto

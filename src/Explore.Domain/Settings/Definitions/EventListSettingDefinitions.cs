@@ -1,6 +1,3 @@
-// ABOUTME: Setting definitions for EventList page customization (browse mode, pagination, card field visibility).
-// ABOUTME: All settings are user-overridable and lockable by tenant administrators.
-
 namespace Explore.Domain.Settings.Definitions;
 
 public static class EventListSettingDefinitions

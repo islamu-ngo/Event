@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL tests for durable Coop callback pointers and their inbox retention dependency.
-// ABOUTME: Proves atomic settlement, replay identity, tenant-safe constraints, rollback, and payload cleanup ordering.
-
 using System.Text;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Resolves registration-provider callback bindings without requiring tenant identity from the route.
-// ABOUTME: Keeps anonymous controller code away from registration aggregates and repositories.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Domain;

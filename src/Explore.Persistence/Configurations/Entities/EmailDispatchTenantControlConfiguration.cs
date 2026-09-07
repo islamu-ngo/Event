@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for tenant-level email dispatch pause controls.
-// ABOUTME: Keeps Basic Dispatch Mode self-hosting controls queryable and tenant-isolated.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

@@ -1,5 +1,3 @@
-// ABOUTME: Ticket entitlement projection for event, day, and session targets.
-// ABOUTME: Carries target IDs and selection semantics used by ticket authoring.
 namespace Explore.Application.DTOs.EventTicketing;
 
 public sealed record TicketTypeEntitlementDto

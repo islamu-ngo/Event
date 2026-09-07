@@ -1,6 +1,3 @@
-// ABOUTME: Behavioral bUnit tests for EventFilterBar component.
-// ABOUTME: Verifies filter rendering, clear-all via UI click, and active filter counting.
-
 using EventFilterBarComponent = Explore.Blazor.Client.Pages.Events.Components.EventFilterBar;
 
 namespace Explore.Blazor.Client.Tests.Components.Event;

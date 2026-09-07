@@ -1,6 +1,3 @@
-// ABOUTME: Hosted worker that applies Explore database migrations, model-owned PostgreSQL constraints, and seed data.
-// ABOUTME: Runs once in the migration service process before stopping the host.
-
 using Explore.Persistence;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Schema;

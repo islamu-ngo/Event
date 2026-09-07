@@ -1,6 +1,3 @@
-// ABOUTME: Maps webhook endpoint domain entities into management API DTOs.
-// ABOUTME: Keeps Persistence entity-first and prevents secret refs from crossing into read contracts.
-
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Lookups;
 using Explore.Domain;

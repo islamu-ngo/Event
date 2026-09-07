@@ -1,6 +1,3 @@
-// ABOUTME: Safe AI assistant bootstrap payload for the authenticated assistant rail.
-// ABOUTME: Exposes availability, actor choices, model choices, feature flags, and limits without secrets or provider endpoints.
-
 namespace Explore.Application.DTOs.Ai;
 
 public sealed record AiAssistantBootstrapDto

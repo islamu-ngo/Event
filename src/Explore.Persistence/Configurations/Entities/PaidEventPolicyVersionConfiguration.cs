@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for provider-neutral paid-event policy versions and normalized policy children.
-// ABOUTME: Uses portable unfiltered uniqueness slots instead of nullable or filtered active-version indexes.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

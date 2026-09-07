@@ -1,6 +1,3 @@
-// ABOUTME: Maps stable participation-handling lookup rows without model-owned seed data.
-// ABOUTME: Keeps integer IDs and durable product-neutral codes aligned with runtime repair.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

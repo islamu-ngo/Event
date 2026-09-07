@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL persistence tests for tenant-scoped event moderation history records.
-// ABOUTME: Verifies repository ordering, tenant filters, and database uniqueness constraints.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;

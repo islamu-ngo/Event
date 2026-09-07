@@ -1,6 +1,3 @@
-// ABOUTME: Creates a private document upload session bound to a pending OrganizationTenant participation.
-// ABOUTME: Resolves participation ownership server-side so browser clients never receive tenant storage identifiers.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

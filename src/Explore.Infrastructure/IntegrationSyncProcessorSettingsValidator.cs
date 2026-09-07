@@ -1,6 +1,3 @@
-// ABOUTME: Validates IntegrationSync cadence, batch, lease, and retry bounds at host startup.
-// ABOUTME: Prevents unsafe stale-claim recovery and unbounded retry settings from reaching the drain.
-
 using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure;

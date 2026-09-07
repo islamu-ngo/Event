@@ -1,6 +1,3 @@
-// ABOUTME: Verifies ExternalApiKeyRepository tenant-filter bypasses are bounded by explicit credential predicates.
-// ABOUTME: Proves API-key auth and platform-management lookups do not leak ambient tenant rows.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;

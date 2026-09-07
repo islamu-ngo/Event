@@ -1,6 +1,3 @@
-// ABOUTME: HAL link policies for paid-event policy instance and tenant settings documents.
-// ABOUTME: Encodes setting-resource permission metadata so clients use _links for edit affordances.
-
 using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;

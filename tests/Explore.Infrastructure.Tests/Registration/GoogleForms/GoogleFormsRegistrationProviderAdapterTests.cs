@@ -1,6 +1,3 @@
-// ABOUTME: Characterizes the pinned Google Forms REST v1 registration provider behavior.
-// ABOUTME: Uses deterministic HTTP-handler fixtures only; no live Google API or Pub/Sub dependency.
-
 using System.Net;
 using System.Reflection;
 using System.Security.Claims;

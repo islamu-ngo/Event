@@ -1,6 +1,3 @@
-// ABOUTME: Resolves one private fair-return waitlist resource through server-owned authority.
-// ABOUTME: Combines capability checks, sale controls, and settlement state into bounded output.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Waitlist;

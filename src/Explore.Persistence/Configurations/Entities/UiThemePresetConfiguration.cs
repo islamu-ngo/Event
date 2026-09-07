@@ -1,7 +1,3 @@
-// ABOUTME: EF Core configuration for UiThemePreset — theme catalog with explicit owned palette columns,
-// soft-delete, stable ThemeKey uniqueness, and tenant-scoped isolation.
-// ABOUTME: System presets are immutable; tenant presets are soft-deletable to preserve user profile lineage.
-
 namespace Explore.Persistence.Configurations.Entities;
 
 using Explore.Domain;

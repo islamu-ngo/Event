@@ -1,6 +1,3 @@
-// ABOUTME: Records the immutable operator audit for a registration-file quarantine release.
-// ABOUTME: Preserves the first actor, time, reason, and exact status transition independently of mutable file state.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: Rejects incomplete ticketing recovery revisions, thresholds, key references, and restore targets.
-// ABOUTME: Prevents startup from claiming recoverability without retained authority and bounded RPO/RTO.
-
 using Explore.Domain.Secrets;
 using Explore.Secrets.Configuration;
 using Microsoft.Extensions.Options;

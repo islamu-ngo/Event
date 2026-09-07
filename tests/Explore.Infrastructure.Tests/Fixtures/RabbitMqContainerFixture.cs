@@ -1,6 +1,3 @@
-// ABOUTME: RabbitMQ Testcontainers fixture for infrastructure dispatch integration tests.
-// ABOUTME: Exposes AMQP wiring and bounded management diagnostics without logging credentials.
-
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;

@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for NotificationPanel — receives notification list and event callbacks from parent.
-// ABOUTME: Pure presentational component; data loading is managed by NotificationBell.
-
 using Explore.Blazor.Client.Clients;
 using Microsoft.AspNetCore.Components;
 

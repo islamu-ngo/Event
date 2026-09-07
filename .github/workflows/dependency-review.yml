@@ -1,6 +1,3 @@
-# ABOUTME: Blocks pull requests that introduce vulnerable or disallowed dependencies.
-# ABOUTME: Complements NuGet audit by reviewing dependency changes before merge.
-
 name: Dependency Review
 
 permissions:

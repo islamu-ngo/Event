@@ -1,6 +1,3 @@
-// ABOUTME: Requests initial administrator claim for an upstream-authenticated provider account.
-// ABOUTME: Carries trusted adapter identity data and no browser-supplied bootstrap selector.
-
 using Explore.Application.Authentication;
 using Explore.Application.Authorization;
 using Explore.Application.Responses;

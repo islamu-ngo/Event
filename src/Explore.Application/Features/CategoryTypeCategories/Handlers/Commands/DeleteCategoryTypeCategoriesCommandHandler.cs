@@ -1,5 +1,3 @@
-// ABOUTME: Handler for deleting a category-to-category-type link record.
-// ABOUTME: Fetches the junction record by ID and delegates deletion.
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.CategoryTypeCategories.Requests.Commands;
 using MediatR;

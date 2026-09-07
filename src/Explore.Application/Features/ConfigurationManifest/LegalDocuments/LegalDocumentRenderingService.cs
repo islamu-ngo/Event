@@ -1,6 +1,3 @@
-// ABOUTME: Selects immutable published legal evidence and delegates to the Domain Markdown contract.
-// ABOUTME: Keeps preview, API, and public-page rendering locale-aware and value-safe.
-
 namespace Explore.Application.Features.ConfigurationManifest.LegalDocuments;
 
 using System.Collections.Immutable;

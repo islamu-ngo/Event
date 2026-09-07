@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-local profile and moderation metadata for a tenant user.
-// ABOUTME: Allows tenant-admin-controlled profile data without editing global User.Pii.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

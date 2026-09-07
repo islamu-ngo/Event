@@ -1,6 +1,3 @@
-// ABOUTME: Strategy for Anthropic-compatible AI providers using raw HTTP dispatch.
-// ABOUTME: Delegates to AnthropicCompatibleChatProvider; model catalog is not supported.
-
 using Explore.Application.Contracts.Infrastructure.Ai;
 
 namespace Explore.Infrastructure.Ai;

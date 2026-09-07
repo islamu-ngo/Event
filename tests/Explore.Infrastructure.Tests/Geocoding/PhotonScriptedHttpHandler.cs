@@ -1,6 +1,3 @@
-// ABOUTME: In-memory HTTP transport for deterministic Photon adapter contract tests.
-// ABOUTME: Captures exact requests and exposes invocation signals before scripted responses run.
-
 using System.Collections.Concurrent;
 
 namespace Explore.Infrastructure.Tests.Geocoding;

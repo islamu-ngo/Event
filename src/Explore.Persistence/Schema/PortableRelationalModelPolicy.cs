@@ -1,6 +1,3 @@
-// ABOUTME: Normalizes PostgreSQL-oriented relational annotations for the other supported database providers.
-// ABOUTME: Preserves PostgreSQL types while emitting portable defaults and constraint SQL for every provider.
-
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;

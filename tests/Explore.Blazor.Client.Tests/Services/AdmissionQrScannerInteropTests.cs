@@ -1,6 +1,3 @@
-// ABOUTME: Specifies typed native admission QR capability and detection outcomes at the Blazor JS boundary.
-// ABOUTME: Proves validation, ambiguity, fallback availability, redaction, cancellation, and disconnect behavior.
-
 using System.Diagnostics;
 using System.Text.Json;
 using Explore.Blazor.Client.Contracts.Interop;

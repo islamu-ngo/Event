@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for PATCH-based category updates.
-// ABOUTME: Carries route authority, If-Match concurrency, and the grouped update payload.
 using System;
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Category;

@@ -1,6 +1,3 @@
-// ABOUTME: Immutable definition of a single setting: its key, type, default, allowed scopes, and constraints.
-// ABOUTME: Part of the code-defined Setting Definition Registry — setting metadata lives in code, not the database.
-
 using System.Collections.Immutable;
 
 namespace Explore.Domain.Settings;

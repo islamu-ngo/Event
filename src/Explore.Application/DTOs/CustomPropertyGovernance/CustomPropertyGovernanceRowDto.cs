@@ -1,6 +1,3 @@
-// ABOUTME: Read-only DTO for the governance report listing all active Layer 3 definitions with promotion recommendations.
-// ABOUTME: Implements Atlassian 4-question matrix (Rule 12) to surface candidates for Layer 2/Layer 1 promotion.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.DTOs.CustomPropertyGovernance;

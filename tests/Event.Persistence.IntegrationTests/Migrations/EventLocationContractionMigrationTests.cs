@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL acceptance for the generated initial schema's mediated physical venue references.
-// ABOUTME: Proves every carrier rejects raw LocationId use and the development baseline rolls back cleanly.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Persistence;

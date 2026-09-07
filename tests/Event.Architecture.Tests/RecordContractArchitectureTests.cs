@@ -1,6 +1,3 @@
-// ABOUTME: Enforces final record-contract and HTTP body-authority ratchets after records adoption.
-// ABOUTME: Uses compiled metadata and exact reasoned JSON baselines so new, stale, or hidden debt fails deterministically.
-
 namespace Event.Architecture.Tests
 {
 

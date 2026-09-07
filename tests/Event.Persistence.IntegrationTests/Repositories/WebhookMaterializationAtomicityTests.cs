@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL integration tests for atomic outgoing webhook delivery-plan materialization.
-// ABOUTME: Verifies complete commit, rollback, idempotent replay, and changed-payload conflict behavior.
-
 using System.Text;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;

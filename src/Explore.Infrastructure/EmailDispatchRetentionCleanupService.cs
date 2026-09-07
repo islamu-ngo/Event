@@ -1,6 +1,3 @@
-// ABOUTME: Redacts eligible email dispatch content in bounded parent-owned batches.
-// ABOUTME: Supports dry-run evidence without logging recipient or message content.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Models;

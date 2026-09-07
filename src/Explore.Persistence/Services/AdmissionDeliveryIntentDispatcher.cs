@@ -1,6 +1,3 @@
-// ABOUTME: Routes committed admission delivery-intent pointers through the production composite dispatcher.
-// ABOUTME: Re-routes every incomplete handoff and returns typed pending state without putting bearer material in JSON.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;

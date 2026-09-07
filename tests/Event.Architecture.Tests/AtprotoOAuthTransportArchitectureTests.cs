@@ -1,6 +1,3 @@
-// ABOUTME: Enforces one shared ATProto transport policy and explicit hardened CarpaNet client construction.
-// ABOUTME: Prevents implicit PDS clients, confidential logging, and captive OAuth-store dependencies.
-
 using System.Xml.Linq;
 using Explore.Infrastructure.Services.Federation;
 

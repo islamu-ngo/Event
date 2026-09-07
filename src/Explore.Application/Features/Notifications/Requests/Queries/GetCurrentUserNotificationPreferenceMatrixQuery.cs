@@ -1,6 +1,3 @@
-// ABOUTME: Query request for the authenticated user's notification preference matrix.
-// ABOUTME: Returns render-ready category, channel, cell, and mute state from the resolver.
-
 using Explore.Application.DTOs.Notification;
 using MediatR;
 

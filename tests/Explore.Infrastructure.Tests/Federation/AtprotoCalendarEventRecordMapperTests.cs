@@ -1,6 +1,3 @@
-// ABOUTME: Verifies typed community event mapping, exhaustive description preservation, and semantic validation.
-// ABOUTME: Proves disclosed locations map natively while nonnative public values remain in one stable description.
-
 using System.Collections.Immutable;
 using CommunityLexicon.Calendar;
 using CommunityLexicon.Location;

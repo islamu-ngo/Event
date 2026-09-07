@@ -1,6 +1,3 @@
-// ABOUTME: Maps tenant/event-owned registration workflows with portable relational metadata.
-// ABOUTME: Enforces one workflow purpose per event and restrictive tenant/event ownership.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

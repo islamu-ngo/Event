@@ -1,6 +1,3 @@
-// ABOUTME: Regression tests for EventDay HAL link policy authorization metadata.
-// ABOUTME: Prevents event-detail day requests from failing during collection link generation.
-
 namespace Event.Api.IntegrationTests.Features.Hateoas;
 
 using Explore.API.Hateoas.Policies;

@@ -1,6 +1,3 @@
-// ABOUTME: Points to the user's active appearance profile and stores mode/direction/language overrides.
-// ABOUTME: Unique per (UserId, TenantId) — a user can have different active profiles per tenant and one global default.
-
 namespace Explore.Domain;
 
 using Explore.Domain.Enums;

@@ -1,6 +1,3 @@
-// ABOUTME: Handles deletion of session-local custom property definitions with projection cleanup.
-// ABOUTME: Normal deletes retire and soft-delete definition state so historical rows are retained for audit.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventSessionCustomProperty;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines tenant-safe metadata filters for future AI vector/RAG search.
-// ABOUTME: Keeps vector retrieval scoped to tenant-bound public summaries and approved global summaries.
-
 namespace Explore.Application.Features.AiAssistant.Rag;
 
 public sealed record AiRagSearchFilter(

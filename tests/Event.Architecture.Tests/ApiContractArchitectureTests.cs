@@ -1,6 +1,3 @@
-// ABOUTME: Architecture tests enforcing API contract stability invariants at compile time.
-// ABOUTME: Every [Http*] action must have Name= and response metadata; ApiExplorer-hidden endpoints are exempted.
-
 namespace Event.Architecture.Tests;
 
 using System.Linq;

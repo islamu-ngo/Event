@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for DeploymentModeProvider first-run configuration policy.
-// ABOUTME: Verifies convention-first SingleTenant defaults and explicit MultiTenant operator opt-in.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain.Enums;
 using Explore.Infrastructure;

@@ -1,6 +1,3 @@
-// ABOUTME: Configures the event_session_islamic_aspects extension table for session-level Islamic data.
-// ABOUTME: Enforces strict 1:1 vertical partitioning and exact prayer-relative scheduling state.
-
 namespace Explore.Persistence.Configurations.Entities;
 
 using Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for immutable notification fanout occurrences.
-// ABOUTME: Resolves worker pointers with an exact tenant-and-occurrence predicate.
-
 using System.Linq.Expressions;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Models.InternalEvents;

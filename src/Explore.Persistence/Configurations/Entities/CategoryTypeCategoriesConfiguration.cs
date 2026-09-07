@@ -1,6 +1,3 @@
-// ABOUTME: Configures tenant-scoped category-to-type relationships and their uniqueness boundary.
-// ABOUTME: Prevents concurrent writes from creating duplicate category/type assignments.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

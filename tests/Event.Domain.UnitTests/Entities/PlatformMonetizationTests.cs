@@ -1,6 +1,3 @@
-// ABOUTME: Covers default-off, zero-fee, versioned instance monetization Domain configuration.
-// ABOUTME: Proves contribution options remain stored, zero-default, and independent across revisions.
-
 namespace Event.Domain.UnitTests.Entities;
 
 public sealed class PlatformMonetizationTests

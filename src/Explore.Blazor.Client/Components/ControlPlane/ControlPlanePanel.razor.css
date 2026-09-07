@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped styles for the shared control-plane panel primitive. */
-/* ABOUTME: Uses BEM classes, logical properties, and Event design tokens. */
-
 .control-plane-panel {
     container-type: inline-size;
     display: grid;

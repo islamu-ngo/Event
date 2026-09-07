@@ -1,5 +1,3 @@
-<!-- ABOUTME: Centrally pins NuGet package versions for deterministic solution restores. -->
-<!-- ABOUTME: Keeps framework integrations on mutually compatible package major versions. -->
 <Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>

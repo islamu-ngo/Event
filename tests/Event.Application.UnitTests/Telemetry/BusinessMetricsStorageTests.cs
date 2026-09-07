@@ -1,6 +1,3 @@
-// ABOUTME: Verifies local-first storage metrics use bounded, safe OpenTelemetry tags.
-// ABOUTME: Guards against exposing tenant IDs, paths, object keys, filenames, endpoints, or secrets.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Telemetry;
 using Explore.Domain;

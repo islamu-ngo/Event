@@ -1,6 +1,3 @@
-// ABOUTME: Maps untrusted AI event-moderation proposals into validated moderation proposal context.
-// ABOUTME: Rejects missing HAL evidence, stale identity fields, and incomplete heavy-moderation acknowledgement.
-
 using System.Text.Json;
 using Explore.Application.Features.AiAssistant.Prompting;
 using Explore.Application.Features.AiAssistant.Tools;

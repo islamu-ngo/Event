@@ -1,6 +1,3 @@
-// ABOUTME: Machine-readable sync conflict row describing why a requested session-template sync key could not be applied.
-// ABOUTME: Used for stale provenance, concurrent update, and protected local-state outcomes.
-
 namespace Explore.Application.DTOs.EventSessionTemplateSync;
 
 public sealed record SyncConflictDto(

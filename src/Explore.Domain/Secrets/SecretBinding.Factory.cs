@@ -1,6 +1,3 @@
-// ABOUTME: Registry-validated factory + mutation helpers for SecretBinding.
-// ABOUTME: Enforces SecretDefinitionRegistry invariants (allowed scope/source, scope-id consistency, metadata exclusivity).
-
 using Explore.Domain.Enums;
 using SecretSourceTypeEnum = Explore.Domain.Enums.SecretSourceType;
 

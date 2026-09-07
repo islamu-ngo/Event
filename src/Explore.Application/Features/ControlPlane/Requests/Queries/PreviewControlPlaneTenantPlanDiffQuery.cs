@@ -1,6 +1,3 @@
-// ABOUTME: Secured query for previewing tenant plan setting changes before assignment.
-// ABOUTME: Produces a side-effect-free diff between effective settings and a proposed plan draft.
-
 using Explore.Application.Authorization;
 using Explore.Application.Features.ControlPlane.Plans;
 using MediatR;

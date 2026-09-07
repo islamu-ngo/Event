@@ -1,6 +1,3 @@
-// ABOUTME: Real HTTP security coverage for guest payment capability, idempotency, privacy, and target access.
-// ABOUTME: Proves replay scope cannot cross order, event, capability, expiry, or request fingerprints.
-
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;

@@ -1,6 +1,3 @@
-// ABOUTME: Refreshes the exact authenticated ATProto OAuth session before issuing a replacement platform JWT.
-// ABOUTME: Returns a bounded reauthentication outcome when durable or remote provider state is unavailable.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Authentication.Atproto.Models;
 using Explore.Application.Features.Authentication.Atproto.Requests.Commands;

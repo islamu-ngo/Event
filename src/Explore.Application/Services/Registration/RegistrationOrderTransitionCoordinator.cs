@@ -1,6 +1,3 @@
-// ABOUTME: Persists registration-order transitions only after the tracked aggregate accepts them.
-// ABOUTME: Keeps tenant-qualified locking and storage orchestration outside Domain lifecycle authority.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

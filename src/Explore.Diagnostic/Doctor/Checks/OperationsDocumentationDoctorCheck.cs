@@ -1,6 +1,3 @@
-// ABOUTME: Verifies operator remediation documents referenced by doctor output exist.
-// ABOUTME: Keeps doctor remediation links honest and repository-local.
-
 using Explore.Diagnostic.Doctor.Infrastructure;
 
 namespace Explore.Diagnostic.Doctor.Checks;

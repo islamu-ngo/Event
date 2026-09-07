@@ -1,6 +1,3 @@
-// ABOUTME: Proves organizer payment connection CQRS never substitutes admin or session recipients.
-// ABOUTME: Covers actor ownership, scoped idempotency, replacement, disable, and safe queries.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

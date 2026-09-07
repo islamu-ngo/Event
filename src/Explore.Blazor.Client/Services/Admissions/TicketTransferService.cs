@@ -1,6 +1,3 @@
-// ABOUTME: Calls private ticket-transfer BFF endpoints through the shared browser credential pipeline.
-// ABOUTME: Sends claim capability only in X-Ticket-Transfer-Capability and consumes generated contracts.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Admissions;
 using Explore.Blazor.Client.Services.Http;

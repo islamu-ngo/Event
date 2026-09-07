@@ -1,6 +1,3 @@
-// ABOUTME: Reporter identity categories for event-report intake records.
-// ABOUTME: Distinguishes human, anonymous, system, and admin-created reports.
-
 namespace Explore.Domain.Enums;
 
 public enum EventReporterKind

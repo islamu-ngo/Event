@@ -1,6 +1,3 @@
-// ABOUTME: Validates instance location-privacy audience and reveal-duration boundaries.
-// ABOUTME: Keeps the command boundary aligned with the fail-closed governance parser.
-
 using System.Text.Json;
 using Explore.Application.Settings;
 using Explore.Domain.Constants;

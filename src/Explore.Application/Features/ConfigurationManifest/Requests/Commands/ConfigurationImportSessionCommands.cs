@@ -1,6 +1,3 @@
-// ABOUTME: Declares scope-specific authorized requests for configuration import sessions.
-// ABOUTME: Keeps target authority server-derived while carrying only artifact bytes, session capability, and preview intent.
-
 namespace Explore.Application.Features.ConfigurationManifest.Requests.Commands;
 
 using Explore.Application.Authorization;

@@ -1,6 +1,3 @@
-// ABOUTME: Command contract for explicitly resolving replayable email work without sending it.
-// ABOUTME: Records a bounded operator reason and transitions the durable row to a resolved skipped state.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

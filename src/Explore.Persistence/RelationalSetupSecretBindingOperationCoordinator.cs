@@ -1,6 +1,3 @@
-// ABOUTME: Serializes secret-binding operations for one exact Setup enrollment generation.
-// ABOUTME: Reuses provider-neutral session locks so coordination holds across application instances.
-
 namespace Explore.Persistence;
 
 using System.Globalization;

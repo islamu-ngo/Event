@@ -1,6 +1,3 @@
-// ABOUTME: Persists tenant-qualified sale controls/reviews and computes conservative currency-exact payment exposure.
-// ABOUTME: Uses payment/order facts rather than provider approximations for activation decisions.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

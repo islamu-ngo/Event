@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS link policies for notification detail and collection views.
-// ABOUTME: All notification links require authentication since notifications are personal data.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Collections.Generic;

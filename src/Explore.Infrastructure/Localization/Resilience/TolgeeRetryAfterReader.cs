@@ -1,6 +1,3 @@
-// ABOUTME: Stateless reader that extracts retry-after delay from Tolgee 429 JSON responses.
-// ABOUTME: Called by the Polly pipeline's DelayGenerator — never executes retries itself.
-
 using System.Net;
 using System.Text.Json;
 

@@ -1,5 +1,3 @@
-// ABOUTME: Write model for a ticket type entitlement selection.
-// ABOUTME: Contains only caller-supplied scope references and quantity semantics.
 namespace Explore.Application.DTOs.EventTicketing;
 
 public sealed record ManageTicketTypeEntitlementDto

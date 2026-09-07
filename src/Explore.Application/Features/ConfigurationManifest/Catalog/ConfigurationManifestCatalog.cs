@@ -1,6 +1,3 @@
-// ABOUTME: Defines the explicit tenant allowlists within the unified ConfigurationManifest catalog.
-// ABOUTME: Resolves scope-tagged entries to canonical Domain metadata without exposing registry growth.
-
 namespace Explore.Application.Features.ConfigurationManifest.Catalog;
 
 using System.Collections.Frozen;

@@ -1,6 +1,3 @@
-// ABOUTME: Curator-authorized CQRS query for one organizer claim under its parent event.
-// ABOUTME: Keeps claim evidence behind the organizer-claim authorization boundary.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventOrganizerClaim;
 using MediatR;

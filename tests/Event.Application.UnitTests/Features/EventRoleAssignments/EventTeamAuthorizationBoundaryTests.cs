@@ -1,6 +1,3 @@
-// ABOUTME: Verifies EventTeam MediatR requests use the event manage-team authorization boundary.
-// ABOUTME: Proves a denied canonical decision stops the handler before role-delegation logic runs.
-
 using System.Reflection;
 using Explore.Application.Authorization;
 using Explore.Application.Behaviors;

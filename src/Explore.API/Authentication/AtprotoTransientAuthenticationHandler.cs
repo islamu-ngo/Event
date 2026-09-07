@@ -1,6 +1,3 @@
-// ABOUTME: Authenticates only a transient machine and claims its durable replay identifier before dispatch.
-// ABOUTME: Creates no platform-user, DID or tenant identity and never falls back to another scheme.
-
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Explore.Application.Contracts.Persistence;

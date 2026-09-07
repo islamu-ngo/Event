@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS link policies for current-user profile resources.
-// ABOUTME: Emits only links backed by registered user and actor API routes.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Collections.Generic;

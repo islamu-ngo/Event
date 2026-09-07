@@ -1,6 +1,3 @@
-// ABOUTME: Resolves one organizer claim only when it belongs to the authorized parent event.
-// ABOUTME: Maps normalized status and evidence after tenant query filters have applied.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventOrganizerClaim;

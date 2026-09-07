@@ -1,6 +1,3 @@
-// ABOUTME: Sends admission recovery capabilities to the same-origin BFF through the approved executor.
-// ABOUTME: Keeps JSON bodies and transport status handling out of ticket feature services.
-
 using System.Net.Http.Json;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Admissions;

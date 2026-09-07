@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for the authenticated reporter-owned event report status page.
-// ABOUTME: Loads paged HAL resources through IEventReportingService and formats safe status metadata.
-
 using System.Globalization;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;

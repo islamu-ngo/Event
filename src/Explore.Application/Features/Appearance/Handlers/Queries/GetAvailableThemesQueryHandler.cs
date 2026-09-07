@@ -1,6 +1,3 @@
-// ABOUTME: Handles available-theme queries for the current tenant using platform and tenant theme catalogs.
-// ABOUTME: Keeps theme-list resolution in the application layer so future UI/runtime code stays thin.
-
 namespace Explore.Application.Features.Appearance.Handlers.Queries;
 
 using Explore.Application.Contracts.Infrastructure;

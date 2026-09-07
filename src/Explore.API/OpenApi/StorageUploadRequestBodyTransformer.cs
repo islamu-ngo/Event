@@ -1,6 +1,3 @@
-// ABOUTME: Adds the raw binary request-body contract for the storage upload-session operation.
-// ABOUTME: Enables generated API clients to stream upload content instead of hand-building backend requests.
-
 using Explore.API.Hateoas;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;

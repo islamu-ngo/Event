@@ -1,6 +1,3 @@
-// ABOUTME: Tests public versus managed event-agenda-item location projections.
-// ABOUTME: Proves public CQRS handlers omit physical fields while managed detail retains exact IDs.
-
 using System.Text.Json;
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;

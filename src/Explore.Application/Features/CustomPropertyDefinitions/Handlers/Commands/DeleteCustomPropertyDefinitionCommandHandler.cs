@@ -1,6 +1,3 @@
-// ABOUTME: Handles deletion of shared Layer 3 custom-property definitions.
-// ABOUTME: Normal delete retires the definition and keeps its machine key reserved until audited purge.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.CustomPropertyDefinitions.Requests.Commands;
 using Explore.Application.Responses;

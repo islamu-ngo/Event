@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for LocalProvider webhook HTTP delivery attempt ledger rows.
-// ABOUTME: Enforces one attempt number per endpoint/message pair and adds worker polling indexes.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

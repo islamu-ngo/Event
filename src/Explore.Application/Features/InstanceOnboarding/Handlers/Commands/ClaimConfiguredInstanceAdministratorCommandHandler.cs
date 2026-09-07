@@ -1,6 +1,3 @@
-// ABOUTME: Delegates configured administrator claims to shared atomic onboarding completion.
-// ABOUTME: Remains provider-neutral and performs no indirect identity matching.
-
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Features.InstanceOnboarding.Services;
 using Explore.Application.Responses;

@@ -1,6 +1,3 @@
-// ABOUTME: Declares immutable requests and results for coordinated publication-policy mutations.
-// ABOUTME: Keeps persistence-neutral snapshots and deferred setting effects explicit at the boundary.
-
 namespace Explore.Application.Settings;
 
 using System.Collections.Immutable;

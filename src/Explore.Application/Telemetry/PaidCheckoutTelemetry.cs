@@ -1,6 +1,3 @@
-// ABOUTME: Emits bounded non-PII paid Checkout activation telemetry through the Explore.Business meter.
-// ABOUTME: Decorates activation decisions so every public evaluation records one closed outcome category.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Services.Registration;
 

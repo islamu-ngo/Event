@@ -1,6 +1,3 @@
-// ABOUTME: Verifies generated-client forwarding and HAL-constrained address approval.
-// ABOUTME: Proves typed provider outcomes, target binding, cancellation, and HAL route validation.
-
 using System.Reflection;
 
 namespace Explore.Blazor.Client.Tests.Services;

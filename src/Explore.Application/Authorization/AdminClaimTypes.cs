@@ -1,6 +1,3 @@
-// ABOUTME: Constants for persisted administrative authority claims used by server-side transformations.
-// ABOUTME: Covers instance, tenant, organization, and group scopes without making claims a UI authority source.
-
 namespace Explore.Application.Authorization;
 
 /// <summary>

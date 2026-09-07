@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for global user-role assignments outside tenant/org memberships.
-// ABOUTME: Supports platform-administrator authorization checks and onboarding role grants.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

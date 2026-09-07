@@ -1,6 +1,3 @@
-// ABOUTME: Holds typed Studio field-authoring input without mirroring backend entities.
-// ABOUTME: Converts the editor state directly into generated registration-form client inputs.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Pages.Studio.RegistrationForms;

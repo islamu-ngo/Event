@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for public and attendee EventLocation disclosure rendering.
-// ABOUTME: Proves coarse-only public output, exact attendee output, and an honest to-be-announced state.
-
 using Explore.Blazor.Client.Components.Events;
 using Explore.Blazor.Client.Models.Events;
 

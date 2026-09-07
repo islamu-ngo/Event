@@ -1,6 +1,3 @@
-// ABOUTME: Database seeding orchestrator. Seeds lookup tables in ALL environments at runtime.
-// ABOUTME: In Development, also seeds business entities (users, orgs, events) for testing.
-
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;

@@ -1,6 +1,3 @@
-// ABOUTME: Appends configuration-manifest outcomes and exposes only bounded provenance or current-tenant reads.
-// ABOUTME: Relies on the named tenant query filter so missing ambient tenancy fails closed.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;

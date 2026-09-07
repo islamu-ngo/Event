@@ -1,6 +1,3 @@
-// ABOUTME: Executes one captured report decision through durable claim, receipt, and completion phases.
-// ABOUTME: Commits truthful organizer/reporter notifications atomically after exact enforcement succeeds.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;

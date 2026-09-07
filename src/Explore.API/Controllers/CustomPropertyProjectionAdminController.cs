@@ -1,6 +1,3 @@
-// ABOUTME: Admin API controller for custom-property projection operations (rebuild, drain, status, governance).
-// ABOUTME: Implements D2 Operability endpoints with resource metadata authorization, rate limiting, and request timeouts.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

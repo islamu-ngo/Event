@@ -1,6 +1,3 @@
-// ABOUTME: bUnit tests for the shared LanguagePicker component.
-// ABOUTME: Verifies kill-switch rendering, accessible current-language label, and selection delegation.
-
 using System.Reflection;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Shared;

@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for normalized event-location disclosure audiences.
-// ABOUTME: Maps stable integer IDs and unique machine codes without model seed data.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for webhook binding verification-state lookup rows.
-// ABOUTME: Enforces stable integer identifiers and unique governed master codes.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

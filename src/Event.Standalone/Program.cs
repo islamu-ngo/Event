@@ -1,6 +1,3 @@
-// ABOUTME: Composes the API and Blazor owning host modules into one optional web process.
-// ABOUTME: Owns one Combined profile, shutdown state, and ordered startup sequence.
-
 using Explore.API.Hosting;
 using Explore.Blazor.Extensions;
 using Explore.Blazor.Hosting;

@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for tenant reads, counts, and atomic lifecycle transitions.
-// ABOUTME: Uses no-tracking reads and status-qualified ExecuteUpdate compare-and-swap writes.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;

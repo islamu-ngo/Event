@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for synchronizing a user from an external identity provider.
-// ABOUTME: Carries trusted adapter identity and profile data from the validated principal.
 using Explore.Application.Authentication;
 using Explore.Application.DTOs.User;
 using Explore.Application.Responses;

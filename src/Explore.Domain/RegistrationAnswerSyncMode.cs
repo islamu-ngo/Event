@@ -1,6 +1,3 @@
-// ABOUTME: Normalized lookup row for registration-answer synchronization modes.
-// ABOUTME: Keeps stable synchronization IDs separate from their enum convenience mirror.
-
 namespace Explore.Domain;
 
 public sealed class RegistrationAnswerSyncMode

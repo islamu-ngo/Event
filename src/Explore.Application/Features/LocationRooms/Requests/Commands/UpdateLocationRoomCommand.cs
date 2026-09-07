@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for PATCH-based LocationRoom updates.
-// ABOUTME: Carries route authority, If-Match concurrency, and grouped room update payload.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.LocationRoom;
 using Explore.Application.Responses;

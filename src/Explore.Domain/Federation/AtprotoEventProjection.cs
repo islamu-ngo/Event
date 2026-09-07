@@ -1,6 +1,3 @@
-// ABOUTME: Stores the bounded, typed public calendar fields materialized from one canonical ATProto event record.
-// ABOUTME: Keeps request-time discovery independent from raw Jetstream JSON and protocol-specific generated types.
-
 namespace Explore.Domain.Federation;
 
 public sealed class AtprotoEventProjection

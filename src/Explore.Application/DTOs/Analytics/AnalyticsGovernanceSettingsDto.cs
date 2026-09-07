@@ -1,6 +1,3 @@
-// ABOUTME: DTO for analytics governance settings exposed via admin API.
-// ABOUTME: Maps 1:1 to AnalyticsSettingGroup fields for admin read/write.
-
 using Explore.Domain.Enums.Analytics;
 
 namespace Explore.Application.DTOs.Analytics;

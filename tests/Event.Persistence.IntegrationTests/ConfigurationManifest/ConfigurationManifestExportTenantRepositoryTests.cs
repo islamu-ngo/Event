@@ -1,6 +1,3 @@
-// ABOUTME: Verifies whole-instance export tenant discovery is cross-tenant, active-only, and bounded in SQL.
-// ABOUTME: Proves the repository returns no more than the caller's overflow-detection ceiling.
-
 namespace Event.Persistence.IntegrationTests.ConfigurationManifest;
 
 using Event.Persistence.IntegrationTests.Fixtures;

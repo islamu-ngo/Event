@@ -1,6 +1,3 @@
-// ABOUTME: Null-object scheduler operations used when the host runs with background scheduling disabled.
-// ABOUTME: Lets the administration surface report a disabled scheduler instead of failing to resolve a dependency.
-
 using Explore.Application.Contracts.Scheduling;
 
 namespace Explore.API.Scheduling;

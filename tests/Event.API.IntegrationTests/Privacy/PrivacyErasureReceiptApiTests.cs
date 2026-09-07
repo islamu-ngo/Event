@@ -1,6 +1,3 @@
-// ABOUTME: Proves the post-login privacy-erasure status route uses dedicated receipt authentication.
-// ABOUTME: Verifies bounded no-store responses and indistinguishable invalid receipt failures.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;

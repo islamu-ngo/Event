@@ -1,6 +1,3 @@
-// ABOUTME: Authorized command for resolving a manual provider publication from exact operator evidence.
-// ABOUTME: Requires tenant identity, optimistic version, provider message id, actor, and audit reason.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

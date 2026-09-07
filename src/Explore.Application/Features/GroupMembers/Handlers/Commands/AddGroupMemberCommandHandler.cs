@@ -1,5 +1,3 @@
-// ABOUTME: Handler for adding a member to a group.
-// ABOUTME: Validates authorization, creates the group-member join record.
 using System;
 using System.Linq;
 using System.Threading;

@@ -1,6 +1,3 @@
-// ABOUTME: API integration tests for exact configured-administrator provider claims and bounded status.
-// ABOUTME: Proves indirect identity claims cannot take over bootstrap authority or produce partial writes.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;

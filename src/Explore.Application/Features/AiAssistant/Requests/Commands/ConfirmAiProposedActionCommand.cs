@@ -1,6 +1,3 @@
-// ABOUTME: Command contract for confirming an AI-proposed action before tool execution.
-// ABOUTME: Uses AI conversation authorization metadata while handlers enforce tenant and user ownership.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

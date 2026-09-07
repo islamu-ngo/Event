@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query request for fetching a user profile by ID.
-// ABOUTME: Returns UserDto.
 using System;
 using Explore.Application.DTOs.User;
 using MediatR;

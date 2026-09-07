@@ -1,6 +1,3 @@
-// ABOUTME: Implements CarpaNet OAuth session persistence over the tenant-filtered repository.
-// ABOUTME: Requires an explicit tenant/user/DID/PDS/client-key binding for every store instance.
-
 using CarpaNet.OAuth.Storage;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

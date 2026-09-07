@@ -1,9 +1,3 @@
-// ABOUTME: FluentValidation rules for updating event session groups under an existing event.
-// ABOUTME: Confirms group/event/location/room references through tenant-filtered repositories.
-
-// ABOUTME: Structural validation for grouped program-section PATCH requests.
-// ABOUTME: Persisted tenant, uniqueness, placement, and concurrency invariants remain handler-owned.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.EventSessionGroup.Validators;

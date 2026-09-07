@@ -1,5 +1,3 @@
-// ABOUTME: Handler for updating the instance SMTP (email delivery) settings.
-// ABOUTME: Validates input, persists SMTP config to the infrastructure config store.
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;

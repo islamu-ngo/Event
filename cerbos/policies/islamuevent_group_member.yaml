@@ -1,4 +1,3 @@
-# ABOUTME: Cerbos resource policy for group_member resources.
 # Group members are org-scoped: org admins manage membership, all authenticated can view and join.
 
 apiVersion: api.cerbos.dev/v1

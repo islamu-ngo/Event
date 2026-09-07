@@ -1,6 +1,3 @@
-// ABOUTME: Proves the Terminal target routes CommunityToolkit workspace commands into canonical Core output.
-// ABOUTME: Verifies byte parity and bundled Arabic error text without starting a real terminal driver.
-
 namespace ISLAMU.SetupAssistant.Terminal.Tests;
 
 using System.Globalization;

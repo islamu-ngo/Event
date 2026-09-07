@@ -1,6 +1,3 @@
-// ABOUTME: Stable provider-neutral status identities for durable refund attempts.
-// ABOUTME: Distinguishes capacity-reserving ambiguity from definitively released terminals.
-
 namespace Explore.Domain.Enums;
 
 public enum RefundAttemptStatusEnum

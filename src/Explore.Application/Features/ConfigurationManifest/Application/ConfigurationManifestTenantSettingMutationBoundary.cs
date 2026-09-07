@@ -1,6 +1,3 @@
-// ABOUTME: Owns typed tenant-setting writes performed inside a ConfigurationManifest transaction.
-// ABOUTME: Rechecks catalog ownership and blocks guarded keys before reaching persistence.
-
 namespace Explore.Application.Features.ConfigurationManifest.Application;
 
 using Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Domain-entity graph required to irreversibly redact event-owned content during heavy moderation.
-// ABOUTME: Keeps the Application redaction service independent from EF Core while avoiding DTO-shaped repository results.
-
 using Explore.Domain;
 
 namespace Explore.Application.Features.Events.Moderation;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines the Application-layer registry boundary for governed AI tool contracts.
-// ABOUTME: Lets prompts, parsers, and future adapters consume one source of tool truth.
-
 using Explore.Domain.Ai;
 
 namespace Explore.Application.Features.AiAssistant.Tools;

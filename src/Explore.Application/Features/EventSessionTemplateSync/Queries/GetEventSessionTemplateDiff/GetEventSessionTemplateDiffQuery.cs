@@ -1,6 +1,3 @@
-// ABOUTME: Query request for computing an operator-visible event-session-template diff against a target template version.
-// ABOUTME: Authorized as a custom-property template sync-diff operation and resolved fully in the Application layer.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventSessionTemplateSync;
 using Explore.Application.Responses;

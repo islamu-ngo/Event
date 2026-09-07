@@ -1,6 +1,3 @@
-// ABOUTME: Defines immutable private transient results without exposing persistence entities.
-// ABOUTME: Keeps protected bytes opaque and carries only locator, tenant, purpose and expiry binding metadata.
-
 using Explore.Domain;
 using Explore.Application.Responses;
 

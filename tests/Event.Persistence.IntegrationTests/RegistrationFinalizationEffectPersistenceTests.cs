@@ -1,6 +1,3 @@
-// ABOUTME: Proves optional requirement progress and finalization-effect fencing against real PostgreSQL persistence.
-// ABOUTME: Runs concurrent workers to show one durable effect is claimed and completed exactly once.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

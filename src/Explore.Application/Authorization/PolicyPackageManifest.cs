@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral manifest for an authorization policy package.
-// ABOUTME: Enables hashing, diagnostics, and sync orchestration without leaking provider-specific upload details.
-
 namespace Explore.Application.Authorization;
 
 /// <summary>

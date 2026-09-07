@@ -1,6 +1,3 @@
-// ABOUTME: Repository implementation for EventTechAspect entity.
-// ABOUTME: Provides CRUD and specialized queries for tech event aspects.
-
 namespace Explore.Persistence.Repositories;
 
 using System;

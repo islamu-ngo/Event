@@ -1,6 +1,3 @@
-// ABOUTME: Hosted RabbitMQ manual-ack consumer for EmailDispatch pointer deliveries.
-// ABOUTME: Settles broker messages only after the PostgreSQL-backed drain service records the durable outcome.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Telemetry;

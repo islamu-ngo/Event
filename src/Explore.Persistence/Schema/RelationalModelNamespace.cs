@@ -1,6 +1,3 @@
-// ABOUTME: Applies the configured schema or fixed short prefix to the shared Explore EF Core model.
-// ABOUTME: Uses operator schemas only where supported and deterministic ie_ names elsewhere.
-
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Schema;

@@ -1,6 +1,3 @@
-// ABOUTME: Stable relational metadata for individually addressable webhook provider capabilities.
-// ABOUTME: Uses the capability flag value as the normalized lookup identifier for lossless snapshots.
-
 namespace Explore.Domain;
 
 public sealed class WebhookProviderCapabilityLookup

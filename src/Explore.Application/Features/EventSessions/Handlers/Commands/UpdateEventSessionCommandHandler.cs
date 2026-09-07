@@ -1,6 +1,3 @@
-// ABOUTME: Handler for grouped EventSession PATCH updates.
-// ABOUTME: Applies explicit groups, preserves schedule projections, and saves session/aspect atomically.
-
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;

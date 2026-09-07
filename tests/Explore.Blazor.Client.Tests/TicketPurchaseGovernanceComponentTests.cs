@@ -1,6 +1,3 @@
-// ABOUTME: Defines RED accessibility and HAL-authority contracts for ticket purchase governance UI.
-// ABOUTME: Covers semantic grouping, honest name-only scope, disabled submission, and live outcomes.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.Registration;
 using Explore.Blazor.Client.Contracts.Services;

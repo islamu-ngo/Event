@@ -1,6 +1,3 @@
-// ABOUTME: API integration tests for support-access session governance and audit contracts.
-// ABOUTME: Exercises HTTP, MediatR, EF persistence, HAL links, and ProblemDetails mapping together.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;

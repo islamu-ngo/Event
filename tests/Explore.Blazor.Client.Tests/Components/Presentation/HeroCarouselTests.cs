@@ -1,6 +1,3 @@
-// ABOUTME: Focused bUnit coverage for the auto-advancing public-home featured event hero.
-// ABOUTME: Verifies bounded slides, image anatomy, controls, swipe behavior, and ImageHelper fallbacks.
-
 using Explore.Blazor.Client.Components.Presentation;
 
 namespace Explore.Blazor.Client.Tests.Components.Presentation;

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for global.json SDK doctor checks.
-// ABOUTME: Ensures SDK mismatches are visible without attempting installation or repair.
-
 using Explore.Diagnostic.Doctor;
 using Explore.Diagnostic.Doctor.Checks;
 using Explore.Diagnostic.Doctor.Infrastructure;

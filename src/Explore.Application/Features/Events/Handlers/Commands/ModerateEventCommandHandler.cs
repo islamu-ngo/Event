@@ -1,6 +1,3 @@
-// ABOUTME: Handles reversible light moderation by hiding published events without editing content.
-// ABOUTME: Writes safe moderation history, attendee notification outbox work, and cache invalidations atomically.
-
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

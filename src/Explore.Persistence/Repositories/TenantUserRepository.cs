@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for tenant-local user participation records.
-// ABOUTME: Provides active-state checks used by tenant membership and admin authority paths.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

@@ -1,6 +1,3 @@
-// ABOUTME: Transaction boundary coordinator — wraps multi-step write workflows in a single atomic scope.
-// ABOUTME: Uses the execution strategy pattern required by NpgsqlRetryingExecutionStrategy; DbContext is the real UoW.
-
 namespace Explore.Application.Contracts.Persistence;
 
 public interface IUnitOfWork

@@ -1,6 +1,3 @@
-// ABOUTME: Persists one outgoing webhook message, immutable delivery plan, and all targets atomically.
-// ABOUTME: Recovers same-hash concurrent inserts idempotently while rejecting changed semantic identities.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
 using Explore.Domain;

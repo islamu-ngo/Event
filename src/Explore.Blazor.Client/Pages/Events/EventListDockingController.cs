@@ -1,6 +1,3 @@
-// ABOUTME: Event-list docking coordinator for workspace panel registration and persistence.
-// ABOUTME: Keeps dock layout side effects out of the EventList page state and rendering flow.
-
 using Explore.Blazor.Client.Services.Docking;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;

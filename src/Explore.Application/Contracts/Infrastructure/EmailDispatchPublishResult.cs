@@ -1,6 +1,3 @@
-// ABOUTME: Application-layer publish result returned by EmailDispatch transport adapters.
-// ABOUTME: Captures confirm/return/nack metadata without email content or provider-specific exceptions.
-
 namespace Explore.Application.Contracts.Infrastructure;
 
 public sealed record EmailDispatchPublishResult(

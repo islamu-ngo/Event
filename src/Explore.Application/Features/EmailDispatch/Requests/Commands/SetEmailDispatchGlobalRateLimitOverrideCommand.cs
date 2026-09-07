@@ -1,6 +1,3 @@
-// ABOUTME: Instance-admin command for setting or clearing the persisted global SMTP rate override.
-// ABOUTME: Leaves the configured processor rate authoritative whenever the nullable override is cleared.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

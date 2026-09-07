@@ -1,6 +1,3 @@
-// ABOUTME: Persists Event-owned managed tenant provisioning operations and capacity reservations.
-// ABOUTME: Uses no-tracking machine-status reads while tracked entity updates retain xmin concurrency checks.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

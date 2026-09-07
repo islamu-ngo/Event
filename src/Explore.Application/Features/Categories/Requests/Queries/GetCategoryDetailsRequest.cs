@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query request for fetching a single category by ID.
-// ABOUTME: Returns CategoryDto.
 using System;
 using Explore.Application.DTOs.Category;
 using MediatR;

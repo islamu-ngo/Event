@@ -1,6 +1,3 @@
-// ABOUTME: Startup validator for expired idempotency replay-cache cleanup settings.
-// ABOUTME: Fails fast on invalid scheduling, batch, or retention grace configuration.
-
 using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure;

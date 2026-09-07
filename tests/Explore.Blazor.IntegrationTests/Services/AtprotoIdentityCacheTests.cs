@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the AT Protocol identity cache reuses normalized entries without exceeding its capacity.
-// ABOUTME: Covers independent hard bounds for handle mappings and DID documents at the BFF trust boundary.
-
 using CarpaNet.Identity;
 using Explore.Blazor.Services.Auth;
 

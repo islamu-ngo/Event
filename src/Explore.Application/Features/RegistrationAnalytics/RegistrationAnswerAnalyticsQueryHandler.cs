@@ -1,6 +1,3 @@
-// ABOUTME: Handles governed registration-answer analytics reads for event organizers.
-// ABOUTME: Delegates aggregation to persistence so raw answers never cross into API or UI contracts.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.RegistrationAnalytics;

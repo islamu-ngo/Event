@@ -1,6 +1,3 @@
-// ABOUTME: Specifies tenant-owned directory identity resolution and capability readiness.
-// ABOUTME: Proves missing, incomplete, foreign, and valid documents yield bounded payload-free results.
-
 namespace Event.Application.UnitTests.Services;
 
 using System.Diagnostics.Metrics;

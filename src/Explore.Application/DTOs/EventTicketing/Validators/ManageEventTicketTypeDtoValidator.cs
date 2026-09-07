@@ -1,5 +1,3 @@
-// ABOUTME: Validates ticket type payloads before the ticket catalog aggregate mutates.
-// ABOUTME: Is manually constructed by ticket-type command handlers.
 using FluentValidation;
 
 namespace Explore.Application.DTOs.EventTicketing.Validators;

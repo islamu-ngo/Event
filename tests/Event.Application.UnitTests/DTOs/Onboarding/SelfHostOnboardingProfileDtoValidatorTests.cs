@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for convention-first self-hosted onboarding profile validation.
-// ABOUTME: Covers required site identity defaults and bounded optional contact/domain fields.
-
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.Onboarding.Validators;
 

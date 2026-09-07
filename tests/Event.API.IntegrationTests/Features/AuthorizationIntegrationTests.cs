@@ -1,6 +1,3 @@
-// ABOUTME: End-to-end integration tests verifying endpoint-level authorization.
-// ABOUTME: Tests anonymous denials, authenticated access, and tenant-admin organization creation.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;

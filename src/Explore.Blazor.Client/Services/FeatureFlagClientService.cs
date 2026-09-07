@@ -1,6 +1,3 @@
-// ABOUTME: Fetches the authenticated user's feature flags from GET /api/features/my-flags.
-// ABOUTME: Hydrates the FeatureStateContainer on login; no OpenFeature SDK dependency in UI.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Services;

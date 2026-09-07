@@ -1,6 +1,3 @@
-// ABOUTME: Verifies Infrastructure startup replay delegates to the atomic Application boundary.
-// ABOUTME: Preserves cancellation and fails closed on continuity or integrity rejection.
-
 using Explore.Application.Contracts.Services;
 using Explore.Infrastructure.Services.Privacy;
 using NSubstitute;

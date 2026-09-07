@@ -1,6 +1,3 @@
-// ABOUTME: Defines prospective optional, HAL-driven, accessible, localized add-on component contracts.
-// ABOUTME: Pins unchecked defaults, exact totals, focus/live status, RTL-safe CSS, and service isolation.
-
 using AngleSharp.Dom;
 using Bunit;
 using Explore.Blazor.Client.Clients;

@@ -1,6 +1,3 @@
-// ABOUTME: Validates the shape of grouped tenant directory-operator identity patches.
-// ABOUTME: Keeps draft content validation in the domain while rejecting empty stamps and mutation groups.
-
 namespace Explore.Application.DTOs.TenantSettingsDocuments.Validators;
 
 using FluentValidation;

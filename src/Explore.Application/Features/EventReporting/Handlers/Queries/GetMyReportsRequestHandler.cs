@@ -1,6 +1,3 @@
-// ABOUTME: Handles reporter-scoped paged event-report status list reads.
-// ABOUTME: Uses repository entity reads and maps only safe reporter-facing metadata.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventReporting;

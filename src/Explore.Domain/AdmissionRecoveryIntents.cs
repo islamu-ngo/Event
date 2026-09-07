@@ -1,6 +1,3 @@
-// ABOUTME: Models encrypted recovery request and delivery lifecycle state as Domain entities.
-// ABOUTME: Enforces protected-material clearing, receipt coherence, and optimistic concurrency.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

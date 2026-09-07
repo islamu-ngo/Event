@@ -1,6 +1,3 @@
-# ABOUTME: Reusable build/test workflow for Release restore, audit, format, build, and project test lanes.
-# ABOUTME: Supports intentional no-op execution so required caller checks remain always present.
-
 name: "Build & Test (Reusable)"
 
 permissions:

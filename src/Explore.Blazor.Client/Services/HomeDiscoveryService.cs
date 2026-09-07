@@ -1,6 +1,3 @@
-// ABOUTME: Resolves URL and saved home context before issuing one composite public discovery request.
-// ABOUTME: Reduces explicit browser coordinates to a configured coarse area and never persists or transmits origin.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 

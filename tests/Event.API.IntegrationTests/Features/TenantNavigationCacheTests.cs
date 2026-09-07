@@ -1,6 +1,3 @@
-// ABOUTME: API integration tests verifying tenant navigation link CRUD and output cache invalidation.
-// ABOUTME: Proves that POST navigation evicts TenantNav cache so subsequent GET returns the new link.
-
 using System.Net;
 using System.Net.Http.Json;
 using Event.Api.IntegrationTests.Fixtures;

@@ -1,6 +1,3 @@
-// ABOUTME: Handler for retrieving all group positions from the lookup table.
-// ABOUTME: Maps entities to list DTOs via AutoMapper.
-
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;

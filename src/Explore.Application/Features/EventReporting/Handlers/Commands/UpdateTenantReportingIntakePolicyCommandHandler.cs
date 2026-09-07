@@ -1,6 +1,3 @@
-// ABOUTME: Applies current-tenant reporting-intake changes through the coordinated publication-policy boundary.
-// ABOUTME: Commits atomically before releasing cache invalidation and setting notifications.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventReporting;

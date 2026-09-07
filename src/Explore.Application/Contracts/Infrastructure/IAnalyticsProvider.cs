@@ -1,6 +1,3 @@
-// ABOUTME: Provider-agnostic contract for analytics tracking across the application.
-// ABOUTME: Implemented by PostHogAnalyticsProvider, PlausibleAnalyticsProvider, RybbitAnalyticsProvider, RudderStackAnalyticsProvider, and NullAnalyticsProvider.
-
 namespace Explore.Application.Contracts.Infrastructure;
 
 /// <summary>

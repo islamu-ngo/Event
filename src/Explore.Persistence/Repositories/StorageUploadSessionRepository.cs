@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for storage upload reservation sessions.
-// ABOUTME: Supports active lookup, tracking lookup for finalization, and expiry batch discovery.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

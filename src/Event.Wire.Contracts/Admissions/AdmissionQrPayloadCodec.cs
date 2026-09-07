@@ -1,6 +1,3 @@
-// ABOUTME: Owns the exact versioned admission QR payload and 32-byte Base64url bearer invariant.
-// ABOUTME: Rejects non-canonical material ordinally and redacts every token-bearing string representation.
-
 using System.Diagnostics;
 
 namespace ISLAMU.Wire.Contracts.Admissions;

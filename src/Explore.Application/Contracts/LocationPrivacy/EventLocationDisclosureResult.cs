@@ -1,6 +1,3 @@
-// ABOUTME: Constrained immutable result and value contracts for one purpose-scoped location disclosure.
-// ABOUTME: Prevents public physical IDs, suppressed-state values, unsupported timezone, and over-ceiling fields.
-
 using System.Collections.Immutable;
 
 namespace Explore.Application.Contracts.LocationPrivacy;

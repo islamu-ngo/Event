@@ -1,6 +1,3 @@
-// ABOUTME: Coordinates SQLite projection locks in-process and releases transaction leases at completion.
-// ABOUTME: Provides nonblocking contention semantics for the supported single-instance SQLite deployment.
-
 using System.Collections.Concurrent;
 using System.Data.Common;
 using System.Runtime.CompilerServices;

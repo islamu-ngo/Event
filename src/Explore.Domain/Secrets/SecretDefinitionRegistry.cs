@@ -1,6 +1,3 @@
-// ABOUTME: Authoritative catalog of every secret-backed setting the platform understands.
-// ABOUTME: Encodes the canonical Infisical layout for platform, provider, integration, and ATProto secrets.
-
 using System.Collections.Frozen;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;

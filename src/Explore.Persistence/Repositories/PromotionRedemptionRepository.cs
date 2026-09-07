@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for promotion-code lookup and reservation usage accounting.
-// ABOUTME: Uses tenant-filtered entity queries, serializable caller transactions, and stable promotion locks.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Domain;

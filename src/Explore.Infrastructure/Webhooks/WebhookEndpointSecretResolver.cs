@@ -1,6 +1,3 @@
-// ABOUTME: Resolves LocalProvider endpoint signing secret material from configuration-backed references.
-// ABOUTME: Keeps raw webhook secrets out of endpoint persistence while supporting rotation metadata.
-
 using Explore.Application.Contracts.Webhooks;
 using Explore.Domain;
 using Explore.Infrastructure.Configuration;

@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos policy for tenant-bound registration orders with buyer and organizer read boundaries.
-# ABOUTME: Grants lifecycle actions only to the linked account and uses event-registration-manager authority for organizer reads.
-
 apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   resource: "islamuevent_registration_order"

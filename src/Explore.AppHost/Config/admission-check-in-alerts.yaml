@@ -1,6 +1,3 @@
-# ABOUTME: Prometheus alert contract for bounded, aggregate admission check-in telemetry.
-# ABOUTME: Expressions and annotations intentionally omit all tenant, event, target, credential, actor, and device identifiers.
-
 groups:
   - name: admission-check-in
     rules:

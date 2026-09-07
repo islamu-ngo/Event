@@ -1,6 +1,3 @@
-// ABOUTME: Tests for UiShellContextService caching, auth-guard, and CurrentUserState invalidation.
-// ABOUTME: Verifies anonymous users never trigger an API call and cached context is reused within the cache window.
-
 using System.Security.Claims;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Shell;

@@ -1,6 +1,3 @@
-/* ABOUTME: Provides responsive native scroll-snap layout for horizontal event discovery rails. */
-/* ABOUTME: Uses logical properties so touch, keyboard, and RTL browsing share one layout. */
-
 .event-rail {
     min-inline-size: 0;
 }

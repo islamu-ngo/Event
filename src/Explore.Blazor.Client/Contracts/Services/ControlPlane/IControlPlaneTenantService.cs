@@ -1,6 +1,3 @@
-// ABOUTME: Defines tenant lifecycle access for shared control-plane components.
-// ABOUTME: Uses generated API resources, requests, and command responses end to end.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.ControlPlane;

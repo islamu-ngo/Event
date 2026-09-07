@@ -1,6 +1,3 @@
-// ABOUTME: Handles authenticated registration-order starts and lifecycle commands for the current account only.
-// ABOUTME: Delegates all transactional state changes to the shared order lifecycle service after ownership checks.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

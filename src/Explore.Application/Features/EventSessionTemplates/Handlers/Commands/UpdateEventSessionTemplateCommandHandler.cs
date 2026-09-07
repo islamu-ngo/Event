@@ -1,6 +1,3 @@
-// ABOUTME: Applies grouped event session template metadata patches and optional atomic definition replacement.
-// ABOUTME: Enforces persisted tenant binding, immutable parent ownership, optimistic concurrency, and post-commit cache invalidation.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

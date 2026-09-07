@@ -1,6 +1,3 @@
-// ABOUTME: Configures the embedded Identity role table, normalized-name index, and relationships.
-// ABOUTME: Keeps authentication roles isolated from the platform's Domain authorization role model.
-
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

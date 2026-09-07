@@ -1,6 +1,3 @@
-// ABOUTME: Maps one active ticket-unit assignment to a concrete registration order and order line.
-// ABOUTME: Enforces tenant-safe restrictive lineage and unique ordinal slots per line.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

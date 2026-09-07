@@ -1,6 +1,3 @@
-// ABOUTME: Validates bounded notification fanout processor settings during host startup.
-// ABOUTME: Rejects unsafe concurrency, lease, paging, watermark, and readiness configurations.
-
 using Explore.Application.Services;
 using Explore.Domain;
 using Microsoft.Extensions.Options;

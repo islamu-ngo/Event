@@ -1,6 +1,3 @@
-# ABOUTME: Defines presentation-only Markdown rendering for normalized release context.
-# ABOUTME: Contains no commit policy, versioning, provider, URL, or command processors.
-
 [changelog]
 body = """
 # Release {{ version }}

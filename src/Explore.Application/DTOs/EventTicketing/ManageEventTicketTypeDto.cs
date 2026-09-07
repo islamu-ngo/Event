@@ -1,5 +1,3 @@
-// ABOUTME: Write model for creating or updating an event ticket type.
-// ABOUTME: Omits the persisted ticket identifier; update identity comes from the route.
 namespace Explore.Application.DTOs.EventTicketing;
 
 public sealed record ManageEventTicketTypeDto

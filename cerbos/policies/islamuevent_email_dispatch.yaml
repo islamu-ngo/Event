@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos resource policy for EmailDispatch operator resources.
-# ABOUTME: Protects replay and parking affordances behind tenant-admin operator authority.
-
 apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   resource: "islamuevent_email_dispatch"

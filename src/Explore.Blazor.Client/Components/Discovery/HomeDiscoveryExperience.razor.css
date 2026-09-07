@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped responsive layout for the public home discovery context, hero, detailed grid, and spotlight. */
-/* ABOUTME: Uses design tokens, logical properties, and reduced-motion-safe states across LTR and RTL. */
-
 .home-discovery {
     --home-discovery-shell-bleed: 9.5238%;
     --home-discovery-content-gutter: var(--isl-space-4);

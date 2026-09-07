@@ -1,6 +1,3 @@
-// ABOUTME: Persists shell selection preferences through the existing user-settings API.
-// ABOUTME: Revalidates restored workspace, actor, and Settings scope against server shell authority.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;

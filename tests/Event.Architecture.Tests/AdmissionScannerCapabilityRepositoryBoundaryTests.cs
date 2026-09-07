@@ -1,6 +1,3 @@
-// ABOUTME: Guards the scanner-capability repository boundary against Application DTO persistence contracts.
-// ABOUTME: Requires entity inputs and entity-only atomic outcomes while leaving descriptor mapping to Application.
-
 using System.Reflection;
 using Explore.Application.Contracts.Admissions;
 using Explore.Domain;

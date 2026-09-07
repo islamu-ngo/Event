@@ -1,6 +1,3 @@
-// ABOUTME: Unified role controller replacing OrganizationRoleController and UserRoleController.
-// ABOUTME: Supports filtering by normalized role scope lookup ID.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Hateoas;

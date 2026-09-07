@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for event-session agenda item reads.
-// ABOUTME: Provides no-tracking detail/session/list queries with caller cancellation propagation.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.Extensions;

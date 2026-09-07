@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL and file-backed SQLite round-trip coverage for private event and session lifecycle setters.
-// ABOUTME: Proves explicit statuses and schedule projections materialize under tenant filtering.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;

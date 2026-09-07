@@ -1,6 +1,3 @@
-// ABOUTME: Independent allowlist classifying every considered event and RSVP source field for federation.
-// ABOUTME: Makes native mapping, description rendering, and privacy exclusions explicit and reviewable.
-
 using System.Collections.Immutable;
 
 namespace Explore.Application.Features.Federation.Atproto.Services;

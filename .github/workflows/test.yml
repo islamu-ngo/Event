@@ -1,6 +1,3 @@
-# ABOUTME: CI workflow running build and all test suites on push/PR to main and develop.
-# ABOUTME: Always reports a status check, running tests only when build/test-relevant files change.
-
 name: "Build & Test"
 
 permissions:

@@ -1,6 +1,3 @@
-// ABOUTME: Contract invariant tests over the exported OpenAPI document (/openapi/event-api.json).
-// ABOUTME: RED tests documenting 464-duplicate-operation defect - enforces invariants expected post-stabilization.
-
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;

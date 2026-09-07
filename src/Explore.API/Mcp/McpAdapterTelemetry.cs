@@ -1,6 +1,3 @@
-// ABOUTME: Emits bounded MCP adapter tracing and metric metadata for local debugging.
-// ABOUTME: Keeps prompts, payloads, tenant IDs, auth values, and endpoint details out of telemetry.
-
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 

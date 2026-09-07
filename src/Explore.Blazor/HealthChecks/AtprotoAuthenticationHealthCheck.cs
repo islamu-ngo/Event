@@ -1,6 +1,3 @@
-// ABOUTME: Reports bounded operational AT Protocol readiness while keeping optional providers and liveness independent.
-// ABOUTME: Treats disabled login as healthy dormancy and never probes a user PDS or exposes configuration values.
-
 using Explore.Blazor.Constants;
 using Explore.Blazor.Services;
 using Explore.Blazor.Services.Auth;

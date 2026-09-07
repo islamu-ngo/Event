@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL acceptance tests for ordinary Explore database migration behavior after the clean reset.
-// ABOUTME: Converts the obsolete staged gate coverage into current-set, retry, and legacy-config invariants.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Persistence;
 using Explore.Persistence.Schema;

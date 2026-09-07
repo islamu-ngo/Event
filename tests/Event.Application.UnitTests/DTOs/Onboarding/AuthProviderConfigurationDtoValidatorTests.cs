@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for confidential Keycloak client-secret validation during onboarding.
-// ABOUTME: Distinguishes a missing credential from an existing server-side secret redacted from the request.
-
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.Onboarding.Validators;
 using Explore.Domain.Enums;

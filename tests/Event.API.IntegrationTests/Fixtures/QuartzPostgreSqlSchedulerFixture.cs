@@ -1,6 +1,3 @@
-// ABOUTME: Owns one PostgreSQL container shared by the Quartz schema and clustering scheduler proofs.
-// ABOUTME: Turns an absent container runtime into a visible skip so "no Docker" never reads as a regression.
-
 using System.Globalization;
 using Explore.API.Scheduling;
 using Explore.Secrets.Database;

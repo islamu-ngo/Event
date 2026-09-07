@@ -1,6 +1,3 @@
-// ABOUTME: Characterizes the existing supported ATProto-to-local import-plan mapping before extension work.
-// ABOUTME: Keeps Task 21's validated source identity, schedule, and calendar fields stable during later expansion.
-
 using Explore.Application.Features.Federation.Atproto.Models;
 using Explore.Application.Features.Federation.Atproto.Services;
 using Explore.Domain;

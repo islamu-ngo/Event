@@ -1,6 +1,3 @@
-// ABOUTME: Contract for persisting the user's language preference through the BFF.
-// ABOUTME: Wraps POST /bff/language with CultureRegistry-based allowlist validation.
-
 namespace Explore.Blazor.Client.Contracts.Services;
 
 /// <summary>

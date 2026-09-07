@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL integration checks for complete AT Protocol PDS snapshot reconciliation.
-// ABOUTME: Covers canonical idempotency, missing-record tombstones, rejected-record invalidation, and cursor isolation.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Federation.Atproto.Models;

@@ -1,6 +1,3 @@
-// ABOUTME: DTO for event team member listing with user, role, and assignment lifecycle details.
-// ABOUTME: Used by GetEventTeamListRequest for team management UI and API responses.
-
 using Explore.Domain.Enums;
 using System.Text.Json.Serialization;
 

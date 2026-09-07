@@ -1,6 +1,3 @@
-// ABOUTME: Exercises strongly typed admission lifecycle invariants beyond the reflection contract gate.
-// ABOUTME: Provides the real-library issue/rotate/refund QA path without printing credential material.
-
 using Explore.Domain.Enums;
 
 namespace Event.Domain.UnitTests.Entities;

@@ -1,6 +1,3 @@
-// ABOUTME: MediatR query request for retrieving all group positions.
-// ABOUTME: Read-only lookup — no parameters needed.
-
 using System.Collections.Generic;
 using Explore.Application.DTOs.GroupPosition;
 using MediatR;

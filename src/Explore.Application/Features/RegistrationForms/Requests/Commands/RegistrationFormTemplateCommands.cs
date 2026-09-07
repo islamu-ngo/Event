@@ -1,6 +1,3 @@
-// ABOUTME: Defines registration-form template catalog write requests.
-// ABOUTME: Separates template creation authority from event-scoped instantiation provenance.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.RegistrationForms;
 using Explore.Application.Responses;

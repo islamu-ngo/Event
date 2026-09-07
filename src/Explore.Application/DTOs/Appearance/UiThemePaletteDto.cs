@@ -1,6 +1,3 @@
-// ABOUTME: DTO carrying the bounded palette tokens used to create or update a UI theme.
-// ABOUTME: Mirrors the domain palette structure while keeping transport and validation in the application layer.
-
 namespace Explore.Application.DTOs.Appearance;
 
 public sealed record UiThemePaletteDto

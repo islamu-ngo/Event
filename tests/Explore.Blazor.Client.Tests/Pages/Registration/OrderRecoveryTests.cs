@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for account and guest registration-order recovery pages.
-// ABOUTME: Verifies HAL-only authenticated cancellation and fail-closed guest capability handling.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.Registration.FormRenderer;
 using Explore.Blazor.Client.Contracts.Services;

@@ -1,6 +1,3 @@
-// ABOUTME: localStorage adapter for schema-versioned dock layout snapshots.
-// ABOUTME: Keeps storage key construction out of Blazor components and behind IDockLayoutPersistence.
-
 const PREFIX = 'dock_layout:v1:';
 
 export function get(layoutKey) {

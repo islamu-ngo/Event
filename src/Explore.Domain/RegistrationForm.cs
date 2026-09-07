@@ -1,6 +1,3 @@
-// ABOUTME: Defines the tenant/event-owned registration-form aggregate and stable machine identity.
-// ABOUTME: Owns immutable form versions while preventing duplicate version numbers and cross-tenant graphs.
-
 using Explore.Domain.Interfaces;
 using Explore.Domain.Services.Registration;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for typed owner-scoped webhook consumers and provider app mappings.
-// ABOUTME: Returns domain entities only and requires exact ownership scopes for management queries.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

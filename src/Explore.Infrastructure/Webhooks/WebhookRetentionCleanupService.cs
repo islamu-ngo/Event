@@ -1,6 +1,3 @@
-// ABOUTME: Orchestrates bounded webhook retention cleanup with a fresh tenant scope per work item.
-// ABOUTME: Commits data changes and safe system audit atomically while emitting low-cardinality telemetry.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

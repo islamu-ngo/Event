@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for root startup routing decisions driven by the typed instance bootstrap status.
-// ABOUTME: Proves interactive setup, exact configured-provider challenges, completed routing, and fail-closed surfaces.
-
 namespace Explore.Blazor.Client.Tests.Services;
 
 public sealed class StartupRoutingServiceTests

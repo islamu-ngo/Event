@@ -1,6 +1,3 @@
-// ABOUTME: Explicitly abandons terminal provider work that is already under operator authority.
-// ABOUTME: Prevents active lease theft and commits append-only evidence with mandatory safe audit.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;

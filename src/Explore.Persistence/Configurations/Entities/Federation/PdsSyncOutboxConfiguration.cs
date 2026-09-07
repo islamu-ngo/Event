@@ -1,6 +1,3 @@
-// ABOUTME: Maps tenant-owned immutable PDS delivery intent with fenced leases and deterministic idempotency.
-// ABOUTME: Enforces source-version, dependency, supersession, and URI/CID settlement constraints.
-
 using Explore.Domain.Federation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

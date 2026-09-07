@@ -1,6 +1,3 @@
-// ABOUTME: Defines canonical Svix application metadata for typed webhook ownership proof.
-// ABOUTME: Enforces exact owner, consumer, and optional tenant identity for self-hosted applications.
-
 using System.Globalization;
 using Explore.Domain;
 

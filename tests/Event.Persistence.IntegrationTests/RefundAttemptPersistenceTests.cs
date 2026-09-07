@@ -1,6 +1,3 @@
-// ABOUTME: Proves refund reservation, dispute, duplicate, and tenant persistence invariants on SQLite.
-// ABOUTME: Exercises the repository contract without provider I/O or generated migrations.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Services.Registration;

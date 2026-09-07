@@ -1,6 +1,3 @@
-// ABOUTME: Defines bounded registration-form template catalog API contracts.
-// ABOUTME: Carries template ownership, source version provenance, and instantiation input without graph duplication.
-
 namespace Explore.Application.DTOs.RegistrationForms;
 
 public sealed record RegistrationFormTemplateDto(

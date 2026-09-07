@@ -1,6 +1,3 @@
-// ABOUTME: Shared text filtering for Event MCP descriptor projection.
-// ABOUTME: Drops blank entries so truncation counts reflect real content rather than empty placeholders.
-
 namespace Explore.API.Mcp;
 
 internal static class EventMcpTextFilters

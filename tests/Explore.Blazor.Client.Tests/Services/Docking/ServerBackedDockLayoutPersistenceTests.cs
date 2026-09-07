@@ -1,6 +1,3 @@
-// ABOUTME: Tests authenticated server persistence, anonymous fallback, promotion, and governance filtering.
-// ABOUTME: Keeps shell layout storage behind existing settings and local persistence contracts.
-
 using Explore.Blazor.Client.Components.Shell;
 using Explore.Blazor.Client.Contracts.Services.Shell;
 using Explore.Blazor.Client.Services.Docking;

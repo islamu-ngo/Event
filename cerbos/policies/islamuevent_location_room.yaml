@@ -1,4 +1,3 @@
-# ABOUTME: Cerbos resource policy for location_room resources.
 # Rooms are location-scoped: tenant admins manage rooms within their tenant.
 
 apiVersion: api.cerbos.dev/v1

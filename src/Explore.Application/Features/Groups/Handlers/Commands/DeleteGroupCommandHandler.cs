@@ -1,6 +1,3 @@
-// ABOUTME: Handles Group soft-deletion: verifies user permission and soft-deletes the Group.
-// ABOUTME: Requires GroupDelete permission via IGroupMemberRepository.HasPermissionInGroup.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

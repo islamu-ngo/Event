@@ -1,6 +1,3 @@
-// ABOUTME: Setting definitions for tenant-level policies (self-service registration, white-labeling).
-// ABOUTME: Instance-only settings that control tenant capabilities.
-
 namespace Explore.Domain.Settings.Definitions;
 
 public static class TenantSettingDefinitions

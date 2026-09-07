@@ -1,6 +1,3 @@
-// ABOUTME: Query-bindable model for EventSessionController.GetAll session discovery endpoint.
-// ABOUTME: Transport concern only; mapped to GetEventSessionListRequest (MediatR) in the controller.
-
 using System.ComponentModel.DataAnnotations;
 using Explore.Application.DTOs.CustomPropertyProjection;
 

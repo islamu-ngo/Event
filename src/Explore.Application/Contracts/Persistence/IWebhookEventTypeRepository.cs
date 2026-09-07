@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for the canonical outgoing webhook event type catalog.
-// ABOUTME: Keeps event type persistence provider-neutral for Local and Svix synchronization.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

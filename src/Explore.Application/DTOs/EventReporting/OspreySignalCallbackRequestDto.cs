@@ -1,6 +1,3 @@
-// ABOUTME: API request body for asynchronous Osprey moderation signal callbacks.
-// ABOUTME: Carries tenant/report/event identity plus bounded provider signal metadata only.
-
 namespace Explore.Application.DTOs.EventReporting;
 
 public sealed record OspreySignalCallbackRequestDto

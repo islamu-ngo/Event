@@ -1,6 +1,3 @@
-// ABOUTME: Maps append-only incoming webhook redrive provenance across processing generations.
-// ABOUTME: Enforces one tenant-scoped redrive record for each target processing generation.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

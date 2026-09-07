@@ -1,6 +1,3 @@
-// ABOUTME: Reports fixed-cardinality ticketing recovery readiness from durable aggregate state.
-// ABOUTME: Emits only closed status, counts, and age; tenant, money, provider, and bearer identifiers are forbidden.
-
 using Explore.Application.Contracts.Recovery;
 using Explore.Secrets.Configuration;
 using Microsoft.Extensions.DependencyInjection;

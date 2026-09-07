@@ -1,6 +1,3 @@
-@* ABOUTME: Inline Studio form for ticket pricing, limits, collection mode, and admission entitlements. *@
-@* ABOUTME: Enforces lookup-specific field combinations before emitting generated API write models. *@
-
 <div class="ticket-type-editor" data-testid="ticket-type-editor">
     <MudTextField T="string" Label="Name" @bind-Value="Model.Name" Required="true" Variant="Variant.Outlined" Disabled="IsSaving" data-testid="ticket-type-name" />
     <MudSelect T="int" Label="Pricing mode" Value="Model.PricingModeId" ValueChanged="OnPricingModeChanged" Variant="Variant.Outlined" Disabled="IsSaving" data-testid="ticket-pricing-mode">

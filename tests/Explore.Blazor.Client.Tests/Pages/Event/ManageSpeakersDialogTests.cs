@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for the event-session speaker management dialog.
-// ABOUTME: Verifies speaker add/remove controls follow API-emitted HAL affordances.
-
 using Explore.Blazor.Client.Pages.Events.Dialogs;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor;

@@ -1,6 +1,3 @@
-// ABOUTME: Join table linking roles to their granted permissions for dynamic RBAC.
-// ABOUTME: Composite PK (RoleId, PermissionId). Used by LocalAuthorizationProvider and PolicySyncService.
-
 namespace Explore.Domain;
 
 public class RolePermission

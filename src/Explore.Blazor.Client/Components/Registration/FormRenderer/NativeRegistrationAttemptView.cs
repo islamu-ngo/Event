@@ -1,6 +1,3 @@
-// ABOUTME: Projects the generated attendee-safe attempt contract into renderer-only immutable view state.
-// ABOUTME: Keeps generated NSwag transport names at the service boundary without importing Studio authoring contracts.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Components.Registration.FormRenderer;

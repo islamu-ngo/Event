@@ -1,6 +1,3 @@
-// ABOUTME: Defines the typed low-level client for the same-origin admission recovery BFF bridge.
-// ABOUTME: Keeps raw HTTP construction outside feature services while preserving explicit outcomes.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Services.Http;
 

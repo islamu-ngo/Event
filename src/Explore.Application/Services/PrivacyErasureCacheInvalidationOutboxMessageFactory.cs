@@ -1,6 +1,3 @@
-// ABOUTME: Creates payload-free durable cache-convergence work for one erased User.
-// ABOUTME: Uses the generic outbox retry/dead-letter lifecycle without retaining extra PII payloads.
-
 using Explore.Domain;
 
 namespace Explore.Application.Services;

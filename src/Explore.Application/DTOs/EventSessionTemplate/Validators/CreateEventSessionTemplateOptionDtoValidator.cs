@@ -1,6 +1,3 @@
-// ABOUTME: Validates session template option payload shape with standard field length constraints.
-// ABOUTME: Mirrors CreateEventTemplateOptionDtoValidator for consistency across EAV system.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.EventSessionTemplate.Validators;

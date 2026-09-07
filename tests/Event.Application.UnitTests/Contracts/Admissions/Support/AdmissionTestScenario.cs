@@ -1,6 +1,3 @@
-// ABOUTME: Holds deterministic trusted facts and observable persisted effects for admission orchestration tests.
-// ABOUTME: Recovery storage retains digests and bounded metadata only; plaintext exists only at the delivery fake.
-
 using System.Security.Cryptography;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Persistence;

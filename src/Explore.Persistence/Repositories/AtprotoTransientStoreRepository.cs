@@ -1,6 +1,3 @@
-// ABOUTME: Persists encrypted ATProto authentication transients in the instance relational database.
-// ABOUTME: Uses non-retrying conditional deletion so only the durably committed single winner receives payload.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.Database;

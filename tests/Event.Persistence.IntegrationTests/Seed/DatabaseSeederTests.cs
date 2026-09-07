@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for runtime database seeding against PostgreSQL.
-// ABOUTME: Verifies development catalog seeding remains idempotent and preserves user state across API startups.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Constants;

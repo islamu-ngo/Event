@@ -1,6 +1,3 @@
-// ABOUTME: Verifies signed ATProto repository commits and deterministic Merkle Search Tree snapshots.
-// ABOUTME: Extracts bounded current records only after strict DID-key, CBOR, CID, and structure validation.
-
 using System.Formats.Cbor;
 using System.Numerics;
 using System.Security.Cryptography;

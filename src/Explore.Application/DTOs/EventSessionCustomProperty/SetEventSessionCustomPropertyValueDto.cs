@@ -1,6 +1,3 @@
-// ABOUTME: Write DTO for setting event session custom property values (single or multi-value).
-// ABOUTME: Ordinal distinguishes multi-value entries; single-value uses Ordinal=0.
-
 namespace Explore.Application.DTOs.EventSessionCustomProperty;
 
 public sealed record SetEventSessionCustomPropertyValueDto

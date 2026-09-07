@@ -1,6 +1,3 @@
-// ABOUTME: Configuration for optional RabbitMQ Dispatch Mode for EmailDispatch pointer messages.
-// ABOUTME: Defaults keep Basic PostgreSQL plus SMTP dispatch independent when RabbitMQ is not enabled.
-
 namespace Explore.Infrastructure;
 
 public sealed class EmailDispatchRabbitMqSettings

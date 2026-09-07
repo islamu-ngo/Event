@@ -1,6 +1,3 @@
-// ABOUTME: Loads and validates the embedded ticketing deployment capability matrix.
-// ABOUTME: Rejects unknown statuses, duplicate codes, and any enabled protected delayed-payout state.
-
 using System.Collections.Frozen;
 using System.Reflection;
 using System.Text.Json;

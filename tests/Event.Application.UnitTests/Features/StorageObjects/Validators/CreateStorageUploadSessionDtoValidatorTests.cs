@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for upload-session reservation metadata validation rules.
-// ABOUTME: Verifies unsafe filenames, display names, extensions, and MIME hints are rejected early.
-
 using Explore.Application.DTOs.StorageObject;
 using Explore.Application.DTOs.StorageObject.Validators;
 using Explore.Domain;

@@ -1,5 +1,3 @@
-<!-- ABOUTME: Defines the focused executable TUnit boundary for Event.Setup.Core. -->
-<!-- ABOUTME: References only its owning source project and approved TUnit infrastructure. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>

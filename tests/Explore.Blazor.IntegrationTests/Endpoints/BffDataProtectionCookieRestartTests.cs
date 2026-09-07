@@ -1,6 +1,3 @@
-// ABOUTME: Proves BFF cookie tickets survive a host restart with the Redis Data Protection key ring.
-// ABOUTME: Uses the production BFF registration against an isolated Redis container.
-
 using System.Net;
 using System.Security.Claims;
 using Explore.Blazor.Extensions;

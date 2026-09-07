@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning all event types.
-// ABOUTME: Maps EventType entities to EventTypeDto list.
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventType;

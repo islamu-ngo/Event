@@ -1,6 +1,3 @@
-// ABOUTME: Enum mirror for stable PromotionReservationStatus lookup identities.
-// ABOUTME: Supports exact-once reserve, consume, release, and expiry transitions.
-
 namespace Explore.Domain.Enums;
 
 public enum PromotionReservationStatusEnum

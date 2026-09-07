@@ -1,6 +1,3 @@
-// ABOUTME: Canonical storage provider, visibility, purpose, lifecycle, and session-state values.
-// ABOUTME: Keeps local-first storage metadata stable without leaking provider implementation details.
-
 namespace Explore.Domain;
 
 public static class StorageProviders

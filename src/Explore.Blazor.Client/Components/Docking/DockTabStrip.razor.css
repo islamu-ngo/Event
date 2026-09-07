@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped tab strip styling for stacked dock panels.
-   ABOUTME: Uses logical spacing and tokenized focus states for dormant host rendering. */
-
 .dock-tab-strip {
     display: flex;
     align-items: stretch;

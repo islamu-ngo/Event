@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for AuditLog entity writes used by operator-visible audit trails.
-// ABOUTME: Sync workflows use this to persist structured template-sync audit entries without coupling Application to DbContext.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

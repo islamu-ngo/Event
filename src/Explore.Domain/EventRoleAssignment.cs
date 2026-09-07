@@ -1,6 +1,3 @@
-// ABOUTME: Persisted per-event role assignment grant for event-scoped operational authority.
-// ABOUTME: Uses explicit lifecycle and app-managed Version concurrency; rows are evidence and are not soft-deleted.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;

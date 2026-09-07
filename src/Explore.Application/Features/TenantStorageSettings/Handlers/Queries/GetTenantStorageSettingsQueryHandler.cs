@@ -1,6 +1,3 @@
-// ABOUTME: Handles reads for tenant storage administration settings.
-// ABOUTME: Requires tenant or instance administrator authority before returning usage and redacted settings.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;

@@ -1,6 +1,3 @@
-# ABOUTME: Reusable container image build workflow with SBOM, provenance, and digest evidence.
-# ABOUTME: Publishes API/UI images to ATCR and GHCR while retaining immutable build metadata.
-
 name: "Container Build (Reusable)"
 
 on:

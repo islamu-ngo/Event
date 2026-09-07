@@ -1,6 +1,3 @@
-// ABOUTME: Manages Keycloak container lifecycle for security integration tests using Testcontainers.
-// ABOUTME: Imports the deterministic test realm and waits for OIDC metadata endpoint readiness.
-
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using TUnit.Core.Interfaces;

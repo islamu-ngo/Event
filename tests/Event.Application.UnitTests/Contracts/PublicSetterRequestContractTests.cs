@@ -1,6 +1,3 @@
-// ABOUTME: Ratchets public mutable setters on compiled Application MediatR requests to lifecycle-required members.
-// ABOUTME: Proves trusted persisted-context enrichment uses immutable record copies instead of request mutation.
-
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using Explore.Application.Authorization;

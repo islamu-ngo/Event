@@ -1,6 +1,3 @@
-// ABOUTME: Proves strict release descriptor and public change-fragment validation.
-// ABOUTME: Covers append-only correction, impact references, embargo guards, and stable diagnostics.
-
 using ISLAMU.ReleaseEngineering;
 using System.Globalization;
 

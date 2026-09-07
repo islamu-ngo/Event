@@ -1,6 +1,3 @@
-// ABOUTME: Verifies how the combined host composes the scheduler operator surfaces.
-// ABOUTME: Guards opt-in dashboard mounting, route ownership, and single SignalR circuit ownership.
-
 using Event.Standalone.IntegrationTests.Fixtures;
 using Explore.API.Hosting;
 using Microsoft.AspNetCore.Http;

@@ -1,5 +1,3 @@
-// ABOUTME: Command to update analytics governance settings from admin UI.
-
 using Explore.Application.DTOs.Instance;
 using Explore.Application.Responses;
 using MediatR;

@@ -1,6 +1,3 @@
-// ABOUTME: Coordinates destination-approved direct-transfer staging and promotion into ordinary import sessions.
-// ABOUTME: Preserves target authority, bounded resumability, replay safety, and mandatory preview/apply separation.
-
 namespace Explore.Application.Features.ConfigurationManifest.Managed;
 
 using System.Net;

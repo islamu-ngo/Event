@@ -1,6 +1,3 @@
-// ABOUTME: HAL policies for event-team assignment and revocation actions.
-// ABOUTME: Uses the parent event manage-team capability for collection and revocable item links.
-
 using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;

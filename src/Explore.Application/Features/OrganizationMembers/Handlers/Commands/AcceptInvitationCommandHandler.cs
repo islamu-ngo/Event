@@ -1,6 +1,3 @@
-// ABOUTME: Handler for accepting an organization membership invitation.
-// ABOUTME: Validates invitation ownership before confirming the membership record.
-
 using System;
 using System.Threading;
 using System.Threading.Tasks;

@@ -1,6 +1,3 @@
-// ABOUTME: Resolves non-secret SMTP policy from governance and credentials from the selected authority.
-// ABOUTME: Database settings never supply SMTP usernames or passwords.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Models;

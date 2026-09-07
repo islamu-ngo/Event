@@ -1,6 +1,3 @@
-// ABOUTME: Persists privacy-unfenced user appearance preferences as atomic sparse overrides.
-// ABOUTME: Removes overrides matching inherited values and invalidates user cache after commit.
-
 namespace Explore.Application.Features.Appearance.Handlers.Commands;
 
 using Explore.Application.Contracts.Infrastructure;

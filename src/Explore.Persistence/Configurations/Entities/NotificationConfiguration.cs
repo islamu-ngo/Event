@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for Notification entity with indexes for efficient querying.
-// ABOUTME: Optimized for querying unread notifications per user per tenant with partial index.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

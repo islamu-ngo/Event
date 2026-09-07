@@ -1,6 +1,3 @@
-// ABOUTME: Maps AI assistant domain entities to safe Application DTOs for private history endpoints.
-// ABOUTME: Keeps provider secrets, raw infrastructure errors, and EF concerns out of API-facing shapes.
-
 using Explore.Application.DTOs.Ai;
 using Explore.Domain.Ai;
 

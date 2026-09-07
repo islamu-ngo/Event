@@ -1,6 +1,3 @@
-// ABOUTME: Focused tests for the Blazor control-plane adapter over generated Event API contracts.
-// ABOUTME: Protects HAL resource pass-through, generated request construction, and DI registration.
-
 using Explore.Blazor.Client.Contracts.ControlPlane;
 using Explore.Blazor.Client.Contracts.Services.ControlPlane;
 using Explore.Blazor.Client.Extensions;

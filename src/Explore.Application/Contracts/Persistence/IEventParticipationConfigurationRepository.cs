@@ -1,6 +1,3 @@
-// ABOUTME: Application persistence contract for exact event participation configuration mutations.
-// ABOUTME: Returns Domain entities so handlers retain validation, mapping, and tenant-bound concurrency ownership.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

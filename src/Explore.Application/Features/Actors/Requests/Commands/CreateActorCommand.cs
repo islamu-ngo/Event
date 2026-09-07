@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for creating a new actor.
-// ABOUTME: Carries the CreateActorDto payload.
 using Explore.Application.DTOs.Actor;
 using Explore.Application.Responses;
 using MediatR;

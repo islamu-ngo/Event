@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for event-owned shared capacity pools.
-// ABOUTME: Preserves tenant/event ownership, concurrency metadata, and active-name uniqueness.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

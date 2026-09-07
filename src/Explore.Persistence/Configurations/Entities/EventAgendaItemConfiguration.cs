@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for EventAgendaItem - event-level timeline band with cached local projection fields.
-// ABOUTME: Indexed for (TenantId, EventId, LocalStartDate, LocalStartMinuteOfDay) day/room agenda queries.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

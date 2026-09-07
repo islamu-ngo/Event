@@ -1,6 +1,3 @@
-// ABOUTME: Verifies Event aggregate lifecycle semantic methods and UTC mutation guards.
-// ABOUTME: Proves status, UpdatedAt, and ConcurrencyStamp behavior for ordinary and override transitions.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

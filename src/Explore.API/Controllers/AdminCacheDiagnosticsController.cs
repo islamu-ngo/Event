@@ -1,6 +1,3 @@
-// ABOUTME: Diagnostics-only endpoint for invalidating admin authority cache during full-process E2E tests.
-// ABOUTME: Hidden from API docs and disabled unless an explicit diagnostics flag is enabled.
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Explore.Application.Authentication;

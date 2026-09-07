@@ -1,5 +1,3 @@
-// ABOUTME: Resolves current internal user id from provider identity claims when subject is not a GUID.
-// ABOUTME: Supports provider-key link lookup first, then verified email fallback for Keycloak/Google.
 using MediatR;
 
 namespace Explore.Application.Features.Users.Requests.Queries;

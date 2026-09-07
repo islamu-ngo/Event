@@ -1,6 +1,3 @@
-// ABOUTME: Secured command for creating a draft control-plane tenant plan SaaS tier.
-// ABOUTME: Reuses tenant plan draft validation before any persistence or provisioning side effects.
-
 using Explore.Application.Authorization;
 using Explore.Application.Features.ControlPlane.Plans;
 using Explore.Application.Responses;

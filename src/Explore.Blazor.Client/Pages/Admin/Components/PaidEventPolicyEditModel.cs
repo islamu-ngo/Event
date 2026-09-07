@@ -1,6 +1,3 @@
-// ABOUTME: Client-only edit state for paid-event policy administration screens.
-// ABOUTME: Maps generated paid-policy DTOs at boundaries and validates tenant narrowing before save.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Pages.Admin.Components;

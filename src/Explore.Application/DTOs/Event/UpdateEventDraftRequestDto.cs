@@ -1,6 +1,3 @@
-// ABOUTME: Local draft-event workflow contract for scalar event-shell fields only.
-// ABOUTME: Excludes lifecycle status, session projections, and public API exposure.
-
 using System;
 
 namespace Explore.Application.DTOs.Event;

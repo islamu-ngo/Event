@@ -1,6 +1,3 @@
-// ABOUTME: Control-plane tenant plan DTOs for SaaS tier plan management.
-// ABOUTME: Exposes bounded pricing, version, settings, quota, and assignment metadata.
-
 namespace Explore.Application.DTOs.ControlPlane;
 
 using System.Collections.ObjectModel;

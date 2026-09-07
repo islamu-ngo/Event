@@ -1,6 +1,3 @@
-// ABOUTME: Proves canonical acceptance freshness compares every server-authored disclosure fact.
-// ABOUTME: Prevents a fabricated snapshot from passing with a copied revision and matching lineage.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Services.Registration;

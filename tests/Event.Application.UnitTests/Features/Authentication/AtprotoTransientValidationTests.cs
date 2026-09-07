@@ -1,6 +1,3 @@
-// ABOUTME: Specifies private transient Application validation independently of HTTP and authentication.
-// ABOUTME: Guards exact expiry ceilings, UTF-8 bounds and the sole tenant-free OAuth read exception.
-
 using Explore.Application.Features.Authentication.Atproto.Requests.Commands;
 using Explore.Application.Features.Authentication.Atproto.Requests.Queries;
 using Explore.Application.Features.Authentication.Atproto.Validators;

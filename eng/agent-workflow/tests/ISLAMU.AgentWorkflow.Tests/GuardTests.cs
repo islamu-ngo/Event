@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the lightweight guard accepts valid intents YAML and literal-file commit pathspecs.
-// ABOUTME: Rejects malformed YAML, broad staging targets, globs, traversal, pathspec magic, and duplicates.
-
 using System.Text;
 
 namespace ISLAMU.AgentWorkflow.Tests;

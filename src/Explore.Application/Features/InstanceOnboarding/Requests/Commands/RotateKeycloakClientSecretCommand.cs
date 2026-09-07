@@ -1,6 +1,3 @@
-// ABOUTME: Command contract for post-onboarding Keycloak client-secret rotation.
-// ABOUTME: Carries current user identity for instance-admin authorization and audit-safe logging.
-
 using Explore.Application.DTOs.Onboarding;
 using MediatR;
 

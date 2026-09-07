@@ -1,6 +1,3 @@
-// ABOUTME: Validates Listmonk integration non-secret settings before tenant-scope persistence.
-// ABOUTME: Enforces minimal SSRF guardrails for configured instance URLs without network lookups.
-
 namespace Explore.Application.DTOs.Integrations.Validators;
 
 using System.Net;

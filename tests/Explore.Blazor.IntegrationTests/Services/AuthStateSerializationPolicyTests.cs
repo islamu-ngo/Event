@@ -1,6 +1,3 @@
-// ABOUTME: Tests the browser-readable Blazor authentication-state serialization policy.
-// ABOUTME: Ensures server authority claims are not persisted into WebAssembly auth state.
-
 using System.Security.Claims;
 using Explore.Blazor.Services;
 using Microsoft.AspNetCore.Components.Authorization;

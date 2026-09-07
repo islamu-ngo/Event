@@ -1,6 +1,3 @@
-// ABOUTME: Specifies ordered inclusive ranges of local calendar dates without timezone semantics.
-// ABOUTME: Protects equality, touching-range overlap, deterministic formatting, and a narrow API.
-
 using System.Reflection;
 using Explore.Domain.ValueObjects;
 

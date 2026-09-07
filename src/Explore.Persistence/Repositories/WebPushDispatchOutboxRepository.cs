@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for durable Web Push dispatch claims and terminal transitions.
-// ABOUTME: Mirrors email outbox affected-row updates while keeping stale-subscription cleanup transactional.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.Database;

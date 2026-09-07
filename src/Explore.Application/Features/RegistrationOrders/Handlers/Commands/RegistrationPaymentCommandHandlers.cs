@@ -1,6 +1,3 @@
-// ABOUTME: Handles payment starts and safe retries after account or guest-capability order access is proven.
-// ABOUTME: Delegates durable claim and parked-prehandoff retry decisions to the payment contract service.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

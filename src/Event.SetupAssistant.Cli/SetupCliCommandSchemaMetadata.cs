@@ -1,6 +1,3 @@
-// ABOUTME: Builds the deterministic closed command schema from the CLI's public vocabulary and machine model.
-// ABOUTME: Gives repository tooling one compiled owner without reading schemas or production source text.
-
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;

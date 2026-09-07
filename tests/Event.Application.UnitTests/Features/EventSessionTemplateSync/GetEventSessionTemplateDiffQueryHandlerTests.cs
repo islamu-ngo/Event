@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for GetEventSessionTemplateDiffQueryHandler ensuring diff-service delegation and response wrapping.
-// ABOUTME: Confirms the session query path stays thin and preserves the BaseCommandResponse envelope.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventSessionTemplateSync;
 using Explore.Application.Features.EventSessionTemplateSync.Queries.GetEventSessionTemplateDiff;

@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for actor-bound organizer payment provider connections and supported currencies.
-// ABOUTME: Enforces provider-neutral historical identity, active-scope slots, and tenant-safe replacement lineage.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

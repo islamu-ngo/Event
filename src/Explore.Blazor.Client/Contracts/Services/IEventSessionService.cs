@@ -1,6 +1,3 @@
-// ABOUTME: Service contract for managing Event Sessions and Session Groups.
-// ABOUTME: Extracted from monolithic EventService to enforce single responsibility.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Models;
 

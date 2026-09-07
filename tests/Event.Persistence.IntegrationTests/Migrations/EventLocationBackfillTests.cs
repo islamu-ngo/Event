@@ -1,6 +1,3 @@
-// ABOUTME: Converts obsolete Event Location Privacy backfill tests into ordinary EF migration behavior checks.
-// ABOUTME: Proves legacy Backfill configuration is inert while current migration history applies and retries safely.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Persistence;
 using Explore.Persistence.Schema;

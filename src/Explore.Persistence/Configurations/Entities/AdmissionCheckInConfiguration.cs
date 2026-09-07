@@ -1,6 +1,3 @@
-// ABOUTME: Maps tenant-owned admission targets, policies, append-only events, and current state projections.
-// ABOUTME: Enforces exact tenant lineage, unique event ordering, and provider-portable ticket-target state identity.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

@@ -1,6 +1,3 @@
-// ABOUTME: bUnit tests for EventSessionManager authorized session read behavior.
-// ABOUTME: Verifies management-scoped session reads and draft-friendly session display fallbacks.
-
 using Explore.Blazor.Client.Contracts.Services.Events;
 using Explore.Blazor.Client.Pages.Events.Components;
 

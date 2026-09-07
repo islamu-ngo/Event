@@ -1,6 +1,3 @@
-// ABOUTME: Tests that when Cerbos is the configured authorization provider and is unavailable,
-// ABOUTME: the system denies ALL requests — fail-closed, never falls back to local RBAC.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Security;

@@ -1,6 +1,3 @@
-// ABOUTME: Command to update the title and active state of a footer link group.
-// ABOUTME: Validates the group belongs to the current tenant before updating.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using FluentValidation;

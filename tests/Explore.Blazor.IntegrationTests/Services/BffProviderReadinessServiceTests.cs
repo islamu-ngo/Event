@@ -1,6 +1,3 @@
-// ABOUTME: Focused tests for BFF auth provider readiness and scheme mapping behavior.
-// ABOUTME: Keeps provider-selection logic covered after extraction from auth endpoints.
-
 using System.Security.Cryptography;
 using System.Text.Json;
 using CarpaNet.OAuth.Storage;

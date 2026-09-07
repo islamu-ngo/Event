@@ -1,5 +1,4 @@
 /* ===== Block: group-profile ===== */
-/* ABOUTME: Luma-inspired group profile layout with banner, overlapping avatar, and event timeline. */
 
 ::deep .group-profile {
     padding-bottom: var(--isl-space-16);

@@ -1,6 +1,3 @@
-// ABOUTME: Unit-style tests for the optional MCP adapter readiness health check.
-// ABOUTME: Verifies startup/runtime effective posture reports safe bounded configuration only.
-
 using Explore.API.Configuration;
 using Explore.API.HealthChecks;
 using Explore.API.Mcp;

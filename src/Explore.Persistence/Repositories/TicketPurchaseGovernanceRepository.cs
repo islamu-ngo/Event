@@ -1,6 +1,3 @@
-// ABOUTME: Persists tenant-qualified ticket purchase policy, authority usage, and durable operation identity.
-// ABOUTME: Serializes operation, policy, and authority locks so ceiling consumption has one deterministic winner.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.Database;

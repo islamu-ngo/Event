@@ -1,6 +1,3 @@
-// ABOUTME: Architecture ratchets keep event lifecycle status mutation behind explicit domain operations.
-// ABOUTME: Verifies private status foreign-key setters and blocks generic public status mutation seams.
-
 using System.Reflection;
 using Explore.Application.Features.Events.Handlers.Commands;
 using Explore.API.Controllers;

@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped content styles for the authoritative profile and readiness onboarding workspace. */
-/* ABOUTME: Uses logical properties and design tokens inside the shared responsive workspace shell. */
-
 .instance-onboarding {
     box-sizing: border-box;
     display: grid;

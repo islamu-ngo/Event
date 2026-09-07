@@ -1,6 +1,3 @@
-// ABOUTME: Resolves human-readable holder and entitlement facts for authorized admission tickets.
-// ABOUTME: Keeps presentation projection separate from entity-returning account repositories.
-
 using System.Collections.Immutable;
 
 namespace Explore.Application.Contracts.Admissions;

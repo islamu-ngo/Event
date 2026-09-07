@@ -1,6 +1,3 @@
-// ABOUTME: Defines source-free environment, activation, machine-parity, and dotenv contract vectors.
-// ABOUTME: Keeps expected behavior independent from current or proposed production implementations.
-
 namespace ISLAMU.Setup.Core.EnvironmentTests;
 
 using System.Text;

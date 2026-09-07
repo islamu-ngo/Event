@@ -1,6 +1,3 @@
-// ABOUTME: The default HAL resource assembler for DTO families that need no assembly behavior of their own.
-// ABOUTME: Replaces dozens of empty subclasses whose only content was forwarding three constructor arguments.
-
 using Explore.Application.Contracts.Hateoas;
 
 namespace Explore.API.Hateoas;

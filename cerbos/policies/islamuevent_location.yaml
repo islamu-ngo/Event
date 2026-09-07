@@ -1,4 +1,3 @@
-# ABOUTME: Cerbos resource policy for location resources.
 # Locations are tenant-scoped: only authorized administrators can view or manage them.
 
 apiVersion: api.cerbos.dev/v1

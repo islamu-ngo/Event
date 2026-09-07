@@ -1,6 +1,3 @@
-// ABOUTME: Presence-aware write DTOs for ordinary instance governance sub-resources.
-// ABOUTME: Each contract distinguishes omitted leaves from explicit values without reusing read DTOs for writes.
-
 using Explore.Application.Models.Common;
 
 namespace Explore.Application.DTOs.Instance;

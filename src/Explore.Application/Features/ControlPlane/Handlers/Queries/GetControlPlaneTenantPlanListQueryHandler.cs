@@ -1,6 +1,3 @@
-// ABOUTME: Query handler for control-plane tenant plan SaaS tier summaries.
-// ABOUTME: Maps normalized plan/version entities without leaking tenant business data.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ControlPlane;
 using Explore.Application.Features.ControlPlane;

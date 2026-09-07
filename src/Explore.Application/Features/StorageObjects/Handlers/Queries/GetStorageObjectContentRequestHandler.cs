@@ -1,6 +1,3 @@
-// ABOUTME: Query handler for metadata-driven storage object content reads.
-// ABOUTME: Delegates lifecycle, visibility, and provider resolution to the shared content reader.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.StorageObjects.Requests.Queries;
 using Explore.Application.Models.Storage;

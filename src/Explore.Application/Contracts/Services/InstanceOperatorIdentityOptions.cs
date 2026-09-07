@@ -1,6 +1,3 @@
-// ABOUTME: Startup-bound general instance operator identity and its fail-closed options validator contract.
-// ABOUTME: Keeps platform accountability separate from payment activation, refund, and reconciliation governance.
-
 namespace Explore.Application.Contracts.Services;
 
 using System.Collections.Immutable;

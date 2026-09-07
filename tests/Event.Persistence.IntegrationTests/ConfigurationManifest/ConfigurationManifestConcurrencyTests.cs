@@ -1,6 +1,3 @@
-// ABOUTME: Proves PostgreSQL manifest bootstrap serializes tenant and paid-policy authority.
-// ABOUTME: Covers slug collisions, fresh post-lock snapshots, and stale-policy rollback without timing waits.
-
 using System.Collections.Immutable;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;

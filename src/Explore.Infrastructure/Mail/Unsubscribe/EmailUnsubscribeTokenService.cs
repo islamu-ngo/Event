@@ -1,6 +1,3 @@
-// ABOUTME: Time-limited DataProtection token service for email unsubscribe links.
-// ABOUTME: Keeps unsubscribe payloads opaque while allowing anonymous one-click endpoints to identify scope.
-
 using System.Security.Cryptography;
 using System.Text.Json;
 using Explore.Application.Contracts.Services;

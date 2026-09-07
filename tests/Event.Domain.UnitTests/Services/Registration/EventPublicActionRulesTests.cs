@@ -1,6 +1,3 @@
-// ABOUTME: Verifies an event can expose zero actions but never multiple primary participation actions.
-// ABOUTME: Keeps public call-to-action ordering deterministic before persistence constraints run.
-
 using Explore.Domain;
 using Explore.Domain.Services.Registration;
 

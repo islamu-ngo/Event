@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for control-plane domain and DNS checklist derivation.
-// ABOUTME: Verifies configured hosts are transformed into safe operator-facing DNS guidance.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Instance;
 using Explore.Application.Features.ControlPlane.Handlers.Queries;

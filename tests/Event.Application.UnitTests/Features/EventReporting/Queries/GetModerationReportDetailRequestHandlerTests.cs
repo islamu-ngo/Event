@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for event-report management detail query handling.
-// ABOUTME: Verifies explicit evidence decryption, event matching, and safe management projections.
-
 using System.Security.Cryptography;
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;

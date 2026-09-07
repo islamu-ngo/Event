@@ -1,6 +1,3 @@
-// ABOUTME: Normalized scheduler, job, and trigger state tokens shared by the admin API and its clients.
-// ABOUTME: Keeps operator surfaces free of scheduler library enums so a scheduler swap cannot break the contract.
-
 namespace Explore.Application.Contracts.Scheduling;
 
 /// <summary>

@@ -1,6 +1,3 @@
-// ABOUTME: Defines immutable CQRS commands for add-on catalog and order lifecycle writes.
-// ABOUTME: Carries route and caller intent while leaving tenant, prices, totals, and authority server-owned.
-
 using Explore.Application.DTOs.EventAddOns;
 using MediatR;
 

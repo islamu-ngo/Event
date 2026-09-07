@@ -1,6 +1,3 @@
-// ABOUTME: Proves organizer payment account-create operations are durable retry fences.
-// ABOUTME: Covers stable provider idempotency keys, terminal slots, and no reactivation.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

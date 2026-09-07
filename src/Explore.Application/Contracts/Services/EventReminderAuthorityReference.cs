@@ -1,6 +1,3 @@
-// ABOUTME: Defines the exact structured session/start authority carried by scheduled reminder email rows.
-// ABOUTME: Lets dispatch reject stale schedule snapshots without parsing recipient-facing email copy.
-
 using System.Globalization;
 using Explore.Domain.Services.Scheduling;
 

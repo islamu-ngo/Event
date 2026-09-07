@@ -1,6 +1,3 @@
-// ABOUTME: Tests Infrastructure AT Protocol OAuth key resolution, rotation pinning, and outbound policy readiness.
-// ABOUTME: Proves the layer-local CarpaNet factory fails closed without a valid instance key and rejects private egress.
-
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;

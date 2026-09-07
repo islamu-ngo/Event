@@ -1,6 +1,3 @@
-// ABOUTME: Withdraws an active organizer claim only for a user controlling its claimant actor.
-// ABOUTME: Exact replay of an already-withdrawn claim returns success without repeating the transition.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventOrganizerClaims.Requests.Commands;

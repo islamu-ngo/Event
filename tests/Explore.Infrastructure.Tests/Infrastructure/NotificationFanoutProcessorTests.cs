@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for bounded notification fanout processor hosting and settings.
-// ABOUTME: Verifies startup limits, fresh claim scopes, and aggregate claim outcomes without running providers.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;

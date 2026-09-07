@@ -1,6 +1,3 @@
-// ABOUTME: MCP read-only resources for AI assistant conversation metadata.
-// ABOUTME: Omits raw proposed-action payloads and delegates tenant/user checks through MediatR queries.
-
 using System.ComponentModel;
 using System.Text.Json;
 using Explore.Application.DTOs.Ai;

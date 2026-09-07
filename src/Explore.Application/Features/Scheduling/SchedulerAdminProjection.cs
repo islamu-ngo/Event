@@ -1,6 +1,3 @@
-// ABOUTME: Shared projection from scheduler runtime snapshots onto scheduler administration read models.
-// ABOUTME: Keeps the overview and job-collection queries reporting identical state for the same scheduler.
-
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.DTOs.Scheduling;
 

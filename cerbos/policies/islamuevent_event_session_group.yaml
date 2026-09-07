@@ -1,4 +1,3 @@
-# ABOUTME: Cerbos resource policy for event_session_group resources.
 # Event session groups are event-scoped program sections such as tracks, devrooms, stages, and rooms.
 
 apiVersion: api.cerbos.dev/v1

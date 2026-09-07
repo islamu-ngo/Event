@@ -1,6 +1,3 @@
-// ABOUTME: Guards the AI conversation repository contract against IQueryable leakage and soft-delete regressions.
-// ABOUTME: Ensures privacy erasure methods stay entity-first and return concrete task shapes.
-
 using Explore.Application.Contracts.Persistence;
 using TUnit.Core;
 

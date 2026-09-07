@@ -1,6 +1,3 @@
-// ABOUTME: Tests for client-side AI assistant conversation state and HAL affordance gating.
-// ABOUTME: Ensures proposal actions are exposed only from server-provided links.
-
 using Explore.Blazor.Client.Services.Ai;
 using Explore.Blazor.Client.Tests;
 

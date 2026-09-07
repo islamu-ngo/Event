@@ -1,6 +1,3 @@
-// ABOUTME: Readiness health check for scheduled AI assistant retention cleanup settings.
-// ABOUTME: Exposes bounded operator-safe cleanup posture without tenant IDs, prompts, or payloads.
-
 using Explore.Infrastructure;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;

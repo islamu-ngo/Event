@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for PolicyChangeOutbox — transactional outbox for policy change events.
-// ABOUTME: Index on Status+NextRetryAt for efficient background worker polling.
-
 using Explore.Domain.Policies;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

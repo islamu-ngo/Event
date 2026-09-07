@@ -1,6 +1,3 @@
-// ABOUTME: Typed setting group for dedicated Control Plane Admin Portal instance settings.
-// ABOUTME: Deserializes admin_portal.* keys into defaults consumed by governance DTO mapping.
-
 namespace Explore.Application.Settings.Groups;
 
 using Explore.Application.Contracts.Infrastructure;

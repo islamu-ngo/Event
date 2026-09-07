@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for unscheduled event-session draft creation.
-// ABOUTME: Enforces the minimal draft shell required before lifecycle readiness policy runs.
-
 using Explore.Application.DTOs.EventSession;
 using FluentValidation;
 

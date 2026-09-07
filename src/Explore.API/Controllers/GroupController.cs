@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for group CRUD operations with member management and HATEOAS support.
-// ABOUTME: Manages user groups, group settings, and group-level permissions.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

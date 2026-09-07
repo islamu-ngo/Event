@@ -1,6 +1,3 @@
-// ABOUTME: Emits add-on catalog, order, fulfillment, and refund links from server-owned state.
-// ABOUTME: Keeps every organizer and buyer action fail-closed when its HAL capability is absent.
-
 using System.Security.Claims;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.DTOs.EventAddOns;

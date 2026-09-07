@@ -1,6 +1,3 @@
-// ABOUTME: Retains one UUIDv7 idempotency identity across ambiguous waitlist mutation retries.
-// ABOUTME: Rotates identity only for a different action target or after a definitive response.
-
 namespace Explore.Blazor.Client.Components.Waitlist;
 
 internal sealed class WaitlistMutationOperationLease

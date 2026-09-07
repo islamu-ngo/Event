@@ -1,6 +1,3 @@
-// ABOUTME: Capability-scoped tenant directory-operator identity contract and closed readiness vocabulary.
-// ABOUTME: Separates incomplete persisted drafts from normalized identities safe for activation, public, or paid use.
-
 namespace Explore.Domain.ValueObjects;
 
 using System.Collections.Immutable;

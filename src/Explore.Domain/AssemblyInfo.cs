@@ -1,6 +1,3 @@
-// ABOUTME: Grants the Application layer the internal aggregate pinning seam for generated form artifacts.
-// ABOUTME: Grants Domain and Application tests narrow internal construction access without public exposure.
-
 using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("Explore.Application")]

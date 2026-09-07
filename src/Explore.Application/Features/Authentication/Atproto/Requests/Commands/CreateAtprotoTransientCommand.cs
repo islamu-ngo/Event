@@ -1,6 +1,3 @@
-// ABOUTME: Requests creation of a bounded protected pre-authentication value for a target tenant.
-// ABOUTME: Tenant metadata is authenticated machine intent, never ambient user or tenant authority.
-
 using Explore.Domain;
 using Explore.Application.Features.Authentication.Atproto.Models;
 using MediatR;

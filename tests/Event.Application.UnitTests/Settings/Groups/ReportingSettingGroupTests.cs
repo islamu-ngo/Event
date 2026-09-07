@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the reporting moderation provider settings group.
-// ABOUTME: Verifies tenant provider enablement and credential parsing from resolved settings.
-
 namespace Event.Application.UnitTests.Settings.Groups;
 
 using Explore.Application.Contracts.Infrastructure;

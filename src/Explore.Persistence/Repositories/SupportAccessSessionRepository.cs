@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for persisted support-access session lifecycle state.
-// ABOUTME: Exposes only bounded actor/session/tenant query paths for sensitive support records.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

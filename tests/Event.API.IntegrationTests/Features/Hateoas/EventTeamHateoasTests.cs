@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS contract coverage for event-team assignment and revocation affordances.
-// ABOUTME: Proves collection and item links share the canonical event manage-team capability context.
-
 using System.Security.Claims;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;

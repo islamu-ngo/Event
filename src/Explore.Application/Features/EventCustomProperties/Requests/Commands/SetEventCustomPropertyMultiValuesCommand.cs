@@ -1,6 +1,3 @@
-// ABOUTME: Command request for replacing all values of a multi-value custom property definition.
-// ABOUTME: Atomically removes existing values and inserts the new set for the given definition+event.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventCustomProperty;
 using Explore.Application.Responses;

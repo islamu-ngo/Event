@@ -1,6 +1,3 @@
-// ABOUTME: Unit-level HATEOAS policy tests for event-report option and status resources.
-// ABOUTME: Guards reporter-facing links so UI affordances come only from HAL metadata.
-
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.Authorization;

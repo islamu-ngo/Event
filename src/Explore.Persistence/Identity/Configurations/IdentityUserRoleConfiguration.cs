@@ -1,6 +1,3 @@
-// ABOUTME: Configures the composite key and table for embedded Identity user-role memberships.
-// ABOUTME: Keeps membership rows normalized and cascade-owned by their Identity user and role.
-
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

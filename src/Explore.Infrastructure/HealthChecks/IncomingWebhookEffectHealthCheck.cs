@@ -1,6 +1,3 @@
-// ABOUTME: Readiness check for the durable incoming Coop effect queue.
-// ABOUTME: Reports bounded backlog and stale-lease counts without tenant, callback, or provider identifiers.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Services.Webhooks;
 using Explore.Application.Telemetry;

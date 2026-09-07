@@ -1,6 +1,3 @@
-// ABOUTME: Pure Application-layer tenant plan draft model for SaaS pricing-tier validation.
-// ABOUTME: Pins registered-setting, sensitive-setting, quota, and diff semantics before persistence exists.
-
 using Explore.Domain.Settings;
 
 namespace Explore.Application.Features.ControlPlane.Plans;

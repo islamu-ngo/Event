@@ -1,6 +1,3 @@
-// ABOUTME: HAL policy for private actor-scoped Studio navigation context.
-// ABOUTME: Emits the managed-event route only after the query handler granted order-management capability.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Security.Claims;

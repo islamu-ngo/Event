@@ -1,6 +1,3 @@
-// ABOUTME: Verifies fanout-occurrence schema in the rebased PostgreSQL baseline.
-// ABOUTME: Proves model parity, tenant-safe foreign keys, and the recipient uniqueness guard.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Persistence;
 using Microsoft.EntityFrameworkCore;

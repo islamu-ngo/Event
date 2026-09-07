@@ -1,6 +1,3 @@
-// ABOUTME: Defines the identity-free registration-order payload returned to a capability holder.
-// ABOUTME: Projects safe order state without exposing account or purchaser actor identifiers.
-
 using System.Text.Json.Serialization;
 using Explore.Application.Responses;
 

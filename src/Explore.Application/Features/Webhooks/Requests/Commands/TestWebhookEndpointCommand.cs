@@ -1,6 +1,3 @@
-// ABOUTME: Authorized command for scheduling a LocalProvider test delivery to one webhook endpoint.
-// ABOUTME: Uses persisted endpoint ownership for webhook test authorization checks.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

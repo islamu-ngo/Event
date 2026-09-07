@@ -1,6 +1,3 @@
-// ABOUTME: MainLayout-level tests for workspace navigation panel visibility synchronization.
-// ABOUTME: Verifies no-provider close, auto-reopen, and no-reopen after user-close.
-
 using Explore.Blazor.Client.Components.Shell;
 using Explore.Blazor.Client.Components.Shell.Workspaces;
 using Explore.Blazor.Client.Contracts.Services.Ai;

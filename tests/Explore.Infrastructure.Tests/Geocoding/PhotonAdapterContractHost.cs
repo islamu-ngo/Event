@@ -1,6 +1,3 @@
-// ABOUTME: Reflection bridge from RED tests to the not-yet-implemented Photon adapter boundary.
-// ABOUTME: Keeps tests compiling while requiring a concrete public Infrastructure contract at runtime.
-
 using System.Collections;
 using System.Reflection;
 using System.Runtime.ExceptionServices;

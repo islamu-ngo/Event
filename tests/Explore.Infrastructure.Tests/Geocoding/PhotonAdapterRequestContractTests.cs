@@ -1,6 +1,3 @@
-// ABOUTME: RED contracts for optional Photon configuration and bounded outbound requests.
-// ABOUTME: Proves None is healthy and Photon sends only explicit provider-owned query dimensions.
-
 using System.Net;
 
 namespace Explore.Infrastructure.Tests.Geocoding;

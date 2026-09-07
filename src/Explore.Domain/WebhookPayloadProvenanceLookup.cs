@@ -1,6 +1,3 @@
-// ABOUTME: Stable relational lookup rows describing webhook payload byte provenance.
-// ABOUTME: Distinguishes exact captured bytes from canonicalized legacy JSON that cannot recover original formatting.
-
 namespace Explore.Domain;
 
 public sealed class WebhookPayloadProvenanceLookup

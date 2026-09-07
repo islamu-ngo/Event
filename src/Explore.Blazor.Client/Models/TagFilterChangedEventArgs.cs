@@ -1,4 +1,3 @@
-// ABOUTME: Event args emitted by the TriStateTagFilterDropdown when tag selections change.
 // Contains the lists of included/excluded tag IDs and their combination modes.
 
 namespace Explore.Blazor.Client.Models;

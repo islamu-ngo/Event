@@ -1,6 +1,3 @@
-// ABOUTME: API-facing command for assigning an event role by target user email.
-// ABOUTME: Resolves the user in Application before delegating to the canonical assignment command.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using Explore.Domain.Constants;

@@ -1,6 +1,3 @@
-/* ABOUTME: Full-height layout for the authenticated AI assistant workspace. */
-/* ABOUTME: Leaves conversation presentation and responsive behavior with the shared rail. */
-
 .ai-workspace {
     inline-size: 100%;
     min-inline-size: 0;

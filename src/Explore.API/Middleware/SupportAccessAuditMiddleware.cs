@@ -1,6 +1,3 @@
-// ABOUTME: API middleware that records bounded request evidence for active support-access sessions.
-// ABOUTME: Preserves per-request auditability without changing response behavior when audit persistence fails.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Runtime RabbitMQ consumer tests that drain valid pointers through real SMTP to Mailpit.
-// ABOUTME: Proves broker ACK follows durable EmailDispatch drain state instead of preceding it.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

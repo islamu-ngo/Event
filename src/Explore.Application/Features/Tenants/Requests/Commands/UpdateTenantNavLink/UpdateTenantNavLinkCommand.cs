@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for updating a tenant navigation link.
-// ABOUTME: Carries the UpdateTenantNavLinkDto payload.
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Tenant;
 using Explore.Application.Responses;

@@ -1,6 +1,3 @@
-// ABOUTME: Executes exact AdmissionRecoveryService request, consume, and resend contracts with fixed time.
-// ABOUTME: Covers issued-ticket lineage, single use, expiry, scope, atomic rotation, and uniform receipts.
-
 using ApplicationUnitTests.Contracts.Admissions.Support;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Exceptions;

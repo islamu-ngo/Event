@@ -1,6 +1,3 @@
-// ABOUTME: RED HAL tests for tenant-governed event-reporting intake affordances.
-// ABOUTME: Specifies fail-closed DTO context and asynchronous assembler enrichment without cached DTO mutation.
-
 namespace Event.Api.IntegrationTests.Features.Hateoas;
 
 using System.Security.Claims;

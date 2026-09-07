@@ -1,6 +1,3 @@
-// ABOUTME: Defines the machine-readable ticketing deployment capability catalog port.
-// ABOUTME: Keeps release status vocabulary closed and independent from embedded-resource mechanics.
-
 namespace Explore.Application.Contracts.Deployment;
 
 public static class TicketingDeploymentStatuses

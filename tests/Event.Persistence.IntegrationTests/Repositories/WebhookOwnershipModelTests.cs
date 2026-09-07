@@ -1,6 +1,3 @@
-// ABOUTME: EF Core model tests for typed webhook ownership and instance/tenant scope isolation.
-// ABOUTME: Verifies typed owner FKs, computed configuration scopes, composite containment, and checks.
-
 using Explore.Domain;
 using Explore.Persistence;
 using Microsoft.EntityFrameworkCore;

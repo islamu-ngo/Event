@@ -1,6 +1,3 @@
-// ABOUTME: Defines exact MediatR contracts for admission recovery and current-account ticket reads.
-// ABOUTME: Carries only email, capability, or ticket identity at the transport-to-application boundary.
-
 using Explore.Application.DTOs.AdmissionTickets;
 using MediatR;
 

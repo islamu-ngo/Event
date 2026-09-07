@@ -1,6 +1,3 @@
-// ABOUTME: Pins EventLocation disclosure authorization metadata and HAL affordance parity.
-// ABOUTME: Verifies management links fail closed and never advertise unimplemented location actions.
-
 using System.Reflection;
 using System.Security.Claims;
 using Event.Api.IntegrationTests.Fixtures;

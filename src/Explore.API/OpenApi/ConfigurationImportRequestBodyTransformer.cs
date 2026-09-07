@@ -1,6 +1,3 @@
-// ABOUTME: Shapes instance and tenant configuration imports as exact binary request bodies.
-// ABOUTME: Prevents anonymous multipart Body types from leaking into the generated client.
-
 namespace Explore.API.OpenApi;
 
 using Explore.API.Hateoas;

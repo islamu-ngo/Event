@@ -1,6 +1,3 @@
-// ABOUTME: Keyboard helpers for the shell AI assistant rail prompt composer.
-// ABOUTME: Keeps Enter-to-send behavior precise while preserving native Shift+Enter newlines.
-
 const promptHandlers = new WeakMap();
 
 export function attachPromptKeyboardHandler(element, dotNetReference) {

@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for the canonical outgoing webhook event type catalog.
-// ABOUTME: Stores versioned jsonb schemas used by Local and Svix provider synchronization.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

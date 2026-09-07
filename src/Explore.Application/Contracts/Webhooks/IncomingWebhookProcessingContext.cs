@@ -1,6 +1,3 @@
-// ABOUTME: Immutable processing identity copied only from an active persisted incoming webhook claim.
-// ABOUTME: Carries tenant, provider, payload, generation, lease, and fence data without caller substitution.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Webhooks;

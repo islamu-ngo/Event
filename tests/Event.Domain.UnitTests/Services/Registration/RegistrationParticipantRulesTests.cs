@@ -1,6 +1,3 @@
-// ABOUTME: Proves confirmation rules for every participant-data collection mode.
-// ABOUTME: Covers required, optional, deferred, and guardian-backed assignment invariants.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;

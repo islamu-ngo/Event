@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the configured authority-retention duration remains the backup horizon plus safety margin.
-// ABOUTME: Guards the finite authority append adapters from deriving an independent retention policy.
-
 using Explore.Application.Configuration;
 
 namespace Event.Application.UnitTests.Configuration;

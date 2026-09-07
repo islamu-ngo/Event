@@ -1,6 +1,3 @@
-// ABOUTME: Characterizes value equality, copying, factory invariants, and legal with variants for Domain value records.
-// ABOUTME: Confirms current record candidates already preserve normalized values without exposing sensitive hash material.
-
 using Explore.Domain.ValueObjects;
 
 namespace Event.Domain.UnitTests.ValueObjects;

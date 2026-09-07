@@ -1,6 +1,3 @@
-// ABOUTME: Validates identifiers for separately authorized webhook payload reads.
-// ABOUTME: Prevents invalid identifiers from reaching tenant-scoped persistence or audit boundaries.
-
 using Explore.Application.Features.Webhooks.Requests.Queries;
 using FluentValidation;
 

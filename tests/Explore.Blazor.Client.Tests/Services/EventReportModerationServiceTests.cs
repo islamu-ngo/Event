@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the moderator-facing EventReportModerationService wrapper.
-// ABOUTME: Verifies HAL queue pagination, filter forwarding, and detail fallback behavior.
-
 using Explore.Blazor.Client.Contracts.Services.EventReporting;
 
 namespace Explore.Blazor.Client.Tests.Services;

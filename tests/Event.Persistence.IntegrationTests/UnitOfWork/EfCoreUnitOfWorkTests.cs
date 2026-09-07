@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for EfCoreUnitOfWork transactional correctness against a real Postgres database.
-// ABOUTME: Covers commit, rollback, nesting, generic returns, and translated optimistic-concurrency conflicts.
-
 using System.Data;
 using System.Text.Json;
 using Event.Persistence.IntegrationTests.Fixtures;

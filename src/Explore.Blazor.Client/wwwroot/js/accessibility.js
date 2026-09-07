@@ -1,6 +1,3 @@
-// ABOUTME: JS interop module for accessibility: focus management, ARIA live announcements, and motion preferences.
-// ABOUTME: Loaded as ES module via import() from AccessibilityFocusService and AccessibilityAnnouncerService.
-
 let _savedFocusElement = null;
 
 /**

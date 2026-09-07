@@ -1,6 +1,3 @@
-// ABOUTME: Tests Event aggregate schedule projection rebuilding across timezone changes.
-// ABOUTME: Verifies sessions, agenda items, day links, and event rollups stay derived from UTC instants.
-
 namespace Event.Domain.UnitTests.Entities;
 
 using Explore.Domain.Enums;

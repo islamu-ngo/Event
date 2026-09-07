@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos policy tests for account-scoped registration-order access and organizer management reads.
-# ABOUTME: Confirms tenant and instance administrators cannot inherit tenant business-order access.
-
 name: RegistrationOrderPolicyTests
 description: "Validates buyer cancellation and event registration-manager order visibility"
 

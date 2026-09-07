@@ -1,6 +1,3 @@
-// ABOUTME: HAL link policies for event-session agenda-item detail and collection resources.
-// ABOUTME: Emits route-backed, permission-gated affordances through the standard capability pipeline.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Collections.Generic;

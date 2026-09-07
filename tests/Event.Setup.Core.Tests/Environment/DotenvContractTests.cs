@@ -1,6 +1,3 @@
-// ABOUTME: Specifies a strict deterministic UTF-8 dotenv dialect and relevant-only readiness behavior.
-// ABOUTME: Exercises injection, bounds, round-trip, placeholder, provenance, and diagnostic leakage contracts.
-
 namespace ISLAMU.Setup.Core.EnvironmentTests;
 
 using System.Reflection;

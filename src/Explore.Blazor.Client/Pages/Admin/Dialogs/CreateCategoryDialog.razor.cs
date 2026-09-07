@@ -1,6 +1,3 @@
-// ABOUTME: Dialog helper entrypoint for showing CreateCategoryDialog via typed static API.
-// ABOUTME: Keeps dialog invocation logic in code-behind rather than inline Razor blocks.
-
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
 

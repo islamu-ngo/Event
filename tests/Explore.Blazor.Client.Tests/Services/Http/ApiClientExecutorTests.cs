@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the shared API client executor converts HTTP responses into ApiResult values.
-// ABOUTME: Locks the low-level client pipeline contract before migrating higher-level services.
-
 using System.Net;
 using System.Text;
 using Explore.Blazor.Client.Services.Http;

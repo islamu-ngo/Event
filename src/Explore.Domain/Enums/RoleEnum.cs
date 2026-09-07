@@ -1,6 +1,3 @@
-// ABOUTME: Unified role identifiers covering Platform, Tenant, Organization, Group, and Event scopes.
-// ABOUTME: IDs match the Role seed data and reserve contiguous ranges by scope.
-
 namespace Explore.Domain.Enums;
 
 public enum RoleEnum

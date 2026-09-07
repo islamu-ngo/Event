@@ -1,6 +1,3 @@
-// ABOUTME: Maps PII-free append-only EventLocation disclosure-policy history.
-// ABOUTME: Enforces one-step policy versions, tenant-safe association ownership, and unique versions.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

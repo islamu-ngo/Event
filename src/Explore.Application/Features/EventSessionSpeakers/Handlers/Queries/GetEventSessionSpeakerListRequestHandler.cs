@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning all session-speaker links.
-// ABOUTME: Maps junction entities to EventSessionSpeakerDto list.
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;

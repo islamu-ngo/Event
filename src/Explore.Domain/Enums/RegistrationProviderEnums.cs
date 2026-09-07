@@ -1,6 +1,3 @@
-// ABOUTME: Stable enum mirrors for provider-neutral registration integration lookup rows.
-// ABOUTME: Keeps Domain rules provider-agnostic while persistence stores integer lookup FKs.
-
 namespace Explore.Domain.Enums;
 
 public enum RegistrationProviderKindEnum { Native = 1, ExternalForm = 2, ExternalApi = 3 }

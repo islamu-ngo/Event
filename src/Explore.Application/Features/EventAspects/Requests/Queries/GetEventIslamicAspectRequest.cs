@@ -1,6 +1,3 @@
-// ABOUTME: Query request to get the Islamic aspect for an event.
-// ABOUTME: Returns null if the event doesn't have an Islamic aspect.
-
 namespace Explore.Application.Features.EventAspects.Requests.Queries;
 
 using System;

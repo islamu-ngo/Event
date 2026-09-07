@@ -1,6 +1,3 @@
-// ABOUTME: Grants instance-administrator authority to one exact existing ATProto account binding.
-// ABOUTME: Uses serializable convergence and canonical role checks without creating identities or tenant grants.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;

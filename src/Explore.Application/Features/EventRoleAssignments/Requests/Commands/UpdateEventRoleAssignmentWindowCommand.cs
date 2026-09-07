@@ -1,6 +1,3 @@
-// ABOUTME: Command for updating the validity window of an open event role assignment.
-// ABOUTME: Uses domain lifecycle methods so the app-managed Version concurrency token advances deterministically.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using Explore.Domain.Constants;

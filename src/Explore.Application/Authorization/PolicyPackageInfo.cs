@@ -1,6 +1,3 @@
-// ABOUTME: Immutable summary of the current dynamic policy state for observability and staleness detection.
-// ABOUTME: Content hash enables comparing expected vs actual policy state without full deserialization.
-
 namespace Explore.Application.Authorization;
 
 /// <summary>

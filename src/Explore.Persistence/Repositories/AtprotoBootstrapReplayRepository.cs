@@ -1,6 +1,3 @@
-// ABOUTME: Atomically records consumed ATProto bootstrap jtis in the shared idempotency table.
-// ABOUTME: Reuses provider-portable idempotency claims so concurrent API instances permit one winner.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 

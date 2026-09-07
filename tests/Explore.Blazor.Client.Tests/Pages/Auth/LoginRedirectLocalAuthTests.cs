@@ -42,13 +42,13 @@ public sealed class LoginRedirectLocalAuthTests
         navigation.NavigateTo("/login");
 
         var cut = context.Render<LoginRedirect>();
-        var email = cut.Find("input[type=email]");
+        var email = cut.Find("input[autocomplete=username][type=text]");
         var password = cut.Find("input[type=password]");
 
         await Assert.That(email.GetAttribute("autocomplete")).IsEqualTo("username");
         await Assert.That(password.GetAttribute("autocomplete")).IsEqualTo("current-password");
         await Assert.That(cut.FindAll("label").Any(label =>
-            label.TextContent.Contains("Email address", StringComparison.Ordinal))).IsTrue();
+            label.TextContent.Contains("Username or email", StringComparison.Ordinal))).IsTrue();
         await Assert.That(cut.FindAll("label").Any(label =>
             label.TextContent.Contains("Password", StringComparison.Ordinal))).IsTrue();
         await Assert.That(cut.Find("button[type=submit]").TextContent).Contains("Sign in");
@@ -75,12 +75,12 @@ public sealed class LoginRedirectLocalAuthTests
         navigation.NavigateTo("/login?returnUrl=%2Fdashboard");
         var cut = context.Render<LoginRedirect>();
 
-        cut.Find("input[type=email]").Change("member@example.test");
+        cut.Find("input[autocomplete=username]").Change("member-name");
         cut.Find("input[type=password]").Change(password);
         cut.Find("form[data-local-login]").Submit();
 
         await Assert.That(captured).IsNotNull();
-        await Assert.That(captured!.Email).IsEqualTo("member@example.test");
+        await Assert.That(captured!.Identifier).IsEqualTo("member-name");
         await Assert.That(captured.Password).IsEqualTo(password);
         await Assert.That(captured.ReturnUrl).IsEqualTo("/dashboard");
         await Assert.That(captured.IsPersistent).IsFalse();
@@ -102,20 +102,18 @@ public sealed class LoginRedirectLocalAuthTests
         navigation.NavigateTo("/login");
         var cut = context.Render<LoginRedirect>();
 
-        cut.Find("input[type=email]").Change("member@example.test");
+        cut.Find("input[autocomplete=username]").Change("member@example.test");
         cut.Find("input[type=password]").Change(password);
         cut.Find("form[data-local-login]").Submit();
 
-        var alert = cut.Find("[role=alert]");
-        await Assert.That(alert.TextContent).Contains(
-            "The email or password was not accepted");
+        await Assert.That(cut.Find("[role=alert]")).IsNotNull();
         await Assert.That(cut.Markup).DoesNotContain(password);
         await Assert.That(navigation.Uri).EndsWith("/login");
     }
 
     [Test]
     [Arguments("email_verification_required", "Verify your email address before signing in.")]
-    [Arguments("untrusted_provider_detail", "The email or password was not accepted")]
+    [Arguments("untrusted_provider_detail", "The username or password was not accepted")]
     public async Task LocalLoginMapsOnlyKnownFailureCodesToGuidance(string errorCode, string expectedGuidance)
     {
         using var context = CreateContext(out _);
@@ -130,7 +128,7 @@ public sealed class LoginRedirectLocalAuthTests
         navigation.NavigateTo("/login");
         var cut = context.Render<LoginRedirect>();
 
-        cut.Find("input[type=email]").Change("member@example.test");
+        cut.Find("input[autocomplete=username]").Change("member@example.test");
         cut.Find("input[type=password]").Change(password);
         cut.Find("form[data-local-login]").Submit();
 

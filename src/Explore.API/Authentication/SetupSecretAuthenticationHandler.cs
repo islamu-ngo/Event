@@ -1,4 +1,4 @@
-// ABOUTME: Authenticates setup-secret authority only for the two canonical instance provider GET and PATCH routes.
+// ABOUTME: Authenticates setup-secret authority only for canonical provider settings and Local first-run routes.
 // ABOUTME: Fails closed without placing setup secret material in principals, logs, responses, or exceptions.
 
 using System.Security.Claims;
@@ -27,7 +27,11 @@ public sealed class SetupSecretAuthenticationHandler(
     internal static bool SupportsRequest(HttpRequest request)
         => (HttpMethods.IsGet(request.Method) || HttpMethods.IsPatch(request.Method))
            && (string.Equals(request.Path.Value, AuthProviderPath, StringComparison.OrdinalIgnoreCase)
-               || string.Equals(request.Path.Value, AuthorizationProviderPath, StringComparison.OrdinalIgnoreCase));
+               || string.Equals(request.Path.Value, AuthorizationProviderPath, StringComparison.OrdinalIgnoreCase))
+           || HttpMethods.IsGet(request.Method)
+               && string.Equals(request.Path.Value, "/api/instanceonboarding/status", StringComparison.OrdinalIgnoreCase)
+           || HttpMethods.IsPost(request.Method)
+               && string.Equals(request.Path.Value, "/api/instanceonboarding/complete-local", StringComparison.OrdinalIgnoreCase);
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {

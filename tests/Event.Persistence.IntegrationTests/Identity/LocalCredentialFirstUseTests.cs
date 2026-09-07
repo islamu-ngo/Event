@@ -679,7 +679,7 @@ public sealed class LocalCredentialFirstUseTests
             await using AsyncServiceScope scope = Provider.CreateAsyncScope();
             LocalIdentityAuthService authentication = Authentication(scope);
             stateReadBarrier?.Arm(Identity(scope));
-            return await authentication.AuthenticateAsync(new LocalAuthRequestDto(Email: _email, Password: password), CancellationToken);
+            return await authentication.AuthenticateAsync(new LocalAuthRequestDto(Identifier: _email, Password: password), CancellationToken);
         }
 
         internal LocalIdentityAuthService Authentication(AsyncServiceScope scope)

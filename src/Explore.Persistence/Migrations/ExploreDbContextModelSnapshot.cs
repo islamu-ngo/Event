@@ -15589,7 +15589,7 @@ namespace Explore.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_instance_bootstrap_states_mode_evidence", "(mode = 1 AND provider_kind IS NULL AND configuration_fingerprint IS NULL AND selector_fingerprint IS NULL) OR (mode = 2 AND provider_kind IS NOT NULL AND configuration_fingerprint IS NOT NULL AND selector_fingerprint IS NOT NULL)");
 
-                            t.HasCheckConstraint("ck_instance_bootstrap_states_provider_kind", "provider_kind IS NULL OR provider_kind BETWEEN 1 AND 2");
+                            t.HasCheckConstraint("ck_instance_bootstrap_states_provider_kind", "provider_kind IS NULL OR provider_kind IN (1, 2, 4)");
 
                             t.HasCheckConstraint("ck_instance_bootstrap_states_status", "status BETWEEN 1 AND 3");
 
@@ -36747,6 +36747,7 @@ namespace Explore.Persistence.Migrations
                         .HasName("pk_local_identity_users");
 
                     b.HasIndex("NormalizedEmail")
+                        .IsUnique()
                         .HasDatabaseName("ix_local_identity_users_normalized_email");
 
                     b.HasIndex("NormalizedUserName")

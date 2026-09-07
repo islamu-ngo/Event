@@ -4,7 +4,7 @@
 namespace Explore.Blazor.Client.Models.Requests;
 
 internal sealed record LocalBffLoginRequest(
-    string Email,
+    string Identifier,
     string Password,
     bool IsPersistent,
     string ReturnUrl)

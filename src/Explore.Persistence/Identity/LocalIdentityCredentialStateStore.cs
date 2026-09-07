@@ -91,6 +91,34 @@ internal sealed class LocalIdentityCredentialStateStore(
             items: summaries, pageNumber: request.PageNumber, pageSize: request.PageSize, totalCount: totalCount);
     }
 
+    public async Task<LocalIdentityBinding?> ReadLinkedIdentityAsync(Guid localSubjectId, CancellationToken cancellationToken)
+    {
+        if (localSubjectId == Guid.Empty)
+            throw new ArgumentException("A Local subject is required.", nameof(localSubjectId));
+        var current = await (
+            from user in identityDbContext.Set<LocalIdentityUser>().AsNoTracking()
+            join token in identityDbContext.Set<IdentityUserToken<Guid>>().AsNoTracking() on user.Id equals token.UserId
+            where user.Id == localSubjectId
+                && token.LoginProvider == LocalCredentialStateMetadata.TokenLoginProvider
+                && token.Name == LocalCredentialStateMetadata.TokenName
+            select new { token.Value, user.PasswordHash, user.SecurityStamp, user.ConcurrencyStamp })
+            .SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+        if (current is null || string.IsNullOrWhiteSpace(current.PasswordHash)
+            || string.IsNullOrWhiteSpace(current.SecurityStamp) || string.IsNullOrWhiteSpace(current.ConcurrencyStamp))
+            return null;
+        LocalCredentialStateMetadata? state = DeserializeMetadata(current.Value);
+        if (state?.State is not (LocalCredentialState.ChangeRequired or LocalCredentialState.Ready)
+            || state.ApplicationUserId != localSubjectId)
+            return null;
+        LocalIdentityCredentialOperation? operation = await identityDbContext.Set<LocalIdentityCredentialOperation>()
+            .AsNoTracking().SingleOrDefaultAsync(candidate => candidate.Id == state.OperationId, cancellationToken)
+            .ConfigureAwait(false);
+        if (operation is null || operation.LocalSubjectId != localSubjectId || !IsCurrentMetadata(operation, state)
+            || !await HasExactApplicationBindingAsync(operation, cancellationToken).ConfigureAwait(false))
+            return null;
+        return new LocalIdentityBinding(localSubjectId, operation.PersonalActorId, operation.ExternalLoginId, state.State);
+    }
+
     public async Task<LocalCredentialOperationStatus?> ReadOperationAsync(Guid operationId, CancellationToken cancellationToken)
     {
         if (operationId == Guid.Empty)
@@ -522,7 +550,7 @@ internal sealed class LocalIdentityCredentialStateStore(
         LocalIdentityUser? user = await identityDbContext.Set<LocalIdentityUser>().AsNoTracking()
             .SingleOrDefaultAsync(candidate => candidate.Id == operation.LocalSubjectId, cancellationToken)
             .ConfigureAwait(false);
-        if (user is null || string.IsNullOrWhiteSpace(user.Email) || string.IsNullOrWhiteSpace(user.FirstName))
+        if (user is null || string.IsNullOrWhiteSpace(user.UserName) || string.IsNullOrWhiteSpace(user.FirstName))
             return null;
 
         return new LocalCredentialProvisioningSnapshot(
@@ -539,7 +567,8 @@ internal sealed class LocalIdentityCredentialStateStore(
             email: user.Email,
             firstName: user.FirstName,
             lastName: user.LastName,
-            emailVerified: user.EmailConfirmed);
+            emailVerified: user.EmailConfirmed,
+            username: user.UserName);
     }
 
     public Task<LocalCredentialActivationOutcome> ActivateChangeRequiredAsync(
@@ -688,9 +717,58 @@ internal sealed class LocalIdentityCredentialStateStore(
             throw new InvalidOperationException("Credential reconciliation requires contexts without pending changes.");
     }
 
+    public async Task<bool> ValidateBootstrapCreationAsync(
+        LocalCredentialCreateRequest request, string password, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
+        EnsureReconciliationContextsIdle();
+        if (string.IsNullOrWhiteSpace(password)
+            || password.Length is < LocalIdentityOptions.MinimumPasswordLength or > LocalIdentityOptions.MaximumPasswordLength)
+            return false;
+        LocalCredentialCreateResult? existing = await ResolveExistingAsync(request, null, cancellationToken).ConfigureAwait(false);
+        if (existing is not null)
+            return existing.Outcome == LocalCredentialCreateOutcome.Replayed;
+
+        var user = new LocalIdentityUser
+        {
+            UserName = request.Username, Email = request.Email,
+            FirstName = request.FirstName, LastName = request.LastName, EmailConfirmed = true,
+            LockoutEnabled = true, CreatedAt = timeProvider.GetUtcNow().UtcDateTime
+        };
+        foreach (IUserValidator<LocalIdentityUser> validator in userManager.UserValidators)
+        {
+            IdentityResult validation = await validator.ValidateAsync(userManager, user).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!validation.Succeeded) return false;
+        }
+        foreach (IPasswordValidator<LocalIdentityUser> validator in userManager.PasswordValidators)
+        {
+            IdentityResult validation = await validator.ValidateAsync(userManager, user, password).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!validation.Succeeded) return false;
+        }
+        return true;
+    }
+
+    public Task<LocalCredentialCreateResult> CreateBootstrapPendingAsync(
+        LocalCredentialCreateRequest request, Guid? localSubjectId, string password, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (string.IsNullOrWhiteSpace(password)
+            || password.Length is < LocalIdentityOptions.MinimumPasswordLength or > LocalIdentityOptions.MaximumPasswordLength)
+            return Task.FromResult(LocalCredentialCreateResult.Rejected(LocalCredentialCreateOutcome.Invalid));
+        if (localSubjectId is { } subject && (subject == Guid.Empty || subject.Version != 7 || subject.Variant is < 8 or > 11))
+            throw new ArgumentException("A UUIDv7 Local subject is required.", nameof(localSubjectId));
+        return CreatePendingCoreAsync(request, localSubjectId, password, cancellationToken);
+    }
+
     public Task<LocalCredentialCreateResult> CreatePendingAsync(
-        LocalCredentialCreateRequest request,
-        CancellationToken cancellationToken)
+        LocalCredentialCreateRequest request, CancellationToken cancellationToken) =>
+        CreatePendingCoreAsync(request, null, null, cancellationToken);
+
+    private Task<LocalCredentialCreateResult> CreatePendingCoreAsync(
+        LocalCredentialCreateRequest request, Guid? localSubjectId, string? password, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
@@ -702,11 +780,12 @@ internal sealed class LocalIdentityCredentialStateStore(
             throw new InvalidOperationException("Credential creation requires a context without pending changes.");
 
         return identityDbContext.Database.CreateExecutionStrategy().ExecuteAsync(
-            () => CreateAttemptAsync(request, cancellationToken));
+            () => EfCoreUnitOfWork.ExecuteBootstrapConflictRetryAsync(
+                () => CreateAttemptAsync(request, localSubjectId, password, cancellationToken), cancellationToken));
     }
 
     private async Task<LocalCredentialCreateResult> CreateAttemptAsync(
-        LocalCredentialCreateRequest request,
+        LocalCredentialCreateRequest request, Guid? localSubjectId, string? password,
         CancellationToken cancellationToken)
     {
         List<object> ownedEntities = [];
@@ -717,7 +796,7 @@ internal sealed class LocalIdentityCredentialStateStore(
                 .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false);
             try
             {
-                LocalCredentialCreateResult? existing = await ResolveExistingAsync(request, cancellationToken)
+                LocalCredentialCreateResult? existing = await ResolveExistingAsync(request, localSubjectId, cancellationToken)
                     .ConfigureAwait(false);
                 if (existing is not null)
                     return existing;
@@ -725,7 +804,8 @@ internal sealed class LocalIdentityCredentialStateStore(
                 DateTime createdAt = timeProvider.GetUtcNow().UtcDateTime;
                 var user = new LocalIdentityUser
                 {
-                    UserName = request.Email,
+                    Id = localSubjectId ?? Guid.CreateVersion7(),
+                    UserName = request.Username,
                     Email = request.Email,
                     FirstName = request.FirstName,
                     LastName = request.LastName,
@@ -734,7 +814,7 @@ internal sealed class LocalIdentityCredentialStateStore(
                     CreatedAt = createdAt
                 };
                 ownedEntities.Add(user);
-                string temporaryPassword = $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(32))}";
+                string temporaryPassword = password ?? $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(32))}";
                 IdentityResult creation = await userManager.CreateAsync(user, temporaryPassword).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!creation.Succeeded)
@@ -790,7 +870,7 @@ internal sealed class LocalIdentityCredentialStateStore(
                 identityDbContext.Entry(entity).State = EntityState.Detached;
         }
 
-        LocalCredentialCreateResult? converged = await ResolveExistingAsync(request, cancellationToken)
+        LocalCredentialCreateResult? converged = await ResolveExistingAsync(request, localSubjectId, cancellationToken)
             .ConfigureAwait(false);
         if (converged is not null)
             return converged;
@@ -800,19 +880,21 @@ internal sealed class LocalIdentityCredentialStateStore(
     }
 
     private async Task<LocalCredentialCreateResult?> ResolveExistingAsync(
-        LocalCredentialCreateRequest request,
+        LocalCredentialCreateRequest request, Guid? localSubjectId,
         CancellationToken cancellationToken)
     {
         LocalIdentityCredentialOperation? operation = await identityDbContext.Set<LocalIdentityCredentialOperation>()
             .AsNoTracking()
             .SingleOrDefaultAsync(candidate => candidate.Id == request.OperationId, cancellationToken)
             .ConfigureAwait(false);
-        string? normalizedName = userManager.NormalizeName(request.Email);
+        string? normalizedName = userManager.NormalizeName(request.Username);
+        string? normalizedEmail = userManager.NormalizeEmail(request.Email);
         if (operation is null)
         {
             bool existingName = await identityDbContext.Set<LocalIdentityUser>()
                 .AsNoTracking()
-                .AnyAsync(user => user.NormalizedUserName == normalizedName, cancellationToken)
+                .AnyAsync(user => user.NormalizedUserName == normalizedName || user.Id == localSubjectId
+                    || (normalizedEmail != null && user.NormalizedEmail == normalizedEmail), cancellationToken)
                 .ConfigureAwait(false);
             return existingName ? LocalCredentialCreateResult.Rejected(LocalCredentialCreateOutcome.Conflict) : null;
         }
@@ -822,6 +904,7 @@ internal sealed class LocalIdentityCredentialStateStore(
             .SingleOrDefaultAsync(user => user.Id == operation.LocalSubjectId, cancellationToken)
             .ConfigureAwait(false);
         if (operation.Kind != LocalCredentialOperationKind.Create
+            || (localSubjectId.HasValue && operation.LocalSubjectId != localSubjectId.Value)
             || operation.InitiatingApplicationUserId != request.InitiatingApplicationUserId
             || existingUser is null
             || !string.Equals(existingUser.NormalizedUserName, normalizedName, StringComparison.Ordinal)

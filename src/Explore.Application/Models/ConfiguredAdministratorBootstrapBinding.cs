@@ -37,15 +37,14 @@ public sealed record ConfiguredAdministratorBootstrapBinding
 
 public sealed record ConfiguredAdministratorProfile
 {
-    public ConfiguredAdministratorProfile(string email, string? firstName, string? lastName)
+    public ConfiguredAdministratorProfile(string? email, string? firstName, string? lastName)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(email);
         Email = email;
         FirstName = firstName;
         LastName = lastName;
     }
 
-    public string Email { get; }
+    public string? Email { get; }
     public string? FirstName { get; }
     public string? LastName { get; }
 }

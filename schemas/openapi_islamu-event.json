@@ -59079,6 +59079,176 @@
         "x-rate-limit-policy": "SetupSecret"
       }
     },
+    "/api/instanceonboarding/complete-local": {
+      "post": {
+        "tags": [
+          "InstanceOnboarding"
+        ],
+        "summary": "Complete Local Instance Onboarding",
+        "description": "Enrolls the initial Local administrator under setup authority. Private credential replacement is required before ordinary sign-in.",
+        "operationId": "CompleteLocalInstanceOnboarding",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteLocalInstanceOnboardingRequestDto"
+              }
+            },
+            "text/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteLocalInstanceOnboardingRequestDto"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteLocalInstanceOnboardingRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseCommandResponseOfGuid"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseCommandResponseOfGuid"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseCommandResponseOfGuid"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-endpoint-class": "Admin",
+        "x-rate-limit-policy": "SetupSecret"
+      }
+    },
     "/api/instanceonboarding/validate-secret": {
       "post": {
         "tags": [
@@ -108720,6 +108890,43 @@
           }
         }
       },
+      "CompleteLocalInstanceOnboardingRequestDto": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "username": {
+            "type": "string"
+          },
+          "temporaryPassword": {
+            "type": "string"
+          },
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "firstName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lastName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "settings": {
+            "$ref": "#/components/schemas/CompleteInstanceOnboardingRequest"
+          }
+        },
+        "additionalProperties": false
+      },
       "CompleteTenantOnboardingRequest": {
         "required": [
           "settings",
@@ -137207,6 +137414,13 @@
               "string"
             ]
           },
+          "pendingOperationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
           "generation": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
@@ -147619,6 +147833,13 @@
               "string"
             ]
           },
+          "pendingOperationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
           "generation": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
@@ -149164,12 +149385,12 @@
       },
       "LocalAuthRequestDto": {
         "required": [
-          "email",
+          "identifier",
           "password"
         ],
         "type": "object",
         "properties": {
-          "email": {
+          "identifier": {
             "type": "string"
           },
           "password": {
@@ -149992,8 +150213,7 @@
           "externalSystem",
           "externalCustomerId",
           "tenantFullName",
-          "tenantSlug",
-          "externalAdmin"
+          "tenantSlug"
         ],
         "type": "object",
         "properties": {
@@ -150026,7 +150246,24 @@
             ]
           },
           "externalAdmin": {
-            "$ref": "#/components/schemas/ManagedProviderExternalAdminDto"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ManagedProviderExternalAdminDto"
+              }
+            ]
+          },
+          "localIdentity": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ManagementTenantLocalIdentityDto"
+              }
+            ]
           },
           "organizer": {
             "oneOf": [
@@ -150038,7 +150275,8 @@
               }
             ]
           }
-        }
+        },
+        "additionalProperties": false
       },
       "ManagedProviderClientProvisioningResultDto": {
         "type": "object",
@@ -150143,7 +150381,8 @@
               "string"
             ]
           }
-        }
+        },
+        "additionalProperties": false
       },
       "ManagedProviderOrganizerDto": {
         "required": [
@@ -150541,40 +150780,14 @@
               }
             ]
           },
-          "invitation": {
+          "localIdentity": {
             "oneOf": [
               {
                 "type": "null"
               },
               {
-                "$ref": "#/components/schemas/ManagementTenantAdministratorInvitationDto"
+                "$ref": "#/components/schemas/ManagementTenantLocalIdentityDto"
               }
-            ]
-          }
-        },
-        "additionalProperties": false
-      },
-      "ManagementTenantAdministratorInvitationDto": {
-        "required": [
-          "email",
-          "firstName",
-          "lastName"
-        ],
-        "type": "object",
-        "properties": {
-          "email": {
-            "type": "string"
-          },
-          "firstName": {
-            "type": "string"
-          },
-          "lastName": {
-            "type": "string"
-          },
-          "displayName": {
-            "type": [
-              "null",
-              "string"
             ]
           }
         },
@@ -150695,6 +150908,16 @@
           },
           "jsonValue": {
             "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ManagementTenantLocalIdentityDto": {
+        "type": "object",
+        "properties": {
+          "localSubjectId": {
+            "type": "string",
+            "format": "uuid"
           }
         },
         "additionalProperties": false
@@ -151063,6 +151286,16 @@
           },
           "administrator": {
             "$ref": "#/components/schemas/ManagementTenantAdministratorDto"
+          },
+          "directoryOperatorIdentity": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TenantDirectoryOperatorIdentityInputDto"
+              }
+            ]
           },
           "plan": {
             "$ref": "#/components/schemas/ManagementTenantPlanDto"

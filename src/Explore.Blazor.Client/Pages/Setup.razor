@@ -4,6 +4,8 @@
 @page "/setup"
 @rendermode InteractiveServer
 @layout SetupLayout
+@implements IAsyncDisposable
+@using Explore.Blazor.Client.Helpers
 @inject IInstanceOnboardingService InstanceOnboardingService
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
@@ -87,7 +89,13 @@
                         <MudAlert Severity="Severity.Error" Class="mb-3">@_errorMessage</MudAlert>
                     }
 
-                    @if (_isAuthenticated && _hasStoredSecret)
+                    @if (_isLocalSetup && _hasStoredSecret && _canCompleteLocal)
+                    {
+                        <MudAlert Severity="Severity.Success">Setup authority is active. Create the initial Local administrator without signing in first.</MudAlert>
+                        <MudButton Elevation="0" Color="Color.Primary" Variant="Variant.Filled" FullWidth="true" OnClick="ContinueLocalSetupAsync">Continue Local setup</MudButton>
+                        <MudButton Elevation="0" Variant="Variant.Text" FullWidth="true" OnClick="ClearStoredSecretAsync">Clear Secret</MudButton>
+                    }
+                    else if (_isAuthenticated && _hasStoredSecret && !_isLocalSetup)
                     {
                         <MudAlert Severity="Severity.Success" Class="mb-4">
                             Setup secret is validated and your session is authenticated.
@@ -164,6 +172,9 @@
 
 @code {
     private bool _isLoading = true;
+    private bool _isLocalSetup;
+    private bool _canCompleteLocal;
+    private bool _disposed;
     private bool _isValidating;
     private bool _isAuthenticated;
     private bool _validationSucceeded;
@@ -202,6 +213,7 @@
         _errorMessage = null;
 
         var status = await InstanceOnboardingService.GetStatusAsync();
+        if (_disposed) return;
         if (status is null)
         {
             _errorMessage = "Could not determine setup status. Try refreshing.";
@@ -215,6 +227,8 @@
             return;
         }
 
+        _isLocalSetup = string.Equals(status.Provider, "Local", StringComparison.OrdinalIgnoreCase);
+        _canCompleteLocal = status.HasHalLink("complete-local");
         _isAuthenticated = status.IsAuthenticated == true;
         _setupSecretState = string.IsNullOrWhiteSpace(status.SetupSecretState) ? "Unavailable" : status.SetupSecretState;
         _setupSecretGuidance = status.SetupSecretGuidance ?? string.Empty;
@@ -227,6 +241,7 @@
         _errorMessage = null;
 
         var result = await InstanceOnboardingService.ValidateSecretAsync(_secret.Trim());
+        if (_disposed) return;
         _isValidating = false;
 
         if (!result.Valid)
@@ -239,6 +254,8 @@
         // Persist via browser fetch so the setup-secret HttpOnly cookie is set on the browser.
         var bffModule = await GetBffModuleAsync();
         var persistResult = await bffModule.InvokeAsync<BffMutationResult>("persistSetupSecret", _secret.Trim());
+        _secret = string.Empty;
+        if (_disposed) return;
         if (persistResult is null || !persistResult.Ok)
         {
             _validationSucceeded = false;
@@ -251,12 +268,24 @@
         _secret = string.Empty;
         _isSecretSyncedForAuthenticatedSession = false;
         _hasAttemptedAuthenticatedSecretSync = false;
+        if (_isLocalSetup)
+        {
+            Navigation.NavigateTo(Navigation.Uri, forceLoad: true, replace: true);
+            return;
+        }
         await LoadDetectedProvidersAsync();
 
         if (_isAuthenticated && GetSafeReturnUrl() is { } returnUrl)
         {
             Navigation.NavigateTo(returnUrl, forceLoad: true);
         }
+    }
+
+    private async Task ContinueLocalSetupAsync()
+    {
+        if (!_canCompleteLocal || _disposed) return;
+        string destination = await GetAuthorizationProviderDestinationAsync();
+        if (!_disposed) Navigation.NavigateTo(destination, forceLoad: true);
     }
 
     private void ContinueToAuthConfig()
@@ -285,6 +314,7 @@
     {
         var bffModule = await GetBffModuleAsync();
         var status = await bffModule.InvokeAsync<SetupSecretStatusResponse>("getSetupSecretStatus");
+        if (_disposed) return;
 
         if (status is null || !status.HasPersistedSecret)
         {
@@ -334,7 +364,7 @@
 
     private async Task LoadDetectedProvidersAsync()
     {
-        if (!_validationSucceeded)
+        if (_isLocalSetup || _disposed || !_validationSucceeded)
         {
             _detectedProviders = [];
             return;
@@ -399,7 +429,7 @@
 
     private async Task EnsureSecretSyncedForAuthenticatedSessionAsync()
     {
-        if (_isSyncingSecret
+        if (_isLocalSetup || _disposed || _isSyncingSecret
             || _isSecretSyncedForAuthenticatedSession
             || _hasAttemptedAuthenticatedSecretSync
             || !_isAuthenticated
@@ -461,6 +491,17 @@
     {
         _bffModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>("import", "/js/bff.js");
         return _bffModule;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        _secret = string.Empty;
+        if (_bffModule is not null)
+        {
+            try { await _bffModule.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+        }
     }
 
     // DTOs for JS interop are in Explore.Blazor.Client.Models.Responses.BffJsInteropResponses

@@ -204,7 +204,7 @@ public sealed class LocalCredentialAdministrationHttpTests
 
         string readyPassword = NewPassword();
         await fixture.ReplaceThroughHttpAsync(email, temporaryPassword, readyPassword);
-        string oldBearer = await fixture.LoginAsync(new LocalAuthRequestDto(Email: email, Password: readyPassword));
+        string oldBearer = await fixture.LoginAsync(new LocalAuthRequestDto(Identifier: email, Password: readyPassword));
         using (HttpResponseMessage current = await fixture.SendAsync(HttpMethod.Get, "/api/user", token: oldBearer))
             await Assert.That(current.StatusCode).IsEqualTo(HttpStatusCode.OK);
         Guid resetId = Guid.CreateVersion7();
@@ -216,7 +216,7 @@ public sealed class LocalCredentialAdministrationHttpTests
             await Assert.That(revoked.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
         string finalPassword = NewPassword();
         await fixture.ReplaceThroughHttpAsync(email, resetIssue.GetProperty("temporaryPassword").GetString()!, finalPassword);
-        string freshBearer = await fixture.LoginAsync(new LocalAuthRequestDto(Email: email, Password: finalPassword));
+        string freshBearer = await fixture.LoginAsync(new LocalAuthRequestDto(Identifier: email, Password: finalPassword));
         using HttpResponseMessage restored = await fixture.SendAsync(HttpMethod.Get, "/api/user", token: freshBearer);
         await Assert.That(restored.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That((await ReadAsync(restored)).GetProperty("id").GetGuid()).IsEqualTo(subjectId);
@@ -279,7 +279,7 @@ public sealed class LocalCredentialAdministrationHttpTests
         if (route == Route.Reset)
         {
             LocalAuthRequestDto target = await fixture.Factory.SeedLocalUserAsync(emailConfirmed: true);
-            Guid targetId = await fixture.SubjectIdAsync(target.Email);
+            Guid targetId = await fixture.SubjectIdAsync(target.Identifier);
             path = ResetPath(targetId);
             body = await fixture.ResetBodyAsync(targetId, operationId);
         }
@@ -440,7 +440,7 @@ public sealed class LocalCredentialAdministrationHttpTests
             await fixture.AssertUnchangedAsync(before);
         }
         using HttpResponseMessage login = await fixture.Client.PostAsJsonAsync("/api/auth/local/login",
-            new LocalAuthRequestDto(Email: await fixture.EmailAsync(pending.Receipt!.LocalSubjectId), Password: pending.TemporaryPassword!), CancellationToken);
+            new LocalAuthRequestDto(Identifier: await fixture.EmailAsync(pending.Receipt!.LocalSubjectId), Password: pending.TemporaryPassword!), CancellationToken);
         await Assert.That(login.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
         JsonElement denied = await ReadAsync(login);
         await Assert.That(denied.GetProperty("status").GetInt32()).IsEqualTo((int)HttpStatusCode.Unauthorized);
@@ -471,7 +471,7 @@ public sealed class LocalCredentialAdministrationHttpTests
     {
         await using var fixture = await Fixture.CreateAsync();
         LocalAuthRequestDto target = await fixture.Factory.SeedLocalUserAsync(emailConfirmed: true);
-        Guid subjectId = await fixture.SubjectIdAsync(target.Email);
+        Guid subjectId = await fixture.SubjectIdAsync(target.Identifier);
         await using (AsyncServiceScope scope = fixture.Factory.Services.CreateAsyncScope())
         {
             var manager = scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>();
@@ -547,7 +547,7 @@ public sealed class LocalCredentialAdministrationHttpTests
             try
             {
                 LocalAuthRequestDto login = await factory.SeedLocalUserAsync(emailConfirmed: true);
-                fixture.AdministratorId = await fixture.SubjectIdAsync(login.Email);
+                fixture.AdministratorId = await fixture.SubjectIdAsync(login.Identifier);
                 await using (ExploreDbContext database = factory.CreateDatabase())
                 {
                     Role role = await database.Set<Role>().SingleAsync(row => row.MasterCode == "platform.admin", CancellationToken);
@@ -594,7 +594,7 @@ public sealed class LocalCredentialAdministrationHttpTests
         internal async Task ReplaceThroughHttpAsync(string email, string temporaryPassword, string newPassword)
         {
             using HttpResponseMessage login = await Client.PostAsJsonAsync("/api/auth/local/login",
-                new LocalAuthRequestDto(Email: email, Password: temporaryPassword), CancellationToken);
+                new LocalAuthRequestDto(Identifier: email, Password: temporaryPassword), CancellationToken);
             await Assert.That(login.StatusCode).IsEqualTo(HttpStatusCode.OK);
             string challenge = (await ReadAsync(login)).GetProperty("replacementChallenge").GetProperty("token").GetString()!;
             using HttpResponseMessage replaced = await SendAsync(HttpMethod.Post, "/api/auth/local/credential-replacement",

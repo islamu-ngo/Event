@@ -170,7 +170,7 @@ public sealed class LocalBffCredentialReplacementTests
 
         await circuit.NavigateAsync("after-provider-change");
 
-        await Assert.That(circuit.Probe.Anonymous.Task.IsCompletedSuccessfully).IsTrue();
+        await circuit.Probe.Anonymous.Task.WaitAsync(TimeSpan.FromSeconds(5), CancellationToken);
         await Assert.That((await circuit.Probe.Authentication.GetAuthenticationStateAsync()).User.Identity?.IsAuthenticated == true).IsFalse();
         await Assert.That(circuit.Probe.Dispatches).IsEqualTo(before);
         await Assert.That(string.IsNullOrEmpty(circuit.Probe.Tokens.AccessToken)).IsTrue();
@@ -215,7 +215,7 @@ public sealed class LocalBffCredentialReplacementTests
             await activity;
         }
 
-        await Assert.That(circuit.Probe.Anonymous.Task.IsCompletedSuccessfully).IsTrue();
+        await circuit.Probe.Anonymous.Task.WaitAsync(TimeSpan.FromSeconds(5), CancellationToken);
         await Assert.That((await circuit.Probe.Authentication.GetAuthenticationStateAsync()).User.Identity?.IsAuthenticated == true).IsFalse();
         await Assert.That(circuit.Probe.Dispatches).IsEqualTo(before);
         await Assert.That(string.IsNullOrEmpty(circuit.Probe.Tokens.AccessToken)).IsTrue();
@@ -314,7 +314,7 @@ public sealed class LocalBffCredentialReplacementTests
 
         await circuit.NavigateAsync("after-revocation");
 
-        await Assert.That(circuit.Probe.Anonymous.Task.IsCompletedSuccessfully).IsTrue();
+        await circuit.Probe.Anonymous.Task.WaitAsync(TimeSpan.FromSeconds(5), CancellationToken);
         await Assert.That((await circuit.Probe.Authentication.GetAuthenticationStateAsync()).User.Identity?.IsAuthenticated == true).IsFalse();
         await Assert.That(circuit.Probe.Dispatches).IsEqualTo(dispatchedBefore);
         await Assert.That(string.IsNullOrEmpty(circuit.Probe.Tokens.AccessToken)).IsTrue();
@@ -520,6 +520,28 @@ public sealed class LocalBffCredentialReplacementTests
         await Assert.That(response.Headers.CacheControl?.NoStore).IsEqualTo(true);
         await Assert.That(fixture.Transport.ReplacementObserved).IsFalse();
         await Assert.That(await fixture.IsAuthenticatedAsync()).IsFalse();
+    }
+
+    [Test]
+    public async Task UsernameOnlyLoginReplacesRestrictedCredentialBeforeIssuingEmailFreeCookie()
+    {
+        await using var fixture = new Fixture();
+        fixture.Transport.OmitEmail = true;
+        fixture.Transport.ReadyAfterReplacement = true;
+        using (HttpResponseMessage challenge = await fixture.LoginAsync())
+        {
+            await Assert.That(challenge.StatusCode).IsEqualTo(HttpStatusCode.OK);
+            await Assert.That(await fixture.IsAuthenticatedAsync()).IsFalse();
+        }
+        using HttpRequestMessage request = await fixture.ReplacementRequestAsync(NewPassword());
+        using HttpResponseMessage replacement = await fixture.Client.SendAsync(request, CancellationToken);
+        await Assert.That(replacement.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(await fixture.IsAuthenticatedAsync()).IsFalse();
+        using HttpResponseMessage fresh = await fixture.LoginAsync();
+        await Assert.That(fresh.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        AuthenticationTicket ticket = fixture.ReadCookieTicket(fresh);
+        await Assert.That(ticket.Principal.HasClaim(claim => claim.Type == ClaimTypes.Email || claim.Type == "email")).IsFalse();
+        await Assert.That(await fixture.IsAuthenticatedAsync()).IsTrue();
     }
 
     [Test]
@@ -851,7 +873,7 @@ public sealed class LocalBffCredentialReplacementTests
             {
                 Content = JsonContent.Create(new
                 {
-                    email = $"browser-{Guid.CreateVersion7():N}@example.test", password = NewPassword(),
+                    identifier = $"browser-{Guid.CreateVersion7():N}", password = NewPassword(),
                     isPersistent = true, returnUrl = "https://untrusted.example.test/redirect"
                 })
             };
@@ -1066,6 +1088,8 @@ public sealed class LocalBffCredentialReplacementTests
         internal string CreateFreshSameUserAccessToken() => CreateAccessToken(userId: _userId, provider: TokenProvider.Local);
         internal RevokedCookieAuthority? CookieDefect { get; set; }
         internal bool OrdinaryLogin { get; set; }
+        internal bool OmitEmail { get; set; }
+        internal bool ReadyAfterReplacement { get; set; }
         internal MalformedChallenge? Malformed { get; set; }
         internal bool ReplacementObserved { get; private set; }
         internal string? ReplacementPath { get; private set; }
@@ -1122,7 +1146,7 @@ public sealed class LocalBffCredentialReplacementTests
                 };
                 var payload = new
                 {
-                    id = userId, email = $"session-{_userId:N}@example.test", firstName = "Local", lastName = "Browser",
+                    id = userId, email = OmitEmail ? null : $"session-{_userId:N}@example.test", firstName = "Local", lastName = "Browser",
                     emailVerified = true, _links = new { self = new { href = "/api/user" } }
                 };
                 if (CurrentUserResponseDisposed is { } disposed)
@@ -1134,10 +1158,14 @@ public sealed class LocalBffCredentialReplacementTests
             }
             if (path.Equals("/api/auth/local/login", StringComparison.OrdinalIgnoreCase))
             {
+                using var login = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken));
+                if (!login.RootElement.TryGetProperty("identifier", out var identifier)
+                    || string.IsNullOrWhiteSpace(identifier.GetString()) || login.RootElement.TryGetProperty("email", out _))
+                    return new HttpResponseMessage(HttpStatusCode.BadRequest);
                 if (OrdinaryLogin)
                     return Json(new
                     {
-                        success = true, userId = _userId, email = $"session-{_userId:N}@example.test",
+                        success = true, userId = _userId, email = OmitEmail ? null : $"session-{_userId:N}@example.test",
                         firstName = "Local", lastName = "Browser", emailVerified = true, roles = Array.Empty<string>(),
                         token = LoginAccessToken ?? AccessToken, expiresAt = DateTimeOffset.UtcNow.AddMinutes(30)
                     });
@@ -1165,7 +1193,11 @@ public sealed class LocalBffCredentialReplacementTests
                 ReplacementBody = await request.Content!.ReadAsStringAsync(cancellationToken);
                 LeakedBrowserHeaders = request.Headers.Contains("Cookie") || request.Headers.Contains("X-Tenant-Slug")
                     || request.Headers.Contains("X-Setup-Secret") || request.Headers.Contains("X-CSRF-TOKEN");
-                if (ReplacementStatus == HttpStatusCode.NoContent) return new HttpResponseMessage(HttpStatusCode.NoContent);
+                if (ReplacementStatus == HttpStatusCode.NoContent)
+                {
+                    if (ReadyAfterReplacement) OrdinaryLogin = true;
+                    return new HttpResponseMessage(HttpStatusCode.NoContent);
+                }
                 var reply = new HttpResponseMessage(ReplacementStatus)
                 {
                     Content = JsonContent.Create(new { detail = ProviderDetail, token = Challenge })

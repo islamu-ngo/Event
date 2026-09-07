@@ -220,6 +220,7 @@ public sealed class EnvironmentCatalogueInvariantTests
             "INSTANCE_BOOTSTRAP_ADMIN_EMAIL",
             "INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME",
             "INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME",
+            "INSTANCE_BOOTSTRAP_LOCAL_PASSWORD",
         ];
         EnvironmentVariableDefinition[] definitions = catalogue.Definitions
             .Where(item => item.Key.StartsWith("INSTANCE_BOOTSTRAP_", StringComparison.Ordinal))
@@ -240,11 +241,13 @@ public sealed class EnvironmentCatalogueInvariantTests
             ["INSTANCE_BOOTSTRAP_BINDING_GENERATION"] = (EnvironmentVariableSensitivity.Public,
                 EnvironmentVariableRequirement.Required, "positive-integer"),
             ["INSTANCE_BOOTSTRAP_ADMIN_EMAIL"] = (EnvironmentVariableSensitivity.Sensitive,
-                EnvironmentVariableRequirement.Required, "email-address"),
+                EnvironmentVariableRequirement.Optional, "email-address"),
             ["INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME"] = (EnvironmentVariableSensitivity.Sensitive,
                 EnvironmentVariableRequirement.Optional, "profile-name"),
             ["INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME"] = (EnvironmentVariableSensitivity.Sensitive,
                 EnvironmentVariableRequirement.Optional, "profile-name"),
+            ["INSTANCE_BOOTSTRAP_LOCAL_PASSWORD"] = (EnvironmentVariableSensitivity.Secret,
+                EnvironmentVariableRequirement.Required, "identity-setting"),
         };
 
         foreach (EnvironmentVariableDefinition definition in definitions)
@@ -258,7 +261,7 @@ public sealed class EnvironmentCatalogueInvariantTests
             await Assert.That(definition.RestartBehavior).IsEqualTo(EnvironmentRestartBehavior.Process);
             await Assert.That(definition.Generation.Surfaces.HasFlag(EnvironmentGenerationSurface.Dotenv)).IsTrue();
             await Assert.That(definition.Generation.Surfaces.HasFlag(EnvironmentGenerationSurface.Startup)).IsTrue();
-            await Assert.That(definition.Generation.Surfaces.HasFlag(EnvironmentGenerationSurface.Compose)).IsFalse();
+            await Assert.That(definition.Generation.Surfaces.HasFlag(EnvironmentGenerationSurface.Compose)).IsTrue();
         }
 
         var identity = new HashSet<string>(["identity"], StringComparer.Ordinal);
@@ -271,16 +274,17 @@ public sealed class EnvironmentCatalogueInvariantTests
         string[] atproto = catalogue.Relevant(new EnvironmentActivationContext(
                 "standalone", identity, ["configured-administrator", "atproto"]))
             .Select(item => item.Key).Where(expectedKeys.Contains).ToArray();
+        string[] local = catalogue.Relevant(new EnvironmentActivationContext(
+                "standalone", identity, ["configured-administrator", "local"]))
+            .Select(item => item.Key).Where(expectedKeys.Contains).ToArray();
 
-        string[] keycloakKeys =
-        [
-            "INSTANCE_BOOTSTRAP_MODE", "INSTANCE_BOOTSTRAP_ADMIN_PROVIDER",
-            "INSTANCE_BOOTSTRAP_ADMIN_SUBJECT", "INSTANCE_BOOTSTRAP_BINDING_GENERATION",
-        ];
+        string[] externalKeys = expectedKeys
+            .Where(key => key != "INSTANCE_BOOTSTRAP_LOCAL_PASSWORD").ToArray();
 
         await Assert.That(interactive).IsEquivalentTo(["INSTANCE_BOOTSTRAP_MODE"]);
-        await Assert.That(keycloak).IsEquivalentTo(keycloakKeys);
-        await Assert.That(atproto).IsEquivalentTo(expectedKeys);
+        await Assert.That(keycloak).IsEquivalentTo(externalKeys);
+        await Assert.That(atproto).IsEquivalentTo(externalKeys);
+        await Assert.That(local).IsEquivalentTo(expectedKeys);
     }
 
     [Test]
@@ -301,7 +305,7 @@ public sealed class EnvironmentCatalogueInvariantTests
             "INSTANCE_BOOTSTRAP_MODE", "INSTANCE_BOOTSTRAP_ADMIN_PROVIDER",
             "INSTANCE_BOOTSTRAP_ADMIN_SUBJECT", "INSTANCE_BOOTSTRAP_BINDING_GENERATION",
             "INSTANCE_BOOTSTRAP_ADMIN_EMAIL", "INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME",
-            "INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME",
+            "INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME", "INSTANCE_BOOTSTRAP_LOCAL_PASSWORD",
         ];
 
         MachineCatalogueDefinition[] definitions = machine.Definitions
@@ -314,9 +318,11 @@ public sealed class EnvironmentCatalogueInvariantTests
         await Assert.That(definitions.Select(item => item.Key)).IsEquivalentTo(expectedKeys);
         await Assert.That(definitions.All(item => !item.HasSafeDefault)).IsTrue();
         await Assert.That(definitions.All(item => item.GenerationSurfaces == (int)(
-            EnvironmentGenerationSurface.Dotenv | EnvironmentGenerationSurface.Startup))).IsTrue();
+            EnvironmentGenerationSurface.Dotenv | EnvironmentGenerationSurface.Startup
+            | EnvironmentGenerationSurface.Compose))).IsTrue();
         await Assert.That(entries.Select(item => item.Key)).IsEquivalentTo(expectedKeys);
-        await Assert.That(entries.All(item => item.IsEmptyPlaceholder)).IsTrue();
+        await Assert.That(entries.Where(item => item.Key != "INSTANCE_BOOTSTRAP_MODE")
+            .All(item => item.IsEmptyPlaceholder)).IsTrue();
     }
 
     [Test]
@@ -398,7 +404,7 @@ public sealed class EnvironmentCatalogueInvariantTests
     }
 
     [Test]
-    public async Task GeneratedMachineCatalogueMatchesDotenvAndComposeNamesOrderAndClassifications()
+    public async Task GeneratedMachineCatalogueAcceptsCuratedTemplateAndMatchesComposeContract()
     {
         if (!_runtime.IsCatalogueComplete(_repositoryRoot)) return;
 
@@ -410,10 +416,13 @@ public sealed class EnvironmentCatalogueInvariantTests
         MachineComposeFile compose = EnvironmentMachineConfiguration.ParseCompose(composeText);
         MachineCatalogue catalogue = EnvironmentMachineConfiguration.ParseMachineCatalogue(catalogueText);
         string[] definitionKeys = catalogue.Definitions.OrderBy(item => item.Order).Select(item => item.Key).ToArray();
+        string[] templateKeys = env.Entries.Select(item => item.Key).ToArray();
 
-        await Assert.That(env.Entries.Select(item => item.Key)).IsEquivalentTo(catalogue.DotenvEnvironmentKeys);
-        await Assert.That(env.Entries.Select(item => item.Key).SequenceEqual(
-            catalogue.DotenvEnvironmentKeys, StringComparer.Ordinal)).IsTrue();
+        await Assert.That(templateKeys.Length).IsLessThan(catalogue.DotenvEnvironmentKeys.Count);
+        await Assert.That(templateKeys.Distinct(StringComparer.Ordinal).Count()).IsEqualTo(templateKeys.Length);
+        await Assert.That(templateKeys.All(definitionKeys.Contains)).IsTrue();
+        await Assert.That(catalogue.DotenvEnvironmentKeys.SequenceEqual(
+            CanonicalEnvironmentCatalogue.DotenvEnvironmentKeys, StringComparer.Ordinal)).IsTrue();
         await Assert.That(compose.Keys.SequenceEqual(catalogue.ComposeEnvironmentKeys, StringComparer.Ordinal)).IsTrue();
         await Assert.That(compose.RequiredKeys).IsEquivalentTo(catalogue.ComposeRequiredEnvironmentKeys);
         await Assert.That(catalogue.DotenvEnvironmentKeys.All(definitionKeys.Contains)).IsTrue();
@@ -421,9 +430,8 @@ public sealed class EnvironmentCatalogueInvariantTests
         await Assert.That(EnvironmentContractExpectedVectors.SentinelKeys.All(definitionKeys.Contains)).IsTrue();
         await Assert.That(catalogue.Definitions.Any(item => item.Sensitivity == "secret" && item.HasSafeDefault)).IsFalse();
         await Assert.That(catalogue.Definitions.Any(item => item.Sensitivity == "sensitive" && item.HasSafeDefault)).IsFalse();
-        await Assert.That(catalogue.Definitions
-            .Where(item => item.Requirement == "required" && (item.GenerationSurfaces & 1) != 0)
-            .All(item => env.Entries.Any(entry => entry.Key == item.Key))).IsTrue();
+        await Assert.That(definitionKeys).IsEquivalentTo(
+            CanonicalEnvironmentCatalogue.Catalogue.Definitions.Select(item => item.Key));
         await Assert.That(catalogue.Definitions.All(item =>
             item.ValidatorId.Length > 0
             && item.RestartBehavior.Length > 0

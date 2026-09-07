@@ -151,6 +151,8 @@ public static class InfrastructureServicesRegistration
             IConfiguredAdministratorBootstrapProvider>(provider =>
                 provider.GetRequiredService<ConfiguredAdministratorBootstrapProvider>());
         services.AddScoped<ConfiguredAdministratorBootstrapStartupRunner>();
+        services.AddScoped<Explore.Application.Features.InstanceOnboarding.Services.LocalAdministratorBootstrapOperation>();
+        services.AddScoped<LocalAdministratorBootstrapRunner>();
 
         services.AddOptions<AtprotoInfrastructureOptions>()
             .Bind(configuration.GetSection(AtprotoInfrastructureOptions.SectionName));

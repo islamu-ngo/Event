@@ -31,21 +31,18 @@ public static class BffSetupSecretEndpoints
         app.MapGet("/bff/setup-secret", HandleGetSetupSecretStatusAsync)
             .ExcludeFromDescription();
 
-        // Note: antiforgery is intentionally omitted from setup-secret endpoints.
-        // These run during initial instance bootstrap before any user session exists,
-        // so there is no session to protect with CSRF. The setup secret itself serves
-        // as the authorization credential and rate limiting provides abuse protection.
-        // InteractiveServer Blazor components call these via server-to-server HTTP
-        // (BffSelfClient) which cannot carry browser antiforgery cookies.
         app.MapPost("/bff/setup-secret", HandleSetupSecretAsync)
+            .ValidateAntiforgery()
             .RequireRateLimiting(RateLimitingExtensions.SetupSecretPolicy)
             .ExcludeFromDescription();
 
         app.MapPost("/bff/setup-secret/sync", HandleSetupSecretSyncAsync)
+            .ValidateAntiforgery()
             .RequireRateLimiting(RateLimitingExtensions.SetupSecretPolicy)
             .ExcludeFromDescription();
 
         app.MapDelete("/bff/setup-secret", HandleDeleteSetupSecret)
+            .ValidateAntiforgery()
             .ExcludeFromDescription();
 
         return app;

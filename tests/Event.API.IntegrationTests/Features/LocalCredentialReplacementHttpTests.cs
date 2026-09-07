@@ -153,7 +153,7 @@ public sealed class LocalCredentialReplacementHttpTests
             await Assert.That(readied).IsEqualTo(LocalCredentialReplacementOutcome.Replaced);
         }
         string accessToken = await LoginForAccessTokenAsync(client,
-            new LocalAuthRequestDto(Email: credential.Login.Email, Password: readyPassword));
+            new LocalAuthRequestDto(Identifier: credential.Login.Identifier, Password: readyPassword));
         using (var sync = new HttpRequestMessage(HttpMethod.Post, "/api/User/sync"))
         {
             sync.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
@@ -180,7 +180,7 @@ public sealed class LocalCredentialReplacementHttpTests
         string readyPassword = NewPassword();
         await CompletePrivateReplacementAsync(operationId: credential.Receipt.OperationId, password: readyPassword);
         string bearer = await LoginForAccessTokenAsync(client,
-            new LocalAuthRequestDto(Email: credential.Login.Email, Password: readyPassword));
+            new LocalAuthRequestDto(Identifier: credential.Login.Identifier, Password: readyPassword));
         using (HttpResponseMessage positive = await SynchronizeAsync(bearer))
             await Assert.That(positive.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await AssertCurrentUserAsync(bearer);
@@ -212,7 +212,7 @@ public sealed class LocalCredentialReplacementHttpTests
         string newPassword = NewPassword();
         await CompletePrivateReplacementAsync(operationId: resetRequest.OperationId, password: newPassword);
         string freshBearer = await LoginForAccessTokenAsync(client,
-            new LocalAuthRequestDto(Email: credential.Login.Email, Password: newPassword));
+            new LocalAuthRequestDto(Identifier: credential.Login.Identifier, Password: newPassword));
         using (HttpResponseMessage restored = await SynchronizeAsync(freshBearer))
             await Assert.That(restored.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await AssertCurrentUserAsync(freshBearer);
@@ -263,7 +263,7 @@ public sealed class LocalCredentialReplacementHttpTests
         Guid userId;
         await using (AsyncServiceScope lookup = factory.Services.CreateAsyncScope())
             userId = (await lookup.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>()
-                .FindByEmailAsync(login.Email))!.Id;
+                .FindByEmailAsync(login.Identifier))!.Id;
         using (HttpResponseMessage positive = await SynchronizeAsync(oldBearer))
             await Assert.That(positive.StatusCode).IsEqualTo(HttpStatusCode.OK);
 
@@ -349,7 +349,7 @@ public sealed class LocalCredentialReplacementHttpTests
         await Assert.That(JsonSerializer.Deserialize<LocalCredentialStateMetadata>(committed.TokenValue!)!.State)
             .IsEqualTo(LocalCredentialState.Ready);
         string accessToken = await LoginForAccessTokenAsync(client,
-            new LocalAuthRequestDto(Email: credential.Login.Email, Password: replacement));
+            new LocalAuthRequestDto(Identifier: credential.Login.Identifier, Password: replacement));
         await Assert.That(string.IsNullOrEmpty(accessToken)).IsFalse();
         Snapshot beforeReplay = await ReadAsync(factory, credential);
 
@@ -667,7 +667,7 @@ public sealed class LocalCredentialReplacementHttpTests
                     expectedOperationConcurrencyStamp: pending.OperationConcurrencyStamp), CancellationToken);
             await Assert.That(activated).IsEqualTo(LocalCredentialActivationOutcome.Activated);
         }
-        return new Credential(Login: new LocalAuthRequestDto(Email: email, Password: created.TemporaryPassword!), Receipt: receipt);
+        return new Credential(Login: new LocalAuthRequestDto(Identifier: email, Password: created.TemporaryPassword!), Receipt: receipt);
     }
 
     private static async Task<bool> PasswordIsValidAsync(LocalAdmissionWebApplicationFactory factory, Credential credential, string password)

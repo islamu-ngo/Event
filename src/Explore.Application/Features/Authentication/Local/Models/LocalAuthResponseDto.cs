@@ -119,7 +119,7 @@ public sealed record LocalAuthResponseDto
 
     public static LocalAuthResponseDto Authenticated(
         Guid userId,
-        string email,
+        string? email,
         string firstName,
         string lastName,
         bool emailVerified,
@@ -132,7 +132,7 @@ public sealed record LocalAuthResponseDto
             throw new ArgumentException("Authenticated user ID cannot be empty.", nameof(userId));
         }
 
-        ArgumentException.ThrowIfNullOrWhiteSpace(email);
+        if (email is not null) ArgumentException.ThrowIfNullOrWhiteSpace(email);
         ArgumentException.ThrowIfNullOrWhiteSpace(firstName);
         ArgumentNullException.ThrowIfNull(lastName);
         ArgumentNullException.ThrowIfNull(roles);

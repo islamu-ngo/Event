@@ -55,7 +55,8 @@ internal static class Program
             File.ReadAllBytes(Path.Combine(repositoryRoot, ".env.example"))));
 
         byte[] machineBytes = GenerateMachineCatalogue(catalogue, registry);
-        string documentationPath = Path.Combine(repositoryRoot, "docs", "CONFIGURATION.md");
+        string documentationPath = Path.Combine(repositoryRoot, "docs", "public", "documentation",
+            "readme", "configuration-and-operations", "environment-variables.md");
         byte[] documentationBytes = GenerateDocumentation(
             ReadStrictUtf8(documentationPath), catalogue);
         var outputs = new Dictionary<string, byte[]>(StringComparer.Ordinal)
@@ -112,8 +113,14 @@ internal static class Program
 
     private static void ValidateEnvironmentTemplate(IReadOnlyList<string> actual)
     {
-        if (!actual.SequenceEqual(CanonicalEnvironmentCatalogue.DotenvEnvironmentKeys, StringComparer.Ordinal))
-            throw new InvalidDataException("environment-template-key-order-drift");
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (string key in actual)
+        {
+            if (!seen.Add(key))
+                throw new InvalidDataException("environment-template-duplicate-key:" + key);
+            if (CanonicalEnvironmentCatalogue.Catalogue.Lookup(key) is null)
+                throw new InvalidDataException("environment-template-unknown-key:" + key);
+        }
     }
 
     private static void ValidateCompose(ComposeProjection actual)
@@ -195,27 +202,24 @@ internal static class Program
     {
         var generated = new StringBuilder();
         generated.AppendLine(DocumentationBegin);
-        generated.AppendLine("## Generated Environment Catalogue");
+        generated.AppendLine("## Complete Environment Variable Catalogue");
         generated.AppendLine();
-        generated.AppendLine("This bounded section is generated from the package-free Core catalogue. Runtime secret binding remains authoritative in `SecretDefinitionRegistry`; Compose topology remains owned by `docker-compose.yml`.");
+        generated.AppendLine("This generated reference lists every supported catalogue variable, including advanced and profile-specific settings intentionally omitted from the curated `.env.example`. Add only the overrides your deployment needs.");
         generated.AppendLine();
-        generated.AppendLine("Source anchors: `src/Event.Setup.Core/Environment/`, `src/Explore.Domain/Secrets/SecretDefinitionRegistry.cs`, `.env.example`, and `docker-compose.yml`.");
+        generated.AppendLine("Defaults below are declared metadata, never values read from a deployment or secret store. Secret values must be supplied through the selected secret authority.");
         generated.AppendLine();
-        generated.AppendLine("```bash");
-        generated.AppendLine("dotnet run --project eng/setup-assistant/EnvironmentCatalogueGenerator/EnvironmentCatalogueGenerator.csproj --configuration Release -- --write");
-        generated.AppendLine("dotnet run --project eng/setup-assistant/EnvironmentCatalogueGenerator/EnvironmentCatalogueGenerator.csproj --configuration Release -- --check");
-        generated.AppendLine("```");
-        generated.AppendLine();
-        generated.AppendLine("| Key | Category | Sensitivity | Requirement | Restart | Surfaces |");
+        generated.AppendLine("| Variable | Category | Sensitivity | Default | Requirement | Restart |");
         generated.AppendLine("|---|---|---|---|---|---|");
         foreach (EnvironmentVariableDefinition item in catalogue.Definitions)
         {
             generated.Append("| `").Append(item.Key).Append("` | ")
                 .Append(EnumName(item.Category)).Append(" | ")
                 .Append(EnumName(item.Sensitivity)).Append(" | ")
+                .Append(item.Sensitivity == EnvironmentVariableSensitivity.Secret
+                    ? "None (secret)"
+                    : item.SafeDefault?.Replace("|", "\\|", StringComparison.Ordinal) ?? "None").Append(" | ")
                 .Append(EnumName(item.Requirement)).Append(" | ")
-                .Append(EnumName(item.RestartBehavior)).Append(" | ")
-                .Append(SurfaceNames(item.Generation.Surfaces)).AppendLine(" |");
+                .Append(EnumName(item.RestartBehavior)).AppendLine(" |");
         }
         generated.AppendLine(DocumentationEnd);
         string block = generated.ToString().Replace("\r\n", "\n", StringComparison.Ordinal).TrimEnd('\n');
@@ -229,7 +233,7 @@ internal static class Program
         }
         else
         {
-            const string insertion = "## Runtime Configuration Sources";
+            const string insertion = "## Related Guides & Next Steps";
             int index = current.IndexOf(insertion, StringComparison.Ordinal);
             if (index < 0) throw new InvalidDataException("environment-doc-anchor-missing");
             result = current[..index] + block + "\n\n" + current[index..];
@@ -313,11 +317,6 @@ internal static class Program
         foreach (string value in values) writer.WriteStringValue(value);
         writer.WriteEndArray();
     }
-
-    private static string SurfaceNames(EnvironmentGenerationSurface surfaces) => string.Join(", ",
-        Enum.GetValues<EnvironmentGenerationSurface>()
-            .Where(value => value != EnvironmentGenerationSurface.None && surfaces.HasFlag(value))
-            .Select(EnumName));
 
     private static string EnumName<T>(T value) where T : struct, Enum =>
         value.ToString().ToLowerInvariant();

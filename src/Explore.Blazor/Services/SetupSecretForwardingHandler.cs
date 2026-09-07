@@ -58,6 +58,7 @@ public class SetupSecretForwardingHandler : DelegatingHandler
         var endpoint = path[onboardingBasePath.Length..].TrimEnd('/');
         return endpoint.Equals("status", StringComparison.OrdinalIgnoreCase)
             || endpoint.Equals("complete", StringComparison.OrdinalIgnoreCase)
+            || HttpMethods.IsPost(method) && endpoint.Equals("complete-local", StringComparison.OrdinalIgnoreCase)
             || endpoint.Equals("validate-secret", StringComparison.OrdinalIgnoreCase)
             || MatchesEndpointFamily(endpoint, "auth-provider-configuration")
             || MatchesEndpointFamily(endpoint, "authz-provider-configuration");

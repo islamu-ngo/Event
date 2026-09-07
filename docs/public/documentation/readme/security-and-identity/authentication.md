@@ -36,7 +36,12 @@ The browser communicates strictly with `Explore.Blazor` over HTTPS regardless of
 
 ### Local Identity
 
-Local Identity provides email/password sign-in without an external identity container. Passwords are hashed by ASP.NET Core Identity and failed attempts use bounded lockout. Public self-registration is closed: the former API and BFF registration routes have been removed, with no replacement public signup endpoint.
+Local Identity provides username/password or email/password sign-in without an external identity container. Passwords are hashed by ASP.NET Core Identity and failed attempts use bounded lockout. Public self-registration is closed: the former API and BFF registration routes have been removed, with no replacement public signup endpoint.
+
+Direct login requests use `identifier` and `password`; the former `email`
+request member is not an alias. A username does not contain `@`; an email-shaped
+identifier uses the account's actual stored address. Accounts without email
+keep it absent rather than receiving an invented address.
 
 Login failures use bounded machine-readable error codes. Do not include login
 request bodies or successful token responses in support logs. Their ordinary
@@ -44,7 +49,7 @@ diagnostic text omits credentials, but explicit JSON body capture does not.
 
 A correct password is not sufficient when credential setup is incomplete. Local sign-in also requires an explicit ready state in the selected Identity database. Missing, invalid, or unfinished credential state blocks sign-in even for a verified email address; disabling email delivery does not bypass this check. Records without state are not automatically treated as ready. This sign-in check alone does not revoke existing sessions.
 
-When instance email delivery is enabled, Local sign-in requires an already-verified email address. Missing SMTP configuration or a delivery outage does not bypass that requirement. Tenant email settings cannot override the instance sign-in policy. When instance delivery is disabled, unverified Local accounts may sign in, but their addresses remain unverified; disabling delivery never proves mailbox ownership. An invalid or unreadable instance policy blocks unverified sign-in until the configuration is repaired.
+When instance email delivery is enabled, Local sign-in requires the stored Local verification flag. Supervised bootstrap can establish that flag as administrative provenance; this does not invent an address or prove mailbox delivery. Missing SMTP configuration or a delivery outage does not bypass the gate. Tenant email settings cannot override the instance sign-in policy. When instance delivery is disabled, unverified Local accounts may sign in, but their addresses remain unverified; disabling delivery never proves mailbox ownership. An invalid or unreadable instance policy blocks unverified sign-in until the configuration is repaired.
 
 Event's delivery setting does not control Keycloak or AT Protocol verification, password recovery, or sign-in. Those remain owned by the selected identity provider. This Local sign-in policy does not itself provide account provisioning, email verification, or password recovery.
 
@@ -61,7 +66,7 @@ not accepted from an earlier lookup.
 
 Instance administrators can use the administrative API to create Local accounts,
 issue supervised reset credentials and inspect or reconcile interrupted operations.
-The dedicated administration UI and first-run integration are still being completed.
+The Local accounts section provides the same server-authorized operations.
 Tenant administrators cannot change these shared credentials. The storage flow keeps
 new credentials pending until the matching application account is committed,
 then marks them as requiring a private password change; neither state permits
@@ -126,6 +131,28 @@ Configure:
 Generate a signing key with `openssl rand -base64 64` and store it through the selected [secret authority](../configuration-and-operations/secrets.md). Never commit it.
 
 For database isolation, set `IDENTITY_DATABASE_TOPOLOGY=external` and provide the `IDENTITY_DATABASE_*` provider, database, runtime, and migrator settings. PostgreSQL, SQLite, SQL Server, MariaDB, and MySQL are supported. The migration service applies a context-owned credential schema with a separate migrations history.
+
+#### First-run Local administrator
+
+During incomplete setup, enter the deployment's setup secret and select Local
+authentication. Use the Local enrollment action offered by the wizard, provide
+a username and temporary password, and complete the required site and
+directory-operator information. Account email is optional; legally required
+public contact information is a separate input.
+
+Completion creates the account and administrator linkage but does not sign the
+browser in. Sign in with the temporary password, replace it privately, then
+sign in again. This setup-authorized action does not reopen public registration.
+After an interrupted attempt, refresh setup status so the wizard can recover
+the original operation reference rather than start a competing operation.
+
+For headless setup, select `ConfiguredAdministrator`, set the bootstrap provider
+to `local`, use a canonical UUIDv7 subject as the username, and supply
+`INSTANCE_BOOTSTRAP_LOCAL_PASSWORD` through the selected secret authority.
+The active authentication provider must also be Local. The password has no
+source default and does not become a reset mechanism after setup completes.
+See [environment variables](../configuration-and-operations/environment-variables.md#8-first-run-setup--administrator-bootstrap)
+for the selectors and optional profile fields.
 
 ### Keycloak
 

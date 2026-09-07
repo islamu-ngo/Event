@@ -1,6 +1,7 @@
 // ABOUTME: Validates local sign-in credentials before any Identity store access.
-// ABOUTME: Applies bounded email and password rules without revealing account existence.
+// ABOUTME: Applies bounded username-or-email and password rules without revealing account existence.
 
+using System.Net.Mail;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Configuration;
 using FluentValidation;
@@ -13,10 +14,15 @@ public sealed class LocalAuthRequestDtoValidator : AbstractValidator<LocalAuthRe
     {
         RuleLevelCascadeMode = CascadeMode.Stop;
 
-        RuleFor(request => request.Email)
+        RuleFor(request => request.Identifier)
             .NotEmpty()
-            .MaximumLength(254)
-            .EmailAddress();
+            .MaximumLength(256)
+            .Must(identifier => !identifier.Any(char.IsControl)
+                && (identifier.Contains('@', StringComparison.Ordinal)
+                    ? MailAddress.TryCreate(identifier.Trim(), out var address)
+                        && string.Equals(address.Address, identifier.Trim(), StringComparison.OrdinalIgnoreCase)
+                    : identifier.Trim().All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '.' or '_' or '+')))
+            .WithMessage("A bounded username or valid email identifier is required.");
 
         RuleFor(request => request.Password)
             .NotEmpty()

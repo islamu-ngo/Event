@@ -7,6 +7,8 @@ public static partial class CanonicalEnvironmentCatalogue
 {
     private static readonly string[] DotenvKeyData = Lines(
         """
+        ASPNETCORE_ENVIRONMENT
+        DOTNET_ENVIRONMENT
         API_HTTP_PORT
         UI_HTTP_PORT
         KEYCLOAK_HTTP_PORT
@@ -107,6 +109,7 @@ public static partial class CanonicalEnvironmentCatalogue
         INSTANCE_BOOTSTRAP_ADMIN_EMAIL
         INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME
         INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME
+        INSTANCE_BOOTSTRAP_LOCAL_PASSWORD
         HOSTING_REPLICA_COUNT
         PROMOTIONS_CODE_LOOKUP_ACTIVE_KEY_VERSION
         PROMOTIONS_CODE_LOOKUP_HMAC_KEY
@@ -433,6 +436,14 @@ public static partial class CanonicalEnvironmentCatalogue
         SETUP_SECRET
         SETUP_SECRET_FILE
         SETUP_SECRET_REQUIRED
+        INSTANCE_BOOTSTRAP_MODE
+        INSTANCE_BOOTSTRAP_ADMIN_PROVIDER
+        INSTANCE_BOOTSTRAP_ADMIN_SUBJECT
+        INSTANCE_BOOTSTRAP_BINDING_GENERATION
+        INSTANCE_BOOTSTRAP_ADMIN_EMAIL
+        INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME
+        INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME
+        INSTANCE_BOOTSTRAP_LOCAL_PASSWORD
         HOSTING_REPLICA_COUNT
         PROMOTIONS_CODE_LOOKUP_ACTIVE_KEY_VERSION
         PROMOTIONS_CODE_LOOKUP_HMAC_KEY
@@ -659,6 +670,7 @@ public static partial class CanonicalEnvironmentCatalogue
     private static readonly string[] SecretKeyData = Lines(
         """
         SETUP_SECRET
+        INSTANCE_BOOTSTRAP_LOCAL_PASSWORD
         SETUP_SECRET_BINDING_COMMITMENT_HMAC_KEY
         STORAGE_S3_ENDPOINT
         STORAGE_S3_PUBLIC_ENDPOINT
@@ -811,6 +823,9 @@ public static partial class CanonicalEnvironmentCatalogue
                 ["configured-bootstrap-config"] = EnvironmentActivationExpression.All(
                     EnvironmentActivationExpression.Capability("identity"),
                     EnvironmentActivationExpression.Provider("configured-administrator")),
+                ["local-bootstrap-config"] = EnvironmentActivationExpression.All(
+                    EnvironmentActivationExpression.Feature("configured-bootstrap-config"),
+                    EnvironmentActivationExpression.Provider("local")),
                 ["atproto-bootstrap-config"] = EnvironmentActivationExpression.All(
                     EnvironmentActivationExpression.Feature("configured-bootstrap-config"),
                     EnvironmentActivationExpression.Provider("atproto")),

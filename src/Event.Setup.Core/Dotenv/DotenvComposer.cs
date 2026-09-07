@@ -180,10 +180,10 @@ public static class DotenvComposer
         string value) => definition.ValidatorId switch
     {
         "instance-bootstrap-mode" => value is "Interactive" or "ConfiguredAdministrator",
-        "instance-bootstrap-provider" => value is "keycloak" or "atproto",
+        "instance-bootstrap-provider" => value is "local" or "keycloak" or "atproto",
         "positive-integer" when definition.Key == "INSTANCE_BOOTSTRAP_BINDING_GENERATION" =>
-            int.TryParse(value, System.Globalization.NumberStyles.None,
-                System.Globalization.CultureInfo.InvariantCulture, out int generation)
+            long.TryParse(value, System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture, out long generation)
             && generation > 0,
         "email-address" when definition.Key == "INSTANCE_BOOTSTRAP_ADMIN_EMAIL" =>
             ValidEmailAddress(value),

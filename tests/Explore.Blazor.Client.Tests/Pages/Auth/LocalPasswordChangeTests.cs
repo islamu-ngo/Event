@@ -125,7 +125,7 @@ public sealed class LocalPasswordChangeTests
         var password = CreatePassword();
         var email = $"{Guid.NewGuid():N}@example.test";
         var login = new LocalBffLoginRequest(
-            Email: email,
+            Identifier: email,
             Password: password,
             IsPersistent: false,
             ReturnUrl: "/");

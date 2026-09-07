@@ -16,6 +16,7 @@ public interface IInstanceOnboardingService
     Task<InstanceOnboardingStatusDto?> GetStatusAsync();
     Task<SetupSecretValidationResultDto> ValidateSecretAsync(string secret);
     Task<BaseCommandResponseOfGuid> CompleteAsync(CompleteInstanceOnboardingRequest completion);
+    Task<BaseCommandResponseOfGuid> CompleteLocalAsync(CompleteLocalInstanceOnboardingRequestDto completion, CancellationToken cancellationToken = default);
 
     Task<DeploymentModeDto> GetDeploymentModeAsync();
     Task<ModuleSettingsDto> GetModuleSettingsAsync();
@@ -170,6 +171,33 @@ public sealed class InstanceOnboardingService(
         {
             logger.LogError(ex, "Failed to complete onboarding.");
             return FailedCommandResponse("Request failed.");
+        }
+    }
+
+    public async Task<BaseCommandResponseOfGuid> CompleteLocalAsync(
+        CompleteLocalInstanceOnboardingRequestDto completion, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await onboardingClient.CompleteLocalInstanceOnboardingAsync(completion, cancellationToken: cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (ApiException exception)
+        {
+            logger.LogWarning("Local setup completion failed. StatusCode={StatusCode}", exception.StatusCode);
+            return FailedCommandResponse("Local setup did not complete. Refresh setup status and retry with the same account details.");
+        }
+        catch (HttpRequestException)
+        {
+            logger.LogWarning("Local setup completion transport failed.");
+            return FailedCommandResponse("Local setup could not be confirmed. Refresh setup status before retrying.");
+        }
+        finally
+        {
+            completion.TemporaryPassword = string.Empty;
         }
     }
 

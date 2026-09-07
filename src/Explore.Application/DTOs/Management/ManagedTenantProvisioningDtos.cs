@@ -2,6 +2,7 @@
 // ABOUTME: Accepts only bounded tenant bootstrap intent and returns safe operation/result references.
 
 using System.Text.Json.Serialization;
+using Explore.Application.DTOs.TenantSettings;
 using Explore.Domain.Enums;
 
 namespace Explore.Application.DTOs.Management;
@@ -17,6 +18,7 @@ public sealed record ManagementTenantProvisioningRequestDto
     public required string TenantName { get; init; }
     public required string TenantSlug { get; init; }
     public required ManagementTenantAdministratorDto Administrator { get; init; }
+    public TenantDirectoryOperatorIdentityInputDto? DirectoryOperatorIdentity { get; init; }
     public required ManagementTenantPlanDto Plan { get; init; }
     public IReadOnlyList<string> ApprovedModules { get; init; } = [];
     public ManagementTenantDomainIntentDto? Domain { get; init; }
@@ -29,7 +31,7 @@ public sealed record ManagementTenantProvisioningRequestDto
 public sealed record ManagementTenantAdministratorDto
 {
     public ManagementTenantExternalIdentityDto? ExternalIdentity { get; init; }
-    public ManagementTenantAdministratorInvitationDto? Invitation { get; init; }
+    public ManagementTenantLocalIdentityDto? LocalIdentity { get; init; }
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
@@ -45,12 +47,9 @@ public sealed record ManagementTenantExternalIdentityDto
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record ManagementTenantAdministratorInvitationDto
+public sealed record ManagementTenantLocalIdentityDto
 {
-    public required string Email { get; init; }
-    public required string FirstName { get; init; }
-    public required string LastName { get; init; }
-    public string? DisplayName { get; init; }
+    public Guid LocalSubjectId { get; init; }
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]

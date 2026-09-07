@@ -1,22 +1,21 @@
 // ABOUTME: Application-layer orchestration for provider-provisioned tenant, user actor, and tenant-admin role grant creation.
-// ABOUTME: Keeps tenant roles, optional organizers, and required invitation delivery in one managed-provisioning transaction.
+// ABOUTME: Links existing Local administrators without credential mutation and fences tenant grants by live authority.
 
-using System.Net;
 using System.Text.Json;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Infrastructure;
-using Explore.Application.Contracts.Notifications;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.ManagedProviderProvisioning;
 using Explore.Application.DTOs.ManagedProviderProvisioning.Validators;
 using Explore.Application.DTOs.Management;
 using Explore.Application.Exceptions;
-using Explore.Application.Features.ManagedProviderProvisioning;
+using Explore.Application.Features.Authentication.Local;
+using Explore.Application.DTOs.Management.Validators;
 using Explore.Application.Features.ManagedProviderProvisioning.Requests.Commands;
 using Explore.Application.Features.Management;
 using Explore.Application.Management;
-using Explore.Application.Notifications;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
@@ -53,7 +52,11 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
     ITenantSettingRepository tenantSettingRepository,
     ITenantSettingsDocumentRepository tenantSettingsDocumentRepository,
     ITenantCreationService tenantCreationService,
-    IRecipientNotificationMaterializer recipientNotificationMaterializer,
+    ILocalCredentialAdministration credentials,
+    IAdminContext adminContext,
+    IPlatformUserRoleRepository platformUserRoles,
+    IManagedControlPlaneRegistrationRepository registrationRepository,
+    IDeploymentModeProvider deploymentModeProvider,
     IAuditLogRepository auditLogRepository,
     ITenantBrandingSettingsDocumentProvisioningService brandingProvisioningService,
     ITypedSettingsDocumentResolver typedSettingsDocumentResolver,
@@ -106,13 +109,13 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
         var normalizedExternalSystem = dto.ExternalSystem.Trim();
         var normalizedExternalCustomerId = dto.ExternalCustomerId.Trim();
         var normalizedTenantSlug = dto.TenantSlug.Trim().ToLowerInvariant();
-        var identityAuthority = dto.ExternalAdmin.IdentityProvider.Trim();
-        var normalizedSubject = dto.ExternalAdmin.Subject;
-        var normalizedIdentityProvider = ResolveIdentityProvider(identityAuthority, normalizedSubject);
-        ProviderAccountKey accountKey = CreateManagedProviderAccountKey(
-            normalizedIdentityProvider,
-            identityAuthority,
-            normalizedSubject);
+        var identityAuthority = dto.ExternalAdmin?.IdentityProvider.Trim();
+        var normalizedSubject = dto.LocalIdentity?.LocalSubjectId.ToString("D") ?? dto.ExternalAdmin!.Subject;
+        var normalizedIdentityProvider = dto.LocalIdentity is not null ? "local"
+            : ResolveIdentityProvider(identityAuthority!, normalizedSubject);
+        ProviderAccountKey accountKey = dto.LocalIdentity is not null
+            ? new ProviderAccountKey(AuthenticationProviderKind.Local, normalizedSubject)
+            : CreateManagedProviderAccountKey(normalizedIdentityProvider, identityAuthority!, normalizedSubject);
         ManagedTenantProvisioningOperation? managedOperation = null;
         if (managementRequest is not null)
         {
@@ -127,7 +130,16 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
                     "tenant_provisioning_operation_missing");
             }
 
+            var managementValidation = await new ManagementTenantProvisioningRequestValidator()
+                .ValidateAsync(managementRequest, cancellationToken);
+            if (!managementValidation.IsValid)
+                return BaseCommandResponse.Validation<ManagedProviderClientProvisioningResultDto>(
+                    managementValidation.Errors.Select(error => error.ErrorMessage));
             managementRequest = ManagedTenantProvisioningRequestCodec.Normalize(managementRequest);
+            if (dto != ManagedTenantProvisioningRequestCodec.ToProvisioningRequest(managementRequest))
+                return Failure("Managed tenant provisioning input differs from its snapshot.",
+                    "Only the durable request may select the administrator and tenant bootstrap inputs.",
+                    "tenant_provisioning_operation_conflict");
             managedOperation = await managedTenantProvisioningOperationRepository.GetByIdAsNoTrackingAsync(
                 operationId.Value,
                 cancellationToken);
@@ -149,6 +161,15 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
             }
         }
 
+        ManagementTenantProvisioningBlockerDto? authorityBlocker = await EvaluateAuthorityAsync(managedOperation, cancellationToken);
+        if (authorityBlocker is not null)
+            return Failure(authorityBlocker.Message, authorityBlocker.Message, authorityBlocker.Code);
+        LocalIdentityBinding? localBinding = dto.LocalIdentity is { } local
+            ? await credentials.ReadLinkedIdentityAsync(local.LocalSubjectId, cancellationToken) : null;
+        if (dto.LocalIdentity is not null && localBinding is null)
+            return Failure("Local administrator is unavailable.", "An exact linked ChangeRequired or Ready Local identity is required.",
+                "tenant_local_administrator_unavailable");
+
         var existingCustomerBinding = await externalBindingRepository.GetByExternalKeyAsync(
             normalizedProviderKey,
             normalizedExternalSystem,
@@ -166,6 +187,7 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
                 normalizedIdentityProvider,
                 normalizedSubject,
                 managedOperation,
+                localBinding,
                 cancellationToken);
         }
 
@@ -200,7 +222,10 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
         {
             return Failure("External admin identity is linked to a missing user.", "The external login points to a user that could not be found.");
         }
-
+        if (localBinding is not null && (existingUser?.Id != localBinding.LocalSubjectId
+            || existingLogin?.Id != localBinding.ExternalLoginId))
+            return Failure("Local administrator is unavailable.", "The exact global Local user and login must already exist.",
+                "tenant_local_administrator_unavailable");
 
         var tenantId = Guid.CreateVersion7();
         var brandingDocumentId = Guid.CreateVersion7();
@@ -223,15 +248,19 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
         var organizerActorId = dto.Organizer == null ? (Guid?)null : Guid.CreateVersion7();
         var organizerParticipationId = dto.Organizer == null ? (Guid?)null : Guid.CreateVersion7();
         var organizerMembershipId = dto.Organizer == null ? (Guid?)null : Guid.CreateVersion7();
-        var tenantAdministratorInvitationIntentId = managementRequest?.Administrator.Invitation is null
-            ? (Guid?)null
-            : Guid.CreateVersion7();
-        var tenantAdministratorInvitationEmailId = managementRequest?.Administrator.Invitation is null
-            ? (Guid?)null
-            : Guid.CreateVersion7();
-
         async Task<ManagedProviderClientProvisioningResultDto> ProvisionAsync(CancellationToken ct)
         {
+            ManagementTenantProvisioningBlockerDto? currentAuthority = await EvaluateAuthorityAsync(managedOperation, ct);
+            if (currentAuthority is not null)
+                throw new AdministratorLinkageException(currentAuthority.Code, currentAuthority.Message);
+            if (dto.LocalIdentity is { } localIdentity)
+            {
+                LocalIdentityBinding? currentBinding = await credentials.ReadLinkedIdentityAsync(localIdentity.LocalSubjectId, ct);
+                if (currentBinding is null || currentBinding.LocalSubjectId != localBinding!.LocalSubjectId
+                    || currentBinding.PersonalActorId != localBinding.PersonalActorId
+                    || currentBinding.ExternalLoginId != localBinding.ExternalLoginId)
+                    throw new AdministratorLinkageException("tenant_local_administrator_unavailable", "The exact Local administrator binding is unavailable.");
+            }
             TenantCreationOutcome creation =
                 await tenantCreationService.CreateInCurrentTransactionAsync(
                     new TenantCreationRequest(
@@ -256,12 +285,15 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
                     ct);
             Tenant tenant = creation.Tenant;
             tenant.Description = $"Provisioned from {dto.ExternalSystem.Trim()} customer {dto.ExternalCustomerId.Trim()} by provider {dto.ProviderKey.Trim()}.";
-            var user = await EnsureUserAsync(dto.ExternalAdmin, normalizedIdentityProvider, accountKey, existingUser, userId);
-            var userActor = await EnsureUserActorAsync(dto.ExternalAdmin, user, userActorId);
+            var user = localBinding is not null ? existingUser!
+                : await EnsureUserAsync(dto.ExternalAdmin!, normalizedIdentityProvider, accountKey, existingUser, userId);
+            var userActor = localBinding is not null
+                ? (await actorRepository.GetActorWithDetails(localBinding.PersonalActorId, ct))!
+                : await EnsureUserActorAsync(dto.ExternalAdmin!, user, userActorId);
             var tenantUser = await EnsureTenantUserAsync(tenant.Id, user.Id, userActor.Id, tenantUserId, user.Id);
             var tenantUserProfile = await EnsureTenantUserProfileAsync(dto.ExternalAdmin, tenant.Id, tenantUser.Id, tenantUserProfileId, user.Id);
 
-            if (existingLogin == null)
+            if (localBinding is null && existingLogin == null)
             {
                 await userExternalLoginRepository.Create(new UserExternalLogin
                 {
@@ -271,7 +303,7 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
                     AuthenticationProviderId = (int)accountKey.ProviderKind,
                     AuthenticationProvider = null!,
                     ProviderKey = accountKey.Value,
-                    ProviderDisplayName = dto.ExternalAdmin.IdentityProvider.Trim(),
+                    ProviderDisplayName = dto.ExternalAdmin!.IdentityProvider.Trim(),
                     CreatedAt = DateTime.UtcNow,
                     CreatedBy = user.Id
                 });
@@ -416,9 +448,6 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
                     resolvedBootstrap,
                     operationId!.Value,
                     managedOperation!.ManagedInstanceId,
-                    tenantAdministratorInvitationIntentId,
-                    tenantAdministratorInvitationEmailId,
-                    ResolvePersistedInvitationEmail(managedOperation),
                     tenant,
                     user,
                     ct);
@@ -565,6 +594,10 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
                 result = outcome.Result;
             }
         }
+        catch (AdministratorLinkageException exception)
+        {
+            return Failure(exception.Message, exception.Message, exception.FailureCode);
+        }
         catch (TenantDirectoryOperatorIdentityReadinessException exception)
         {
             return BaseCommandResponse.Failure<ManagedProviderClientProvisioningResultDto>(
@@ -592,6 +625,26 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
         return BaseCommandResponse.Success(
             result,
             "Managed provider client provisioned successfully.");
+    }
+
+    private async Task<ManagementTenantProvisioningBlockerDto?> EvaluateAuthorityAsync(
+        ManagedTenantProvisioningOperation? operation, CancellationToken cancellationToken)
+    {
+        if (operation is null)
+            return await LocalCredentialAdministrator.ResolveAsync(adminContext, platformUserRoles, cancellationToken) is not null
+                ? null : new("authorization_denied", "Current instance administrator authority is required.");
+        if (!managedControlPlaneOptions.Value.Enabled)
+            return new("managed_mode_disabled", "Managed mode is disabled.");
+        DeploymentMode mode = await deploymentModeProvider.GetCurrentModeAsync(cancellationToken);
+        if (mode != DeploymentMode.MultiTenant)
+            return new("tenant_provisioning_requires_multi_tenant", "Managed tenant provisioning requires MultiTenant mode.");
+        return ManagedTenantProvisioningRegistrationPolicy.Evaluate(
+            await registrationRepository.GetCurrentAsync(cancellationToken), operation.ManagedInstanceId, mode);
+    }
+
+    private sealed class AdministratorLinkageException(string failureCode, string message) : Exception(message)
+    {
+        public string FailureCode { get; } = failureCode;
     }
 
     private async Task<User> EnsureUserAsync(
@@ -677,7 +730,7 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
     }
 
     private async Task<TenantUserProfile> EnsureTenantUserProfileAsync(
-        ManagedProviderExternalAdminDto admin,
+        ManagedProviderExternalAdminDto? admin,
         Guid tenantId,
         Guid tenantUserId,
         Guid tenantUserProfileId,
@@ -696,8 +749,8 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
             Tenant = null!,
             TenantUserId = tenantUserId,
             TenantUser = null!,
-            DisplayNameOverride = ResolveDisplayName(admin),
-            ContactEmailOverride = admin.Email.Trim(),
+            DisplayNameOverride = admin is null ? null : ResolveDisplayName(admin),
+            ContactEmailOverride = admin?.Email.Trim(),
             CreatedAt = DateTime.UtcNow,
             CreatedBy = createdBy
         });
@@ -921,9 +974,6 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
         ManagedTenantProvisioningResolvedBootstrap bootstrap,
         Guid operationId,
         Guid managedInstanceId,
-        Guid? tenantAdministratorInvitationIntentId,
-        Guid? tenantAdministratorInvitationEmailId,
-        string? tenantAdministratorInvitationEmail,
         Tenant tenant,
         User administrator,
         CancellationToken cancellationToken)
@@ -996,66 +1046,6 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
         brandingDocument.UpdatedBy = null;
         await tenantSettingsDocumentRepository.Update(brandingDocument);
 
-        if (request.Administrator.Invitation is not null)
-        {
-            Uri signInUrl = managedControlPlaneOptions.Value.TenantAdministratorSignInUrl
-                ?? throw new InvalidOperationException("Tenant administrator sign-in URL is unavailable after preflight.");
-            string encodedUrl = WebUtility.HtmlEncode(signInUrl.AbsoluteUri);
-            Guid intentId = tenantAdministratorInvitationIntentId
-                ?? throw new InvalidOperationException("Tenant administrator invitation intent identity is missing.");
-            Guid emailId = tenantAdministratorInvitationEmailId
-                ?? throw new InvalidOperationException("Tenant administrator invitation email identity is missing.");
-            string recipientEmail = tenantAdministratorInvitationEmail
-                ?? throw new InvalidOperationException("Persisted tenant administrator invitation authority is missing.");
-            if (!string.Equals(
-                    recipientEmail,
-                    request.Administrator.Invitation.Email,
-                    StringComparison.Ordinal)
-                || !string.Equals(recipientEmail, administrator.Pii.Email, StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException(
-                    "Persisted tenant administrator invitation authority does not match the provisioned recipient.");
-            }
-
-            await recipientNotificationMaterializer.MaterializeInCurrentTransactionAsync(
-                new RecipientNotificationMaterialization(
-                    IntentId: intentId,
-                    Intent: new NotificationIntentDraft(
-                        Explore.Application.Notifications.NotificationCategory.ProductLifecycle,
-                        TenantId: tenant.Id,
-                        RecipientKind: nameof(NotificationRecipientKindEnum.TenantAdmin),
-                        TemplateKey: "tenant-administrator-invitation",
-                        SafePayloadReference: operationId.ToString("D"),
-                        DeduplicationKey: $"managed-tenant-provisioning:{operationId:D}:tenant-administrator-invitation",
-                        CorrelationId: operationId.ToString("D"),
-                        UserId: administrator.Id),
-                    DeliveryPolicy: NotificationDeliveryPolicyEnum.TenantAdministrationRequired,
-                    DisclosureLevel: "generic",
-                    InApp: null,
-                    Email: new EmailDispatchOutbox
-                    {
-                        Id = emailId,
-                        TenantId = tenant.Id,
-                        Kind = EmailDispatchKind.TenantAdministratorInvitation,
-                        SourceType = "managed_tenant_provisioning",
-                        SourceId = operationId,
-                        RecipientUserId = administrator.Id,
-                        RecipientAddressSource = RecipientAddressSource.ManagedTenantAdministratorInvitation,
-                        ManagedTenantProvisioningOperationId = operationId,
-                        RecipientEmail = recipientEmail,
-                        Subject = $"Administrator invitation for {tenant.FullName}",
-                        PlainTextBody = $"Assalamu alaykum,\n\nYou have been invited to administer {tenant.FullName}. Sign in with this verified email address: {signInUrl.AbsoluteUri}\n\nEvent Platform",
-                        HtmlBody = $"<p>Assalamu alaykum,</p><p>You have been invited to administer {WebUtility.HtmlEncode(tenant.FullName)}.</p><p><a href=\"{encodedUrl}\">Sign in to Event</a> with this verified email address.</p><p>Event Platform</p>",
-                        CorrelationId = operationId.ToString("D"),
-                        CreatedAt = now,
-                        CreatedBy = null
-                    },
-                    IncludeEmailChannel: true,
-                    EmailRequired: true,
-                    LinkAllowed: true),
-                cancellationToken);
-        }
-
         await auditLogRepository.Create(new AuditLog
         {
             Id = Guid.CreateVersion7(),
@@ -1070,7 +1060,7 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
                 operationId,
                 planVersionId = bootstrap.PlanVersion.Id,
                 modules = bootstrap.Modules.Select(module => module.ModuleKey).Order(StringComparer.Ordinal),
-                invitationRequested = request.Administrator.Invitation is not null
+                localAdministratorLinked = request.Administrator.LocalIdentity is not null
             }),
             AffectedColumns = JsonSerializer.Serialize(new[]
             {
@@ -1095,6 +1085,7 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
         string normalizedIdentityProvider,
         string normalizedSubject,
         ManagedTenantProvisioningOperation? managedOperation,
+        LocalIdentityBinding? localBinding,
         CancellationToken cancellationToken)
     {
         if (existingCustomerBinding.InternalType != ExternalBindingTypes.Internal.Tenant)
@@ -1199,6 +1190,14 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
                 "Managed provider provisioning binding is incomplete.",
                 "The existing provider customer binding is missing the tenant user state, user actor, external login, or tenant-admin role grant.");
         }
+
+        if (localBinding is not null && (user.Id != localBinding.LocalSubjectId
+            || actorBinding.InternalType != ExternalBindingTypes.Internal.Actor
+            || actorBinding.InternalId != localBinding.PersonalActorId
+            || loginBinding.InternalType != ExternalBindingTypes.Internal.UserExternalLogin
+            || loginBinding.InternalId != localBinding.ExternalLoginId))
+            return Failure("Local administrator replay binding is invalid.", "The tenant linkage must retain the exact global Local identity.",
+                "tenant_local_administrator_unavailable");
 
         return BaseCommandResponse.Success(
             new ManagedProviderClientProvisioningResultDto
@@ -1305,28 +1304,12 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
             StringComparison.Ordinal)
         && string.Equals(current.TenantSlug, expected.TenantSlug, StringComparison.Ordinal);
 
-    private static string? ResolvePersistedInvitationEmail(ManagedTenantProvisioningOperation operation)
-    {
-        if (string.IsNullOrWhiteSpace(operation.RequestJson))
-        {
-            return null;
-        }
-
-        return ManagedTenantProvisioningRequestCodec.Deserialize(operation.RequestJson)
-            .Administrator.Invitation?.Email;
-    }
-
     private static string ResolveIdentityProvider(string authority, string subject)
     {
         if (authority.Equals("atproto", StringComparison.OrdinalIgnoreCase))
         {
             _ = Explore.Domain.ValueObjects.AtprotoDid.Parse(subject);
             return "atproto";
-        }
-
-        if (authority.Equals("managed-invitation", StringComparison.OrdinalIgnoreCase))
-        {
-            return "managed-invitation";
         }
 
         if (!Uri.TryCreate(authority, UriKind.Absolute, out Uri? issuer)
@@ -1348,11 +1331,7 @@ public class EnsureManagedProviderClientProvisionedCommandHandler(
         provider == "atproto"
             ? PlatformIdentityPrincipalExtensions.CreateAtprotoAccountKey(
                 Explore.Domain.ValueObjects.AtprotoDid.Parse(subject))
-            : PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
-                provider == "managed-invitation"
-                    ? "https://control-plane.invalid/managed-invitation"
-                    : authority,
-                subject);
+            : PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(authority, subject);
 
     private static string ResolveDisplayName(ManagedProviderExternalAdminDto admin)
     {

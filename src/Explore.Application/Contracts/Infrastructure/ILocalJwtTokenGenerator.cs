@@ -82,14 +82,14 @@ public sealed record LocalJwtTokenSubject
 {
     public LocalJwtTokenSubject(
         LocalSessionAuthority authority,
-        string email,
+        string? email,
         string firstName,
         string lastName,
         IEnumerable<string> roles)
     {
         ArgumentNullException.ThrowIfNull(authority);
 
-        ArgumentException.ThrowIfNullOrWhiteSpace(email);
+        if (email is not null) ArgumentException.ThrowIfNullOrWhiteSpace(email);
         ArgumentException.ThrowIfNullOrWhiteSpace(firstName);
         ArgumentNullException.ThrowIfNull(lastName);
         ArgumentNullException.ThrowIfNull(roles);
@@ -109,7 +109,7 @@ public sealed record LocalJwtTokenSubject
     }
 
     public LocalSessionAuthority Authority { get; }
-    public string Email { get; }
+    public string? Email { get; }
     public string FirstName { get; }
     public string LastName { get; }
     public IReadOnlyList<string> Roles { get; }

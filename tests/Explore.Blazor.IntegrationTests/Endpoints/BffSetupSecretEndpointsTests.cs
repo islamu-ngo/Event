@@ -6,6 +6,7 @@ using System.Threading.RateLimiting;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Extensions;
 using Explore.Blazor.Services;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -222,10 +223,10 @@ public sealed class BffSetupSecretEndpointsTests
         using var handler = new ValidateSecretHandler(HttpStatusCode.OK, """{"valid":true}""");
         await using var app = await CreateAppAsync(handler, useRealSetupRateLimit: true);
 
-        using var firstRequest = CreateSetupSecretRequest("first-secret", "rotated-xsrf-one");
+        using var firstRequest = CreateSetupSecretRequest(app.Client, "first-secret", "rotated-xsrf-one");
         using var firstResponse = await app.Client.SendAsync(firstRequest);
         using var secondRequest = CreateSetupSecretRequest(
-            "second-secret", "rotated-xsrf-two", "rotated-setup-cookie");
+            app.Client, "second-secret", "rotated-xsrf-two", "rotated-setup-cookie");
         using var secondResponse = await app.Client.SendAsync(secondRequest);
 
         await Assert.That(firstResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
@@ -251,6 +252,7 @@ public sealed class BffSetupSecretEndpointsTests
         builder.WebHost.UseTestServer();
         builder.Services.AddRouting();
         builder.Services.AddLogging();
+        builder.Services.AddAntiforgery(options => options.HeaderName = "X-CSRF-TOKEN");
 
         if (useRealSetupRateLimit)
         {
@@ -296,13 +298,20 @@ public sealed class BffSetupSecretEndpointsTests
                 await next(context);
             });
         }
+        app.MapGet("/test-antiforgery", (HttpContext context, IAntiforgery antiforgery) =>
+            Results.Json(new { token = antiforgery.GetAndStoreTokens(context).RequestToken }));
         app.MapSetupSecretEndpoints();
         await app.StartAsync();
-
-        return new TestBffApp(app, app.GetTestClient());
+        var client = app.GetTestClient();
+        using var issued = await client.GetAsync("/test-antiforgery");
+        using var body = System.Text.Json.JsonDocument.Parse(await issued.Content.ReadAsStringAsync());
+        client.DefaultRequestHeaders.Add("X-CSRF-TOKEN", body.RootElement.GetProperty("token").GetString());
+        client.DefaultRequestHeaders.Add("Cookie", string.Join("; ", issued.Headers.GetValues("Set-Cookie").Select(value => value.Split(';')[0])));
+        return new TestBffApp(app, client);
     }
 
     private static HttpRequestMessage CreateSetupSecretRequest(
+        HttpClient client,
         string secret,
         string antiforgeryCookie,
         string? setupSecretCookie = null)
@@ -311,9 +320,9 @@ public sealed class BffSetupSecretEndpointsTests
         {
             Content = JsonContent.Create(new { secret })
         };
-        request.Headers.Add("Cookie", setupSecretCookie is null
+        request.Headers.Add("Cookie", string.Join("; ", client.DefaultRequestHeaders.GetValues("Cookie")) + "; " + (setupSecretCookie is null
             ? $"XSRF-TOKEN={antiforgeryCookie}"
-            : $"XSRF-TOKEN={antiforgeryCookie}; setup-secret={setupSecretCookie}");
+            : $"XSRF-TOKEN={antiforgeryCookie}; setup-secret={setupSecretCookie}"));
         return request;
     }
 

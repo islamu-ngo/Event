@@ -34,7 +34,7 @@ public sealed class LocalAuthenticationCommandHandlerTests
             providerDispatcher: CreateActiveDispatcher(), sender: sender);
 
         LocalAuthResponseDto response = await handler.Handle(
-            new LocalLoginCommand(new LocalAuthRequestDto(Email: "admin@example.test", Password: CreateValidPassword())),
+            new LocalLoginCommand(new LocalAuthRequestDto(Identifier: "admin@example.test", Password: CreateValidPassword())),
             CancellationToken.None);
 
         await Assert.That(response.Outcome).IsEqualTo(LocalAuthOutcome.ReplacementRequired);
@@ -150,7 +150,7 @@ public sealed class LocalAuthenticationCommandHandlerTests
             sender);
 
         LocalAuthResponseDto result = await handler.Handle(
-            new LocalLoginCommand(new LocalAuthRequestDto(Email: "admin@example.test", Password: CreateValidPassword())),
+            new LocalLoginCommand(new LocalAuthRequestDto(Identifier: "admin@example.test", Password: CreateValidPassword())),
             CancellationToken.None);
 
         await Assert.That(result.Success).IsFalse();
@@ -179,7 +179,7 @@ public sealed class LocalAuthenticationCommandHandlerTests
             sender);
 
         LocalAuthResponseDto result = await handler.Handle(
-            new LocalLoginCommand(new LocalAuthRequestDto(Email: "admin@example.test", Password: CreateValidPassword())),
+            new LocalLoginCommand(new LocalAuthRequestDto(Identifier: "admin@example.test", Password: CreateValidPassword())),
             CancellationToken.None);
 
         await Assert.That(result.Success).IsFalse();

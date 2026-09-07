@@ -224,6 +224,7 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations.Identity
                         .HasName("pk_ie_local_identity_users");
 
                     b.HasIndex("NormalizedEmail")
+                        .IsUnique()
                         .HasDatabaseName("ix_local_identity_users_normalized_email");
 
                     b.HasIndex("NormalizedUserName")

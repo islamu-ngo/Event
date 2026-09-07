@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Options;
 using Event.Web.BffHosting.Security;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Net.Http.Headers;
 
 namespace Explore.Blazor.Services;
 
@@ -101,7 +102,8 @@ public sealed class SetupSecretResolver(
     ISetupSecretSessionService setupSecretSessionService,
     ISetupSecretCookieProtector cookieProtector,
     IOptions<SetupSecretResolverOptions> options,
-    IHostEnvironment environment) : ISetupSecretResolver
+    IHostEnvironment environment,
+    IBffAuthCookieStore? circuitCookies = null) : ISetupSecretResolver
 {
     private const string SetupSecretCookieName = "setup-secret";
     private const string SetupSecretSessionCookieName = "setup-secret-session";
@@ -160,7 +162,7 @@ public sealed class SetupSecretResolver(
 
     private string? ResolveAnonymousSessionSecret(HttpContext? httpContext)
     {
-        var sessionId = httpContext?.Request.Cookies[SetupSecretSessionCookieName];
+        var sessionId = ReadCookie(httpContext, SetupSecretSessionCookieName);
         return string.IsNullOrWhiteSpace(sessionId)
             ? null
             : setupSecretSessionService.GetForAnonymousSession(sessionId.Trim())?.Trim();
@@ -168,7 +170,7 @@ public sealed class SetupSecretResolver(
 
     private SetupSecretResolutionResult ResolveProtectedCookieSecret(HttpContext? httpContext)
     {
-        var protectedCookie = httpContext?.Request.Cookies[SetupSecretCookieName];
+        var protectedCookie = ReadCookie(httpContext, SetupSecretCookieName);
         if (string.IsNullOrWhiteSpace(protectedCookie))
         {
             return SetupSecretResolutionResult.NotFound("setup_secret_cookie_missing");
@@ -177,6 +179,14 @@ public sealed class SetupSecretResolver(
         return cookieProtector.TryUnprotect(protectedCookie, out var secret)
             ? SetupSecretResolutionResult.FoundFrom(SetupSecretSource.ProtectedSetupCookie, secret!)
             : SetupSecretResolutionResult.NotFound("setup_secret_cookie_invalid");
+    }
+
+    private string? ReadCookie(HttpContext? httpContext, string name)
+    {
+        if (httpContext is not null) return httpContext.Request.Cookies[name];
+        if (circuitCookies?.CookieHeader is not { Length: > 0 } header
+            || !CookieHeaderValue.TryParseList([header], out var cookies)) return null;
+        return cookies.FirstOrDefault(cookie => string.Equals(cookie.Name.Value, name, StringComparison.Ordinal))?.Value.Value;
     }
 
     private string? ResolveDevelopmentConfigurationSecret()

@@ -45,7 +45,7 @@ public sealed class LocalIdentityAuthServiceTests
         await Assert.That(result.Success).IsTrue();
         await Assert.That(result.Token).IsNotNull();
         await Assert.That(result.EmailVerified).IsFalse();
-        LocalIdentityUser? stored = await fixture.UserManager.FindByEmailAsync(request.Email);
+        LocalIdentityUser? stored = await fixture.UserManager.FindByEmailAsync(request.Identifier);
         await Assert.That(stored).IsNotNull();
         await Assert.That(stored!.PasswordHash).IsNotNull();
         await Assert.That(stored.PasswordHash).IsNotEqualTo(request.Password);
@@ -59,7 +59,7 @@ public sealed class LocalIdentityAuthServiceTests
         LocalAuthRequestDto login = await fixture.SeedUserAsync(emailConfirmed: false);
         await fixture.SetInstanceIntentAsync("true");
         string wrongPassword = CreateValidPassword();
-        var invalid = new LocalAuthRequestDto(Email: login.Email, Password: wrongPassword);
+        var invalid = new LocalAuthRequestDto(Identifier: login.Identifier, Password: wrongPassword);
 
         LocalAuthResponseDto first = await fixture.Service.AuthenticateAsync(
             invalid,
@@ -158,7 +158,7 @@ public sealed class LocalIdentityAuthServiceTests
         await Assert.That(result.Success).IsTrue();
         await Assert.That(result.Token).IsNotNull();
         await Assert.That(result.EmailVerified).IsFalse();
-        await Assert.That((await fixture.UserManager.FindByEmailAsync(login.Email))!.EmailConfirmed).IsFalse();
+        await Assert.That((await fixture.UserManager.FindByEmailAsync(login.Identifier))!.EmailConfirmed).IsFalse();
     }
 
     [Test]
@@ -409,7 +409,7 @@ public sealed class LocalIdentityAuthServiceTests
             applicationUser = await Context.Users.SingleAsync(row => row.Id == receipt.LocalSubjectId, CancellationToken);
             applicationUser.EmailVerified = emailConfirmed;
             await Context.SaveChangesAsync(CancellationToken);
-            return new LocalAuthRequestDto(Email: user.Email!, Password: password);
+            return new LocalAuthRequestDto(Identifier: user.Email!, Password: password);
         }
 
         internal Task<string?> SetInstanceIntentAsync(string value) => _systemSettings.UpsertAsync(new SystemSetting

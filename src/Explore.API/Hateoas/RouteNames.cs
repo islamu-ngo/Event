@@ -1186,6 +1186,7 @@ public static class RouteNames
     public const string GetInstanceOnboardingStatus = nameof(GetInstanceOnboardingStatus);
     public const string SaveInstanceOnboardingProfile = nameof(SaveInstanceOnboardingProfile);
     public const string CompleteInstanceOnboarding = nameof(CompleteInstanceOnboarding);
+    public const string CompleteLocalInstanceOnboarding = nameof(CompleteLocalInstanceOnboarding);
     public const string ValidateInstanceSetupSecret = nameof(ValidateInstanceSetupSecret);
     public const string GetInstanceOnboardingAuthProviderConfiguration = nameof(GetInstanceOnboardingAuthProviderConfiguration);
     public const string GetInstanceOnboardingAuthProviderConfigurationInternal = nameof(GetInstanceOnboardingAuthProviderConfigurationInternal);

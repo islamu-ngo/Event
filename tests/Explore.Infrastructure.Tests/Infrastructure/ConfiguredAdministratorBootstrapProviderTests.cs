@@ -54,8 +54,7 @@ public sealed class ConfiguredAdministratorBootstrapProviderTests
                      "INSTANCE_BOOTSTRAP_MODE",
                      "INSTANCE_BOOTSTRAP_ADMIN_PROVIDER",
                      "INSTANCE_BOOTSTRAP_ADMIN_SUBJECT",
-                     "INSTANCE_BOOTSTRAP_BINDING_GENERATION",
-                     "INSTANCE_BOOTSTRAP_ADMIN_EMAIL"
+                     "INSTANCE_BOOTSTRAP_BINDING_GENERATION"
                  })
         {
             Dictionary<string, string?> incomplete = ConfiguredValues();
@@ -91,6 +90,30 @@ public sealed class ConfiguredAdministratorBootstrapProviderTests
         Dictionary<string, string?> lastNameOnly = ConfiguredValues();
         lastNameOnly.Remove("INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME");
         await AssertReason(database.Repository, lastNameOnly, "instance_bootstrap_profile_matrix_invalid");
+    }
+
+    [Test]
+    [Arguments("keycloak", Subject)]
+    [Arguments("atproto", Did)]
+    public async Task ExternalBindingWithoutEmailStillRequiresTheExactProviderIdentity(string providerCode, string subject)
+    {
+        await using var database = await BootstrapDatabase.CreateAsync();
+        var values = ConfiguredValues();
+        values["INSTANCE_BOOTSTRAP_ADMIN_PROVIDER"] = providerCode;
+        values["INSTANCE_BOOTSTRAP_ADMIN_SUBJECT"] = subject;
+        values.Remove("INSTANCE_BOOTSTRAP_ADMIN_EMAIL");
+        var provider = CreateProvider(database.Repository, BuildConfiguration(values));
+        await new ConfiguredAdministratorBootstrapStartupRunner(provider, database.Repository, database.UnitOfWork,
+            new FixedTimeProvider(PreparedAt)).PrepareAsync();
+        ProviderAccountKey account = providerCode == "keycloak"
+            ? PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(Authority, subject)
+            : PlatformIdentityPrincipalExtensions.CreateAtprotoAccountKey(AtprotoDid.Parse(subject));
+        var binding = await provider.GetVerifiedBindingAsync(account);
+        await Assert.That(binding).IsNotNull();
+        await Assert.That(binding!.AdministratorProfile.Email).IsNull();
+        await Assert.That(binding.AccountKey).IsEqualTo(account);
+        await Assert.That(await provider.GetVerifiedBindingAsync(new ProviderAccountKey(
+            AuthenticationProviderKind.Local, Guid.CreateVersion7().ToString("D")))).IsNull();
     }
 
     [Test]

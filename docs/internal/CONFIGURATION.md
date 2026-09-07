@@ -3,9 +3,14 @@ ABOUTME: Focuses on non-inferable key names, mapping behavior, and settings casc
 
 # Configuration
 
+The exhaustive environment-variable reference is maintained in
+[the public operator guide](../public/documentation/readme/configuration-and-operations/environment-variables.md).
+`.env.example` is intentionally a curated baseline, not a complete catalogue.
+This document owns configuration architecture, source anchors and invariants.
+
 ## Headless Instance Onboarding (Configured Administrator)
 
-Instance onboarding reads exactly seven keys from the deployment environment or
+Instance onboarding reads eight keys from the deployment environment or
 the selected secret authority. Nothing is hardcoded in source, and there is no
 fallback source: if the selected authority doesn't supply a key, the key is
 absent.
@@ -13,20 +18,24 @@ absent.
 | Key | Interactive | ConfiguredAdministrator |
 |---|---|---|
 | `INSTANCE_BOOTSTRAP_MODE` | `Interactive` | `ConfiguredAdministrator` |
-| `INSTANCE_BOOTSTRAP_ADMIN_PROVIDER` | must be absent/empty | required, `keycloak` or `atproto` |
-| `INSTANCE_BOOTSTRAP_ADMIN_SUBJECT` | must be absent/empty | required, exact subject |
+| `INSTANCE_BOOTSTRAP_ADMIN_PROVIDER` | must be absent/empty | required, `local`, `keycloak` or `atproto` |
+| `INSTANCE_BOOTSTRAP_ADMIN_SUBJECT` | must be absent/empty | required, exact provider subject; Local uses a canonical UUIDv7 |
 | `INSTANCE_BOOTSTRAP_BINDING_GENERATION` | must be absent/empty | required, positive integer |
-| `INSTANCE_BOOTSTRAP_ADMIN_EMAIL` | must be absent/empty | required |
+| `INSTANCE_BOOTSTRAP_ADMIN_EMAIL` | must be absent/empty | optional credential/profile address, validated when supplied |
 | `INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME` | must be absent/empty | optional, only with last name |
 | `INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME` | must be absent/empty | optional, only with first name |
+| `INSTANCE_BOOTSTRAP_LOCAL_PASSWORD` | must be absent/empty | required secret for Local; absent for external providers |
 
-Both matrices are closed. A missing mode, an unknown mode string, any configured
+The incomplete-setup matrices are closed. A missing mode, an unknown mode string, any configured
 key present under `Interactive`, any required key missing under
 `ConfiguredAdministrator`, or one profile name without the other is a startup
 failure, not a warning.
 
 Subject meaning depends on the provider key:
 
+- `local`: the canonical UUIDv7 is the stable Local subject and username.
+  The selected bootstrap password creates a temporary credential; neither a
+  configured subject nor an email address grants an ordinary session.
 - `keycloak`: the subject is paired with the existing `Keycloak:Authority`
   issuer. That issuer stays where it already lives; onboarding never introduces
   a second issuer setting.
@@ -37,6 +46,27 @@ existing configuration; onboarding reads it and never redefines it.
 
 The binding generation is a positive integer you own. Raise it when you
 intentionally change the configured administrator; never reuse or lower it.
+Completed setup is terminal: leaving or changing bootstrap credentials does not
+reset passwords or grant another administrator.
+
+`LocalAdministratorBootstrapRunner` runs after the existing generation
+preparation. The selected Identity store first commits its pending credential
+and stable receipt. `LocalAdministratorBootstrapOperation` then completes exact
+application linkage, administrator grants and setup finality in the application
+transaction before activating `ChangeRequired`. A restart reconciles that
+receipt without replaying the password. Private replacement followed by fresh
+login is required before ordinary administrator use.
+
+Credential email is separate from directory-operator identity. A tenant that
+requires legal/public contact details still needs those explicitly supplied
+facts; bootstrap must not invent them from a username or optional account email.
+
+The generated `LocalAdministratorBootstrap` migrations enforce unique non-null
+normalized credential email and permit Local provider value 4 in the bootstrap
+state constraint. They cover both primary and external Identity contexts.
+Rollback after creating Local bootstrap state requires a compatible database
+backup or a forward fix; do not relabel provider values or delete identity
+lineage to force an older constraint to accept newer state.
 
 ## Legal-Identity Configuration Boundaries
 

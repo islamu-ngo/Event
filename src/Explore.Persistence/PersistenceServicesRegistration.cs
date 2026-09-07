@@ -124,7 +124,7 @@ public static class PersistenceServicesRegistration
             ?? new LocalIdentityOptions();
         IdentityBuilder identityBuilder = services.AddIdentityCore<LocalIdentityUser>(options =>
             {
-                options.User.RequireUniqueEmail = true;
+                options.User.RequireUniqueEmail = false;
                 options.Lockout.AllowedForNewUsers = true;
                 options.Lockout.MaxFailedAccessAttempts = localIdentityOptions.LockoutThreshold;
                 options.Lockout.DefaultLockoutTimeSpan =
@@ -136,7 +136,8 @@ public static class PersistenceServicesRegistration
                 options.Password.RequireNonAlphanumeric = false;
                 options.Password.RequireUppercase = false;
             })
-            .AddRoles<LocalIdentityRole>();
+            .AddRoles<LocalIdentityRole>()
+            .AddUserValidator<OptionalEmailLocalIdentityUserValidator>();
 
         IdentityDatabaseTopology identityTopology = IdentityDatabaseConfiguration.GetTopology(configuration);
         if (identityTopology == IdentityDatabaseTopology.External)

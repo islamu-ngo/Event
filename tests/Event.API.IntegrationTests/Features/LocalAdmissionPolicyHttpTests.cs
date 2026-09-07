@@ -55,7 +55,7 @@ public sealed class LocalAdmissionPolicyHttpTests
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
         using HttpClient client = CreateClient(factory);
         LocalAuthRequestDto login = await factory.SeedLocalUserAsync(emailConfirmed: false);
-        LocalGraphSnapshot before = await ReadLocalGraphAsync(factory, login.Email);
+        LocalGraphSnapshot before = await ReadLocalGraphAsync(factory, login.Identifier);
 
         using HttpResponseMessage response = await client.PostAsJsonAsync("/api/auth/local/login", login);
 
@@ -65,9 +65,9 @@ public sealed class LocalAdmissionPolicyHttpTests
             .IsEqualTo("email_verification_required");
         await Assert.That(body.RootElement.TryGetProperty("token", out _)).IsFalse();
         await using ExploreDbContext stored = factory.CreateDatabase();
-        await Assert.That((await stored.LocalIdentityUsers.SingleAsync(user => user.Email == login.Email))
+        await Assert.That((await stored.LocalIdentityUsers.SingleAsync(user => user.Email == login.Identifier))
             .EmailConfirmed).IsFalse();
-        await Assert.That(await ReadLocalGraphAsync(factory, login.Email)).IsEqualTo(before);
+        await Assert.That(await ReadLocalGraphAsync(factory, login.Identifier)).IsEqualTo(before);
     }
 
     [Test]
@@ -76,7 +76,7 @@ public sealed class LocalAdmissionPolicyHttpTests
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
         using HttpClient client = CreateClient(factory);
         LocalAuthRequestDto login = await factory.SeedLocalUserAsync(emailConfirmed: true);
-        LocalGraphSnapshot before = await ReadLocalGraphAsync(factory, login.Email);
+        LocalGraphSnapshot before = await ReadLocalGraphAsync(factory, login.Identifier);
 
         using HttpResponseMessage response = await client.PostAsJsonAsync("/api/auth/local/login", login);
 
@@ -92,13 +92,13 @@ public sealed class LocalAdmissionPolicyHttpTests
         await Assert.That(principal.FindFirst("email_verified")?.Value).IsEqualTo("true");
 
         await using ExploreDbContext stored = factory.CreateDatabase();
-        var identity = await stored.LocalIdentityUsers.SingleAsync(user => user.Email == login.Email);
+        var identity = await stored.LocalIdentityUsers.SingleAsync(user => user.Email == login.Identifier);
         var linked = await stored.UserExternalLogins.Include(binding => binding.User).SingleAsync(
             binding => binding.AuthenticationProviderId == (int)AuthenticationProviderKind.Local
                 && binding.ProviderKey == identity.Id.ToString());
-        await Assert.That(linked.User.Email).IsEqualTo(login.Email);
+        await Assert.That(linked.User.Email).IsEqualTo(login.Identifier);
         await Assert.That(linked.User.EmailVerified).IsEqualTo(true);
-        LocalGraphSnapshot after = await ReadLocalGraphAsync(factory, login.Email);
+        LocalGraphSnapshot after = await ReadLocalGraphAsync(factory, login.Identifier);
         await Assert.That(after.UserId).IsEqualTo(before.UserId);
         await Assert.That(after.ActorId).IsEqualTo(before.ActorId);
         await Assert.That(after.LoginId).IsEqualTo(before.LoginId);
@@ -119,7 +119,7 @@ public sealed class LocalAdmissionPolicyHttpTests
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         using JsonDocument body = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
         await Assert.That(body.RootElement.GetProperty("emailVerified").GetBoolean()).IsFalse();
-        await AssertUnconfirmedAsync(factory, login.Email);
+        await AssertUnconfirmedAsync(factory, login.Identifier);
     }
 
     [Test]
@@ -149,7 +149,7 @@ public sealed class LocalAdmissionPolicyHttpTests
 
         await Assert.That(response.StatusCode).IsEqualTo(
             instanceEnabled ? HttpStatusCode.Unauthorized : HttpStatusCode.OK);
-        await AssertUnconfirmedAsync(factory, login.Email);
+        await AssertUnconfirmedAsync(factory, login.Identifier);
     }
 
     [Test]
@@ -160,7 +160,7 @@ public sealed class LocalAdmissionPolicyHttpTests
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
         using HttpClient client = CreateClient(factory);
         LocalAuthRequestDto login = await factory.SeedLocalUserAsync(emailConfirmed: false);
-        LocalGraphSnapshot before = await ReadLocalGraphAsync(factory, login.Email);
+        LocalGraphSnapshot before = await ReadLocalGraphAsync(factory, login.Identifier);
         await SetInstanceIntentAsync(factory, intent);
 
         using HttpResponseMessage response = await client.PostAsJsonAsync("/api/auth/local/login", login);
@@ -169,8 +169,8 @@ public sealed class LocalAdmissionPolicyHttpTests
         using JsonDocument body = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
         await Assert.That(body.RootElement.GetProperty("code").GetString()).IsEqualTo("authentication_failed");
         await Assert.That(body.RootElement.TryGetProperty("token", out _)).IsFalse();
-        await AssertUnconfirmedAsync(factory, login.Email);
-        await Assert.That(await ReadLocalGraphAsync(factory, login.Email)).IsEqualTo(before);
+        await AssertUnconfirmedAsync(factory, login.Identifier);
+        await Assert.That(await ReadLocalGraphAsync(factory, login.Identifier)).IsEqualTo(before);
     }
 
     [Test]
@@ -190,9 +190,9 @@ public sealed class LocalAdmissionPolicyHttpTests
         await SetInstanceIntentAsync(factory, "false");
         using HttpResponseMessage disabled = await client.PostAsJsonAsync("/api/auth/local/login", login);
         await Assert.That(disabled.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        await AssertUnconfirmedAsync(factory, login.Email);
+        await AssertUnconfirmedAsync(factory, login.Identifier);
         await using ExploreDbContext stored = factory.CreateDatabase();
-        await Assert.That((await stored.Users.SingleAsync(user => user.Pii.Email == login.Email)).EmailVerified)
+        await Assert.That((await stored.Users.SingleAsync(user => user.Pii.Email == login.Identifier)).EmailVerified)
             .IsEqualTo(false);
     }
 
@@ -216,7 +216,7 @@ public sealed class LocalAdmissionPolicyHttpTests
         await Assert.That(body.RootElement.GetProperty("code").GetString())
             .IsEqualTo("email_verification_required");
         await Assert.That(body.RootElement.TryGetProperty("token", out _)).IsFalse();
-        await AssertUnconfirmedAsync(factory, login.Email);
+        await AssertUnconfirmedAsync(factory, login.Identifier);
     }
 
     [Test]

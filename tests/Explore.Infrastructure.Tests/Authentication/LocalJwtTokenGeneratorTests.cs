@@ -22,9 +22,11 @@ public sealed class LocalJwtTokenGeneratorTests
         new(2026, 9, 4, 15, 0, 0, TimeSpan.Zero);
 
     [Test]
-    [Arguments(true)]
-    [Arguments(false)]
-    public async Task GeneratedTokenIsSignedAndCarriesBoundedLocalIdentityClaims(bool emailVerified)
+    [Arguments(true, "admin@example.test")]
+    [Arguments(false, "admin@example.test")]
+    [Arguments(true, null)]
+    [Arguments(false, null)]
+    public async Task GeneratedTokenIsSignedAndCarriesBoundedLocalIdentityClaims(bool emailVerified, string? email)
     {
         byte[] key = RandomNumberGenerator.GetBytes(64);
         var resolver = CreateResolver(Convert.ToBase64String(key));
@@ -40,7 +42,7 @@ public sealed class LocalJwtTokenGeneratorTests
             localSubjectId: Guid.CreateVersion7(), securityStamp: securityStamp, emailVerified: emailVerified);
         var subject = new LocalJwtTokenSubject(
             authority: authority,
-            email: "admin@example.test",
+            email: email,
             firstName: "Site",
             lastName: "Administrator",
             roles: ["Admin", "Organizer"]);
@@ -78,6 +80,8 @@ public sealed class LocalJwtTokenGeneratorTests
         await Assert.That(principal.HasClaim(claim => claim.Type == LocalCredentialChallengeToken.SecurityStampClaim)).IsFalse();
         await Assert.That(principal.FindFirstValue("auth_provider"))
             .IsEqualTo(AuthenticationProviderKind.Local.ToString().ToLowerInvariant());
+        await Assert.That(principal.FindFirstValue(JwtRegisteredClaimNames.Email)).IsEqualTo(email);
+        await Assert.That(principal.FindAll(JwtRegisteredClaimNames.Email).Count()).IsEqualTo(email is null ? 0 : 1);
         Claim[] verificationClaims = principal.FindAll("email_verified").ToArray();
         await Assert.That(verificationClaims.Length == 1
             && verificationClaims[0].Value == (emailVerified ? "true" : "false")).IsTrue();

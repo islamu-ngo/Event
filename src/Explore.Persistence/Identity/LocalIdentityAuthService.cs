@@ -43,10 +43,10 @@ internal sealed class LocalIdentityAuthService : ILocalIdentityAuthService
     {
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
-        string email = NormalizeEmail(request.Email);
-        LocalIdentityUser? user = await _userManager
-            .FindByEmailAsync(email)
-            .ConfigureAwait(false);
+        string identifier = request.Identifier.Trim();
+        LocalIdentityUser? user = identifier.Contains('@', StringComparison.Ordinal)
+            ? await _userManager.FindByEmailAsync(identifier).ConfigureAwait(false)
+            : await _userManager.FindByNameAsync(identifier).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         if (user is null)
         {
@@ -216,11 +216,6 @@ internal sealed class LocalIdentityAuthService : ILocalIdentityAuthService
         CancellationToken cancellationToken)
     {
         string? email = user.Email;
-        if (string.IsNullOrWhiteSpace(email))
-        {
-            return LocalAuthResponseDto.Failed(failure: LocalAuthFailure.AuthenticationFailed);
-        }
-
         IList<string> roles = await _userManager.GetRolesAsync(user).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         LocalIssuedToken issued = await _tokenGenerator.GenerateAsync(
@@ -242,6 +237,4 @@ internal sealed class LocalIdentityAuthService : ILocalIdentityAuthService
             expiresAt: issued.ExpiresAt);
     }
 
-    private static string NormalizeEmail(string email) =>
-        email.Trim().ToLowerInvariant();
 }

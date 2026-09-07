@@ -52,7 +52,7 @@
 @code {
     private List<RouteConfig> _routes = new();
     private static List<Type> RequireAuthenticated() => [typeof(AuthenticatedRouteGuard)];
-    private static List<Type> RequireMultiTenantOnboarding() => [typeof(AuthenticatedRouteGuard), typeof(MultiTenantOnboardingRouteGuard)];
+    private static List<Type> RequireMultiTenantOnboarding() => [typeof(MultiTenantOnboardingRouteGuard)];
     private static List<Type> RequireAdmin() => [typeof(AdminRouteGuard)];
     private static List<Type> RequireMultiTenantAdmin() => [typeof(AdminRouteGuard), typeof(MultiTenantControlPlaneRouteGuard)];
     private static List<Type> RequireTenantAdmin() => [typeof(TenantAdminRouteGuard)];
@@ -89,6 +89,7 @@
                 Component = typeof(InstanceOnboarding),
                 Layout = typeof(SetupLayout),
                 Transition = RouteTransition.Fade,
+                EnableCache = false,
                 Guards = RequireMultiTenantOnboarding()
             },
             new RouteConfig

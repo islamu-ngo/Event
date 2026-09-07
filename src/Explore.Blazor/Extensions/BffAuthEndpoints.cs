@@ -745,7 +745,7 @@ public static class BffAuthEndpoints
             LocalAuthResponseDto response = await client.LoginLocalIdentityAsync(
                 new LocalAuthRequestDto
                 {
-                    Email = request.Email,
+                    Identifier = request.Identifier,
                     Password = request.Password
                 },
                 cancellationToken: cancellationToken);
@@ -829,13 +829,14 @@ public static class BffAuthEndpoints
             new(ClaimTypes.NameIdentifier, userId.ToString("D")),
             new("internal_user_id", userId.ToString("D")),
             new(ClaimTypes.Name, response.Email ?? userId.ToString("D")),
-            new(ClaimTypes.Email, response.Email ?? string.Empty),
             new("given_name", response.FirstName ?? string.Empty),
             new("family_name", response.LastName ?? string.Empty),
             new("email_verified", response.EmailVerified == true ? "true" : "false"),
             new("auth_provider", "local"),
             new("sid", Guid.CreateVersion7().ToString("D"))
         };
+        if (!string.IsNullOrWhiteSpace(response.Email))
+            claims.Add(new Claim(ClaimTypes.Email, response.Email));
         claims.AddRange((response.Roles ?? [])
             .Where(role => !string.IsNullOrWhiteSpace(role))
             .Select(role => new Claim(ClaimTypes.Role, role)));

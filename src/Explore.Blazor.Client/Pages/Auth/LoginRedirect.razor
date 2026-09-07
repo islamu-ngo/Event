@@ -82,13 +82,13 @@
                                       data-local-login="true">
                                 <DataAnnotationsValidator />
                                 <MudTextField T="string"
-                                              Label="Email address"
-                                              InputType="InputType.Email"
+                                              Label="Username or email"
+                                              InputType="InputType.Text"
                                               Variant="Variant.Outlined"
                                               Required="true"
-                                              RequiredError="Email address is required"
-                                              For="@(() => _localCredentials.Email)"
-                                              @bind-Value="_localCredentials.Email"
+                                              RequiredError="Username or email is required"
+                                              For="@(() => _localCredentials.Identifier)"
+                                              @bind-Value="_localCredentials.Identifier"
                                               Disabled="_isSubmittingLocal"
                                               autocomplete="username"
                                               Class="login-page__credential-input" />
@@ -192,6 +192,8 @@
     private string? _expandedProviderName;
     private string? _localAuthErrorMessage;
     private bool _isSubmittingLocal;
+    private bool _disposed;
+    private int _localRequestGeneration;
     private string _primaryProvider = string.Empty;
     private IJSObjectReference? _bffModule;
     private readonly LocalCredentialsInput _localCredentials = new();
@@ -328,6 +330,8 @@
 
     private void StartProvider(BffAuthProviderItem provider)
     {
+        _localRequestGeneration++;
+        _localCredentials.Password = string.Empty;
         if (IsAtproto(provider))
         {
             _expandedProviderName = provider.Name;
@@ -371,18 +375,19 @@
 
     private async Task SubmitLocalCredentialsAsync()
     {
-        if (_isSubmittingLocal)
+        if (_disposed || _isSubmittingLocal)
         {
             return;
         }
 
         _isSubmittingLocal = true;
+        int generation = ++_localRequestGeneration;
         _localAuthErrorMessage = null;
         try
         {
             IJSObjectReference module = await GetBffModuleAsync();
             var request = new LocalBffLoginRequest(
-                Email: _localCredentials.Email.Trim(),
+                Identifier: _localCredentials.Identifier.Trim(),
                 Password: _localCredentials.Password,
                 IsPersistent: _localCredentials.IsPersistent,
                 ReturnUrl: _returnUrl);
@@ -391,13 +396,14 @@
                     "authenticateLocal",
                     "/bff/auth/local/login",
                     request);
+            if (_disposed || generation != _localRequestGeneration) return;
             if (response is null || !string.IsNullOrEmpty(response.ErrorCode)
                 || string.IsNullOrWhiteSpace(response.RedirectUrl))
             {
                 _localCredentials.Password = string.Empty;
                 _localAuthErrorMessage = response?.ErrorCode == "email_verification_required"
                     ? "Verify your email address before signing in."
-                    : "The email or password was not accepted. Check your details and try again.";
+                    : "The username or password was not accepted. Check your details and try again.";
                 return;
             }
 
@@ -409,6 +415,7 @@
         catch (Exception)
         {
             _localCredentials.Password = string.Empty;
+            if (_disposed || generation != _localRequestGeneration) return;
             Logger.LogWarning(
                 "Local Identity sign-in request failed (errorCode=local_login_unavailable)");
             _localAuthErrorMessage =
@@ -416,6 +423,7 @@
         }
         finally
         {
+            _localCredentials.Password = string.Empty;
             _isSubmittingLocal = false;
         }
     }
@@ -427,6 +435,9 @@
 
     public async ValueTask DisposeAsync()
     {
+        _disposed = true;
+        _localRequestGeneration++;
+        _localCredentials.Password = string.Empty;
         if (_bffModule is not null)
         {
             try
@@ -601,8 +612,8 @@
     private sealed class LocalCredentialsInput
     {
         [Required]
-        [EmailAddress]
-        public string Email { get; set; } = string.Empty;
+        [StringLength(256)]
+        public string Identifier { get; set; } = string.Empty;
 
         [Required]
         public string Password { get; set; } = string.Empty;

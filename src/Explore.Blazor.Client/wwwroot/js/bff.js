@@ -204,10 +204,15 @@ async function _bffMutate(method, url, body) {
             headers['Content-Type'] = 'application/json';
         }
 
-        const xsrf = getCookie('XSRF-TOKEN');
-        if (xsrf) {
-            headers['X-CSRF-TOKEN'] = xsrf;
+        let xsrf = getCookie('XSRF-TOKEN');
+        if (!xsrf) {
+            await fetch('/auth/status', { credentials: 'same-origin' });
+            xsrf = getCookie('XSRF-TOKEN');
         }
+        if (!xsrf) {
+            return { ok: false, status: 400, error: 'Request verification is unavailable.', data: null };
+        }
+        headers['X-CSRF-TOKEN'] = xsrf;
 
         const response = await fetch(url, {
             method,

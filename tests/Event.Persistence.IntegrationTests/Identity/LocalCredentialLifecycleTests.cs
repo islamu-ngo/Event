@@ -390,7 +390,7 @@ public sealed class LocalCredentialLifecycleTests
                 .IsEqualTo(1);
             await Assert.That(await application.LocalIdentityUsers.CountAsync(CancellationToken))
                 .IsEqualTo(topology == IdentityDatabaseTopology.Colocated ? 1 : 0);
-            _request = new LocalAuthRequestDto(Email: email, Password: password);
+            _request = new LocalAuthRequestDto(Identifier: email, Password: password);
             var secrets = Substitute.For<ISecretResolver>();
             secrets.ResolveAsync(SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey, null, Arg.Any<CancellationToken>())
                 .Returns(SecretResolutionResult.Resolved(new ResolvedSecret(

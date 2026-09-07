@@ -21,6 +21,7 @@ public sealed class GetOnboardingPreflightQueryHandler(
     ITenantRepository tenantRepository,
     ISystemSettingRepository systemSettingRepository,
     IConfiguration configuration,
+    IAuthenticationProviderDispatcher authenticationProviders,
     IS3ConfigResolver? s3ConfigResolver = null,
     ISmtpConfigResolver? smtpConfigResolver = null,
     IS3PreflightVerifier? s3PreflightVerifier = null)
@@ -42,7 +43,7 @@ public sealed class GetOnboardingPreflightQueryHandler(
         AddMigrationCheck(result);
         AddDeploymentModeCheck(result, deploymentMode);
         await AddDefaultTenantCheckAsync(result, deploymentMode, onboardingCompleted);
-        await AddAuthConfigurationCheckAsync(result);
+        await AddAuthConfigurationCheckAsync(result, cancellationToken);
         await AddCanonicalHostCheckAsync(result);
         await AddDnsChecklistWarningsAsync(result, deploymentMode);
         await AddOperationalWarningsAsync(result, cancellationToken);
@@ -116,8 +117,9 @@ public sealed class GetOnboardingPreflightQueryHandler(
             defaultTenant is null ? "Complete instance onboarding to create the internal default tenant." : null);
     }
 
-    private async Task AddAuthConfigurationCheckAsync(OnboardingPreflightDto result)
+    private async Task AddAuthConfigurationCheckAsync(OnboardingPreflightDto result, CancellationToken cancellationToken)
     {
+        var localReady = await authenticationProviders.GetActivePrimaryProviderAsync(cancellationToken) == AuthenticationProviderKind.Local;
         var keycloakReady = HasConfigurationValue("Keycloak:Authority")
             && (HasConfigurationValue("Keycloak:ClientId") || HasConfigurationValue("Keycloak:Audience"));
         var storedKeycloak = await IsKeycloakPrimaryProviderAsync()
@@ -132,13 +134,13 @@ public sealed class GetOnboardingPreflightQueryHandler(
             result,
             "auth_config",
             "Authentication configuration",
-            keycloakReady || storedKeycloak || atprotoReady || googleReady
+            localReady || keycloakReady || storedKeycloak || atprotoReady || googleReady
                 ? OnboardingPreflightCheckStatus.Pass
                 : OnboardingPreflightCheckStatus.Fail,
-            keycloakReady || storedKeycloak || atprotoReady || googleReady
+            localReady || keycloakReady || storedKeycloak || atprotoReady || googleReady
                 ? "At least one authentication provider has enough configuration to continue."
                 : "No authentication provider appears ready for admin sign-in.",
-            keycloakReady || storedKeycloak || atprotoReady || googleReady
+            localReady || keycloakReady || storedKeycloak || atprotoReady || googleReady
                 ? null
                 : "Configure Keycloak, AT Protocol, or Google SSO before completing onboarding.");
     }

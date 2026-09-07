@@ -67,7 +67,7 @@ public sealed class LocalBffAuthenticationFlowTests : IAsyncDisposable
         var credentials = CreateLoginRequest();
         var registrationBody = new
         {
-            credentials.Email,
+            credentials.Identifier,
             credentials.Password,
             FirstName = "Amina",
             LastName = "Noor",
@@ -229,7 +229,7 @@ public sealed class LocalBffAuthenticationFlowTests : IAsyncDisposable
     private static LocalBffLoginRequest CreateLoginRequest() =>
         new()
         {
-            Email = "admin@example.test",
+            Identifier = "admin@example.test",
             Password = $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(16))}",
             ReturnUrl = "/dashboard"
         };
@@ -282,7 +282,7 @@ public sealed class LocalBffAuthenticationFlowTests : IAsyncDisposable
                 Success = true,
                 FailureCode = string.Empty,
                 UserId = Guid.CreateVersion7(),
-                Email = body.Email,
+                Email = body.Identifier,
                 FirstName = "Site",
                 LastName = "Administrator",
                 EmailVerified = false,

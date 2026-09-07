@@ -230,6 +230,7 @@ namespace Explore.Persistence.Identity.Migrations
                         .HasName("pk_local_identity_users");
 
                     b.HasIndex("NormalizedEmail")
+                        .IsUnique()
                         .HasDatabaseName("ix_local_identity_users_normalized_email");
 
                     b.HasIndex("NormalizedUserName")

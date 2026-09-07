@@ -7,7 +7,7 @@ namespace Explore.Blazor.Models;
 
 public sealed class LocalBffLoginRequest
 {
-    public string Email { get; init; } = string.Empty;
+    public string Identifier { get; init; } = string.Empty;
     public string Password { get; init; } = string.Empty;
     public bool IsPersistent { get; init; }
     public string? ReturnUrl { get; init; }

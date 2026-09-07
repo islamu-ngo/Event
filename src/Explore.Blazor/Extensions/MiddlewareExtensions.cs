@@ -447,6 +447,19 @@ public static class MiddlewareExtensions
             return;
         }
 
+        if (string.Equals(path, "/onboarding/instance", StringComparison.OrdinalIgnoreCase)
+            && HasTrustedSetupSecret(ctx))
+        {
+            var status = await ctx.RequestServices.GetRequiredService<IBffOnboardingStatusProvider>()
+                .GetStatusAsync(ctx.RequestAborted);
+            if (status.Disposition == BffOnboardingDisposition.InteractivePending
+                && string.Equals(status.Provider, "Local", StringComparison.Ordinal))
+            {
+                await next();
+                return;
+            }
+        }
+
         var returnUrl = Uri.EscapeDataString(path + ctx.Request.QueryString);
         ctx.Response.Redirect($"/login?returnUrl={returnUrl}");
     }

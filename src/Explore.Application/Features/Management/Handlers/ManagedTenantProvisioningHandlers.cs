@@ -1,6 +1,7 @@
 // ABOUTME: Schedules, reads, cancels, and processes durable Event-owned tenant provisioning operations.
 // ABOUTME: Rejects mode, capacity, trust, and bootstrap policy before mutation and dispatches only an outbox pointer.
 
+using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.ManagedProviderProvisioning;
@@ -9,7 +10,6 @@ using Explore.Application.DTOs.Management.Validators;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.ManagedProviderProvisioning;
 using Explore.Application.Features.Management.Requests.Commands;
-using Explore.Application.Management;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
@@ -46,6 +46,11 @@ public sealed class ScheduleManagedTenantProvisioningCommandHandler(
         ManagementTenantProvisioningRequestDto normalized =
             ManagedTenantProvisioningRequestCodec.Normalize(request.Request);
         string requestHash = ManagedTenantProvisioningRequestCodec.ComputeHash(normalized);
+
+        BaseCommandResponse<ManagementTenantProvisioningOperationDto>? authorityFailure =
+            await EvaluateInstanceSchedulingPolicyAsync(request.ManagedInstanceId, cancellationToken);
+        if (authorityFailure is not null)
+            return authorityFailure;
 
         ReplayResolution replay = await ResolveReplayAsync(
             request.ManagedInstanceId,
@@ -509,11 +514,20 @@ public sealed class ProcessManagedTenantProvisioningOperationCommandHandler(
             return true;
         }
 
-        ManagementTenantProvisioningRequestDto managementRequest =
-            ManagedTenantProvisioningRequestCodec.Deserialize(operation.RequestJson);
-        ManagedProviderClientProvisioningDto provisioningDto = MapProvisioningRequest(
-            managementRequest,
-            operation.Id);
+        ManagementTenantProvisioningRequestDto managementRequest;
+        try
+        {
+            managementRequest = ManagedTenantProvisioningRequestCodec.Deserialize(operation.RequestJson);
+        }
+        catch (JsonException)
+        {
+            await EnsureTerminalTransitionAsync(operation.Id, request.OutboxMessageId,
+                await operationRepository.TryFailAsync(operation.Id, request.OutboxMessageId,
+                    "tenant_provisioning_request_snapshot_invalid", DateTime.UtcNow, cancellationToken), cancellationToken);
+            return true;
+        }
+        ManagedProviderClientProvisioningDto provisioningDto =
+            ManagedTenantProvisioningRequestCodec.ToProvisioningRequest(managementRequest);
         BaseCommandResponse<ManagedProviderClientProvisioningResultDto> result =
             await provisioner.EnsureAsync(
                 provisioningDto,
@@ -581,43 +595,6 @@ public sealed class ProcessManagedTenantProvisioningOperationCommandHandler(
         nameof(ManagedTenantProvisioningOperation),
         operationId.ToString("D"));
 
-    private static ManagedProviderClientProvisioningDto MapProvisioningRequest(
-        ManagementTenantProvisioningRequestDto request,
-        Guid operationId)
-    {
-        ManagementTenantExternalIdentityDto? identity = request.Administrator.ExternalIdentity;
-        ManagementTenantAdministratorInvitationDto? invitation = request.Administrator.Invitation;
-        return new ManagedProviderClientProvisioningDto
-        {
-            ProviderKey = "islamu-event-control-plane",
-            ExternalSystem = "control-plane",
-            ExternalCustomerId = request.ExternalCustomerReference,
-            TenantFullName = request.TenantName,
-            TenantSlug = request.TenantSlug,
-            ActivateTenant = true,
-            ExternalAdmin = identity is not null
-                ? new ManagedProviderExternalAdminDto
-                {
-                    IdentityProvider = identity.IdentityProvider,
-                    Subject = identity.Subject,
-                    Email = identity.Email,
-                    FirstName = identity.FirstName,
-                    LastName = identity.LastName,
-                    DisplayName = identity.DisplayName,
-                    EmailVerified = identity.EmailVerified
-                }
-                : new ManagedProviderExternalAdminDto
-                {
-                    IdentityProvider = "managed-invitation",
-                    Subject = operationId.ToString("D"),
-                    Email = invitation!.Email,
-                    FirstName = invitation.FirstName,
-                    LastName = invitation.LastName,
-                    DisplayName = invitation.DisplayName,
-                    EmailVerified = false
-                }
-        };
-    }
 }
 
 public sealed class ReconcileManagedTenantProvisioningDeadLetterCommandHandler(

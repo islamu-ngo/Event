@@ -149,7 +149,7 @@ public sealed class AuthProviderConfigurationTests : IDisposable
     }
 
     [Test]
-    public async Task SavedLocalPrimaryRequiresLoginBeforeContinuing()
+    public async Task SavedLocalPrimaryContinuesSetupWithoutLogin()
     {
         var model = new AuthProviderConfigurationDto
         {
@@ -173,23 +173,9 @@ public sealed class AuthProviderConfigurationTests : IDisposable
             _context.Services.GetRequiredService<BunitNavigationManager>();
         var cut = _context.RenderMudComponent<AuthProviderConfiguration>();
 
-        cut.FindAll("button")
-            .Single(button => button.TextContent.Contains(
-                "Save & Continue to Login",
-                StringComparison.Ordinal))
-            .Click();
-
-        cut.WaitForAssertion(() =>
-        {
-            if (!navigation.Uri.Contains(
-                    "/login?provider=local",
-                    StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException(
-                    "Local onboarding did not route through focused login.");
-            }
-        });
-        await Assert.That(navigation.Uri).Contains(
-            "returnUrl=%2Fonboarding%2Finstance");
+        await cut.FindAll("button")
+            .Single(button => button.TextContent.Contains("Save & Continue Setup", StringComparison.Ordinal))
+            .ClickAsync(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
+        await Assert.That(navigation.Uri).EndsWith("/onboarding/instance");
     }
 }

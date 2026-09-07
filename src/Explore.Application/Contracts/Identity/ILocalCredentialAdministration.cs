@@ -14,8 +14,21 @@ public interface ILocalCredentialAdministration
 
     Task<LocalCredentialOperationStatus?> ReadOperationAsync(Guid operationId, CancellationToken cancellationToken);
 
+    Task<LocalIdentityBinding?> ReadLinkedIdentityAsync(Guid localSubjectId, CancellationToken cancellationToken);
+
     Task<LocalCredentialCreateResult> CreatePendingAsync(
         LocalCredentialCreateRequest request,
+        CancellationToken cancellationToken);
+
+    Task<bool> ValidateBootstrapCreationAsync(
+        LocalCredentialCreateRequest request,
+        string password,
+        CancellationToken cancellationToken);
+
+    Task<LocalCredentialCreateResult> CreateBootstrapPendingAsync(
+        LocalCredentialCreateRequest request,
+        Guid? localSubjectId,
+        string password,
         CancellationToken cancellationToken);
 
     Task<LocalCredentialProvisioningSnapshot?> ReadProvisioningAsync(
@@ -34,6 +47,12 @@ public interface ILocalCredentialAdministration
         LocalCredentialResetRequest request,
         CancellationToken cancellationToken);
 }
+
+public sealed record LocalIdentityBinding(
+    Guid LocalSubjectId,
+    Guid PersonalActorId,
+    Guid ExternalLoginId,
+    LocalCredentialState CredentialState);
 
 public sealed record LocalIdentityListRequest
 {
@@ -429,18 +448,20 @@ public sealed record LocalCredentialProvisioningSnapshot
     public LocalCredentialProvisioningSnapshot(
         LocalCredentialOperationReceipt receipt,
         Guid operationConcurrencyStamp,
-        string email,
+        string? email,
         string firstName,
         string lastName,
-        bool emailVerified)
+        bool emailVerified,
+        string? username = null)
     {
         ArgumentNullException.ThrowIfNull(receipt);
         if (operationConcurrencyStamp == Guid.Empty)
             throw new ArgumentException("An operation concurrency stamp is required.", nameof(operationConcurrencyStamp));
-        ArgumentException.ThrowIfNullOrWhiteSpace(email);
+        ArgumentException.ThrowIfNullOrWhiteSpace(username ?? email);
         ArgumentException.ThrowIfNullOrWhiteSpace(firstName);
         ArgumentNullException.ThrowIfNull(lastName);
 
+        Username = username ?? email!;
         Receipt = receipt;
         OperationConcurrencyStamp = operationConcurrencyStamp;
         Email = email;
@@ -451,7 +472,8 @@ public sealed record LocalCredentialProvisioningSnapshot
 
     public LocalCredentialOperationReceipt Receipt { get; }
     public Guid OperationConcurrencyStamp { get; }
-    public string Email { get; }
+    public string Username { get; }
+    public string? Email { get; }
     public string FirstName { get; }
     public string LastName { get; }
     public bool EmailVerified { get; }
@@ -479,26 +501,30 @@ public sealed record LocalCredentialCreateRequest
     public LocalCredentialCreateRequest(
         Guid operationId,
         Guid initiatingApplicationUserId,
-        string email,
+        string? email,
         string firstName,
-        string lastName)
+        string lastName,
+        string? username = null)
     {
         if (operationId == Guid.Empty)
             throw new ArgumentException("An operation identifier is required.", nameof(operationId));
         if (initiatingApplicationUserId == Guid.Empty)
             throw new ArgumentException("An initiating application user is required.", nameof(initiatingApplicationUserId));
-        ArgumentException.ThrowIfNullOrWhiteSpace(email);
+        ArgumentException.ThrowIfNullOrWhiteSpace(username ?? email);
         ArgumentException.ThrowIfNullOrWhiteSpace(firstName);
         ArgumentNullException.ThrowIfNull(lastName);
 
-        string normalizedEmail = email.Trim().ToLowerInvariant();
-        if (normalizedEmail.Length > 256
+        string? normalizedEmail = email?.Trim().ToLowerInvariant();
+        if (normalizedEmail is not null && (normalizedEmail.Length > 256
             || !MailAddress.TryCreate(normalizedEmail, out MailAddress? address)
-            || !string.Equals(address.Address, normalizedEmail, StringComparison.OrdinalIgnoreCase))
+            || !string.Equals(address.Address, normalizedEmail, StringComparison.OrdinalIgnoreCase)))
         {
             throw new ArgumentException("A valid bounded email address is required.", nameof(email));
         }
 
+        string normalizedUsername = (username ?? normalizedEmail!).Trim();
+        if (normalizedUsername.Length is < 1 or > 256 || normalizedUsername.Any(char.IsControl))
+            throw new ArgumentException("A valid bounded username is required.", nameof(username));
         string normalizedFirstName = firstName.Trim();
         string normalizedLastName = lastName.Trim();
         if (normalizedFirstName.Length > 200)
@@ -508,6 +534,7 @@ public sealed record LocalCredentialCreateRequest
 
         OperationId = operationId;
         InitiatingApplicationUserId = initiatingApplicationUserId;
+        Username = normalizedUsername;
         Email = normalizedEmail;
         FirstName = normalizedFirstName;
         LastName = normalizedLastName;
@@ -515,7 +542,8 @@ public sealed record LocalCredentialCreateRequest
 
     public Guid OperationId { get; }
     public Guid InitiatingApplicationUserId { get; }
-    public string Email { get; }
+    public string Username { get; }
+    public string? Email { get; }
     public string FirstName { get; }
     public string LastName { get; }
 

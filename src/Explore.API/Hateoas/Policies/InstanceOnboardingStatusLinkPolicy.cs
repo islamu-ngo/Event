@@ -5,6 +5,7 @@ namespace Explore.API.Hateoas.Policies;
 
 using System.Security.Claims;
 using Explore.Application.Authorization;
+using Explore.Application.Constants;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
@@ -21,12 +22,19 @@ public sealed class InstanceOnboardingStatusLinkPolicy(
 
     public IEnumerable<LinkDefinition> GetLinks(InstanceOnboardingStatusDto dto, ClaimsPrincipal? user)
     {
-        _ = user;
-
         yield return LinkDefinition.Self(RouteNames.GetInstanceOnboardingStatus);
 
         if (!dto.IsCompleted && HasActiveSetupAuthority())
         {
+            if (dto.State == "InteractivePending" && dto.Provider == "Local"
+                && user?.Identities.Any(identity => identity.IsAuthenticated
+                    && identity.AuthenticationType == ApiAuthenticationSchemeNames.SetupSecret) == true)
+            {
+                yield return new LinkDefinition(
+                    "complete-local", RouteNames.CompleteLocalInstanceOnboarding,
+                    Method: HttpMethods.Post, Title: "Complete Local instance onboarding", RequiresAuth: true);
+            }
+
             yield return new LinkDefinition(
                 "manage-authentication",
                 RouteNames.GetInstanceOnboardingAuthProviderConfigurationInternal,
@@ -39,7 +47,8 @@ public sealed class InstanceOnboardingStatusLinkPolicy(
                 Method: HttpMethods.Get,
                 Title: "Manage authorization provider during setup");
 
-            if (dto.IsAuthenticated)
+            if (dto.IsAuthenticated && user?.Identities.Any(identity => identity.IsAuthenticated
+                && identity.AuthenticationType != ApiAuthenticationSchemeNames.SetupSecret) == true)
             {
                 yield return new LinkDefinition(
                     "save-profile",

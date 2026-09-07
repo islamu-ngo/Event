@@ -10,15 +10,26 @@ authority stops required startup work and never falls back to another source.
 
 ## Instance Onboarding Keys
 
-The seven `INSTANCE_BOOTSTRAP_*` keys follow the same single-authority rule as
+The eight `INSTANCE_BOOTSTRAP_*` keys follow the same single-authority rule as
 every other value here. They come from the deployment environment or from the
 one selected secret authority, never from source defaults, appsettings
 fallbacks, or a second provider. A missing or unreadable key fails startup
 closed.
 
-They select an administrator; they don't authenticate one. The subject, DID,
-issuer pairing, and generation are selectors only. Actual privilege is granted
-only after a real sign-in presents the exact provider claim.
+The subject, DID, issuer pairing and generation are selectors, not authentication
+proof. External identities still require a real sign-in with the exact provider
+claim. Configured Local bootstrap additionally resolves
+`authentication.local.bootstrap_password` from
+`INSTANCE_BOOTSTRAP_LOCAL_PASSWORD` (Infisical `/api`); it is instance-only,
+bootstrap-classified and has no live-rotation path or source default.
+
+That secret creates only the initial temporary credential during incomplete
+setup. The native receipt coordinates Identity creation with application
+linkage, administrator grants and setup completion. Private first-use
+replacement and a fresh login are required before ordinary session authority.
+Completed-state reconciliation does not reread or replay leftover bootstrap
+passwords; use normal credential administration rather than editing this secret
+to reset an established account.
 
 Diagnostics stay value-free. Logs, health output, and support evidence carry
 status and reason codes, never the configured subject, DID, email, profile

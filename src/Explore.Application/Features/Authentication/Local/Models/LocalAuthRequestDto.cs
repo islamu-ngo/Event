@@ -3,7 +3,7 @@
 
 namespace Explore.Application.Features.Authentication.Local.Models;
 
-public sealed record LocalAuthRequestDto(string Email, string Password)
+public sealed record LocalAuthRequestDto(string Identifier, string Password)
 {
     public override string ToString() => nameof(LocalAuthRequestDto);
 }

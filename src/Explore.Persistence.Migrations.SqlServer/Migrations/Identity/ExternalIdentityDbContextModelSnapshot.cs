@@ -231,7 +231,9 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations.Identity
                         .HasName("pk_local_identity_users");
 
                     b.HasIndex("NormalizedEmail")
-                        .HasDatabaseName("ix_local_identity_users_normalized_email");
+                        .IsUnique()
+                        .HasDatabaseName("ix_local_identity_users_normalized_email")
+                        .HasFilter("[normalized_email] IS NOT NULL");
 
                     b.HasIndex("NormalizedUserName")
                         .IsUnique()

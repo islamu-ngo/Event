@@ -36,6 +36,13 @@ Application handlers manually instantiate FluentValidation validators, require L
 
 `LocalIdentityAuthService` owns password hashing, normalized-email uniqueness, UUIDv7 credential identities, failed-access counters, dummy verification for unknown accounts, and lockout. The Domain `User` remains the platform profile/authorization aggregate; `LocalIdentityUser` remains a credential record. Repositories continue returning Domain entities, not authentication DTOs.
 
+Local login consumes `identifier`, not the retired `email` request member.
+Address-shaped identifiers use native email lookup; usernames without `@` use
+native username lookup. Both resolve the same exact Local subject and existing
+application binding. An absent credential email remains nullable in successful
+authentication data and is omitted from JWT email claims, never replaced with
+a synthetic address.
+
 Local authentication decisions use closed `LocalAuthOutcome` and `LocalAuthFailure` enums. Failure
 factories reject undefined values and cannot carry session authority; successful
 results have no failure. Named factory construction identifies every field.
@@ -111,6 +118,29 @@ state cannot repopulate a revoked scope. These are activity-time checks, not a
 distributed transaction or immediate push invalidation of idle browser tabs.
 
 Local login carries `SuppressIdempotencyResponseStorage` and `PrivateNoStore` metadata. Every request must evaluate current admission policy, even when a client repeats an `Idempotency-Key`; the generic middleware must neither persist a token-bearing response nor replay a prior success. Browser cache headers alone do not disable application-level idempotency storage.
+
+## First-Run Local Enrollment
+
+`POST /api/InstanceOnboarding/complete-local` dispatches the Local onboarding
+command through the existing controller. Native SetupSecret authentication,
+incomplete setup, current Local-provider admission and native credential
+validation precede enrollment. The request carries an operation ID, username,
+temporary password, optional email/profile fields and the existing nonsecret
+settings contract. It cannot select the subject, grant, provider or session
+authority. Generic idempotency body/response storage is suppressed and responses
+are private/no-store.
+
+The core commits its selected-store receipt, application linkage, administrator
+grants and bootstrap finality before activating ChangeRequired credentials.
+Completion returns only `BaseCommandResponse<Guid>`, not a password, challenge
+or token. The browser uses the existing login, private replacement and fresh-login
+sequence. Authenticated external-provider completion remains a separate action.
+
+Onboarding status is private/no-store. Its nullable `pendingOperationId` is
+disclosed only to active native setup authority, allowing a fresh client to
+recover the exact interactive operation after a lost response. The `complete-local`
+HAL relation uses the same setup/Local/incomplete conditions. A new browser must
+reuse that discovered reference rather than reserve a competing operation.
 
 ## Administrative Credential Handover
 

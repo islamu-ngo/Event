@@ -14,6 +14,7 @@ public static partial class CanonicalEnvironmentCatalogue
         Identity,
         Keycloak,
         ConfiguredBootstrap,
+        LocalBootstrap,
         AtprotoBootstrap,
         Security,
         Infisical,
@@ -50,6 +51,8 @@ public static partial class CanonicalEnvironmentCatalogue
             Value = new(
                 new Dictionary<string, EnvironmentMetadataPolicy>(StringComparer.Ordinal)
                 {
+                ["ASPNETCORE_ENVIRONMENT"] = new(EnvironmentVariableCategory.Deployment, EnvironmentVariableSensitivity.Public, EnvironmentVariableRequirement.Optional, null, "deployment-setting", EnvironmentRestartBehavior.Process, ActivationPolicy.Deployment, StartupOwned: true),
+                ["DOTNET_ENVIRONMENT"] = new(EnvironmentVariableCategory.Deployment, EnvironmentVariableSensitivity.Public, EnvironmentVariableRequirement.Optional, null, "deployment-setting", EnvironmentRestartBehavior.Process, ActivationPolicy.Deployment, StartupOwned: true),
                 ["API_HTTP_PORT"] = new(EnvironmentVariableCategory.Deployment, EnvironmentVariableSensitivity.Public, EnvironmentVariableRequirement.Optional, null, "port-number", EnvironmentRestartBehavior.Deployment, ActivationPolicy.Deployment, StartupOwned: true),
                 ["UI_HTTP_PORT"] = new(EnvironmentVariableCategory.Deployment, EnvironmentVariableSensitivity.Public, EnvironmentVariableRequirement.Optional, null, "port-number", EnvironmentRestartBehavior.Deployment, ActivationPolicy.Deployment, StartupOwned: true),
                 ["KEYCLOAK_HTTP_PORT"] = new(EnvironmentVariableCategory.Identity, EnvironmentVariableSensitivity.Public, EnvironmentVariableRequirement.Optional, null, "port-number", EnvironmentRestartBehavior.Process, ActivationPolicy.Keycloak, StartupOwned: true),
@@ -148,9 +151,10 @@ public static partial class CanonicalEnvironmentCatalogue
                 ["INSTANCE_BOOTSTRAP_ADMIN_PROVIDER"] = new(EnvironmentVariableCategory.Identity, EnvironmentVariableSensitivity.Public, EnvironmentVariableRequirement.Required, null, "instance-bootstrap-provider", EnvironmentRestartBehavior.Process, ActivationPolicy.ConfiguredBootstrap, StartupOwned: true),
                 ["INSTANCE_BOOTSTRAP_ADMIN_SUBJECT"] = new(EnvironmentVariableCategory.Identity, EnvironmentVariableSensitivity.Sensitive, EnvironmentVariableRequirement.Required, null, "identity-subject", EnvironmentRestartBehavior.Process, ActivationPolicy.ConfiguredBootstrap, StartupOwned: true),
                 ["INSTANCE_BOOTSTRAP_BINDING_GENERATION"] = new(EnvironmentVariableCategory.Identity, EnvironmentVariableSensitivity.Public, EnvironmentVariableRequirement.Required, null, "positive-integer", EnvironmentRestartBehavior.Process, ActivationPolicy.ConfiguredBootstrap, StartupOwned: true),
-                ["INSTANCE_BOOTSTRAP_ADMIN_EMAIL"] = new(EnvironmentVariableCategory.Identity, EnvironmentVariableSensitivity.Sensitive, EnvironmentVariableRequirement.Required, null, "email-address", EnvironmentRestartBehavior.Process, ActivationPolicy.AtprotoBootstrap, StartupOwned: true),
-                ["INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME"] = new(EnvironmentVariableCategory.Identity, EnvironmentVariableSensitivity.Sensitive, EnvironmentVariableRequirement.Optional, null, "profile-name", EnvironmentRestartBehavior.Process, ActivationPolicy.AtprotoBootstrap, StartupOwned: true),
-                ["INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME"] = new(EnvironmentVariableCategory.Identity, EnvironmentVariableSensitivity.Sensitive, EnvironmentVariableRequirement.Optional, null, "profile-name", EnvironmentRestartBehavior.Process, ActivationPolicy.AtprotoBootstrap, StartupOwned: true),
+                ["INSTANCE_BOOTSTRAP_ADMIN_EMAIL"] = new(EnvironmentVariableCategory.Identity, EnvironmentVariableSensitivity.Sensitive, EnvironmentVariableRequirement.Optional, null, "email-address", EnvironmentRestartBehavior.Process, ActivationPolicy.ConfiguredBootstrap, StartupOwned: true),
+                ["INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME"] = new(EnvironmentVariableCategory.Identity, EnvironmentVariableSensitivity.Sensitive, EnvironmentVariableRequirement.Optional, null, "profile-name", EnvironmentRestartBehavior.Process, ActivationPolicy.ConfiguredBootstrap, StartupOwned: true),
+                ["INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME"] = new(EnvironmentVariableCategory.Identity, EnvironmentVariableSensitivity.Sensitive, EnvironmentVariableRequirement.Optional, null, "profile-name", EnvironmentRestartBehavior.Process, ActivationPolicy.ConfiguredBootstrap, StartupOwned: true),
+                ["INSTANCE_BOOTSTRAP_LOCAL_PASSWORD"] = new(EnvironmentVariableCategory.Identity, EnvironmentVariableSensitivity.Secret, EnvironmentVariableRequirement.Required, null, "identity-setting", EnvironmentRestartBehavior.Process, ActivationPolicy.LocalBootstrap, StartupOwned: true),
                 ["HOSTING_REPLICA_COUNT"] = new(EnvironmentVariableCategory.Deployment, EnvironmentVariableSensitivity.Public, EnvironmentVariableRequirement.Defaulted, "1", "positive-integer", EnvironmentRestartBehavior.Deployment, ActivationPolicy.Deployment, StartupOwned: true),
                 ["PROMOTIONS_CODE_LOOKUP_ACTIVE_KEY_VERSION"] = new(EnvironmentVariableCategory.Platform, EnvironmentVariableSensitivity.Public, EnvironmentVariableRequirement.Optional, null, "platform-setting", EnvironmentRestartBehavior.Process, ActivationPolicy.Platform, StartupOwned: true),
                 ["PROMOTIONS_CODE_LOOKUP_HMAC_KEY"] = new(EnvironmentVariableCategory.Security, EnvironmentVariableSensitivity.Secret, EnvironmentVariableRequirement.Optional, null, "security-setting", EnvironmentRestartBehavior.Process, ActivationPolicy.Security, StartupOwned: true),
@@ -434,6 +438,7 @@ public static partial class CanonicalEnvironmentCatalogue
         ActivationPolicy.Identity => EnvironmentActivationExpression.Feature("identity-config"),
         ActivationPolicy.Keycloak => EnvironmentActivationExpression.Feature("keycloak-config"),
         ActivationPolicy.ConfiguredBootstrap => EnvironmentActivationExpression.Feature("configured-bootstrap-config"),
+        ActivationPolicy.LocalBootstrap => EnvironmentActivationExpression.Feature("local-bootstrap-config"),
         ActivationPolicy.AtprotoBootstrap => EnvironmentActivationExpression.Feature("atproto-bootstrap-config"),
         ActivationPolicy.Security => EnvironmentActivationExpression.Feature("security-config"),
         ActivationPolicy.Infisical => EnvironmentActivationExpression.Feature("infisical-config"),

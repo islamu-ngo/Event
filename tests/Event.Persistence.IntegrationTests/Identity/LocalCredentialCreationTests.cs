@@ -73,7 +73,7 @@ public sealed class LocalCredentialCreationTests
             credentialStates: fixture.StateStore(scope));
 
         LocalAuthResponseDto login = await authentication.AuthenticateAsync(
-            new LocalAuthRequestDto(Email: request.Email, Password: result.TemporaryPassword!), fixture.CancellationToken);
+            new LocalAuthRequestDto(Identifier: request.Email, Password: result.TemporaryPassword!), fixture.CancellationToken);
 
         await Assert.That(string.IsNullOrEmpty(login.Token)).IsTrue();
         await Assert.That(login.Success).IsFalse();

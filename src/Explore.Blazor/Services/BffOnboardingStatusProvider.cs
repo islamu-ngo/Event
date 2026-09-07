@@ -144,7 +144,7 @@ public sealed class BffOnboardingStatusProvider : IBffOnboardingStatusProvider
         if (!isCompleted
             && string.Equals(state, "InteractivePending", StringComparison.Ordinal)
             && string.Equals(mode, "Interactive", StringComparison.Ordinal)
-            && string.IsNullOrEmpty(provider))
+            && (string.IsNullOrEmpty(provider) || provider is "Local" or "Keycloak" or "Atproto"))
         {
             return BffOnboardingDisposition.InteractivePending;
         }

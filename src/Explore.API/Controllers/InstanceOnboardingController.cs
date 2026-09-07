@@ -76,6 +76,7 @@ public class InstanceOnboardingController : EventControllerBase
     }
 
     [AllowAnonymous]
+    [PrivateNoStore]
     [EndpointClassification(EndpointClass.Public)]
     [HttpGet("status", Name = RouteNames.GetInstanceOnboardingStatus)]
     [EndpointSummary("Get Instance Onboarding Status")]
@@ -85,7 +86,7 @@ public class InstanceOnboardingController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<HalResource<InstanceOnboardingStatusDto>>> GetStatus(CancellationToken cancellationToken = default)
     {
-        var status = await _mediator.Send(new GetInstanceOnboardingStatusQuery(), cancellationToken);
+        var status = await _mediator.Send(new GetInstanceOnboardingStatusQuery { SetupPrincipal = User }, cancellationToken);
         var resource = await _statusAssembler.ToResource(status, HttpContext);
         return Ok(resource);
     }
@@ -185,6 +186,28 @@ public class InstanceOnboardingController : EventControllerBase
             "bootstrap_disabled");
 
         return Ok(response);
+    }
+
+    [Authorize(AuthenticationSchemes = Explore.Application.Constants.ApiAuthenticationSchemeNames.SetupSecret)]
+    [SetupSecretRequired(requireIncomplete: true)]
+    [EnableRateLimiting(RateLimitingExtensions.SetupSecretPolicy)]
+    [PrivateNoStore]
+    [SuppressIdempotencyResponseStorage]
+    [EndpointClassification(EndpointClass.Admin)]
+    [HttpPost("complete-local", Name = RouteNames.CompleteLocalInstanceOnboarding)]
+    [EndpointSummary("Complete Local Instance Onboarding")]
+    [EndpointDescription("Enrolls the initial Local administrator under setup authority. Private credential replacement is required before ordinary sign-in.")]
+    [ProducesResponseType(typeof(BaseCommandResponse<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status410Gone)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
+    public async Task<ActionResult<BaseCommandResponse<Guid>>> CompleteLocal(
+        [FromBody] CompleteLocalInstanceOnboardingRequestDto request, CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(new CompleteLocalInstanceOnboardingCommand(request, User), cancellationToken);
+        return response.IsSuccess ? Ok(response) : this.ToCommandValidationProblem(response, CompleteValidationProblem);
     }
 
     [AllowAnonymous]

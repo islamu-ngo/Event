@@ -102,6 +102,7 @@
                         <MudRadioGroup T="int"
                                        Value="CurrentPrimaryProviderId"
                                        ValueChanged="OnPrimaryProviderChanged"
+                                       Disabled="_submitState.IsSubmitting"
                                        aria-label="Primary authentication provider">
                             <MudRadio T="int"
                                       Value="LocalIdentityProviderId"
@@ -386,7 +387,7 @@
                     }
                     else
                     {
-                        @:Save & Continue to Login
+                        @(CurrentPrimaryProviderId == LocalIdentityProviderId ? "Save & Continue Setup" : "Save & Continue to Login")
                     }
                 </AppButton>
             </div>
@@ -668,8 +669,7 @@
         {
             AtprotoProviderId =>
                 $"/login?provider=atproto&returnUrl={Uri.EscapeDataString(returnPath)}",
-            LocalIdentityProviderId =>
-                $"/login?provider=local&returnUrl={Uri.EscapeDataString(returnPath)}",
+            LocalIdentityProviderId => returnPath,
             _ => returnPath
         };
         Navigation.NavigateTo(destination, forceLoad: true);

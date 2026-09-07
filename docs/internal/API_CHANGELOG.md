@@ -5,6 +5,28 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 ## 2026-09-07
 
+- **Breaking: Local sign-in accepts an identifier.** API and BFF Local login
+  requests use `identifier` instead of `email`, without a compatibility alias.
+  Usernames and email addresses resolve existing Local credentials; successful
+  identity data permits absent email, and JWTs omit the email claim when absent.
+- **Additive: setup-authorized Local administrator completion.**
+  `POST /api/InstanceOnboarding/complete-local`
+  (`CompleteLocalInstanceOnboarding`) accepts an operation ID, username,
+  temporary password, optional account email/profile fields and existing setup
+  settings. It requires native SetupSecret authority, incomplete setup and an
+  active Local provider. Completion returns no credential or session authority;
+  private replacement and fresh login remain required. Responses are
+  private/no-store and excluded from generic idempotency storage.
+  Onboarding status exposes `pendingOperationId` only to active setup authority,
+  and advertises `complete-local` through HAL for eligible setup.
+- **Breaking: managed Local administrators use existing identity references.**
+  Managed provisioning accepts `localIdentity.localSubjectId` instead of an
+  administrator invitation. Explicit directory-operator identity is carried
+  through validation and provisioning; credential email cannot supply it.
+  The referenced account's live global binding is checked without pinning
+  request replay to a password operation or security stamp. Provisioning links
+  tenant grants without issuing credentials or producing administrator email.
+
 - **Additive: instance-owned Local credential administration.** The following
   private/no-store operations require a current persisted instance-admin grant:
 

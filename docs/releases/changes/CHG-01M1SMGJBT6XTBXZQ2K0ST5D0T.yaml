@@ -1,0 +1,34 @@
+# ABOUTME: Records Local bootstrap and managed administrator linkage without required credential email.
+# ABOUTME: Documents setup authority, identifier login, schema changes, and operator recovery.
+Change-Id: CHG-01M1SMGJBT6XTBXZQ2K0ST5D0T
+Title: bootstrap and link Local administrators without email
+Type: feat
+Scope: onboarding
+Summary: Use setup-finality and explicit Local identity references for initial and managed tenant administration while keeping temporary passwords out of durable application requests.
+Group: email-optional-self-hosting
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: Local sign-in accepts Identifier instead of Email; managed provisioning requires explicit operator identity and existing Local references instead of administrator invitations.
+  Security:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented
+    Detail: Native setup authority and active Local admission govern enrollment; exact linkage and setup finality precede private replacement and ordinary session authority.
+  Migration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: Generated LocalAdministratorBootstrap migrations enforce unique non-null normalized email and permit Local bootstrap provider state in both Identity topologies.
+  Configuration:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Detail: INSTANCE_BOOTSTRAP_LOCAL_PASSWORD is an instance-only bootstrap secret with no default or live-rotation path; Compose forwards bootstrap inputs only to the API.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: Contracts add setup-authorized Local completion and pending-operation discovery, nullable email data, Identifier login and existing Local administrator references.
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: Initial Local administrators use private first-use replacement and fresh login; interrupted setup reuses its discovered operation and completed setup cannot be replayed.

@@ -61,6 +61,10 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
     private ILoggerProvider? _logCapture;
     private IdentityDatabaseTopology _identityTopology = IdentityDatabaseTopology.Colocated;
     private string? _identityConnectionString;
+    private bool _incompleteSetup;
+    private bool _enableRateLimiting;
+
+    public string SetupSecret { get; } = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
     private LocalAdmissionWebApplicationFactory(AuthenticationProviderKind primaryProvider)
     {
@@ -87,16 +91,22 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         AuthenticationProviderKind primaryProvider = AuthenticationProviderKind.Local,
         IInterceptor? persistenceInterceptor = null,
         ILoggerProvider? logCapture = null,
-        IdentityDatabaseTopology identityTopology = IdentityDatabaseTopology.Colocated)
+        IdentityDatabaseTopology identityTopology = IdentityDatabaseTopology.Colocated,
+        bool incompleteSetup = false,
+        bool enableRateLimiting = false)
     {
         var factory = new LocalAdmissionWebApplicationFactory(primaryProvider)
         {
             _persistenceInterceptor = persistenceInterceptor,
             _logCapture = logCapture,
-            _identityTopology = identityTopology
+            _identityTopology = identityTopology,
+            _incompleteSetup = incompleteSetup,
+            _enableRateLimiting = enableRateLimiting
         };
         try
         {
+            if (incompleteSetup)
+                factory.SetEnvironment("SETUP_SECRET", factory.SetupSecret);
             await factory.SeedDatabaseAsync();
             if (identityTopology == IdentityDatabaseTopology.External)
             {
@@ -138,7 +148,8 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
                 ["SETUP_SECRET_FILE"] = _databasePath + ".setup",
                 ["OutboxProcessor:Enabled"] = "false",
                 ["EmailDispatchProcessor:Enabled"] = "false",
-                ["Testing:SkipJwtAuthorityWarmup"] = "true"
+                ["Testing:SkipJwtAuthorityWarmup"] = "true",
+                ["RateLimiting:DisableInTesting"] = _enableRateLimiting ? "false" : "true"
             };
             if (_primaryProvider == AuthenticationProviderKind.Keycloak)
             {
@@ -149,6 +160,12 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
             else if (_primaryProvider == AuthenticationProviderKind.Atproto)
             {
                 settings["Authentication:AtprotoLoginEnabled"] = "true";
+            }
+            else if (_incompleteSetup)
+            {
+                settings["Keycloak:Authority"] = null;
+                settings["Keycloak:MetadataAddress"] = null;
+                settings["PublicBaseUrl"] = "https://example.test";
             }
 
             configuration.AddInMemoryCollection(settings);
@@ -431,7 +448,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         applicationUser.EmailVerified = emailConfirmed;
         await database.SaveChangesAsync();
 
-        return new LocalAuthRequestDto(Email: email, Password: password);
+        return new LocalAuthRequestDto(Identifier: email, Password: password);
     }
 
     public override async ValueTask DisposeAsync()
@@ -524,8 +541,11 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
             id: Guid.CreateVersion7(),
             deploymentMode: DeploymentMode.SingleTenant,
             createdAt: now);
-        bootstrap.CompleteInteractive(completedByUserId: bootstrapUser.Id, completedAt: now);
-        database.InstanceBootstrapStates.Add(bootstrap);
+        if (!_incompleteSetup)
+        {
+            bootstrap.CompleteInteractive(completedByUserId: bootstrapUser.Id, completedAt: now);
+            database.InstanceBootstrapStates.Add(bootstrap);
+        }
         database.SystemSettings.Add(new SystemSetting
         {
             Id = Guid.CreateVersion7(),

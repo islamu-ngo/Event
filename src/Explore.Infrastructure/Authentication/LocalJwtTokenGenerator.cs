@@ -76,7 +76,6 @@ internal sealed class LocalJwtTokenGenerator(
         {
             new(JwtRegisteredClaimNames.Sub, subject.Authority.LocalSubjectId.ToString("D")),
             new(LocalSessionToken.SecurityStampClaim, subject.Authority.SecurityStamp),
-            new(JwtRegisteredClaimNames.Email, subject.Email),
             new(JwtRegisteredClaimNames.GivenName, subject.FirstName),
             new(JwtRegisteredClaimNames.FamilyName, subject.LastName),
             new("email_verified", subject.Authority.EmailVerified ? "true" : "false", ClaimValueTypes.Boolean),
@@ -87,6 +86,8 @@ internal sealed class LocalJwtTokenGenerator(
                 issuedAt.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture),
                 ClaimValueTypes.Integer64)
         };
+        if (subject.Email is not null)
+            claims.Add(new Claim(JwtRegisteredClaimNames.Email, subject.Email));
         claims.AddRange(subject.Roles.Select(role => new Claim("roles", role)));
 
         var token = new JwtSecurityToken(

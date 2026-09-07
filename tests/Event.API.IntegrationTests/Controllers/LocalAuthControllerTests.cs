@@ -25,7 +25,7 @@ public sealed class LocalAuthControllerTests
         LocalAuthController controller = CreateController(sender);
 
         ActionResult<LocalAuthResponseDto> result = await controller.Login(
-            new LocalAuthRequestDto(Email: "admin@example.test", Password: CreateOpaqueValue()), CancellationToken.None);
+            new LocalAuthRequestDto(Identifier: "admin@example.test", Password: CreateOpaqueValue()), CancellationToken.None);
 
         var response = (result.Result as OkObjectResult)?.Value as LocalAuthResponseDto;
         await Assert.That(response).IsNotNull();
@@ -55,7 +55,7 @@ public sealed class LocalAuthControllerTests
         LocalAuthController controller = CreateController(sender);
 
         ActionResult<LocalAuthResponseDto> result = await controller.Login(
-            new LocalAuthRequestDto(Email: "admin@example.test", Password: CreateOpaqueValue()),
+            new LocalAuthRequestDto(Identifier: "admin@example.test", Password: CreateOpaqueValue()),
             CancellationToken.None);
 
         var ok = result.Result as OkObjectResult;
@@ -83,7 +83,7 @@ public sealed class LocalAuthControllerTests
         string password = CreateOpaqueValue();
 
         ActionResult<LocalAuthResponseDto> result = await controller.Login(
-            new LocalAuthRequestDto(Email: "admin@example.test", Password: password),
+            new LocalAuthRequestDto(Identifier: "admin@example.test", Password: password),
             CancellationToken.None);
 
         var problemResult = result.Result as ObjectResult;

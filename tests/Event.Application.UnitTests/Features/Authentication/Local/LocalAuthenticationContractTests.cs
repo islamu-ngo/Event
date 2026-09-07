@@ -5,6 +5,9 @@ using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Features.Authentication.Local.Validators;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.DTOs.Onboarding;
+using Explore.Application.DTOs.Onboarding.Validators;
+using Explore.Domain.Enums;
 using System.Security.Cryptography;
 using System.Text.Json;
 
@@ -125,15 +128,79 @@ public sealed class LocalAuthenticationContractTests
     }
 
     [Test]
+    [Arguments("operator")]
+    [Arguments("operator.name-1")]
+    [Arguments("operator@example.test")]
+    public async Task LoginValidatorAcceptsBoundedUsernameOrEmail(string identifier)
+    {
+        var result = await new LocalAuthRequestDtoValidator().ValidateAsync(
+            new LocalAuthRequestDto(identifier, $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(32))}"));
+        await Assert.That(result.IsValid).IsTrue();
+    }
+
+    [Test]
+    [Arguments("invalid@")]
+    [Arguments("@example.test")]
+    [Arguments("operator name")]
+    [Arguments("operator\nname")]
+    [Arguments("")]
+    public async Task LoginValidatorRejectsInvalidIdentifiers(string identifier)
+    {
+        var result = await new LocalAuthRequestDtoValidator().ValidateAsync(
+            new LocalAuthRequestDto(identifier, $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(32))}"));
+        await Assert.That(result.IsValid).IsFalse();
+    }
+
+    [Test]
+    public async Task LocalSetupValidatorPreservesOptionalEmailAndSeparateLegalIdentity()
+    {
+        var request = new CompleteLocalInstanceOnboardingRequestDto
+        {
+            OperationId = Guid.CreateVersion7(), Username = $"operator-{Guid.CreateVersion7():N}",
+            TemporaryPassword = $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(32))}",
+            Settings = new CompleteInstanceOnboardingRequest
+            {
+                DeploymentMode = DeploymentMode.MultiTenant,
+                SiteProfile = new SelfHostOnboardingProfileDto { SiteName = "Local operator" }
+            }
+        };
+        var validator = new CompleteLocalInstanceOnboardingRequestDtoValidator();
+        await Assert.That((await validator.ValidateAsync(request)).IsValid).IsTrue();
+        var invalid = new[]
+        {
+            request with { OperationId = Guid.Empty },
+            request with { Username = "operator@example.test" },
+            request with { Username = new string('x', 257) },
+            request with { Email = "invalid@" },
+            request with { Email = string.Empty },
+            request with { TemporaryPassword = new string('x', 129) },
+            request with { Settings = request.Settings with { DeploymentMode = DeploymentMode.SingleTenant } }
+        };
+        foreach (var item in invalid)
+        {
+            var result = await validator.ValidateAsync(item);
+            await Assert.That(result.IsValid).IsFalse();
+            await Assert.That(result.Errors.Any(error => error.ErrorMessage.Contains(request.TemporaryPassword, StringComparison.Ordinal))).IsFalse();
+        }
+        await Assert.That(request.ToString().Contains(request.TemporaryPassword, StringComparison.Ordinal)
+            || request.ToString().Contains(request.Username, StringComparison.Ordinal)).IsFalse();
+        using JsonDocument json = JsonSerializer.SerializeToDocument(request, JsonSerializerOptions.Web);
+        await Assert.That(json.RootElement.GetProperty("email").ValueKind).IsEqualTo(JsonValueKind.Null);
+        using JsonDocument login = JsonSerializer.SerializeToDocument(new LocalAuthRequestDto(request.Username, request.TemporaryPassword), JsonSerializerOptions.Web);
+        await Assert.That(login.RootElement.GetProperty("identifier").GetString()).IsEqualTo(request.Username);
+        await Assert.That(login.RootElement.TryGetProperty("email", out _)).IsFalse();
+    }
+
+    [Test]
     public async Task LoginValidatorRejectsMalformedCredentials()
     {
-        var request = new LocalAuthRequestDto("not-an-email", string.Empty);
+        var request = new LocalAuthRequestDto("invalid@", string.Empty);
 
         var result = await new LocalAuthRequestDtoValidator().ValidateAsync(request);
 
         await Assert.That(result.IsValid).IsFalse();
         await Assert.That(result.Errors.Select(error => error.PropertyName))
-            .Contains(nameof(LocalAuthRequestDto.Email));
+            .Contains(nameof(LocalAuthRequestDto.Identifier));
         await Assert.That(result.Errors.Select(error => error.PropertyName))
             .Contains(nameof(LocalAuthRequestDto.Password));
     }
@@ -165,7 +232,7 @@ public sealed class LocalAuthenticationContractTests
     {
         string email = $"request-{Guid.CreateVersion7():N}@example.test";
         string password = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-        var request = new LocalAuthRequestDto(Email: email, Password: password);
+        var request = new LocalAuthRequestDto(Identifier: email, Password: password);
 
         string diagnostic = request.ToString();
 

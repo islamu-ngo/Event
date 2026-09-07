@@ -151,6 +151,14 @@ public static class EventBffRequestPolicy
 
     public static bool RequiresSetupSecret(string method, PathString path)
     {
+        if (HttpMethods.IsGet(method)
+                && string.Equals(path.Value, "/api/instanceonboarding/status", StringComparison.OrdinalIgnoreCase)
+            || HttpMethods.IsPost(method)
+                && string.Equals(path.Value, "/api/instanceonboarding/complete-local", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
         if (HttpMethods.IsPatch(method)
             && (string.Equals(
                     path.Value,

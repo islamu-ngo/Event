@@ -22,7 +22,9 @@ public sealed class LocalJwtTokenGeneratorTests
         new(2026, 9, 4, 15, 0, 0, TimeSpan.Zero);
 
     [Test]
-    public async Task GeneratedTokenIsSignedAndCarriesBoundedLocalIdentityClaims()
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task GeneratedTokenIsSignedAndCarriesBoundedLocalIdentityClaims(bool emailVerified)
     {
         byte[] key = RandomNumberGenerator.GetBytes(64);
         var resolver = CreateResolver(Convert.ToBase64String(key));
@@ -33,13 +35,15 @@ public sealed class LocalJwtTokenGeneratorTests
                 AccessTokenLifetimeMinutes = 30
             }),
             new FixedTimeProvider(Now));
+        string securityStamp = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        var authority = new LocalSessionAuthority(
+            localSubjectId: Guid.CreateVersion7(), securityStamp: securityStamp, emailVerified: emailVerified);
         var subject = new LocalJwtTokenSubject(
-            Guid.Parse("01990aa7-4c67-7fb8-a303-8b301cc615af"),
-            "admin@example.test",
-            "Site",
-            "Administrator",
-            true,
-            ["Admin", "Organizer"]);
+            authority: authority,
+            email: "admin@example.test",
+            firstName: "Site",
+            lastName: "Administrator",
+            roles: ["Admin", "Organizer"]);
 
         LocalIssuedToken issued = await generator.GenerateAsync(
             subject,
@@ -67,10 +71,16 @@ public sealed class LocalJwtTokenGeneratorTests
             out _);
 
         await Assert.That(principal.FindFirstValue(JwtRegisteredClaimNames.Sub))
-            .IsEqualTo(subject.UserId.ToString("D"));
+            .IsEqualTo(subject.Authority.LocalSubjectId.ToString("D"));
+        Claim[] sessionStampClaims = principal.FindAll(LocalSessionToken.SecurityStampClaim).ToArray();
+        await Assert.That(sessionStampClaims.Length == 1
+            && string.Equals(sessionStampClaims[0].Value, securityStamp, StringComparison.Ordinal)).IsTrue();
+        await Assert.That(principal.HasClaim(claim => claim.Type == LocalCredentialChallengeToken.SecurityStampClaim)).IsFalse();
         await Assert.That(principal.FindFirstValue("auth_provider"))
             .IsEqualTo(AuthenticationProviderKind.Local.ToString().ToLowerInvariant());
-        await Assert.That(principal.FindFirstValue("email_verified")).IsEqualTo("true");
+        Claim[] verificationClaims = principal.FindAll("email_verified").ToArray();
+        await Assert.That(verificationClaims.Length == 1
+            && verificationClaims[0].Value == (emailVerified ? "true" : "false")).IsTrue();
         await Assert.That(principal.FindAll("roles").Select(claim => claim.Value))
             .IsEquivalentTo(["Admin", "Organizer"]);
         await Assert.That(issued.ExpiresAt).IsEqualTo(Now.AddMinutes(30));
@@ -93,12 +103,14 @@ public sealed class LocalJwtTokenGeneratorTests
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             generator.GenerateAsync(
                 new LocalJwtTokenSubject(
-                    Guid.CreateVersion7(),
-                    "admin@example.test",
-                    "Site",
-                    "Administrator",
-                    false,
-                    []),
+                    authority: new LocalSessionAuthority(
+                        localSubjectId: Guid.CreateVersion7(),
+                        securityStamp: Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),
+                        emailVerified: false),
+                    email: "admin@example.test",
+                    firstName: "Site",
+                    lastName: "Administrator",
+                    roles: []),
                 CancellationToken.None));
     }
 

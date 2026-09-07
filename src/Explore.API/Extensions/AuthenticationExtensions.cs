@@ -11,6 +11,7 @@ using Explore.API.Authentication;
 using Explore.API.Configuration;
 using Explore.API.ExceptionHandling;
 using Explore.API.Mcp;
+using Explore.Application.Authentication;
 using Explore.Application.Authorization;
 using Explore.Application.Configuration;
 using Explore.Application.Constants;
@@ -208,8 +209,13 @@ public static class AuthenticationExtensions
             {
                 options.MapInboundClaims = false;
                 options.RequireHttpsMetadata = false;
+                options.IncludeErrorDetails = false;
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
+                    AuthenticationType = ApiAuthenticationSchemeNames.LocalIdentity,
+                    RequireSignedTokens = true,
+                    ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
+                    ValidTypes = ["JWT"],
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = new SymmetricSecurityKey(
                         ResolveLocalIdentityValidationKey(configuration)),
@@ -222,7 +228,55 @@ public static class AuthenticationExtensions
                     NameClaimType = JwtRegisteredClaimNames.Email,
                     RoleClaimType = "roles"
                 };
+                options.Events = new JwtBearerEvents
+                {
+                    OnTokenValidated = async context =>
+                    {
+                        CancellationToken cancellationToken = context.HttpContext.RequestAborted;
+                        cancellationToken.ThrowIfCancellationRequested();
+                        LocalSessionAuthority? authority = context.Principal?.TryGetLocalSessionAuthority();
+                        if (authority is null)
+                        {
+                            context.Fail("Local session authority is invalid.");
+                            return;
+                        }
+                        var authentication = context.HttpContext.RequestServices.GetRequiredService<ILocalIdentityAuthService>();
+                        LocalSessionValidationOutcome outcome = await authentication.ValidateSessionAsync(authority, cancellationToken)
+                            .ConfigureAwait(false);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (outcome != LocalSessionValidationOutcome.Valid)
+                        {
+                            context.Fail("Local session authority is invalid.");
+                        }
+                    }
+                };
             })
+            .AddScheme<JwtBearerOptions, LocalCredentialReplacementHandler>(
+                ApiAuthenticationSchemeNames.LocalCredentialReplacement, options =>
+                {
+                    options.MapInboundClaims = false;
+                    options.RequireHttpsMetadata = false;
+                    options.IncludeErrorDetails = false;
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        AuthenticationType = ApiAuthenticationSchemeNames.LocalCredentialReplacement,
+                        ValidateIssuerSigningKey = true,
+                        IssuerSigningKey = new SymmetricSecurityKey(ResolveLocalIdentityValidationKey(configuration)),
+                        RequireSignedTokens = true,
+                        ValidAlgorithms = [LocalCredentialChallengeToken.RequiredAlgorithm],
+                        ValidTypes = [LocalCredentialChallengeToken.TokenType],
+                        ValidateIssuer = true,
+                        ValidIssuer = LocalIdentityOptions.Issuer,
+                        ValidateAudience = true,
+                        ValidAudience = LocalCredentialChallengeToken.Audience,
+                        AudienceValidator = (audiences, _, _) =>
+                            audiences?.ToArray() is [var audience]
+                            && string.Equals(audience, LocalCredentialChallengeToken.Audience, StringComparison.Ordinal),
+                        ValidateLifetime = true,
+                        RequireExpirationTime = true,
+                        ClockSkew = TimeSpan.Zero
+                    };
+                })
             .AddScheme<ApiKeyAuthenticationOptions, ApiKeyAuthenticationHandler>(
                 ApiAuthenticationSchemeNames.ApiKey,
                 options =>

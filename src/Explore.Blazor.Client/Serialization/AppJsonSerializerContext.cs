@@ -23,6 +23,13 @@ namespace Explore.Blazor.Client.Serialization;
     WriteIndented = false,
     AllowTrailingCommas = true)]
 [JsonSerializable(typeof(JsonElement))]
+[JsonSerializable(typeof(HalResourceOfControlPlaneOverviewDto))]
+[JsonSerializable(typeof(HalCollectionResourceOfLocalIdentitySummary))]
+[JsonSerializable(typeof(HalResourceOfLocalIdentitySummary))]
+[JsonSerializable(typeof(HalResourceOfLocalCredentialIssueDto))]
+[JsonSerializable(typeof(HalResourceOfLocalCredentialOperationStatus))]
+[JsonSerializable(typeof(CreateLocalIdentityRequestDto))]
+[JsonSerializable(typeof(ResetLocalCredentialRequestDto))]
 [JsonSerializable(typeof(ActorDto))]
 [JsonSerializable(typeof(ActorListDto))]
 [JsonSerializable(typeof(ActorTypeDto))]

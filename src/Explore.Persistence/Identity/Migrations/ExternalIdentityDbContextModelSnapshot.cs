@@ -23,6 +23,88 @@ namespace Explore.Persistence.Identity.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Explore.Persistence.Identity.LocalIdentityCredentialOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("ExternalLoginId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("external_login_id");
+
+                    b.Property<Guid>("InitiatingApplicationUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("initiating_application_user_id");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("LocalSubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("local_subject_id");
+
+                    b.Property<Guid>("PersonalActorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("personal_actor_id");
+
+                    b.Property<Guid?>("PreviousOperationConcurrencyStamp")
+                        .HasColumnType("uuid")
+                        .HasColumnName("previous_operation_concurrency_stamp");
+
+                    b.Property<Guid?>("PreviousOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("previous_operation_id");
+
+                    b.Property<string>("ResetReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("reset_reason");
+
+                    b.Property<int>("Stage")
+                        .HasColumnType("integer")
+                        .HasColumnName("stage");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<DateTime>("VerifiedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("verified_at");
+
+                    b.Property<Guid>("VerifiedByApplicationUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("verified_by_application_user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_local_identity_credential_operation");
+
+                    b.HasIndex("LocalSubjectId")
+                        .HasDatabaseName("ix_local_identity_credential_operation_local_subject_id");
+
+                    b.ToTable("local_identity_credential_operation", "islamu_identity", t =>
+                        {
+                            t.HasCheckConstraint("ck_local_credential_operation_kind", "kind BETWEEN 1 AND 2");
+
+                            t.HasCheckConstraint("ck_local_credential_operation_reset_metadata", "(kind = 1 AND previous_operation_id IS NULL AND previous_operation_concurrency_stamp IS NULL AND reset_reason IS NULL) OR (kind = 2 AND previous_operation_id IS NOT NULL AND previous_operation_id <> id AND previous_operation_concurrency_stamp IS NOT NULL AND reset_reason IS NOT NULL AND TRIM(reset_reason) <> '' AND stage <> 1)");
+
+                            t.HasCheckConstraint("ck_local_credential_operation_stage", "stage BETWEEN 1 AND 5");
+
+                            t.HasCheckConstraint("ck_local_credential_operation_timestamps", "((kind = 1 AND verified_at >= created_at) OR (kind = 2 AND verified_at <= created_at)) AND (updated_at IS NULL OR updated_at >= created_at)");
+                        });
+                });
+
             modelBuilder.Entity("Explore.Persistence.Identity.LocalIdentityRole", b =>
                 {
                     b.Property<Guid>("Id")
@@ -294,6 +376,16 @@ namespace Explore.Persistence.Identity.Migrations
                         .HasName("pk_identity_user_tokens");
 
                     b.ToTable("identity_user_tokens", "islamu_identity");
+                });
+
+            modelBuilder.Entity("Explore.Persistence.Identity.LocalIdentityCredentialOperation", b =>
+                {
+                    b.HasOne("Explore.Persistence.Identity.LocalIdentityUser", null)
+                        .WithMany()
+                        .HasForeignKey("LocalSubjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_local_identity_credential_operation_local_ident_082ba06f3f19");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>

@@ -132,6 +132,7 @@ public static class BlazorHostApplicationExtensions
         pipeline.UseHttpsRedirection();
         pipeline.UseStartupRedirectMiddleware(app);
         pipeline.UsePathTenantResolverMiddleware();
+        pipeline.UseLocalCredentialPrivacyHeaders();
         pipeline.UseRouting();
         pipeline.UseAuthentication();
         pipeline.UseAdmissionCheckInBffTransport();

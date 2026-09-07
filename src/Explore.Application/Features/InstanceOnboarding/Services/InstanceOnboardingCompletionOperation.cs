@@ -260,6 +260,24 @@ public sealed class InstanceOnboardingCompletionOperation(
                 "Configured administrator claim did not match.");
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
+        List<UserExternalLogin> currentLogins = await externalLoginRepository.GetByUser(input.UserId);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (currentLogins.Any(login => login.AuthenticationProviderId == (int)AuthenticationProviderKind.Local))
+        {
+            UserExternalLogin? configuredLogin = await externalLoginRepository.GetByProviderAndKey(
+                command.AuthenticatedAccount);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (configuredLogin is null || configuredLogin.UserId != input.UserId
+                || configuredLogin.AuthenticationProviderId != (int)command.AuthenticatedAccount.ProviderKind
+                || !string.Equals(configuredLogin.ProviderKey, command.AuthenticatedAccount.Value, StringComparison.Ordinal))
+            {
+                return ConfiguredTerminal(
+                    code: "configured_administrator_claim_conflict",
+                    message: "Configured administrator claim requires a current explicit account binding.");
+            }
+        }
+
         if (bootstrap?.Status == InstanceBootstrapStatus.Completed)
         {
             bool sameClaim = bootstrap.Mode == InstanceBootstrapMode.ConfiguredAdministrator

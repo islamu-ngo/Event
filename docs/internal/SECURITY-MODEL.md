@@ -86,6 +86,19 @@ The process boundary changes, but the trust boundary does not. The bridge is res
 
 ### Cookie-to-API token conversion
 
+Local browser authority is not established by cookie expiry alone. Before cookie
+acceptance and subsequent interactive activity, the BFF privately probes the
+existing current-user API with the original Local token and requires the returned
+subject to match. Native API validation checks current credential state, stamp,
+verification fact and binding. Circuit checks retain the original session and
+compare the live provider markers again after awaiting the probe. Rejection makes
+the circuit anonymous and prevents dispatch; scoped token revocation cannot
+resurrect from a stale handshake or a newer same-user session. Cleanup deletes only
+the original subject/session partition, never all sessions when that pair is
+missing. Cancellation is checked before rejection mutates claims or cached state.
+This is request/activity-time admission, not a transactional authorization fence
+or push notification to idle tabs; see [Local browser session authority](AUTHENTICATION.md#local-browser-session-authority).
+
 For an authenticated BFF browser request in either Topology, the flow is:
 
 1. The browser sends an HttpOnly BFF cookie to the BFF; it never receives the access token.

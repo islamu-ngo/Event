@@ -1677,3 +1677,259 @@ uninitializable.
 - [ ] Stays in journal only (one-off debugging lesson)
 
 ---
+
+[2026-09-06 Europe/Brussels] — Fresh roles do not make cached identity links current
+
+**Context**: Administrative Local credential reconciliation checks current database platform roles before creating the application account. Review traced the identity resolution that precedes that role check.
+
+**Symptom / Observation**: A native SQLite regression warmed `AdminContext` with an external login linked to an administrator, removed that exact login through another scope, and retained the user's platform role. Identity resolution still returned the former user and reconciliation passed its authority check. The test failed before the fix and passes in the seventeen-case binding suite.
+
+**Root Cause**: `AdminContext.ResolveUserIdAsync` cached successful provider-account mappings for ten minutes. Its user invalidation removed role-profile keys, not the resolved-identity key. An uncached role query therefore checked a current grant for a stale identity mapping.
+
+**Resolution**: Remove only resolved-identity caching and reuse the existing exact, no-tracking provider-account lookup on each resolution. Keep canonical principal parsing and role-profile caches separate. Verify with `dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --treenode-filter "/*/*/*LocalCredentialBindingTests/*"`. The compiled native suite passed17/17 with zero skips; no general role-cache or concurrent revocation linearizability guarantee is implied.
+
+**Why This Matters for Future Work**: Current authorization requires both a current identity binding and a current grant. Rechecking one cannot compensate for caching the other. Test revocation after warming real caches, not only first-request denial.
+
+**References**:
+- `src/Explore.Infrastructure/Identity/AdminContext.cs:73`
+- `src/Explore.Persistence/Repositories/UserExternalLoginRepository.cs:24`
+- `src/Explore.Application/Features/Authentication/Local/Handlers/Commands/ReconcileLocalCredentialOperationCommandHandler.cs:72`
+- `tests/Event.Persistence.IntegrationTests/Identity/LocalCredentialBindingTests.cs:173`
+- `docs/internal/AUTHENTICATION.md`
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/internal/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for a path-scoped rule
+- [x] Candidate for skill update: `auth-patterns`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [ ] Stays in journal only (one-off debugging lesson)
+
+---
+
+[2026-09-06 Europe/Brussels] — Identity guards belong in the transaction granting authority
+
+**Context**: Local/external account isolation added fresh ownership checks to user synchronization. Configured administrator claims were also traced because they can finish before ordinary synchronization runs.
+
+**Symptom / Observation**: All twenty-five ordinary synchronization cases passed, but two additional native configured-provider tests reproduced existing-account adoption and an administrator claim succeeding after its exact external link was removed. A legitimate exact-link configured claim passed in the same fixture.
+
+**Root Cause**: Synchronization captured a provider link and selected its User ID, then called a configured-claim operation that owned a separate transaction. That operation could grant administrator authority or return completed-replay effects before the ordinary synchronization transaction rechecked ownership. Unlinked claims also accepted a DTO-selected existing User ID.
+
+**Resolution**: Unlinked configured synchronization allocates a fresh server UUID. `InstanceOnboardingCompletionOperation.AdmitConfiguredAsync` verifies current Local ownership and exact provider/account/User binding inside the transaction that can grant authority, before its completed-replay branch. Tests use the real configured provider and startup preparation to establish valid fingerprints, not substituted claim success. The compiled native `LocalIdentitySynchronizationTests` suite passes28/28, and the existing configured-bootstrap suite passes11/11, both with zero skips.
+
+**Why This Matters for Future Work**: A correct preflight or later transaction cannot protect an earlier independently committed write. Trace nested operations and early returns, put the guard in the authority-owning transaction, and test with valid upstream authority so a missing fixture prerequisite cannot conceal the vulnerability.
+
+**References**:
+- `src/Explore.Application/Features/Users/Handlers/Commands/SyncUserCommandHandler.cs:98`
+- `src/Explore.Application/Features/InstanceOnboarding/Services/InstanceOnboardingCompletionOperation.cs:263`
+- `tests/Event.API.IntegrationTests/Features/LocalIdentitySynchronizationTests.cs`
+- `tests/Event.API.IntegrationTests/Features/ConfiguredAdministratorBootstrapTests.cs`
+- `docs/internal/AUTHENTICATION.md`
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/internal/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for a path-scoped rule
+- [x] Candidate for skill update: `auth-patterns`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [ ] Stays in journal only (one-off debugging lesson)
+
+---
+
+[2026-09-06 Europe/Brussels] — A password proof must retain its credential version
+
+**Context**: First-use Local credentials move from ChangeRequired to Ready while replacing the native password hash and security stamps in one selected Identity transaction.
+
+**Symptom / Observation**: Twenty-six native replacement cases passed, but independent review found a missing interleaving. A login verified the temporary password and paused before reading lifecycle state. Another request completed real replacement. The first login then observed Ready and issued an ordinary token from its stale password proof. Deterministic tests reproduced this in both colocated and external Identity layouts.
+
+**Root Cause**: The fresh state read was not bound to the version of the credential used for password verification. The expected-stamp guard existed only inside the ChangeRequired branch, so a concurrent transition to Ready bypassed it. Fresh state alone was insufficient.
+
+**Resolution**: Capture the user security stamp immediately after password verification. Require it in the shared state-read method and read state plus current stamp through one untracked SQL join. Reject an ordinal mismatch before accepting either state; never reload a newer stamp and retain the older password proof. The two race tests failed before the fix; all twenty-eight native first-use cases now pass with zero skips, including actual replacement, independent scopes and the state-query barrier.
+
+**Why This Matters for Future Work**: Authentication evidence and the state authorizing its use must describe the same credential version. This is an initial-admission invariant, separate from revoking already-issued sessions. A passing replacement transaction suite cannot substitute for testing authentication concurrently with that transition.
+
+**References**:
+- `src/Explore.Persistence/Identity/LocalIdentityAuthService.cs`
+- `src/Explore.Persistence/Identity/LocalIdentityCredentialStateStore.cs`
+- `tests/Event.Persistence.IntegrationTests/Identity/LocalCredentialFirstUseTests.cs`
+- `docs/internal/AUTHENTICATION.md`
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/internal/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for a path-scoped rule
+- [x] Candidate for skill update: `auth-patterns`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [ ] Stays in journal only (one-off debugging lesson)
+
+---
+
+[2026-09-06 Europe/Brussels] — Rejected provider identity must not recover authority through GUID fallback
+
+**Context**: The dedicated Local password-replacement HTTP tests included ordinary authenticated user synchronization as a positive control. That exposed Local issuer reconstruction incorrectly using OIDC URL parsing.
+
+**Symptom / Observation**: Correcting Local provider reconstruction made its invalid issuer return null. Independent review then found that administrator resolution and claims transformation interpreted this null as permission to use the raw subject GUID. Two real native tests seeded an administrator without an external binding and reproduced both resolved administrator identity and administrative claim enrichment from an externally classified principal asserting the Local provider name.
+
+**Root Cause**: Provider rejection and provider absence shared the same nullable outcome, while downstream consumers retained a separate platform-GUID fallback. Tightening one parser unintentionally widened authority in those consumers. Testing only the rejected provider projection missed the later fallback.
+
+**Resolution**: The canonical platform-ID reader now validates Local authority before its generic GUID chain, reusing the exact Local issuer and canonical nonempty subject checks. Invalid Local authority returns null terminally; valid Local authority returns only its canonical subject, regardless of alternative name-identifier, session or internal-ID claims. No consumer-specific guards were added. Both native exploit tests failed before the fix; the final 29 HTTP/native-consumer cases and 73 principal cases pass without skips. The dedicated replacement route uses native JWT validation and typed command outcomes, and does not issue a session.
+
+**Why This Matters for Future Work**: A stricter parser is not automatically a stricter authorization flow. Trace every consumer of a rejected identity through all fallback branches, and test with a genuinely privileged victim account and no binding so an empty fixture cannot conceal the issue. This bounded correction preserves non-Local behavior; it is not a general audit of every provider fallback.
+
+**References**:
+- `src/Explore.Application/Authentication/PlatformIdentityPrincipalExtensions.cs`
+- `src/Explore.Infrastructure/Identity/AdminContext.cs`
+- `src/Explore.Infrastructure/Identity/AdminClaimsTransformation.cs`
+- `tests/Event.API.IntegrationTests/Features/LocalCredentialReplacementHttpTests.cs`
+- `tests/Explore.Infrastructure.Tests/Identity/PlatformIdentityPrincipalExtensionsTests.cs`
+- `docs/internal/AUTHENTICATION.md`
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/internal/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for a path-scoped rule
+- [x] Candidate for skill update: `auth-patterns`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [ ] Stays in journal only (one-off debugging lesson)
+
+---
+
+[2026-09-06 Europe/Brussels] — Native cookie and wire controls expose handover defects hidden by substitutes
+
+**Context**: Restricted Local password handover adds a purpose-separated Data Protection cookie and a BFF password-only endpoint without issuing ordinary session authority.
+
+**Symptom / Observation**: The original API transport stub represented no failure as null, while the real API serializes `failureCode` as an empty string. Correcting that stub exposed twenty failed BFF cases. A later positive control unprotected the actual ordinary cookie ticket and found that the trusted circuit-subject reader rejected it, despite native cookie authentication succeeding.
+
+**Root Cause**: The BFF's response predicate did not match the existing serialized API contract. Separately, Local login created a claims identity using the invented `LocalIdentity` authentication-type string, while the shared BFF identity reader accepts only its explicitly trusted cookie/provider schemes. Sending that identity through cookie `SignInAsync` did not change its stored authentication type. The shared test fixture's fake authentication forwarding had concealed the distinction.
+
+**Resolution**: The BFF accepts an empty no-failure code while rejecting nonempty failures and contradictory session payloads. Ordinary Local cookie identities now use `CookieAuthenticationDefaults.AuthenticationScheme`, retaining `auth_provider=local`; no trust list was broadened. New tests restore native cookie authentication, Data Protection, antiforgery, onboarding and generated-client behavior, substituting only downstream HTTP and unrelated resolver configuration. The real cookie ticket supplies circuit-store partition keys; the test proves old-token storage before restricted handover and its removal afterward. All thirty-one BFF cases pass.
+
+**Why This Matters for Future Work**: A cookie header or an authenticated flag is not proof that purpose-specific session readers can use or revoke that identity. Exercise the actual ticket, downstream readers and stored-token partition. External transport substitutes must preserve real success-envelope details, not merely enough fields to satisfy the consuming test. Likewise, rendered accessibility checks must verify unique description targets: sharing a MudBlazor-owned error ID with an external alert created three duplicate IDs, which the strengthened five-case page suite now detects.
+
+**References**:
+- `src/Explore.Blazor/Extensions/BffAuthEndpoints.cs`
+- `src/Explore.Blazor/Extensions/BffLocalCredentialEndpoints.cs`
+- `src/Event.Web.BffHosting/Security/EventBffPrincipalExtensions.cs`
+- `src/Explore.Blazor.Client/Pages/Auth/LocalPasswordChange.razor`
+- `tests/Explore.Blazor.IntegrationTests/Endpoints/LocalBffCredentialReplacementTests.cs`
+- `tests/Explore.Blazor.Client.Tests/Pages/Auth/LocalPasswordChangeTests.cs`
+- `docs/internal/AUTHENTICATION.md`
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/internal/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for a path-scoped rule
+- [x] Candidate for skill update: `blazor-bff-patterns`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [ ] Stays in journal only (one-off debugging lesson)
+
+---
+
+[2026-09-07 Europe/Brussels] — Valid JWTs can restore a revoked verification fact during sync
+
+**Context**: While implementing current Local session admission, the reset regression showed that cryptographic token validity alone did not revoke an old session. Independent review then examined synchronization under disabled instance email delivery.
+
+**Symptom / Observation**: A real verified login token remained accepted after an independent commit set both Identity and application verification to false without changing the security stamp. Calling user synchronization with that token persisted application verification as true again. The strengthened HTTP regression failed with `Expected to be false` / `but found True`, before its separate unauthorized-status assertion.
+
+**Root Cause**: Delivery policy determines whether an unverified account may sign in; it does not prove that an old token's verification claim is still true. Checking the current policy and credential stamp without comparing the claimed verification fact allowed synchronization to treat stale evidence as current authority.
+
+**Resolution**: Nominal `LocalSessionAuthority` owns the original password-checked stamp and verification Boolean once. Login and native Local bearer validation share a fresh Ready/receipt/binding check and require the current Identity verification fact to match the claim, independently of delivery policy. Invalid or unreadable authority fails before claims enrichment and synchronization. Both mismatch directions deny; a freshly issued false-fact token remains valid under disabled delivery, and enabling only delivery invalidates it. The full 32-case HTTP class and 68 native cases pass. Verified command from the task worktree: `dotnet tests/Event.API.IntegrationTests/bin/Release/net10.0/Event.API.IntegrationTests.dll --treenode-filter "/*/*/*LocalCredentialReplacementHttpTests/*" --minimum-expected-tests 32 --progress off --maximum-parallel-tests 1`.
+
+**Why This Matters for Future Work**: A token can be correctly signed yet carry facts that must no longer authorize writes. Test the persisted effect, not merely the response status, and distinguish evidence freshness from policy permission. Admission reads are not a distributed transaction or a fence against later changes; business handlers still need their own transactional checks. Browser cookies and existing interactive circuits require separate invalidation.
+
+**References**:
+- `src/Explore.Application/Contracts/Infrastructure/ILocalIdentityAuthService.cs`
+- `src/Explore.Persistence/Identity/LocalIdentityCredentialStateStore.cs`
+- `src/Explore.Persistence/Identity/LocalIdentityAuthService.cs`
+- `src/Explore.API/Extensions/AuthenticationExtensions.cs`
+- `tests/Event.API.IntegrationTests/Features/LocalCredentialReplacementHttpTests.cs`
+- `tests/Event.Persistence.IntegrationTests/Identity/LocalCredentialFirstUseTests.cs`
+- `docs/internal/AUTHENTICATION.md`
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/internal/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for a path-scoped rule
+- [x] Candidate for skill update: `auth-patterns`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [ ] Stays in journal only (one-off debugging lesson)
+
+---
+
+[2026-09-07 Europe/Brussels] — Circuit revocation needs original authority and lifecycle ordering
+
+**Context**: While extending current Local credential enforcement from API bearers to native BFF cookies and Blazor interactive circuits, real TestServer WebSocket tests exercised initialization, subsequent navigation and same-user concurrent sessions.
+
+**Symptom / Observation**: Clearing token fields did not prevent a stale circuit from obtaining a newer same-user token through fallback storage. Moving the authentication guard before capture then caused all six circuit tests to time out waiting for the opening observer, even though `StartCircuit` had completed. Separate controlled awaits reproduced dispatch after a live provider-marker change and after actual guard disposal.
+
+**Root Cause**: Blazor's initial inbound activity invokes the opening callback through the downstream delegate; requiring an already-captured snapshot on that activity suppresses initialization itself. After opening, the current principal, ambient handshake context and user-level token fallback are not interchangeable with the original session authority. Authentication-state changes and disposal can also occur while authority reads await completion.
+
+**Resolution**: `TokenCircuitHandler` records completed opening explicitly, retains original cookie authority and rechecks the live subject, session and provider markers after the private current-user probe. Its final lifetime check also covers anonymous activities. Revocation publishes native anonymous state; `CircuitAccessTokenService.RevokeSession` irreversibly denies reads/writes in that scope and deletes only the original typed subject/session partition. It never clears every session when that pair is missing. Verified 55 cases with `dotnet tests/Explore.Blazor.IntegrationTests/bin/Release/net10.0/Explore.Blazor.IntegrationTests.dll --treenode-filter "/*/*/*LocalBffCredentialReplacementTests/*" --minimum-expected-tests 55 --progress off --maximum-parallel-tests 1`; the owning token-service 22 and privacy 5 cases also pass.
+
+**Why This Matters for Future Work**: Prove both successful framework initialization and rejected later activity at the real transport boundary. Clearing a cache field is not revocation when another lookup can resurrect authority. Compare live authority after awaits, preserve independently valid sessions, and distinguish a service-disposal test from framework teardown or browser acceptance. These checks do not create a distributed authorization transaction or notify idle tabs immediately.
+
+**References**:
+- `src/Explore.Blazor/Services/TokenCircuitHandler.cs`
+- `src/Explore.Blazor/Services/CircuitAccessTokenService.cs`
+- `src/Explore.Blazor/Services/BffAdminClaimsTransformation.cs`
+- `tests/Explore.Blazor.IntegrationTests/Endpoints/LocalBffCredentialReplacementTests.cs`
+- `tests/Explore.Blazor.IntegrationTests/Services/CircuitAccessTokenServiceTests.cs`
+- `docs/internal/AUTHENTICATION.md`
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/internal/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for a path-scoped rule
+- [x] Candidate for skill update: `blazor-bff-patterns`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [ ] Stays in journal only (one-off debugging lesson)
+
+---
+
+[2026-09-07 Europe/Brussels] — Cached privileged responses can outlive administrator authority
+
+**Context**: Native HTTP tests exercised retry-safe Local credential reconciliation after a persisted instance administrator grant was removed.
+
+**Symptom / Observation**: Repeating a previously successful request with the same idempotency key returned HTTP 200 and operation status instead of HTTP 403. The same bearer still authenticated the current-user endpoint, isolating grant revocation from authentication failure. No new mutation or plaintext password was involved.
+
+**Root Cause**: Generic `IdempotencyMiddleware` replays stored responses before invoking the handler. Its request identity partitions by authenticated scheme and user, not current persisted administrator grants. Consequently the handler's otherwise fresh authority checks never run for a cached response; private/no-store browser headers do not prevent this application-level replay.
+
+**Resolution**: Apply the existing `SuppressIdempotencyResponseStorage` metadata to reconciliation, as already required for create/reset issuance. This bypasses generic lookup and storage while the native operation ledger retains retry safety. The regression first proves an authorized replay preserves the ledger, then proves revoked access returns 403 without operation disclosure. All 35 native administration cases passed with zero skips using `dotnet tests/Event.API.IntegrationTests/bin/Release/net10.0/Event.API.IntegrationTests.dll --treenode-filter "/*/*/*LocalCredentialAdministrationHttpTests/*" --minimum-expected-tests 35 --progress off --maximum-parallel-tests 1`.
+
+**Why This Matters for Future Work**: Idempotency and authorization have different lifetimes. Inspect the entire middleware-to-handler flow when a privileged operation reuses persisted results; absence of a second mutation does not make stale disclosure authorized. Prefer an existing durable operation ledger over cached privileged HTTP responses when current authorization must run on every retry.
+
+**References**:
+- `src/Explore.API/Controllers/LocalIdentityAdministrationController.cs:168`
+- `src/Explore.API/Middleware/IdempotencyMiddleware.cs`
+- `tests/Event.API.IntegrationTests/Features/LocalCredentialAdministrationHttpTests.cs`
+- `docs/internal/AUTHENTICATION.md`
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/internal/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for a path-scoped rule
+- [x] Candidate for skill update: `auth-patterns`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [ ] Stays in journal only (one-off debugging lesson)
+
+---
+
+[2026-09-07 Europe/Brussels] — HAL enum references must retain CLR nullability
+
+**Context**: Connecting Local account administration to the real generated client exposed a contract mismatch not covered by successful API endpoint tests.
+
+**Symptom / Observation**: The API correctly returned `credentialState: null` for missing metadata or a noncurrent operation, but both generated list and operation clients threw `JsonException` instead of preserving unknown state.
+
+**Root Cause**: `HalDtoSchemaTransformer.ReplaceEnumPropertiesWithReferences` unwrapped `Nullable<T>` to identify the enum component, then replaced the property with a bare reference. That discarded nullability on both DTO and flattened HAL wrappers. The generated record transformation was not responsible; NSwag received the wrong schema.
+
+**Resolution**: Pass CLR nullability to the shared reference helper and use the existing native `oneOf` null/reference shape for nullable enum properties, including existing bare references. Nonnullable enum references remain unchanged. Regenerate OpenAPI, inventory and client through native tools. Both original generated-client null cases now pass; generated-record architecture, OpenAPI parity and contract invariants pass 54 additional checks with no skips.
+
+**Why This Matters for Future Work**: Endpoint success and typed enum generation do not prove wire fidelity. Test legitimate null values through the actual generated client, preserve unknown states rather than substituting an enum default, and fix the authoritative schema transformer instead of adding client compatibility code.
+
+**References**:
+- `src/Explore.API/OpenApi/HalDtoSchemaTransformer.cs`
+- `tests/Explore.Blazor.Client.Tests/Services/LocalIdentityAdministrationServiceTests.cs`
+- `tests/Event.API.IntegrationTests/Features/OpenApiParityTests.cs`
+- `tests/Event.API.IntegrationTests/Features/ContractInvariantsTests.cs`
+- `docs/internal/API_CHANGELOG.md`
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/internal/QUICK_REFERENCE.md` (new non-inferable rule)
+- [x] Candidate for a path-scoped rule
+- [ ] Candidate for skill update
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [ ] Stays in journal only (one-off debugging lesson)
+
+---

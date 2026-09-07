@@ -1,8 +1,10 @@
-// ABOUTME: Enriches the BFF cookie principal with persisted administrative authority from the API.
-// ABOUTME: Projects instance, tenant, organization, and group scopes at trusted session boundaries.
+// ABOUTME: Validates current Local session authority before projecting API-backed administrative claims.
+// ABOUTME: Binds private current-user probes to the original subject and rejects stale cached enrichment.
 
 using System.Net.Http.Headers;
 using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
+using Event.Web.BffHosting.Authentication;
 using Event.Web.BffHosting.Security;
 using Explore.Blazor.Client.Clients;
 using Microsoft.AspNetCore.Authentication;
@@ -59,6 +61,12 @@ public sealed class BffAdminClaimsTransformation
         bool synchronizeUser = false,
         CancellationToken cancellationToken = default)
     {
+        if (!await ValidateLocalSessionAsync(
+                principal, properties, properties?.GetTokenValue("access_token"), cancellationToken))
+        {
+            return false;
+        }
+
         if (principal.Identity?.IsAuthenticated != true
             || !principal.TryGetAdminSubject(out var sub))
         {
@@ -143,6 +151,101 @@ public sealed class BffAdminClaimsTransformation
         _cache.Set(cacheKey, BffAdminAuthorityCacheEntry.Failure, FailureCacheDuration);
         RemoveAdminClaims(principal);
         return false;
+    }
+
+    internal async Task<bool> ValidateLocalSessionAsync(
+        ClaimsPrincipal principal,
+        AuthenticationProperties? properties,
+        string? accessToken,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        const string localIssuer = "islamu-event-local";
+        const string localAudience = "islamu-event-api";
+        var providerClaims = principal.FindAll("auth_provider").ToArray();
+        var protectedProvider = properties?.Items.TryGetValue(
+            EventBffAuthenticationConstants.AuthenticationProviderPropertyKey, out var provider) == true
+            ? provider : null;
+        var oidcScheme = properties?.Items.TryGetValue(
+            EventBffAuthenticationConstants.OidcSchemePropertyKey, out var scheme) == true
+            ? scheme : null;
+        JwtSecurityToken? token = null;
+        if (!string.IsNullOrWhiteSpace(accessToken) && accessToken.Length <= 8192)
+        {
+            try
+            {
+                token = new JwtSecurityTokenHandler().ReadJwtToken(accessToken);
+            }
+            catch (Exception exception) when (exception is ArgumentException
+                or Microsoft.IdentityModel.Tokens.SecurityTokenException)
+            {
+            }
+        }
+
+        var hasLocalIndicator = string.Equals(protectedProvider, "local", StringComparison.Ordinal)
+            || providerClaims.Any(claim => claim.Value == "local")
+            || token?.Claims.Any(claim => claim.Type == "iss" && claim.Value == localIssuer
+                || claim.Type == "auth_provider" && claim.Value == "local") == true;
+        if (!hasLocalIndicator)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return true;
+        }
+
+        var subjectId = Guid.Empty;
+        var hasLocalAuthorityShape = (protectedProvider is null or "local")
+            && string.IsNullOrEmpty(oidcScheme)
+            && providerClaims is [{ Value: "local" }]
+            && principal.Identities.Any(identity => identity.IsAuthenticated
+                && identity.HasClaim("auth_provider", "local"))
+            && principal.TryGetOpaqueProviderSubject(out var subject)
+            && Guid.TryParseExact(subject.Value, "D", out subjectId)
+            && subjectId != Guid.Empty
+            && string.Equals(subject.Value, subjectId.ToString("D"), StringComparison.Ordinal)
+            && principal.TryGetSessionId(out _)
+            && token is not null
+            && HasSingleTokenClaim(token, "iss", localIssuer)
+            && HasSingleTokenClaim(token, "aud", localAudience)
+            && HasSingleTokenClaim(token, "auth_provider", "local")
+            && HasSingleTokenClaim(token, "sub", subjectId.ToString("D"))
+            && !token.Claims.Any(claim => claim.Type == "purpose");
+        if (hasLocalAuthorityShape)
+        {
+            try
+            {
+                using var client = _httpClientFactory.CreateClient(HttpClientName);
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+                var currentUser = await new UserClient(client).GetCurrentUserAsync(
+                    cancellationToken: cancellationToken);
+                if (currentUser.Id == subjectId)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    return true;
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception)
+            {
+                // Provider payloads and token material must never enter diagnostics.
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        RemoveAdminClaims(principal);
+        if (principal.TryGetAdminSubject(out var adminSubject))
+        {
+            _cache.Remove($"{CacheKeyPrefix}{adminSubject.PartitionKey}");
+        }
+        return false;
+    }
+
+    private static bool HasSingleTokenClaim(JwtSecurityToken token, string type, string expected)
+    {
+        var claims = token.Claims.Where(claim => claim.Type == type).Take(2).ToArray();
+        return claims is [var claim] && string.Equals(claim.Value, expected, StringComparison.Ordinal);
     }
 
     private async Task<Guid?> SynchronizeUserAsync(

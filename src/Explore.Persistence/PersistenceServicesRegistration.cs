@@ -7,6 +7,7 @@ using System.Text;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.LocationPrivacy;
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;
@@ -128,7 +129,7 @@ public static class PersistenceServicesRegistration
                 options.Lockout.MaxFailedAccessAttempts = localIdentityOptions.LockoutThreshold;
                 options.Lockout.DefaultLockoutTimeSpan =
                     TimeSpan.FromMinutes(localIdentityOptions.LockoutDurationMinutes);
-                options.Password.RequiredLength = 12;
+                options.Password.RequiredLength = LocalIdentityOptions.MinimumPasswordLength;
                 options.Password.RequiredUniqueChars = 1;
                 options.Password.RequireDigit = false;
                 options.Password.RequireLowercase = false;
@@ -137,7 +138,8 @@ public static class PersistenceServicesRegistration
             })
             .AddRoles<LocalIdentityRole>();
 
-        if (IdentityDatabaseConfiguration.GetTopology(configuration) == IdentityDatabaseTopology.External)
+        IdentityDatabaseTopology identityTopology = IdentityDatabaseConfiguration.GetTopology(configuration);
+        if (identityTopology == IdentityDatabaseTopology.External)
         {
             services.AddDbContext<ExternalIdentityDbContext>(options =>
                 IdentityDatabaseProviderComposition.Configure(
@@ -152,7 +154,20 @@ public static class PersistenceServicesRegistration
         }
         identityBuilder.AddDefaultTokenProviders();
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        services.AddScoped(serviceProvider =>
+        {
+            DbContext identityDbContext = identityTopology == IdentityDatabaseTopology.External
+                ? serviceProvider.GetRequiredService<ExternalIdentityDbContext>()
+                : serviceProvider.GetRequiredService<ExploreDbContext>();
+            return new LocalIdentityCredentialStateStore(
+                identityDbContext: identityDbContext,
+                applicationDbContext: serviceProvider.GetRequiredService<ExploreDbContext>(),
+                userManager: serviceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(),
+                timeProvider: serviceProvider.GetRequiredService<TimeProvider>());
+        });
         services.AddScoped<ILocalIdentityAuthService, LocalIdentityAuthService>();
+        services.AddScoped<ILocalCredentialAdministration>(serviceProvider =>
+            serviceProvider.GetRequiredService<LocalIdentityCredentialStateStore>());
 
         // Unit of Work (wraps EF Core transactions)
         services.AddScoped<IUnitOfWork, EfCoreUnitOfWork>();

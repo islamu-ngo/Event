@@ -38,9 +38,84 @@ The browser communicates strictly with `Explore.Blazor` over HTTPS regardless of
 
 Local Identity provides email/password sign-in without an external identity container. Passwords are hashed by ASP.NET Core Identity and failed attempts use bounded lockout. Public self-registration is closed: the former API and BFF registration routes have been removed, with no replacement public signup endpoint.
 
+Login failures use bounded machine-readable error codes. Do not include login
+request bodies or successful token responses in support logs. Their ordinary
+diagnostic text omits credentials, but explicit JSON body capture does not.
+
+A correct password is not sufficient when credential setup is incomplete. Local sign-in also requires an explicit ready state in the selected Identity database. Missing, invalid, or unfinished credential state blocks sign-in even for a verified email address; disabling email delivery does not bypass this check. Records without state are not automatically treated as ready. This sign-in check alone does not revoke existing sessions.
+
 When instance email delivery is enabled, Local sign-in requires an already-verified email address. Missing SMTP configuration or a delivery outage does not bypass that requirement. Tenant email settings cannot override the instance sign-in policy. When instance delivery is disabled, unverified Local accounts may sign in, but their addresses remain unverified; disabling delivery never proves mailbox ownership. An invalid or unreadable instance policy blocks unverified sign-in until the configuration is repaired.
 
 Event's delivery setting does not control Keycloak or AT Protocol verification, password recovery, or sign-in. Those remain owned by the selected identity provider. This Local sign-in policy does not itself provide account provisioning, email verification, or password recovery.
+
+Local sign-in requires its application account and active personal profile to
+already be linked; signing in does not create or repair that account. An external
+identity cannot claim a Local account merely by using the same email address.
+An already-established explicit provider link remains separate from email matching.
+
+Configured administrator sign-in does not select an existing account by a supplied
+user ID. Without an exact provider link it creates a new application account;
+reuse of a Local-owned account requires that link to remain present when the
+claim transaction checks it. A link removed before that transaction starts is
+not accepted from an earlier lookup.
+
+Instance administrators can use the administrative API to create Local accounts,
+issue supervised reset credentials and inspect or reconcile interrupted operations.
+The dedicated administration UI and first-run integration are still being completed.
+Tenant administrators cannot change these shared credentials. The storage flow keeps
+new credentials pending until the matching application account is committed,
+then marks them as requiring a private password change; neither state permits
+ordinary sign-in. Retrying an interrupted linking operation preserves its account
+identifiers and never returns another temporary password. A valid temporary
+password can now produce a restricted, at-most-five-minute replacement challenge,
+not an ordinary signed-in session. Native replacement preserves the 12–128-character
+login limits, rejects reuse of the temporary password, and requires a fresh login
+after the change. Creation returns a generated temporary password only once;
+neither status reads nor retried operations return it again. Record the operation
+ID, hand over the password privately, and do not persist credential-bearing
+responses in logs or scripts. If the response is lost, inspect the operation,
+explicitly reconcile pending creation if needed, then issue a separately authorized
+reset with a new operation ID. Status reads never complete setup themselves.
+Every administrative retry checks current instance administrator access, including
+reconciliation; a previous successful response does not retain revoked access.
+Protected API
+requests now recheck Local credentials: an old token is rejected after a committed
+reset, a broken account binding or a change to its verification fact. Tokens issued
+before the required session-stamp contract are rejected; sign in again. Unverified
+tokens also stop working when instance email delivery is enabled. If current
+authority cannot be read, the API denies the request with HTTP 401. The browser
+session is also checked on cookie-authenticated requests and subsequent interactive
+activity. Invalid current authority rejects the cookie or makes the interactive
+session anonymous without executing that activity. A separate fresh login for the
+same account is preserved. An idle tab is not immediately notified by a push;
+validation occurs when it next sends activity. Sign in again after replacing the
+temporary password. An unavailable authority check fails closed.
+Do not change database state manually to
+bypass setup. Reset is not email verification and does not remove an existing
+lockout. A repeated reset request must never reveal the temporary password again;
+an operator who loses that handover will need a separately authorized new reset.
+
+For browser sign-in, a valid temporary password opens the private password-change
+page. Choose and confirm a new password, then sign in again when returned to the
+login page. Entering this restricted step clears the browser's previous local
+session. The short-lived challenge stays in a protected HttpOnly cookie, not in
+page data or browser-readable storage. If the step expires, return to sign in;
+the page never renews its deadline. Validation errors clear both password fields
+and let you retry while the challenge is still current.
+
+Direct API clients can submit the short-lived challenge as a Bearer token to
+`POST /api/auth/local/credential-replacement`, with a JSON body containing only
+`newPassword`. An ordinary access token cannot replace the challenge. Successful
+replacement returns an empty HTTP 204 response, not a signed-in session; sign in
+again using the new password. Password validation returns HTTP 400 and allows a
+corrected request while the challenge remains valid. Invalid, expired or consumed
+authority returns HTTP 401; a concurrent operation conflict returns HTTP 409.
+Do not log or persist challenges or password request bodies. Reusing an
+`Idempotency-Key` cannot replay successful replacement.
+
+Administrative identity resolution checks the current exact external-login link,
+so removing that link cannot leave a cached administrator identity mapping.
+This does not log the person out of their external identity provider.
 
 Configure:
 

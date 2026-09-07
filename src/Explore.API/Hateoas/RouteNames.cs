@@ -10,6 +10,12 @@ namespace Explore.API.Hateoas;
 public static class RouteNames
 {
     public const string LoginLocalIdentity = nameof(LoginLocalIdentity);
+    public const string CompleteLocalCredentialReplacement = nameof(CompleteLocalCredentialReplacement);
+    public const string ListLocalIdentities = nameof(ListLocalIdentities);
+    public const string CreateLocalIdentity = nameof(CreateLocalIdentity);
+    public const string ResetLocalCredential = nameof(ResetLocalCredential);
+    public const string GetLocalCredentialOperation = nameof(GetLocalCredentialOperation);
+    public const string ReconcileLocalCredentialOperation = nameof(ReconcileLocalCredentialOperation);
     public const string CreateSetupTargetEnrollment = nameof(CreateSetupTargetEnrollment);
     public const string GetSetupTargetEnrollment = nameof(GetSetupTargetEnrollment);
     public const string RevokeSetupTargetEnrollment = nameof(RevokeSetupTargetEnrollment);

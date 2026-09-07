@@ -6,6 +6,8 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Identity;
+using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Contracts.LocationPrivacy;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.CustomPropertyProjection;
@@ -39,6 +41,10 @@ internal static class OpenApiStringEnumSchemaCatalog
 {
     private static IReadOnlyCollection<Type> EagerNestedEnumTypes { get; } =
     [
+        typeof(LocalCredentialState),
+        typeof(LocalCredentialOperationKind),
+        typeof(LocalCredentialOperationStage),
+        typeof(LocalCredentialIssueOutcome),
         typeof(AddressProviderOutcome),
         typeof(AdmissionCheckInDependencyStatus),
         typeof(AdmissionCheckInOperationalAction),
@@ -55,6 +61,10 @@ internal static class OpenApiStringEnumSchemaCatalog
 
     public static IReadOnlyCollection<Type> EnumTypes { get; } =
     [
+        typeof(LocalCredentialState),
+        typeof(LocalCredentialOperationKind),
+        typeof(LocalCredentialOperationStage),
+        typeof(LocalCredentialIssueOutcome),
         typeof(AddressProviderOutcome),
         typeof(AdmissionCheckInAction),
         typeof(AdmissionCheckInDependencyStatus),

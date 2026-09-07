@@ -8,6 +8,7 @@ using Explore.Blazor.Client.Contracts.Services.Scheduling;
 using Explore.Blazor.Client.Models;
 using Explore.Blazor.Client.Pages.Admin.Instance.Components;
 using Explore.Blazor.Client.Tests.Common.Authentication;
+using Explore.Blazor.Client.Tests.Services;
 using MudBlazor;
 
 namespace Explore.Blazor.Client.Tests.Pages.Admin;
@@ -23,10 +24,15 @@ public sealed class InstanceAdminSettingsLayoutTests : IDisposable
     private readonly IPlatformMonetizationService _monetizationService;
     private readonly IPaidEventPolicyService _paidEventPolicyService;
     private readonly ISchedulerAdminService _schedulerAdminService;
+    private readonly LocalIdentityUiTransport _localTransport = new() { Discoverable = false };
+    private readonly HttpClient _localHttp;
 
     public InstanceAdminSettingsLayoutTests()
     {
         _ctx = new BlazorTestContext();
+        _localHttp = _localTransport.CreateHttpClient();
+        _ctx.Services.AddSingleton<IControlPlaneOverviewService>(_localTransport.CreateOverview(_localHttp));
+        _ctx.Services.AddScoped(_ => _localTransport.CreateService(_localHttp));
         _ctx.AddShellStateMocks();
         _ctx.SetAuthenticatedUser(Guid.NewGuid(), "Instance Admin", "admin@example.com");
         _ctx.AddMockService<IControlPlaneOperationsService>();
@@ -48,7 +54,41 @@ public sealed class InstanceAdminSettingsLayoutTests : IDisposable
         ConfigureSingleTenantInstanceDefaults();
     }
 
-    public void Dispose() => _ctx.Dispose();
+    public void Dispose()
+    {
+        _ctx.Dispose();
+        _localHttp.Dispose();
+        _localTransport.Dispose();
+    }
+
+    [Test]
+    [Arguments(DeploymentMode.SingleTenant, true)]
+    [Arguments(DeploymentMode.SingleTenant, false)]
+    [Arguments(DeploymentMode.MultiTenant, true)]
+    [Arguments(DeploymentMode.MultiTenant, false)]
+    public async Task LocalAccountsNavigationComesOnlyFromOverviewInEitherDeploymentMode(DeploymentMode mode, bool discoverable)
+    {
+        _localTransport.Discoverable = discoverable;
+        _instanceOnboardingService.GetDeploymentModeAsync().Returns(new DeploymentModeDto { Mode = mode });
+        _instanceOnboardingService.GetStatusAsync().Returns(new InstanceOnboardingStatusDto
+        {
+            IsCompleted = true, IsAuthenticated = true, IsCurrentUserInstanceAdmin = true,
+            SelectedDeploymentMode = mode.ToString()
+        });
+        var cut = RenderInstanceAdminSettingsLayout();
+        cut.WaitForState(() => cut.FindAll("[role='option']").Any());
+        cut.WaitForAssertion(() =>
+        {
+            if (cut.FindAll("[role='option']").Any(item => item.TextContent.Trim() == "Local accounts") != discoverable)
+                throw new InvalidOperationException("Local accounts navigation must follow overview discovery.");
+        });
+        await Assert.That(_localTransport.Requests.Any(request => request.Uri.AbsolutePath == "/api/admin/control-plane/overview")).IsTrue();
+        if (discoverable)
+        {
+            cut.FindAll("[role='option']").Single(item => item.TextContent.Trim() == "Local accounts").Click();
+            cut.WaitForElement("#local-accounts-heading");
+        }
+    }
 
     /// <summary>
     /// Whether the scheduler section exists is a server fact: the host may not expose the administration API at

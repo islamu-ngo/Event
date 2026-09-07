@@ -2,6 +2,7 @@
 // ABOUTME: Applies bounded email and password rules without revealing account existence.
 
 using Explore.Application.Features.Authentication.Local.Models;
+using Explore.Application.Configuration;
 using FluentValidation;
 
 namespace Explore.Application.Features.Authentication.Local.Validators;
@@ -19,7 +20,7 @@ public sealed class LocalAuthRequestDtoValidator : AbstractValidator<LocalAuthRe
 
         RuleFor(request => request.Password)
             .NotEmpty()
-            .MinimumLength(12)
-            .MaximumLength(128);
+            .MinimumLength(LocalIdentityOptions.MinimumPasswordLength)
+            .MaximumLength(LocalIdentityOptions.MaximumPasswordLength);
     }
 }

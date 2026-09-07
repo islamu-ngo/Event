@@ -7,6 +7,11 @@ internal static class HalOpenApiSchemaCatalog
 {
     public static IReadOnlyList<Type> RegisteredDtoTypes { get; } =
     [
+        typeof(Explore.Application.Contracts.Identity.LocalIdentitySummary),
+        typeof(Explore.Application.Contracts.Identity.LocalCredentialOperationStatus),
+        typeof(Explore.Application.Contracts.Identity.LocalCredentialOperationReceipt),
+        typeof(Explore.Application.Contracts.Identity.LocalCredentialResetReceipt),
+        typeof(Explore.Application.Features.Authentication.Local.Models.LocalCredentialIssueDto),
         // Event DTOs
         typeof(Explore.Application.DTOs.Event.EventDto),
         typeof(Explore.Application.DTOs.Event.EventListDto),
@@ -268,6 +273,9 @@ internal static class HalOpenApiSchemaCatalog
 
     public static IReadOnlyDictionary<string, Type> DetailResourceMappings { get; } = new Dictionary<string, Type>
     {
+        ["HalResourceOfLocalIdentitySummary"] = typeof(Explore.Application.Contracts.Identity.LocalIdentitySummary),
+        ["HalResourceOfLocalCredentialOperationStatus"] = typeof(Explore.Application.Contracts.Identity.LocalCredentialOperationStatus),
+        ["HalResourceOfLocalCredentialIssueDto"] = typeof(Explore.Application.Features.Authentication.Local.Models.LocalCredentialIssueDto),
         ["HalResourceOfSetupTargetEnrollmentData"] =
             typeof(ISLAMU.Wire.Contracts.SetupLive.SetupTargetEnrollmentData),
         ["HalResourceOfSetupSecretBindingOperationData"] =
@@ -449,6 +457,7 @@ internal static class HalOpenApiSchemaCatalog
 
     public static IReadOnlyDictionary<string, string> CollectionEmbeddedItemResourceMappings { get; } = new Dictionary<string, string>
     {
+        ["HalCollectionEmbeddedOfLocalIdentitySummary"] = "HalResourceOfLocalIdentitySummary",
         ["HalCollectionEmbeddedOfSetupSecretBindingReadinessItem"] =
             "HalResourceOfSetupSecretBindingReadinessItem",
         ["HalCollectionEmbeddedOfActorListDto"] = "HalResourceOfActorListDto",

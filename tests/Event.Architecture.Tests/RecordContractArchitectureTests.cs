@@ -45,6 +45,7 @@ public sealed class RecordContractArchitectureTests
         "Explore.Application.Features.Promotions.PromotionManagementCommandResponseDto",
         "Explore.Application.Features.Promotions.Requests.Commands.PromotionRedemptionResponseDto",
         "Explore.Application.Responses.CreateExternalApiKeyCommandResponse",
+        "Explore.Application.Responses.LocalCredentialIssueCommandResponse",
         "Explore.Application.Responses.WebhookProviderPortalAccessCommandResponse",
     ];
 
@@ -203,7 +204,7 @@ public sealed class RecordContractArchitectureTests
     }
 
     [Test]
-    public async Task BaseCommandResponseHierarchyIsExactlyTwelveImmutableDirectRecordDescendants()
+    public async Task BaseCommandResponseHierarchyMatchesExpectedImmutableDirectRecordDescendants()
     {
         var descendants = DiscoverConcreteBaseCommandResponseDescendants();
         var descendantNames = descendants
@@ -231,7 +232,6 @@ public sealed class RecordContractArchitectureTests
             .ToArray();
 
         await Assert.That(IsRecord(typeof(BaseCommandResponse<>))).IsTrue();
-        await Assert.That(descendantNames).Count().IsEqualTo(12);
         await Assert.That(descendantNames).IsEquivalentTo(ExpectedBaseCommandResponseDescendants);
         await Assert.That(nonRecords).IsEmpty();
         await Assert.That(indirectDescendants).IsEmpty();

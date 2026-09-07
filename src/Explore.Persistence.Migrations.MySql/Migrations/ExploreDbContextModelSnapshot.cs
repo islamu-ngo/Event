@@ -36536,6 +36536,88 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Explore.Persistence.Identity.LocalIdentityCredentialOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("char(36)")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("ExternalLoginId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("external_login_id");
+
+                    b.Property<Guid>("InitiatingApplicationUserId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("initiating_application_user_id");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("int")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("LocalSubjectId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("local_subject_id");
+
+                    b.Property<Guid>("PersonalActorId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("personal_actor_id");
+
+                    b.Property<Guid?>("PreviousOperationConcurrencyStamp")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("previous_operation_concurrency_stamp");
+
+                    b.Property<Guid?>("PreviousOperationId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("previous_operation_id");
+
+                    b.Property<string>("ResetReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)")
+                        .HasColumnName("reset_reason");
+
+                    b.Property<int>("Stage")
+                        .HasColumnType("int")
+                        .HasColumnName("stage");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("updated_at");
+
+                    b.Property<DateTime>("VerifiedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("verified_at");
+
+                    b.Property<Guid>("VerifiedByApplicationUserId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("verified_by_application_user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_local_identity_credential_operation");
+
+                    b.HasIndex("LocalSubjectId")
+                        .HasDatabaseName("ix_local_identity_credential_operation_local_subject_id");
+
+                    b.ToTable("ie_local_identity_credential_operation", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_local_credential_operation_kind", "kind BETWEEN 1 AND 2");
+
+                            t.HasCheckConstraint("ck_local_credential_operation_reset_metadata", "(kind = 1 AND previous_operation_id IS NULL AND previous_operation_concurrency_stamp IS NULL AND reset_reason IS NULL) OR (kind = 2 AND previous_operation_id IS NOT NULL AND previous_operation_id <> id AND previous_operation_concurrency_stamp IS NOT NULL AND reset_reason IS NOT NULL AND TRIM(reset_reason) <> '' AND stage <> 1)");
+
+                            t.HasCheckConstraint("ck_local_credential_operation_stage", "stage BETWEEN 1 AND 5");
+
+                            t.HasCheckConstraint("ck_local_credential_operation_timestamps", "((kind = 1 AND verified_at >= created_at) OR (kind = 2 AND verified_at <= created_at)) AND (updated_at IS NULL OR updated_at >= created_at)");
+                        });
+                });
+
             modelBuilder.Entity("Explore.Persistence.Identity.LocalIdentityRole", b =>
                 {
                     b.Property<Guid>("Id")
@@ -48516,6 +48598,16 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_ie_configuration_direct_transfer_chunks_ie_configura_c2d603d8");
+                });
+
+            modelBuilder.Entity("Explore.Persistence.Identity.LocalIdentityCredentialOperation", b =>
+                {
+                    b.HasOne("Explore.Persistence.Identity.LocalIdentityUser", null)
+                        .WithMany()
+                        .HasForeignKey("LocalSubjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ie_local_identity_credential_operation_ie_local_iden_1288010b");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>

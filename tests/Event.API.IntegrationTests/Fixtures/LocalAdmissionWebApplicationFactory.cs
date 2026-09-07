@@ -6,6 +6,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Explore.API.Authentication;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Features.Authentication.Atproto.Models;
@@ -26,9 +27,11 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
@@ -50,8 +53,14 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
     private readonly string _externalKeyId = Guid.CreateVersion7().ToString("N");
     private readonly string _databasePath = Path.Combine(
         Path.GetTempPath(), $"local-admission-{Guid.CreateVersion7():N}.db");
+    private readonly string _identityDatabasePath = Path.Combine(
+        Path.GetTempPath(), $"local-admission-identity-{Guid.CreateVersion7():N}.db");
     private readonly Dictionary<string, string?> _previousEnvironment = [];
     private string? _connectionString;
+    private IInterceptor? _persistenceInterceptor;
+    private ILoggerProvider? _logCapture;
+    private IdentityDatabaseTopology _identityTopology = IdentityDatabaseTopology.Colocated;
+    private string? _identityConnectionString;
 
     private LocalAdmissionWebApplicationFactory(AuthenticationProviderKind primaryProvider)
     {
@@ -75,12 +84,25 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
     }
 
     public static async Task<LocalAdmissionWebApplicationFactory> CreateAsync(
-        AuthenticationProviderKind primaryProvider = AuthenticationProviderKind.Local)
+        AuthenticationProviderKind primaryProvider = AuthenticationProviderKind.Local,
+        IInterceptor? persistenceInterceptor = null,
+        ILoggerProvider? logCapture = null,
+        IdentityDatabaseTopology identityTopology = IdentityDatabaseTopology.Colocated)
     {
-        var factory = new LocalAdmissionWebApplicationFactory(primaryProvider);
+        var factory = new LocalAdmissionWebApplicationFactory(primaryProvider)
+        {
+            _persistenceInterceptor = persistenceInterceptor,
+            _logCapture = logCapture,
+            _identityTopology = identityTopology
+        };
         try
         {
             await factory.SeedDatabaseAsync();
+            if (identityTopology == IdentityDatabaseTopology.External)
+            {
+                await using DbContext identity = factory.CreateIdentityDatabase();
+                await identity.Database.EnsureCreatedAsync();
+            }
             return factory;
         }
         catch
@@ -93,15 +115,22 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         base.ConfigureWebHost(builder);
+        if (_logCapture is not null)
+            builder.ConfigureLogging(logging => logging.AddProvider(_logCapture));
         string primaryProvider = _primaryProvider.ToString().ToLowerInvariant();
         builder.UseSetting("Authentication:Provider", primaryProvider);
         builder.UseSetting("SecretProvider:Provider", "Environment");
+        builder.UseSetting("IdentityDatabase:Topology", _identityTopology.ToString().ToLowerInvariant());
+        builder.UseSetting("IdentityDatabase:Provider", "Sqlite");
+        builder.UseSetting("IdentityDatabase:Name", _identityDatabasePath);
         builder.ConfigureAppConfiguration((_, configuration) =>
         {
             var settings = new Dictionary<string, string?>
             {
                 ["Authentication:Provider"] = primaryProvider,
-                ["IdentityDatabase:Topology"] = "colocated",
+                ["IdentityDatabase:Topology"] = _identityTopology.ToString().ToLowerInvariant(),
+                ["IdentityDatabase:Provider"] = "Sqlite",
+                ["IdentityDatabase:Name"] = _identityDatabasePath,
                 ["SecretProvider:Provider"] = "Environment",
                 ["Database:Provider"] = "Sqlite",
                 ["Database:Database"] = _databasePath,
@@ -311,25 +340,96 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         return new ExploreDbContext(options.Options);
     }
 
+    public DbContext CreateIdentityDatabase()
+    {
+        if (_identityTopology == IdentityDatabaseTopology.Colocated)
+            return CreateDatabase();
+        using IServiceScope scope = Services.CreateScope();
+        DbContextOptions<ExternalIdentityDbContext> options = scope.ServiceProvider
+            .GetRequiredService<DbContextOptions<ExternalIdentityDbContext>>();
+        var context = new ExternalIdentityDbContext(options);
+        _identityConnectionString = context.Database.GetConnectionString();
+        return context;
+    }
+
     public async Task<LocalAuthRequestDto> SeedLocalUserAsync(bool emailConfirmed)
     {
         await using AsyncServiceScope scope = Services.CreateAsyncScope();
         var manager = scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>();
+        var credentials = scope.ServiceProvider.GetRequiredService<ILocalCredentialAdministration>();
+        var database = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        Guid initiatorId = (await database.InstanceBootstrapStates.SingleAsync()).CompletedByUserId!.Value;
         string email = $"local-{Guid.CreateVersion7():N}@example.test";
-        string password = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-        var user = new LocalIdentityUser
-        {
-            UserName = email,
-            Email = email,
-            EmailConfirmed = emailConfirmed,
-            FirstName = "Local",
-            LastName = "Member"
-        };
-        IdentityResult result = await manager.CreateAsync(user, password);
-        if (!result.Succeeded)
+        string password = $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(32))}";
+        LocalCredentialCreateResult created = await credentials.CreatePendingAsync(new LocalCredentialCreateRequest(
+            operationId: Guid.CreateVersion7(), initiatingApplicationUserId: initiatorId,
+            email: email, firstName: "Local", lastName: "Member"), CancellationToken.None);
+        if (created.Outcome != LocalCredentialCreateOutcome.Created)
         {
             throw new InvalidOperationException("The native Identity fixture could not create its account.");
         }
+        LocalCredentialOperationReceipt receipt = created.Receipt!;
+        DateTime createdAt = DateTime.UtcNow;
+        var applicationUser = new User
+        {
+            Id = receipt.LocalSubjectId,
+            Pii = new UserPii { Email = email, FirstName = "Local", LastName = "Member" },
+            EmailVerified = true,
+            CreatedAt = createdAt
+        };
+        database.AddRange(applicationUser, new Actor
+        {
+            Id = receipt.PersonalActorId,
+            UserId = applicationUser.Id,
+            User = applicationUser,
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            Pii = new ActorPii { DisplayName = "Local Member" },
+            CreatedAt = createdAt
+        }, new UserExternalLogin
+        {
+            Id = receipt.ExternalLoginId,
+            UserId = applicationUser.Id,
+            User = applicationUser,
+            AuthenticationProviderId = (int)AuthenticationProviderKind.Local,
+            AuthenticationProvider = null!,
+            ProviderKey = applicationUser.Id.ToString("D"),
+            CreatedAt = createdAt
+        });
+        await database.SaveChangesAsync();
+
+        LocalCredentialProvisioningSnapshot pending = (await credentials.ReadProvisioningAsync(
+            receipt.OperationId, CancellationToken.None))!;
+        LocalCredentialActivationOutcome activated = await credentials.ActivateChangeRequiredAsync(
+            new LocalCredentialActivationRequest(operationId: receipt.OperationId,
+                expectedOperationConcurrencyStamp: pending.OperationConcurrencyStamp), CancellationToken.None);
+        if (activated != LocalCredentialActivationOutcome.Activated)
+        {
+            throw new InvalidOperationException("The native Identity fixture could not activate its exact account binding.");
+        }
+        LocalIdentityUser user = (await manager.FindByIdAsync(receipt.LocalSubjectId.ToString("D")))!;
+        DateTimeOffset issuedAt = DateTimeOffset.UtcNow;
+        LocalCredentialReplacementOutcome replaced = await credentials.ReplaceAsync(new LocalCredentialReplacementRequest(
+            authority: new LocalCredentialReplacementAuthority(
+                subject: new LocalCredentialReplacementSubject(localSubjectId: user.Id,
+                    operationId: receipt.OperationId, securityStamp: user.SecurityStamp!),
+                issuedAtUtc: issuedAt, expiresAtUtc: issuedAt.AddMinutes(5)),
+            newPassword: password), CancellationToken.None);
+        if (replaced != LocalCredentialReplacementOutcome.Replaced)
+        {
+            throw new InvalidOperationException("The native Identity fixture could not establish ready credentials.");
+        }
+        DbContext identityDatabase = _identityTopology == IdentityDatabaseTopology.External
+            ? scope.ServiceProvider.GetRequiredService<ExternalIdentityDbContext>() : database;
+        await identityDatabase.Entry(user).ReloadAsync();
+        user.EmailConfirmed = emailConfirmed;
+        if (!(await manager.UpdateAsync(user)).Succeeded)
+        {
+            throw new InvalidOperationException("The native Identity fixture could not restore its verification state.");
+        }
+        applicationUser = await database.Users.SingleAsync(row => row.Id == receipt.LocalSubjectId);
+        applicationUser.EmailVerified = emailConfirmed;
+        await database.SaveChangesAsync();
 
         return new LocalAuthRequestDto(Email: email, Password: password);
     }
@@ -355,11 +455,22 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
                 using var connection = new SqliteConnection(_connectionString);
                 SqliteConnection.ClearPool(connection);
             }
+            if (_identityConnectionString is not null)
+            {
+                using var connection = new SqliteConnection(_identityConnectionString);
+                SqliteConnection.ClearPool(connection);
+            }
 
             File.Delete(_databasePath);
             File.Delete(_databasePath + "-wal");
             File.Delete(_databasePath + "-shm");
             File.Delete(_databasePath + ".setup");
+            if (_identityTopology == IdentityDatabaseTopology.External)
+            {
+                File.Delete(_identityDatabasePath);
+                File.Delete(_identityDatabasePath + "-wal");
+                File.Delete(_identityDatabasePath + "-shm");
+            }
         }
     }
 
@@ -375,6 +486,8 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
             });
         _connectionString = database.ConnectionString;
         options.UseSnakeCaseNamingConvention();
+        if (_persistenceInterceptor is not null)
+            options.AddInterceptors(_persistenceInterceptor);
     }
 
     private async Task SeedDatabaseAsync()

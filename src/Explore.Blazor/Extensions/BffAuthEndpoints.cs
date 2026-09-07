@@ -608,6 +608,7 @@ public static class BffAuthEndpoints
     {
         ctx.Response.Headers.CacheControl = "no-store, no-cache";
         ctx.Response.Headers.Pragma = "no-cache";
+        ctx.RequestServices.GetRequiredService<LocalCredentialChallengeCookie>().Delete(ctx);
 
         var logger = ctx.RequestServices.GetRequiredService<ILoggerFactory>()
             .CreateLogger("AuthEndpoints");
@@ -719,6 +720,9 @@ public static class BffAuthEndpoints
         IDynamicAuthSchemeManager schemeManager,
         CancellationToken cancellationToken)
     {
+        ctx.Response.Headers.CacheControl = "no-store";
+        var challengeCookie = ctx.RequestServices.GetRequiredService<LocalCredentialChallengeCookie>();
+        challengeCookie.Delete(ctx);
         if (!string.Equals(
                 schemeManager.GetActivePrimaryProvider(),
                 "local",
@@ -745,6 +749,40 @@ public static class BffAuthEndpoints
                     Password = request.Password
                 },
                 cancellationToken: cancellationToken);
+            if (response.ReplacementChallenge is { } challenge)
+            {
+                if (response.Success != false
+                    || !string.IsNullOrEmpty(response.FailureCode)
+                    || response.UserId is not null
+                    || response.Email is not null
+                    || response.FirstName is not null
+                    || response.LastName is not null
+                    || response.EmailVerified == true
+                    || response.Token is not null
+                    || response.ExpiresAt is not null
+                    || response.Roles is { Count: > 0 })
+                {
+                    return LocalAuthenticationFailure(StatusCodes.Status401Unauthorized);
+                }
+
+                await BffLocalCredentialEndpoints.ClearLocalSessionAsync(ctx);
+                var admission = await BffLocalCredentialEndpoints.GetFreshAdmissionAsync(ctx, cancellationToken);
+                if (admission != BffLocalCredentialEndpoints.LocalCredentialAdmission.Allowed)
+                {
+                    return LocalAuthenticationFailure(
+                        admission == BffLocalCredentialEndpoints.LocalCredentialAdmission.Denied
+                            ? StatusCodes.Status409Conflict
+                            : StatusCodes.Status503ServiceUnavailable);
+                }
+
+                if (!challengeCookie.TryIssue(ctx, challenge.Token, challenge.ExpiresAt))
+                {
+                    return LocalAuthenticationFailure(StatusCodes.Status401Unauthorized);
+                }
+
+                return Results.Ok(new { redirectUrl = BffLocalCredentialEndpoints.PasswordChangePath });
+            }
+
             return await CompleteLocalSignInAsync(
                 ctx,
                 response,
@@ -803,7 +841,7 @@ public static class BffAuthEndpoints
             .Select(role => new Claim(ClaimTypes.Role, role)));
         var principal = new ClaimsPrincipal(new ClaimsIdentity(
             claims,
-            "LocalIdentity",
+            CookieAuthenticationDefaults.AuthenticationScheme,
             ClaimTypes.Name,
             ClaimTypes.Role));
         string safeReturnUrl = ResolveLocalReturnUrl(returnUrl);

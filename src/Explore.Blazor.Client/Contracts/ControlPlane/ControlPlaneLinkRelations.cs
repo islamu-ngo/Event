@@ -5,6 +5,10 @@ namespace Explore.Blazor.Client.Contracts.ControlPlane;
 
 public static class ControlPlaneLinkRelations
 {
+    public const string LocalIdentities = "local-identities";
+    public const string CreateLocalIdentity = "create-local-identity";
+    public const string IssueTemporaryCredential = "issue-temporary-credential";
+    public const string Reconcile = "reconcile";
     public const string Self = "self";
     public const string Plans = "plans";
     public const string Settings = "settings";

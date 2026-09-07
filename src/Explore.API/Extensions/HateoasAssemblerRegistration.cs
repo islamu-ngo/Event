@@ -8,6 +8,8 @@ using Explore.API.Hateoas.Assemblers;
 using Explore.API.Hateoas.Policies;
 using Explore.API.Hateoas.Resources;
 using Explore.Application.Contracts.Hateoas;  // For ILinkPolicy, ICollectionLinkPolicy
+using Explore.Application.Contracts.Identity;
+using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.DTOs.Actor;
 using Explore.Application.DTOs.ActorSubscription;
 using Explore.Application.DTOs.Admissions;
@@ -226,6 +228,9 @@ public static class HateoasAssemblerRegistration
         services.AddHalResource<SchedulerAdminJobDto, SchedulerAdminJobLinkPolicy, SchedulerAdminJobCollectionLinkPolicy>();
 
         services.AddHalResource<ControlPlaneOverviewDto, ControlPlaneOverviewLinkPolicy, ControlPlaneOverviewCollectionLinkPolicy>();
+        services.AddHalResource<LocalIdentitySummary, LocalIdentityDetailLinkPolicy, LocalIdentityCollectionLinkPolicy>();
+        services.AddHalResource<LocalCredentialOperationStatus, LocalCredentialOperationDetailLinkPolicy, LocalCredentialOperationCollectionLinkPolicy>();
+        services.AddHalResource<LocalCredentialIssueDto, LocalCredentialIssueDetailLinkPolicy, LocalCredentialIssueCollectionLinkPolicy>();
         services.AddHalResource<ControlPlaneDomainOverviewDto, ControlPlaneDomainLinkPolicy, ControlPlaneDomainCollectionLinkPolicy>();
         services.AddHalResource<ControlPlaneOperationsDto, ControlPlaneOperationsLinkPolicy, ControlPlaneOperationsCollectionLinkPolicy>();
         services.AddHalResource<ControlPlaneDeploymentModeRunbookDto, ControlPlaneDeploymentModeRunbookLinkPolicy, ControlPlaneDeploymentModeRunbookCollectionLinkPolicy>();

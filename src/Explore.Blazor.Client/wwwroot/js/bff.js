@@ -174,6 +174,28 @@ export async function authenticateLocal(url, body) {
         : null;
 }
 
+/** Submit a new password; restricted authority stays in the BFF-owned HttpOnly cookie. */
+export async function replaceLocalCredential(body) {
+    const result = await _bffMutate('POST', '/bff/auth/local/credential-replacement', body);
+    if (result.status === 200 && result.data?.redirectUrl === '/login') {
+        return { redirectUrl: '/login' };
+    }
+
+    if (result.status === 400 && result.data?.code === 'password_rejected') {
+        return { errorCode: 'password_rejected' };
+    }
+    if (result.status === 401 && result.data?.code === 'replacement_required') {
+        return { errorCode: 'replacement_required' };
+    }
+    if (result.status === 409 && result.data?.code === 'replacement_conflict') {
+        return { errorCode: 'replacement_conflict' };
+    }
+    if (result.status === 429) {
+        return { errorCode: 'rate_limited' };
+    }
+    return null;
+}
+
 /** @private Shared mutation helper. Reads XSRF token from cookie if present. */
 async function _bffMutate(method, url, body) {
     try {

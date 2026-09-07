@@ -55,6 +55,7 @@ public sealed class LocalAdmissionPolicyHttpTests
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
         using HttpClient client = CreateClient(factory);
         LocalAuthRequestDto login = await factory.SeedLocalUserAsync(emailConfirmed: false);
+        LocalGraphSnapshot before = await ReadLocalGraphAsync(factory, login.Email);
 
         using HttpResponseMessage response = await client.PostAsJsonAsync("/api/auth/local/login", login);
 
@@ -66,15 +67,16 @@ public sealed class LocalAdmissionPolicyHttpTests
         await using ExploreDbContext stored = factory.CreateDatabase();
         await Assert.That((await stored.LocalIdentityUsers.SingleAsync(user => user.Email == login.Email))
             .EmailConfirmed).IsFalse();
-        await Assert.That(await stored.Users.AnyAsync(user => user.Pii.Email == login.Email)).IsFalse();
+        await Assert.That(await ReadLocalGraphAsync(factory, login.Email)).IsEqualTo(before);
     }
 
     [Test]
-    public async Task VerifiedLocalLoginIssuesNativeValidTokenAndSynchronizesDomainAccount()
+    public async Task VerifiedLocalLoginIssuesNativeValidTokenAndPreservesEstablishedBinding()
     {
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
         using HttpClient client = CreateClient(factory);
         LocalAuthRequestDto login = await factory.SeedLocalUserAsync(emailConfirmed: true);
+        LocalGraphSnapshot before = await ReadLocalGraphAsync(factory, login.Email);
 
         using HttpResponseMessage response = await client.PostAsJsonAsync("/api/auth/local/login", login);
 
@@ -96,6 +98,10 @@ public sealed class LocalAdmissionPolicyHttpTests
                 && binding.ProviderKey == identity.Id.ToString());
         await Assert.That(linked.User.Email).IsEqualTo(login.Email);
         await Assert.That(linked.User.EmailVerified).IsEqualTo(true);
+        LocalGraphSnapshot after = await ReadLocalGraphAsync(factory, login.Email);
+        await Assert.That(after.UserId).IsEqualTo(before.UserId);
+        await Assert.That(after.ActorId).IsEqualTo(before.ActorId);
+        await Assert.That(after.LoginId).IsEqualTo(before.LoginId);
     }
 
     [Test]
@@ -154,6 +160,7 @@ public sealed class LocalAdmissionPolicyHttpTests
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
         using HttpClient client = CreateClient(factory);
         LocalAuthRequestDto login = await factory.SeedLocalUserAsync(emailConfirmed: false);
+        LocalGraphSnapshot before = await ReadLocalGraphAsync(factory, login.Email);
         await SetInstanceIntentAsync(factory, intent);
 
         using HttpResponseMessage response = await client.PostAsJsonAsync("/api/auth/local/login", login);
@@ -163,8 +170,7 @@ public sealed class LocalAdmissionPolicyHttpTests
         await Assert.That(body.RootElement.GetProperty("code").GetString()).IsEqualTo("authentication_failed");
         await Assert.That(body.RootElement.TryGetProperty("token", out _)).IsFalse();
         await AssertUnconfirmedAsync(factory, login.Email);
-        await using ExploreDbContext stored = factory.CreateDatabase();
-        await Assert.That(await stored.Users.AnyAsync(user => user.Pii.Email == login.Email)).IsFalse();
+        await Assert.That(await ReadLocalGraphAsync(factory, login.Email)).IsEqualTo(before);
     }
 
     [Test]
@@ -263,6 +269,27 @@ public sealed class LocalAdmissionPolicyHttpTests
         await Assert.That((await stored.LocalIdentityUsers.SingleAsync(user => user.Email == email)).EmailConfirmed)
             .IsFalse();
     }
+
+    private static async Task<LocalGraphSnapshot> ReadLocalGraphAsync(LocalAdmissionWebApplicationFactory factory, string email)
+    {
+        await using ExploreDbContext database = factory.CreateDatabase();
+        UserExternalLogin login = await database.UserExternalLogins
+            .Include(binding => binding.User).ThenInclude(user => user.Pii)
+            .SingleAsync(binding => binding.AuthenticationProviderId == (int)AuthenticationProviderKind.Local
+                && binding.User.Pii.Email == email);
+        Actor actor = await database.Actors.Include(candidate => candidate.Pii)
+            .SingleAsync(candidate => candidate.UserId == login.UserId);
+        return new LocalGraphSnapshot(
+            UserId: login.UserId, ActorId: actor.Id, LoginId: login.Id,
+            Email: login.User.Email, FirstName: login.User.FirstName, LastName: login.User.LastName,
+            EmailVerified: login.User.EmailVerified, DisplayName: actor.DisplayName,
+            UserStamp: login.User.ConcurrencyStamp, ActorStamp: actor.ConcurrencyStamp);
+    }
+
+    private sealed record LocalGraphSnapshot(
+        Guid UserId, Guid ActorId, Guid LoginId,
+        string Email, string FirstName, string LastName, bool? EmailVerified, string DisplayName,
+        Guid UserStamp, Guid ActorStamp);
 
     private static HttpClient CreateClient(LocalAdmissionWebApplicationFactory factory) =>
         factory.CreateClient(new WebApplicationFactoryClientOptions

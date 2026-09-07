@@ -9,6 +9,10 @@ namespace Explore.Application.Hateoas;
 /// </summary>
 public static class LinkRelations
 {
+    public const string LocalIdentities = "local-identities";
+    public const string CreateLocalIdentity = "create-local-identity";
+    public const string IssueTemporaryCredential = "issue-temporary-credential";
+
     public const string CreateConfigurationImportSession =
         "create-configuration-import-session";
     public const string ExportTenantConfigurationPackage =

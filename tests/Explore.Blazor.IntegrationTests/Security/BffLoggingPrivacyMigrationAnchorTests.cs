@@ -14,6 +14,8 @@ using Explore.Blazor.Client.Configuration;
 using Explore.Blazor.Services;
 using Explore.Blazor.Services.Auth;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Components.Server;
 using Microsoft.AspNetCore.Components.Server.Circuits;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
@@ -150,15 +152,21 @@ public sealed class BffLoggingPrivacyMigrationAnchorTests
         };
         context.Items["AccessToken"] = token;
         context.Request.Headers.Cookie = cookie;
+        using var requestScope = factory.Services.CreateScope();
+        context.RequestServices = requestScope.ServiceProvider;
+        var authenticationState = new ServerAuthenticationStateProvider();
+        authenticationState.SetAuthenticationState(Task.FromResult(new AuthenticationState(context.User)));
         var store = new CircuitTokenStore(NullLogger<CircuitTokenStore>.Instance);
         var accessor = new HttpContextAccessor { HttpContext = context };
-        var handler = new TokenCircuitHandler(
-            accessor,
-            new CircuitAccessTokenService(
+        using var handler = new TokenCircuitHandler(
+            httpContextAccessor: accessor,
+            circuitAccessTokenService: new CircuitAccessTokenService(
                 store, accessor, NullLogger<CircuitAccessTokenService>.Instance),
-            new CircuitUserContext(),
-            new BffAuthCookieStore(),
-            capture.Factory.CreateLogger<TokenCircuitHandler>());
+            circuitUserContext: new CircuitUserContext(),
+            bffAuthCookieStore: new BffAuthCookieStore(),
+            logger: capture.Factory.CreateLogger<TokenCircuitHandler>(),
+            authenticationStateProvider: authenticationState,
+            adminClaimsTransformation: requestScope.ServiceProvider.GetRequiredService<BffAdminClaimsTransformation>());
 
         await handler.OnCircuitOpenedAsync(circuit, CancellationToken.None);
 

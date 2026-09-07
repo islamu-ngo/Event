@@ -1,5 +1,5 @@
-// ABOUTME: Cookie authentication events that refresh OIDC access tokens for browser-BFF hosts.
-// ABOUTME: Keeps refresh-token grant handling shared while delegating host-specific session cleanup and claim enrichment.
+// ABOUTME: Validates current browser-session authority before cookie acceptance and OIDC token refresh.
+// ABOUTME: Delegates host validation, typed rejection cleanup, and refreshed claim enrichment through shared callbacks.
 
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -13,15 +13,26 @@ using Microsoft.Extensions.Options;
 
 namespace Event.Web.BffHosting.Authentication;
 
+public enum EventBffSessionRejectionCategory
+{
+    CurrentAuthority = 1,
+    TokenRefresh = 2
+}
+
 public interface IEventBffCookieSessionHandler
 {
     Task OnSigningInAsync(CookieSigningInContext context);
+
+    Task<bool> ValidatePrincipalAsync(CookieValidatePrincipalContext context);
 
     Task OnTokenRefreshSucceededAsync(
         CookieValidatePrincipalContext context,
         IReadOnlyList<AuthenticationToken> refreshedTokens);
 
-    Task OnTokenRefreshRejectedAsync(CookieValidatePrincipalContext context, string reason);
+    Task OnTokenRefreshRejectedAsync(
+        CookieValidatePrincipalContext context,
+        EventBffSessionRejectionCategory category,
+        string reason);
 
     Task<bool> TryRedirectRejectedHtmlNavigationAsync(CookieValidatePrincipalContext context, string reason);
 }
@@ -30,11 +41,16 @@ public sealed class NoopEventBffCookieSessionHandler : IEventBffCookieSessionHan
 {
     public Task OnSigningInAsync(CookieSigningInContext context) => Task.CompletedTask;
 
+    public Task<bool> ValidatePrincipalAsync(CookieValidatePrincipalContext context) => Task.FromResult(true);
+
     public Task OnTokenRefreshSucceededAsync(
         CookieValidatePrincipalContext context,
         IReadOnlyList<AuthenticationToken> refreshedTokens) => Task.CompletedTask;
 
-    public Task OnTokenRefreshRejectedAsync(CookieValidatePrincipalContext context, string reason) =>
+    public Task OnTokenRefreshRejectedAsync(
+        CookieValidatePrincipalContext context,
+        EventBffSessionRejectionCategory category,
+        string reason) =>
         Task.CompletedTask;
 
     public Task<bool> TryRedirectRejectedHtmlNavigationAsync(
@@ -76,6 +92,15 @@ public class EventBffTokenRefreshCookieEvents(
 
     public override async Task ValidatePrincipal(CookieValidatePrincipalContext context)
     {
+        if (!await sessionHandler.ValidatePrincipalAsync(context))
+        {
+            await RejectAndSignOutAsync(
+                context: context,
+                category: EventBffSessionRejectionCategory.CurrentAuthority,
+                reason: "local_session_rejected");
+            return;
+        }
+
         var accessToken = context.Properties.GetTokenValue("access_token");
         if (string.IsNullOrEmpty(accessToken))
         {
@@ -110,7 +135,10 @@ public class EventBffTokenRefreshCookieEvents(
                     "[TokenRefresh] Refresh failed for scheme {Scheme} (reason={Reason}) — signing out",
                     schemeName,
                     result.FailureReason);
-                await RejectAndSignOutAsync(context, result.FailureReason ?? "refresh_failed");
+                await RejectAndSignOutAsync(
+                    context: context,
+                    category: EventBffSessionRejectionCategory.TokenRefresh,
+                    reason: result.FailureReason ?? "refresh_failed");
                 return;
             }
 
@@ -123,14 +151,20 @@ public class EventBffTokenRefreshCookieEvents(
         catch (Exception ex)
         {
             logger.LogError(ex, "[TokenRefresh] Exception during refresh for scheme {Scheme} — signing out", schemeName);
-            await RejectAndSignOutAsync(context, reason: "refresh_exception");
+            await RejectAndSignOutAsync(
+                context: context,
+                category: EventBffSessionRejectionCategory.TokenRefresh,
+                reason: "refresh_exception");
         }
     }
 
-    private async Task RejectAndSignOutAsync(CookieValidatePrincipalContext context, string reason)
+    private async Task RejectAndSignOutAsync(
+        CookieValidatePrincipalContext context,
+        EventBffSessionRejectionCategory category,
+        string reason)
     {
         context.HttpContext.Items[EventBffAuthenticationConstants.TokenRefreshRejectedItemKey] = true;
-        await sessionHandler.OnTokenRefreshRejectedAsync(context, reason);
+        await sessionHandler.OnTokenRefreshRejectedAsync(context: context, category: category, reason: reason);
         context.RejectPrincipal();
 
         try

@@ -17,6 +17,32 @@ namespace Event.Application.UnitTests.Features.Authentication.Local;
 
 public sealed class LocalAuthenticationCommandHandlerTests
 {
+    [Test]
+    public async Task ReplacementChallengeNeverEntersOrdinaryUserSynchronization()
+    {
+        var service = Substitute.For<ILocalIdentityAuthService>();
+        var sender = Substitute.For<ISender>();
+        var challenge = new LocalIssuedReplacementChallenge(
+            token: Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),
+            expiresAt: DateTimeOffset.UtcNow.AddMinutes(5));
+        service.AuthenticateAsync(Arg.Any<LocalAuthRequestDto>(), Arg.Any<CancellationToken>())
+            .Returns(LocalAuthResponseDto.ReplacementRequired(challenge: challenge));
+        sender.Send(Arg.Any<SyncUserCommand>(), Arg.Any<CancellationToken>())
+            .Returns<Task<BaseCommandResponse<Guid>>>(_ => throw new InvalidOperationException(
+                "A replacement challenge must not synchronize an ordinary user session."));
+        var handler = new LocalLoginCommandHandler(authService: service,
+            providerDispatcher: CreateActiveDispatcher(), sender: sender);
+
+        LocalAuthResponseDto response = await handler.Handle(
+            new LocalLoginCommand(new LocalAuthRequestDto(Email: "admin@example.test", Password: CreateValidPassword())),
+            CancellationToken.None);
+
+        await Assert.That(response.Outcome).IsEqualTo(LocalAuthOutcome.ReplacementRequired);
+        await Assert.That(response.Success).IsFalse();
+        await Assert.That(response.Token).IsNull();
+        await Assert.That(response.ReplacementChallenge?.Token).IsEqualTo(challenge.Token);
+    }
+
     private static readonly Guid UserId =
         Guid.Parse("01990aa7-4c67-7fb8-a303-8b301cc615af");
 
@@ -38,7 +64,7 @@ public sealed class LocalAuthenticationCommandHandlerTests
             CancellationToken.None);
 
         await Assert.That(result.Success).IsFalse();
-        await Assert.That(result.FailureCode).IsEqualTo("invalid_request");
+        await Assert.That(result.Failure).IsEqualTo(LocalAuthFailure.InvalidRequest);
         await authService.DidNotReceiveWithAnyArgs()
             .AuthenticateAsync(default!, default);
     }
@@ -99,22 +125,22 @@ public sealed class LocalAuthenticationCommandHandlerTests
             CancellationToken.None);
 
         await Assert.That(result.Success).IsFalse();
-        await Assert.That(result.FailureCode).IsEqualTo("provider_inactive");
+        await Assert.That(result.Failure).IsEqualTo(LocalAuthFailure.ProviderInactive);
         await authService.DidNotReceiveWithAnyArgs()
             .AuthenticateAsync(default!, default);
     }
 
     [Test]
-    [Arguments("email_verification_required")]
-    [Arguments("authentication_failed")]
-    public async Task DeniedIssuanceNeverAttemptsDomainSynchronization(string failureCode)
+    [Arguments(LocalAuthFailure.EmailVerificationRequired)]
+    [Arguments(LocalAuthFailure.AuthenticationFailed)]
+    public async Task DeniedIssuanceNeverAttemptsDomainSynchronization(LocalAuthFailure failure)
     {
         var authService = Substitute.For<ILocalIdentityAuthService>();
         var sender = Substitute.For<ISender>();
         authService.AuthenticateAsync(
                 Arg.Any<LocalAuthRequestDto>(),
                 Arg.Any<CancellationToken>())
-            .Returns(LocalAuthResponseDto.Failed(failureCode));
+            .Returns(LocalAuthResponseDto.Failed(failure: failure));
         sender.Send(Arg.Any<SyncUserCommand>(), Arg.Any<CancellationToken>())
             .Returns<Task<BaseCommandResponse<Guid>>>(_ =>
                 throw new InvalidOperationException("Denied issuance must not synchronize a domain user."));
@@ -128,7 +154,7 @@ public sealed class LocalAuthenticationCommandHandlerTests
             CancellationToken.None);
 
         await Assert.That(result.Success).IsFalse();
-        await Assert.That(result.FailureCode).IsEqualTo(failureCode);
+        await Assert.That(result.Failure).IsEqualTo(failure);
         await Assert.That(result.Token).IsNull();
     }
 
@@ -157,7 +183,7 @@ public sealed class LocalAuthenticationCommandHandlerTests
             CancellationToken.None);
 
         await Assert.That(result.Success).IsFalse();
-        await Assert.That(result.FailureCode).IsEqualTo("user_sync_failed");
+        await Assert.That(result.Failure).IsEqualTo(LocalAuthFailure.UserSynchronizationFailed);
         await Assert.That(result.Token).IsNull();
     }
 

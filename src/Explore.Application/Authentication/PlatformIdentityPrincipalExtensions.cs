@@ -2,6 +2,7 @@
 // ABOUTME: Single authority for the documented user-id fallback chain and provider account reconstruction.
 
 using System.Security.Claims;
+using Explore.Application.Configuration;
 using Explore.Application.Constants;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
@@ -35,6 +36,7 @@ public static class PlatformIdentityPrincipalExtensions
         ApiAuthenticationSchemeNames.AtprotoBootstrap,
         ApiAuthenticationSchemeNames.AtprotoSession,
         ApiAuthenticationSchemeNames.PrivacyErasureReceipt,
+        ApiAuthenticationSchemeNames.LocalCredentialReplacement,
     ];
 
     /// <summary>
@@ -56,6 +58,17 @@ public static class PlatformIdentityPrincipalExtensions
         if (identity is null)
         {
             return null;
+        }
+
+        if (string.Equals(GetAuthProvider(identity), "local", StringComparison.Ordinal))
+        {
+            string? subject = GetProviderSubject(identity);
+            if (string.IsNullOrWhiteSpace(subject)
+                || GetProviderAccountKey(identity, "local", subject) is null)
+            {
+                return null;
+            }
+            return Guid.ParseExact(subject, "D");
         }
 
         string?[] candidates =
@@ -212,6 +225,17 @@ public static class PlatformIdentityPrincipalExtensions
         string provider,
         string providerSubject)
     {
+        if (string.Equals(provider, "local", StringComparison.Ordinal))
+        {
+            string? localIssuer = identity?.FindFirst("iss")?.Value;
+            return string.Equals(localIssuer, LocalIdentityOptions.Issuer, StringComparison.Ordinal)
+                && Guid.TryParseExact(providerSubject, "D", out Guid localSubjectId)
+                && localSubjectId != Guid.Empty
+                && string.Equals(providerSubject, localSubjectId.ToString("D"), StringComparison.Ordinal)
+                    ? new ProviderAccountKey(providerKind: AuthenticationProviderKind.Local, value: providerSubject)
+                    : null;
+        }
+
         if (string.Equals(provider, AuthSchemeNames.Atproto.ToLowerInvariant(), StringComparison.Ordinal))
         {
             string didValue = identity?.FindFirst("did")?.Value

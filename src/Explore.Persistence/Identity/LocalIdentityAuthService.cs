@@ -3,6 +3,7 @@
 
 using System.Security.Cryptography;
 using System.Text.Json;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Authentication.Local.Models;
@@ -16,17 +17,20 @@ internal sealed class LocalIdentityAuthService : ILocalIdentityAuthService
     private readonly UserManager<LocalIdentityUser> _userManager;
     private readonly ILocalJwtTokenGenerator _tokenGenerator;
     private readonly ISystemSettingRepository _systemSettings;
+    private readonly LocalIdentityCredentialStateStore _credentialStates;
     private readonly LocalIdentityUser _dummyUser;
     private readonly string _dummyPasswordHash;
 
     public LocalIdentityAuthService(
         UserManager<LocalIdentityUser> userManager,
         ILocalJwtTokenGenerator tokenGenerator,
-        ISystemSettingRepository systemSettings)
+        ISystemSettingRepository systemSettings,
+        LocalIdentityCredentialStateStore credentialStates)
     {
         _userManager = userManager;
         _tokenGenerator = tokenGenerator;
         _systemSettings = systemSettings;
+        _credentialStates = credentialStates;
         _dummyUser = new LocalIdentityUser();
         _dummyPasswordHash = userManager.PasswordHasher.HashPassword(
             _dummyUser,
@@ -50,12 +54,12 @@ internal sealed class LocalIdentityAuthService : ILocalIdentityAuthService
                 _dummyUser,
                 _dummyPasswordHash,
                 request.Password);
-            return LocalAuthResponseDto.Failed("invalid_credentials");
+            return LocalAuthResponseDto.Failed(failure: LocalAuthFailure.InvalidCredentials);
         }
 
         if (await _userManager.IsLockedOutAsync(user).ConfigureAwait(false))
         {
-            return LocalAuthResponseDto.Failed("account_locked");
+            return LocalAuthResponseDto.Failed(failure: LocalAuthFailure.AccountLocked);
         }
 
         if (!await _userManager.CheckPasswordAsync(user, request.Password).ConfigureAwait(false))
@@ -65,45 +69,120 @@ internal sealed class LocalIdentityAuthService : ILocalIdentityAuthService
                 .ConfigureAwait(false);
             if (!accessFailure.Succeeded)
             {
-                return LocalAuthResponseDto.Failed("authentication_failed");
+                return LocalAuthResponseDto.Failed(failure: LocalAuthFailure.AuthenticationFailed);
             }
 
             return await _userManager.IsLockedOutAsync(user).ConfigureAwait(false)
-                ? LocalAuthResponseDto.Failed("account_locked")
-                : LocalAuthResponseDto.Failed("invalid_credentials");
+                ? LocalAuthResponseDto.Failed(failure: LocalAuthFailure.AccountLocked)
+                : LocalAuthResponseDto.Failed(failure: LocalAuthFailure.InvalidCredentials);
         }
 
+        string? checkedSecurityStamp = user.SecurityStamp;
+        bool checkedEmailVerified = user.EmailConfirmed;
         IdentityResult reset = await _userManager
             .ResetAccessFailedCountAsync(user)
             .ConfigureAwait(false);
         if (!reset.Succeeded)
         {
-            return LocalAuthResponseDto.Failed("authentication_failed");
+            return LocalAuthResponseDto.Failed(failure: LocalAuthFailure.AuthenticationFailed);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        if (!user.EmailConfirmed)
+        if (string.IsNullOrWhiteSpace(checkedSecurityStamp))
         {
-            try
+            return LocalAuthResponseDto.Failed(failure: LocalAuthFailure.InvalidCredentials);
+        }
+        try
+        {
+            LocalCredentialStateMetadata? credentialState = await _credentialStates
+                .ReadAsync(localSubjectId: user.Id, expectedSecurityStamp: checkedSecurityStamp,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+            if (credentialState?.State == LocalCredentialState.ChangeRequired)
+            {
+                LocalCredentialReplacementSubject? subject = await _credentialStates.ReadReplacementSubjectAsync(
+                    localSubjectId: user.Id,
+                    expectedSecurityStamp: checkedSecurityStamp,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+                if (subject is null)
+                {
+                    return LocalAuthResponseDto.Failed(failure: LocalAuthFailure.InvalidCredentials);
+                }
+                LocalIssuedReplacementChallenge challenge = await _tokenGenerator
+                    .GenerateReplacementChallengeAsync(subject, cancellationToken).ConfigureAwait(false);
+                return LocalAuthResponseDto.ReplacementRequired(challenge: challenge);
+            }
+            if (credentialState?.State != LocalCredentialState.Ready)
+            {
+                return LocalAuthResponseDto.Failed(failure: LocalAuthFailure.InvalidCredentials);
+            }
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return LocalAuthResponseDto.Failed(failure: LocalAuthFailure.AuthenticationFailed);
+        }
+
+        var authority = new LocalSessionAuthority(
+            localSubjectId: user.Id, securityStamp: checkedSecurityStamp, emailVerified: checkedEmailVerified);
+        (LocalIdentityUser? currentUser, LocalAuthFailure? failure) = await ReadValidatedSessionAsync(
+            authority: authority, cancellationToken: cancellationToken).ConfigureAwait(false);
+        if (failure is { } rejected)
+        {
+            return LocalAuthResponseDto.Failed(failure: rejected);
+        }
+        return await CreateAuthenticatedResponseAsync(
+            user: currentUser!,
+            authority: authority,
+            cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task<LocalSessionValidationOutcome> ValidateSessionAsync(
+        LocalSessionAuthority authority,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(authority);
+        cancellationToken.ThrowIfCancellationRequested();
+        var (_, failure) = await ReadValidatedSessionAsync(
+            authority: authority, cancellationToken: cancellationToken).ConfigureAwait(false);
+        return failure switch
+        {
+            null => LocalSessionValidationOutcome.Valid,
+            LocalAuthFailure.AuthenticationFailed => LocalSessionValidationOutcome.Unavailable,
+            _ => LocalSessionValidationOutcome.Invalid
+        };
+    }
+
+    private async Task<(LocalIdentityUser? User, LocalAuthFailure? Failure)> ReadValidatedSessionAsync(
+        LocalSessionAuthority authority,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            LocalIdentityUser? user = await _credentialStates.ReadReadySessionAsync(authority, cancellationToken)
+                .ConfigureAwait(false);
+            if (user is null)
+            {
+                return (User: null, Failure: LocalAuthFailure.InvalidCredentials);
+            }
+            if (!user.EmailConfirmed)
             {
                 var intent = await _systemSettings.GetByKey(
-                    GovernanceSettingKeys.Email.DeliveryEnabled,
-                    cancellationToken).ConfigureAwait(false);
+                    GovernanceSettingKeys.Email.DeliveryEnabled, cancellationToken).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
                 if (intent is not null && JsonSerializer.Deserialize<bool>(intent.Value))
                 {
-                    return LocalAuthResponseDto.Failed("email_verification_required");
+                    return (User: null, Failure: LocalAuthFailure.EmailVerificationRequired);
                 }
             }
-            catch (Exception exception) when (exception is not OperationCanceledException)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                return LocalAuthResponseDto.Failed("authentication_failed");
-            }
+            cancellationToken.ThrowIfCancellationRequested();
+            return (User: user, Failure: null);
         }
-
-        return await CreateAuthenticatedResponseAsync(user, cancellationToken)
-            .ConfigureAwait(false);
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return (User: null, Failure: LocalAuthFailure.AuthenticationFailed);
+        }
     }
 
     public Task RequestPasswordResetAsync(
@@ -133,23 +212,23 @@ internal sealed class LocalIdentityAuthService : ILocalIdentityAuthService
 
     private async Task<LocalAuthResponseDto> CreateAuthenticatedResponseAsync(
         LocalIdentityUser user,
+        LocalSessionAuthority authority,
         CancellationToken cancellationToken)
     {
         string? email = user.Email;
         if (string.IsNullOrWhiteSpace(email))
         {
-            return LocalAuthResponseDto.Failed("authentication_failed");
+            return LocalAuthResponseDto.Failed(failure: LocalAuthFailure.AuthenticationFailed);
         }
 
         IList<string> roles = await _userManager.GetRolesAsync(user).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         LocalIssuedToken issued = await _tokenGenerator.GenerateAsync(
             new LocalJwtTokenSubject(
-                userId: user.Id,
+                authority: authority,
                 email: email,
                 firstName: user.FirstName,
                 lastName: user.LastName,
-                emailVerified: user.EmailConfirmed,
                 roles: roles),
             cancellationToken).ConfigureAwait(false);
         return LocalAuthResponseDto.Authenticated(

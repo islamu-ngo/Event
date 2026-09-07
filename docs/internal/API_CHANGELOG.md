@@ -3,8 +3,65 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 # API Changelog
 
+## 2026-09-07
+
+- **Additive: instance-owned Local credential administration.** The following
+  private/no-store operations require a current persisted instance-admin grant:
+
+  | Method and route | Operation |
+  | --- | --- |
+  | GET `/api/instance/local-identities` | `ListLocalIdentities` |
+  | POST `/api/instance/local-identities` | `CreateLocalIdentity` |
+  | POST `/api/instance/local-identities/{userId}/temporary-credential` | `ResetLocalCredential` |
+  | GET `/api/instance/local-identity-operations/{operationId}` | `GetLocalCredentialOperation` |
+  | POST `/api/instance/local-identity-operations/{operationId}/reconcile` | `ReconcileLocalCredentialOperation` |
+
+  Create returns 201; reset, safe replay, status and reconciliation return 200.
+  Caller-owned operation IDs support recovery, but generic response replay is
+  disabled for create, reset and reconciliation: only successful issuance contains
+  the generated temporary password, and every retry rechecks current administrator
+  authority. Bodies cannot supply actor, verification or initial-password
+  authority. Missing targets return 404, conflicts 409, and denied instance
+  authority 403; unauthenticated writes retain native 401. HAL advertises create,
+  eligible reset and pending-create reconciliation; the control-plane overview
+  links to the collection. Regenerate clients from the native OpenAPI export.
+- **Correction: nullable HAL enum contracts preserve unknown state.** The native
+  HAL schema transformer now retains CLR nullable enum properties on both DTOs
+  and flattened wrappers. Generated clients can read `credentialState: null` for
+  missing or invalid credential metadata instead of throwing or inventing a state.
+  Nonnullable enum properties retain their existing wire contracts.
+- **Breaking: Local access tokens require current credential authority.** Ordinary
+  JWTs now carry `local_session_stamp` and an explicit verification fact. Protected
+  API requests validate current Ready credentials, completed operation and active
+  account binding before claims enrichment. Reset, stamp or verification changes,
+  invalid binding, and enabled email intent for unverified credentials deny access.
+  Invalid or unreadable current authority returns bounded HTTP 401. Previously
+  issued stamp-less tokens require fresh login; no compatibility path is retained.
+  External-provider and restricted replacement schemes are unchanged.
+- **Security: Local browser sessions recheck current credential authority.** Native
+  cookie validation and subsequent interactive activities probe the existing
+  current-user API with the original server-held token. Invalid authority rejects
+  the cookie or stops circuit dispatch and publishes anonymous state. Cleanup is
+  limited to the original session and cannot adopt or remove a newer same-user
+  login. No new endpoint, browser token exposure or client regeneration is required.
+
 ## 2026-09-06
 
+- **Additive: first-use Local credentials yield restricted replacement authority.**
+  Local login can return `replacementChallenge` instead of an ordinary token.
+  `POST /api/auth/local/credential-replacement` accepts that challenge as Bearer
+  authorization and a password-only body. Success is empty HTTP 204 and requires
+  fresh login; password rejection is 400, invalid authority 401, and concurrency
+  conflict 409. Ordinary access tokens cannot authorize replacement. Responses
+  are private/no-store and excluded from generic idempotency storage and replay.
+  Regenerate clients from `schemas/openapi_islamu-event.json`.
+- **Additive: browser Local password replacement uses a separate restricted cookie.**
+  Temporary-password login directs the browser to `/auth/local/change-password`.
+  `POST /bff/auth/local/credential-replacement` requires antiforgery and accepts
+  only the new password; the BFF supplies its protected challenge server-side.
+  Completion clears the challenge and returns fixed `/login` navigation without
+  signing the browser in. Local credential responses are private/no-store,
+  including early request rejection.
 - **Breaking: public Local registration is removed.** `POST /api/auth/local/register`
   (`RegisterLocalIdentity`) and `POST /bff/auth/local/register` no longer create
   credentials. The registration command and request/response contracts are retired;

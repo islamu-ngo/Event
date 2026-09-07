@@ -1,0 +1,155 @@
+@* ABOUTME: Provides the instance administration section for Local accounts and one-time credential handover. *@
+@* ABOUTME: Keeps Local account actions inside the shared settings layout and its server-authored HAL boundary. *@
+
+@using Explore.Blazor.Client.Components.Common
+@using MudBlazor
+
+<section class="local-accounts" aria-labelledby="local-accounts-heading" dir="auto">
+    <h2 id="local-accounts-heading" tabindex="-1">@T("heading", "Local accounts")</h2>
+    <p>@T("summary", "Create Local accounts and supervise temporary credential handover. Recipients must replace temporary passwords before signing in.")</p>
+    @if (_loading)
+    {
+        <p role="status">@T("loading", "Checking Local account availability…")</p>
+    }
+    else if (!IsAvailable)
+    {
+        <p>@T("unavailable", "Local account administration is unavailable because the server did not advertise this capability.")</p>
+    }
+    else
+    {
+        @if (CanCreate)
+        {
+            <div class="local-accounts__actions">
+                <AppButton OnClick="OpenCreate" Disabled="@(_busy || HasPendingOperations)">
+                    @T("create.open", "Create local account")
+                </AppButton>
+            </div>
+        }
+        @if (_mode == FormMode.Create)
+        {
+            <form class="local-accounts__form" data-local-account-create="true" novalidate
+                  @onsubmit="SubmitCreateAsync" @onsubmit:preventDefault="true" aria-busy="@(_busy ? "true" : "false")">
+                <h3>@T("create.heading", "New Local account")</h3>
+                <p id="local-account-help">@T("create.help", "The server generates the temporary password. Arrange a private handover with the recipient.")</p>
+                <label for="local-account-email">@T("email", "Email")</label>
+                <AppTextField T="string" Id="local-account-email" @bind-Value="_email" InputType="InputType.Email"
+                              Required="true" MaxLength="256" Disabled="_busy" autocomplete="email"
+                              HelperId="local-account-help" Error="@(_validationAttempted && EmailInvalid)"
+                              ErrorId="local-account-email-error" ErrorText="@T("error.email", "Enter a valid email address of at most 256 characters.")" />
+                <label for="local-account-first-name">@T("firstName", "First name")</label>
+                <AppTextField T="string" Id="local-account-first-name" @bind-Value="_firstName"
+                              Required="true" MaxLength="200" Disabled="_busy" autocomplete="given-name"
+                              HelperId="local-account-help" Error="@(_validationAttempted && FirstNameInvalid)"
+                              ErrorId="local-account-first-name-error" ErrorText="@T("error.firstName", "Enter a first name of at most 200 characters.")" />
+                <label for="local-account-last-name">@T("lastName", "Last name")</label>
+                <AppTextField T="string" Id="local-account-last-name" @bind-Value="_lastName"
+                              MaxLength="200" Disabled="_busy" autocomplete="family-name"
+                              HelperId="local-account-help" Error="@(_validationAttempted && LastNameInvalid)"
+                              ErrorId="local-account-last-name-error" ErrorText="@T("error.lastName", "Use at most 200 characters for the last name.")" />
+                <div class="local-accounts__actions">
+                    <AppButton ButtonType="ButtonType.Submit" Disabled="_busy">@T("create.submit", "Submit local account")</AppButton>
+                    <AppButton Variant="Variant.Outlined" OnClick="CancelInteraction">@T("create.cancel", "Cancel account creation")</AppButton>
+                </div>
+            </form>
+        }
+        @if (_mode == FormMode.Reset && _selectedIdentity is { } selected)
+        {
+            <form class="local-accounts__form" data-local-credential-reset="true" novalidate
+                  @onsubmit="SubmitResetAsync" @onsubmit:preventDefault="true" aria-busy="@(_busy ? "true" : "false")">
+                <h3>@T("reset.heading", "Issue a temporary credential")</h3>
+                <p dir="auto">@selected.FirstName @selected.LastName — @selected.Email</p>
+                <p id="local-reset-help">@T("reset.help", "This replaces the current password and revokes existing Local sessions. Record why you are resetting this account.")</p>
+                <label for="local-reset-reason">@T("reset.reason", "Reset reason")</label>
+                <AppTextField T="string" Id="local-reset-reason" @bind-Value="_reason" Required="true"
+                              MaxLength="1000" Disabled="_busy" autocomplete="off" HelperId="local-reset-help"
+                              Error="@(_validationAttempted && ReasonInvalid)" ErrorId="local-reset-reason-error"
+                              ErrorText="@T("error.reason", "Enter a reset reason of at most 1000 characters.")" />
+                <div class="local-accounts__actions">
+                    <AppButton ButtonType="ButtonType.Submit" Disabled="_busy">@T("reset.submit", "Submit temporary credential")</AppButton>
+                    <AppButton Variant="Variant.Outlined" OnClick="CancelInteraction">@T("reset.cancel", "Cancel reset")</AppButton>
+                </div>
+                <p>@T("cancel.warning", "Canceling closes this form but cannot undo a request already accepted by the server. Keep its operation ID to check the outcome.")</p>
+            </form>
+        }
+        @if (_temporaryPassword is not null)
+        {
+            <div class="local-accounts__handover" role="group" aria-labelledby="local-handover-heading">
+                <h3 id="local-handover-heading" tabindex="-1">@T("handover.heading", "Temporary password")</h3>
+                <p id="local-handover-help">@T("handover.help", "Shown once. Select and deliver this password privately to the intended recipient. It is not emailed or saved here. The recipient must choose a new password before signing in.")</p>
+                <code class="local-accounts__credential" tabindex="0" aria-describedby="local-handover-help">@_temporaryPassword</code>
+                <AppButton Variant="Variant.Outlined" OnClick="DismissCredential">@T("handover.dismiss", "Dismiss credential")</AppButton>
+            </div>
+        }
+        <ul class="local-accounts__list" aria-label="@T("list.label", "Local accounts")">
+            @foreach (var identity in Identities)
+            {
+                <li @key="identity.LocalSubjectId" class="local-accounts__account" data-local-subject-id="@identity.LocalSubjectId.ToString("D")">
+                    <div class="local-accounts__identity">
+                        <strong dir="auto">@identity.FirstName @identity.LastName</strong>
+                        <span dir="auto">@identity.Email</span>
+                        <span>@CredentialStateLabel(identity.CredentialState)</span>
+                    </div>
+                    @if (CanReset(identity))
+                    {
+                        <AppButton Variant="Variant.Outlined" OnClick="@(() => OpenReset(identity))"
+                                   Disabled="@(_busy || _identitiesStale || HasPendingReset(identity.LocalSubjectId))">
+                            @T("reset.open", "Issue temporary credential")
+                        </AppButton>
+                    }
+                </li>
+            }
+        </ul>
+        @if (!Identities.Any())
+        {
+            <p>@T("empty", "No Local accounts were returned.")</p>
+        }
+        <div class="local-accounts__actions">
+            @if (_identities?.HasPrevious == true && _identities.PageNumber is > 1)
+            {
+                <AppButton Variant="Variant.Outlined" Disabled="_busy" OnClick="@(() => LoadAsync(_identities.PageNumber.Value - 1))">@T("previous", "Previous page")</AppButton>
+            }
+            @if (_identities?.HasNext == true && _identities.PageNumber is > 0 and < int.MaxValue)
+            {
+                <AppButton Variant="Variant.Outlined" Disabled="_busy" OnClick="@(() => LoadAsync(_identities.PageNumber.Value + 1))">@T("next", "Next page")</AppButton>
+            }
+        </div>
+        <form class="local-accounts__form" data-local-operation-check="true" novalidate
+              @onsubmit="CheckOperationAsync" @onsubmit:preventDefault="true">
+            <h3>@T("operation.heading", "Check a credential operation")</h3>
+            <p id="local-operation-help">@T("operation.help", "If a response was lost, check the original operation ID. Status and reconciliation never disclose a password or issue another one.")</p>
+            <label for="local-operation-id">@T("operation.id", "Operation ID")</label>
+            <AppTextField T="string" Id="local-operation-id" @bind-Value="_operationInput" Disabled="_busy"
+                          HelperId="local-operation-help" autocomplete="off" spellcheck="false"
+                          Error="_operationIdInvalid" ErrorId="local-operation-id-error"
+                          ErrorText="@T("error.operationId", "Enter a valid operation ID.")" />
+            <AppButton ButtonType="ButtonType.Submit" Disabled="_busy">@T("operation.check", "Check operation")</AppButton>
+        </form>
+        @if (_operation is not null)
+        {
+            <p>@T("operation.found", "Operation found:") <span>@_operation.Receipt.OperationId</span></p>
+            <p>@T("operation.stage", "Stage:") @OperationStageLabel(_operation.Receipt.Stage)</p>
+            @if (CanReconcile)
+            {
+                <AppButton OnClick="ReconcileAsync" Disabled="_busy">@T("operation.reconcile", "Reconcile")</AppButton>
+            }
+        }
+        @if (HasPendingOperations)
+        {
+            <p>@T("operation.recoveryRequired", "The previous issuance may have completed. Check its operation ID before repeating work for that account.")</p>
+            <ul aria-label="@T("operation.unresolved", "Unconfirmed credential operations")">
+                @foreach (var pending in _pendingOperations)
+                {
+                    <li @key="pending.Key"><code>@pending.Key.ToString("D")</code></li>
+                }
+            </ul>
+        }
+    }
+    @if (_errorMessage is not null)
+    {
+        <p class="local-accounts__error" id="local-accounts-error" role="alert">@_errorMessage</p>
+    }
+    @if (_notice is not null)
+    {
+        <p role="status">@_notice</p>
+    }
+</section>

@@ -94,6 +94,7 @@ public static class ServiceRegistrationExtensions
                 ?? configuration["SETUP_SECRET"]?.Trim();
         });
         services.AddSingleton<ISetupSecretCookieProtector, SetupSecretCookieProtector>();
+        services.AddSingleton<LocalCredentialChallengeCookie>();
         services.AddScoped<ISetupSecretResolver, SetupSecretResolver>();
         services.AddScoped<IStorageUploadSessionStore, StorageUploadSessionStore>();
         services.AddScoped<IBffSupportAccessSessionStore, BffSupportAccessSessionStore>();

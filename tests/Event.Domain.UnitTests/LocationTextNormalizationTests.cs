@@ -9,6 +9,8 @@ public sealed class LocationTextNormalizationTests
 {
     [Test]
     [Arguments("Cafe\u0301", "CAFÉ")]
+    [Arguments("a\u030Angstro\u0308m", "ÅNGSTRÖM")]
+    [Arguments("\u1100\u1161", "\uAC00")]
     [Arguments("é", "É")]
     [Arguments("Straße", "STRAßE")]
     [Arguments("İstanbul", "İSTANBUL")]

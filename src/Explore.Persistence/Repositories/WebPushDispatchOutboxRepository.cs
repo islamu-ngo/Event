@@ -290,7 +290,8 @@ public sealed class WebPushDispatchOutboxRepository : IWebPushDispatchOutboxRepo
         DateTime failedAt,
         CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async cancellationToken =>
         {
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
             var updatedDispatch = await _dbContext.WebPushDispatchOutbox
@@ -335,7 +336,7 @@ public sealed class WebPushDispatchOutboxRepository : IWebPushDispatchOutboxRepo
 
             await transaction.CommitAsync(cancellationToken);
             return true;
-        });
+        }, cancellationToken);
     }
 
     private async Task<bool> SameTenantInactiveSubscriptionExists(Guid tenantId, Guid subscriptionId, CancellationToken cancellationToken)

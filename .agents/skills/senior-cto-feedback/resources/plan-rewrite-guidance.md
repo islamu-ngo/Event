@@ -1,10 +1,10 @@
-<!-- ABOUTME: Rewrite guidance for improving implementation-plan workstreams after CTO review. -->
-<!-- ABOUTME: Converts vague planning into executable plan/context/tasks updates with cleaner sequencing and stronger verification. -->
+<!-- ABOUTME: Direct triad update guidance for Senior CTO reviews of implementation-plan workstreams. -->
+<!-- ABOUTME: Converts architectural critique into executable plan.md, context.md, and tasks.md updates without creating review files. -->
 # Plan Rewrite Guidance
 
-Use this when the user wants the plan improved, or when the CTO feedback should include a better implementation sequence.
+This guidance governs how the Senior CTO review directly refines, tightens, and updates the workstream triad (`plan.md`, `context.md`, `tasks.md`).
 
-The target is usually an existing `implementation-plan` workstream, not a blank outline. Rewrite the existing `plan.md`, `context.md`, and `tasks.md` so future agents can implement from them directly.
+Senior CTO review **never** writes `*-cto-review.md` files. Instead, 100% of the CTO's review brain and architectural rigor is applied directly as in-place edits to the existing `plan.md`, `context.md`, and `tasks.md` so future agents can implement from them directly without friction or artifact clutter. No prior approval is required before applying these edits.
 
 ## Rewrite Principles
 
@@ -32,18 +32,32 @@ When improving a workstream:
 1. tighten `...-plan.md` to reflect the real architecture and sequence;
 2. update `...-context.md` so the current status, next step, and risks match the rewritten plan;
 3. update `...-tasks.md` so each phase and verification step maps to the rewritten plan;
-4. remove or rename tasks that no longer match the recommended direction.
-5. compare the rewrite against I-VSD refresh triggers and synchronize review state.
+4. remove or rename tasks that no longer match the recommended direction;
+5. compare the rewrite against I-VSD refresh triggers and synchronize review state;
 6. close every phase with an immediate, phase-owned `conventional-commit` task after verification, including a concrete planning-authored default message; never retain a final-only catch-all commit or implementation-time message placeholder.
+
+## Zero-Loss Information Preservation (Where Review Data Lives)
+
+Eliminating separate `*-cto-review.md` files must **never** result in lost review intelligence. Chat output is ephemeral, whereas the triad (`plan.md`, `context.md`, `tasks.md`) is durable and persistent across sessions.
+
+Every piece of architectural analysis, risk profiling, adversarial stress-testing, and scoring must be permanently recorded into its canonical location across the triad:
+
+| Review Dimension / Element | Destination in the Triad | How & Why It Is Preserved |
+|---|---|---|
+| **3D Evaluation Scorecard**<br>(Completeness, Correctness, Coherence) | `plan.md` §0 Planning Metadata & `context.md` Review State | Records the baseline audit scores, gate status, and alignment date permanently in metadata so future sessions know the exact architectural evaluation. |
+| **Source-Free Research & Seams Evidence** | `plan.md` §2 Source-Grounded Current State (Evidence Log, Seams) | Codebase reality, verified types, callers/callees, extension seams, and AST evidence live directly in §2.1–§2.9 of the plan. |
+| **Socratic Stress-Testing Challenges**<br>(Scenarios, Questions, Edge Cases) | `plan.md` §3 Proposed Future State & §5 Architecture Decisions | Converts Socratic challenges directly into explicit RFC 2119 requirements (WHEN/THEN behavior rules) and concrete architectural invariants. |
+| **"The Worst Break" Catastrophic Failure Mode** | `plan.md` §7.1 Testing Strategy / §9 Security & `tasks.md` Phase Red Tasks | Documents the catastrophic production failure mode in the testing strategy, and immediately translates it into failing Invariant-Breaker specification tests in Phase Red before implementation. |
+| **Ranked Top Risks & Minimum Acceptable Fixes**<br>(Blocker, Critical, Major) | `plan.md` §13/§14.2 Risk Register & `context.md` Known Risks | Preserves ranked risks with concrete mitigations, severity tiers, and verification triggers in the risk register rather than an isolated review document. |
+| **Breaking Deletions & Legacy Elimination** | `plan.md` §12 Migration & Compatibility Plan & `context.md` Key Decisions | Explicitly records obsolete code, endpoints, tables, and adapter shims marked for outright deletion under greenfield development principles. |
+| **Test-First Sequences & Atomic Commits** | `tasks.md` Phase Checklist & Planned Commit Contracts | Turns architectural advice into an executable, verifiable sequence of Red -> Green -> Refactor tasks with path-limited Conventional Commits. |
 
 ## I-VSD Invalidation After Rewrites
 
 Use the refresh triggers in `.agents/skills/i-vsd/resources/integration-contract.md`.
 
 - If the rewrite changes provider authority, affected stakeholders, user defaults/rights, data/AI/telemetry, moderation, monetization, portability, deployment responsibility, an escalation gate, or an `IVSD-*` task mapping, mark the report `stale`.
-- Set CTO review to `Changes required` and user approval to `Awaiting approval` for the rewritten revision.
-- Route the updated triad through I-VSD planning-mode revalidation, then require a fresh CTO review bound to the new plan/tasks and report revisions.
-- Do not approve the same revision in the pass that rewrote it.
+- Update `plan.md` Section 0 Metadata to show `CTO Review: Applied & Aligned (YYYY-MM-DD)` and record that I-VSD revalidation is required before implementation.
 - If the rewrite is wording, formatting, status, evidence-location, or architecture-detail clarification with no provider-responsibility change, preserve the current report and record why no refresh trigger fired.
 
 ## Recommended Plan Shape

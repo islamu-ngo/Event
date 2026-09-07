@@ -28,8 +28,8 @@ public sealed class TagAnchoredReVerificationTests
 
         await Assert.That(candidateCode).IsEqualTo(Program.Success).Because(candidateOutput);
         await Assert.That(tagCode).IsEqualTo(Program.Success).Because(tagOutput);
-        await Assert.That(candidateOutput).IsEqualTo("release_candidate_verified: docs/releases/1.1.0/release-candidate.v1.json\n");
-        await Assert.That(tagOutput).IsEqualTo("release_tag_verified: docs/releases/1.1.0/release-evidence.v1.json\n");
+        await Assert.That(candidateOutput).IsEqualTo("release_candidate_verified: docs/internal/releases/1.1.0/release-candidate.v1.json\n");
+        await Assert.That(tagOutput).IsEqualTo("release_tag_verified: docs/internal/releases/1.1.0/release-evidence.v1.json\n");
     }
 
     [Test]

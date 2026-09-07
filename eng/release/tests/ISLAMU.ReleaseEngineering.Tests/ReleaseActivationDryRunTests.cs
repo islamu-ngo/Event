@@ -104,7 +104,7 @@ public sealed class ReleaseActivationDryRunTests
 
         using var fixture = GovernedReleaseFixture.CreateSha1();
 
-        // Every generated artifact must live under docs/releases/<version>/. Nothing in the
+        // Every generated artifact must live under docs/internal/releases/<version>/. Nothing in the
         // repository root, docs/, or CHANGELOG.md may be written by the release flow, so an
         // ordinary push to a development branch cannot produce changelog churn.
         string[] generated = Directory
@@ -121,10 +121,10 @@ public sealed class ReleaseActivationDryRunTests
 
         await Assert.That(generated).IsEquivalentTo(new[]
         {
-            $"docs/releases/{GovernedReleaseFixture.FirstReleaseVersion}/release-context.v1.json",
-            $"docs/releases/{GovernedReleaseFixture.FirstReleaseVersion}/release-notes.md",
-            $"docs/releases/{GovernedReleaseFixture.SecondReleaseVersion}/release-context.v1.json",
-            $"docs/releases/{GovernedReleaseFixture.SecondReleaseVersion}/release-notes.md",
+            $"docs/internal/releases/{GovernedReleaseFixture.FirstReleaseVersion}/release-context.v1.json",
+            $"docs/internal/releases/{GovernedReleaseFixture.FirstReleaseVersion}/release-notes.md",
+            $"docs/internal/releases/{GovernedReleaseFixture.SecondReleaseVersion}/release-context.v1.json",
+            $"docs/internal/releases/{GovernedReleaseFixture.SecondReleaseVersion}/release-notes.md",
         });
     }
 }

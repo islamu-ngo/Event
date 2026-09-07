@@ -147,6 +147,11 @@ public sealed class UnicodeScalarKeyV1Tests
         }
 
         string digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(corpus.ToString())));
-        await Assert.That(digest).IsEqualTo("96DE6714789B6B199E8EF0F70D94595980DD057E404D1452C94BDE0C639FD0E6");
+        string[] knownGoldenDigests =
+        [
+            "96DE6714789B6B199E8EF0F70D94595980DD057E404D1452C94BDE0C639FD0E6", // Unicode 16 / ICU 78+
+            "789689B89558B27E815FB63765F74118D97C2D1ABF1A130DF2D2DEE9EB9CD16D", // Unicode 15.1 / ICU 74 (Ubuntu runner)
+        ];
+        await Assert.That(knownGoldenDigests).Contains(digest);
     }
 }

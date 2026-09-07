@@ -114,7 +114,7 @@ with both `Changelog: skip` and a non-empty `Changelog-Reason:`; breaking
 changes cannot be skipped.
 
 High-impact, breaking, migration, security, and deterministically grouped work also
-needs a governed change fragment under `docs/releases/changes/<change-id>.yaml` and a
+needs a governed change fragment under `docs/internal/releases/changes/<change-id>.yaml` and a
 matching `Change-Id:` footer. A backport records the original commit in that fragment's
 `Backport-Of` field as a full object ID.
 

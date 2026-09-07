@@ -41,6 +41,12 @@ ABOUTME: Focuses on non-inferable constraints and project-specific behavior.
 29. **Dependencies must preserve outbound licensing options**: Do not add a library, package, image, asset, or generated component whose terms prevent ISLAMU-owned material from being offered under any outbound license the Project Steward may select under the CLA. Third-party material always retains its own terms; commercial or exceptional use requires documented approval for each distribution mode.
 30. **No Python/JavaScript tooling & scripting as last resort**: Agents must not run or author Python or Node/JS scripts. Rely on native editing tools (`apply_patch`, `replace_file_content`) and standard Bash commands. Creating scripts is an absolute last resort (high ROI only) and belongs in `eng/` (C# / Bash). `.ci/scripts/` is strictly for CI/CD pipelines.
 31. **Secrets Source of Truth**: Secrets, passwords, API tokens, connection strings, and encryption keys must never be hard-coded or defined in `Explore.AppHost` (`AppHost.cs`), test fixtures, controllers, or code. Secrets reside strictly in **Infisical**, explicit environment injection documented by **`.env.example`**, or the explicitly selected shared **.NET User Secrets** authority in **Development/Testing only**. User Secrets are rejected elsewhere and never act as fallback. Tests and local hosting bind dynamically through an approved authority or secret provider mocks.
+32. **Self-Contained Interaction & Zero Plan-Opening Overhead**: Prompts, feedback requests, milestone reports, and approval inquiries MUST be completely self-contained and immediately actionable without requiring the developer to open `dev/active/<task>/...`. Bare internal codes (`P04/P06`, `T02.1`, `P03 gates`) are forbidden in isolation. Every approval or decision prompt must provide an inline Decision Brief with plain-English feature names, clear context, trade-offs, and recommended options.
+33. **The 3-Ring Progressive Verification Model & Yak-Shaving Quarantine**:
+    - **Ring 1 (Inner Loop / Sliced)**: In-progress subtasks run in-memory TUnit sliced tests (`--treenode-filter "/*/*/*<TestClass>/*"`) targeting `Event.Domain.UnitTests` or `Event.Application.UnitTests` (< 2s, 0 Docker containers, 0 network I/O). 90%+ of domain/normalization/validation invariants belong in Domain unit tests.
+    - **Ring 2 (Phase Exit Gate)**: Verify the modified project against a single canonical provider in < 15s.
+    - **Ring 3 (Plan Exit Gate)**: The full 5-database matrix, migrations, and architecture tests run strictly at plan exit before PR creation.
+    - **Yak-Shaving Quarantine**: Agents are strictly forbidden from fixing unrelated pre-existing test suite rot or fixture failures encountered during feature tasks. Prove if it reproduces on untouched base, log it in `*-context.md` / `dev/backlog/`, quarantine it, and proceed with the assigned scope.
 
 ## Multi-Tenancy Reminder
 Runtime tenant resolution:
@@ -67,8 +73,12 @@ Database defense-in-depth (PostgreSQL):
 ## Build And Test Baseline
 
 1. Build: `dotnet build --configuration Release --verbosity quiet`
-2. Run test projects individually with `dotnet test --project <path>.csproj` (not solution-level test).
+2. Follow the **3-Ring Progressive Verification Model** (`AGENTS.md` §8):
+   - **Ring 1 (< 2s)**: In-memory TUnit slicing (`--treenode-filter`) for subtasks.
+   - **Ring 2 (< 15s)**: Single-project, single canonical provider run for phase exits.
+   - **Ring 3 (Plan Exit)**: Multi-provider matrix and full suites run once at workstream exit.
 3. Use `AGENTS.md` for the exact current project list.
+4. Enforce the **Yak-Shaving Quarantine Rule**: quarantine pre-existing test rot outside task scope.
 
 ## Common Failure Patterns
 1. DTO changed but NSwag client not regenerated.

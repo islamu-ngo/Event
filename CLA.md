@@ -19,7 +19,7 @@ To re-run the CLA check after signing, post a comment containing only `recheck`.
 
 ## Why a CLA?
 
-ISLAMU Event is distributed publicly under `AGPL-3.0-or-later`. The CLA grants the ISLAMU project steward additional inbound rights from contributors so the non-profit organization (ISLAMU ASBL en formation) can also offer ISLAMU Event under alternative terms for legitimate enterprise internal-use on-premises/VPC compliance (where corporate policies ban AGPL copyleft on internal tools), humanitarian missions, and sustainability—without taking ownership away from contributors.
+ISLAMU Event is distributed publicly under `AGPL-3.0-or-later`. The CLA grants the ISLAMU project steward additional inbound rights from contributors so the non-profit organization (ISLAMU ASBL en formation, transitioning seamlessly to ISLAMU ASBL upon registration) can also offer ISLAMU Event under alternative terms for legitimate enterprise internal-use on-premises/VPC compliance (where corporate policies ban AGPL copyleft on internal tools), humanitarian missions, and sustainability—without taking ownership away from contributors.
 
 **Community Anti-SaaS Protection:** The Project Steward is bound by a strict covenant never to grant an alternative license permitting a third party to operate a closed-source, proprietary SaaS or cloud service. Any entity offering ISLAMU Event as a SaaS must use `AGPL-3.0-or-later`, guaranteeing that all code improvements are shared back with the community. See [`legal/CLA.md`](legal/CLA.md) for the full legal text.
 
@@ -28,5 +28,5 @@ ISLAMU Event is distributed publicly under `AGPL-3.0-or-later`. The CLA grants t
 - **Full CLA text & Governance:** [`legal/CLA.md`](legal/CLA.md)
 - **I-VSD Licensing & Strategy Review:** [`islamic-value-sensitive-design/i-vsd-licensing-and-commercial-strategy.md`](islamic-value-sensitive-design/i-vsd-licensing-and-commercial-strategy.md)
 - **Contribution guidelines:** [`CONTRIBUTING.md`](CONTRIBUTING.md)
-- **Legal governance decision:** [`docs/legal/CONTRIBUTION_GOVERNANCE.md`](docs/legal/CONTRIBUTION_GOVERNANCE.md)
-- **IP governance:** [`docs/legal/IP_GOVERNANCE.md`](docs/legal/IP_GOVERNANCE.md)
+- **Legal governance decision:** [`docs/internal/legal/CONTRIBUTION_GOVERNANCE.md`](docs/internal/legal/CONTRIBUTION_GOVERNANCE.md)
+- **IP governance:** [`docs/internal/legal/IP_GOVERNANCE.md`](docs/internal/legal/IP_GOVERNANCE.md)

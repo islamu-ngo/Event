@@ -48,7 +48,7 @@ public sealed class ChangeWorkflowCommandTests
             "--group", "registration-correction");
 
         string created = createOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries)[0].Split("id=", StringSplitOptions.None)[1].Split(' ')[0];
-        string fragmentPath = Path.Combine(repository.Path, "docs", "releases", "changes", created + ".yaml");
+        string fragmentPath = Path.Combine(repository.Path, "docs", "internal", "releases", "changes", created + ".yaml");
         repository.Git("add", Path.GetRelativePath(repository.Path, fragmentPath));
         string messagePath = Path.Combine(repository.Path, "COMMIT_EDITMSG");
         File.WriteAllText(
@@ -116,7 +116,7 @@ public sealed class ChangeWorkflowCommandTests
             "--from", "CHG-2026-0011",
             "--to", replacement,
             "--reason", "Target branch already owns the original identifier.");
-        repository.Git("add", "docs/releases");
+        repository.Git("add", "docs/internal/releases");
         repository.CommitStaged("chore(release): bind collision correction");
         (int rangeCode, string rangeOutput) = repository.Run(
             "preflight-range", "--target", "develop", "--head", "HEAD");
@@ -124,6 +124,7 @@ public sealed class ChangeWorkflowCommandTests
         string renamePath = Path.Combine(
             repository.Path,
             "docs",
+            "internal",
             "releases",
             "change-id-renames",
             commit + ".yaml");
@@ -228,7 +229,7 @@ public sealed class ChangeWorkflowCommandTests
         Supersedes: []
         Impacts:
           Breaking:
-            Reference: docs/releases/README.md
+            Reference: docs/internal/releases/README.md
             Disposition: not-applicable
           Security:
             Reference: docs/SECURITY_OVERVIEW.md
@@ -259,7 +260,7 @@ public sealed class ChangeWorkflowCommandTests
             Directory.CreateDirectory(path);
             var fixture = new ChangeRepositoryFixture(path);
             fixture.Git("init", "--initial-branch=develop");
-            Directory.CreateDirectory(System.IO.Path.Combine(path, "docs", "releases", "changes"));
+            Directory.CreateDirectory(System.IO.Path.Combine(path, "docs", "internal", "releases", "changes"));
             Directory.CreateDirectory(System.IO.Path.Combine(path, "eng", "release", "policy"));
             File.WriteAllText(
                 System.IO.Path.Combine(path, "eng", "release", "policy", "release-policy.yaml"),
@@ -284,7 +285,7 @@ public sealed class ChangeWorkflowCommandTests
 
         public void WriteFragment(string changeId) =>
             File.WriteAllText(
-                System.IO.Path.Combine(Path, "docs", "releases", "changes", changeId + ".yaml"),
+                System.IO.Path.Combine(Path, "docs", "internal", "releases", "changes", changeId + ".yaml"),
                 FragmentYaml(changeId));
 
         public void CreateBranch(string name) => Git("switch", "-c", name);

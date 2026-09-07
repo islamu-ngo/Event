@@ -55,7 +55,9 @@ internal static class Program
             File.ReadAllBytes(Path.Combine(repositoryRoot, ".env.example"))));
 
         byte[] machineBytes = GenerateMachineCatalogue(catalogue, registry);
-        string documentationPath = Path.Combine(repositoryRoot, "docs", "CONFIGURATION.md");
+        string documentationPath = File.Exists(Path.Combine(repositoryRoot, "docs", "internal", "CONFIGURATION.md"))
+            ? Path.Combine(repositoryRoot, "docs", "internal", "CONFIGURATION.md")
+            : Path.Combine(repositoryRoot, "docs", "CONFIGURATION.md");
         byte[] documentationBytes = GenerateDocumentation(
             ReadStrictUtf8(documentationPath), catalogue);
         var outputs = new Dictionary<string, byte[]>(StringComparer.Ordinal)

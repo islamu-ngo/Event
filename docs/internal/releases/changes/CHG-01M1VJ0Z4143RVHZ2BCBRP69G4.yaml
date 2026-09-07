@@ -1,6 +1,6 @@
 # ABOUTME: Public change fragment for durable paid registration Checkout and reconciliation.
 # ABOUTME: Records migration, configuration, OpenAPI, security, and operator impacts.
-Change-Id: CHG-2026-0004
+Change-Id: CHG-01M1VJ0Z4143RVHZ2BCBRP69G4
 Title: Paid registrations reconcile authoritative provider evidence
 Type: feat
 Scope: registration

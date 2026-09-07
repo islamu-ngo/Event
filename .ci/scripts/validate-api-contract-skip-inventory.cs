@@ -6,7 +6,9 @@ using System.Text.RegularExpressions;
 
 var root = args.Length > 0 ? args[0] : ".";
 var integrationTestRoot = Path.Combine(root, "tests", "Event.API.IntegrationTests");
-var inventoryPath = Path.Combine(root, "docs", "API_CONTRACT_TEST_DEBT.md");
+var inventoryPath = File.Exists(Path.Combine(root, "docs", "internal", "API_CONTRACT_TEST_DEBT.md"))
+    ? Path.Combine(root, "docs", "internal", "API_CONTRACT_TEST_DEBT.md")
+    : Path.Combine(root, "docs", "API_CONTRACT_TEST_DEBT.md");
 
 if (!Directory.Exists(integrationTestRoot))
 {

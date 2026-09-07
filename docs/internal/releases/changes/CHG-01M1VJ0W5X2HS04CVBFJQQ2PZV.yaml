@@ -1,6 +1,6 @@
 # ABOUTME: Public change fragment for provider-native migration and privacy-erasure isolation.
 # ABOUTME: Records topology enforcement, migration ownership, and operator recovery impact.
-Change-Id: CHG-2026-0002
+Change-Id: CHG-01M1VJ0W5X2HS04CVBFJQQ2PZV
 Title: Provider-native database migration and privacy-erasure isolation
 Type: fix
 Scope: storage

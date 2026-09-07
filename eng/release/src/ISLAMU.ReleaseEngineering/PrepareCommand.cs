@@ -27,7 +27,7 @@ public static class PrepareCommand
             }
 
             string releaseDirectory = ResolveChild(root, args[1], mustExist: true);
-            string expectedReleaseParent = Path.Combine(root, "docs", "releases");
+            string expectedReleaseParent = Path.Join(Path.GetFullPath(root), "docs", "internal", "releases");
             if (!string.Equals(Path.GetDirectoryName(releaseDirectory), expectedReleaseParent, PathComparison))
             {
                 return Reject(output, "prepare_release_path_invalid");
@@ -70,7 +70,7 @@ public static class PrepareCommand
                 .Distinct(StringComparer.Ordinal)
                 .Order(StringComparer.Ordinal)
                 .ToArray();
-            string fragmentDirectory = Path.Combine(root, "docs", "releases", "changes");
+            string fragmentDirectory = Path.Join(Path.GetFullPath(root), "docs", "internal", "releases", "changes");
             string[] fragments = Directory.Exists(fragmentDirectory)
                 ? Directory.EnumerateFiles(fragmentDirectory, "*.yaml", SearchOption.TopDirectoryOnly)
                     .Where(path => linkedChangeIds.Contains(Path.GetFileNameWithoutExtension(path), StringComparer.Ordinal))

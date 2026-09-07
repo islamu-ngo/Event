@@ -1,6 +1,6 @@
 # ABOUTME: Public change fragment for Domain-owned Event and EventSession lifecycle enforcement.
 # ABOUTME: Records breaking transition, HAL, and session parent-status contract changes.
-Change-Id: CHG-2026-0003
+Change-Id: CHG-01M1VJ0XMHMBBTZ3XK8P00KR8M
 Title: One lifecycle contract across event workflows
 Type: feat
 Scope: events

@@ -63,10 +63,9 @@ internal static class Program
 
         var markdown = RenderMarkdown(operations);
 
-        var outputPath = Path.Combine(
-            repoRoot,
-            "docs",
-            "API_CONTRACT_INVENTORY.md");
+        var outputPath = Directory.Exists(Path.Combine(repoRoot, "docs", "internal"))
+            ? Path.Combine(repoRoot, "docs", "internal", "API_CONTRACT_INVENTORY.md")
+            : Path.Combine(repoRoot, "docs", "API_CONTRACT_INVENTORY.md");
 
         var outputDir = Path.GetDirectoryName(outputPath)!;
         Directory.CreateDirectory(outputDir);

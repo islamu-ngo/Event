@@ -81,6 +81,12 @@ Every change must answer these eight questions **before editing any file**:
 11. **Greenfield Breaking Change Freedom (No Backward Compatibility Baggage)**: This repository is pre-release with 0 external adopters. Never preserve obsolete endpoints, bad DTO shapes, legacy columns, or adapter shims for backward compatibility. Breaking changes are encouraged whenever they simplify code or align with Clean Architecture.
 12. **Strict Test Quality Over Quantity (No Mock-Mirroring or Scraping)**: Tests MUST guard true business invariants, rich domain state machines, concurrency races, tenant isolation, and security fail-closed semantics. Prohibit tautological mock-mirroring (`Received(1)`), framework-testing boilerplate (testing EF Core cancellation), raw source-code / CSS text scraping, and ephemeral mutation test project sprawl.
 13. **Dual-Documentation Parity & Separation (Public vs Internal)**: Any change impacting external configuration (`.env.example`), deployment topologies (`docker-compose.yml`), public API endpoints, or administrative features MUST update both the public adopter guide in `docs/public/` (operator/adopter perspective on GitBook) and the technical source anchor in `docs/internal/` (C# architecture and invariants) within the same PR, following Single Responsibility without duplicating raw configs. See `docs/internal/DOCUMENTATION_ARCHITECTURE.md`.
+14. **Self-Contained Interaction & Zero Plan-Opening Overhead**: Prompts, questions, feedback requests, and status reports to the developer MUST be completely self-contained and immediately actionable without requiring the developer to open `dev/active/<task>/...` or grep internal plan files. Agents must NEVER reference bare phase/task IDs (`P04/P06`, `T02.1`, `P03 gates`) in isolation. Every approval request, decision prompt, or milestone update MUST provide a self-contained Decision Brief inline: descriptive human names of features/components, current context, the exact choice with rationale, and clear recommended options with trade-offs. The implementation plan is internal working memory; the chat response is the developer console.
+15. **The 3-Ring Progressive Verification Model & Yak-Shaving Quarantine**:
+    - **Ring 1 (Inner Loop / Sliced)**: Subtask changes MUST be verified via fast in-memory TUnit sliced tests (`--treenode-filter "/*/*/*<TestClass>/*"`) targeting Domain or Application unit tests in **< 2 seconds**. Zero Docker containers or network I/O in the inner loop. 90%+ of algorithmic/normalization/business invariants belong in `Event.Domain.UnitTests`.
+    - **Ring 2 (Phase Exit Gate)**: Verify the single touched project against ONE canonical provider (e.g., SQLite in-memory or single PostgreSQL container) in **< 15 seconds**.
+    - **Ring 3 (Plan Exit / Workstream Gate)**: The full multi-database provider matrix (PostgreSQL, SQLite, SQL Server, MySQL), migration checks, and full suites are run ONCE at the end of the entire implementation plan before PR creation.
+    - **Yak-Shaving Quarantine**: Agents are strictly FORBIDDEN from absorbing or repairing pre-existing unrelated test suite rot encountered during feature work. If an existing test fails outside the task's path, verify if it reproduces on an untouched base worktree, log it under `*-context.md` (or `dev/backlog/`), and quarantine it. Never derail feature implementation to fix unrelated persistence suite failures.
 
 **Full list:** [`docs/internal/QUICK_REFERENCE.md`](docs/internal/QUICK_REFERENCE.md)
 
@@ -120,10 +126,21 @@ When a task touches a topic covered by docs, skills, or rules, retrieve the **sm
 
 Before the first product edit, ensure local tracking is fresh against upstream (`git checkout develop && git pull --ff-only`), then establish the green baseline once for code changes. Do not rerun an unchanged baseline; every PR touching product code must still leave the build and minimum tests green.
 
+**The 3-Ring Progressive Verification Hierarchy:**
+1. **Ring 1 (Inner Loop — Subtask Level, < 2s)**:
+   - Run ONLY the target test class using TUnit slicing: `--treenode-filter "/*/*/*<TestClass>/*"`.
+   - Strictly in-memory (`Event.Domain.UnitTests` or `Event.Application.UnitTests`).
+   - Zero Docker containers, zero network I/O, zero database setup lag.
+2. **Ring 2 (Phase Exit Gate — Phase Level, < 15s)**:
+   - Run a single Release build and at most ONE selected project test against a single canonical provider.
+   - Forbid running the multi-database provider matrix during intermediate phase exits.
+3. **Ring 3 (Plan Exit Gate — Workstream Level)**:
+   - Full multi-database matrix, migration round-trips, and architecture guardrails run ONCE at the end of the workstream before PR creation.
+
 **Scope & Layer Discipline:**
 - **Tier 4 (Docs / Agent Context):** For documentation, agent context, markdown-only, or comment changes, DO NOT run `dotnet build` or .NET test suites. Verification is strictly scoped to markdown formatting, link integrity, and schema checks.
 - **Layer-Bounded Execution:** Never run test suites belonging to unrelated architectural layers (e.g., no database integration tests for UI changes; no Blazor tests for CQRS handlers).
-- **TUnit Slicing:** During active development, run ONLY the target test class using `--treenode-filter "/*/*/*<TestClass>/*"` (~1.5s). Full project runs (`--project`) are reserved for phase exits or PR completion.
+- **Yak-Shaving Quarantine Rule:** Never derail feature implementation to fix pre-existing test rot or broken fixtures outside the task path. Verify reproduction on clean base, log under `*-context.md`, quarantine the failure, and proceed with the assigned deliverable.
 
 **Build Command (Code Changes Only):**
 ```bash
@@ -147,6 +164,20 @@ dotnet build --configuration Release --verbosity quiet
 Before an implementation agent ends a task, pauses for the user's next prompt, performs a handoff, or claims work is complete, the final response MUST teach the user what changed. Do not give only an abstract status line such as “email sending implemented” or “docs updated.” The user is a developer and must understand the implementation without opening the diff.
 
 The final summary must be medium-sized and technically specific. Include the architecture/design pattern used, concrete libraries/frameworks/infrastructure/protocols, important files/classes/handlers/components changed, data/control flow, relevant best practices such as transactional outbox, CQRS/MediatR, Clean Architecture, HAL affordance gating, tenant isolation, idempotency, retry/error handling, and what was verified or remains. Keep it concise enough for chat, but detailed enough that the user learns the implemented approach.
+
+### Self-Contained Human Interaction & Decision Brief Requirement
+
+> **The Golden Invariant**: The developer should **never** need to open the implementation plan (`dev/active/<task>/...`) just to understand an agent's question, status update, or approval request.
+
+Active dev-docs (`plan.md`, `tasks.md`, `context.md`) serve as machine/session working memory and an execution ledger. They are **not** the developer's primary user interface. Forcing the user to leave the conversation, navigate files, and cross-reference cryptic phase codes (e.g. *"Do you approve proceeding with P04/P06 while keeping both P03 gates explicitly open?"*) is an unacceptable agent UX failure.
+
+Whenever an agent prompts for approval, requests architectural direction, reports milestone completion, or flags a blocker, the response MUST be formatted as a **Self-Contained Decision Brief**:
+
+1. **Context & Current Position**: 1–2 sentences on what was just completed or where the workstream currently stands.
+2. **Plain-English Substance**: Always use descriptive feature/component names alongside any phase numbers (e.g., *"Phase 4 (PostgreSQL Outbox Worker & Dead-Letter Dispatch)"* instead of bare *"P04"*).
+3. **The Exact Decision & Why It Matters**: Explain in plain English what decision is needed, why it arose, and what the real-world trade-off is (e.g., *"Why keep Phase 3 gates open? Because Redis distributed locking requires integration tests that depend on the benchmark harness"*).
+4. **Structured Actionable Options**: Provide explicit, numbered choices with a clear recommendation (e.g., `Option A (Recommended): ...`, `Option B: ...`) and the pros/cons of each, so the developer can approve or guide in seconds without leaving chat.
+5. **Immediate Next Action**: Clearly state what the agent will execute the moment the user responds.
 
 ---
 

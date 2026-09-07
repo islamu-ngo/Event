@@ -1,6 +1,6 @@
 # ABOUTME: Public change fragment for paid-registration refunds and buyer protection.
 # ABOUTME: Records migration, API, security, and operator impacts for Phase 19.
-Change-Id: CHG-2026-0009
+Change-Id: CHG-01M1VJ164PAQ0PSFW2E6CTDCJY
 Title: Paid registrations gain durable refund and event-change protection
 Type: feat
 Scope: registration

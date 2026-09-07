@@ -28,7 +28,7 @@ public sealed class FirstGovernedReleaseTests
         if (OperatingSystem.IsWindows()) return;
 
         using var fixture = GovernedReleaseFixture.CreateFirstGovernedRelease();
-        string evidencePath = Path.Combine(fixture.RepositoryPath, "docs", "releases", "baselines", $"{GovernedReleaseFixture.BaselineRef}.v1.json");
+        string evidencePath = Path.Combine(fixture.RepositoryPath, "docs", "internal", "releases", "baselines", $"{GovernedReleaseFixture.BaselineRef}.v1.json");
 
         using JsonDocument document = JsonDocument.Parse(File.ReadAllBytes(evidencePath));
         JsonElement root = document.RootElement;
@@ -49,7 +49,7 @@ public sealed class FirstGovernedReleaseTests
 
         using var fixture = GovernedReleaseFixture.CreateFirstGovernedRelease();
         string version = GovernedReleaseFixture.FirstGovernedReleaseVersion;
-        string notes = File.ReadAllText(Path.Combine(fixture.RepositoryPath, "docs", "releases", version, "release-notes.md"));
+        string notes = File.ReadAllText(Path.Combine(fixture.RepositoryPath, "docs", "internal", "releases", version, "release-notes.md"));
 
         await Assert.That(notes).StartsWith($"# Release {version}\n");
         await Assert.That(notes).Contains("## Maintainer Summary");
@@ -72,8 +72,8 @@ public sealed class FirstGovernedReleaseTests
         (int candidateCode, string candidateOutput) = fixture.VerifyCandidate(version, fixture.B);
         (int tagCode, string tagOutput) = fixture.VerifyTag(version, fixture.B, fixture.FirstTagObject);
 
-        string candidate = File.ReadAllText(Path.Combine(fixture.RepositoryPath, "docs", "releases", version, "release-candidate.v1.json"));
-        using JsonDocument evidence = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(fixture.RepositoryPath, "docs", "releases", version, "release-evidence.v1.json")));
+        string candidate = File.ReadAllText(Path.Combine(fixture.RepositoryPath, "docs", "internal", "releases", version, "release-candidate.v1.json"));
+        using JsonDocument evidence = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(fixture.RepositoryPath, "docs", "internal", "releases", version, "release-evidence.v1.json")));
 
         await Assert.That(fixture.BranchRefs()).IsEqualTo(string.Empty);
         await Assert.That(candidateCode).IsEqualTo(Program.Success).Because(candidateOutput);
@@ -94,12 +94,12 @@ public sealed class FirstGovernedReleaseTests
         string version = GovernedReleaseFixture.FirstGovernedReleaseVersion;
         fixture.VerifyCandidate(version, fixture.B);
         fixture.VerifyTag(version, fixture.B, fixture.FirstTagObject);
-        byte[] originalEvidence = File.ReadAllBytes(Path.Combine(fixture.RepositoryPath, "docs", "releases", version, "release-evidence.v1.json"));
+        byte[] originalEvidence = File.ReadAllBytes(Path.Combine(fixture.RepositoryPath, "docs", "internal", "releases", version, "release-evidence.v1.json"));
 
         string clone = fixture.CreateTagOnlyClone($"v{version}");
         (int candidateCode, string candidateOutput) = fixture.VerifyCandidate(version, fixture.B, clone);
         (int tagCode, string tagOutput) = fixture.VerifyTag(version, fixture.B, fixture.FirstTagObject, clone);
-        byte[] cloneEvidence = File.ReadAllBytes(Path.Combine(clone, "docs", "releases", version, "release-evidence.v1.json"));
+        byte[] cloneEvidence = File.ReadAllBytes(Path.Combine(clone, "docs", "internal", "releases", version, "release-evidence.v1.json"));
 
         await Assert.That(fixture.BranchRefs(clone)).IsEqualTo(string.Empty);
         await Assert.That(candidateCode).IsEqualTo(Program.Success).Because(candidateOutput);

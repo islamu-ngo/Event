@@ -1,6 +1,6 @@
 # ABOUTME: Public change fragment for the whole-instance ConfigurationManifest cutover.
 # ABOUTME: Records breaking configuration, migration, API, security, and operator actions.
-Change-Id: CHG-2026-0014
+Change-Id: CHG-01M1VJ1EH9EMK3Q5BK4GRPY054
 Title: One ConfigurationManifest bootstraps the complete instance
 Type: feat
 Scope: architecture

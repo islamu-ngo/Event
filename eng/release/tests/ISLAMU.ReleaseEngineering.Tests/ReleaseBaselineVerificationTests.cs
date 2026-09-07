@@ -29,7 +29,7 @@ public sealed class ReleaseBaselineVerificationTests
         await Assert.That(firstCode).IsEqualTo(Program.Success);
         await Assert.That(secondCode).IsEqualTo(Program.Success);
         await Assert.That(spawnedCode).IsEqualTo(Program.Success);
-        await Assert.That(firstOutput).IsEqualTo($"release_baseline_verified: docs/releases/baselines/{fixture.BaselineRef}.v1.json\n");
+        await Assert.That(firstOutput).IsEqualTo($"release_baseline_verified: docs/internal/releases/baselines/{fixture.BaselineRef}.v1.json\n");
         await Assert.That(secondOutput).IsEqualTo(firstOutput);
         await Assert.That(spawnedOutput).IsEqualTo(firstOutput);
         await Assert.That(File.ReadAllBytes(fixture.EvidencePath)).IsEquivalentTo(firstBytes);
@@ -52,7 +52,7 @@ public sealed class ReleaseBaselineVerificationTests
         (int exitCode, string output) = fixture.SpawnVerifyBaseline(tagObject);
 
         await Assert.That(exitCode).IsEqualTo(Program.Success);
-        await Assert.That(output).IsEqualTo($"release_baseline_verified: docs/releases/baselines/{fixture.BaselineRef}.v1.json\n");
+        await Assert.That(output).IsEqualTo($"release_baseline_verified: docs/internal/releases/baselines/{fixture.BaselineRef}.v1.json\n");
         await Assert.That(fixture.BaselineTarget.Length).IsEqualTo(64);
         await Assert.That(tagObject.Length).IsEqualTo(64);
     }
@@ -133,7 +133,7 @@ public sealed class ReleaseBaselineVerificationTests
             configPath = Path.Combine(bundleRoot, "config", "cliff.toml");
             executablePath = Path.Combine(bundleRoot, "git-cliff");
             BaselineRef = "changelog-baseline-2026-08-15";
-            EvidencePath = Path.Combine(RepositoryPath, "docs", "releases", "baselines", BaselineRef + ".v1.json");
+            EvidencePath = Path.Combine(RepositoryPath, "docs", "internal", "releases", "baselines", BaselineRef + ".v1.json");
             Directory.CreateDirectory(RepositoryPath);
             Directory.CreateDirectory(Path.GetDirectoryName(configPath)!);
             Directory.CreateDirectory(authorityRoot);

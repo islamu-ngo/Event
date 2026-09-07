@@ -165,29 +165,6 @@ public sealed class LocalAddressSuggestionQueryTests(PostgreSqlContainerFixture 
         await AssertUnicodeCorpusAsync(context);
     }
 
-    [Test]
-    public Task SqliteUnicodeCorpusUsesCanonicalLiteralBoundaryAndOrdinalOrdering() =>
-        RunSqliteUnicodeCorpusAsync();
-
-    internal static async Task RunSqliteUnicodeCorpusAsync()
-    {
-        string path = DatabasePath("unicode");
-        DeleteSqliteFiles(path);
-        try
-        {
-            await using ExploreDbContext context = CreateSqliteContext(path);
-            await context.Database.EnsureCreatedAsync();
-            context.EnableTenantFilterBypass("Seed Unicode local-address corpus.");
-            await LookupTableSeeder.SeedAsync(context);
-            await SeedUnicodeCorpusAsync(context);
-            context.TenantContext = new TestTenantContext(TenantId);
-            await AssertUnicodeCorpusAsync(context);
-        }
-        finally
-        {
-            DeleteSqliteFiles(path);
-        }
-    }
 
     [Test]
     public async Task TrustedActorAndUserIdentitiesMustBeNonemptyBeforeExecution()

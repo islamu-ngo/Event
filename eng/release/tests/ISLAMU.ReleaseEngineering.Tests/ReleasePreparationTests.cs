@@ -358,7 +358,7 @@ public sealed class ReleasePreparationTests
         public PreparationFixture()
         {
             Root = Path.Combine(Path.GetTempPath(), $"islamu-prepare-{Guid.NewGuid():N}");
-            ReleaseDirectory = Path.Combine(Root, "docs", "releases", "1.1.0");
+            ReleaseDirectory = Path.Combine(Root, "docs", "internal", "releases", "1.1.0");
             bundleRoot = Path.Combine(Root, "bundle");
             isolationRoot = Path.Combine(Root, "isolation");
             lockPath = Path.Combine(bundleRoot, "toolchain.lock.json");
@@ -451,7 +451,7 @@ public sealed class ReleasePreparationTests
                 using RuntimePromotionTrustRootScope trustRoot = RuntimePromotionTrustRootScope.Use(allowedSignersPath);
                 using var output = new StringWriter();
                 int exitCode = PrepareCommand.Run(
-                    ["prepare", "docs/releases/1.1.0"],
+                    ["prepare", "docs/internal/releases/1.1.0"],
                     output,
                     candidateRoot,
                     "linux-x64",
@@ -491,7 +491,7 @@ public sealed class ReleasePreparationTests
                 using RuntimePromotionTrustRootScope trustRoot = RuntimePromotionTrustRootScope.Use(allowedSignersPath);
                 using var output = new StringWriter();
                 int exitCode = PrepareCommand.Run(
-                    ["prepare", $"docs/releases/{version}"],
+                    ["prepare", $"docs/internal/releases/{version}"],
                     output,
                     candidateRoot,
                     "linux-x64",
@@ -528,7 +528,7 @@ public sealed class ReleasePreparationTests
                     UseShellExecute = false,
                     WorkingDirectory = candidateRoot,
                 };
-                foreach (string argument in new[] { assemblyPath, "prepare", "docs/releases/1.1.0" })
+                foreach (string argument in new[] { assemblyPath, "prepare", "docs/internal/releases/1.1.0" })
                 {
                     startInfo.ArgumentList.Add(argument);
                 }
@@ -583,7 +583,7 @@ public sealed class ReleasePreparationTests
                 foreach ((string name, string value) in variables) Environment.SetEnvironmentVariable(name, value);
                 using RuntimePromotionTrustRootScope trustRoot = RuntimePromotionTrustRootScope.Use(allowedSignersPath);
                 using var output = new StringWriter();
-                int exitCode = PrepareCommand.Run(["prepare", "docs/releases/1.1.0"], output, candidateRoot, "linux-x64", TimeSpan.FromSeconds(2));
+                int exitCode = PrepareCommand.Run(["prepare", "docs/internal/releases/1.1.0"], output, candidateRoot, "linux-x64", TimeSpan.FromSeconds(2));
                 return (exitCode, output.ToString());
             }
             finally
@@ -628,9 +628,9 @@ public sealed class ReleasePreparationTests
                 string feature = Commit("feat(registration): let attendees correct registration details\n\nChange-Id: CHG-2026-0001");
             }
 
-            string cliReleaseDirectory = Path.Combine(candidateRoot, "docs", "releases", "1.1.0");
+            string cliReleaseDirectory = Path.Combine(candidateRoot, "docs", "internal", "releases", "1.1.0");
             Directory.CreateDirectory(cliReleaseDirectory);
-            Directory.CreateDirectory(Path.Combine(candidateRoot, "docs", "releases", "changes"));
+            Directory.CreateDirectory(Path.Combine(candidateRoot, "docs", "internal", "releases", "changes"));
             string previousOid = Git("rev-list", "--max-parents=0", "HEAD").Trim();
             CommandReleasePath = Path.Combine(cliReleaseDirectory, "release.yaml");
             CommandSummaryPath = Path.Combine(cliReleaseDirectory, "summary.md");
@@ -642,8 +642,8 @@ public sealed class ReleasePreparationTests
             File.WriteAllText(CommandSummaryPath, summary);
             File.WriteAllText(Path.Combine(candidateRoot, "context.json"), "caller supplied context must be ignored\n");
             File.WriteAllText(Path.Combine(candidateRoot, "range.txt"), new string('f', 40) + "\n");
-            File.WriteAllText(Path.Combine(candidateRoot, "docs", "releases", "changes", "CHG-2026-0001.yaml"),
-                "Change-Id: CHG-2026-0001\nTitle: Registration worker restart\nType: feat\nScope: registration\nSummary: Attendees can now correct registration details.\nSupersedes: []\nImpacts:\n  Breaking:\n    Reference: docs/releases/README.md\n    Disposition: not-applicable\n  Security:\n    Reference: docs/SECURITY_OVERVIEW.md\n    Disposition: not-applicable\n  Migration:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: not-applicable\n  Configuration:\n    Reference: docs/CONFIGURATION.md\n    Disposition: not-applicable\n  OpenAPI:\n    Reference: docs/API_CHANGELOG.md\n    Disposition: not-applicable\n  Operator:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: documented\n    Detail: Restart registration workers after deployment.\n");
+            File.WriteAllText(Path.Combine(candidateRoot, "docs", "internal", "releases", "changes", "CHG-2026-0001.yaml"),
+                "Change-Id: CHG-2026-0001\nTitle: Registration worker restart\nType: feat\nScope: registration\nSummary: Attendees can now correct registration details.\nSupersedes: []\nImpacts:\n  Breaking:\n    Reference: docs/internal/releases/README.md\n    Disposition: not-applicable\n  Security:\n    Reference: docs/SECURITY_OVERVIEW.md\n    Disposition: not-applicable\n  Migration:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: not-applicable\n  Configuration:\n    Reference: docs/CONFIGURATION.md\n    Disposition: not-applicable\n  OpenAPI:\n    Reference: docs/API_CHANGELOG.md\n    Disposition: not-applicable\n  Operator:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: documented\n    Detail: Restart registration workers after deployment.\n");
             return cliReleaseDirectory;
         }
 
@@ -660,8 +660,8 @@ public sealed class ReleasePreparationTests
             string baselineOid = Commit("baseline lower bound");
             Git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid", "tag", "-a", baselineRef, baselineOid, "-m", baselineRef);
             string baselineTagObjectId = Git("rev-parse", $"refs/tags/{baselineRef}^{{object}}").Trim();
-            Directory.CreateDirectory(Path.Combine(candidateRoot, "docs", "releases", "baselines"));
-            File.WriteAllBytes(Path.Combine(candidateRoot, "docs", "releases", "baselines", baselineRef + ".v1.json"), CanonicalArtifactPolicy.CanonicalizeJson(JsonSerializer.Serialize(new
+            Directory.CreateDirectory(Path.Combine(candidateRoot, "docs", "internal", "releases", "baselines"));
+            File.WriteAllBytes(Path.Combine(candidateRoot, "docs", "internal", "releases", "baselines", baselineRef + ".v1.json"), CanonicalArtifactPolicy.CanonicalizeJson(JsonSerializer.Serialize(new
             {
                 schemaVersion = "release-baseline.v1",
                 baselineRef,
@@ -678,17 +678,17 @@ public sealed class ReleasePreparationTests
             string feature = Commit("feat(registration): let attendees correct registration details\n\nChange-Id: CHG-2026-0001");
             Git("branch", "-f", line, feature);
 
-            string cliReleaseDirectory = Path.Combine(candidateRoot, "docs", "releases", version);
+            string cliReleaseDirectory = Path.Combine(candidateRoot, "docs", "internal", "releases", version);
             Directory.CreateDirectory(cliReleaseDirectory);
-            Directory.CreateDirectory(Path.Combine(candidateRoot, "docs", "releases", "changes"));
+            Directory.CreateDirectory(Path.Combine(candidateRoot, "docs", "internal", "releases", "changes"));
             CommandReleasePath = Path.Combine(cliReleaseDirectory, "release.yaml");
             CommandSummaryPath = Path.Combine(cliReleaseDirectory, "summary.md");
             CommandContextPath = Path.Combine(cliReleaseDirectory, "release-context.v1.json");
             File.WriteAllText(CommandReleasePath,
                 $"Version: {version}\nLine: {line}\nRelease-Date: 2026-08-14\nBase-Stable-Tag: {baselineRef}\nPrevious-Published-Tag: {baselineRef}\nRelease-Range:\n  Base-Ref: {baselineRef}\n  Base-Oid: {baselineOid}\n  Previous-Ref: {baselineRef}\n  Previous-Oid: {baselineOid}\nCompatibility:\n  - v1\nImpact-Dispositions:\n  breaking: not-applicable\n  security: not-applicable\n  migration: not-applicable\n  configuration: not-applicable\n  openapi: not-applicable\n  operator: documented\n");
             File.WriteAllText(CommandSummaryPath, "Attendees can now correct registration details.\n");
-            File.WriteAllText(Path.Combine(candidateRoot, "docs", "releases", "changes", "CHG-2026-0001.yaml"),
-                "Change-Id: CHG-2026-0001\nTitle: Registration worker restart\nType: feat\nScope: registration\nSummary: Attendees can now correct registration details.\nSupersedes: []\nImpacts:\n  Breaking:\n    Reference: docs/releases/README.md\n    Disposition: not-applicable\n  Security:\n    Reference: docs/SECURITY_OVERVIEW.md\n    Disposition: not-applicable\n  Migration:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: not-applicable\n  Configuration:\n    Reference: docs/CONFIGURATION.md\n    Disposition: not-applicable\n  OpenAPI:\n    Reference: docs/API_CHANGELOG.md\n    Disposition: not-applicable\n  Operator:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: documented\n    Detail: Restart registration workers after deployment.\n");
+            File.WriteAllText(Path.Combine(candidateRoot, "docs", "internal", "releases", "changes", "CHG-2026-0001.yaml"),
+                "Change-Id: CHG-2026-0001\nTitle: Registration worker restart\nType: feat\nScope: registration\nSummary: Attendees can now correct registration details.\nSupersedes: []\nImpacts:\n  Breaking:\n    Reference: docs/internal/releases/README.md\n    Disposition: not-applicable\n  Security:\n    Reference: docs/SECURITY_OVERVIEW.md\n    Disposition: not-applicable\n  Migration:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: not-applicable\n  Configuration:\n    Reference: docs/CONFIGURATION.md\n    Disposition: not-applicable\n  OpenAPI:\n    Reference: docs/API_CHANGELOG.md\n    Disposition: not-applicable\n  Operator:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: documented\n    Detail: Restart registration workers after deployment.\n");
             return cliReleaseDirectory;
         }
 
@@ -711,7 +711,7 @@ public sealed class ReleasePreparationTests
                 ["v1"], impacts);
             var fragmentImpacts = new Dictionary<string, FragmentImpact>(StringComparer.Ordinal)
             {
-                ["breaking"] = new("docs/releases/README.md", "not-applicable", null, null),
+                ["breaking"] = new("docs/internal/releases/README.md", "not-applicable", null, null),
                 ["security"] = new("docs/SECURITY_OVERVIEW.md", "not-applicable", null, null),
                 ["migration"] = new("docs/RELEASE_RUNBOOK.md", "not-applicable", null, null),
                 ["configuration"] = new("docs/CONFIGURATION.md", "not-applicable", null, null),

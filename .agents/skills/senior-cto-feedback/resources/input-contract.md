@@ -1,8 +1,8 @@
 <!-- ABOUTME: Input contract for Senior CTO review of implementation-plan workstreams and missing-context handling. -->
-<!-- ABOUTME: Defines what artifacts to read, what minimum evidence is required, and how to review partial implementation-plan inputs safely. -->
+<!-- ABOUTME: Defines what artifacts to read, what minimum evidence is required, and how to refine partial implementation-plan inputs safely. -->
 # Input Contract
 
-Use this file to determine whether enough material exists for a useful Senior CTO review and how to proceed when the input is partial.
+Use this file to determine whether enough material exists for a useful Senior CTO review and how to proceed when the input is partial. Refinements are applied directly into the active workstream triad without creating review files.
 
 ## Preferred Input Shape
 

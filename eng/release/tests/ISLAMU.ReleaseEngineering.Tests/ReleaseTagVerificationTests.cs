@@ -31,7 +31,7 @@ public sealed class ReleaseTagVerificationTests
         using JsonDocument document = JsonDocument.Parse(firstBytes);
         JsonElement root = document.RootElement;
         await Assert.That(secondCode).IsEqualTo(Program.Success);
-        await Assert.That(firstOutput).IsEqualTo("release_tag_verified: docs/releases/1.1.0/release-evidence.v1.json\n");
+        await Assert.That(firstOutput).IsEqualTo("release_tag_verified: docs/internal/releases/1.1.0/release-evidence.v1.json\n");
         await Assert.That(secondOutput).IsEqualTo(firstOutput);
         await Assert.That(secondBytes).IsEquivalentTo(firstBytes);
         await Assert.That(firstDigest).IsEqualTo(Sha256(secondBytes));
@@ -212,7 +212,7 @@ public sealed class ReleaseTagVerificationTests
             allowedReleaseSignersPath = Path.Combine(bundleRoot, "trust", "allowed-signers");
             configPath = Path.Combine(bundleRoot, "config", "cliff.toml");
             executablePath = Path.Combine(bundleRoot, "git-cliff");
-            ReleaseDirectory = Path.Combine(RepositoryPath, "docs", "releases", "1.1.0");
+            ReleaseDirectory = Path.Combine(RepositoryPath, "docs", "internal", "releases", "1.1.0");
             ContextPath = Path.Combine(ReleaseDirectory, "release-context.v1.json");
             NotesPath = Path.Combine(ReleaseDirectory, "release-notes.md");
             CandidateManifestPath = Path.Combine(ReleaseDirectory, "release-candidate.v1.json");
@@ -229,7 +229,7 @@ public sealed class ReleaseTagVerificationTests
             Git("branch", "-f", "v1.1", A);
             WriteBundle();
             Prepare();
-            Git("add", "docs/releases/1.1.0");
+            Git("add", "docs/internal/releases/1.1.0");
             B = Commit("docs(release): prepare 1.1.0\n\nChangelog: skip\nChangelog-Reason: release metadata commit");
             Git("branch", "-f", "v1.1", B);
         }
@@ -263,7 +263,7 @@ public sealed class ReleaseTagVerificationTests
 
         public void VerifyCandidate()
         {
-            (int exitCode, string output) = RunWithEnvironment(writer => CandidateCommand.Run(["verify-candidate", "docs/releases/1.1.0", B], writer, RepositoryPath, "linux-x64", TimeSpan.FromSeconds(2)));
+            (int exitCode, string output) = RunWithEnvironment(writer => CandidateCommand.Run(["verify-candidate", "docs/internal/releases/1.1.0", B], writer, RepositoryPath, "linux-x64", TimeSpan.FromSeconds(2)));
             if (exitCode != Program.Success) throw new InvalidOperationException(output);
         }
 
@@ -282,14 +282,14 @@ public sealed class ReleaseTagVerificationTests
 
         public string GenerateTagMessage()
         {
-            (int exitCode, string output) = RunWithEnvironment(writer => TagCommand.Run(["tag-message", "docs/releases/1.1.0"], writer, RepositoryPath, "linux-x64", TimeSpan.FromSeconds(2)));
+            (int exitCode, string output) = RunWithEnvironment(writer => TagCommand.Run(["tag-message", "docs/internal/releases/1.1.0"], writer, RepositoryPath, "linux-x64", TimeSpan.FromSeconds(2)));
             if (exitCode != Program.Success) throw new InvalidOperationException(output);
             return output;
         }
 
         public (int ExitCode, string Output) VerifyTag(string tagObjectId, string? previousTagObjectId = null)
         {
-            List<string> args = ["verify-tag", "docs/releases/1.1.0", B, tagObjectId];
+            List<string> args = ["verify-tag", "docs/internal/releases/1.1.0", B, tagObjectId];
             if (previousTagObjectId is not null) args.Add(previousTagObjectId);
             return RunWithEnvironment(writer => TagCommand.Run(args.ToArray(), writer, RepositoryPath, "linux-x64", TimeSpan.FromSeconds(2)));
         }
@@ -375,17 +375,17 @@ public sealed class ReleaseTagVerificationTests
         private void Prepare()
         {
             Directory.CreateDirectory(ReleaseDirectory);
-            Directory.CreateDirectory(Path.Combine(RepositoryPath, "docs", "releases", "changes"));
+            Directory.CreateDirectory(Path.Combine(RepositoryPath, "docs", "internal", "releases", "changes"));
             Directory.CreateDirectory(Path.Combine(RepositoryPath, "eng", "release", "policy"));
             File.WriteAllText(Path.Combine(ReleaseDirectory, "release.yaml"),
                 $"Version: 1.1.0\nLine: v1.1\nRelease-Date: 2026-08-14\nBase-Stable-Tag: v1.0.0\nPrevious-Published-Tag: v1.0.0\nRelease-Range:\n  Base-Ref: v1.0.0\n  Base-Oid: {Initial}\n  Previous-Ref: v1.0.0\n  Previous-Oid: {Initial}\nCompatibility:\n  - v1\nImpact-Dispositions:\n  breaking: not-applicable\n  security: not-applicable\n  migration: not-applicable\n  configuration: not-applicable\n  openapi: not-applicable\n  operator: documented\n");
             File.WriteAllText(Path.Combine(ReleaseDirectory, "summary.md"), "Attendees can now correct registration details.\n");
-            File.WriteAllText(Path.Combine(RepositoryPath, "docs", "releases", "changes", "CHG-2026-0001.yaml"),
-                "Change-Id: CHG-2026-0001\nTitle: Registration worker restart\nType: feat\nScope: registration\nSummary: Attendees can now correct registration details.\nSupersedes: []\nImpacts:\n  Breaking:\n    Reference: docs/releases/README.md\n    Disposition: not-applicable\n  Security:\n    Reference: docs/SECURITY_OVERVIEW.md\n    Disposition: not-applicable\n  Migration:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: not-applicable\n  Configuration:\n    Reference: docs/CONFIGURATION.md\n    Disposition: not-applicable\n  OpenAPI:\n    Reference: docs/API_CHANGELOG.md\n    Disposition: not-applicable\n  Operator:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: documented\n    Detail: Restart registration workers after deployment.\n");
+            File.WriteAllText(Path.Combine(RepositoryPath, "docs", "internal", "releases", "changes", "CHG-2026-0001.yaml"),
+                "Change-Id: CHG-2026-0001\nTitle: Registration worker restart\nType: feat\nScope: registration\nSummary: Attendees can now correct registration details.\nSupersedes: []\nImpacts:\n  Breaking:\n    Reference: docs/internal/releases/README.md\n    Disposition: not-applicable\n  Security:\n    Reference: docs/SECURITY_OVERVIEW.md\n    Disposition: not-applicable\n  Migration:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: not-applicable\n  Configuration:\n    Reference: docs/CONFIGURATION.md\n    Disposition: not-applicable\n  OpenAPI:\n    Reference: docs/API_CHANGELOG.md\n    Disposition: not-applicable\n  Operator:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: documented\n    Detail: Restart registration workers after deployment.\n");
             File.WriteAllText(Path.Combine(RepositoryPath, "eng", "release", "policy", "release-policy.yaml"), ReleasePolicyYaml);
             File.WriteAllText(Path.Combine(RepositoryPath, "eng", "release", "policy", "scope-registry.yaml"), "schemaVersion: 1\npublicScopes:\n  - events\n  - registration\nengineeringScopes:\n  - release\n");
             RewriteManifestAndReceipt();
-            (int exitCode, string output) = RunWithEnvironment(writer => PrepareCommand.Run(["prepare", "docs/releases/1.1.0"], writer, RepositoryPath, "linux-x64", TimeSpan.FromSeconds(2)));
+            (int exitCode, string output) = RunWithEnvironment(writer => PrepareCommand.Run(["prepare", "docs/internal/releases/1.1.0"], writer, RepositoryPath, "linux-x64", TimeSpan.FromSeconds(2)));
             if (exitCode != Program.Success) throw new InvalidOperationException(output);
         }
 

@@ -1,6 +1,6 @@
 # ABOUTME: Public change fragment for governed address geocoding and local reuse.
 # ABOUTME: Records breaking API, privacy, migration, configuration, and operator impacts.
-Change-Id: CHG-2026-0012
+Change-Id: CHG-01M1VJ1AXKSGQ990K33EXET1KT
 Title: Locations gain governed private address geocoding
 Type: feat
 Scope: discovery

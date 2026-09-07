@@ -26,7 +26,7 @@ dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEng
 ```
 
 The command atomically creates
-`docs/releases/changes/<Change-Id>.yaml`, initializes every required impact
+`docs/internal/releases/changes/<Change-Id>.yaml`, initializes every required impact
 section for review, and prints `commit_footer: Change-Id: <Change-Id>`. Use
 `allocate-change-id --target develop` only when another tool owns fragment
 creation.
@@ -67,7 +67,7 @@ dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEng
 ```
 
 The command creates or reuses the replacement fragment and writes
-`docs/releases/change-id-renames/<full-commit-oid>.yaml`. Preparation and
+`docs/internal/releases/change-id-renames/<full-commit-oid>.yaml`. Preparation and
 candidate verification apply the replacement only when the immutable commit
 still has the recorded old footer. The old footer remains unchanged; a loose
 alias, branch-bound mapping, or reused replacement ID is rejected. Commit the
@@ -121,7 +121,7 @@ After `prepare` output is committed as the final release-preparation commit `B`,
 
 ```bash
 dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj -- \
-  verify-candidate docs/releases/<version> <full-B-oid>
+  verify-candidate docs/internal/releases/<version> <full-B-oid>
 ```
 
 The command is read-only with respect to Git: it never commits, tags, pushes, fetches,
@@ -137,7 +137,7 @@ release sources and candidate digest, then sign the tag outside the verifier:
 
 ```bash
 dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj -- \
-  tag-message docs/releases/<version> > /tmp/islamu-release-tag-message.txt
+  tag-message docs/internal/releases/<version> > /tmp/islamu-release-tag-message.txt
 
 git -c gpg.format=ssh -c user.signingKey=/path/to/release-signing-key \
   tag -s v<version> <full-B-oid> -F /tmp/islamu-release-tag-message.txt
@@ -148,7 +148,7 @@ Verify the resulting tag object locally with the same promoted bundle:
 ```bash
 tag_object_id=$(git rev-parse "refs/tags/v<version>^{object}")
 dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj -- \
-  verify-tag docs/releases/<version> <full-B-oid> "$tag_object_id"
+  verify-tag docs/internal/releases/<version> <full-B-oid> "$tag_object_id"
 ```
 
 `verify-tag` is read-only with respect to Git. It rejects lightweight, unsigned,
@@ -165,7 +165,7 @@ compare-and-swap inputs:
 
 ```bash
 dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj -- \
-  verify-main docs/releases/<version> <expected-old-origin-main-oid> "$tag_object_id"
+  verify-main docs/internal/releases/<version> <expected-old-origin-main-oid> "$tag_object_id"
 ```
 
 `verify-main` is also read-only. It checks the final evidence target, tag object, and

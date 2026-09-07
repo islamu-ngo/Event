@@ -46,11 +46,11 @@ Planning mode owns no architecture sequence or task status. It supplies the mora
 
 Use when `senior-cto-feedback` reviews or rewrites an implementation-plan workstream.
 
-1. Bind the review to the current plan, tasks, and I-VSD report; context supplies current status but is not a substitute for those reviewed inputs.
-2. Default review is read-only except for `dev/active/<task>/<task>-cto-review.md`.
-3. A missing or stale I-VSD report yields `Changes required`, never technical approval.
-4. An explicit user request may authorize rewriting the triad. The reviewer that rewrites it cannot approve that rewritten revision in the same pass.
-5. A material rewrite marks the I-VSD report stale and routes back through planning-mode revalidation before a fresh CTO review.
+1. Bind the review to the exact plan, tasks, and I-VSD revisions; context supplies current status but is not a substitute for those reviewed inputs.
+2. The Senior CTO review directly updates the workstream triad (`plan.md`, `context.md`, `tasks.md`) without writing any separate `*-cto-review.md` files.
+3. A missing or stale I-VSD report yields `Changes required` in plan metadata, never technical approval.
+4. Triad updates are applied directly without requiring prior user approval. If the update modifies provider-controlled risks or `IVSD-*` mappings, it marks the I-VSD report stale and requires planning-mode revalidation.
+5. A material rewrite marks the I-VSD report stale and routes back through planning-mode revalidation before fresh CTO alignment.
 
 CTO review grants technical readiness only. It cannot grant user approval, issue scholarly/legal conclusions, or convert I-VSD evidence into certification.
 

@@ -1,6 +1,6 @@
 # ABOUTME: Public change fragment for the authorization platform redesign.
 # ABOUTME: Records the removed fail-open setting, gRPC-only runtime path, and operator diagnostics.
-Change-Id: CHG-2026-0001
+Change-Id: CHG-01M1VJ05ZAYMZ7T538R9K19Y0H
 Title: Single authorization decision path with observable policy state
 Type: feat
 Scope: access

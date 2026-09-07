@@ -1,12 +1,12 @@
 <!-- ABOUTME: Scoring and decision rubric for Senior CTO reviews of /dev-docs implementation-plan workstreams. -->
-<!-- ABOUTME: Focuses on architecture integrity, self-hosting, security, sequencing, and whether future agents can safely implement from the plan. -->
+<!-- ABOUTME: Focuses on architecture integrity, self-hosting, security, sequencing, and directly updating the workstream triad. -->
 # Senior CTO Review Rubric
 
-Use this rubric to evaluate implementation plans for enterprise-grade self-hostable software.
+Use this rubric to evaluate implementation plans for enterprise-grade self-hostable software and directly refine the active workstream triad (`plan.md`, `context.md`, `tasks.md`).
 
 Score only when useful. Prefer practical judgment over mechanical scoring.
 
-The main target is a `/dev-docs` workstream, so include artifact quality in the review, not just architecture quality.
+The CTO does not write a separate review markdown file. Instead, this rubric guides direct, in-place refinements to the triad and structures the high-signal chat summary.
 
 ## 0. The 3-Dimensional Evaluation Scorecard
 
@@ -245,12 +245,11 @@ Check:
 - Another implementation agent could resume without re-asking the user for core context.
 - Knowledge Graduation: Out-of-scope, follow-up, or deferred items are explicitly identified for promotion to `dev/backlog/<slug>.md` (and durable architecture to `docs/internal/adr/`), rather than being left as dead text in an ephemeral plan.
 
-## CTO Decision Labels
+## CTO Decisions & Direct Triad Actions
 
-Use one:
+The CTO decides the path forward and applies it directly to the triad without creating review files:
 
-- **Approve** — plan is ready to implement.
-- **Approve with required changes** — direction is right; named changes must be made first.
-- **Split before approval** — scope is too large or mixed.
-- **Reject** — wrong architecture or unacceptable risk.
-- **Defer** — valuable, but not the right time or missing a foundational dependency.
+- **Approved as Refined** — The plan's architecture is sound or has been directly refined to be execution-ready; update metadata to `Applied & Aligned` in `plan.md`, synchronize `context.md`, and ensure `tasks.md` has complete Red/Green sequences and atomic commit contracts.
+- **Split Applied** — Scope exceeded right-sizing limits (2+ conditions met); directly restructure the active triad to scope strictly to the primary slice, and graduate deferred scope to `dev/backlog/<slug>.md`.
+- **Scope Pruned & Re-Aligned** — Direction was viable but contained bloat or backward-compatibility shims; directly excise the legacy shims from `plan.md` and `tasks.md`.
+- **Reject / Defer** — Fundamental architectural flaw or missing foundational prerequisite; update `context.md` with explicit blockers and explain the rationale in the chat summary.

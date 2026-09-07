@@ -69,7 +69,7 @@ public sealed class ReleaseMainVerificationTests
         repo.SetRemoteMain(repo.V110);
         string before = repo.SnapshotRefs();
 
-        (int code, string output) = repo.VerifyMain(repo.V110, repo.V101TagObject, releaseDirectory: "docs/releases/1.0.1");
+        (int code, string output) = repo.VerifyMain(repo.V110, repo.V101TagObject, releaseDirectory: "docs/internal/releases/1.0.1");
 
         await Assert.That(code).IsEqualTo(Program.Success);
         await Assert.That(output).IsEqualTo($"release_main_verified: action=no-main-move old={repo.V110} new={repo.V101} tag=v1.0.1 instruction=publish-release-without-main-update\n");
@@ -81,7 +81,7 @@ public sealed class ReleaseMainVerificationTests
     {
         using var repo = MainFixture.Create();
 
-        (int code, string output) = repo.VerifyMain(repo.V110, repo.V101TagObject, releaseDirectory: "docs/releases/1.0.1");
+        (int code, string output) = repo.VerifyMain(repo.V110, repo.V101TagObject, releaseDirectory: "docs/internal/releases/1.0.1");
 
         await Assert.That(code).IsEqualTo(Program.ToolchainRejected);
         await Assert.That(output).IsEqualTo("verify_main_failed: release_main_cas_mismatch\n");
@@ -91,7 +91,7 @@ public sealed class ReleaseMainVerificationTests
     public async Task VerifyMainRejectsPrereleaseCasRaceNonDescendantAndMissingObjects()
     {
         using var prerelease = MainFixture.Create();
-        (int prereleaseCode, string prereleaseOutput) = prerelease.VerifyMain(prerelease.V100, prerelease.V111RcTagObject, releaseDirectory: "docs/releases/1.1.1-rc.1");
+        (int prereleaseCode, string prereleaseOutput) = prerelease.VerifyMain(prerelease.V100, prerelease.V111RcTagObject, releaseDirectory: "docs/internal/releases/1.1.1-rc.1");
 
         using var race = MainFixture.Create();
         race.SetRemoteMain(race.V110);
@@ -118,7 +118,7 @@ public sealed class ReleaseMainVerificationTests
     public async Task VerifyMainRejectsStaleFinalEvidenceMovedTagAndShortOids()
     {
         using var stale = MainFixture.Create();
-        stale.WriteEvidence("docs/releases/1.1.0", stale.V110, stale.V110TagObject, targetOverride: stale.V100);
+        stale.WriteEvidence("docs/internal/releases/1.1.0", stale.V110, stale.V110TagObject, targetOverride: stale.V100);
         (int staleCode, string staleOutput) = stale.VerifyMain(stale.V100, stale.V110TagObject);
 
         using var moved = MainFixture.Create();
@@ -141,7 +141,7 @@ public sealed class ReleaseMainVerificationTests
     public async Task VerifyMainIgnoresUnvalidatedHigherReleaseDirectory()
     {
         using var repo = MainFixture.Create();
-        string ambient = Path.Combine(repo.Root, "docs", "releases", "9.0.0");
+        string ambient = Path.Combine(repo.Root, "docs", "internal", "releases", "9.0.0");
         Directory.CreateDirectory(ambient);
         File.WriteAllBytes(Path.Combine(ambient, "release-evidence.v1.json"), [0]);
 
@@ -156,9 +156,9 @@ public sealed class ReleaseMainVerificationTests
     {
         using var repo = MainFixture.Create();
         string oversized = $"{new string('9', 128)}.0.0";
-        repo.WriteEvidence($"docs/releases/{oversized}", repo.V110, repo.V110TagObject, versionOverride: oversized);
+        repo.WriteEvidence($"docs/internal/releases/{oversized}", repo.V110, repo.V110TagObject, versionOverride: oversized);
 
-        (int code, string output) = repo.VerifyMain(repo.V100, repo.V110TagObject, $"docs/releases/{oversized}");
+        (int code, string output) = repo.VerifyMain(repo.V100, repo.V110TagObject, $"docs/internal/releases/{oversized}");
 
         await Assert.That(code).IsEqualTo(Program.ToolchainRejected);
         await Assert.That(output).IsEqualTo("verify_main_failed: release_main_version_invalid\n");
@@ -169,13 +169,13 @@ public sealed class ReleaseMainVerificationTests
     {
         using var missing = MainFixture.Create();
         missing.SetRemoteMain(missing.V110);
-        File.Delete(Path.Combine(missing.Root, "docs", "releases", "1.0.1", "release-context.v1.json"));
-        (int missingCode, string missingOutput) = missing.VerifyMain(missing.V110, missing.V101TagObject, "docs/releases/1.0.1");
+        File.Delete(Path.Combine(missing.Root, "docs", "internal", "releases", "1.0.1", "release-context.v1.json"));
+        (int missingCode, string missingOutput) = missing.VerifyMain(missing.V110, missing.V101TagObject, "docs/internal/releases/1.0.1");
 
         using var mismatched = MainFixture.Create();
         mismatched.SetRemoteMain(mismatched.V110);
-        mismatched.WriteEvidence("docs/releases/1.0.1", mismatched.V101, mismatched.V101TagObject, backportOverride: mismatched.Parallel);
-        (int mismatchedCode, string mismatchedOutput) = mismatched.VerifyMain(mismatched.V110, mismatched.V101TagObject, "docs/releases/1.0.1");
+        mismatched.WriteEvidence("docs/internal/releases/1.0.1", mismatched.V101, mismatched.V101TagObject, backportOverride: mismatched.Parallel);
+        (int mismatchedCode, string mismatchedOutput) = mismatched.VerifyMain(mismatched.V110, mismatched.V101TagObject, "docs/internal/releases/1.0.1");
 
         await Assert.That(missingCode).IsEqualTo(Program.ToolchainRejected);
         await Assert.That(missingOutput).IsEqualTo("verify_main_failed: release_main_forward_port_evidence_invalid\n");
@@ -269,7 +269,7 @@ public sealed class ReleaseMainVerificationTests
     public async Task VerifyMainRejectsMalformedFinalEvidenceWithBoundedDiagnostic()
     {
         using var missing = MainFixture.Create();
-        missing.WriteEvidenceJson("docs/releases/1.1.0", new
+        missing.WriteEvidenceJson("docs/internal/releases/1.1.0", new
         {
             schemaVersion = "release-evidence.v1",
             version = "1.1.0",
@@ -281,7 +281,7 @@ public sealed class ReleaseMainVerificationTests
         (int missingCode, string missingOutput) = missing.VerifyMain(missing.V100, missing.V110TagObject);
 
         using var wrongType = MainFixture.Create();
-        wrongType.WriteEvidenceJson("docs/releases/1.1.0", new
+        wrongType.WriteEvidenceJson("docs/internal/releases/1.1.0", new
         {
             schemaVersion = "release-evidence.v1",
             version = "1.1.0",
@@ -294,7 +294,7 @@ public sealed class ReleaseMainVerificationTests
         (int wrongTypeCode, string wrongTypeOutput) = wrongType.VerifyMain(wrongType.V100, wrongType.V110TagObject);
 
         using var nullField = MainFixture.Create();
-        nullField.WriteEvidenceJson("docs/releases/1.1.0", new
+        nullField.WriteEvidenceJson("docs/internal/releases/1.1.0", new
         {
             schemaVersion = "release-evidence.v1",
             version = "1.1.0",
@@ -339,9 +339,9 @@ public sealed class ReleaseMainVerificationTests
             Parallel = Commit("parallel main");
             Checkout("v1.1");
             SetRemoteMain(V100);
-            WriteEvidence("docs/releases/1.1.0", V110, V110TagObject);
-            WriteEvidence("docs/releases/1.0.1", V101, V101TagObject);
-            WriteEvidence("docs/releases/1.1.1-rc.1", V111Rc, V111RcTagObject);
+            WriteEvidence("docs/internal/releases/1.1.0", V110, V110TagObject);
+            WriteEvidence("docs/internal/releases/1.0.1", V101, V101TagObject);
+            WriteEvidence("docs/internal/releases/1.1.1-rc.1", V111Rc, V111RcTagObject);
         }
 
         public string Root { get; }
@@ -358,7 +358,7 @@ public sealed class ReleaseMainVerificationTests
 
         public static MainFixture Create(string objectFormat = "sha1") => new(objectFormat);
 
-        public (int ExitCode, string Output) VerifyMain(string oldOid, string tagObjectId, string releaseDirectory = "docs/releases/1.1.0", TimeSpan? timeout = null)
+        public (int ExitCode, string Output) VerifyMain(string oldOid, string tagObjectId, string releaseDirectory = "docs/internal/releases/1.1.0", TimeSpan? timeout = null)
         {
             using var writer = new StringWriter();
             int exitCode = MainCommand.Run(["verify-main", releaseDirectory, oldOid, tagObjectId], writer, Root, timeout ?? TimeSpan.FromSeconds(2));

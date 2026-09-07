@@ -120,8 +120,8 @@ internal sealed class GovernedReleaseFixture : IDisposable
     public string BaselineTagObject { get; } = string.Empty;
     public static string BaselineRef => BaselineTagName;
     public static string FirstGovernedReleaseVersion => FirstGovernedVersion;
-    public string FirstReleaseDirectory => Path.Combine(RepositoryPath, "docs", "releases", FirstVersion);
-    public string SecondReleaseDirectory => Path.Combine(RepositoryPath, "docs", "releases", SecondVersion);
+    public string FirstReleaseDirectory => Path.Combine(RepositoryPath, "docs", "internal", "releases", FirstVersion);
+    public string SecondReleaseDirectory => Path.Combine(RepositoryPath, "docs", "internal", "releases", SecondVersion);
     public static string FirstReleaseVersion => FirstVersion;
     public static string SecondReleaseVersion => SecondVersion;
 
@@ -152,7 +152,7 @@ internal sealed class GovernedReleaseFixture : IDisposable
 
     public (int ExitCode, string Output) VerifyCandidate(string version, string candidateOid, string? repositoryPath = null) =>
         RunWithEnvironment(writer => CandidateCommand.Run(
-            ["verify-candidate", $"docs/releases/{version}", candidateOid],
+            ["verify-candidate", $"docs/internal/releases/{version}", candidateOid],
             writer,
             repositoryPath ?? RepositoryPath,
             "linux-x64",
@@ -160,7 +160,7 @@ internal sealed class GovernedReleaseFixture : IDisposable
 
     public (int ExitCode, string Output) VerifyTag(string version, string candidateOid, string tagObjectId, string? repositoryPath = null) =>
         RunWithEnvironment(writer => TagCommand.Run(
-            ["verify-tag", $"docs/releases/{version}", candidateOid, tagObjectId],
+            ["verify-tag", $"docs/internal/releases/{version}", candidateOid, tagObjectId],
             writer,
             repositoryPath ?? RepositoryPath,
             "linux-x64",
@@ -168,7 +168,7 @@ internal sealed class GovernedReleaseFixture : IDisposable
 
     public (int ExitCode, string Output) VerifyMain(string version, string expectedOldOid, string tagObjectId, string? repositoryPath = null) =>
         RunWithEnvironment(writer => MainCommand.Run(
-            ["verify-main", $"docs/releases/{version}", expectedOldOid, tagObjectId],
+            ["verify-main", $"docs/internal/releases/{version}", expectedOldOid, tagObjectId],
             writer,
             repositoryPath ?? RepositoryPath,
             CommandTimeout));
@@ -179,7 +179,7 @@ internal sealed class GovernedReleaseFixture : IDisposable
     public string GenerateTagMessage(string version, string? repositoryPath = null)
     {
         (int exitCode, string output) = RunWithEnvironment(writer => TagCommand.Run(
-            ["tag-message", $"docs/releases/{version}"],
+            ["tag-message", $"docs/internal/releases/{version}"],
             writer,
             repositoryPath ?? RepositoryPath,
             "linux-x64",
@@ -189,7 +189,7 @@ internal sealed class GovernedReleaseFixture : IDisposable
 
     public (int ExitCode, string Output) OpenMaintenanceLine(string version, string tagObjectId, string? repositoryPath = null) =>
         RunWithEnvironment(writer => MaintenanceLineCommand.Run(
-            ["open-maintenance-line", $"docs/releases/{version}", tagObjectId],
+            ["open-maintenance-line", $"docs/internal/releases/{version}", tagObjectId],
             writer,
             repositoryPath ?? RepositoryPath,
             "linux-x64",
@@ -207,7 +207,7 @@ internal sealed class GovernedReleaseFixture : IDisposable
 
     public void DeleteGeneratedManifests(string version)
     {
-        string directory = Path.Combine(RepositoryPath, "docs", "releases", version);
+        string directory = Path.Combine(RepositoryPath, "docs", "internal", "releases", version);
         foreach (string name in new[] { "release-candidate.v1.json", "release-evidence.v1.json" })
         {
             string path = Path.Combine(directory, name);
@@ -291,7 +291,7 @@ internal sealed class GovernedReleaseFixture : IDisposable
 
     private string PrepareAndCommit(string version, string baseTag, string baseOid, string releaseDate)
     {
-        string releaseDirectory = Path.Combine(RepositoryPath, "docs", "releases", version);
+        string releaseDirectory = Path.Combine(RepositoryPath, "docs", "internal", "releases", version);
         Directory.CreateDirectory(releaseDirectory);
         File.WriteAllText(
             Path.Combine(releaseDirectory, "release.yaml"),
@@ -303,7 +303,7 @@ internal sealed class GovernedReleaseFixture : IDisposable
                 : "Attendees can now correct registration details.\n");
 
         (int exitCode, string output) = RunWithEnvironment(writer => PrepareCommand.Run(
-            ["prepare", $"docs/releases/{version}"],
+            ["prepare", $"docs/internal/releases/{version}"],
             writer,
             RepositoryPath,
             "linux-x64",
@@ -364,11 +364,11 @@ internal sealed class GovernedReleaseFixture : IDisposable
 
     private void WriteWorkspace()
     {
-        Directory.CreateDirectory(Path.Combine(RepositoryPath, "docs", "releases", "changes"));
+        Directory.CreateDirectory(Path.Combine(RepositoryPath, "docs", "internal", "releases", "changes"));
         Directory.CreateDirectory(Path.Combine(RepositoryPath, "eng", "release", "policy"));
         File.WriteAllText(
-            Path.Combine(RepositoryPath, "docs", "releases", "changes", "CHG-2026-0001.yaml"),
-            "Change-Id: CHG-2026-0001\nTitle: Registration correction window\nType: feat\nScope: registration\nSummary: Attendees can now correct registration details.\nSupersedes: []\nImpacts:\n  Breaking:\n    Reference: docs/releases/README.md\n    Disposition: not-applicable\n  Security:\n    Reference: docs/SECURITY_OVERVIEW.md\n    Disposition: not-applicable\n  Migration:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: not-applicable\n  Configuration:\n    Reference: docs/CONFIGURATION.md\n    Disposition: not-applicable\n  OpenAPI:\n    Reference: docs/API_CHANGELOG.md\n    Disposition: not-applicable\n  Operator:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: documented\n    Detail: Restart registration workers after deployment.\n");
+            Path.Combine(RepositoryPath, "docs", "internal", "releases", "changes", "CHG-2026-0001.yaml"),
+            "Change-Id: CHG-2026-0001\nTitle: Registration correction window\nType: feat\nScope: registration\nSummary: Attendees can now correct registration details.\nSupersedes: []\nImpacts:\n  Breaking:\n    Reference: docs/internal/releases/README.md\n    Disposition: not-applicable\n  Security:\n    Reference: docs/SECURITY_OVERVIEW.md\n    Disposition: not-applicable\n  Migration:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: not-applicable\n  Configuration:\n    Reference: docs/CONFIGURATION.md\n    Disposition: not-applicable\n  OpenAPI:\n    Reference: docs/API_CHANGELOG.md\n    Disposition: not-applicable\n  Operator:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: documented\n    Detail: Restart registration workers after deployment.\n");
         File.WriteAllText(Path.Combine(RepositoryPath, "eng", "release", "policy", "release-policy.yaml"), ReleasePolicyYaml);
         File.WriteAllText(Path.Combine(RepositoryPath, "eng", "release", "policy", "scope-registry.yaml"), "schemaVersion: 1\npublicScopes:\n  - events\n  - registration\nengineeringScopes:\n  - release\n");
     }

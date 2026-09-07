@@ -35,6 +35,35 @@
 - **Overnight Solution-Level Test Runs in Clean-Room Context**: Running `dotnet test` solution-wide causes massive context output and memory consumption. Always isolate test execution to the single relevant test project.
 - **PowerShell Syntax in Bash Shell**: Shell verification commands must use strictly POSIX Bash syntax. Never use PowerShell constructs or aliases.
 
+[2026-09-06 Europe/Brussels] — Compiler servers can inherit and retain build locks
+
+**Context**: Serializing shared-output .NET builds during the approved Unicode workstream's Architecture/Persistence regression repairs.
+
+**Symptom / Observation**: A finished build left later builds waiting indefinitely. Native `lslocks -o COMMAND,PID,MODE,BLOCKER,PATH` showed `VBCSCompiler`, not the waiting test processes, holding the task's build lock.
+
+**Root Cause**: Plain `flock <lock-file> <command>` allowed the lock file descriptor to reach the compiler server started by the build. That daemon outlived the command and retained the lock. A waiter PID and elapsed time alone did not identify the blocker.
+
+**Resolution**: Validate the exact lock owner and command before stopping an orphaned task-created process. Use `flock --close <lock-file> <command>` for subsequent serialized builds; native `flock --help` confirms that this closes the descriptor before running the command. Corrected focused Architecture executions passed6/6 and7/7, and lock inspection showed active flock owners instead of retained compiler-server ownership. No global build-server shutdown or repository helper script was needed.
+
+**Why This Matters for Future Work**: Build serialization can itself create a false test hang when child daemons inherit file descriptors. Check the real lock owner before restarting tests, and prevent inheritance rather than adding timeouts or killing unrelated processes.
+
+**References**:
+
+- `.agents/CONTEXT_ENGINEERING.md#in-session-test-economy--clean-architecture-scoping`
+- `tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj`
+- Native `flock --help` and `lslocks --help`
+- Verified Architecture repair: `8e252c831465555fa6492071b82ef9e086348991`.
+
+**Promotion Consideration**:
+
+- [ ] Candidate for `docs/internal/QUICK_REFERENCE.md`.
+- [ ] Candidate for new `.agents/rules/*.md` entry.
+- [ ] Candidate for skill update.
+- [ ] Candidate for ADR.
+- [x] Stays in journal only (observed build-orchestration lesson).
+
+---
+
 [2026-09-06 Europe/Brussels] — Global signal callbacks can retain disposed test hosts
 
 **Context**: Full API acceptance exhausted memory while constructing many hosts. A bounded investigation separated host disposal from process-wide callback ownership before another complete run.

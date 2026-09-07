@@ -1,6 +1,6 @@
 # ABOUTME: Public change fragment for semantics-first record contracts and trusted request authority.
 # ABOUTME: Records breaking API, security, migration, configuration, OpenAPI, and operator impacts.
-Change-Id: CHG-2026-0010
+Change-Id: CHG-01M1VJ17RD9AT6PNN1X0093958
 Title: Immutable contracts use records without trusting body authority
 Type: refactor
 Scope: architecture

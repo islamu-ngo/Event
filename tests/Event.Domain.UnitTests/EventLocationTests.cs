@@ -321,6 +321,64 @@ public sealed class EventLocationTests
     }
 
     [Test]
+    [Arguments("Session")]
+    [Arguments("Group")]
+    [Arguments("Agenda")]
+    public async Task DeletionDetachClearsEveryPhysicalReferenceWithoutChangingIdentity(string carrier)
+    {
+        Guid tenantId = Guid.CreateVersion7();
+        Guid eventId = Guid.CreateVersion7();
+        Location location = CreatePhysicalLocation(tenantId);
+        var room = new LocationRoom { Id = Guid.CreateVersion7(), Name = "Room", LocationId = location.Id, Location = location, TenantId = tenantId, Tenant = null! };
+        EventLocation placement = EventLocation.CreatePhysical(tenantId, eventId, location.Id,
+            Guid.CreateVersion7(), DomainTestClock.UtcNow);
+        object?[] references;
+        Guid retainedEventId;
+        Guid retainedTenantId;
+        switch (carrier)
+        {
+            case "Session":
+                EventSession session = CreateSession(tenantId, eventId, null);
+                session.AssignEventLocation(placement);
+                session.Location = location;
+                session.RoomId = room.Id;
+                session.Room = room;
+                session.DetachEventLocationForDeletion();
+                session.DetachEventLocationForDeletion();
+                references = [session.EventLocationId, session.EventLocation, session.LocationId, session.Location, session.RoomId, session.Room];
+                (retainedEventId, retainedTenantId) = (session.EventId, session.TenantId);
+                break;
+            case "Group":
+                var group = new EventSessionGroup { EventId = eventId, Event = null!, TenantId = tenantId, Tenant = null!, Name = "Track" };
+                group.AssignEventLocation(placement);
+                group.Location = location;
+                group.RoomId = room.Id;
+                group.Room = room;
+                group.DetachEventLocationForDeletion();
+                group.DetachEventLocationForDeletion();
+                references = [group.EventLocationId, group.EventLocation, group.LocationId, group.Location, group.RoomId, group.Room];
+                (retainedEventId, retainedTenantId) = (group.EventId, group.TenantId);
+                break;
+            default:
+                var agenda = new EventAgendaItem { EventId = eventId, Event = null!, TenantId = tenantId, Tenant = null!, Title = "Break" };
+                agenda.AssignEventLocation(placement);
+                agenda.Location = location;
+                agenda.RoomId = room.Id;
+                agenda.Room = room;
+                agenda.DetachEventLocationForDeletion();
+                agenda.DetachEventLocationForDeletion();
+                references = [agenda.EventLocationId, agenda.EventLocation, agenda.LocationId, agenda.Location, agenda.RoomId, agenda.Room];
+                (retainedEventId, retainedTenantId) = (agenda.EventId, agenda.TenantId);
+                break;
+        }
+
+        await Assert.That(references).IsEquivalentTo(new object?[6]);
+        await Assert.That(retainedEventId).IsEqualTo(eventId);
+        await Assert.That(retainedTenantId).IsEqualTo(tenantId);
+        await Assert.That(placement.IsDeleted).IsFalse();
+    }
+
+    [Test]
     public async Task CarrierRejectsCrossEventOrCrossTenantPlacement()
     {
         var tenantId = Guid.CreateVersion7();

@@ -76,11 +76,14 @@ jobs:
       - name: Verify Relative Markdown Link Integrity
         shell: bash
         run: |
-          echo "=== Step 3: Validating relative Markdown links across docs/ and README.md ==="
+          echo "=== Step 3: Validating relative Markdown links across docs/public/ and README.md ==="
           errors=0
           total=0
 
-          target_files=("README.md" $(find docs -name "*.md"))
+          mapfile -t target_files < <(
+            echo "README.md"
+            find docs/public -type f -name "*.md"
+          )
 
           for file in "${target_files[@]}"; do
             src_dir=$(dirname "$file")

@@ -278,7 +278,7 @@ public sealed class ReleaseContextPolicyTests
         Supersedes: []
         Impacts:
           Breaking:
-            Reference: docs/releases/README.md
+            Reference: docs/internal/releases/README.md
             Disposition: not-applicable
           Security:
             Reference: SECURITY-POLICY.md

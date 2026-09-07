@@ -1,6 +1,6 @@
 # ABOUTME: Public change fragment for the ATProtocol Jetstream v2 federated ingestion migration.
 # ABOUTME: Records configuration, operator, migration, and security impacts of the v2 consumer.
-Change-Id: CHG-2026-0005
+Change-Id: CHG-01M1VJ10ET59QH3KZKDTTKZJ9W
 Title: Federated event ingestion runs on Jetstream v2
 Type: feat
 Scope: federation

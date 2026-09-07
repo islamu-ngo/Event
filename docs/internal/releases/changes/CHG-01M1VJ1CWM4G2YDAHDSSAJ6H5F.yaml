@@ -1,6 +1,6 @@
 # ABOUTME: Public change fragment for bounded privacy-erasure authority retention and restore safety.
 # ABOUTME: Records floor-aware replay, hold pseudonymization, provider migrations, and operator recovery impact.
-Change-Id: CHG-2026-0013
+Change-Id: CHG-01M1VJ1CWM4G2YDAHDSSAJ6H5F
 Title: Bounded privacy-erasure authority retention with fail-closed restore checks
 Type: feat
 Scope: privacy

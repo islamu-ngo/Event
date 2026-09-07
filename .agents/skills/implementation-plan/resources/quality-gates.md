@@ -41,10 +41,12 @@
 - Every task names exact files or a bounded investigation that will discover them.
 - Every task includes observable acceptance criteria, dependencies, effort, and required guidance.
 - Phases are reviewable slices with rollback or failure-diagnosis guidance.
-- **Clean Architecture Slicing**: Verification strictly targets the touched layer (e.g., Blazor UI tests for UI changes; Application unit tests for CQRS changes). Never include irrelevant or cross-layer integration suites in unit-level slices.
-- **Subtask Verification**: Subtasks specify targeted TUnit tree-node filtering (`--treenode-filter "/*/*/*<TestClass>/*"`) for active iteration rather than full-project or solution-wide test commands.
+- **Clean Architecture Slicing & 3-Ring Progressive Verification**:
+  - **Ring 1 (Inner Loop, < 2s)**: Subtasks specify fast in-memory TUnit slicing (`--treenode-filter "/*/*/*<TestClass>/*"`) targeting `Event.Domain.UnitTests` or `Event.Application.UnitTests`. Zero Docker containers or network I/O in the inner loop. Pure domain invariants (normalization, validation, state machines) belong in Domain unit tests (< 50ms).
+  - **Ring 2 (Phase Exit Gate, < 15s)**: Every intermediate phase ends with exactly one Release build (`dotnet build -c Release -v q`) and at most one fastest relevant project test against ONE canonical provider (e.g. SQLite in-memory or single PostgreSQL container). **Planning multi-database provider matrix runs or container sweeps during intermediate phases is strictly forbidden.**
+  - **Ring 3 (Plan Exit Gate)**: The full 5-database provider matrix (PostgreSQL, SQLite, SQL Server, MySQL), EF Core migrations, and `Event.Architecture.Tests` are planned strictly at the final plan exit before PR creation.
+- **Yak-Shaving Quarantine Rule**: The plan must forbid agents from absorbing, debugging, or fixing pre-existing test rot or broken fixtures outside the task scope. When unrelated tests fail, agents must reproduce on clean base, log under `*-context.md` / `dev/backlog/`, quarantine the failure, and proceed with the assigned deliverable.
 - Tests are specified against public contracts (MediatR requests, HTTP routes, ProblemDetails RFC 7807, database states) rather than private implementation details.
-- Every phase ends with exactly one Release build and at most one fastest relevant non-browser project test.
 - Every phase then ends with a self-sufficient declarative commit contract. If a phase touches dozens or hundreds of files or multiple separable layers, it sequences multiple atomic commit contracts following `conventional-commit`. The commit stages and commits strictly phase-owned files on the task branch (`feat/<task-name>`), verifying clean status before completing the phase. Normal execution does not reload `conventional-commit`.
 - Message overrides are limited to explicit user-driven outcome changes, atomic phase splits, material implementation divergence, changed breaking/change-fragment classification, or a planned message that became factually false. Stylistic preference is never sufficient.
 - Only an allowed override loads `conventional-commit`; every resulting actual contract repeats the declarative schema before any commit executes.
@@ -87,21 +89,32 @@ git diff --check -- .agents/skills .agents/contract tests/Event.Architecture.Tes
 
 Run the planned implementation test suite only during implementation, not while producing the plan. Record known baseline failures honestly in context and tasks.
 
-## Final Response
+## Final Response (Self-Contained Executive Plan Brief)
 
-Use this shape:
+The final response presenting the plan MUST be a **Self-Contained Executive Plan Brief** so the user can understand, review, and approve the plan directly in chat without being forced to open `dev/active/<task-name>/`:
 
 ```text
-Created/updated implementation planning docs for `<task-name>`:
+Created/updated implementation plan for `<task-name>`:
 - dev/active/<task-name>/<task-name>-plan.md
 - dev/active/<task-name>/<task-name>-context.md
 - dev/active/<task-name>/<task-name>-tasks.md
 
-Potential Risks & Unknowns:
-<Short evidence-grounded paragraph naming the hardest unresolved area.>
+### Executive Summary & Architectural Approach
+<2-3 sentences explaining what will change, the core architectural design pattern, and the primary business/platform benefit.>
 
-Recommended next step:
-<Specific section for user review, or the first approved implementation slice.>
+### Phase Roadmap
+- **Phase 1: <Descriptive Name>** — <What is built, layers touched, and invariants verified>
+- **Phase 2: <Descriptive Name>** — <What is built, layers touched, and invariants verified>
+- ...
+
+### Key Decisions & Trade-offs
+- <Bullet points on major technical or architectural choices made during intake/planning>
+
+### Potential Risks & Hardest Unknowns
+<Short evidence-grounded paragraph naming the hardest unresolved area or edge case.>
+
+### Recommended Next Step & Approval Request
+<Explicit call for approval or specific direction to proceed with Phase 1, with options if applicable.>
 ```
 
 Do not say implementation started. If re-baselining, summarize what materially changed in the planning artifacts.

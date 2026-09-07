@@ -34,7 +34,7 @@ public static class MainCommand
             if (!FullOidPattern.IsMatch(args[2]) || !FullOidPattern.IsMatch(args[3])) return Reject(output, "release_main_oid_not_full");
 
             string releaseDirectory = ResolveChild(root, args[1], mustExist: true);
-            string releasesRoot = Path.Combine(root, "docs", "releases");
+            string releasesRoot = Path.Join(Path.GetFullPath(root), "docs", "internal", "releases");
             if (!string.Equals(Path.GetDirectoryName(releaseDirectory), releasesRoot, PathComparison)) return Reject(output, "release_main_path_invalid");
 
             string expectedOld = args[2];

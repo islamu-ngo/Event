@@ -1,6 +1,7 @@
 // ABOUTME: Implements the single global renewable Jetstream lease and fenced cursor ownership.
 // ABOUTME: Atomically applies canonical records, tombstones, tenant presentations, or quarantine before cursor advance.
 
+using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Persistence;
@@ -16,6 +17,7 @@ using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Explore.Persistence.Repositories;
 
@@ -52,41 +54,49 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
         return await strategy.ExecuteAsync(async () =>
         {
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
-            await AcquireConsumerLockAsync(normalizedService, cancellationToken);
-
-            var state = await _dbContext.AtprotoJetstreamConsumerStates
-                .SingleOrDefaultAsync(value => value.Service == normalizedService, cancellationToken);
-            if (state is null)
+            try
             {
-                state = new AtprotoJetstreamConsumerState
+                await AcquireConsumerLockAsync(normalizedService, cancellationToken);
+
+                var state = await _dbContext.AtprotoJetstreamConsumerStates
+                    .SingleOrDefaultAsync(value => value.Service == normalizedService, cancellationToken);
+                if (state is null)
                 {
-                    Id = Guid.CreateVersion7(),
-                    Service = normalizedService,
-                    UpdatedAt = claimedAt
-                };
-                await _dbContext.AtprotoJetstreamConsumerStates.AddAsync(state, cancellationToken);
-            }
-            else if (state.LeaseExpiresAt > claimedAt)
-            {
-                await transaction.CommitAsync(cancellationToken);
-                return null;
-            }
+                    state = new AtprotoJetstreamConsumerState
+                    {
+                        Id = Guid.CreateVersion7(),
+                        Service = normalizedService,
+                        UpdatedAt = claimedAt
+                    };
+                    await _dbContext.AtprotoJetstreamConsumerStates.AddAsync(state, cancellationToken);
+                }
+                else if (state.LeaseExpiresAt > claimedAt)
+                {
+                    await transaction.CommitAsync(cancellationToken);
+                    return null;
+                }
 
-            state.LeaseOwner = normalizedOwner;
-            state.LeaseToken = Guid.CreateVersion7();
-            state.LeaseExpiresAt = claimedAt.Add(leaseDuration);
-            state.LeaseFence = checked(state.LeaseFence + 1);
-            state.UpdatedAt = claimedAt;
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            var claim = new AtprotoJetstreamClaim(
-                state.Id,
-                state.Service,
-                state.Cursor,
-                state.LeaseToken.Value,
-                state.LeaseFence);
-            _dbContext.Entry(state).State = EntityState.Detached;
-            return claim;
+                state.LeaseOwner = normalizedOwner;
+                state.LeaseToken = Guid.CreateVersion7();
+                state.LeaseExpiresAt = claimedAt.Add(leaseDuration);
+                state.LeaseFence = checked(state.LeaseFence + 1);
+                state.UpdatedAt = claimedAt;
+                await _dbContext.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                var claim = new AtprotoJetstreamClaim(
+                    state.Id,
+                    state.Service,
+                    state.Cursor,
+                    state.LeaseToken.Value,
+                    state.LeaseFence);
+                _dbContext.Entry(state).State = EntityState.Detached;
+                return claim;
+            }
+            catch
+            {
+                await RollbackFailedAttemptAsync(transaction);
+                throw;
+            }
         });
     }
 
@@ -139,62 +149,70 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
         {
             var consumed = new List<FileStorageWriteResult>();
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
-            await AcquireConsumerLockAsync(request.Claim.Service, cancellationToken);
-            var state = await _dbContext.AtprotoJetstreamConsumerStates.SingleOrDefaultAsync(value =>
-                value.Id == request.Claim.ConsumerStateId &&
-                value.Service == request.Claim.Service &&
-                value.Cursor == request.ExpectedCursor &&
-                value.LeaseToken == request.Claim.LeaseToken &&
-                value.LeaseFence == request.Claim.LeaseFence &&
-                value.LeaseExpiresAt > request.ObservedAt,
-                cancellationToken);
-            if (state is null)
+            try
             {
-                await transaction.RollbackAsync(cancellationToken);
-                return AtprotoPersistenceApplyResult.Rejected;
-            }
-
-            if (request.Record is not null && !await ApplyRecordAsync(request, consumed, cancellationToken))
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                return AtprotoPersistenceApplyResult.Rejected;
-            }
-
-            if (request.EventProjectionInvalidation is not null)
-            {
-                await InvalidateEventProjectionAsync(request, cancellationToken);
-            }
-
-            if (request.AccountPurge is not null)
-            {
-                await PurgeAccountAsync(request, cancellationToken);
-            }
-
-            if (request.Quarantine is not null)
-            {
-                bool alreadyQuarantined = await _dbContext.AtprotoJetstreamQuarantines.AnyAsync(value =>
-                    value.ConsumerStateId == state.Id && value.Cursor == request.NextCursor,
+                await AcquireConsumerLockAsync(request.Claim.Service, cancellationToken);
+                var state = await _dbContext.AtprotoJetstreamConsumerStates.SingleOrDefaultAsync(value =>
+                    value.Id == request.Claim.ConsumerStateId &&
+                    value.Service == request.Claim.Service &&
+                    value.Cursor == request.ExpectedCursor &&
+                    value.LeaseToken == request.Claim.LeaseToken &&
+                    value.LeaseFence == request.Claim.LeaseFence &&
+                    value.LeaseExpiresAt > request.ObservedAt,
                     cancellationToken);
-                if (!alreadyQuarantined)
+                if (state is null)
                 {
-                    request.Quarantine.ConsumerStateId = state.Id;
-                    request.Quarantine.Cursor = request.NextCursor;
-                    await _dbContext.AtprotoJetstreamQuarantines.AddAsync(request.Quarantine, cancellationToken);
+                    await transaction.RollbackAsync(cancellationToken);
+                    return AtprotoPersistenceApplyResult.Rejected;
                 }
-            }
 
-            state.Cursor = request.AdvanceCursor ? request.NextCursor : request.ExpectedCursor;
-            state.LastEventAt = request.ObservedAt;
-            state.UpdatedAt = request.ObservedAt;
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            if (!await HasCurrentFenceAtCommitAsync(request.Claim, cancellationToken))
+                if (request.Record is not null && !await ApplyRecordAsync(request, consumed, cancellationToken))
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    return AtprotoPersistenceApplyResult.Rejected;
+                }
+
+                if (request.EventProjectionInvalidation is not null)
+                {
+                    await InvalidateEventProjectionAsync(request, cancellationToken);
+                }
+
+                if (request.AccountPurge is not null)
+                {
+                    await PurgeAccountAsync(request, cancellationToken);
+                }
+
+                if (request.Quarantine is not null)
+                {
+                    bool alreadyQuarantined = await _dbContext.AtprotoJetstreamQuarantines.AnyAsync(value =>
+                        value.ConsumerStateId == state.Id && value.Cursor == request.NextCursor,
+                        cancellationToken);
+                    if (!alreadyQuarantined)
+                    {
+                        request.Quarantine.ConsumerStateId = state.Id;
+                        request.Quarantine.Cursor = request.NextCursor;
+                        await _dbContext.AtprotoJetstreamQuarantines.AddAsync(request.Quarantine, cancellationToken);
+                    }
+                }
+
+                state.Cursor = request.AdvanceCursor ? request.NextCursor : request.ExpectedCursor;
+                state.LastEventAt = request.ObservedAt;
+                state.UpdatedAt = request.ObservedAt;
+                await _dbContext.SaveChangesAsync(cancellationToken);
+                if (!await HasCurrentFenceAtCommitAsync(request.Claim, cancellationToken))
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    return AtprotoPersistenceApplyResult.Rejected;
+                }
+
+                await transaction.CommitAsync(cancellationToken);
+                return new AtprotoPersistenceApplyResult(true, consumed);
+            }
+            catch
             {
-                await transaction.RollbackAsync(cancellationToken);
-                return AtprotoPersistenceApplyResult.Rejected;
+                await RollbackFailedAttemptAsync(transaction);
+                throw;
             }
-
-            await transaction.CommitAsync(cancellationToken);
-            return new AtprotoPersistenceApplyResult(true, consumed);
         });
     }
 
@@ -224,215 +242,223 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
             var consumed = new List<FileStorageWriteResult>();
 
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
-            await AcquireConsumerLockAsync(request.Claim.Service, cancellationToken);
-            AtprotoJetstreamConsumerState? state = await _dbContext.AtprotoJetstreamConsumerStates
-                .SingleOrDefaultAsync(value =>
-                    value.Id == request.Claim.ConsumerStateId
-                    && value.Service == request.Claim.Service
-                    && value.LeaseToken == request.Claim.LeaseToken
-                    && value.LeaseFence == request.Claim.LeaseFence
-                    && value.LeaseExpiresAt > request.ObservedAt,
-                    cancellationToken);
-            if (state is null)
+            try
             {
-                await transaction.RollbackAsync(cancellationToken);
-                return AtprotoPersistenceApplyResult.Rejected;
-            }
-
-            string[] scannedDids = request.ScannedDids.ToArray();
-            Dictionary<string, AtprotoPdsSnapshot> snapshots = request.Snapshots
-                .ToDictionary(value => value.Did, StringComparer.Ordinal);
-            HashSet<(string Did, string Collection, string RecordKey)> present = request.Snapshots
-                .SelectMany(snapshot => snapshot.PresentIdentities.Select(identity =>
-                    (snapshot.Did, identity.Collection, identity.RecordKey)))
-                .ToHashSet();
-            HashSet<(string Did, string Collection, string RecordKey)> accepted = request.Snapshots
-                .SelectMany(snapshot => snapshot.Items.Select(item =>
-                    (snapshot.Did, item.Record.Collection, item.Record.RecordKey)))
-                .ToHashSet();
-            List<AtprotoRecord> canonicalRecords = await _dbContext.AtprotoRecords
-                .Where(value =>
-                    scannedDids.Contains(value.Did)
-                    && (value.Collection == EventCollection || value.Collection == RsvpCollection))
-                .ToListAsync(cancellationToken);
-            Dictionary<(string Did, string Collection, string RecordKey), AtprotoRecord> canonicalByIdentity =
-                canonicalRecords.ToDictionary(value => (value.Did, value.Collection, value.RecordKey));
-            AtprotoRecord[] missing = canonicalRecords
-                .Where(value =>
-                    value.Direction != AtprotoRecordDirection.Outbound
-                    && value.SourceVersion < request.SnapshotVersion
-                    && !present.Contains((value.Did, value.Collection, value.RecordKey)))
-                .ToArray();
-            string[] missingEventUris = missing
-                .Where(value => value.Collection == EventCollection && value.Uri is not null)
-                .Select(value => value.Uri!)
-                .Distinct(StringComparer.Ordinal)
-                .ToArray();
-            var dependentCandidates = missingEventUris.Length == 0
-                ? []
-                : await _dbContext.AtprotoRecords
-                    .Where(value =>
-                        value.Collection == RsvpCollection
-                        && value.SubjectUri != null
-                        && missingEventUris.Contains(value.SubjectUri)
-                        && value.SourceVersion < request.SnapshotVersion)
-                    .Select(value => new
-                    {
-                        value.Id,
-                        value.Did,
-                        value.Collection,
-                        value.RecordKey
-                    })
-                    .ToArrayAsync(cancellationToken);
-            Guid[] dependentRecordIds = dependentCandidates
-                .Where(value => !accepted.Contains((value.Did, value.Collection, value.RecordKey)))
-                .Select(value => value.Id)
-                .ToArray();
-            Guid[] canonicalIds = canonicalRecords.Select(value => value.Id).ToArray();
-            Dictionary<Guid, AtprotoEventProjection> projections = await _dbContext.AtprotoEventProjections
-                .Where(value => canonicalIds.Contains(value.AtprotoRecordId))
-                .ToDictionaryAsync(value => value.AtprotoRecordId, cancellationToken);
-            Guid[] presentationRecordIds = canonicalIds.Concat(dependentRecordIds).Distinct().ToArray();
-            List<AtprotoRecordTenantPresentation> presentations = await _dbContext
-                .AtprotoRecordTenantPresentations
-                .IgnoreTenantFilter(TenantFilterBypassReasons.AtprotoPdsSnapshotGlobalReconciliation)
-                .Where(value => presentationRecordIds.Contains(value.AtprotoRecordId))
-                .ToListAsync(cancellationToken);
-            Dictionary<(Guid TenantId, Guid RecordId), AtprotoRecordTenantPresentation> presentationByKey =
-                presentations.ToDictionary(value => (value.TenantId, value.AtprotoRecordId));
-            HashSet<Guid> visibleTenantIds = request.PresentationTenantIds.ToHashSet();
-
-            foreach (string did in scannedDids)
-            {
-                foreach (AtprotoPdsSnapshotItem item in snapshots[did].Items)
+                await AcquireConsumerLockAsync(request.Claim.Service, cancellationToken);
+                AtprotoJetstreamConsumerState? state = await _dbContext.AtprotoJetstreamConsumerStates
+                    .SingleOrDefaultAsync(value =>
+                        value.Id == request.Claim.ConsumerStateId
+                        && value.Service == request.Claim.Service
+                        && value.LeaseToken == request.Claim.LeaseToken
+                        && value.LeaseFence == request.Claim.LeaseFence
+                        && value.LeaseExpiresAt > request.ObservedAt,
+                        cancellationToken);
+                if (state is null)
                 {
-                    var identity = (did, item.Record.Collection, item.Record.RecordKey);
-                    AtprotoFederatedEventImportPlan[] eventImports = request.EventImports
+                    await transaction.RollbackAsync(cancellationToken);
+                    return AtprotoPersistenceApplyResult.Rejected;
+                }
+
+                string[] scannedDids = request.ScannedDids.ToArray();
+                Dictionary<string, AtprotoPdsSnapshot> snapshots = request.Snapshots
+                    .ToDictionary(value => value.Did, StringComparer.Ordinal);
+                HashSet<(string Did, string Collection, string RecordKey)> present = request.Snapshots
+                    .SelectMany(snapshot => snapshot.PresentIdentities.Select(identity =>
+                        (snapshot.Did, identity.Collection, identity.RecordKey)))
+                    .ToHashSet();
+                HashSet<(string Did, string Collection, string RecordKey)> accepted = request.Snapshots
+                    .SelectMany(snapshot => snapshot.Items.Select(item =>
+                        (snapshot.Did, item.Record.Collection, item.Record.RecordKey)))
+                    .ToHashSet();
+                List<AtprotoRecord> canonicalRecords = await _dbContext.AtprotoRecords
+                    .Where(value =>
+                        scannedDids.Contains(value.Did)
+                        && (value.Collection == EventCollection || value.Collection == RsvpCollection))
+                    .ToListAsync(cancellationToken);
+                Dictionary<(string Did, string Collection, string RecordKey), AtprotoRecord> canonicalByIdentity =
+                    canonicalRecords.ToDictionary(value => (value.Did, value.Collection, value.RecordKey));
+                AtprotoRecord[] missing = canonicalRecords
+                    .Where(value =>
+                        value.Direction != AtprotoRecordDirection.Outbound
+                        && value.SourceVersion < request.SnapshotVersion
+                        && !present.Contains((value.Did, value.Collection, value.RecordKey)))
+                    .ToArray();
+                string[] missingEventUris = missing
+                    .Where(value => value.Collection == EventCollection && value.Uri is not null)
+                    .Select(value => value.Uri!)
+                    .Distinct(StringComparer.Ordinal)
+                    .ToArray();
+                var dependentCandidates = missingEventUris.Length == 0
+                    ? []
+                    : await _dbContext.AtprotoRecords
                         .Where(value =>
-                            string.Equals(value.Did, did, StringComparison.Ordinal)
-                            && string.Equals(value.AtUri, item.Record.Uri, StringComparison.Ordinal))
-                        .ToArray();
-                    if (!canonicalByIdentity.TryGetValue(identity, out AtprotoRecord? canonical))
+                            value.Collection == RsvpCollection
+                            && value.SubjectUri != null
+                            && missingEventUris.Contains(value.SubjectUri)
+                            && value.SourceVersion < request.SnapshotVersion)
+                        .Select(value => new
+                        {
+                            value.Id,
+                            value.Did,
+                            value.Collection,
+                            value.RecordKey
+                        })
+                        .ToArrayAsync(cancellationToken);
+                Guid[] dependentRecordIds = dependentCandidates
+                    .Where(value => !accepted.Contains((value.Did, value.Collection, value.RecordKey)))
+                    .Select(value => value.Id)
+                    .ToArray();
+                Guid[] canonicalIds = canonicalRecords.Select(value => value.Id).ToArray();
+                Dictionary<Guid, AtprotoEventProjection> projections = await _dbContext.AtprotoEventProjections
+                    .Where(value => canonicalIds.Contains(value.AtprotoRecordId))
+                    .ToDictionaryAsync(value => value.AtprotoRecordId, cancellationToken);
+                Guid[] presentationRecordIds = canonicalIds.Concat(dependentRecordIds).Distinct().ToArray();
+                List<AtprotoRecordTenantPresentation> presentations = await _dbContext
+                    .AtprotoRecordTenantPresentations
+                    .IgnoreTenantFilter(TenantFilterBypassReasons.AtprotoPdsSnapshotGlobalReconciliation)
+                    .Where(value => presentationRecordIds.Contains(value.AtprotoRecordId))
+                    .ToListAsync(cancellationToken);
+                Dictionary<(Guid TenantId, Guid RecordId), AtprotoRecordTenantPresentation> presentationByKey =
+                    presentations.ToDictionary(value => (value.TenantId, value.AtprotoRecordId));
+                HashSet<Guid> visibleTenantIds = request.PresentationTenantIds.ToHashSet();
+
+                foreach (string did in scannedDids)
+                {
+                    foreach (AtprotoPdsSnapshotItem item in snapshots[did].Items)
                     {
-                        canonical = item.Record;
-                        canonical.Id = canonical.Id == Guid.Empty ? Guid.CreateVersion7() : canonical.Id;
-                        canonical.Direction = AtprotoRecordDirection.Inbound;
-                        canonical.Provenance = AtprotoRecordProvenance.Jetstream;
-                        canonicalByIdentity.Add(identity, canonical);
-                        await _dbContext.AtprotoRecords.AddAsync(canonical, cancellationToken);
-                    }
-                    else if (canonical.SourceVersion > request.SnapshotVersion)
-                    {
-                        continue;
-                    }
-                    else if (canonical.SourceVersion == request.SnapshotVersion)
-                    {
+                        var identity = (did, item.Record.Collection, item.Record.RecordKey);
+                        AtprotoFederatedEventImportPlan[] eventImports = request.EventImports
+                            .Where(value =>
+                                string.Equals(value.Did, did, StringComparison.Ordinal)
+                                && string.Equals(value.AtUri, item.Record.Uri, StringComparison.Ordinal))
+                            .ToArray();
+                        if (!canonicalByIdentity.TryGetValue(identity, out AtprotoRecord? canonical))
+                        {
+                            canonical = item.Record;
+                            canonical.Id = canonical.Id == Guid.Empty ? Guid.CreateVersion7() : canonical.Id;
+                            canonical.Direction = AtprotoRecordDirection.Inbound;
+                            canonical.Provenance = AtprotoRecordProvenance.Jetstream;
+                            canonicalByIdentity.Add(identity, canonical);
+                            await _dbContext.AtprotoRecords.AddAsync(canonical, cancellationToken);
+                        }
+                        else if (canonical.SourceVersion > request.SnapshotVersion)
+                        {
+                            continue;
+                        }
+                        else if (canonical.SourceVersion == request.SnapshotVersion)
+                        {
+                            await ApplyEventImportsAsync(
+                                canonical,
+                                eventImports,
+                                request.ObservedAt,
+                                TenantFilterBypassReasons.AtprotoPdsSnapshotGlobalReconciliation,
+                                updateExisting: false,
+                                consumed,
+                                cancellationToken);
+                            continue;
+                        }
+                        else
+                        {
+                            ApplySnapshotRecord(canonical, item.Record);
+                        }
+
+                        canonical.SourceVersion = request.SnapshotVersion;
+                        canonical.SourceCursor = null;
+                        canonical.UpdatedAt = request.ObservedAt;
+                        canonical.TombstonedAt = null;
+                        ApplySnapshotProjection(canonical, item.EventProjection, projections, request);
+                        ReconcilePresentations(
+                            canonical,
+                            visibleTenantIds,
+                            presentations,
+                            presentationByKey,
+                            request);
                         await ApplyEventImportsAsync(
                             canonical,
                             eventImports,
                             request.ObservedAt,
                             TenantFilterBypassReasons.AtprotoPdsSnapshotGlobalReconciliation,
-                            updateExisting: false,
+                            updateExisting: true,
                             consumed,
                             cancellationToken);
+                    }
+                }
+
+                foreach ((string did, string collection, string recordKey) in present.Except(accepted))
+                {
+                    if (!canonicalByIdentity.TryGetValue((did, collection, recordKey), out AtprotoRecord? canonical)
+                        || canonical.SourceVersion >= request.SnapshotVersion)
+                    {
                         continue;
                     }
-                    else
+
+                    if (collection == EventCollection
+                        && projections.Remove(canonical.Id, out AtprotoEventProjection? projection))
                     {
-                        ApplySnapshotRecord(canonical, item.Record);
+                        _dbContext.AtprotoEventProjections.Remove(projection);
                     }
 
+                    HidePresentations(canonical.Id, presentations, request);
+                    await ApplyEventImportsAsync(
+                        canonical,
+                        [],
+                        request.ObservedAt,
+                        TenantFilterBypassReasons.AtprotoPdsSnapshotGlobalReconciliation,
+                        updateExisting: true,
+                        consumed,
+                        cancellationToken,
+                        forceTombstone: true);
+                }
+
+                foreach (AtprotoRecord canonical in missing)
+                {
+                    canonical.Cid = null;
+                    canonical.RecordJson = null;
+                    canonical.RecordHash = null;
+                    canonical.SubjectUri = null;
+                    canonical.SubjectCid = null;
+                    canonical.IndexedAt = request.ObservedAt;
                     canonical.SourceVersion = request.SnapshotVersion;
                     canonical.SourceCursor = null;
                     canonical.UpdatedAt = request.ObservedAt;
-                    canonical.TombstonedAt = null;
-                    ApplySnapshotProjection(canonical, item.EventProjection, projections, request);
-                    ReconcilePresentations(
-                        canonical,
-                        visibleTenantIds,
-                        presentations,
-                        presentationByKey,
-                        request);
+                    canonical.TombstonedAt = request.ObservedAt;
+                    if (canonical.Collection == EventCollection
+                        && projections.Remove(canonical.Id, out AtprotoEventProjection? projection))
+                    {
+                        _dbContext.AtprotoEventProjections.Remove(projection);
+                    }
+
+                    HidePresentations(canonical.Id, presentations, request);
                     await ApplyEventImportsAsync(
                         canonical,
-                        eventImports,
+                        [],
                         request.ObservedAt,
                         TenantFilterBypassReasons.AtprotoPdsSnapshotGlobalReconciliation,
                         updateExisting: true,
                         consumed,
                         cancellationToken);
                 }
-            }
 
-            foreach ((string did, string collection, string recordKey) in present.Except(accepted))
-            {
-                if (!canonicalByIdentity.TryGetValue((did, collection, recordKey), out AtprotoRecord? canonical)
-                    || canonical.SourceVersion >= request.SnapshotVersion)
+                foreach (Guid dependentId in dependentRecordIds)
                 {
-                    continue;
+                    HidePresentations(dependentId, presentations, request);
                 }
 
-                if (collection == EventCollection
-                    && projections.Remove(canonical.Id, out AtprotoEventProjection? projection))
+                await _dbContext.SaveChangesAsync(cancellationToken);
+                if (!await HasCurrentFenceAtCommitAsync(request.Claim, cancellationToken))
                 {
-                    _dbContext.AtprotoEventProjections.Remove(projection);
+                    await transaction.RollbackAsync(cancellationToken);
+                    return AtprotoPersistenceApplyResult.Rejected;
                 }
 
-                HidePresentations(canonical.Id, presentations, request);
-                await ApplyEventImportsAsync(
-                    canonical,
-                    [],
-                    request.ObservedAt,
-                    TenantFilterBypassReasons.AtprotoPdsSnapshotGlobalReconciliation,
-                    updateExisting: true,
-                    consumed,
-                    cancellationToken,
-                    forceTombstone: true);
+                await transaction.CommitAsync(cancellationToken);
+                return new AtprotoPersistenceApplyResult(true, consumed);
             }
-
-            foreach (AtprotoRecord canonical in missing)
+            catch
             {
-                canonical.Cid = null;
-                canonical.RecordJson = null;
-                canonical.RecordHash = null;
-                canonical.SubjectUri = null;
-                canonical.SubjectCid = null;
-                canonical.IndexedAt = request.ObservedAt;
-                canonical.SourceVersion = request.SnapshotVersion;
-                canonical.SourceCursor = null;
-                canonical.UpdatedAt = request.ObservedAt;
-                canonical.TombstonedAt = request.ObservedAt;
-                if (canonical.Collection == EventCollection
-                    && projections.Remove(canonical.Id, out AtprotoEventProjection? projection))
-                {
-                    _dbContext.AtprotoEventProjections.Remove(projection);
-                }
-
-                HidePresentations(canonical.Id, presentations, request);
-                await ApplyEventImportsAsync(
-                    canonical,
-                    [],
-                    request.ObservedAt,
-                    TenantFilterBypassReasons.AtprotoPdsSnapshotGlobalReconciliation,
-                    updateExisting: true,
-                    consumed,
-                    cancellationToken);
+                await RollbackFailedAttemptAsync(transaction);
+                throw;
             }
-
-            foreach (Guid dependentId in dependentRecordIds)
-            {
-                HidePresentations(dependentId, presentations, request);
-            }
-
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            if (!await HasCurrentFenceAtCommitAsync(request.Claim, cancellationToken))
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                return AtprotoPersistenceApplyResult.Rejected;
-            }
-
-            await transaction.CommitAsync(cancellationToken);
-            return new AtprotoPersistenceApplyResult(true, consumed);
         });
     }
 
@@ -623,6 +649,30 @@ public sealed class AtprotoJetstreamRepository : IAtprotoJetstreamRepository, IA
             presentation.IsVisible = false;
             presentation.SourceVersion = request.SnapshotVersion;
             presentation.EvaluatedAt = request.ObservedAt;
+        }
+    }
+
+    private async Task RollbackFailedAttemptAsync(IDbContextTransaction transaction)
+    {
+        try
+        {
+            await transaction.RollbackAsync(CancellationToken.None);
+        }
+        catch (ObjectDisposedException)
+        {
+            // Preserve the original failure if the provider already disposed the transaction.
+        }
+        catch (InvalidOperationException)
+        {
+            // Preserve the original failure if the transaction is no longer rollback-ready.
+        }
+        catch (DbException)
+        {
+            // Cleanup must not replace the original operation failure.
+        }
+        finally
+        {
+            _dbContext.ChangeTracker.Clear();
         }
     }
 

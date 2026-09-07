@@ -22,7 +22,8 @@ public static class BaselineEvidencePolicy
         baseline = default!;
         if (!IsBaselineRef(baselineRef)) return false;
 
-        string path = Path.Combine(repositoryRoot, "docs", "releases", "baselines", baselineRef + ".v1.json");
+        string baselineFileName = Path.GetFileName(baselineRef + ".v1.json");
+        string path = Path.Join(Path.GetFullPath(repositoryRoot), "docs", "internal", "releases", "baselines", baselineFileName);
         if (!File.Exists(path)) return false;
 
         byte[] bytes = File.ReadAllBytes(path);

@@ -53,7 +53,7 @@ jobs:
               .agents/*|.claude/*|.codex/*|.copilot/*|.gemini/*|.opencode/*|.repomix/*|.sisyphus/*|.taskmaster/*) return 0 ;;
               _bmad/*|_bmad-output/*) return 0 ;;
               docs/*|schemas/*|assets/*|dev/*|event/*) return 0 ;;
-              cerbos/*|docker/*|docker-compose.yml|src/Explore.AppHost/*|tests/Event.Benchmarks/*|amp/*) return 0 ;;
+              cerbos/*|docker/*|src/Explore.AppHost/*|tests/Event.Benchmarks/*|amp/*) return 0 ;;
               *.md|LICENSE|.editorconfig|.dockerignore|.mcp.json|repomix.config.json|opencode.json|jean.json) return 0 ;;
               *) return 1 ;;
             esac

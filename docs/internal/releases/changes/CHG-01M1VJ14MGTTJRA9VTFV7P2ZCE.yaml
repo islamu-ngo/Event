@@ -1,6 +1,6 @@
 # ABOUTME: Public change fragment for clustered durable queue-drain scheduling and recovery.
 # ABOUTME: Records the breaking cadence cutover, operator controls, and API recovery impact.
-Change-Id: CHG-2026-0008
+Change-Id: CHG-01M1VJ14MGTTJRA9VTFV7P2ZCE
 Title: Durable queue drains survive clustered restarts safely
 Type: feat
 Scope: self-hosting

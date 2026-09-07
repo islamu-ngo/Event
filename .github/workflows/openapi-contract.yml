@@ -59,8 +59,8 @@ jobs:
             base_sha="HEAD~1"
           fi
 
-          changed_files="$(git diff --name-only "$base_sha" "$GITHUB_SHA")"
-          relevant_files="$(printf '%s\n' "$changed_files" | grep -E '^(src/Explore\.API/.*\.(cs|csproj|json)$|src/Explore\.Application/.*\.cs$|src/Explore\.Domain/.*\.cs$|tests/Event\.API\.IntegrationTests/.*\.(cs|csproj)$|tests/Explore\.GeneratedContracts\.Tests/.*\.(cs|csproj)$|eng/tools/Explore\.GeneratedContracts/.*|eng/tools/Explore\.ApiContractInventory/.*|src/Explore\.Blazor\.Client/(nswag\.json|Explore\.Blazor\.Client\.csproj|Clients/EventApiClient\.g\.cs)$|schemas/openapi_islamu-event\.json$|docs/API_CONTRACT_INVENTORY\.md$|docs/API_CONTRACT_TEST_DEBT\.md$|docs/API_CHANGELOG\.md$|Directory\.Packages\.props$|dotnet-tools\.json$|global\.json$|\.ci/spectral\.yaml$|\.ci/scripts/validate-api-contract-skip-inventory\.cs$|\.github/workflows/openapi-contract\.yml$)' || true)"
+          changed_files="$(git diff --name-only "$base_sha" "${GITHUB_SHA:-HEAD}" || true)"
+          relevant_files="$(printf '%s\n' "$changed_files" | grep -E '^(src/Explore\.API/.*\.(cs|csproj|json)$|src/Explore\.Application/.*\.cs$|src/Explore\.Domain/.*\.cs$|tests/Event\.API\.IntegrationTests/.*\.(cs|csproj)$|tests/Explore\.GeneratedContracts\.Tests/.*\.(cs|csproj)$|eng/tools/Explore\.GeneratedContracts/.*|eng/tools/Explore\.ApiContractInventory/.*|src/Explore\.Blazor\.Client/(nswag\.json|Explore\.Blazor\.Client\.csproj|Clients/EventApiClient\.g\.cs)$|schemas/openapi_islamu-event\.json$|docs/(internal/)?API_CONTRACT_INVENTORY\.md$|docs/(internal/)?API_CONTRACT_TEST_DEBT\.md$|docs/(internal/)?API_CHANGELOG\.md$|Directory\.Packages\.props$|dotnet-tools\.json$|global\.json$|\.ci/spectral\.yaml$|\.ci/scripts/validate-api-contract-skip-inventory\.cs$|\.github/workflows/openapi-contract\.yml$)' || true)"
 
           if [ -n "$relevant_files" ]; then
             echo "relevant=true" >> "$GITHUB_OUTPUT"
@@ -131,11 +131,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p artifacts/openapi-contract
+          inventory_path="docs/API_CONTRACT_INVENTORY.md"
+          if [ -f "docs/internal/API_CONTRACT_INVENTORY.md" ]; then
+            inventory_path="docs/internal/API_CONTRACT_INVENTORY.md"
+          fi
 
-          git diff -- schemas/openapi_islamu-event.json docs/API_CONTRACT_INVENTORY.md src/Explore.Blazor.Client/Clients/EventApiTagClients.g.cs > artifacts/openapi-contract/generated-contract.diff
+          git diff -- schemas/openapi_islamu-event.json "$inventory_path" src/Explore.Blazor.Client/Clients/EventApiTagClients.g.cs > artifacts/openapi-contract/generated-contract.diff
           cp schemas/openapi_islamu-event.json artifacts/openapi-contract/openapi.json
-          cp docs/API_CONTRACT_INVENTORY.md artifacts/openapi-contract/API_CONTRACT_INVENTORY.md
+          cp "$inventory_path" artifacts/openapi-contract/API_CONTRACT_INVENTORY.md
           cp src/Explore.Blazor.Client/Clients/EventApiTagClients.g.cs artifacts/openapi-contract/EventApiTagClients.g.cs
 
           if [ -e schemas/openapi.json ] || [ -e src/schemas/openapi_event-api.json ]; then
@@ -143,7 +146,7 @@ jobs:
             exit 1
           fi
 
-          if git diff --quiet -- schemas/openapi_islamu-event.json docs/API_CONTRACT_INVENTORY.md src/Explore.Blazor.Client/Clients/EventApiTagClients.g.cs; then
+          if git diff --quiet -- schemas/openapi_islamu-event.json "$inventory_path" src/Explore.Blazor.Client/Clients/EventApiTagClients.g.cs; then
             {
               echo "## OpenAPI Contract Drift"
               echo
@@ -156,7 +159,7 @@ jobs:
               echo "Generated OpenAPI artifacts are stale. Build Explore.API and Explore.Blazor.Client locally, then commit:"
               echo
               echo "- \`schemas/openapi_islamu-event.json\`"
-              echo "- \`docs/API_CONTRACT_INVENTORY.md\`"
+              echo "- \`$inventory_path\`"
               echo "- \`src/Explore.Blazor.Client/Clients/EventApiTagClients.g.cs\`"
             } >> "$GITHUB_STEP_SUMMARY"
             exit 1
@@ -209,7 +212,7 @@ jobs:
 
           changed_files="$(git diff --name-only "$base_sha" "$GITHUB_SHA" || true)"
           changelog_changed=false
-          if printf '%s\n' "$changed_files" | grep -qx 'docs/API_CHANGELOG.md'; then
+          if printf '%s\n' "$changed_files" | grep -E -qx 'docs/(internal/)?API_CHANGELOG.md'; then
             changelog_changed=true
           fi
 
@@ -327,14 +330,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git diff -- schemas/openapi_islamu-event.json docs/API_CONTRACT_INVENTORY.md src/Explore.Blazor.Client/Clients/EventApiTagClients.g.cs > artifacts/openapi-contract/determinism.diff
+          inventory_path="docs/API_CONTRACT_INVENTORY.md"
+          if [ -f "docs/internal/API_CONTRACT_INVENTORY.md" ]; then
+            inventory_path="docs/internal/API_CONTRACT_INVENTORY.md"
+          fi
+
+          git diff -- schemas/openapi_islamu-event.json "$inventory_path" src/Explore.Blazor.Client/Clients/EventApiTagClients.g.cs > artifacts/openapi-contract/determinism.diff
 
           if [ -e schemas/openapi.json ] || [ -e src/schemas/openapi_event-api.json ]; then
             echo "Unexpected legacy OpenAPI artifacts exist after deterministic rebuild: schemas/openapi.json or src/schemas/openapi_event-api.json" >&2
             exit 1
           fi
 
-          if git diff --quiet -- schemas/openapi_islamu-event.json docs/API_CONTRACT_INVENTORY.md src/Explore.Blazor.Client/Clients/EventApiTagClients.g.cs; then
+          if git diff --quiet -- schemas/openapi_islamu-event.json "$inventory_path" src/Explore.Blazor.Client/Clients/EventApiTagClients.g.cs; then
             {
               echo "## OpenAPI Determinism"
               echo

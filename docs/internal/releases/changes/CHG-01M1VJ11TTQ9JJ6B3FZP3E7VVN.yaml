@@ -1,6 +1,6 @@
 # ABOUTME: Public change fragment for per-event venue disclosure and consent-backed private homes.
 # ABOUTME: Records breaking contract, migration, operator, and privacy impacts of the EventLocation work.
-Change-Id: CHG-2026-0006
+Change-Id: CHG-01M1VJ11TTQ9JJ6B3FZP3E7VVN
 Title: Event venues disclose per event instead of per venue
 Type: feat
 Scope: privacy

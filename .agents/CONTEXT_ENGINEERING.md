@@ -97,9 +97,26 @@ Context budgets dynamically adapt based on the task's criticality tier resolved 
 
 ## In-Session Test Economy & Clean Architecture Scoping
 
-To prevent test execution sprawl, excessive token usage, and slow feedback loops during interactive coding sessions, agents MUST adhere to Clean Architecture layer scoping:
+To eliminate the 50% test diagnosis and 15% container troubleshooting bottleneck during interactive coding sessions, agents MUST adhere to Clean Architecture layer scoping and the **3-Ring Progressive Verification Model**:
 
-### 1. Layer-Bounded Test Scoping
+### 1. The 3-Ring Progressive Verification Model
+
+| Ring | Scope & Cadence | Target Execution Time | Permitted Suites & Infrastructure | Purpose |
+|---|---|---|---|---|
+| **Ring 1: Inner Loop** | Subtask level (every code edit) | **< 2 seconds** | Sliced in-memory TUnit (`--treenode-filter`) in `Event.Domain.UnitTests` or `Event.Application.UnitTests`. **0 Docker containers, 0 network I/O, 0 database lag**. | Instant Red/Green validation of business logic, state machines, and invariants. |
+| **Ring 2: Phase Exit Gate** | Phase boundary (before phase commit) | **< 15 seconds** | Single Release build (`dotnet build -c Release -v q`) + at most **one** selected test project against **one canonical provider** (e.g. SQLite in-memory or single PostgreSQL container). | Verify project compilability and single-layer integration without matrix delays. |
+| **Ring 3: Plan Exit Gate** | Workstream boundary (before PR creation) | Minutes | Full 5-database matrix (PostgreSQL, SQLite, SQL Server, MySQL), EF Core migrations, and `Event.Architecture.Tests`. | Catch multi-dialect edge cases and architecture drift once before PR submission. |
+
+### 2. The Yak-Shaving Quarantine Rule
+
+Agents are **strictly forbidden** from absorbing, investigating, or repairing pre-existing test suite rot or broken fixtures outside the phase-owned scope:
+1. **Detect**: If an existing test fails outside the task's path during a run.
+2. **Isolate & Verify**: Prove whether the failure reproduces on a clean worktree of the base branch (`git checkout develop`).
+3. **Log & Quarantine**: If pre-existing/unrelated, log the exact failing command, error snippet, and path under `*-context.md` (`Validation Baseline / Pre-Existing Technical Debt`) or `dev/backlog/<slug>.md`.
+4. **Halt Yak-Shaving**: Under no circumstances modify unrelated tests or production code to "fix" the suite.
+5. **Proceed**: Continue executing the assigned scope once the phase-owned slice is green.
+
+### 3. Layer-Bounded Test Scoping
 Run ONLY the test project that directly protects the modified layer:
 
 | Modified Source Path | Permitted Test Suites | Strictly Forbidden Suites (Sprawl) |
@@ -113,13 +130,18 @@ Run ONLY the test project that directly protects the modified layer:
 | `src/Explore.API/**` | `Event.API.IntegrationTests`<br/>`Event.Architecture.Tests` | Blazor Client UI tests, Secrets unit tests |
 | `src/Explore.Secrets/**` | `Explore.Secrets.UnitTests` | All other test suites |
 
-### 2. Fast-Loop TUnit Slicing (`--treenode-filter`)
+### 4. Fast-Loop TUnit Slicing (`--treenode-filter`)
 During active development of a task or handler, agents must NEVER run the entire test project. Use TUnit's `--treenode-filter` to run ONLY the target test class:
 ```bash
 # ✅ Fast Loop (~1.5s, clean output):
 dotnet run --project tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj --no-build -- --treenode-filter "/*/*/*<TargetTestClassName>/*"
 ```
-Full project-level test runs (`dotnet test --project <path>.csproj`) are reserved strictly for the **Phase Exit Gate** or PR completion.
+Full project-level test runs (`dotnet test --project <path>.csproj`) are reserved strictly for the **Phase Exit Gate** (Ring 2) or PR completion (Ring 3).
+
+### 5. Domain Invariants vs Persistence Queries
+Shift 90%+ of algorithmic, normalization, validation, and state-machine checks from database integration tests into fast in-memory domain tests:
+- **Domain Unit Tests (`< 50ms`)**: Unicode FormC normalization, string trimming, case-folding, regex matching, entity state machines, status transition rules.
+- **Persistence Integration Tests**: Reserved strictly for EF Core mapping annotations, foreign key cascade behaviors, and engine-specific SQL dialect peculiarities.
 
 ## Research Boundary
 
@@ -136,6 +158,19 @@ Agents and subagents must operate strictly within the repository's native enviro
 - **CI/CD Isolation**: Scripts under `.ci/scripts/` are strictly dedicated to CI/CD pipeline automation (e.g. release bundle verification, license policy enforcement) and must never be repurposed for agent/dev scratch tasks.
 - **Secrets Source of Truth**: Secrets, connection strings, API tokens, passwords, and encryption keys must strictly reside in **Infisical** or **`.env`** (with schema/keys documented in **`.env.example`**). NEVER hard-code, define, or embed secrets in `AppHost.cs`, test fixtures, classes, or configuration files.
 - **Verification Scoping Discipline**: Documentation, agent contract, and markdown-only changes (Tier 4) must NEVER run full `dotnet build` or .NET test suites. Verification for documentation tasks is strictly scoped to file format, schema validation, and link integrity.
+
+## Human-Agent Interaction & Zero-Friction Prompts
+
+Active task artifacts (`plan.md`, `tasks.md`, `context.md` in `dev/active/<task>/`) exist exclusively to maintain deterministic, structured session memory and execution boundaries across agent context resets and worktree transitions. They are **machine and session working memory**, not the developer's user interface.
+
+- **Zero Plan-Opening Mandate**: The developer must **never** be forced to open `dev/active/<task>/` to understand what an agent is asking, reporting, or proposing.
+- **Prohibited Shorthand**: Prompts, approvals, and questions must never use bare IDs (`P01`, `P04/P06`, `T02.1`, `Gate 3`) without immediate inline functional names and plain-English explanations.
+- **Decision Brief Architecture**: Any turn pausing for developer decision or approval must present an inline Decision Brief detailing:
+  1. *Context*: Recent progress and current architectural position.
+  2. *Substance*: Human-readable component and domain names.
+  3. *Decision & Trade-offs*: Why the choice matters and what each path entails.
+  4. *Actionable Choices*: Labeled options with a recommended default.
+  5. *Next Action*: What will be executed immediately upon reply.
 
 ## Workstream And Handoff State
 

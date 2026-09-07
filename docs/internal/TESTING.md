@@ -43,6 +43,28 @@ Key TUnit features used:
 | `Assert.That(x).IsEqualTo(y)` | Fluent async assertions |
 | `Assert.Multiple()` | Group multiple assertions |
 
+## The 3-Ring Progressive Verification Model
+
+To eliminate the 50% test diagnosis and 15% container troubleshooting bottleneck during agentic and contributor workflows, the repository strictly enforces a **3-Ring Progressive Verification** hierarchy:
+
+| Ring | Scope & Cadence | Budget | Permitted Suites & Infrastructure | Purpose |
+|---|---|---|---|---|
+| **Ring 1: Inner Loop** | Subtask level (during active coding) | **< 2s** | In-memory TUnit slicing (`--treenode-filter`) in `Event.Domain.UnitTests` or `Event.Application.UnitTests`. **0 containers, 0 network, 0 DB lag**. | Instant Red/Green validation of business logic, state machines, and invariants. |
+| **Ring 2: Phase Exit Gate** | Phase boundary (before phase commit) | **< 15s** | Release build (`dotnet build -c Release -v q`) + at most **one** selected project test against **one canonical provider** (e.g. SQLite in-memory or single PostgreSQL container). | Ensure project-level integrity without matrix delays. |
+| **Ring 3: Plan Exit Gate** | Workstream boundary (before PR) | Minutes | Full 5-database matrix (PostgreSQL, SQLite, SQL Server, MySQL), EF Core migrations, and `Event.Architecture.Tests`. | Catch multi-dialect edge cases and architecture drift once before PR submission. |
+
+### Fast-Loop In-Memory Slicing vs Containerized Persistence Testing
+
+- **In-Memory Domain Invariants (Ring 1)**: Pure algorithmic, normalization, validation, and state-machine tests (e.g., Unicode FormC normalization, string trimming, case-folding, regex matching, entity status transitions) MUST run in `Event.Domain.UnitTests` in **< 50ms**. Never write database integration tests to verify pure in-memory business logic.
+- **Containerized Integration Tests (Ring 2/3)**: `Event.Persistence.IntegrationTests` and `Event.API.IntegrationTests` are reserved strictly for EF Core mapping annotations, SQL dialect translation, transactions, RLS filters, and HTTP middleware pipelines.
+
+### The Yak-Shaving Quarantine Rule
+
+When working on a feature or bug fix:
+1. Agents and contributors are **strictly forbidden** from fixing pre-existing test suite rot or unrelated fixture failures encountered during execution.
+2. If an existing test fails outside the task's path, verify whether it reproduces on a clean worktree of `develop`.
+3. If pre-existing, document it in `*-context.md` under `Validation Baseline / Pre-Existing Technical Debt` (and optionally `dev/backlog/<slug>.md`), quarantine it, and proceed with the assigned scope.
+
 ## Test Projects
 
 Each project has a specific role. Run individually — never use solution-level `dotnet test`. The primary projects are listed below.

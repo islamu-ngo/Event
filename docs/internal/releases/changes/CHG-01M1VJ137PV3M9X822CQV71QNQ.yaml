@@ -1,6 +1,6 @@
 # ABOUTME: Public change fragment for immutable paid-checkout acceptance and operator governance.
 # ABOUTME: Records breaking contract, migration, configuration, security, and operator impacts.
-Change-Id: CHG-2026-0007
+Change-Id: CHG-01M1VJ137PV3M9X822CQV71QNQ
 Title: Paid checkout requires current operator-backed acceptance
 Type: feat
 Scope: registration

@@ -11,12 +11,13 @@ Last Updated: 2026-09-05
 - Subject: email-optional self-hosting and mailbox-free participation
 - Workstream: email-optional-self-hosting
 - Report kind: consolidated consultancy and planning assessment
-- Report status: draft
-- Disposition: changes-required
+- Report status: current
+- Disposition: plan-aligned
 - Evidence cutoff: 2026-09-05
 - Reviewed input revision: original consultancy SHA-256 `6213e3809f84ec4c6ec209be5bdca25a2beb30161e3568daa20833aa51e0c3e9`; pre-consolidation planning assessment SHA-256 `5f26939aeeb06fe931495e16e83bb9ee4c31ac627e81fe9721178f51d34c3303`; repository Git object `1ca0edeac1da90d29a135c5efa3f8c6269e2574c`
 - Supersedes: the two separate subject reports identified in Evidence Reviewed; this file is their single canonical successor, as explicitly requested by the user.
-- Review boundary: consolidation is complete only as a document merge; implementation and final plan alignment remain unverified.
+- Reviewed design: `plan-r1`; the canonical plan/task links and byte-level revision binding are recorded in Planning Handoff.
+- Review boundary: alignment is to the proposed implementation design only. Findings remain open; implementation, empirical outcomes and security certification are not claimed.
 
 ## Scope
 
@@ -44,7 +45,13 @@ The user resolved administrator identifier scope on 2026-09-05: retain email/pas
 
 The user additionally resolved authentication-email ownership: only Local Identity adapts its application-owned verification/reset email flows to Event SMTP availability. Keycloak owns its authentication emails and verification; ATProto leaves account email to the actual PDS/account provider. Event consumes trusted provider verification status where available without taking over that responsibility. Event-generated registration and event-notification emails remain governed by Event's own SMTP capability for all users.
 
-The user subsequently specified mandatory verification for Local sign-in when SMTP is enabled, administrator-controlled Local account creation, and directly verified administrator-provisioned accounts. Preserving existing unverified sign-in was explicitly rejected. Where public attendee account creation is unavailable under this Local posture, authenticated-attendee-only event registration must not be configurable. External providers retain their own onboarding possibilities, including Keycloak configurations without email. The scope of tenant-administrator provisioning authority remains undecided.
+The user subsequently specified mandatory verification for Local sign-in when SMTP is enabled, administrator-controlled Local account creation, and directly verified administrator-provisioned accounts. Preserving existing unverified sign-in was explicitly rejected. Where public attendee account creation is unavailable under this Local posture, authenticated-attendee-only event registration must not be configurable. External providers retain their own onboarding possibilities, including Keycloak configurations without email.
+
+### Planning Selections For The Complete Design
+
+After the instruction to complete the plan, `plan-r1` selects instance-administrator-only Local credential creation/reset, consistent with global credential ownership. Tenant membership/role administration does not grant credential authority; tenant delegation is a separately graduated proposal, not a hidden unresolved branch or a claim of user approval.
+
+The design uses explicit default-off delivery intent, coherent tenant transport ownership, a common disable/handoff fence and nonfatal email degradation for core readiness. Global Local verification reads instance intent; tenant mail cannot become a sign-in bypass. It specifies two-store credential operation convergence, mandatory private first-use replacement and current-stamp session checks, a native bounded challenge with stable-order replay recovery, limited-purpose post-confirmation access, free-only transactional cancellation and event-bounded PII expiry. Existing providers, modes, orders, outboxes, calendar serializer and cleanup remain authoritative.
 
 ## Claim Boundary
 
@@ -265,7 +272,7 @@ The original proposed `ScheduleManagedTenantProvisioning` variant and `MustChang
 
 Force the recipient to establish a private password at first use before administrative access. Restrict actual API/BFF authority and sessions, not just a page redirect. Directly verified status does not bypass first-use rotation. One-time disclosure, expiry, concurrency/replay fencing and audit must be observable in tests.
 
-Provide an audited instance-supervised reset for a locked-out Local tenant administrator, issuing a new temporary credential and reinstating mandatory replacement. Password change by an already authenticated user must not depend on SMTP. Whether tenant administrators may also provision verified Local accounts remains an explicit user decision; tenant scope cannot authorize takeover of a shared identity or another tenant.
+Provide an audited instance-supervised reset for a locked-out Local tenant administrator, issuing a new temporary credential and reinstating mandatory replacement. Password change by an already authenticated user must not depend on SMTP. The completed plan selects instance-only credential authority; a future tenant-delegation proposal must not authorize takeover of a shared identity or another tenant.
 
 Credential operations stay with their actual authority: do not create Local passwords for Keycloak/ATProto users or assume permission to administer their external accounts. Forced replacement improves accountability but cannot guarantee non-repudiation against the operator of the host.
 
@@ -297,11 +304,11 @@ These principles apply across the whole provider responsibility boundary, not ju
 
 ## Validation Gaps
 
-- Administrator identifier scope and authentication-email ownership are resolved. Exact out-of-band provisioning operations still require bounded source tracing; external-provider credential administration is not implicitly authorized.
-- The exact managed-tenant provisioning queue, notification eligibility and operator/UI flows still need final bounded tracing before task packets.
+- Administrator identifier, verification, provisioning authority and account-only event eligibility are explicit in the completed plan. External-provider credential administration is excluded.
+- Managed-request serialization, recipient/dispatch ownership, identity topology, session caches, capability expiry and consumed allocation were traced; the plan owns their concrete changes and regression seams.
 - No live host, no-email registration, mail transport, concurrency, token replay, provider migration or browser scenario was exercised.
 - No empirical anti-hoarding, mobile accessibility, no-show, retention or operator-comprehension evidence exists in this investigation.
-- Mailpit image/version/license selection and challenge dependency choice remain unmade; no dependency approval is implied.
+- The plan reuses existing Mailpit/Ical.Net/framework infrastructure and selects native proof-of-work without a new third-party dependency. Actual deployment pin/provenance checks and measured challenge tuning remain implementation/release evidence, not claimed completed research.
 - Measure anonymous signup-to-attendance conversion and no-show rates when neither email confirmation nor an emailed calendar invite exists.
 - Assess real public-deployment abuse velocity and whether IP/subnet limits plus the selected challenge preserve fair access.
 - Test whether operators distinguish anonymous-only, directory-only and full participation, and intentional email opt-out from degraded configured delivery. The consultancy also used `AnonymousDirectoryOnly` and `FullRegistration` as informal labels; these are not extra implemented modes.
@@ -309,9 +316,7 @@ These principles apply across the whole provider responsibility boundary, not ju
 
 ## Escalation Needed
 
-Before final planning: determine whether directly verified Local account provisioning belongs only to the instance administrator or can also be delegated to tenant administrators. The latter must not enable tenant administrators to take over shared identities or affect another tenant. This is the authority branch explicitly left open by the user.
-
-Before final planning: resolve any remaining out-of-band provisioning scope not determined by actual credential ownership. Local keeps email/password and owns its application-SMTP-dependent authentication email; Keycloak and ATProto own their own authentication email/verification. These ownership decisions are settled and must not be reopened. They do not authorize external-provider credential administration or a Local fallback account.
+No unresolved authority branch blocks `plan-r1`. Instance-only Local provisioning is the conservative planning selection for user review; tenant delegation is explicitly outside this revision. Local keeps email/password and owns its application-SMTP-dependent authentication email; Keycloak and ATProto retain their own authority. No external credential administration or Local fallback identity is authorized.
 
 Any later paid-event communication/legal-record scope belongs to the existing paid-event governance. No new religious-legal determination is needed for the present technical intake.
 
@@ -320,7 +325,7 @@ Technical rate limiting does not itself require a scholarly ruling. Organizer gu
 ## Evidence Reviewed
 
 - Original consultancy input: former `i-vsd-email-optional-self-hosting-consultancy-report.md`, SHA-256 `6213e3809f84ec4c6ec209be5bdca25a2beb30161e3568daa20833aa51e0c3e9`. Its standalone/current/ready-for-planning metadata, findings and lifecycle are incorporated here; the separate file is retired by the user's consolidation request.
-- Planning input: this path before consolidation, SHA-256 `5f26939aeeb06fe931495e16e83bb9ee4c31ac627e81fe9721178f51d34c3303`. Its draft/changes-required state remains appropriate until planning gates are met.
+- Planning input: this path before consolidation, SHA-256 `5f26939aeeb06fe931495e16e83bb9ee4c31ac627e81fe9721178f51d34c3303`. Its historical draft/changes-required state is preserved in Review Lifecycle; the completed design is now assessed separately below.
 - User clarification on 2026-09-05: retain email/password; preserve multiple current and future authentication providers. This is an explicit scope decision, not a source-code observation.
 - Further user clarification on 2026-09-05: only Local adapts authentication-email behavior to Event SMTP; Keycloak/ATProto retain verification responsibility and Event must respect trusted provider-reported verification status. Current ATProto JIT source supplies no mailbox proof.
 - Superseding Local policy correction on 2026-09-05: SMTP-enabled sign-in requires verification; Local account creation is administrator-controlled and accounts pass as verified directly; unavailable visitor signup prohibits authenticated-attendee-only event registration in that posture. Existing unverified development accounts are not a compatibility constraint.
@@ -367,13 +372,34 @@ Initial source guidance spans security/privacy and the sovereign registration in
 ## Planning Handoff
 
 - Workstream: email-optional-self-hosting
-- Status: draft
-- Reviewed input revision: both pre-consolidation SHA-256 inputs in Review Metadata, product Git object `1ca0edeac1da90d29a135c5efa3f8c6269e2574c`, and the dated user decisions in Scope.
+- Status: current / plan-aligned to proposed `plan-r1`
+- Reviewed input revision: both pre-consolidation SHA-256 inputs in Review Metadata, product Git object `1ca0edeac1da90d29a135c5efa3f8c6269e2574c`, the dated user decisions in Scope, and the completed plan/task artifacts linked below.
+- Plan: [email-optional-self-hosting-plan.md](../dev/active/email-optional-self-hosting/email-optional-self-hosting-plan.md).
+- Tasks: [email-optional-self-hosting-tasks.md](../dev/active/email-optional-self-hosting/email-optional-self-hosting-tasks.md).
+- Plan SHA-256 at design handoff: `8ba76db055c77389abc56cb3239e576e0d7f7b06450021fa175bfa2c46f646e6`.
+- Tasks SHA-256 at design handoff: `80de3df82a29006e481427275b96a24c9367f210827ab43a8371b36cd3addfc4`.
+- These hashes bind the reviewed design/ledger revision. Later checkbox-only progress does not constitute a behavioral rewrite; material design changes require I-VSD revalidation.
+- Planning verification: 19 numbered plan sections, 26 behavioral scenarios, 36 implementation tasks, 12 phase gates, 12 matching commit packets, all seven I-VSD mappings, 16 syntax-valid Bash blocks and 25 existing local link targets. No product test or build was run for this documentation task.
+- Review limitation: the separate plan-review child could not run because its provider usage quota was exhausted. Lead source/contract/structure review is recorded; no independent CTO or implementation-security approval is claimed.
 - Findings and mitigations: IVSD-F001 -> IVSD-M001 through IVSD-F007 -> IVSD-M007.
-- Required plan mappings: all seven finding/mitigation pairs need named scenarios and tasks, explicit non-applicability or a user-approved escalation. None is silently deferred.
-- Escalations required before: final planning and planning approval.
+- Implementation/user approval: not granted by this report. CTO review: Not reviewed.
+- Escalations required before implementation: user approval of the complete plan; no further intake branch is hidden in its tasks.
 - Refresh triggers: administrator identifier/provider scope; visitor defaults; communication guarantees; SMTP disable and tenant override behavior; capability lifecycle; abuse challenge; retention; credential recovery authority; any changed mapped mitigation.
-- Plan-aligned: No. The plan and execution ledger do not yet exist.
+- Plan-aligned: Yes, as a documentation/design assessment only. No finding is marked implemented or resolved.
+
+### Scenario And Task Mapping
+
+| Finding / mitigation | Scenarios in plan Section 3 | Tasks in the execution ledger | Disposition |
+| --- | --- | --- | --- |
+| IVSD-F001 / IVSD-M001 | S01-S03, S23-S24 | 1.1-1.3, 2.1-2.3, 12.1-12.3 | Implement explicit optional delivery, coherent scope and actual deployment |
+| IVSD-F002 / IVSD-M002 | S04, S06, S18-S20, S25-S26 | 7.1-7.3, 9.1-9.3, 10.1-10.3 | Implement honest notice, durable private status, calendar and safe cancellation |
+| IVSD-F003 / IVSD-M003 | S16-S17, S19, S22 | 8.1-8.3, 10.1-10.3 | Implement native challenge, stable allocation replay, approval/capacity and cancellation safety |
+| IVSD-F004 / IVSD-M004 | S02-S06, S24 | 1.1-1.3, 2.1-2.3, 12.1-12.3 | Implement typed revocation, locks, bounded park/skip and Unknown protection |
+| IVSD-F005 / IVSD-M005 | S04, S07-S09, S11-S15, S25-S26 | 3.1-3.3, 4.1-4.3, 5.1-5.3, 6.1-6.3, 7.1-7.3 | Implement Local administrator enrollment/verification and preserve external authority |
+| IVSD-F006 / IVSD-M006 | S18, S21-S22 | 9.1-9.3, 11.1-11.3 | Implement minimum collection, read-time expiry and bounded cleanup |
+| IVSD-F007 / IVSD-M007 | S09-S13, S24 | 4.1-4.3, 5.1-5.3, 6.1-6.3 | Implement instance-owned handover/reset, private replacement and cross-store convergence |
+
+P12 graduates durable decisions and field-evaluation gaps. Tenant credential delegation is a separate scoped backlog proposal; the required instance-supervised recovery is fully included. Revalidation confirms every material finding/mitigation has a concrete scenario/task mapping and retains its source evidence and uncertainty.
 
 ## Review Lifecycle
 
@@ -387,12 +413,13 @@ Initial source guidance spans security/privacy and the sovereign registration in
 | 2026-09-05 | draft | draft | Relocated planning artifacts to canonical main-repository paths under the updated planning workflow | Product revision and behavioral decisions unchanged; native artifact relocation only |
 | 2026-09-05 | draft | draft | User mandated SMTP-enabled Local verification and directly verified administrative provisioning, rejecting permissive sign-in preservation | Corrected Local admission/event eligibility contract; instance versus tenant provisioning authority remains open |
 | 2026-09-05 | two subject reports | draft (single canonical report) | User explicitly required a lossless consolidation instead of duplicate reports | Both input hashes, all seven stable findings/mitigations, source locators, corrected claims and decision history retained here |
+| 2026-09-05 | draft | current / plan-aligned | Completed `plan-r1` with 12 phases, 36 implementation tasks and all seven I-VSD mappings | Canonical plan/task links, selected authority boundaries and bounded verification/commit contracts; implementation not started |
 
 ## Consolidation Coverage And Corrections
 
 | Original material | Canonical destination / treatment |
 | --- | --- |
-| Metadata and original two review transitions | Review Metadata, Evidence Reviewed and Review Lifecycle retain source identities and historical state; current draft status is not inflated to plan-aligned |
+| Metadata and original two review transitions | Review Metadata, Evidence Reviewed and Review Lifecycle retain source identities and historical state; later plan-alignment is explicitly bound to the completed proposed design, not implementation |
 | Target deployments, audiences, in/out scope | Scope and Context Inventory; payment/PDS/legal boundaries retained |
 | Seven overlooked failures, four negative consequences and four positive outcomes | Common Overlooked Failures And Outcomes, including unmeasured 60-second ambition |
 | IVSD-F001 through IVSD-F007, ownership, principles and validation duties | Findings retain IDs, original evidence locators and explicit provider decisions; source corrections are stated rather than silently dropped |

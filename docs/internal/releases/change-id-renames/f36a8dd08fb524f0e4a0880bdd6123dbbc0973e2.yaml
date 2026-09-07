@@ -1,0 +1,7 @@
+# ABOUTME: Commit-bound correction for a colliding immutable Change-Id footer.
+# ABOUTME: Maps only the exact recorded Git object to its replacement public fragment.
+Schema-Version: change-id-rename.v1
+Commit-Oid: f36a8dd08fb524f0e4a0880bdd6123dbbc0973e2
+Old-Change-Id: CHG-2026-0002
+New-Change-Id: CHG-01M1VJ0W5X2HS04CVBFJQQ2PZV
+Reason: Standardize historical fragment to ULID convention.

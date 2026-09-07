@@ -25,7 +25,7 @@ public static class ChangeIdRenamePolicy
 
     public static ChangeIdRenameLoadResult Load(string repositoryRoot)
     {
-        string directory = Path.Combine(repositoryRoot, "docs", "releases", "change-id-renames");
+        string directory = Path.Join(Path.GetFullPath(repositoryRoot), "docs", "internal", "releases", "change-id-renames");
         if (!Directory.Exists(directory))
         {
             return new ChangeIdRenameLoadResult(true, [], [], []);

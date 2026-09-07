@@ -30,7 +30,7 @@ public sealed class ReleaseCandidateVerificationTests
         await Assert.That(secondCode).IsEqualTo(Program.Success);
         await Assert.That(secondOutput).IsEqualTo(firstOutput);
         await Assert.That(secondBytes).IsEquivalentTo(firstBytes);
-        await Assert.That(firstOutput).IsEqualTo("release_candidate_verified: docs/releases/1.1.0/release-candidate.v1.json\n");
+        await Assert.That(firstOutput).IsEqualTo("release_candidate_verified: docs/internal/releases/1.1.0/release-candidate.v1.json\n");
         await Assert.That(root.GetProperty("schemaVersion").GetString()).IsEqualTo("release-candidate.v1");
         await Assert.That(root.GetProperty("objectFormat").GetString()).IsEqualTo(fixture.ObjectFormat);
         await Assert.That(root.GetProperty("candidateOid").GetString()).IsEqualTo(fixture.B);
@@ -167,7 +167,7 @@ public sealed class ReleaseCandidateVerificationTests
             allowedSignersPath = Path.Combine(authorityRoot, "allowed-promoters");
             configPath = Path.Combine(bundleRoot, "config", "cliff.toml");
             executablePath = Path.Combine(bundleRoot, "git-cliff");
-            ReleaseDirectory = Path.Combine(RepositoryPath, "docs", "releases", "1.1.0");
+            ReleaseDirectory = Path.Combine(RepositoryPath, "docs", "internal", "releases", "1.1.0");
             ContextPath = Path.Combine(ReleaseDirectory, "release-context.v1.json");
             NotesPath = Path.Combine(ReleaseDirectory, "release-notes.md");
             CandidateManifestPath = Path.Combine(ReleaseDirectory, "release-candidate.v1.json");
@@ -182,7 +182,7 @@ public sealed class ReleaseCandidateVerificationTests
             A = Commit("feat(registration): let attendees correct registration details\n\nChange-Id: CHG-2026-0001");
             WriteBundle();
             Prepare();
-            Git("add", "docs/releases/1.1.0");
+            Git("add", "docs/internal/releases/1.1.0");
             B = Commit("docs(release): prepare 1.1.0\n\nChangelog: skip\nChangelog-Reason: release metadata commit");
         }
 
@@ -244,7 +244,7 @@ public sealed class ReleaseCandidateVerificationTests
                 foreach ((string name, string value) in variables) Environment.SetEnvironmentVariable(name, value);
                 using RuntimePromotionTrustRootScope trustRoot = RuntimePromotionTrustRootScope.Use(allowedSignersPath);
                 using var output = new StringWriter();
-                int exitCode = CandidateCommand.Run(["verify-candidate", "docs/releases/1.1.0", candidateOid], output, RepositoryPath, "linux-x64", TimeSpan.FromSeconds(2));
+                int exitCode = CandidateCommand.Run(["verify-candidate", "docs/internal/releases/1.1.0", candidateOid], output, RepositoryPath, "linux-x64", TimeSpan.FromSeconds(2));
                 return (exitCode, output.ToString());
             }
             finally
@@ -258,14 +258,14 @@ public sealed class ReleaseCandidateVerificationTests
         private void Prepare()
         {
             Directory.CreateDirectory(ReleaseDirectory);
-            Directory.CreateDirectory(Path.Combine(RepositoryPath, "docs", "releases", "changes"));
+            Directory.CreateDirectory(Path.Combine(RepositoryPath, "docs", "internal", "releases", "changes"));
             Directory.CreateDirectory(Path.Combine(RepositoryPath, "eng", "release", "policy"));
             string previous = Git("rev-list", "--max-parents=0", "HEAD").Trim();
             File.WriteAllText(Path.Combine(ReleaseDirectory, "release.yaml"),
                 $"Version: 1.1.0\nLine: v1.1\nRelease-Date: 2026-08-14\nBase-Stable-Tag: v1.0.0\nPrevious-Published-Tag: v1.0.0\nRelease-Range:\n  Base-Ref: v1.0.0\n  Base-Oid: {previous}\n  Previous-Ref: v1.0.0\n  Previous-Oid: {previous}\nCompatibility:\n  - v1\nImpact-Dispositions:\n  breaking: not-applicable\n  security: not-applicable\n  migration: not-applicable\n  configuration: not-applicable\n  openapi: not-applicable\n  operator: documented\n");
             File.WriteAllText(Path.Combine(ReleaseDirectory, "summary.md"), "Attendees can now correct registration details.\n");
-            File.WriteAllText(Path.Combine(RepositoryPath, "docs", "releases", "changes", "CHG-2026-0001.yaml"),
-                "Change-Id: CHG-2026-0001\nTitle: Registration worker restart\nType: feat\nScope: registration\nSummary: Attendees can now correct registration details.\nSupersedes: []\nImpacts:\n  Breaking:\n    Reference: docs/releases/README.md\n    Disposition: not-applicable\n  Security:\n    Reference: docs/SECURITY_OVERVIEW.md\n    Disposition: not-applicable\n  Migration:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: not-applicable\n  Configuration:\n    Reference: docs/CONFIGURATION.md\n    Disposition: not-applicable\n  OpenAPI:\n    Reference: docs/API_CHANGELOG.md\n    Disposition: not-applicable\n  Operator:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: documented\n    Detail: Restart registration workers after deployment.\n");
+            File.WriteAllText(Path.Combine(RepositoryPath, "docs", "internal", "releases", "changes", "CHG-2026-0001.yaml"),
+                "Change-Id: CHG-2026-0001\nTitle: Registration worker restart\nType: feat\nScope: registration\nSummary: Attendees can now correct registration details.\nSupersedes: []\nImpacts:\n  Breaking:\n    Reference: docs/internal/releases/README.md\n    Disposition: not-applicable\n  Security:\n    Reference: docs/SECURITY_OVERVIEW.md\n    Disposition: not-applicable\n  Migration:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: not-applicable\n  Configuration:\n    Reference: docs/CONFIGURATION.md\n    Disposition: not-applicable\n  OpenAPI:\n    Reference: docs/API_CHANGELOG.md\n    Disposition: not-applicable\n  Operator:\n    Reference: docs/RELEASE_RUNBOOK.md\n    Disposition: documented\n    Detail: Restart registration workers after deployment.\n");
             File.WriteAllText(Path.Combine(RepositoryPath, "eng", "release", "policy", "release-policy.yaml"),
                 ReleasePolicyYaml);
             File.WriteAllText(Path.Combine(RepositoryPath, "eng", "release", "policy", "scope-registry.yaml"),
@@ -296,7 +296,7 @@ public sealed class ReleaseCandidateVerificationTests
                 foreach ((string name, string value) in variables) Environment.SetEnvironmentVariable(name, value);
                 using RuntimePromotionTrustRootScope trustRoot = RuntimePromotionTrustRootScope.Use(allowedSignersPath);
                 using var output = new StringWriter();
-                int exitCode = PrepareCommand.Run(["prepare", "docs/releases/1.1.0"], output, RepositoryPath, "linux-x64", TimeSpan.FromSeconds(2));
+                int exitCode = PrepareCommand.Run(["prepare", "docs/internal/releases/1.1.0"], output, RepositoryPath, "linux-x64", TimeSpan.FromSeconds(2));
                 return (exitCode, output.ToString());
             }
             finally

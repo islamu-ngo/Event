@@ -1,6 +1,6 @@
 # ABOUTME: Public change fragment for deterministic generated browser record contracts.
 # ABOUTME: Records source compatibility, OpenAPI, security, and operator impacts.
-Change-Id: CHG-2026-0011
+Change-Id: CHG-01M1VJ199BWSA2Y38S8W4GNN64
 Title: Complete immutable results, semantic constraints, and generated records
 Type: refactor
 Scope: architecture

@@ -21,18 +21,16 @@ public class OrganizationCentricGuardrailTests
     ];
 
     [Test]
-    [DisplayName("Domain must not introduce organization-centric scope entity files")]
-    public async Task DomainMustNotIntroduce_OrganizationCentricScopeEntityFiles()
+    [DisplayName("Domain must not introduce organization-centric scope entity types")]
+    public async Task DomainMustNotIntroduce_OrganizationCentricScopeTypes()
     {
-        var domainDirectory = RepositoryRoot.GetDirectories("Explore.Domain", SearchOption.AllDirectories)
-            .Single(directory => directory.Parent?.Name == "src");
-        var forbiddenFiles = ForbiddenScopeConceptNames
-            .SelectMany(name => domainDirectory.GetFiles($"{name}.cs", SearchOption.AllDirectories))
-            .Select(file => RelativePath(file.FullName))
+        var forbiddenTypes = DomainAssembly.GetTypes()
+            .Where(type => ForbiddenScopeConceptNames.Contains(type.Name, StringComparer.Ordinal))
+            .Select(type => type.FullName ?? type.Name)
             .ToList();
 
-        await Assert.That(forbiddenFiles).IsEmpty()
-            .Because("organization-centric UX must not add Domain entity files for workspace, sub-tenant, or organization-scope concepts");
+        await Assert.That(forbiddenTypes).IsEmpty()
+            .Because("organization-centric UX must not add Domain entity types for workspace, sub-tenant, or organization-scope concepts");
     }
 
     [Test]

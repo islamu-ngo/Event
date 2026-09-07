@@ -1,6 +1,6 @@
 # ABOUTME: Public change fragment for the server-authoritative ticketing lifecycle.
 # ABOUTME: Records security, migration, OpenAPI, and operator impacts for ticketing.
-Change-Id: CHG-2026-0015
+Change-Id: CHG-01M1VJ1GBNXQPSM1W08EWPM9G9
 Title: Events gain governed ticket transfers and fair-return waitlists
 Type: feat
 Scope: ticketing

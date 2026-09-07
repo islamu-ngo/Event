@@ -47,6 +47,7 @@
     * [AT Protocol & Bluesky Jetstream](readme/federation-and-open-protocols/at-protocol-and-bluesky-jetstream.md)
     * [Lexicons](readme/federation-and-open-protocols/lexicons.md)
   * [Contributing](readme/contributing/README.md)
+    * [Agentic Engineering & AI Workflow](readme/contributing/agentic-engineering.md)
     * [Local Development](readme/contributing/local-development.md)
     * [Clean Architecture](readme/contributing/clean-architecture.md)
     * [TUnit](readme/contributing/tunit.md)

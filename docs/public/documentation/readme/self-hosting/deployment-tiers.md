@@ -20,18 +20,30 @@ ISLAMU Event is architected to scale from a single lightweight VM to a distribut
 | **Minimum Hardware** | 1 vCPU, 2 GB RAM | 4 vCPUs, 8 GB RAM | 8+ vCPUs, 16+ GB RAM (per node) |
 
 > [!TIP]
-> **⚙️ Real-World Reference Setup:**
-> Our baseline community reference deployment runs comfortably on an entry-level **Hetzner CX22 cloud server** (~$4.50/month):
-> - **Hardware:** 2 vCPUs, 4 GB RAM, 40 GB NVMe SSD
-> - **Average Resource Usage:** ~1.4 GB RAM, 10–25% CPU utilization
-> - **Stack Running Comfortably:**
->   - `event-api` (ASP.NET Core REST API & Background Workers)
->   - `event-ui` (Blazor WebAssembly BFF)
->   - `postgres` (Primary PostgreSQL 16 database)
->   - `keycloak` (Identity Provider OIDC container)
->   - SQLite Privacy Erasure Authority store
->   - Caddy Reverse Proxy (Auto-HTTPS)
-> - **Workload Handled:** Comfortably supports 2,500+ monthly attendees, 500 peak ticket check-ins per event weekend, and continuous background outbox email delivery with sub-45ms API responses.
+> **⚙️ Real-World Reference Setup (ISLAMU's Production Topology):**
+> Our primary production deployment is orchestrated using a **Coolify Cloud** subscription connected to a **Hetzner CPX32** cloud server (see our [Coolify Deployment Guide](coolify-cerbos-traefik.md)):
+> - **Server Hardware & Compute:**
+>   - **CPU:** 4 vCPUs
+>   - **RAM:** 8 GB
+>   - **Disk (Local):** 160 GB
+>   - **Attached Storage:** 50 GB (1 Volume)
+>   - **Management:** Server connected to [Coolify Cloud](https://coolify.io)
+> - **Object Storage:** Hetzner Object Storage resource (S3-compatible)
+>   - **Location:** City: Falkenstein | Country: Germany | Network zone: `eu-central`
+> - **Deployed Services (via Coolify):**
+>   - `islamu-event-api` Docker image (ASP.NET Core REST API & Background Workers)
+>   - `islamu-event-ui` Docker image (Blazor WebAssembly BFF)
+>   - `postgres` for ISLAMU Event (Primary application database)
+>   - `postgres` for Cerbos (Dedicated policy storage backend)
+>   - `cerbos` Docker image (Policy Decision Point for fine-grained authorization)
+>   - `keycloak` Phase Two Docker image (`phasetwo/phasetwo-keycloak` for multi-tenancy & OIDC identity)
+>   - `cockroachdb` (Dedicated database backend for Phase Two Keycloak)
+>   - `infisical` (Secrets management engine for dynamic runtime configuration)
+>   - SQLite Privacy Erasure Authority store (GDPR anti-resurrection fence)
+> - **Workload Handled:** Comfortably supports multi-tenant organizations, concurrent ticket launches and check-ins, and continuous background outbox email delivery with sub-45ms API responses.
+>
+> 💡 **Latency & Datacenter Placement Note:**
+> It is best to choose a server location close to where you are or where your main public is located to have the lowest latency. Co-locating your compute server and object storage near your primary audience minimizes round-trip latency, accelerates media uploads/downloads, and ensures the fastest responsiveness.
 
 ---
 
@@ -109,5 +121,6 @@ ISLAMU Event is architected to scale from a single lightweight VM to a distribut
 
 * **[Docker Standalone Runbook](docker-standalone.md)** — Deploy Tier 1 single-container setup with SQLite.
 * **[Docker Compose Runbook](docker-compose.md)** — Deploy Tier 2 production split stack with PostgreSQL and Keycloak.
+* **[Coolify with Cerbos & Traefik](coolify-cerbos-traefik.md)** — Deploy Cerbos PDP and production stack on Coolify.
 * **[Environment Variables Reference](../configuration-and-operations/environment-variables.md)** — Review all baseline and advanced configuration dials.
 * **[Backup, Restore & Upgrade](../configuration-and-operations/backup-restore-upgrade.md)** — Operational runbook for database dumps, restore rehearsal, and version migrations.

@@ -661,13 +661,14 @@
       "type": "workflow",
       "enforcement": "suggest",
       "priority": "high",
-      "description": "Load when executing, running, or implementing an approved task plan from `dev/active/<task>/`; orchestrates phase execution, canonical worktree isolation (`git worktree` in `.worktrees/` + plan `mv`), Red/Green/Refactor task loops, semantic phase commits, pre-PR rebase conflict protection, and PR lifecycle teardown.",
+      "description": "Load when executing, running, or resuming an approved task plan from `dev/active/<task>/` or `.worktrees/<task>`; orchestrates fresh worktree setup, in-flight worktree/develop resume, Red/Green/Refactor task loops, semantic phase commits, pre-PR rebase conflict protection, PR creation with pre-flight Release Impact, and parked worktree lifecycle.",
       "promptTriggers": {
-        "keywords": ["implement tasks", "execute plan", "run tasks", "start implementation", "execute phase", "worktree"],
+        "keywords": ["implement tasks", "execute plan", "run tasks", "start implementation", "execute phase", "worktree", "resume task", "resume implementation", "continue implementation", "continue task", "resume plan"],
         "intentPatterns": [
           "(implement|execute|run).*?(task|plan|phase)",
           "(start|begin).*?implementation",
-          "(worktree).*?(implement|task)"
+          "(worktree).*?(implement|task)",
+          "(resume|continue).*?(task|plan|implementation|phase)"
         ]
       },
       "fileTriggers": {

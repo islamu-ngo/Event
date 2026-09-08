@@ -17,7 +17,8 @@ After confirmation, use the offered guest-status action, then explicitly copy or
 download its private link. The current browser's in-memory checkout capability is
 not a backup. Save the link somewhere private before closing the page.
 
-Anyone who possesses the complete link can read its limited status. Do not post
+Anyone who possesses the complete link can read its limited status and can cancel
+an eligible free guest confirmation when the server offers that action. Do not post
 it publicly, include it in analytics or send it in support tickets. If you lose
 the link and the browser's capability, there is no email-based or guessed-identity
 recovery path.
@@ -43,8 +44,30 @@ The page shows only safe order/event lifecycle facts and the access deadline.
 Event cancellation and order cancellation are distinct facts; an event marked
 cancelled does not itself prove that every downstream action has finished.
 The status link does not grant checkout, payment, form-editing, attendee-data or
-check-in credential authority. This status surface does not add confirmed-order
-self-cancellation.
+check-in credential authority.
+
+## Cancelling An Eligible Free Guest Confirmation
+
+Use cancellation only when the private status page offers it, and confirm the
+exact registration shown. Dismissing the confirmation sends no cancellation.
+The server checks current eligibility again when the POST arrives; a previously
+visible action can become unavailable.
+
+This operation is limited to free anonymous confirmations with no paid-order
+history and no relevant check-in history. A zero displayed balance alone is not
+proof that an order is free. Paid/refunded orders, account-owned registrations,
+staff corrections and unsupported states retain their existing processes.
+A recorded check-in prevents this guest cancellation even if it was later undone.
+
+Successful cancellation changes the order, revokes its eligible admission and
+releases consumed capacity in one transaction. Repeating the same successful
+operation does not release places twice. Opening or refreshing the status page
+does not cancel anything. If the server reports a conflict, use the refreshed
+status rather than assuming cancellation succeeded.
+
+The existing finite private-status window still applies. An unconfirmed order
+does not gain post-confirmation cancellation authority from its checkout link.
+Contact the organizer for situations outside this narrow self-service action.
 
 ## Public Calendar Export
 

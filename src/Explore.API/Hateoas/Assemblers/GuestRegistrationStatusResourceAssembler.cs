@@ -1,11 +1,12 @@
-// ABOUTME: Adds public-calendar discovery to the isolated guest status HAL resource.
-// ABOUTME: Reuses the public query without capability propagation and leaves private status valid when no export exists.
+// ABOUTME: Adds public-calendar discovery and authoritative cancellation affordances to private guest status.
+// ABOUTME: Rechecks core eligibility after calendar awaits without propagating guest authority into public queries.
 
 using System.Security.Claims;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Features.Events.Requests.Queries;
+using Explore.Application.Features.RegistrationOrders.Queries;
 using Explore.Application.Hateoas;
 using MediatR;
 
@@ -22,6 +23,10 @@ public sealed class GuestRegistrationStatusResourceAssembler(
         GuestRegistrationStatusDto dto, ClaimsPrincipal? user, HttpContext httpContext)
     {
         var calendar = await sender.Send(new GetEventCalendarExportRequest(dto.EventId), httpContext.RequestAborted);
-        return detailPolicy.GetLinks(dto, publicCalendarAvailable: calendar is not null).ToArray();
+        bool? eligible = await sender.Send(new GetGuestRegistrationCancellationEligibilityQuery(
+            dto.EventId, dto.OrderId, httpContext.Request.Headers["X-Registration-Order-Capability"].ToString()),
+            httpContext.RequestAborted);
+        return detailPolicy.GetLinks(dto with { CanCancelRegistration = eligible is true },
+            publicCalendarAvailable: calendar is not null).ToArray();
     }
 }

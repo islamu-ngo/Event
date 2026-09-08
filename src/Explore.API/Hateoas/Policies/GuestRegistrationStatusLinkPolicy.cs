@@ -1,5 +1,5 @@
-// ABOUTME: Defines the isolated read-only link family for an already authorized guest status snapshot.
-// ABOUTME: Calendar eligibility comes only from the existing public-purpose export, never guest authority.
+// ABOUTME: Defines private guest status links using server-evaluated cancellation eligibility only.
+// ABOUTME: Calendar eligibility remains isolated to the existing public-purpose export, never guest authority.
 
 using System.Security.Claims;
 using Explore.Application.Contracts.Hateoas;
@@ -17,6 +17,11 @@ public sealed class GuestRegistrationStatusLinkPolicy : ILinkPolicy<GuestRegistr
     {
         yield return LinkDefinition.Self(RouteNames.GetGuestRegistrationStatus,
             new { eventId = dto.EventId, orderId = dto.OrderId });
+        if (dto.CanCancelRegistration)
+        {
+            yield return new LinkDefinition(LinkRelations.CancelRegistration, RouteNames.CancelConfirmedGuestRegistration,
+                new { eventId = dto.EventId, orderId = dto.OrderId }, HttpMethods.Post);
+        }
         if (publicCalendarAvailable)
         {
             yield return new LinkDefinition(LinkRelations.Calendar, RouteNames.GetEventCalendar,

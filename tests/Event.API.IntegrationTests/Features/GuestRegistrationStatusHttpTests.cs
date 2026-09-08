@@ -24,7 +24,7 @@ using static Event.Api.IntegrationTests.Features.AnonymousRegistrationChallengeH
 namespace Event.Api.IntegrationTests.Features;
 
 [NotInParallel]
-public sealed class GuestRegistrationStatusHttpTests
+public sealed partial class GuestRegistrationStatusHttpTests
 {
     private const string CapabilityHeader = "X-Registration-Order-Capability";
 
@@ -49,7 +49,7 @@ public sealed class GuestRegistrationStatusHttpTests
         using JsonDocument document = JsonDocument.Parse(await status.Content.ReadAsStringAsync());
         await Assert.That(document.RootElement.GetProperty("orderId").GetGuid()).IsEqualTo(orderId);
         await Assert.That(document.RootElement.GetProperty("_links").EnumerateObject().Select(link => link.Name).ToArray())
-            .IsEquivalentTo(new[] { "self", "calendar" });
+            .IsEquivalentTo(new[] { "self", "calendar", "cancel-registration" });
         await Assert.That(await status.Content.ReadAsStringAsync()).DoesNotContain(capability);
 
         foreach (string suffix in new[] { "", "/participants", "/requirement-progress", "/payment" })
@@ -77,6 +77,9 @@ public sealed class GuestRegistrationStatusHttpTests
         using HttpResponseMessage status = await SendAsync(host.Client, HttpMethod.Get,
             StatusPath(host.EventId, orderId), capability);
         await AssertPrivateNotFound(status);
+        using HttpResponseMessage cancellation = await CancelAsync(host.Client,
+            CancellationPath(host.EventId, orderId), capability);
+        await AssertPrivateNotFound(cancellation);
         using HttpResponseMessage checkout = await SendAsync(host.Client, HttpMethod.Get,
             $"/api/events/{host.EventId}/registration-orders/guest/{orderId}", capability);
         await Assert.That(checkout.StatusCode).IsEqualTo(HttpStatusCode.OK);
@@ -219,7 +222,7 @@ public sealed class GuestRegistrationStatusHttpTests
         await Assert.That(status.StatusCode).IsEqualTo(HttpStatusCode.OK);
         using JsonDocument document = JsonDocument.Parse(await status.Content.ReadAsStringAsync());
         await Assert.That(document.RootElement.GetProperty("_links").EnumerateObject().Select(link => link.Name).ToArray())
-            .IsEquivalentTo(new[] { "self" });
+            .IsEquivalentTo(new[] { "self", "cancel-registration" });
         if (reason == "cancelled")
         {
             await Assert.That(document.RootElement.GetProperty("eventStatusId").GetInt32()).IsEqualTo((int)EventStatusEnum.Cancelled);

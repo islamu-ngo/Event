@@ -42,6 +42,11 @@
     font-weight: 600;
 }
 
+.guest-registration-status__cancellation {
+    border-block-start: 1px solid var(--isl-color-border);
+    padding-block-start: var(--isl-space-3);
+}
+
 .guest-registration-status__actions {
     display: flex;
     flex-wrap: wrap;

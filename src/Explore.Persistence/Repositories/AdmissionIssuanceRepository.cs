@@ -61,6 +61,14 @@ public sealed class AdmissionIssuanceRepository(
                 request.RegistrationOrderId,
                 cancellationToken);
         }
+        // The fence excludes other writers, but a tracking query can still reuse
+        // an order retained before cancellation. Refresh only that authority root.
+        RegistrationOrder? trackedOrder = dbContext.RegistrationOrders.Local.SingleOrDefault(value =>
+            value.TenantId == request.TenantId && value.Id == request.RegistrationOrderId);
+        if (trackedOrder is not null)
+        {
+            await dbContext.Entry(trackedOrder).ReloadAsync(cancellationToken);
+        }
         IQueryable<RegistrationOrder> orders = dbContext.RegistrationOrders;
         RegistrationOrder? order = await orders
             .Include(value => value.Pii)

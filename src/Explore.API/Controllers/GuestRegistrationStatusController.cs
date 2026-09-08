@@ -1,4 +1,4 @@
-// ABOUTME: Exposes only authorized post-confirmation guest status through the existing capability header.
+// ABOUTME: Exposes private post-confirmation guest status and cancellation through the existing capability header.
 // ABOUTME: Uses a separate HAL family and private generic errors without granting checkout or attendee calendar access.
 
 using Asp.Versioning;
@@ -10,11 +10,13 @@ using Explore.API.Hateoas;
 using Explore.API.Models;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.DTOs.RegistrationOrders;
+using Explore.Application.Features.RegistrationOrders.Commands;
 using Explore.Application.Features.RegistrationOrders.Queries;
 using Explore.Application.Hateoas;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Explore.API.Controllers;
 
@@ -28,6 +30,35 @@ public sealed class GuestRegistrationStatusController(
 {
     private static readonly ApiNotFoundProblemDescriptor MissingStatus = new(
         "Registration order not found", "Registration order not found.");
+
+    private static readonly CommandFailurePolicy CancellationFailures = CommandFailurePolicy
+        .ValidatedBy(new ApiValidationProblemDescriptor(
+            "registrationOrder", "Registration cancellation failed", "The registration could not be cancelled."))
+        .NotFound(MissingStatus, "registration_order_not_found")
+        .Conflict("Registration cancellation unavailable", "This registration cannot be cancelled.",
+            "guest_registration_cancellation_ineligible");
+
+    [AllowAnonymous]
+    [EndpointClassification(EndpointClass.PublicTransactional)]
+    [EnableRateLimiting(RateLimitingExtensions.PublicTransactionalPolicy)]
+    [PrivateNoStore]
+    [SuppressIdempotencyResponseStorage]
+    [HttpPost("cancellation", Name = RouteNames.CancelConfirmedGuestRegistration)]
+    [EndpointSummary("Cancel an eligible confirmed guest registration")]
+    [EndpointDescription("Rechecks the exact event, order and capability header against current server eligibility. Successful cancellation and authorized duplicates return no content. Does not authorize paid refunds, staff correction or checkout.")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
+    public async Task<ActionResult> CancelConfirmed(
+        Guid eventId,
+        Guid orderId,
+        [FromHeader(Name = "X-Registration-Order-Capability")] string? capability,
+        CancellationToken cancellationToken = default) =>
+        CancellationFailures.Map(this, await sender.Send(
+            new CancelConfirmedGuestRegistrationCommand(eventId, orderId, capability), cancellationToken),
+            onSuccess: NoContent);
 
     [AllowAnonymous]
     [EndpointClassification(EndpointClass.Public)]

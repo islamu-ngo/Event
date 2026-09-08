@@ -207,8 +207,8 @@ The DTO contains only event/order IDs, status lookup IDs, actual confirmation/
 cancellation times, current last-session end and the promised deadline. Event
 cancellation is not inferred to be order cancellation or completed revocation.
 No names, contact, answers, participant IDs, payment details, private location,
-raw capability or hash enter the status projection. P10 cancellation is a
-separate future operation, not an action on this read-only status contract.
+raw capability or hash enter the status projection. Confirmed guest cancellation
+is the separate explicit POST below, never an effect of a status GET.
 
 The API accepts `X-Registration-Order-Capability` only and returns generic 404
 for invalid, absent, foreign, deleted, expired or unpromised access. Status and
@@ -222,6 +222,47 @@ The private browser landing scrubs fragment material before analytics/network
 initialization and restores only the exact scoped capability in memory. Explicit
 copy/download is the durable user action, with no bearer URL in server-rendered
 markup. See [the adopter guide](../public/documentation/readme/events-and-ticketing/email-optional-participation.md).
+
+## Free Anonymous Confirmed Cancellation
+
+`CancelConfirmedGuestRegistrationCommand` reuses the limited P09 capability and
+live promise but adds exact free/anonymous/attendance eligibility. Unconfirmed
+orders have no authority for this purpose and return generic 404. Valid
+post-confirmation authority on ineligible paid, attended or unsupported state
+returns bounded 409. `cancel-registration` HAL is projected from the same native
+eligibility service; no role, current balance or client status flag grants it.
+
+`AnonymousCancellationRules` uses pinned booking/participation/account facts,
+frozen line/add-on/contribution totals and exact order-level paid acceptance,
+payment-attempt and success-observation history. GuestAllowed and
+CapabilityTokenAllowed remain supported anonymous profiles. Generic Confirmed
+terminal rules and active-only hold release remain unchanged; explicit
+aggregate/coordinator methods own this narrower transition.
+
+One serializable Application transaction holds order/issuance exclusion while
+discovering full ticket lineage. Native assignment/readiness, ticket and target
+fences follow their established order and sorted identities. Check-in does not
+take the order lock, so that lock alone or an empty active-state query cannot
+prove no attendance. Current counters and append-only history, including undo,
+remain evidence. Mutation state is reloaded after any P09 promise CAS.
+Issuance also reloads an already tracked order under its authority fence, so a
+previously observed Confirmed state cannot issue admission after cancellation
+has released capacity. The refresh preserves the surrounding tracked graph.
+
+The transaction-bound core of `AdmissionRevocationService` is reused without
+nesting its public UoW wrapper. Exact consumed holds are conditionally released
+under pool fences, preserving quantity and consumption history while recording
+release time/stamp. Revocation, release and order transition commit together;
+deadline crossings and failed evidence checks roll back effects. Duplicate
+success cannot repeat those effects. Existing paid/refund/staff callers keep
+their prior transaction and authority contracts.
+
+The bodyless capability-header POST is private/no-store/no-referrer and suppresses
+generic response replay; each invocation rechecks current authority and the
+aggregate owns idempotence. The browser confirms a captured event/order/capability
+and route generation, allows one pending operation, and refreshes canonical
+status after success or conflict. The BFF retains antiforgery and private failure
+headers. No capability is added to URLs or request bodies.
 
 ## 5. End-to-End Lifecycle Sequence
 

@@ -341,6 +341,7 @@ public static class PersistenceServicesRegistration
         services.AddScoped<AdmissionScannerCapabilityRepository>();
         services.AddScoped<IAdmissionScannerCapabilityRepository>(provider =>
             provider.GetRequiredService<AdmissionScannerCapabilityRepository>());
+        services.AddScoped<IAnonymousCancellationRepository, AnonymousCancellationRepository>();
         services.AddScoped<AdmissionRevocationRepository>();
         services.AddScoped<IAdmissionRevocationRepository>(provider =>
             provider.GetRequiredService<AdmissionRevocationRepository>());

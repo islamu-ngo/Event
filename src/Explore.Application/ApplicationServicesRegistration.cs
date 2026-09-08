@@ -234,6 +234,7 @@ public static class ApplicationServicesRegistration
         services.AddScoped<AdmissionIssuanceService>();
         services.AddScoped<IAdmissionIssuanceService>(provider =>
             provider.GetRequiredService<AdmissionIssuanceService>());
+        services.AddScoped<AnonymousCancellationService>();
         services.AddScoped<AdmissionRevocationService>();
         services.AddScoped<IAdmissionRevocationService>(provider =>
             provider.GetRequiredService<AdmissionRevocationService>());

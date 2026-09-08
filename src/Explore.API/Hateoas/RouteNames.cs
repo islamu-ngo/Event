@@ -426,6 +426,7 @@ public static class RouteNames
     public const string StartGuestRegistrationOrder = nameof(StartGuestRegistrationOrder);
     public const string GetGuestRegistrationOrder = nameof(GetGuestRegistrationOrder);
     public const string GetGuestRegistrationStatus = nameof(GetGuestRegistrationStatus);
+    public const string CancelConfirmedGuestRegistration = nameof(CancelConfirmedGuestRegistration);
     public const string GetRegistrationCheckoutComposition = nameof(GetRegistrationCheckoutComposition);
     public const string ContinueGuestRegistrationOrder = nameof(ContinueGuestRegistrationOrder);
     public const string FinalizeGuestRegistrationOrder = nameof(FinalizeGuestRegistrationOrder);

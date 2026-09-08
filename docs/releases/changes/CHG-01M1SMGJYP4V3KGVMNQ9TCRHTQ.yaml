@@ -1,0 +1,34 @@
+# ABOUTME: Records narrowly authorized free anonymous confirmed cancellation.
+# ABOUTME: Binds one-transaction order, admission and consumed-capacity release to current capability.
+Change-Id: CHG-01M1SMGJYP4V3KGVMNQ9TCRHTQ
+Title: release free guest admission through safe cancellation
+Type: feat
+Scope: registration
+Summary: Atomically cancel eligible free anonymous confirmations, revoke admission, and release consumed capacity once without extending paid-order or checked-in authority.
+Group: email-optional-self-hosting
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: Eligible free anonymous confirmations gain an explicit cancellation lifecycle while generic Confirmed transitions remain terminal.
+  Security:
+    Reference: docs/internal/ADMISSION_AND_REGISTRATION.md
+    Disposition: documented
+    Detail: Current finite guest authority, exact paid history and fenced attendance evidence precede atomic revocation and consumed release; no account or role substitutes.
+  Migration:
+    Reference: docs/internal/ADMISSION_AND_REGISTRATION.md
+    Disposition: not-applicable
+    Detail: The operation reuses existing order, ticket, credential and hold states without a relational schema change.
+  Configuration:
+    Reference: docs/internal/ADMISSION_AND_REGISTRATION.md
+    Disposition: not-applicable
+    Detail: Existing guest-status promise, capability, capacity and admission authority are reused without new deployment settings.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: A named bodyless private cancellation POST and server-evaluated HAL relation accompany native generated client contracts.
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/email-optional-participation.md
+    Disposition: documented
+    Detail: Private-link holders deliberately confirm eligible free cancellation; paid, attended and unsupported cases retain their existing organizer processes.

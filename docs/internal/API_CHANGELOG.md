@@ -5,6 +5,19 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 ## 2026-09-08
 
+- **Explicit free guest confirmed cancellation.**
+  `POST /api/events/{eventId}/guest-registration-orders/{orderId}/cancellation`
+  (`CancelConfirmedGuestRegistration`) accepts the existing capability header and
+  no body. Success and valid duplicate success return 204; missing post-confirmation
+  authority returns generic private 404, while valid but ineligible authority
+  returns 409 `guest_registration_cancellation_ineligible`. The server-authored
+  `cancel-registration` POST relation appears only after native eligibility checks.
+  No GET, generic checkout DELETE, paid/refund path or session authority is expanded.
+- **Atomic admission and capacity release.** Eligible anonymous confirmations
+  use a dedicated transition that revokes admission and releases exact consumed
+  holds once, excluding real check-in and issuance races. Generic Confirmed state
+  remains terminal. Every POST revalidates authority rather than serving generic
+  idempotency response storage.
 - **Private post-confirmation guest status.**
   `GET /api/events/{eventId}/guest-registration-orders/{orderId}/status`
   (`GetGuestRegistrationStatus`) accepts only the established guest capability

@@ -241,7 +241,8 @@ public static class MiddlewareExtensions
 
     private static bool IsGuestStatusTransportPath(PathString path) =>
         path.Value?.Contains("/guest-registration-orders/", StringComparison.OrdinalIgnoreCase) == true
-        && path.Value.TrimEnd('/').EndsWith("/status", StringComparison.OrdinalIgnoreCase);
+        && (path.Value.TrimEnd('/').EndsWith("/status", StringComparison.OrdinalIgnoreCase)
+            || path.Value.TrimEnd('/').EndsWith("/cancellation", StringComparison.OrdinalIgnoreCase));
 
     private static bool IsSensitiveAdmissionPath(PathString path) =>
         path.StartsWithSegments("/tickets", StringComparison.OrdinalIgnoreCase) ||

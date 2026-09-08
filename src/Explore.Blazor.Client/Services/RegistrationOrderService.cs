@@ -367,6 +367,34 @@ public sealed class RegistrationOrderService(
         }
     }
 
+    public async Task<GuestRegistrationCancellationOutcome> CancelConfirmedGuestRegistrationAsync(
+        Guid eventId, Guid orderId, GuestRegistrationOrderCapability capability, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(30));
+            await statusClient.CancelConfirmedGuestRegistrationAsync(eventId, orderId, capability.Value, cancellationToken: timeout.Token);
+            return GuestRegistrationCancellationOutcome.Succeeded;
+        }
+        catch (ApiException exception)
+        {
+            // Never expose or log the upstream problem body or capability; never retry a mutation.
+            logger.LogWarning("Private registration cancellation was unavailable. Status: {StatusCode}.", exception.StatusCode);
+            return exception.StatusCode == 409 ? GuestRegistrationCancellationOutcome.Conflict : GuestRegistrationCancellationOutcome.Unavailable;
+        }
+        catch (HttpRequestException)
+        {
+            logger.LogWarning("Private registration cancellation transport was unavailable.");
+            return GuestRegistrationCancellationOutcome.Unavailable;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            logger.LogWarning("Private registration cancellation transport timed out.");
+            return GuestRegistrationCancellationOutcome.Unavailable;
+        }
+    }
+
     public Task<HalResourceOfRegistrationOrderParticipantsDto?> GetGuestParticipantsAsync(
         Guid eventId,
         Guid orderId,

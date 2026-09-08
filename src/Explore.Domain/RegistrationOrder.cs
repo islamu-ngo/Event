@@ -521,6 +521,21 @@ public sealed class RegistrationOrder : ITenantEntity, IAuditableEntity, ISoftDe
         return true;
     }
 
+    public bool TryCancelConfirmedAnonymous(AnonymousCancellationEvidence evidence, DateTime timestamp)
+    {
+        DateTime utcTimestamp = EnsureUtc(timestamp, nameof(timestamp));
+        if (!AnonymousCancellationRules.IsEligible(this, evidence) || utcTimestamp < ConfirmedAt)
+        {
+            return false;
+        }
+
+        RegistrationOrderStatusId = (int)RegistrationOrderStatusEnum.Cancelled;
+        CancelledAt = utcTimestamp;
+        UpdatedAt = utcTimestamp;
+        BumpConcurrency(Guid.CreateVersion7());
+        return true;
+    }
+
     public VerifiedPurchaserIdentity? GetVerifiedPurchaserIdentity()
     {
         if (AccountUserId.HasValue)

@@ -25,8 +25,20 @@ public sealed class AdmissionRevocationService(
             return Task.FromResult(Result(AdmissionRevocationOutcome.InvalidRequest));
         }
 
-        return unitOfWork.ExecuteInTransactionAsync(async token =>
+        return unitOfWork.ExecuteInTransactionAsync(
+            token => ReconcileInCurrentTransactionAsync(request, token), cancellationToken);
+    }
+
+    // The caller retains the order and admission fences and owns commit/rollback.
+    public async Task<AdmissionRevocationResult> ReconcileInCurrentTransactionAsync(
+        AdmissionRevocationRequest request,
+        CancellationToken token)
+    {
+        if (!IsValidRequest(request))
         {
+            return Result(AdmissionRevocationOutcome.InvalidRequest);
+        }
+
             AdmissionRevocationContext? context = await repository.LoadAsync(request, token);
             if (context is null ||
                 context.TenantId != request.TenantId ||
@@ -72,7 +84,6 @@ public sealed class AdmissionRevocationService(
                     revoked,
                     preserved),
                 token);
-        }, cancellationToken);
     }
 
     private static bool IsValidRequest(AdmissionRevocationRequest? request) =>

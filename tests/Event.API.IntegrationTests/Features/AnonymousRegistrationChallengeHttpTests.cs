@@ -389,6 +389,16 @@ public sealed class AnonymousRegistrationChallengeHttpTests
             return await (client ?? Client).SendAsync(request);
         }
 
+        public async Task<string> LoginAsync()
+        {
+            var credentials = await _base.SeedLocalUserAsync(emailConfirmed: true);
+            using var request = Request("/api/auth/local/login", Guid.CreateVersion7().ToString("N"), JsonSerializer.Serialize(credentials));
+            using HttpResponseMessage response = await Client.SendAsync(request);
+            await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+            using JsonDocument body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            return body.RootElement.GetProperty("token").GetString()!;
+        }
+
         public async Task<SolvedProof> IssueAsync(string key, string? body = null)
         {
             using var request = Request($"{_pathBase}/api/events/{EventId:D}/guest-registration-challenges", key, body ?? Body);

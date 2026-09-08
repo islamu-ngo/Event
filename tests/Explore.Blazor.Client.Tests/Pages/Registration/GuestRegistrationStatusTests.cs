@@ -13,6 +13,7 @@ using Explore.Blazor.Client.Services.Http;
 using Explore.Blazor.Client.Services.Shell;
 using Explore.Blazor.Client.Shared;
 using Microsoft.Extensions.Logging.Abstractions;
+using MudBlazor;
 
 namespace Explore.Blazor.Client.Tests.Pages.Registration;
 
@@ -46,7 +47,7 @@ public sealed class GuestRegistrationStatusTests
         await Assert.That(cut.Markup).DoesNotContain(token);
         await Assert.That(flow.Navigation.Uri).DoesNotContain(token);
         await Assert.That(cut.FindAll("input, textarea, a[href*='#']").Count).IsEqualTo(0);
-        await Assert.That(cut.FindAll("button").Count).IsEqualTo(3); // refresh, copy, download; no P10 action or placeholder
+        await Assert.That(cut.FindAll("button").Count).IsEqualTo(3); // no cancellation affordance without its server relation
         await WriteEvidenceAsync(cut.Markup, "authorized");
     }
 
@@ -161,6 +162,161 @@ public sealed class GuestRegistrationStatusTests
         await Assert.That(analytics.ReceivedCalls().Any()).IsFalse();
     }
 
+    [Test]
+    [Arguments(null, false)]
+    [Arguments("GET", false)]
+    [Arguments("DELETE", false)]
+    [Arguments("POST", true)]
+    public async Task CancellationRequiresExactPostHalAffordance(string? method, bool available)
+    {
+        using var flow = new Flow(Secret());
+        flow.Transport.CancelMethod = method;
+        var cut = flow.Render();
+        await flow.CompleteAsync(cut);
+        await Assert.That(cut.FindAll("#guest-status-cancel").Count).IsEqualTo(available ? 1 : 0);
+        await Assert.That(flow.Transport.CancellationRequests).IsEqualTo(0);
+        await cut.FindAll("button")[0].ClickAsync(new MouseEventArgs());
+        await Assert.That(flow.Transport.CancellationRequests).IsEqualTo(0);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task RenderedConfirmationDismissesWithoutRequestOrSubmitsExactlyOnce(bool confirm)
+    {
+        using var flow = new Flow(Secret());
+        flow.Transport.CancelMethod = "POST";
+        var dialogHost = flow.Context.Render<MudDialogProvider>();
+        var cut = flow.Render();
+        await flow.CompleteAsync(cut);
+        var dialogShown = MarkupSignal(dialogHost, () => dialogHost.FindAll("[role=dialog]").Count == 1);
+        var click = cut.Find("#guest-status-cancel").ClickAsync(new MouseEventArgs());
+        await dialogShown.WaitAsync(TimeSpan.FromSeconds(5));
+        await WriteEvidenceAsync(cut.Markup + dialogHost.Markup, confirm ? "cancellation-confirmation" : "cancellation-dismissal");
+        var titleId = dialogHost.Find("[role=dialog]").GetAttribute("aria-labelledby");
+        await Assert.That(dialogHost.FindAll($"[id='{titleId}']").Count).IsEqualTo(1);
+        await Assert.That(flow.Transport.CancellationRequests).IsEqualTo(0);
+        await dialogHost.Find(confirm ? ".mud-message-box__yes-button" : ".mud-message-box__cancel-button").ClickAsync(new MouseEventArgs());
+        if (!confirm)
+        {
+            await click.WaitAsync(TimeSpan.FromSeconds(5));
+            await Assert.That(flow.Transport.CancellationRequests).IsEqualTo(0);
+            await Assert.That(cut.FindAll("#guest-status-cancel").Count).IsEqualTo(1);
+            return;
+        }
+        await flow.Transport.CancellationEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.That(flow.Transport.CancellationRequests).IsEqualTo(1);
+        await Assert.That(flow.Transport.CancellationPath).IsEqualTo($"/api/events/{flow.EventId}/guest-registration-orders/{flow.OrderId}/cancellation");
+        await Assert.That(flow.Transport.CancellationCapability == flow.Token).IsTrue();
+        await Assert.That(flow.Transport.CancellationBody).IsEqualTo(string.Empty);
+        await Assert.That(flow.Transport.CancellationIdempotencyKey).IsNull();
+        await Assert.That(cut.Find("[data-testid=registration-status]").GetAttribute("data-status-id")).IsEqualTo("9");
+        await Assert.That(cut.Find("#guest-status-cancellation-result").GetAttribute("data-cancellation-result")).IsEqualTo("pending");
+        await Assert.That(cut.FindAll("#guest-status-cancel").Count).IsEqualTo(0);
+        var complete = MarkupSignal(cut, () => cut.Find("#guest-status-cancellation-result").GetAttribute("data-cancellation-result") == "succeeded");
+        flow.Transport.CancellationReply.SetResult(204);
+        await complete.WaitAsync(TimeSpan.FromSeconds(5));
+        await click.WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.That(flow.Transport.StatusReads).IsEqualTo(2);
+        await Assert.That(cut.Find("[data-testid=registration-status]").GetAttribute("data-status-id")).IsEqualTo("12");
+        await Assert.That(cut.FindAll("#guest-status-cancel").Count).IsEqualTo(0);
+        await Assert.That(cut.Markup).DoesNotContain(flow.Token!);
+        await WriteEvidenceAsync(cut.Markup, "cancellation-complete");
+    }
+
+    [Test]
+    public async Task DuplicateClicksWhileConfirmingCannotStartAnotherDialogOrRequest()
+    {
+        using var flow = new Flow(Secret(), holdConfirmation: true);
+        var dialog = flow.Confirmation;
+        flow.Transport.CancelMethod = "POST";
+        var cut = flow.Render();
+        await flow.CompleteAsync(cut);
+        var button = cut.Find("#guest-status-cancel");
+        var click = button.ClickAsync(new MouseEventArgs());
+        await dialog.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await button.ClickAsync(new MouseEventArgs());
+        await Assert.That(dialog.Count()).IsEqualTo(1);
+        dialog.Reply.SetResult(true);
+        await flow.Transport.CancellationEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.That(flow.Transport.CancellationRequests).IsEqualTo(1);
+        flow.Transport.CancellationReply.SetResult(204);
+        await click.WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.That(flow.Transport.CancellationRequests).IsEqualTo(1);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task NavigationInvalidatesCapturedConfirmationAndPendingResponse(bool submitted)
+    {
+        using var flow = new Flow(Secret(), holdConfirmation: true);
+        var dialog = flow.Confirmation;
+        flow.Transport.CancelMethod = "POST";
+        var cut = flow.Render();
+        await flow.CompleteAsync(cut);
+        var click = cut.Find("#guest-status-cancel").ClickAsync(new MouseEventArgs());
+        await dialog.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        if (submitted)
+        {
+            dialog.Reply.SetResult(true);
+            await flow.Transport.CancellationEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        var otherEvent = Guid.CreateVersion7();
+        var otherOrder = Guid.CreateVersion7();
+        var otherCapability = Secret();
+        flow.Context.JSInterop.Setup<string?>("guestRegistrationStatus.take", invocation => Equals(invocation.Arguments[0], otherEvent)).SetResult(otherCapability);
+        var navigated = MarkupSignal(cut, () => flow.Transport.StatusPath == $"/api/events/{otherEvent}/guest-registration-orders/{otherOrder}/status"
+            && cut.FindAll("[data-testid=registration-status]").Count == 1);
+        await cut.InvokeAsync(() => cut.Render(parameters => parameters.Add(page => page.EventId, otherEvent).Add(page => page.OrderId, otherOrder)));
+        await navigated.WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.That(flow.Transport.StatusCapability == otherCapability).IsTrue();
+        if (submitted) flow.Transport.CancellationReply.SetResult(204);
+        else dialog.Reply.SetResult(true);
+        await click.WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.That(flow.Transport.CancellationRequests).IsEqualTo(submitted ? 1 : 0);
+        if (submitted)
+            await Assert.That(flow.Transport.CancellationPath).IsEqualTo($"/api/events/{flow.EventId}/guest-registration-orders/{flow.OrderId}/cancellation");
+        await Assert.That(cut.Find("#guest-status-cancellation-result").HasAttribute("data-cancellation-result")).IsFalse();
+        await Assert.That(cut.Find("[data-testid=registration-status]").GetAttribute("data-status-id")).IsEqualTo("9");
+    }
+
+    [Test]
+    [Arguments(409, 200, "conflict")]
+    [Arguments(409, 503, "conflict")]
+    [Arguments(404, 200, "unavailable")]
+    [Arguments(401, 200, "unavailable")]
+    [Arguments(503, 200, "unavailable")]
+    public async Task ConflictReloadAndTransportFailuresNeverRetainStalePermission(int status, int reloadStatus, string outcome)
+    {
+        using var flow = new Flow(Secret(), holdConfirmation: true);
+        var dialog = flow.Confirmation;
+        flow.Transport.CancelMethod = "POST";
+        var cut = flow.Render();
+        await flow.CompleteAsync(cut);
+        var click = cut.Find("#guest-status-cancel").ClickAsync(new MouseEventArgs());
+        await dialog.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        dialog.Reply.SetResult(true);
+        await flow.Transport.CancellationEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        flow.Transport.CancelMethod = null;
+        flow.Transport.ReloadStatus = reloadStatus;
+        flow.Transport.CancellationReply.SetResult(status);
+        await click.WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.That(cut.Find("#guest-status-cancellation-result").GetAttribute("data-cancellation-result")).IsEqualTo(outcome);
+        await Assert.That(cut.FindAll("#guest-status-cancel").Count).IsEqualTo(0);
+        await Assert.That(flow.Transport.StatusReads).IsEqualTo(status == 409 ? 2 : 1);
+        await Assert.That(flow.Transport.CancellationRequests).IsEqualTo(1);
+        await Assert.That(cut.Markup).DoesNotContain(flow.Token!);
+        await WriteEvidenceAsync(cut.Markup, $"cancellation-{status}-{reloadStatus}");
+    }
+
+    private static Task MarkupSignal<T>(IRenderedComponent<T> cut, Func<bool> predicate) where T : IComponent
+    {
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        cut.OnMarkupUpdated += (_, _) => { if (predicate()) completion.TrySetResult(); };
+        return completion.Task;
+    }
+
     private static async Task WriteEvidenceAsync(string markup, string state)
     {
         if (Environment.GetEnvironmentVariable("GUEST_STATUS_EVIDENCE") is { Length: > 0 } output)
@@ -181,8 +337,11 @@ public sealed class GuestRegistrationStatusTests
         private readonly EventApiBehaviorMessageHandler _pipeline;
         public GuestRegistrationOrderCapability Capability => Capabilities.TryGet(EventId, OrderId, out var capability) ? capability! : throw new InvalidOperationException();
 
-        public Flow(string? token)
+        public (TaskCompletionSource Entered, TaskCompletionSource<bool?> Reply, Func<int> Count) Confirmation { get; }
+
+        public Flow(string? token, bool holdConfirmation = false)
         {
+            if (holdConfirmation) Confirmation = HoldConfirmation();
             Token = token;
             Context.SetAnonymousUser();
             Context.JSInterop.Setup<string?>("guestRegistrationStatus.take", _ => true).SetResult(token);
@@ -201,6 +360,16 @@ public sealed class GuestRegistrationStatusTests
                 Navigation, TimeProvider.System, provider.GetRequiredService<AuthenticationStateProvider>(), new GuestRegistrationStatusClient(_http)));
             Service = (RegistrationOrderService)Context.Services.GetRequiredService<IRegistrationOrderService>();
             Navigation.NavigateTo($"/registration/guest/events/{EventId}/orders/{OrderId}/status");
+        }
+        private (TaskCompletionSource Entered, TaskCompletionSource<bool?> Reply, Func<int> Count) HoldConfirmation()
+        {
+            var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var reply = new TaskCompletionSource<bool?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            int count = 0;
+            var dialogs = Context.AddMockService<IDialogService>();
+            dialogs.ShowMessageBoxAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<DialogOptions>())
+                .Returns(_ => { count++; entered.TrySetResult(); return reply.Task; });
+            return (entered, reply, () => count);
         }
         public IRenderedComponent<GuestRegistrationStatus> Render() => Context.RenderMudComponent<GuestRegistrationStatus>(parameters => parameters
             .Add(page => page.EventId, EventId).Add(page => page.OrderId, OrderId));
@@ -227,6 +396,17 @@ public sealed class GuestRegistrationStatusTests
         public string? StatusPath { get; private set; }
         public string? StatusBody { get; private set; }
         public bool Calendar { get; set; }
+        public string? CancelMethod { get; set; }
+        public int StatusReads { get; private set; }
+        public int ReloadStatus { get; set; } = 200;
+        public TaskCompletionSource CancellationEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<int> CancellationReply { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public int CancellationRequests { get; private set; }
+        public string? CancellationPath { get; private set; }
+        public string? CancellationCapability { get; private set; }
+        public string? CancellationBody { get; private set; }
+        public string? CancellationIdempotencyKey { get; private set; }
+        public bool Cancelled { get; private set; }
         public int GeneralReads { get; private set; }
         public bool CheckoutAvailable { get; set; }
         public bool Confirmed { get; private set; }
@@ -235,17 +415,35 @@ public sealed class GuestRegistrationStatusTests
             string path = request.RequestUri!.AbsolutePath;
             int status = 200;
             object body;
+            if (path.EndsWith("/cancellation", StringComparison.Ordinal))
+            {
+                if (request.Method != HttpMethod.Post) throw new InvalidOperationException("Cancellation requires POST.");
+                CancellationRequests++;
+                CancellationPath = request.RequestUri.PathAndQuery;
+                CancellationCapability = request.Headers.GetValues("X-Registration-Order-Capability").Single();
+                CancellationIdempotencyKey = request.Headers.TryGetValues("Idempotency-Key", out var keys) ? keys.Single() : null;
+                CancellationBody = request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync(cancellationToken);
+                CancellationEntered.TrySetResult();
+                // Deliberately allow late completion to exercise stale-response rejection.
+                status = await CancellationReply.Task;
+                Cancelled = status == 204;
+                if (Cancelled) CancelMethod = null;
+                return new HttpResponseMessage((HttpStatusCode)status) { RequestMessage = request,
+                    Content = new StringContent(status == 204 ? string.Empty : "{}", Encoding.UTF8, "application/problem+json") };
+            }
             if (path.EndsWith("/status", StringComparison.Ordinal))
             {
+                StatusReads++;
                 StatusCapability = request.Headers.GetValues("X-Registration-Order-Capability").Single();
                 StatusPath = request.RequestUri.PathAndQuery;
                 StatusBody = request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync(cancellationToken);
                 StatusEntered.TrySetResult();
-                status = await StatusReply.Task.WaitAsync(cancellationToken);
+                status = StatusReads == 1 ? await StatusReply.Task.WaitAsync(cancellationToken) : ReloadStatus;
                 var links = new Dictionary<string, object> { ["self"] = new { href = path, method = "GET" } };
                 if (Calendar) links["calendar"] = new { href = $"https://api.internal/api/event/{eventId}/calendar", method = "GET" };
-                body = new { eventId, orderId, eventStatusId = 3, registrationOrderStatusId = 9,
-                    confirmedAt = "2026-09-01T12:00:00Z", cancelledAt = (string?)null, lastSessionEndUtc = "2026-09-10T18:00:00Z",
+                if (CancelMethod is not null) links["cancel-registration"] = new { href = path.Replace("/status", "/cancellation", StringComparison.Ordinal), method = CancelMethod };
+                body = new { eventId, orderId, eventStatusId = 3, registrationOrderStatusId = Cancelled ? 12 : 9,
+                    confirmedAt = "2026-09-01T12:00:00Z", cancelledAt = Cancelled ? "2026-09-08T12:00:00Z" : (string?)null, lastSessionEndUtc = "2026-09-10T18:00:00Z",
                     statusAccessUntil = "2026-10-10T18:00:00Z", _links = links };
             }
             else if (request.Method == HttpMethod.Post && path.EndsWith("/finalize", StringComparison.Ordinal))

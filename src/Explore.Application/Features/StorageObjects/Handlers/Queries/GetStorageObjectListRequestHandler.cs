@@ -31,7 +31,7 @@ public class GetStorageObjectListRequestHandler : IRequestHandler<GetStorageObje
         var dtos = new List<StorageObjectListDto>();
         foreach (var storageObject in storageObjects)
         {
-            var eligibility = await StorageObjectContentEligibility.ResolveAsync(
+            var eligibility = await StorageObjectContentEligibilityDto.ResolveAsync(
                 storageObject, _storageObjectRepository, _timeProvider, cancellationToken);
             dtos.Add(_mapper.Map<StorageObjectListDto>(storageObject) with { ContentEligibility = eligibility });
         }

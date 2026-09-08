@@ -5,18 +5,18 @@ using Explore.Domain.Services.Registration;
 namespace Explore.Application.DTOs.StorageObject;
 
 /// <summary>Server-only registration disclosure facts carried to final HAL projection.</summary>
-public sealed record StorageObjectContentEligibility(
+public sealed record StorageObjectContentEligibilityDto(
     bool ContentAllowed,
     bool PresignedDownloadAllowed,
     DateTime? DisclosureUntilUtc)
 {
-    public static StorageObjectContentEligibility Unrestricted { get; } = new(true, true, null);
-    private static StorageObjectContentEligibility Denied { get; } = new(false, false, null);
+    public static StorageObjectContentEligibilityDto Unrestricted { get; } = new(true, true, null);
+    private static StorageObjectContentEligibilityDto Denied { get; } = new(false, false, null);
 
     public bool CanReadAt(DateTime utcNow) =>
         ContentAllowed && (DisclosureUntilUtc is null || utcNow < DisclosureUntilUtc.Value);
 
-    internal static async Task<StorageObjectContentEligibility> ResolveAsync(
+    internal static async Task<StorageObjectContentEligibilityDto> ResolveAsync(
         Domain.StorageObject storageObject,
         IStorageObjectRepository repository,
         TimeProvider timeProvider,

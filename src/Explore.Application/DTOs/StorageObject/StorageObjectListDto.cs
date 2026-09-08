@@ -8,7 +8,7 @@ namespace Explore.Application.DTOs.StorageObject;
 public sealed record StorageObjectListDto
 {
     [JsonIgnore]
-    public StorageObjectContentEligibility ContentEligibility { get; init; } = StorageObjectContentEligibility.Unrestricted;
+    public StorageObjectContentEligibilityDto ContentEligibility { get; init; } = StorageObjectContentEligibilityDto.Unrestricted;
 
     public StorageObjectListDto ForDisclosureAt(DateTime utcNow) => ContentEligibility.CanReadAt(utcNow)
         ? this

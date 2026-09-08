@@ -69,7 +69,7 @@ public sealed class StorageObjectResourceAssembler : ResourceAssemblerBase<Stora
     }
 
     private static void ApplyDisclosureBoundary(
-        Dictionary<string, HalLink> links, StorageObjectContentEligibility eligibility, DateTime utcNow)
+        Dictionary<string, HalLink> links, StorageObjectContentEligibilityDto eligibility, DateTime utcNow)
     {
         // Authorization may have awaited past the bound after candidates were captured.
         if (!eligibility.CanReadAt(utcNow))

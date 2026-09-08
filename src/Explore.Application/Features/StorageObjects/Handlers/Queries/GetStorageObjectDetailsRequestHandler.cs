@@ -27,7 +27,7 @@ public class GetStorageObjectDetailsRequestHandler : IRequestHandler<GetStorageO
     {
         var storageObject = await _storageObjectRepository.GetById(request.Id);
         if (storageObject is null) return null;
-        var eligibility = await StorageObjectContentEligibility.ResolveAsync(
+        var eligibility = await StorageObjectContentEligibilityDto.ResolveAsync(
             storageObject, _storageObjectRepository, _timeProvider, cancellationToken);
         var dto = _mapper.Map<StorageObjectDto>(storageObject) with { ContentEligibility = eligibility };
         return dto.ForDisclosureAt(_timeProvider.GetUtcNow().UtcDateTime);

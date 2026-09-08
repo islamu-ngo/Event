@@ -361,7 +361,7 @@ public sealed class InstanceOnboardingService(
     }
 
     public Task<AuthProviderConfigurationDto> GetAuthProviderConfigurationAsync() =>
-        GetSettingsAsync(ct => onboardingClient.GetInstanceOnboardingAuthProviderConfigurationAsync(cancellationToken: ct), () => new());
+        GetSettingsAsync(async ct => (await onboardingClient.GetInstanceOnboardingAuthProviderConfigurationAsync(cancellationToken: ct)).ToDto() ?? new(), () => new());
 
     public Task<AuthProviderConfigurationDto> GetAuthProviderConfigurationAsAdminAsync() =>
         GetSettingsAsync(ct => authenticationClient.GetInstanceAuthProviderConfigurationAsync(cancellationToken: ct), () => new());

@@ -3,6 +3,7 @@
 
 using Event.Web.BffHosting.Authentication;
 using Explore.Blazor.Client.Clients;
+using Explore.Blazor.Client.Helpers;
 using Explore.Blazor.Constants;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
@@ -198,7 +199,7 @@ public class DynamicAuthSchemeManager : IDynamicAuthSchemeManager, IDisposable
         {
             return includeSecrets && !string.IsNullOrEmpty(setupSecret)
                 ? await apiClient.GetInstanceOnboardingAuthProviderConfigurationInternalAsync()
-                : await apiClient.GetInstanceOnboardingAuthProviderConfigurationAsync();
+                : (await apiClient.GetInstanceOnboardingAuthProviderConfigurationAsync()).ToDto();
         }
         catch (ApiException ex)
         {

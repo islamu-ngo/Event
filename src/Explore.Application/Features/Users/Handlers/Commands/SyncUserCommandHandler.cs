@@ -2,6 +2,7 @@
 // ABOUTME: Rechecks ownership inside the write transaction and prevents implicit Local/external account adoption.
 
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Authentication;
 using Explore.Application.DTOs.User;
@@ -61,8 +62,9 @@ public class SyncUserCommandHandler : IRequestHandler<SyncUserCommand, BaseComma
         {
             ProviderAccountKey accountKey = request.AccountKey;
             AuthenticationProviderKind providerKind = accountKey.ProviderKind;
-            if (!string.IsNullOrWhiteSpace(userDto.AuthProvider)
-                && userDto.AuthProvider.ParseAuthenticationProviderKind() != providerKind)
+            if ((request.LocalLifecycleSynchronization is not null && providerKind != AuthenticationProviderKind.Local)
+                || (!string.IsNullOrWhiteSpace(userDto.AuthProvider)
+                    && userDto.AuthProvider.ParseAuthenticationProviderKind() != providerKind))
             {
                 return BaseCommandResponse.Validation<Guid>(
                     ["Provider account authority is invalid."],
@@ -75,7 +77,8 @@ public class SyncUserCommandHandler : IRequestHandler<SyncUserCommand, BaseComma
             var existingLogin = await _userExternalLoginRepository.GetByProviderAndKey(accountKey);
             if (providerKind == AuthenticationProviderKind.Local)
             {
-                if (!await HasValidLocalBindingAsync(accountKey, userDto.Id, existingLogin, cancellationToken))
+                if (!await HasValidLocalBindingAsync(accountKey, userDto.Id, existingLogin, cancellationToken,
+                        request.LocalLifecycleSynchronization))
                     return ExplicitBindingRequired();
             }
             else if (existingLogin is null && userDto.Id != Guid.Empty
@@ -85,7 +88,7 @@ public class SyncUserCommandHandler : IRequestHandler<SyncUserCommand, BaseComma
             }
 
             InstanceBootstrapState? bootstrap = await _bootstrapRepository.GetCurrent(cancellationToken);
-            if (bootstrap is
+            if (request.LocalLifecycleSynchronization is null && bootstrap is
                 {
                     Mode: InstanceBootstrapMode.ConfiguredAdministrator
                 })
@@ -183,13 +186,14 @@ public class SyncUserCommandHandler : IRequestHandler<SyncUserCommand, BaseComma
             var newUserId = userDto.Id != Guid.Empty ? userDto.Id : Guid.CreateVersion7();
             var loginId = Guid.CreateVersion7();
 
-            var synchronization = await _unitOfWork.ExecuteSerializableAsync<BaseCommandResponse<Guid>>(async ct =>
+            async Task<BaseCommandResponse<Guid>> SynchronizeAsync(CancellationToken ct)
             {
                 UserExternalLogin? currentLogin = await _userExternalLoginRepository.GetByProviderAndKey(accountKey);
                 ct.ThrowIfCancellationRequested();
                 if (providerKind == AuthenticationProviderKind.Local)
                 {
-                    if (!await HasValidLocalBindingAsync(accountKey, userDto.Id, currentLogin, ct)
+                    if (!await HasValidLocalBindingAsync(accountKey, userDto.Id, currentLogin, ct,
+                            request.LocalLifecycleSynchronization)
                         || user is null || currentLogin!.UserId != user.Id)
                     {
                         return ExplicitBindingRequired();
@@ -263,9 +267,15 @@ public class SyncUserCommandHandler : IRequestHandler<SyncUserCommand, BaseComma
                     await EnsureExternalLoginLinkInTransactionAsync(user, accountKey, loginId, ct);
                     return BaseCommandResponse.Success(id: user.Id, message: "User synchronized successfully.");
                 }
-            }, cancellationToken);
+            }
 
-            if (synchronization.IsSuccess)
+            // Only the internal lifecycle receipt opts into the native store's existing transaction.
+            // Both paths execute the same binding recheck and mirror writer; no second persistence boundary.
+            var synchronization = request.LocalLifecycleSynchronization is null
+                ? await _unitOfWork.ExecuteSerializableAsync(SynchronizeAsync, cancellationToken)
+                : await SynchronizeAsync(cancellationToken);
+
+            if (synchronization.IsSuccess && request.LocalLifecycleSynchronization is null)
                 await _cache.RemoveAsync($"user:detail:{synchronization.Id}", cancellationToken);
             return synchronization;
         }
@@ -287,7 +297,8 @@ public class SyncUserCommandHandler : IRequestHandler<SyncUserCommand, BaseComma
         ProviderAccountKey accountKey,
         Guid requestedUserId,
         UserExternalLogin? login,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        LocalIdentityLifecycleSynchronization? lifecycle = null)
     {
         if (!Guid.TryParseExact(accountKey.Value, "D", out Guid subjectId) || subjectId == Guid.Empty
             || !string.Equals(accountKey.Value, subjectId.ToString("D"), StringComparison.Ordinal)
@@ -302,7 +313,11 @@ public class SyncUserCommandHandler : IRequestHandler<SyncUserCommand, BaseComma
         User? user = await _userRepository.GetUserWithDetails(subjectId, cancellationToken);
         return user is { IsDeleted: false, Actor: { IsDeleted: false, IsSuspended: false } }
             && user.Actor.UserId == subjectId
-            && user.Actor.ActorTypeId == (int)ActorTypeEnum.User;
+            && user.Actor.ActorTypeId == (int)ActorTypeEnum.User
+            && (lifecycle is null || (lifecycle.ApplicationUserId == subjectId
+                && requestedUserId == subjectId
+                && lifecycle.Operation.ExternalLoginId == login.Id
+                && lifecycle.Operation.PersonalActorId == user.Actor.Id));
     }
 
     private async Task<bool> IsLocalOwnedAsync(Guid userId, CancellationToken cancellationToken)

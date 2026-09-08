@@ -9,18 +9,13 @@ namespace Event.Application.UnitTests.Notifications;
 public sealed class DefaultNotificationOwnershipResolverTests
 {
     [Test]
-    public async Task ResolveAsync_RoutesIdentityLifecycleToConfiguredAccountAuthority()
+    public async Task ResolveAsync_RejectsIdentityLifecycleWithoutResolvedLinkedAuthority()
     {
-        var resolver = CreateResolver(new NotificationRoutingOptions
-        {
-            DefaultAccountAuthorityKind = AccountAuthorityKind.IslamuOperatedPds
-        });
+        var resolver = CreateResolver();
 
-        var decision = await resolver.ResolveAsync(new NotificationIntentDraft(NotificationCategory.IdentityLifecycle));
-
-        await Assert.That(decision.Ownership).IsEqualTo(NotificationOwnership.AccountAuthority);
-        await Assert.That(decision.AccountAuthorityKind).IsEqualTo(AccountAuthorityKind.IslamuOperatedPds);
-        await Assert.That(decision.RequiresLocalAudit).IsTrue();
+        await Assert.That(async () => await resolver.ResolveAsync(
+            new NotificationIntentDraft(NotificationCategory.IdentityLifecycle)))
+            .Throws<InvalidOperationException>();
     }
 
     [Test]

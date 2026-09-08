@@ -8,7 +8,6 @@ public sealed class NotificationRoutingOptions
     public const string SectionName = "NotificationRouting";
 
     public NotificationOwnership IdentityLifecycleOwner { get; set; } = NotificationOwnership.AccountAuthority;
-    public AccountAuthorityKind DefaultAccountAuthorityKind { get; set; } = AccountAuthorityKind.Keycloak;
 
     public NotificationOwnership ProductLifecycleOwner { get; set; } = NotificationOwnership.IslamuEvent;
     public NotificationOwnership EventLifecycleOwner { get; set; } = NotificationOwnership.IslamuEvent;
@@ -65,11 +64,6 @@ public sealed class NotificationRoutingOptions
         if (IdentityLifecycleOwner != NotificationOwnership.AccountAuthority)
         {
             errors.Add("IdentityLifecycleOwner must be AccountAuthority because credential-token lifecycle email is owned by the account authority.");
-        }
-
-        if (!Enum.IsDefined(DefaultAccountAuthorityKind) || DefaultAccountAuthorityKind == AccountAuthorityKind.None)
-        {
-            errors.Add("DefaultAccountAuthorityKind must name the account authority for identity lifecycle email.");
         }
     }
 

@@ -51,7 +51,40 @@ A correct password is not sufficient when credential setup is incomplete. Local 
 
 When instance email delivery is enabled, Local sign-in requires the stored Local verification flag. Supervised bootstrap can establish that flag as administrative provenance; this does not invent an address or prove mailbox delivery. Missing SMTP configuration or a delivery outage does not bypass the gate. Tenant email settings cannot override the instance sign-in policy. When instance delivery is disabled, unverified Local accounts may sign in, but their addresses remain unverified; disabling delivery never proves mailbox ownership. An invalid or unreadable instance policy blocks unverified sign-in until the configuration is repaired.
 
-Event's delivery setting does not control Keycloak or AT Protocol verification, password recovery, or sign-in. Those remain owned by the selected identity provider. This Local sign-in policy does not itself provide account provisioning, email verification, or password recovery.
+Event's delivery setting does not control Keycloak or AT Protocol verification, password recovery, or sign-in. Lifecycle actions follow the account's actual linked provider, not the instance's default provider. Local enrollment remains an administrator or setup operation; recovery never creates an account.
+
+#### Local verification and recovery
+
+Use the verification, recovery or password-change action offered by the server in
+sign-in or account security settings. Local verification and recovery require
+usable instance email delivery; a tenant mail server does not replace it.
+Disabling delivery or an SMTP outage never verifies an address or bypasses the
+existing sign-in gate. Keycloak and AT Protocol recovery remain with their provider.
+
+Verification and email-change links expire after 30 minutes, and password-recovery
+links after 15 minutes. Repeating a request while its operation remains live reuses
+that operation without extending its deadline or invalidating a link in transit.
+Request responses are deliberately generic: acknowledgement does not confirm that
+an account exists or that a message was sent. Rate and operation limits may prevent
+additional mail.
+
+Open the private link and explicitly submit the requested action. Verification,
+email change and password recovery cannot be exchanged for one another. The
+browser removes the link's private fragment before forwarding the form, and does
+not save the token in browser storage. Do not paste a complete private link into
+logs or support tickets. Successful completion does not sign you in; use a fresh
+ordinary login.
+
+Changing an address requires a current Local session and verification of the
+proposed address. Ordinary password change requires the current password and
+works without SMTP. It is separate from first-use temporary-password replacement.
+Password changes reject an unchanged password and revoke stale Local sessions.
+
+Email delivery is not guaranteed by an accepted request. Pending work stays
+bounded by its original expiry, and uncertain SMTP acceptance is not automatically
+resent. Restoring email does not revive an expired link. For Local accounts with
+no eligible address, use the existing administrator credential-reset process
+rather than guessing another account or substituting an external provider.
 
 Local sign-in requires its application account and active personal profile to
 already be linked; signing in does not create or repair that account. An external

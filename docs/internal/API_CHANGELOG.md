@@ -3,6 +3,30 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 # API Changelog
 
+## 2026-09-08
+
+- **Local lifecycle operations.** `POST /api/auth/local/email-verifications`
+  (`RequestLocalEmailVerification`) and `/password-recoveries`
+  (`RequestLocalPasswordRecovery`) return empty 202 responses without disclosing
+  missing or ineligible accounts. Proposed-address verification instead requires
+  the current ordinary Local session and its server-derived credential stamp.
+  `/email-verifications/consume` (`ConfirmLocalEmail`) and
+  `/password-recoveries/consume` (`CompleteLocalPasswordRecovery`) accept the exact
+  operation pointer and native purpose-bound token. Completion returns 204 without
+  issuing a session; wrong purpose, account, generation, expiry or replay is denied.
+- **Protected ordinary password change.** `POST /api/auth/local/password`
+  (`ChangeLocalPassword`) requires current Local authority plus the current and
+  proposed passwords. It works independently of SMTP, rotates credential stamps
+  and does not accept first-use replacement authority.
+- **Breaking: authentication-provider discovery uses HAL.**
+  `GetInstanceOnboardingAuthProviderConfiguration` retains its flattened
+  configuration fields and adds server-authored lifecycle links. The generated
+  response is `HalResourceOfAuthProviderConfigurationDto`; current-user HAL
+  publishes the applicable Local actions without changing external-provider
+  ownership. BFF lifecycle POSTs preserve antiforgery, private/no-store responses
+  and suppression of generic response replay. Private mail-link material travels
+  only in the browser fragment, never its query string.
+
 ## 2026-09-07
 
 - **Guarded SMTP delivery disable.** Instance administration exposes

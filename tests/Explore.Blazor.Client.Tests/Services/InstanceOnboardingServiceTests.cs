@@ -414,13 +414,14 @@ public class InstanceOnboardingServiceTests
     {
         // Arrange
         Uri? requestUri = null;
-        var expected = new AuthProviderConfigurationDto
+        var expected = new HalResourceOfAuthProviderConfigurationDto
         {
             PrimaryProviderId = KeycloakProviderId,
             KeycloakAuthority = "https://keycloak.example.com/auth/realms/ISLAMU",
             KeycloakClientId = "islamu-event-blazor",
             KeycloakClientSecret = string.Empty,
-            KeycloakDetectedFromEnvironment = true
+            KeycloakDetectedFromEnvironment = true,
+            _links = new Dictionary<string, HalLink> { ["verify-email"] = new() { Href = "/api/auth/local/email-verifications" } }
         };
         SetupBffClient(request =>
         {
@@ -436,6 +437,8 @@ public class InstanceOnboardingServiceTests
         await Assert.That(requestUri!.AbsolutePath).IsEqualTo("/api/instanceonboarding/auth-provider-configuration");
         await Assert.That(result.KeycloakDetectedFromEnvironment).IsTrue();
         await Assert.That(result.KeycloakClientSecret).IsEmpty();
+        var links = (JsonElement)result.AdditionalProperties["_links"];
+        await Assert.That(links.GetProperty("verify-email").GetProperty("href").GetString()).IsEqualTo("/api/auth/local/email-verifications");
     }
 
     [Test]

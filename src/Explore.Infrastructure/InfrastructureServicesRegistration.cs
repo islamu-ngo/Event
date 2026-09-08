@@ -560,7 +560,11 @@ public static class InfrastructureServicesRegistration
             client.Timeout = TimeSpan.FromSeconds(45);
         })
         .ConfigurePrimaryHttpMessageHandler(CreateKeycloakBootstrapHttpHandler);
-        services.AddScoped<IAccountAuthorityLifecycleEmailService, KeycloakAccountAuthorityLifecycleEmailService>();
+        services.AddScoped<IAccountAuthorityLifecycleEmailProvider, KeycloakAccountAuthorityLifecycleEmailService>();
+        services.AddScoped<IAccountAuthorityLifecycleEmailProvider, LocalIdentityLifecycleEmailService>();
+        services.AddScoped<ILocalIdentityLifecycleSmtpTransport, LocalIdentityLifecycleSmtpTransport>();
+        services.AddScoped<LocalIdentityLifecycleDeliveryProcessor>();
+        services.AddHostedService<LocalIdentityLifecycleDeliveryWorker>();
 
         services.AddOptions<AuthorizationProviderDeploymentOptions>()
             .Bind(configuration.GetSection(AuthorizationProviderDeploymentOptions.SectionName))

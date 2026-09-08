@@ -153,7 +153,7 @@ public static class PersistenceServicesRegistration
         {
             identityBuilder.AddEntityFrameworkStores<ExploreDbContext>();
         }
-        identityBuilder.AddDefaultTokenProviders();
+        identityBuilder.AddDefaultTokenProviders().AddLocalLifecycleTokenProviders();
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         services.AddScoped(serviceProvider =>
         {
@@ -166,6 +166,21 @@ public static class PersistenceServicesRegistration
                 userManager: serviceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(),
                 timeProvider: serviceProvider.GetRequiredService<TimeProvider>());
         });
+        services.AddScoped<ILocalIdentityLifecycleStore>(serviceProvider => new LocalIdentityLifecycleStore(
+            identityDbContext: identityTopology == IdentityDatabaseTopology.External
+                ? serviceProvider.GetRequiredService<ExternalIdentityDbContext>()
+                : serviceProvider.GetRequiredService<ExploreDbContext>(),
+            applicationDbContext: serviceProvider.GetRequiredService<ExploreDbContext>(),
+            userManager: serviceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(),
+            timeProvider: serviceProvider.GetRequiredService<TimeProvider>(),
+            credentialStates: serviceProvider.GetRequiredService<LocalIdentityCredentialStateStore>()));
+        services.AddScoped<ILocalIdentityLifecycleDeliveryStore>(serviceProvider => new LocalIdentityLifecycleDeliveryStore(
+            identityDbContext: identityTopology == IdentityDatabaseTopology.External
+                ? serviceProvider.GetRequiredService<ExternalIdentityDbContext>()
+                : serviceProvider.GetRequiredService<ExploreDbContext>(),
+            applicationDbContext: serviceProvider.GetRequiredService<ExploreDbContext>(),
+            credentialStates: serviceProvider.GetRequiredService<LocalIdentityCredentialStateStore>(),
+            timeProvider: serviceProvider.GetRequiredService<TimeProvider>()));
         services.AddScoped<ILocalIdentityAuthService, LocalIdentityAuthService>();
         services.AddScoped<ILocalCredentialAdministration>(serviceProvider =>
             serviceProvider.GetRequiredService<LocalIdentityCredentialStateStore>());

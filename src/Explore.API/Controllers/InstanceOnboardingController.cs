@@ -8,7 +8,9 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
+using Explore.API.Hateoas.Policies;
 using Explore.API.Models;
+using Explore.Application.Features.Authentication.Local.Handlers.Queries;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
@@ -253,11 +255,24 @@ public class InstanceOnboardingController : EventControllerBase
     [HttpGet("auth-provider-configuration", Name = RouteNames.GetInstanceOnboardingAuthProviderConfiguration)]
     [EndpointSummary("Get Auth Provider Configuration (Public)")]
     [EndpointDescription("Returns auth provider configuration without secrets. Used by BFF at startup to discover configured providers.")]
-    [ProducesResponseType(typeof(AuthProviderConfigurationDto), StatusCodes.Status200OK)]
-    public async Task<ActionResult<AuthProviderConfigurationDto>> GetAuthProviderConfiguration(CancellationToken cancellationToken = default)
+    [PrivateNoStore]
+    [ProducesResponseType(typeof(HalResource<AuthProviderConfigurationDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<HalResource<AuthProviderConfigurationDto>>> GetAuthProviderConfiguration(CancellationToken cancellationToken = default)
     {
         var configuration = await _authProviderConfigurationService.ReadConfigurationAsync();
-        return Ok(configuration);
+        var capabilities = await _mediator.Send(new GetLocalIdentityLifecycleCapabilitiesQuery(PublicDiscovery: true), cancellationToken);
+        var links = LocalIdentityLifecycleLinkPolicy.GetLinks(capabilities).ToDictionary(
+            definition => definition.Rel,
+            definition => new HalLink
+            {
+                Href = Url.RouteUrl(definition.RouteName, definition.RouteValues)
+                    ?? throw new InvalidOperationException("The Local lifecycle route is not registered."),
+                Method = definition.Method,
+                Title = definition.Title
+            });
+        links.Add(LinkRelations.Self, HalLink.Create(Url.RouteUrl(RouteNames.GetInstanceOnboardingAuthProviderConfiguration)
+            ?? throw new InvalidOperationException("The authentication discovery route is not registered.")));
+        return Ok(new HalResource<AuthProviderConfigurationDto>(configuration, links));
     }
 
     [AllowAnonymous]

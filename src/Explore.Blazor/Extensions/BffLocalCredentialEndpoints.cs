@@ -28,7 +28,9 @@ public static class BffLocalCredentialEndpoints
         var path = context.Request.Path.Value?.TrimEnd('/');
         if (string.Equals(path, "/bff/auth/local/login", StringComparison.OrdinalIgnoreCase)
             || string.Equals(path, ReplacementPath, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(path, PasswordChangePath, StringComparison.OrdinalIgnoreCase))
+            || string.Equals(path, PasswordChangePath, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(path, BffLocalIdentityLifecycleEndpoints.LandingPath, StringComparison.OrdinalIgnoreCase)
+            || context.Request.Path.StartsWithSegments(BffLocalIdentityLifecycleEndpoints.Prefix))
         {
             context.Response.OnStarting(() =>
             {
@@ -37,6 +39,16 @@ public static class BffLocalCredentialEndpoints
             });
         }
 
+        if (context.Request.Path.StartsWithSegments(BffLocalIdentityLifecycleEndpoints.Prefix))
+        {
+            if (context.Request.ContentLength > 16384)
+            {
+                context.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
+                return;
+            }
+            var bodyLimit = context.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>();
+            if (bodyLimit is { IsReadOnly: false }) bodyLimit.MaxRequestBodySize = 16384;
+        }
         await next(context);
     }
 

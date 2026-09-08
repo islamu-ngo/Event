@@ -617,13 +617,13 @@ public sealed class LocalCredentialFirstUseTests
 
     private static string NewPassword() => $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(24))}";
 
-    private sealed record Snapshot(string? PasswordHash, string? SecurityStamp, string? ConcurrencyStamp,
+    internal sealed record Snapshot(string? PasswordHash, string? SecurityStamp, string? ConcurrencyStamp,
         string? TokenValue, LocalCredentialOperationStage Stage, Guid OperationStamp, DateTime? OperationUpdatedAt, DateTime? UserUpdatedAt)
     {
         public override string ToString() => nameof(Snapshot);
     }
 
-    private sealed class Fixture : IAsyncDisposable
+    internal sealed class Fixture : IAsyncDisposable
     {
         private readonly string _applicationPath = Path.Combine(Path.GetTempPath(), $"first-use-app-{Guid.CreateVersion7():N}.db");
         private readonly string _identityPath = Path.Combine(Path.GetTempPath(), $"first-use-identity-{Guid.CreateVersion7():N}.db");
@@ -631,6 +631,7 @@ public sealed class LocalCredentialFirstUseTests
         private readonly byte[] _signingKey = RandomNumberGenerator.GetBytes(64);
         private ServiceProvider? _provider;
         private IdentityDatabaseTopology _topology;
+        private IInterceptor? _transactionObserver;
         private string _email = string.Empty;
         internal ServiceProvider Provider => _provider!;
         internal CancellationToken CancellationToken => _timeout.Token;
@@ -643,9 +644,9 @@ public sealed class LocalCredentialFirstUseTests
 
         private Fixture() => ValidationExpiry = new ExpiryAdvancingPasswordValidator(Clock);
 
-        internal static async Task<Fixture> CreateAsync(IdentityDatabaseTopology topology)
+        internal static async Task<Fixture> CreateAsync(IdentityDatabaseTopology topology, IInterceptor? transactionObserver = null)
         {
-            var fixture = new Fixture { _topology = topology };
+            var fixture = new Fixture { _topology = topology, _transactionObserver = transactionObserver };
             try { await fixture.InitializeAsync(); return fixture; }
             catch { await fixture.DisposeAsync(); throw; }
         }
@@ -802,7 +803,11 @@ public sealed class LocalCredentialFirstUseTests
             var services = new ServiceCollection();
             services.AddLogging();
             services.AddDbContext<ExploreDbContext>(options => Configure(options, _applicationPath));
-            IdentityBuilder identity = services.AddIdentityCore<LocalIdentityUser>().AddRoles<LocalIdentityRole>();
+            services.AddSingleton<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>(
+                new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider());
+            IdentityBuilder identity = services.AddIdentityCore<LocalIdentityUser>().AddRoles<LocalIdentityRole>()
+                .AddUserValidator<OptionalEmailLocalIdentityUserValidator>()
+                .AddLocalLifecycleTokenProviders();
             services.AddSingleton<IPasswordValidator<LocalIdentityUser>>(ValidationExpiry);
             if (_topology == IdentityDatabaseTopology.External)
             {
@@ -870,7 +875,8 @@ public sealed class LocalCredentialFirstUseTests
 
         private void Configure(DbContextOptionsBuilder options, string path) => options
             .UseSqlite(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString())
-            .UseSnakeCaseNamingConvention().AddInterceptors(SqliteNamedLockTransactionInterceptor.Instance, WriteFault, StateReadBarrier);
+            .UseSnakeCaseNamingConvention().AddInterceptors(_transactionObserver is null ? [] : new[] { _transactionObserver })
+            .AddInterceptors(SqliteNamedLockTransactionInterceptor.Instance, WriteFault, StateReadBarrier);
 
         public async ValueTask DisposeAsync()
         {
@@ -886,7 +892,7 @@ public sealed class LocalCredentialFirstUseTests
         }
     }
 
-    private sealed class ControlledClock : TimeProvider
+    internal sealed class ControlledClock : TimeProvider
     {
         private DateTimeOffset _utcNow = DateTimeOffset.UtcNow;
         public override DateTimeOffset GetUtcNow() => _utcNow;
@@ -895,7 +901,7 @@ public sealed class LocalCredentialFirstUseTests
 
     private sealed class InjectedReplacementFailure : Exception;
 
-    private sealed class AuthenticationStateReadBarrier : DbCommandInterceptor
+    internal sealed class AuthenticationStateReadBarrier : DbCommandInterceptor
     {
         private readonly TaskCompletionSource _reached = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource _released = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -927,7 +933,7 @@ public sealed class LocalCredentialFirstUseTests
         }
     }
 
-    private sealed class ExpiryAdvancingPasswordValidator(ControlledClock clock) : IPasswordValidator<LocalIdentityUser>
+    internal sealed class ExpiryAdvancingPasswordValidator(ControlledClock clock) : IPasswordValidator<LocalIdentityUser>
     {
         internal bool Enabled { get; set; }
         internal bool Observed { get; private set; }
@@ -944,7 +950,7 @@ public sealed class LocalCredentialFirstUseTests
         }
     }
 
-    private sealed class ReplacementWriteFault : DbCommandInterceptor
+    internal sealed class ReplacementWriteFault : DbCommandInterceptor
     {
         private DbContext? _identity;
         private ReplacementWriteBoundary _boundary;

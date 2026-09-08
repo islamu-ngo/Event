@@ -92,7 +92,7 @@ their own transactional authorization invariants.
 
 For Ready but unverified credentials, the service then reads uncached instance `email.delivery_enabled` through `ISystemSettingRepository`. Missing intent uses the disabled default; strict JSON `false` permits issuance without changing `EmailConfirmed` or the resulting `email_verified=false` claim. Strict JSON `true` refuses issuance with `email_verification_required`/401, even if SMTP is missing or unhealthy. Malformed intent or a repository failure returns bounded `authentication_failed`/503; cancellation propagates. Tenant settings and transport/secret resolution do not participate in this decision. Already-verified credentials do not need the intent read, but still require Ready credential state.
 
-The same fresh instance intent gates unverified ordinary bearer admission. The BFF exposes only the allowlisted verification-required reason to the login UI; other provider error bodies remain hidden. Recovery, verification delivery and administrative enrollment remain unfinished. Keycloak and AT Protocol retain their own authentication and verification authority regardless of Event email-delivery intent.
+The same fresh instance intent gates unverified ordinary bearer admission. The BFF exposes only the allowlisted verification-required reason to the login UI; other provider error bodies remain hidden. Administrative enrollment remains separate from the Local lifecycle operations below. Keycloak and AT Protocol retain their own authentication and verification authority regardless of Event email-delivery intent.
 
 ### Local browser session authority
 
@@ -118,6 +118,75 @@ state cannot repopulate a revoked scope. These are activity-time checks, not a
 distributed transaction or immediate push invalidation of idle browser tabs.
 
 Local login carries `SuppressIdempotencyResponseStorage` and `PrivateNoStore` metadata. Every request must evaluate current admission policy, even when a client repeats an `Idempotency-Key`; the generic middleware must neither persist a token-bearing response nor replay a prior success. Browser cache headers alone do not disable application-level idempotency storage.
+
+## Local Verification, Email Change And Password Recovery
+
+`DefaultAccountAuthorityLifecycleEmailService` resolves the exact persisted
+`UserExternalLogin` owned by the target user. Provider kind and account key do not
+come from email matching or a global notification default. The Keycloak adapter
+checks the configured issuer before its native provider request; AT Protocol and
+other external providers retain their own lifecycle operations. Local requests
+use `ILocalIdentityLifecycleStore` and the global Local delivery adapter.
+
+`LocalIdentityLifecycleOperation` belongs to the selected Identity store, separate
+from the Create/Reset receipt used for Ready-session admission. Verification and
+email-change operations expire after 30 minutes; password recovery expires after
+15 minutes. Repeated intake reuses a live operation and its original deadline.
+Fresh-operation and delivery budgets are keyed by native subject/purpose, not
+public address-derived rate keys. The public request partition remains independent.
+The ledger retains binding, pending address, generation, deadlines, delivery and
+consumption/synchronization state; it never retains transport tokens or passwords.
+
+Native ASP.NET Core Identity token providers bind the subject and security stamp.
+The operation-specific purpose additionally binds the operation, generation,
+personal actor, external login and destination. Token issuance is transient at
+admitted handoff. The original operation deadline still bounds tokens issued late.
+Consumption validates exact current Ready credentials and permits only the named
+mutation once. Native password policy, unchanged-password rejection and stamp
+rotation remain authoritative. No consume operation creates an account or issues
+an ordinary JWT, browser cookie or first-use replacement challenge.
+
+Global Local accounts do not acquire invented tenant membership for email.
+The delivery processor captures instance transport and durable admission under
+the shared global SMTP policy lease, releasing it before network I/O.
+Uncertain admission is durable before the external send; unknown acceptance never
+becomes an automatic resend. Pending work retains the original expiry, and
+restoring SMTP does not revive expired operations. Ordinary recipient resolution
+stays verified-only; a live verification operation is the separate authority for
+its unverified destination.
+
+`ExecuteSynchronizationAsync` coordinates the native user-row concurrency
+boundary with the Application mirror transaction. The shared `SyncUser` mutation
+path rechecks the exact Local binding without starting a nested transaction.
+The Application commit precedes the Identity acknowledgement in external topology;
+retry is idempotent, not a claim of distributed atomicity. Public retry requires
+the original valid proof and deadline. Trusted worker reconciliation instead uses
+the current consumed receipt and resulting stamp, including after token expiry,
+without retaining or recreating the token. Cache eviction follows committed work.
+
+The five Local lifecycle POST operations are private/no-store and exclude generic
+idempotency response storage. Public current-address verification and recovery
+requests return empty 202 responses without disclosing target eligibility.
+Proposed-address verification requires the original validated ordinary Local
+session and cannot select another account. Consume returns 204 only for its
+permitted operation and mirror synchronization; a fresh ordinary login is separate.
+`POST /api/auth/local/password` requires current Local credentials and the current
+password, independently of SMTP, and never uses the first-use replacement scheme.
+
+Server-authored `verify-email`, `recover-password` and `change-password` links
+drive browser affordances. The existing trusted public browser base URL owns the
+`/auth/local-account-recovery` landing page. Complete pointer/token data travels
+only in the fragment, is removed from history before BFF forwarding, and remains
+memory-only. The BFF preserves antiforgery, private responses and cookie protection
+for ordinary password change.
+
+Generate `LocalIdentityLifecycle` migrations for both primary and external
+Identity stores from the settled model. Keep their schema and code together;
+never hand-edit snapshots or treat rollback as token recovery. Native Local
+credential erasure is a pre-existing unsupported path: Application erasure fences
+and removes bindings, but does not delete native credential receipts. The new
+restrictive ownership foreign key prevents orphan lifecycle rows; it does not
+claim pending-address cleanup or native erasure completeness.
 
 ## First-Run Local Enrollment
 
@@ -439,9 +508,6 @@ Never delete the inactive provider's validation metadata merely because primary 
 
 The initial implementation intentionally reports these operations as unsupported:
 
-* password reset and recovery;
-* authenticated password change;
-* email-verification delivery and confirmation;
 * two-factor authentication;
 * passkeys/WebAuthn;
 * external social-login attachment.

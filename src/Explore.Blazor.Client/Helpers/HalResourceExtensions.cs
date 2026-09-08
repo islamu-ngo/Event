@@ -719,6 +719,15 @@ public static class HalResourceExtensions
         return JsonSerializer.Deserialize<CustomPropertyDefinitionDto>(json, JsonOptions);
     }
 
+    public static AuthProviderConfigurationDto? ToDto(this HalResourceOfAuthProviderConfigurationDto? halResource)
+    {
+        if (halResource is null)
+            return null;
+
+        var json = JsonSerializer.Serialize(halResource, JsonOptions);
+        return JsonSerializer.Deserialize<AuthProviderConfigurationDto>(json, JsonOptions);
+    }
+
     public static InstanceOnboardingStatusDto? ToDto(this HalResourceOfInstanceOnboardingStatusDto? halResource)
     {
         if (halResource is null)

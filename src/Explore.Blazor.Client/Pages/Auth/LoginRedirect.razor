@@ -130,6 +130,14 @@
                                     @LocalSubmitLabel
                                 </MudButton>
                             </EditForm>
+                            @if (_lifecycleLinks?.ContainsKey("recover-password") == true)
+                            {
+                                <p><a href="/auth/local-account-recovery?mode=recover-password">Forgot your Local password?</a></p>
+                            }
+                            @if (_lifecycleLinks?.ContainsKey("verify-email") == true)
+                            {
+                                <p><a href="/auth/local-account-recovery?mode=verify-email">Send a verification email</a></p>
+                            }
                         }
                         else if (!IsAtprotoPrimary || !IsAtproto(provider))
                         {
@@ -198,6 +206,7 @@
     private IJSObjectReference? _bffModule;
     private readonly LocalCredentialsInput _localCredentials = new();
     private List<BffAuthProviderItem> _providers = [];
+    private Dictionary<string, Explore.Blazor.Client.Clients.HalLink>? _lifecycleLinks;
 
     protected override async Task OnInitializedAsync()
     {
@@ -219,6 +228,7 @@
             }
 
             var providers = response.Content?.Providers ?? [];
+            _lifecycleLinks = response.Content?._links;
             _primaryProvider = response.Content?.PrimaryProvider
                 .Trim()
                 .ToLowerInvariant() ?? string.Empty;

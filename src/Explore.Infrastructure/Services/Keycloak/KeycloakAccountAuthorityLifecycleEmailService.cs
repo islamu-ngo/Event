@@ -4,7 +4,10 @@
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Globalization;
+using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Notifications;
 using Explore.Application.Services;
@@ -17,9 +20,10 @@ namespace Explore.Infrastructure.Services.Keycloak;
 public sealed class KeycloakAccountAuthorityLifecycleEmailService(
     IHttpClientFactory httpClientFactory,
     INotificationOrchestrator notificationOrchestrator,
+    ITenantUserRepository tenantUsers,
     IOptions<AccountAuthorityLifecycleEmailOptions> lifecycleOptions,
     IOptions<KeycloakLifecycleEmailOptions> keycloakOptions,
-    ILogger<KeycloakAccountAuthorityLifecycleEmailService> logger) : IAccountAuthorityLifecycleEmailService
+    ILogger<KeycloakAccountAuthorityLifecycleEmailService> logger) : IAccountAuthorityLifecycleEmailProvider
 {
     public const string HttpClientName = "KeycloakLifecycleEmailClient";
 
@@ -30,31 +34,13 @@ public sealed class KeycloakAccountAuthorityLifecycleEmailService(
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public Task<AccountAuthorityLifecycleEmailResult> RequestEmailVerificationAsync(
-        AccountAuthorityLifecycleEmailRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        return RequestAsync(AccountAuthorityLifecycleEmailAction.EmailVerification, request, cancellationToken);
-    }
+    public AccountAuthorityKind Kind => AccountAuthorityKind.Keycloak;
 
-    public Task<AccountAuthorityLifecycleEmailResult> RequestPasswordResetAsync(
-        AccountAuthorityLifecycleEmailRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        return RequestAsync(AccountAuthorityLifecycleEmailAction.PasswordReset, request, cancellationToken);
-    }
-
-    public Task<AccountAuthorityLifecycleEmailResult> RequestEmailUpdateVerificationAsync(
-        AccountAuthorityLifecycleEmailRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        return RequestAsync(AccountAuthorityLifecycleEmailAction.EmailUpdateVerification, request, cancellationToken);
-    }
-
-    private async Task<AccountAuthorityLifecycleEmailResult> RequestAsync(
+    public async Task<AccountAuthorityLifecycleEmailResult> RequestAsync(
         AccountAuthorityLifecycleEmailAction action,
         AccountAuthorityLifecycleEmailRequest request,
-        CancellationToken cancellationToken)
+        ResolvedAccountAuthority authority,
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -64,7 +50,7 @@ public sealed class KeycloakAccountAuthorityLifecycleEmailService(
             return CreateResult(
                 AccountAuthorityLifecycleEmailStatus.Disabled,
                 action,
-                lifecycle.AccountAuthorityKind,
+                Kind,
                 reasonCode: "account_authority_lifecycle_email_disabled");
         }
 
@@ -75,18 +61,32 @@ public sealed class KeycloakAccountAuthorityLifecycleEmailService(
             return CreateResult(
                 AccountAuthorityLifecycleEmailStatus.ProviderNotConfigured,
                 action,
-                lifecycle.AccountAuthorityKind,
+                Kind,
                 reasonCode: providerFailureCode);
         }
 
-        var draft = CreateDraft(action, request, lifecycle.AccountAuthorityKind);
+        if (!TryGetProviderSubject(authority.AccountKey, baseUri!, keycloak.Realm.Trim(), out var subject))
+        {
+            return CreateResult(AccountAuthorityLifecycleEmailStatus.ProviderNotConfigured, action, Kind,
+                reasonCode: "keycloak_lifecycle_authority_mismatch");
+        }
+
+        // Existing notification audit is tenant-bound; never invent membership for a global account.
+        if (request.TenantId is not { } tenantId
+            || await tenantUsers.GetByTenantAndUserAsync(tenantId, authority.UserId, cancellationToken) is null)
+        {
+            return CreateResult(AccountAuthorityLifecycleEmailStatus.ScopeUnavailable, action, Kind,
+                reasonCode: "account_authority_audit_scope_unavailable");
+        }
+
+        var draft = CreateDraft(action, request, authority, subject!);
         var orchestration = await notificationOrchestrator.EnqueueAsync(draft, cancellationToken);
         if (orchestration.IsFenced)
         {
             return CreateResult(
                 AccountAuthorityLifecycleEmailStatus.Disabled,
                 action,
-                lifecycle.AccountAuthorityKind,
+                Kind,
                 reasonCode: "account_authority_lifecycle_email_unavailable");
         }
 
@@ -102,7 +102,7 @@ public sealed class KeycloakAccountAuthorityLifecycleEmailService(
 
             using var response = await api.ExecuteActionsEmailAsync(
                 keycloak.Realm.Trim(),
-                request.AccountAuthorityUserId.Trim(),
+                subject!,
                 GetRedirectUri(request),
                 GetClientId(request, keycloak),
                 GetLifespanSeconds(request, keycloak),
@@ -211,7 +211,7 @@ public sealed class KeycloakAccountAuthorityLifecycleEmailService(
         out string failureCode)
     {
         failureCode = "account_authority_provider_not_configured";
-        if (!lifecycle.ProviderConfigured || lifecycle.AccountAuthorityKind != AccountAuthorityKind.Keycloak)
+        if (!lifecycle.ProviderConfigured)
             return false;
 
         if (!keycloak.Enabled || keycloak.AccountAuthorityKind != AccountAuthorityKind.Keycloak)
@@ -262,9 +262,9 @@ public sealed class KeycloakAccountAuthorityLifecycleEmailService(
     private static NotificationIntentDraft CreateDraft(
         AccountAuthorityLifecycleEmailAction action,
         AccountAuthorityLifecycleEmailRequest request,
-        AccountAuthorityKind accountAuthorityKind)
+        ResolvedAccountAuthority authority,
+        string externalUserId)
     {
-        var externalUserId = RequireNonEmpty(request.AccountAuthorityUserId, "Account-authority user id is required.");
         var correlationId = string.IsNullOrWhiteSpace(request.CorrelationId)
             ? Guid.CreateVersion7().ToString("N")
             : request.CorrelationId.Trim();
@@ -276,14 +276,15 @@ public sealed class KeycloakAccountAuthorityLifecycleEmailService(
             TenantId: request.TenantId,
             RecipientKind: RecipientKind,
             TemplateKey: templateKey,
-            SafePayloadReference: $"account-authority:{accountAuthorityKind}:user:{externalUserId}",
+            SafePayloadReference: $"account-authority:{authority.Kind}:login:{authority.ExternalLoginId}",
             IsUserFacing: true,
             IsIslamuInitiated: true,
-            DeduplicationKey: $"identity-lifecycle:{actionKey}:{request.UserId}:{correlationId}",
+            DeduplicationKey: $"identity-lifecycle:{actionKey}:{authority.ExternalLoginId}:{correlationId}",
             CorrelationId: correlationId,
             UserId: request.UserId,
             ExternalProviderId: externalUserId,
-            ExternalCorrelationId: correlationId);
+            ExternalCorrelationId: correlationId,
+            AccountAuthority: authority);
     }
 
     private static AccountAuthorityLifecycleEmailResult CreateProviderFailure(
@@ -361,9 +362,25 @@ public sealed class KeycloakAccountAuthorityLifecycleEmailService(
         _ => throw new InvalidOperationException($"Unsupported account-authority lifecycle email action '{action}'.")
     };
 
-    private static string RequireNonEmpty(string value, string message)
+    private static bool TryGetProviderSubject(ProviderAccountKey accountKey, Uri baseUri, string realm,
+        out string? subject)
     {
-        return string.IsNullOrWhiteSpace(value) ? throw new InvalidOperationException(message) : value.Trim();
+        subject = null;
+        var key = accountKey.Value;
+        if (!key.StartsWith("oidc:", StringComparison.Ordinal)) return false;
+        var lengthEnd = key.IndexOf(':', 5);
+        if (lengthEnd < 0 || !int.TryParse(key.AsSpan(5, lengthEnd - 5), NumberStyles.None,
+                CultureInfo.InvariantCulture, out var authorityLength)
+            || authorityLength <= 0 || authorityLength >= key.Length - lengthEnd - 2)
+            return false;
+        var subjectSeparator = lengthEnd + 1 + authorityLength;
+        if (key[subjectSeparator] != ':') return false;
+        var candidate = key[(subjectSeparator + 1)..];
+        var configuredKey = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
+            new Uri(baseUri, $"realms/{Uri.EscapeDataString(realm)}").AbsoluteUri, candidate);
+        if (configuredKey != accountKey) return false;
+        subject = candidate;
+        return true;
     }
 
     internal interface IKeycloakLifecycleEmailApi

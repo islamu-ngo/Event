@@ -192,6 +192,8 @@ public static class MiddlewareExtensions
 
             headers[HeaderNames.XContentTypeOptions] = "nosniff";
             if (IsSensitiveAdmissionPath(context.Request.Path)
+                || context.Request.Path.StartsWithSegments(BffLocalIdentityLifecycleEndpoints.LandingPath, StringComparison.OrdinalIgnoreCase)
+                || context.Request.Path.StartsWithSegments(BffLocalIdentityLifecycleEndpoints.Prefix, StringComparison.OrdinalIgnoreCase)
                 || context.Request.Path.StartsWithSegments(
                     "/bff/events")
                 && (context.Request.Path.Value?.Contains(

@@ -1,0 +1,26 @@
+// ABOUTME: Defines Local lifecycle CQRS commands with session authority supplied only by trusted adapters.
+// ABOUTME: Keeps anonymous intake and operation consumption separate from authentication and session issuance.
+
+using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Features.Authentication.Local.Models;
+using Explore.Application.Responses;
+using MediatR;
+
+namespace Explore.Application.Features.Authentication.Local;
+
+public sealed record RequestLocalEmailVerificationCommand(
+    LocalEmailVerificationRequestDto Request,
+    LocalSessionAuthority? Authority) : IRequest<BaseCommandResponse<Guid>>;
+
+public sealed record ConfirmLocalEmailCommand(
+    LocalEmailConfirmationRequestDto Request) : IRequest<BaseCommandResponse<Guid>>;
+
+public sealed record RequestLocalPasswordRecoveryCommand(
+    LocalPasswordRecoveryRequestDto Request) : IRequest<BaseCommandResponse<Guid>>;
+
+public sealed record CompleteLocalPasswordRecoveryCommand(
+    LocalPasswordRecoveryCompletionRequestDto Request) : IRequest<BaseCommandResponse<Guid>>;
+
+public sealed record ChangeLocalPasswordCommand(
+    LocalPasswordChangeRequestDto Request,
+    LocalSessionAuthority? Authority) : IRequest<BaseCommandResponse<Guid>>;

@@ -88,7 +88,7 @@ public class SecurityBlazorBffWebApplicationFactory : WebApplicationFactory<Prog
                     Arg.Any<string?>(),
                     Arg.Any<string?>(),
                     Arg.Any<CancellationToken>())
-                .Returns(Task.FromResult<AuthProviderConfigurationDto>(null!));
+                .Returns(Task.FromResult<HalResourceOfAuthProviderConfigurationDto>(null!));
             services.AddSingleton(onboardingClient);
 
             services.RemoveAll<IBffResolverConfigurationProvider>();

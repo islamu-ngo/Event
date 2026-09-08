@@ -52,6 +52,11 @@ public class SmtpEmailService : IEmailService, IEmailConnectionTester
         return await SendCoreAsync(message, config, cancellationToken);
     }
 
+    // Global lifecycle admission supplies an instance-owned transport snapshot under the SMTP policy lease.
+    // This entry point intentionally does not consult ambient tenant settings.
+    internal Task<EmailResult> SendAdmittedAsync(EmailMessage message, SmtpConfiguration configuration,
+        CancellationToken cancellationToken) => SendCoreAsync(message, configuration, cancellationToken);
+
     public async Task<EmailResult> TestConnectionAsync(CancellationToken cancellationToken = default)
     {
         var config = await _configResolver.ResolveAsync(null, cancellationToken);
@@ -271,7 +276,13 @@ public class SmtpEmailService : IEmailService, IEmailConnectionTester
         mimeMessage.Subject = message.Subject;
 
         foreach (var (key, value) in message.CustomHeaders)
-            mimeMessage.Headers.Add(key, value);
+        {
+            // MimeMessage creates a Message-ID itself; a stable admitted identifier must replace it, not duplicate it.
+            if (string.Equals(key, "Message-ID", StringComparison.OrdinalIgnoreCase))
+                mimeMessage.Headers.Replace(HeaderId.MessageId, value);
+            else
+                mimeMessage.Headers.Add(key, value);
+        }
 
         var builder = new BodyBuilder();
 

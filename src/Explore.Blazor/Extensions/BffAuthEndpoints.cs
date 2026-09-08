@@ -1056,12 +1056,26 @@ public static class BffAuthEndpoints
                 "[AuthEndpoints] /auth/providers — returning {Count} ready provider(s)",
                 providers.Count);
 
+            IDictionary<string, HalLink>? lifecycleLinks = null;
+            try
+            {
+                var discovery = await ctx.RequestServices.GetRequiredService<IInstanceOnboardingClient>()
+                    .GetInstanceOnboardingAuthProviderConfigurationAsync(cancellationToken: ctx.RequestAborted);
+                lifecycleLinks = discovery?._links;
+            }
+            catch (Exception exception) when (exception is ApiException or HttpRequestException
+                || exception is OperationCanceledException && !ctx.RequestAborted.IsCancellationRequested)
+            {
+                logger.LogWarning("Local lifecycle discovery is unavailable; no lifecycle actions are advertised.");
+            }
+            ctx.Response.Headers.CacheControl = "no-store, private";
             ctx.Response.ContentType = "application/json";
             await ctx.Response.WriteAsJsonAsync(new
             {
                 primaryProvider,
                 atprotoLoginEnabled,
-                providers
+                providers,
+                _links = lifecycleLinks
             });
         }
         catch (Exception ex)

@@ -59661,17 +59661,17 @@
             "content": {
               "text/plain; v=0.1": {
                 "schema": {
-                  "$ref": "#/components/schemas/AuthProviderConfigurationDto"
+                  "$ref": "#/components/schemas/HalResourceOfAuthProviderConfigurationDto"
                 }
               },
               "application/json; v=0.1": {
                 "schema": {
-                  "$ref": "#/components/schemas/AuthProviderConfigurationDto"
+                  "$ref": "#/components/schemas/HalResourceOfAuthProviderConfigurationDto"
                 }
               },
               "text/json; v=0.1": {
                 "schema": {
-                  "$ref": "#/components/schemas/AuthProviderConfigurationDto"
+                  "$ref": "#/components/schemas/HalResourceOfAuthProviderConfigurationDto"
                 }
               }
             }
@@ -62537,6 +62537,242 @@
         "x-rate-limit-policy": "Write"
       }
     },
+    "/api/auth/local/email-verifications": {
+      "post": {
+        "tags": [
+          "LocalEmailVerification"
+        ],
+        "summary": "Request Local email verification",
+        "description": "Requests current-address verification without revealing account eligibility. A proposed address requires a current ordinary Local session and cannot select another account.",
+        "operationId": "RequestLocalEmailVerification",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalEmailVerificationRequestDto"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalEmailVerificationRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-endpoint-class": "Public",
+        "x-rate-limit-policy": "public_transactional"
+      }
+    },
+    "/api/auth/local/email-verifications/consume": {
+      "post": {
+        "tags": [
+          "LocalEmailVerification"
+        ],
+        "summary": "Confirm Local email",
+        "description": "Consumes an exact verification or email-change operation and synchronizes its linked profile. Does not sign in or issue session credentials.",
+        "operationId": "ConfirmLocalEmail",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalEmailConfirmationRequestDto"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalEmailConfirmationRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-endpoint-class": "Public",
+        "x-rate-limit-policy": "public_transactional"
+      }
+    },
     "/api/instance/local-identities": {
       "get": {
         "tags": [
@@ -63725,6 +63961,370 @@
           }
         },
         "x-endpoint-class": "Authenticated"
+      }
+    },
+    "/api/auth/local/password": {
+      "post": {
+        "tags": [
+          "LocalPassword"
+        ],
+        "summary": "Change Local password",
+        "description": "Requires an ordinary current Local session and current password. Does not use email delivery or first-use replacement authority; success requires a fresh login.",
+        "operationId": "ChangeLocalPassword",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalPasswordChangeRequestDto"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalPasswordChangeRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-endpoint-class": "Authenticated",
+        "x-rate-limit-policy": "Write"
+      }
+    },
+    "/api/auth/local/password-recoveries": {
+      "post": {
+        "tags": [
+          "LocalPasswordRecovery"
+        ],
+        "summary": "Request Local password recovery",
+        "description": "Accepts recovery requests uniformly for missing, non-Local, and ineligible targets. Delivery requires a verified address and ready Local credential binding.",
+        "operationId": "RequestLocalPasswordRecovery",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalPasswordRecoveryRequestDto"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalPasswordRecoveryRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-endpoint-class": "Public",
+        "x-rate-limit-policy": "public_transactional"
+      }
+    },
+    "/api/auth/local/password-recoveries/consume": {
+      "post": {
+        "tags": [
+          "LocalPasswordRecovery"
+        ],
+        "summary": "Complete Local password recovery",
+        "description": "Consumes only the specified recovery operation. Completion requires a fresh ordinary login and never returns session credentials.",
+        "operationId": "CompleteLocalPasswordRecovery",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalPasswordRecoveryCompletionRequestDto"
+              }
+            },
+            "application/*+json; v=0.1": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalPasswordRecoveryCompletionRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-endpoint-class": "Public",
+        "x-rate-limit-policy": "public_transactional"
       }
     },
     "/api/location": {
@@ -130247,6 +130847,101 @@
           }
         }
       },
+      "HalResourceOfAuthProviderConfigurationDto": {
+        "type": "object",
+        "properties": {
+          "primaryProviderId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "primaryProviderCode": {
+            "type": "string"
+          },
+          "primaryProviderName": {
+            "type": "string"
+          },
+          "lockPrimaryProvider": {
+            "type": "boolean"
+          },
+          "keycloakAuthority": {
+            "type": "string"
+          },
+          "keycloakClientId": {
+            "type": "string"
+          },
+          "keycloakClientSecret": {
+            "type": "string"
+          },
+          "keycloakDetectedFromEnvironment": {
+            "type": "boolean"
+          },
+          "keycloakClientSecretOwnership": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              },
+              "badge": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "editable": {
+                "type": "boolean"
+              },
+              "configured": {
+                "type": "boolean"
+              },
+              "bootstrapAvailable": {
+                "type": "boolean"
+              }
+            }
+          },
+          "atprotoLoginEnabled": {
+            "type": "boolean"
+          },
+          "atprotoPublicUrl": {
+            "type": "string"
+          },
+          "googleSsoEnabled": {
+            "type": "boolean"
+          },
+          "googleClientId": {
+            "type": "string"
+          },
+          "googleClientSecret": {
+            "type": "string"
+          },
+          "lockAtprotoLoginEnabled": {
+            "type": "boolean"
+          },
+          "lockGoogleSsoEnabled": {
+            "type": "boolean"
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
       "HalResourceOfCategoryDto": {
         "required": [
           "masterCode",
@@ -150514,6 +151209,74 @@
         ],
         "type": "string"
       },
+      "LocalEmailConfirmationRequestDto": {
+        "required": [
+          "operationId",
+          "localSubjectId",
+          "personalActorId",
+          "externalLoginId",
+          "purpose",
+          "generation",
+          "token"
+        ],
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "localSubjectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "personalActorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "externalLoginId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "purpose": {
+            "$ref": "#/components/schemas/LocalIdentityLifecyclePurpose"
+          },
+          "generation": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "token": {
+            "maxLength": 8192,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "LocalEmailVerificationRequestDto": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "proposedEmail": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "LocalIdentityLifecyclePurpose": {
+        "type": "integer"
+      },
       "LocalIdentitySummary": {
         "required": [
           "localSubjectId",
@@ -150710,6 +151473,89 @@
             ]
           }
         }
+      },
+      "LocalPasswordChangeRequestDto": {
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ],
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "newPassword": {
+            "maxLength": 128,
+            "minLength": 12,
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "LocalPasswordRecoveryCompletionRequestDto": {
+        "required": [
+          "operationId",
+          "localSubjectId",
+          "personalActorId",
+          "externalLoginId",
+          "purpose",
+          "generation",
+          "token",
+          "newPassword"
+        ],
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "localSubjectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "personalActorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "externalLoginId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "purpose": {
+            "$ref": "#/components/schemas/LocalIdentityLifecyclePurpose"
+          },
+          "generation": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "token": {
+            "maxLength": 8192,
+            "minLength": 1,
+            "type": "string"
+          },
+          "newPassword": {
+            "maxLength": 128,
+            "minLength": 12,
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "LocalPasswordRecoveryRequestDto": {
+        "required": [
+          "identifier"
+        ],
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
       },
       "LocationAddressSourceEnum": {
         "enum": [
@@ -176324,10 +177170,19 @@
       "name": "LocalCredentialReplacement"
     },
     {
+      "name": "LocalEmailVerification"
+    },
+    {
       "name": "LocalIdentityAdministration"
     },
     {
       "name": "LocalizationAdmin"
+    },
+    {
+      "name": "LocalPassword"
+    },
+    {
+      "name": "LocalPasswordRecovery"
     },
     {
       "name": "Location"

@@ -5,6 +5,7 @@ using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Admissions;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Contracts.Services;
@@ -18,6 +19,7 @@ using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 using Explore.Infrastructure.Services.Registration;
 using Explore.Persistence;
+using Explore.Persistence.QueryFilters;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -72,9 +74,11 @@ public sealed partial class AnonymousCancellationConcurrencyTests
     }
 
     [Test]
-    [Arguments(false)]
-    [Arguments(true)]
-    public async Task AnyAttendanceIncludingUndoDeniesWithoutWrites(bool undo)
+    [Arguments(false, false)]
+    [Arguments(true, false)]
+    [Arguments(false, true)]
+    [Arguments(true, true)]
+    public async Task AnyAttendanceIncludingUndoDeniesWithoutWrites(bool undo, bool deletedAssignment)
     {
         var clock = new Clock();
         await using var fixture = await CreateAsync(clock);
@@ -88,12 +92,77 @@ public sealed partial class AnonymousCancellationConcurrencyTests
             await Assert.That(reversed?.Event).IsNotNull();
             await Assert.That((await fixture.Context.AdmissionCheckInStates.AsNoTracking().SingleAsync()).ActiveCheckInEventId).IsNull();
         }
+        if (deletedAssignment)
+        {
+            await fixture.Context.RegistrationTicketAssignments.ExecuteUpdateAsync(setters =>
+                setters.SetProperty(value => EF.Property<bool>(value, "IsDeleted"), true));
+            await Assert.That(await fixture.Context.RegistrationTicketAssignments.AnyAsync()).IsFalse();
+            await Assert.That(await fixture.Context.RegistrationTicketAssignments.IncludeDeleted().CountAsync()).IsEqualTo(1);
+        }
         var before = await fixture.Context.RegistrationOrders.AsNoTracking().SingleAsync();
         await Assert.That(await EligibleAsync(fixture, command)).IsEqualTo(false);
         var denied = await CancelAsync(fixture, command);
         await Assert.That(denied.FailureCode).IsEqualTo("guest_registration_cancellation_ineligible");
         await Assert.That((await fixture.Context.RegistrationOrders.AsNoTracking().SingleAsync()).ConcurrencyStamp).IsEqualTo(before.ConcurrencyStamp);
         await Assert.That((await fixture.Context.RegistrationInventoryHolds.AsNoTracking().SingleAsync()).IsCapacityAllocated).IsTrue();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task DeletedHoldLineageCannotAuthorizeCancellationOrCompletedReplay(bool cancelled)
+    {
+        var clock = new Clock();
+        await using var fixture = await CreateAsync(clock);
+        var command = await ConfirmAsync(fixture, clock);
+        if (cancelled)
+            await Assert.That((await CancelAsync(fixture, command)).IsSuccess).IsTrue();
+        await fixture.Context.RegistrationInventoryHolds.ExecuteUpdateAsync(setters =>
+            setters.SetProperty(value => value.IsDeleted, true));
+        var order = await fixture.Context.RegistrationOrders.AsNoTracking().SingleAsync();
+        var hold = await fixture.Context.RegistrationInventoryHolds.IncludeDeleted().AsNoTracking().SingleAsync();
+        await Assert.That(await fixture.Context.RegistrationInventoryHolds.AnyAsync()).IsFalse();
+
+        await Assert.That(await EligibleAsync(fixture, command)).IsEqualTo(false);
+        await Assert.That((await CancelAsync(fixture, command)).FailureCode)
+            .IsEqualTo("guest_registration_cancellation_ineligible");
+        await Assert.That((await fixture.Context.RegistrationOrders.AsNoTracking().SingleAsync()).ConcurrencyStamp)
+            .IsEqualTo(order.ConcurrencyStamp);
+        var retained = await fixture.Context.RegistrationInventoryHolds.IncludeDeleted().AsNoTracking().SingleAsync();
+        await Assert.That(retained.ConcurrencyStamp).IsEqualTo(hold.ConcurrencyStamp);
+        await Assert.That(retained.ConsumedAt).IsEqualTo(hold.ConsumedAt);
+        await Assert.That(retained.ReleasedAt).IsEqualTo(hold.ReleasedAt);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task MissingOrWrongAmbientTenantCannotUseExactGuestAuthority(bool missing)
+    {
+        var clock = new Clock();
+        await using var fixture = await CreateAsync(clock);
+        var command = await ConfirmAsync(fixture, clock);
+        await IssueAsync(fixture, command);
+        var order = await fixture.Context.RegistrationOrders.AsNoTracking().SingleAsync();
+        var hold = await fixture.Context.RegistrationInventoryHolds.AsNoTracking().SingleAsync();
+        await using var scope = fixture.CreateScope();
+        var services = scope.ServiceProvider;
+        var foreignTenant = Substitute.For<ITenantContext>();
+        foreignTenant.TenantId.Returns(Guid.CreateVersion7());
+        services.GetRequiredService<ExploreDbContext>().TenantContext = missing ? null : foreignTenant;
+
+        // Even a valid proof and exact explicit tenant predicate cannot replace ambient isolation.
+        await Assert.That(await services.GetRequiredService<IRequestHandler<GetGuestRegistrationCancellationEligibilityQuery, bool?>>()
+            .Handle(new(command.EventId, command.OrderId, command.CapabilityToken), CancellationToken.None)).IsNull();
+        var denied = await services.GetRequiredService<IRequestHandler<CancelConfirmedGuestRegistrationCommand, BaseCommandResponse<Guid>>>()
+            .Handle(command, CancellationToken.None);
+        await Assert.That(denied.FailureCode).IsEqualTo("registration_order_not_found");
+        await Assert.That((await fixture.Context.RegistrationOrders.AsNoTracking().SingleAsync()).ConcurrencyStamp)
+            .IsEqualTo(order.ConcurrencyStamp);
+        await Assert.That((await fixture.Context.RegistrationInventoryHolds.AsNoTracking().SingleAsync()).ConcurrencyStamp)
+            .IsEqualTo(hold.ConcurrencyStamp);
+        await Assert.That(await fixture.Context.AdmissionTicketCredentials.AnyAsync(value =>
+            value.AdmissionTicketCredentialStatusId == (int)AdmissionTicketCredentialStatusEnum.Active)).IsTrue();
     }
 
     [Test]

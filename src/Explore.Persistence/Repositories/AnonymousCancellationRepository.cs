@@ -7,6 +7,7 @@ using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;
 using Explore.Persistence.Database;
+using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
@@ -31,10 +32,10 @@ public sealed class AnonymousCancellationRepository(
             .SingleAsync(value => value.TenantId == tenantId && value.EventId == eventId && value.Id == orderId, cancellationToken);
 
         // No active-only credential/ticket predicate: terminal and transferred lineage can retain attendance.
-        var lineage = await dbContext.AdmissionTickets.IgnoreQueryFilters().AsNoTracking()
+        var lineage = await dbContext.AdmissionTickets.AsNoTracking()
             .Where(ticket => ticket.TenantId == tenantId && ticket.RegistrationOrderId == orderId)
             .Select(ticket => new { ticket.Id, ticket.RegistrationTicketAssignmentId }).ToArrayAsync(cancellationToken);
-        Guid[] assignments = await dbContext.RegistrationTicketAssignments.IgnoreQueryFilters().AsNoTracking()
+        Guid[] assignments = await dbContext.RegistrationTicketAssignments.IncludeDeleted().AsNoTracking()
             .Where(value => value.TenantId == tenantId && value.RegistrationOrderId == orderId)
             .Select(value => value.Id).ToArrayAsync(cancellationToken);
         foreach (Guid assignmentId in assignments.Concat(lineage.Select(value => value.RegistrationTicketAssignmentId)).Distinct().Order())
@@ -46,14 +47,14 @@ public sealed class AnonymousCancellationRepository(
                 dbContext, tenantId, ticket => ticket.Id, ticketId, cancellationToken);
 
         // Event targets include currently empty scopes. Ticket fences exclude first-ever check-in too.
-        Guid[] targetIds = await dbContext.AdmissionTargets.IgnoreQueryFilters().AsNoTracking()
+        Guid[] targetIds = await dbContext.AdmissionTargets.AsNoTracking()
             .Where(target => target.TenantId == tenantId && target.EventId == eventId)
             .Select(target => target.Id).ToArrayAsync(cancellationToken);
         foreach (Guid targetId in targetIds.Order())
             await RelationalEntityRowFence.AcquireAsync<AdmissionTarget>(
                 dbContext, tenantId, target => target.Id, targetId, cancellationToken);
 
-        var tickets = await dbContext.AdmissionTickets.IgnoreQueryFilters().Include(ticket => ticket.Credentials)
+        var tickets = await dbContext.AdmissionTickets.Include(ticket => ticket.Credentials)
             .Where(ticket => ticket.TenantId == tenantId && ticket.RegistrationOrderId == orderId)
             .OrderBy(ticket => ticket.Id).ToArrayAsync(cancellationToken);
         foreach (var ticket in tickets)
@@ -65,20 +66,20 @@ public sealed class AnonymousCancellationRepository(
         if (!tickets.Select(ticket => ticket.Id).SequenceEqual(ticketIds))
             throw new InvalidOperationException("Order ticket lineage changed while issuance was fenced.");
 
-        bool attended = await dbContext.AdmissionCheckInStates.IgnoreQueryFilters().AsNoTracking()
+        bool attended = await dbContext.AdmissionCheckInStates.AsNoTracking()
             .AnyAsync(state => state.TenantId == tenantId && ticketIds.Contains(state.AdmissionTicketId) &&
                 (state.EntryCount > 0 || state.ActiveCheckInEventId != null || state.LastSequence > 0), cancellationToken) ||
-            await dbContext.AdmissionCheckInEvents.IgnoreQueryFilters().AsNoTracking()
+            await dbContext.AdmissionCheckInEvents.AsNoTracking()
                 .AnyAsync(fact => fact.TenantId == tenantId && ticketIds.Contains(fact.AdmissionTicketId), cancellationToken);
         var evidence = new AnonymousCancellationEvidence(
-            await dbContext.PaidOrderAcceptanceSnapshots.IgnoreQueryFilters().AsNoTracking()
+            await dbContext.PaidOrderAcceptanceSnapshots.AsNoTracking()
                 .AnyAsync(value => value.TenantId == tenantId && value.RegistrationOrderId == orderId, cancellationToken),
-            await dbContext.PaymentAttempts.IgnoreQueryFilters().AsNoTracking()
+            await dbContext.PaymentAttempts.AsNoTracking()
                 .AnyAsync(value => value.TenantId == tenantId && value.RegistrationOrderId == orderId, cancellationToken),
-            await dbContext.PaymentSucceededObservations.IgnoreQueryFilters().AsNoTracking()
+            await dbContext.PaymentSucceededObservations.AsNoTracking()
                 .AnyAsync(value => value.TenantId == tenantId && value.RegistrationOrderId == orderId, cancellationToken),
             attended);
-        var holds = await dbContext.RegistrationInventoryHolds.IgnoreQueryFilters().AsNoTracking()
+        var holds = await dbContext.RegistrationInventoryHolds.IncludeDeleted().AsNoTracking()
             .Where(hold => hold.TenantId == tenantId && hold.RegistrationOrderId == orderId)
             .OrderBy(hold => hold.Id).ToArrayAsync(cancellationToken);
         return new(order, evidence, tickets, holds);

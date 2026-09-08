@@ -192,11 +192,26 @@ stable hash so generated MariaDB and MySQL names remain distinct.
 
 The approved primitive set includes transaction/session named locks, row
 fences, skip-locked queue claims, projection locks, provider database clocks,
-and configurable-schema migration generators. Adding another exception
+exact-instant directory query translation, and configurable-schema migration
+generators. `EventDirectoryTemporalQuery` registers SQLite's instant collation
+on each query's actual connection and keeps offset-aware, 100ns comparisons
+inside SQL, including count and paging. The repository still selects the
+temporal view and clock sample through its Application specification.
+Adding another exception
 requires a demonstrated EF capability gap, a parameterized implementation,
 real-engine tests for every affected provider, an architecture allowlist, and
 operator documentation. Ordinary repository branching or raw SQL is not an
 exception path.
+
+`GuestRegistrationCapabilityRepository` owns exact guest-order recovery reads,
+order fencing, and monotonic status-promise CAS, returning Domain entities to
+Application-owned proof and deadline checks. It neither allocates inventory
+nor starts or commits a transaction: the caller retains the serializable
+transaction and the order-before-event-before-assignment/ticket/target/pool
+fence protocol. Cancellation keeps Tenant filtering on all evidence reads;
+only historical assignment and hold reads use `IncludeDeleted()`. Cross-scope
+visitor-policy safety reads use the two dedicated `TenantFilterBypassReasons`
+entries, preserving their canonical-key and affected-event predicates.
 
 Application and Data Protection migrations have independent generated
 histories for all five providers. Retained privacy-erasure authority has its

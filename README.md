@@ -291,10 +291,6 @@ I am deeply grateful to all our amazing contributors.
 
 [![Contributors Image][contributors-image]][contributors-link]
 
-## 📊📈 Repo Stats
-
-![Repo Stats][repobeats-image]
-
 ## 💖 Sponsors
 
 Support ISLAMU Event's ongoing development, infrastructure, and open-source mission by becoming a financial sponsor.

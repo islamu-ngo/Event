@@ -30,6 +30,7 @@ using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -228,14 +229,14 @@ public sealed class LocalBootstrapConvergenceTests
         await using Fixture fixture = await Fixture.CreateAsync(IdentityDatabaseTopology.External);
         await using var scope = fixture.Provider.CreateAsyncScope();
         var application = fixture.Application(scope);
-        var settings = new SystemSettingRepository(application,
-            new RelationalSettingMutationLock(application, new EfCoreUnitOfWork(application)));
-        await settings.UpsertAsync(new SystemSetting
-        {
-            SettingKey = GovernanceSettingKeys.Authentication.PrimaryProviderId,
-            Value = JsonSerializer.Serialize((int)AuthenticationProviderKind.Keycloak),
-            ValueType = SettingValueType.Integer, CreatedAt = DateTime.UtcNow
-        }, fixture.Token);
+        var unitOfWork = new EfCoreUnitOfWork(application);
+        IVisitorAccessSettingsWriter settings = new VisitorAccessSettingsWriter(application,
+            new RelationalSettingMutationLock(application, unitOfWork), unitOfWork,
+            new EventParticipationConfigurationRepository(application), fixture.Configuration);
+        (await settings.ApplyAsync(
+            [new(null, GovernanceSettingKeys.Authentication.PrimaryProviderId,
+                VisitorAccessSettingMutationKind.SetValue, JsonSerializer.Serialize((int)AuthenticationProviderKind.Keycloak))],
+            actorUserId: null, fixture.Token)).EnsureAccepted();
         if (configured)
         {
             await fixture.PrepareAsync();

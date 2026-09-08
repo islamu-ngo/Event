@@ -11,9 +11,13 @@ public sealed class LocalIdentityAdministrationService(
     ILocalIdentityAdministrationClient client,
     IControlPlaneOverviewService overviewService)
 {
+    // This concrete facade retains dependencies only, never per-call authority or handover state.
+    private readonly ILocalIdentityAdministrationClient _client = client;
+    private readonly IControlPlaneOverviewService _overviewService = overviewService;
+
     public Task<HalResourceOfControlPlaneOverviewDto> GetCapabilitiesAsync(
         CancellationToken cancellationToken = default)
-        => overviewService.GetOverviewAsync(cancellationToken: cancellationToken);
+        => _overviewService.GetOverviewAsync(cancellationToken: cancellationToken);
 
     public async Task<HalCollectionResourceOfLocalIdentitySummary> GetIdentitiesAsync(
         int pageNumber = 1, int pageSize = 20, CancellationToken cancellationToken = default)
@@ -27,7 +31,7 @@ public sealed class LocalIdentityAdministrationService(
             throw new ArgumentOutOfRangeException(nameof(pageNumber));
         }
         await RequireDiscoveryAsync(cancellationToken);
-        return await client.ListLocalIdentitiesAsync(
+        return await _client.ListLocalIdentitiesAsync(
             pageNumber: pageNumber, pageSize: pageSize, cancellationToken: cancellationToken);
     }
 
@@ -49,7 +53,7 @@ public sealed class LocalIdentityAdministrationService(
             FirstName = request.FirstName, LastName = request.LastName
         };
         await RequireDiscoveryAsync(cancellationToken);
-        HalResourceOfLocalCredentialIssueDto result = await client.CreateLocalIdentityAsync(
+        HalResourceOfLocalCredentialIssueDto result = await _client.CreateLocalIdentityAsync(
             body: intent, cancellationToken: cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         ValidateIssue(result: result, operationId: intent.OperationId, localSubjectId: null);
@@ -82,7 +86,7 @@ public sealed class LocalIdentityAdministrationService(
             Reason = request.Reason
         };
         await RequireDiscoveryAsync(cancellationToken);
-        HalResourceOfLocalCredentialIssueDto result = await client.ResetLocalCredentialAsync(
+        HalResourceOfLocalCredentialIssueDto result = await _client.ResetLocalCredentialAsync(
             userId: subjectId, body: intent, cancellationToken: cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         ValidateIssue(result: result, operationId: intent.OperationId, localSubjectId: subjectId);
@@ -95,7 +99,7 @@ public sealed class LocalIdentityAdministrationService(
         if (operationId == Guid.Empty)
             throw new ArgumentException("An operation identifier is required.", nameof(operationId));
         await RequireDiscoveryAsync(cancellationToken);
-        HalResourceOfLocalCredentialOperationStatus result = await client.GetLocalCredentialOperationAsync(
+        HalResourceOfLocalCredentialOperationStatus result = await _client.GetLocalCredentialOperationAsync(
             operationId: operationId, cancellationToken: cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (result.Receipt?.OperationId != operationId)
@@ -115,7 +119,7 @@ public sealed class LocalIdentityAdministrationService(
             throw new InvalidOperationException("Local credential reconciliation is unavailable.");
         }
         await RequireDiscoveryAsync(cancellationToken);
-        HalResourceOfLocalCredentialOperationStatus result = await client.ReconcileLocalCredentialOperationAsync(
+        HalResourceOfLocalCredentialOperationStatus result = await _client.ReconcileLocalCredentialOperationAsync(
             operationId: operationId, cancellationToken: cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (result.Receipt?.OperationId != operationId)

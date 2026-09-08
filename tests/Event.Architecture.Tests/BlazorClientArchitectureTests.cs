@@ -1,7 +1,15 @@
 // ABOUTME: Architecture fitness functions for Blazor (Explore.Blazor host + Explore.Blazor.Client WASM).
-// ABOUTME: File-scanning tests — the arch project does not reference Blazor assemblies, so patterns are string-matched.
+// Component injection uses compiled metadata; placement rules inspect handwritten source.
 
+using System.Reflection;
 using System.Text.RegularExpressions;
+using Explore.Blazor.Client.Clients;
+using Explore.Blazor.Client.Contracts.Services.ControlPlane;
+using Explore.Blazor.Client.Extensions;
+using Explore.Blazor.Client.Pages.Admin.Instance.Components;
+using Explore.Blazor.Client.Services.ControlPlane;
+using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.Architecture.Tests;
 
@@ -97,15 +105,15 @@ public class BlazorClientArchitectureTests
     // Framework-concrete types that are intentionally injected without an interface.
     // --------------------------------------------------------------------------------------------
 
-    private static readonly HashSet<string> FrameworkAllowedConcreteInjects = new(StringComparer.Ordinal)
-    {
-        "NavigationManager",
-        "PersistentComponentState",
-        "AuthenticationStateProvider",
-        "HttpClient",
-        "TimeProvider",
-        "IHttpClientFactory", // already interface but listed to be explicit
-    };
+    private static readonly HashSet<Type> FrameworkAllowedConcreteInjects =
+    [
+        typeof(NavigationManager),
+        typeof(PersistentComponentState),
+        typeof(Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider),
+        typeof(HttpClient),
+        typeof(TimeProvider),
+        typeof(IHttpClientFactory),
+    ];
 
     // --------------------------------------------------------------------------------------------
     // Method-name prefixes recognised as event handlers (allowed for `async void`).
@@ -265,98 +273,202 @@ public class BlazorClientArchitectureTests
     }
 
     // ============================================================================================
-    // RULE 1.4 — All [Inject] services must be interfaces (framework concrete types + state
-    // containers excepted). State containers (POCOs ending in State / StateService /
-    // StateContainer) are a deliberate MVU-style pattern and are allowed without an interface.
+    // RULE 1.4 — Interface injection is the default, with framework/state/interop patterns
+    // and the exact scoped, stateless Local administration facade contract documented in BLAZOR.md.
+    // Compiled identities prevent same-name types or additional consumers inheriting its permission.
     // ============================================================================================
 
     [Test]
     public async Task Rule_1_04_Components_MustInject_InterfacesOnly()
     {
-        if (BlazorClientRoot is null)
-        {
-            await Assert.That(true).IsTrue().Because("Blazor.Client source not found — skipping");
-            return;
-        }
-
-        var violations = new List<string>();
-
-        foreach (var file in EnumerateRazorAndCsFiles(BlazorClientRoot))
-        {
-            var relative = NormalisePath(Path.GetRelativePath(BlazorClientRoot, file));
-            if (relative.StartsWith("Services/", StringComparison.OrdinalIgnoreCase)) continue;
-
-            var lines = await File.ReadAllLinesAsync(file);
-            var isRazor = file.EndsWith(".razor", StringComparison.OrdinalIgnoreCase);
-
-            for (var i = 0; i < lines.Length; i++)
-            {
-                var line = lines[i];
-                string? injectedType = null;
-
-                if (isRazor)
-                {
-                    // `@inject TypeName PropertyName` — single-line directive.
-                    var match = Regex.Match(line, @"^\s*@inject\s+(?<type>[A-Za-z_][A-Za-z0-9_<>.,\s]*?)\s+[A-Za-z_][A-Za-z0-9_]*\s*$");
-                    if (match.Success) injectedType = match.Groups["type"].Value.Trim();
-                }
-                else
-                {
-                    // `[Inject]` attribute followed by a property/field declaration on the next
-                    // non-blank / non-comment / non-attribute line. Supports both single-line
-                    // `[Inject] protected IFoo Foo { get; set; }` and canonical two-line form.
-                    if (!Regex.IsMatch(line, @"^\s*\[\s*Inject(?:\s*\([^)]*\))?\s*\](?:\s*$|\s+)")) continue;
-
-                    // If same-line declaration.
-                    var inline = Regex.Match(line, @"\]\s*(?:public|private|protected|internal|required|static|readonly|\s)+\s*(?<type>[A-Za-z_][A-Za-z0-9_<>.,\s]*?)\s+[A-Za-z_][A-Za-z0-9_]*\s*(?:\{|;|=)");
-                    if (inline.Success)
-                    {
-                        injectedType = inline.Groups["type"].Value.Trim();
-                    }
-                    else
-                    {
-                        // Walk forward for the first meaningful line.
-                        for (var j = i + 1; j < lines.Length; j++)
-                        {
-                            var next = lines[j].Trim();
-                            if (next.Length == 0) continue;
-                            if (next.StartsWith("//", StringComparison.Ordinal)) continue;
-                            if (next.StartsWith("/*", StringComparison.Ordinal)) continue;
-                            if (next.StartsWith('[')) continue;
-
-                            var nextMatch = Regex.Match(next, @"^(?:public|private|protected|internal|required|static|readonly|\s)+\s*(?<type>[A-Za-z_][A-Za-z0-9_<>.,]*)\s+[A-Za-z_][A-Za-z0-9_]*\s*(?:\{|;|=)");
-                            if (nextMatch.Success) injectedType = nextMatch.Groups["type"].Value.Trim();
-                            break;
-                        }
-                    }
-                }
-
-                if (string.IsNullOrEmpty(injectedType)) continue;
-
-                // Strip generics (ILogger<X> → ILogger) and the namespace prefix so that
-                // `Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider`
-                // normalises to `AuthenticationStateProvider`.
-                var root = StripGenerics(injectedType).Trim();
-                var dotIdx = root.LastIndexOf('.');
-                if (dotIdx >= 0) root = root[(dotIdx + 1)..];
-                if (string.IsNullOrEmpty(root)) continue;
-
-                if (IsInterfaceName(root)) continue;
-                if (FrameworkAllowedConcreteInjects.Contains(root)) continue;
-                // State-container pattern: POCOs ending in State / StateService / StateContainer
-                // are a deliberate MVU-style state holder and are allowed without an interface.
-                if (root.EndsWith("State", StringComparison.Ordinal)
-                    || root.EndsWith("StateService", StringComparison.Ordinal)
-                    || root.EndsWith("StateContainer", StringComparison.Ordinal)) continue;
-                // Interop wrappers (browser/JS interop) are allowed without an interface.
-                if (root.EndsWith("Interop", StringComparison.Ordinal)) continue;
-
-                violations.Add($"{relative}:{i + 1}: {root}");
-            }
-        }
+        var violations = GetComponentInjections(typeof(LocalAccountsSection).Assembly.GetTypes())
+            .Where(injection => !IsAllowedComponentInjection(injection.Consumer, injection.Property.PropertyType))
+            .Select(injection => $"{injection.Consumer.FullName}.{injection.Property.Name}: {injection.Property.PropertyType.FullName}")
+            .ToArray();
 
         await Assert.That(violations).IsEmpty()
-            .Because($"Components must inject interfaces (I-prefixed), framework types, or state containers. Violations: {string.Join("; ", violations)}");
+            .Because($"Components must inject interfaces or a documented bounded concrete contract. Violations: {string.Join("; ", violations)}");
+    }
+
+    [Test]
+    public async Task Rule_1_04_LocalAdministrationFacade_HasExactlyTheApprovedConsumers()
+    {
+        var consumers = GetComponentInjections(typeof(LocalAccountsSection).Assembly.GetTypes())
+            .Where(injection => injection.Property.PropertyType == typeof(LocalIdentityAdministrationService))
+            .Select(injection => injection.Consumer)
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
+            .ToArray();
+
+        await Assert.That(consumers.SequenceEqual(new[]
+        {
+            typeof(InstanceAdminSettingsLayout), typeof(LocalAccountsSection)
+        })).IsTrue();
+    }
+
+    [Test]
+    public async Task Rule_1_04_LocalAdministrationFacade_MustBeScopedAndDependencyOnly()
+    {
+        var services = new ServiceCollection();
+        services.AddSharedApplicationServices();
+
+        await Assert.That(HasScopedLocalAdministrationRegistration(services)).IsTrue();
+        await Assert.That(HasDependencyOnlyFacadeShape(typeof(LocalIdentityAdministrationService))).IsTrue()
+            .Because("Only two private readonly dependency fields may survive a call; no credential, response, task, delegate or cache state is permitted.");
+    }
+
+    [Test]
+    public async Task Rule_1_04_ConcreteInjectionGuard_RejectsUnapprovedAndImpersonatedConsumersAndServices()
+    {
+        await Assert.That(IsAllowedComponentInjection(typeof(LocalAccountsSection), typeof(LocalIdentityAdministrationService))).IsTrue();
+        await Assert.That(IsAllowedComponentInjection(typeof(InstanceAdminSettingsLayout), typeof(LocalIdentityAdministrationService))).IsTrue();
+        await Assert.That(IsAllowedComponentInjection(typeof(LocalAccountsSection), typeof(DependencyOnlyFacadeProbe))).IsFalse();
+        await Assert.That(IsAllowedComponentInjection(typeof(LocalAccountsSection), typeof(Impostor.LocalIdentityAdministrationService))).IsFalse();
+        await Assert.That(IsAllowedComponentInjection(typeof(Impostor.LocalAccountsSection), typeof(LocalIdentityAdministrationService))).IsFalse();
+
+        var injected = GetComponentInjections(new[] { typeof(UnapprovedConsumer), typeof(InheritedConsumer) })
+            .Where(injection => !IsAllowedComponentInjection(injection.Consumer, injection.Property.PropertyType))
+            .ToArray();
+        await Assert.That(injected.Length).IsEqualTo(2);
+        await Assert.That(injected.All(injection => injection.Property.PropertyType == typeof(LocalIdentityAdministrationService))).IsTrue();
+    }
+
+    [Test]
+    public async Task Rule_1_04_FacadeLifetimeGuard_RejectsWrongLifetimeFactoriesKeysAndDuplicates()
+    {
+        await Assert.That(HasScopedLocalAdministrationRegistration(new ServiceCollection())).IsFalse();
+        foreach (var lifetime in new[] { ServiceLifetime.Singleton, ServiceLifetime.Transient })
+        {
+            IServiceCollection services = new ServiceCollection();
+            services.AddSharedApplicationServices();
+            var registration = services.Single(descriptor => descriptor.ServiceType == typeof(LocalIdentityAdministrationService));
+            services.Remove(registration);
+            services.Add(ServiceDescriptor.Describe(typeof(LocalIdentityAdministrationService), typeof(LocalIdentityAdministrationService), lifetime));
+            await Assert.That(HasScopedLocalAdministrationRegistration(services)).IsFalse();
+        }
+
+        var duplicate = new ServiceCollection();
+        duplicate.AddSharedApplicationServices();
+        duplicate.AddScoped<LocalIdentityAdministrationService>();
+        await Assert.That(HasScopedLocalAdministrationRegistration(duplicate)).IsFalse();
+
+        var factory = new ServiceCollection();
+        factory.AddScoped<LocalIdentityAdministrationService>(_ => throw new InvalidOperationException("Probe factory must not execute."));
+        await Assert.That(HasScopedLocalAdministrationRegistration(factory)).IsFalse();
+
+        var keyed = new ServiceCollection();
+        keyed.AddKeyedScoped<LocalIdentityAdministrationService>("probe");
+        await Assert.That(HasScopedLocalAdministrationRegistration(keyed)).IsFalse();
+    }
+
+    [Test]
+    public async Task Rule_1_04_FacadeStateGuard_RejectsCredentialResponseTaskAndStaticRetention()
+    {
+        await Assert.That(HasDependencyOnlyFacadeShape(typeof(DependencyOnlyFacadeProbe))).IsTrue();
+        foreach (var retainedType in new[]
+        {
+            typeof(string), typeof(object), typeof(HalResourceOfLocalCredentialIssueDto),
+            typeof(Task<HalResourceOfLocalCredentialIssueDto>), typeof(Action), typeof(Dictionary<Guid, string>)
+        })
+        {
+            await Assert.That(HasDependencyOnlyFacadeShape(typeof(RetainingFacadeProbe<>).MakeGenericType(retainedType))).IsFalse();
+            await Assert.That(HasDependencyOnlyFacadeShape(typeof(StaticRetainingFacadeProbe<>).MakeGenericType(retainedType))).IsFalse();
+        }
+        await Assert.That(HasDependencyOnlyFacadeShape(typeof(MutableDependencyFacadeProbe))).IsFalse();
+        await Assert.That(HasDependencyOnlyFacadeShape(typeof(InheritedFacadeProbe))).IsFalse();
+    }
+
+    private static IEnumerable<(Type Consumer, PropertyInfo Property)> GetComponentInjections(IEnumerable<Type> types)
+    {
+        foreach (var consumer in types.Where(type => type.IsClass && typeof(IComponent).IsAssignableFrom(type)))
+        {
+            // Private base injection is inherited by the component even though GetProperties alone omits it.
+            for (Type? declaring = consumer; declaring is not null; declaring = declaring.BaseType)
+            {
+                foreach (var property in declaring.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
+                {
+                    if (property.IsDefined(typeof(InjectAttribute), inherit: false))
+                        yield return (consumer, property);
+                }
+            }
+        }
+    }
+
+    private static bool IsAllowedComponentInjection(Type consumer, Type service)
+    {
+        if (service == typeof(LocalIdentityAdministrationService))
+            return (consumer == typeof(LocalAccountsSection) || consumer == typeof(InstanceAdminSettingsLayout))
+                && HasDependencyOnlyFacadeShape(service);
+
+        if (service.IsInterface || FrameworkAllowedConcreteInjects.Contains(service)) return true;
+        string name = service.Name.Split('`')[0];
+        return name.EndsWith("State", StringComparison.Ordinal)
+            || name.EndsWith("StateService", StringComparison.Ordinal)
+            || name.EndsWith("StateContainer", StringComparison.Ordinal)
+            || name.EndsWith("Interop", StringComparison.Ordinal);
+    }
+
+    private static bool HasScopedLocalAdministrationRegistration(IServiceCollection services)
+    {
+        var registrations = services.Where(descriptor => descriptor.ServiceType == typeof(LocalIdentityAdministrationService)).ToArray();
+        return registrations.Length == 1
+            && !registrations[0].IsKeyedService
+            && registrations[0].Lifetime == ServiceLifetime.Scoped
+            && registrations[0].ImplementationType == typeof(LocalIdentityAdministrationService);
+    }
+
+    private static bool HasDependencyOnlyFacadeShape(Type facade)
+    {
+        var fields = facade.GetFields(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+        return facade.IsSealed && facade.BaseType == typeof(object)
+            && fields.Length == 2
+            && fields.All(field => field.IsPrivate && field.IsInitOnly && !field.IsStatic)
+            && fields.Count(field => field.FieldType == typeof(ILocalIdentityAdministrationClient)) == 1
+            && fields.Count(field => field.FieldType == typeof(IControlPlaneOverviewService)) == 1;
+    }
+
+    private class UnapprovedConsumer : ComponentBase
+    {
+        [Inject] private LocalIdentityAdministrationService Administration { get; set; } = default!;
+    }
+
+    private sealed class InheritedConsumer : UnapprovedConsumer;
+
+    private static class Impostor
+    {
+        internal sealed class LocalIdentityAdministrationService;
+        internal sealed class LocalAccountsSection : ComponentBase;
+    }
+
+    private sealed class DependencyOnlyFacadeProbe
+    {
+        public ILocalIdentityAdministrationClient Client { get; } = null!;
+        public IControlPlaneOverviewService Overview { get; } = null!;
+    }
+
+    private sealed class RetainingFacadeProbe<T>
+    {
+        public ILocalIdentityAdministrationClient Client { get; } = null!;
+        public IControlPlaneOverviewService Overview { get; } = null!;
+        public T? Retained { get; }
+    }
+
+    private sealed class StaticRetainingFacadeProbe<T>
+    {
+        public ILocalIdentityAdministrationClient Client { get; } = null!;
+        public IControlPlaneOverviewService Overview { get; } = null!;
+        public static T? Retained { get; set; }
+    }
+
+    private sealed class MutableDependencyFacadeProbe
+    {
+        public ILocalIdentityAdministrationClient Client { get; set; } = null!;
+        public IControlPlaneOverviewService Overview { get; } = null!;
+    }
+
+    private sealed class InheritedFacadeProbe : UnapprovedConsumer
+    {
+        public ILocalIdentityAdministrationClient Client { get; } = null!;
+        public IControlPlaneOverviewService Overview { get; } = null!;
     }
 
     // ============================================================================================
@@ -929,19 +1041,6 @@ public class BlazorClientArchitectureTests
         || path.EndsWith(".Designer.cs", StringComparison.OrdinalIgnoreCase);
 
     private static string NormalisePath(string path) => path.Replace('\\', '/');
-
-    private static bool IsInterfaceName(string type)
-    {
-        if (string.IsNullOrEmpty(type)) return false;
-        if (type[0] != 'I') return false;
-        return type.Length > 1 && char.IsUpper(type[1]);
-    }
-
-    private static string StripGenerics(string type)
-    {
-        var idx = type.IndexOf('<');
-        return idx < 0 ? type : type[..idx];
-    }
 
     private static bool IsEventHandlerName(string name) =>
         EventHandlerNamePrefixes.Any(prefix => name.StartsWith(prefix, StringComparison.Ordinal));

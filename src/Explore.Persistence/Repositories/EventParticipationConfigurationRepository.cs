@@ -29,7 +29,7 @@ public sealed class EventParticipationConfigurationRepository(ExploreDbContext d
     {
         // Instance policy changes affect inherited tenants even when no override row exists.
         return await dbContext.EventParticipationConfigurations
-            .IgnoreTenantFilter("Visitor policy mutation evaluates AccountRequired configurations across affected tenant scopes; optional tenant selection uses an exact predicate.")
+            .IgnoreTenantFilter(TenantFilterBypassReasons.VisitorPolicyAccountRequiredSafetyRead)
             .AsNoTracking()
             .Where(configuration => configuration.IdentityAccessModeId == (int)IdentityAccessModeEnum.AccountRequired
                 && (!tenantId.HasValue || configuration.TenantId == tenantId.Value)

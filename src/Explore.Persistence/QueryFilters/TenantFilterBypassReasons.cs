@@ -11,6 +11,12 @@ public static class TenantFilterBypassReasons
     public const string InstanceConfigurationManifestExport =
         "Instance-authorized configuration manifest export reads every active tenant for one whole-instance artifact.";
 
+    public const string VisitorPolicyAccountRequiredSafetyRead =
+        "Visitor policy mutation evaluates AccountRequired configurations across affected tenant scopes; optional tenant selection uses an exact predicate.";
+
+    public const string VisitorPolicyAuthorityInheritanceSafetyRead =
+        "Visitor policy mutation composes final inheritance across affected tenants using only canonical authority keys.";
+
     public const string TenantScopedRepositoryExactTenantPredicate =
         "Repository bypasses the ambient tenant filter only after applying an explicit tenant predicate.";
 

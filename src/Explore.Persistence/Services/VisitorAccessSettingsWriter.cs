@@ -60,7 +60,7 @@ public sealed class VisitorAccessSettingsWriter(
         var systems = await context.SystemSettings.AsNoTracking()
             .Where(row => keys.Contains(row.SettingKey)).ToDictionaryAsync(row => row.SettingKey, token);
         var tenants = await context.TenantSettingOverrides
-            .IgnoreTenantFilter("Visitor policy mutation composes final inheritance across affected tenants using only canonical authority keys.")
+            .IgnoreTenantFilter(TenantFilterBypassReasons.VisitorPolicyAuthorityInheritanceSafetyRead)
             .AsNoTracking().Where(row => keys.Contains(row.SettingKey)).ToListAsync(token);
         var tenantRows = tenants.ToDictionary(row => (row.TenantId, row.SettingKey));
         var writes = new List<(object Entity, EntityState State)>();

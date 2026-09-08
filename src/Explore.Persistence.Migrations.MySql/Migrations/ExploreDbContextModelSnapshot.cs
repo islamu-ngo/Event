@@ -25663,6 +25663,10 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .HasColumnType("varchar(44)")
                         .HasColumnName("guest_access_token_hash");
 
+                    b.Property<DateTime?>("GuestStatusAccessUntilUtc")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("guest_status_access_until_utc");
+
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("tinyint(1)")

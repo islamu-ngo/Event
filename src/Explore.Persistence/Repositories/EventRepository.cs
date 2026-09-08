@@ -5,6 +5,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Specifications.Events;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Persistence.Database;
 using Explore.Persistence.Extensions;
 using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
@@ -84,6 +85,15 @@ public class EventRepository : GenericRepository<Event, Guid>, IEventRepository
             .AsNoTracking()
             .WherePubliclyEligible(_dbContext)
             .AnyAsync(@event => @event.TenantId == tenantId && @event.Id == eventId, cancellationToken);
+
+    public async Task<Event?> GetRegistrationStatusEventForUpdateAsync(Guid id, Guid tenantId, CancellationToken cancellationToken)
+    {
+        await RelationalEntityRowFence.AcquireAsync<Event>(
+            _dbContext, tenantId, target => target.Id, id, cancellationToken);
+        return await _dbContext.Events.AsNoTracking()
+            .Include(target => target.ParticipationConfiguration)
+            .FirstOrDefaultAsync(target => target.Id == id && target.TenantId == tenantId, cancellationToken);
+    }
 
     public async Task<Event?> GetAuthorizationTargetByIdAsync(Guid id, CancellationToken cancellationToken)
     {

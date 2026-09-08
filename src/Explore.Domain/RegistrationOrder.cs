@@ -85,6 +85,8 @@ public sealed class RegistrationOrder : ITenantEntity, IAuditableEntity, ISoftDe
 
     public CapabilityTokenHash? GuestAccessTokenHash { get; private set; }
 
+    public DateTime? GuestStatusAccessUntilUtc { get; private set; }
+
     public string CurrencyCode { get; private set; } = string.Empty;
 
     public DateTime? ExpiresAt { get; private set; }
@@ -221,6 +223,32 @@ public sealed class RegistrationOrder : ITenantEntity, IAuditableEntity, ISoftDe
             normalizedCreatedAt,
             normalizedExpiresAt);
     }
+
+    // Allocation establishes the promise before payment is possible. Missing historical promises
+    // are not inferred on reads; only an existing live promise may subsequently be extended.
+    public bool TryEstablishGuestStatusPromise(DateTimeOffset? lastSessionEndUtc, DateTime utcNow)
+    {
+        EnsureUtc(utcNow, nameof(utcNow));
+        if (GuestAccessTokenHash is null || GuestStatusAccessUntilUtc is not null ||
+            RegistrationOrderStatusId != (int)RegistrationOrderStatusEnum.Draft)
+        {
+            return false;
+        }
+
+        DateTime? deadline = GetGuestStatusDeadline(lastSessionEndUtc);
+        if (deadline is null || deadline <= utcNow)
+        {
+            return false;
+        }
+
+        GuestStatusAccessUntilUtc = deadline;
+        return true;
+    }
+
+    public static DateTime? GetGuestStatusDeadline(DateTimeOffset? lastSessionEndUtc) =>
+        lastSessionEndUtc is { } end && end.UtcDateTime <= DateTime.MaxValue.AddDays(-30)
+            ? end.UtcDateTime.AddDays(30)
+            : null;
 
     public void AddLine(RegistrationOrderLine line)
     {

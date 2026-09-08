@@ -212,6 +212,8 @@ public static class HateoasAssemblerRegistration
         services.AddHalResourceWithAssembler<OrganizationMemberDto, OrganizationMemberDetailLinkPolicy, OrganizationMemberCollectionLinkPolicy, OrganizationMemberResourceAssembler>();
 
         services.AddHalResource<RegistrationOrderDto, RegistrationOrderLinkPolicy, RegistrationOrderCollectionLinkPolicy>();
+        services.AddHalResourceWithSharedPolicy<GuestRegistrationStatusDto, GuestRegistrationStatusLinkPolicy,
+            GuestRegistrationStatusCollectionLinkPolicy, GuestRegistrationStatusResourceAssembler>();
         services.AddHalResource<ParticipantReadinessDto, ParticipantReadinessLinkPolicy, ParticipantReadinessCollectionLinkPolicy>();
         services.AddHalResource<TicketTransferDto, TicketTransferLinkPolicy, TicketTransferCollectionLinkPolicy>();
         services.AddHalResource<FairReturnWaitlistDto, FairReturnWaitlistLinkPolicy, FairReturnWaitlistCollectionLinkPolicy>();

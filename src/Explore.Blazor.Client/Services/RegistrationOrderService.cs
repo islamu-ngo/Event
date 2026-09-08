@@ -23,7 +23,8 @@ public sealed class RegistrationOrderService(
     IAnonymousRegistrationChallengeSolver challengeSolver,
     NavigationManager navigation,
     TimeProvider clock,
-    AuthenticationStateProvider authentication) : IRegistrationOrderService
+    AuthenticationStateProvider authentication,
+    IGuestRegistrationStatusClient statusClient) : IRegistrationOrderService
 {
     public Task<RegistrationCheckoutCompositionDto?> GetCheckoutAsync(Guid eventId, CancellationToken cancellationToken = default) =>
         ExecuteAsync(() => orderClient.GetRegistrationCheckoutCompositionAsync(eventId, cancellationToken: cancellationToken));
@@ -347,6 +348,25 @@ public sealed class RegistrationOrderService(
     public Task<HalResourceOfGuestRegistrationOrderDto?> GetGuestAsync(Guid eventId, Guid orderId, GuestRegistrationOrderCapability capability, CancellationToken cancellationToken = default) =>
         ExecuteAsync(() => guestClient.GetGuestRegistrationOrderAsync(eventId, orderId, capability.Value, cancellationToken: cancellationToken));
 
+    public async Task<HalResourceOfGuestRegistrationStatusDto?> GetGuestStatusAsync(
+        Guid eventId, Guid orderId, GuestRegistrationOrderCapability capability, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await statusClient.GetGuestRegistrationStatusAsync(eventId, orderId, capability.Value, cancellationToken: cancellationToken);
+        }
+        catch (ApiException exception)
+        {
+            logger.LogWarning("Private registration status was unavailable. Status: {StatusCode}.", exception.StatusCode);
+            return null;
+        }
+        catch (HttpRequestException)
+        {
+            logger.LogWarning("Private registration status transport was unavailable.");
+            return null;
+        }
+    }
+
     public Task<HalResourceOfRegistrationOrderParticipantsDto?> GetGuestParticipantsAsync(
         Guid eventId,
         Guid orderId,
@@ -427,7 +447,7 @@ public sealed class RegistrationOrderService(
     public Task<GuestRegistrationOrderLifecycleResponseDto?> CancelGuestAsync(Guid eventId, Guid orderId, GuestRegistrationOrderCapability capability, CancellationToken cancellationToken = default) =>
         ExecuteAsync(() => guestClient.CancelGuestRegistrationOrderAsync(eventId, orderId, capability.Value, cancellationToken: cancellationToken));
 
-    public Task<GuestRegistrationOrderLifecycleResponseDto?> ContinueGuestAsync(Guid eventId, Guid orderId, GuestRegistrationOrderCapability capability, int? contributionBasisPoints, CancellationToken cancellationToken = default) =>
+    public Task<HalResourceOfGuestRegistrationOrderLifecycleResponseDto?> ContinueGuestAsync(Guid eventId, Guid orderId, GuestRegistrationOrderCapability capability, int? contributionBasisPoints, CancellationToken cancellationToken = default) =>
         ExecuteAsync(() => guestClient.ContinueGuestRegistrationOrderAsync(
             eventId,
             orderId,
@@ -435,7 +455,7 @@ public sealed class RegistrationOrderService(
             body: new ContinueRegistrationOrderRequest { PlatformContributionBasisPoints = contributionBasisPoints },
             cancellationToken: cancellationToken));
 
-    public Task<GuestRegistrationOrderLifecycleResponseDto?> FinalizeGuestAsync(Guid eventId, Guid orderId, GuestRegistrationOrderCapability capability, CancellationToken cancellationToken = default) =>
+    public Task<HalResourceOfGuestRegistrationOrderLifecycleResponseDto?> FinalizeGuestAsync(Guid eventId, Guid orderId, GuestRegistrationOrderCapability capability, CancellationToken cancellationToken = default) =>
         ExecuteAsync(() => guestClient.FinalizeGuestRegistrationOrderAsync(eventId, orderId, capability.Value, cancellationToken: cancellationToken));
 
     public async Task<HalResourceOfGuestRegistrationOrderDto?> ApplyGuestPromotionAsync(

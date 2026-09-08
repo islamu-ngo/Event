@@ -25621,6 +25621,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("guest_access_token_hash");
 
+                    b.Property<DateTime?>("GuestStatusAccessUntilUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("guest_status_access_until_utc");
+
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER")

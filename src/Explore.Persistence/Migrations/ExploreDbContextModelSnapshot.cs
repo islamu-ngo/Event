@@ -25699,6 +25699,10 @@ namespace Explore.Persistence.Migrations
                         .HasColumnType("character varying(44)")
                         .HasColumnName("guest_access_token_hash");
 
+                    b.Property<DateTime?>("GuestStatusAccessUntilUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("guest_status_access_until_utc");
+
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")

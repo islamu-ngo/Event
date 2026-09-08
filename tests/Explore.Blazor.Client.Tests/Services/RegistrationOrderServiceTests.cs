@@ -52,7 +52,8 @@ public sealed class RegistrationOrderServiceTests : IDisposable
             solver,
             _ctx.Services.GetRequiredService<NavigationManager>(),
             TimeProvider.System,
-            _ctx.Services.GetRequiredService<AuthenticationStateProvider>());
+            _ctx.Services.GetRequiredService<AuthenticationStateProvider>(),
+            Substitute.For<IGuestRegistrationStatusClient>());
     }
 
     public void Dispose() => _ctx.Dispose();

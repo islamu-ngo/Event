@@ -8,6 +8,7 @@ using Explore.API.Hateoas;
 using Explore.API.Hateoas.Assemblers;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.PublicExperience;
 using Explore.Application.Hateoas;
@@ -97,7 +98,8 @@ public sealed class EventReportingIntakeHateoasTests
             new EventDetailLinkPolicy(),
             new EventCollectionLinkPolicy(),
             guard,
-            Substitute.For<IVisitorAccessCapabilityResolver>());
+            Substitute.For<IVisitorAccessCapabilityResolver>(),
+            Substitute.For<IEventRepository>(), TimeProvider.System);
 
         HalCollectionResource<EventListDto> resource = await assembler.ToCollectionResource(
             [cachedA, cachedB, cachedA],
@@ -135,7 +137,8 @@ public sealed class EventReportingIntakeHateoasTests
             new EventDetailLinkPolicy(),
             new EventCollectionLinkPolicy(),
             guard,
-            visitorResolver);
+            visitorResolver,
+            Substitute.For<IEventRepository>(), TimeProvider.System);
         HttpContext context = CreateHttpContext(cancellation.Token);
 
         await Assert.ThrowsAsync<OperationCanceledException>(() => assembler.ToResource(CreateDetail(Guid.CreateVersion7()), context));

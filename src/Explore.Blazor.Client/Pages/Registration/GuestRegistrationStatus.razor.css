@@ -1,0 +1,61 @@
+/* ABOUTME: Logical, reflow-safe layout for the private guest registration status page. */
+/* ABOUTME: Keeps explicit save feedback and keyboard focus visible at narrow viewport widths. */
+
+.guest-registration-status {
+    display: grid;
+    gap: var(--isl-space-section);
+    padding-block: var(--isl-space-page);
+    overflow-wrap: anywhere;
+}
+
+.guest-registration-status__panel,
+.guest-registration-status__notice {
+    display: grid;
+    gap: var(--isl-space-3);
+    padding: var(--isl-space-4);
+    border: 1px solid var(--isl-color-border);
+    border-radius: var(--isl-radius-card);
+}
+
+.guest-registration-status__panel h2,
+.guest-registration-status__panel p {
+    margin: 0;
+}
+
+.guest-registration-status__facts {
+    display: grid;
+    gap: var(--isl-space-3);
+    margin: 0;
+}
+
+.guest-registration-status__facts > div {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--isl-space-2);
+    border-block-end: 1px solid var(--isl-color-border);
+    padding-block-end: var(--isl-space-2);
+}
+
+.guest-registration-status__facts dd {
+    margin: 0;
+    font-weight: 600;
+}
+
+.guest-registration-status__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--isl-space-3);
+}
+
+.guest-registration-status a:focus-visible,
+.guest-registration-status [tabindex]:focus-visible {
+    outline: 2px solid var(--mud-palette-primary);
+    outline-offset: 3px;
+}
+
+.guest-registration-status a {
+    min-block-size: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+}

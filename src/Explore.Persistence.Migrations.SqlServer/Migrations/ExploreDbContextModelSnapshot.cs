@@ -25638,6 +25638,10 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         .HasColumnType("nvarchar(44)")
                         .HasColumnName("guest_access_token_hash");
 
+                    b.Property<DateTime?>("GuestStatusAccessUntilUtc")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("guest_status_access_until_utc");
+
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")

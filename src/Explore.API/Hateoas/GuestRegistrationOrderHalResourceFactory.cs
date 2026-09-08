@@ -16,13 +16,21 @@ public static class GuestRegistrationOrderHalResourceFactory
     public static HalResource<GuestRegistrationOrderDto> Create(
         GuestRegistrationOrderDto order,
         IUrlHelper url,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        GuestRegistrationStatusDto? authorizedStatus = null)
     {
         var values = new { eventId = order.EventId, orderId = order.Id };
         RegistrationOrderLifecycleDecision lifecycle = RegistrationOrderRules.DescribeLifecycle(
             (RegistrationOrderStatusEnum)order.StatusId);
         var resource = new HalResource<GuestRegistrationOrderDto>(order)
             .WithLink(LinkRelations.Self, HalLink.Create(url.Link(RouteNames.GetGuestRegistrationOrder, values)!));
+
+        if (authorizedStatus is not null)
+        {
+            resource.WithLink(LinkRelations.GuestStatus, HalLink.Create(
+                url.Link(RouteNames.GetGuestRegistrationStatus,
+                    new { eventId = authorizedStatus.EventId, orderId = authorizedStatus.OrderId })!));
+        }
 
         resource.WithLink(LinkRelations.ClaimRegistrationOrder, HalLink.CreateAction(
             url.Link(RouteNames.ClaimGuestRegistrationOrder, values)!, HttpMethods.Post));

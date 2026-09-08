@@ -68,6 +68,7 @@
             new RouteConfig { Path = "/", Component = typeof(HomeStart), Transition = RouteTransition.Fade, EnableCache = false },
             new RouteConfig { Path = "/events", Component = typeof(EventList), Transition = RouteTransition.Fade },
             new RouteConfig { Path = "/tickets/recovery", Component = typeof(TicketRecovery), Transition = RouteTransition.Fade, EnableCache = false },
+        new RouteConfig { Path = "/registration/guest/events/:eventId/orders/:orderId/status", Component = typeof(GuestRegistrationStatus), Transition = RouteTransition.Fade, EnableCache = false },
         new RouteConfig { Path = "/registration/guest/events/:eventId/orders/:orderId", Component = typeof(GuestOrderRecovery), Transition = RouteTransition.Fade },
         new RouteConfig { Path = "/registration/events/:eventId/tickets", Component = typeof(TicketSelection), Transition = RouteTransition.Fade },
             new RouteConfig { Path = "/actors/:id", Component = typeof(ActorProfile), Transition = RouteTransition.Fade },

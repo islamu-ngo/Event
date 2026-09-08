@@ -145,6 +145,7 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
             VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
             EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!,
             SessionCount = 1, FirstSessionStartUtc = new DateTimeOffset(2027, 1, 1, 12, 0, 0, TimeSpan.Zero),
+            LastSessionEndUtc = new DateTimeOffset(2027, 1, 1, 14, 0, 0, TimeSpan.Zero),
             CreatedAt = DateTime.UtcNow
         };
         ConfigureEventParticipationDto participation = Participation(accountRequired);

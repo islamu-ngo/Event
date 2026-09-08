@@ -52880,17 +52880,17 @@
             "content": {
               "text/plain; v=0.1": {
                 "schema": {
-                  "$ref": "#/components/schemas/GuestRegistrationOrderLifecycleResponseDto"
+                  "$ref": "#/components/schemas/HalResourceOfGuestRegistrationOrderLifecycleResponseDto"
                 }
               },
               "application/json; v=0.1": {
                 "schema": {
-                  "$ref": "#/components/schemas/GuestRegistrationOrderLifecycleResponseDto"
+                  "$ref": "#/components/schemas/HalResourceOfGuestRegistrationOrderLifecycleResponseDto"
                 }
               },
               "text/json; v=0.1": {
                 "schema": {
-                  "$ref": "#/components/schemas/GuestRegistrationOrderLifecycleResponseDto"
+                  "$ref": "#/components/schemas/HalResourceOfGuestRegistrationOrderLifecycleResponseDto"
                 }
               }
             }
@@ -53065,17 +53065,17 @@
             "content": {
               "text/plain; v=0.1": {
                 "schema": {
-                  "$ref": "#/components/schemas/GuestRegistrationOrderLifecycleResponseDto"
+                  "$ref": "#/components/schemas/HalResourceOfGuestRegistrationOrderLifecycleResponseDto"
                 }
               },
               "application/json; v=0.1": {
                 "schema": {
-                  "$ref": "#/components/schemas/GuestRegistrationOrderLifecycleResponseDto"
+                  "$ref": "#/components/schemas/HalResourceOfGuestRegistrationOrderLifecycleResponseDto"
                 }
               },
               "text/json; v=0.1": {
                 "schema": {
-                  "$ref": "#/components/schemas/GuestRegistrationOrderLifecycleResponseDto"
+                  "$ref": "#/components/schemas/HalResourceOfGuestRegistrationOrderLifecycleResponseDto"
                 }
               }
             }
@@ -53981,6 +53981,120 @@
               "text/json; v=0.1": {
                 "schema": {
                   "$ref": "#/components/schemas/RegistrationPaymentCheckoutTargetDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-endpoint-class": "Public"
+      }
+    },
+    "/api/events/{eventId}/guest-registration-orders/{orderId}/status": {
+      "get": {
+        "tags": [
+          "GuestRegistrationStatus"
+        ],
+        "summary": "Read private guest registration status",
+        "description": "Returns a PII-free confirmed guest status only for the exact event, order and capability header until the disclosed access deadline. Does not authorize checkout, changes or private calendar details.",
+        "operationId": "GetGuestRegistrationStatus",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Registration-Order-Capability",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "api-version",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Api-Version",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfGuestRegistrationStatusDto"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfGuestRegistrationStatusDto"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/HalResourceOfGuestRegistrationStatusDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -125441,6 +125555,67 @@
           }
         }
       },
+      "GuestRegistrationStatusDto": {
+        "required": [
+          "eventId",
+          "orderId",
+          "eventStatusId",
+          "registrationOrderStatusId",
+          "confirmedAt",
+          "cancelledAt",
+          "lastSessionEndUtc",
+          "statusAccessUntil"
+        ],
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventStatusId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "registrationOrderStatusId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "confirmedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cancelledAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastSessionEndUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "statusAccessUntil": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "HalCollectionEmbeddedOfActorListDto": {
         "type": "object",
         "properties": {
@@ -139278,6 +139453,150 @@
                 }
               }
             }
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
+      "HalResourceOfGuestRegistrationOrderLifecycleResponseDto": {
+        "required": [
+          "order",
+          "id",
+          "success",
+          "message",
+          "errors",
+          "failureCode",
+          "quotaExceeded"
+        ],
+        "type": "object",
+        "properties": {
+          "order": {
+            "$ref": "#/components/schemas/GuestRegistrationOrderDto"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "errors": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "failureCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "quotaExceeded": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/QuotaExceededDetails"
+              }
+            ]
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
+      "HalResourceOfGuestRegistrationStatusDto": {
+        "required": [
+          "eventId",
+          "orderId",
+          "eventStatusId",
+          "registrationOrderStatusId",
+          "confirmedAt",
+          "cancelledAt",
+          "lastSessionEndUtc",
+          "statusAccessUntil"
+        ],
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventStatusId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "registrationOrderStatusId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "confirmedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cancelledAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastSessionEndUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "statusAccessUntil": {
+            "type": "string",
+            "format": "date-time"
           },
           "_links": {
             "type": "object",
@@ -178563,6 +178882,9 @@
     },
     {
       "name": "GuestRegistrationOrderPayment"
+    },
+    {
+      "name": "GuestRegistrationStatus"
     },
     {
       "name": "IncomingWebhookEffectsAdmin"

@@ -265,7 +265,8 @@ public sealed class AnonymousRegistrationBrowserFlowTests
                 new RegistrationOrderClient(_http), new AuthenticatedRegistrationOrderClient(_http), new GuestRegistrationOrderClient(_http),
                 Substitute.For<IEventService>(), provider.GetRequiredService<UiShellState>(), Capabilities,
                 NullLogger<RegistrationOrderService>.Instance, new AnonymousRegistrationChallengeClient(_http), Solver,
-                provider.GetRequiredService<NavigationManager>(), Clock, provider.GetRequiredService<AuthenticationStateProvider>()));
+                provider.GetRequiredService<NavigationManager>(), Clock, provider.GetRequiredService<AuthenticationStateProvider>(),
+                new GuestRegistrationStatusClient(_http)));
             Service = (RegistrationOrderService)Context.Services.GetRequiredService<IRegistrationOrderService>();
             behavior.InnerHandler = new BffUnauthorizedHandler(Context.Services.GetRequiredService<NavigationManager>(), NullLogger<BffUnauthorizedHandler>.Instance)
             {

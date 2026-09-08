@@ -1,7 +1,11 @@
+// ABOUTME: Assembles event resources with current reporting, visitor and finite guest-launch authority.
+// ABOUTME: Enriches request-local HAL decisions without mutating cached event projections.
+
 namespace Explore.API.Hateoas.Assemblers;
 
 using System.Security.Claims;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Hateoas;
@@ -17,14 +21,20 @@ public sealed class EventResourceAssembler : ResourceAssemblerBase<EventDto, Eve
         ILinkPolicy<EventDto> detailLinkPolicy,
         ICollectionLinkPolicy<EventListDto> collectionLinkPolicy,
         IEventReportingIntakeGuard intakeGuard,
-        IVisitorAccessCapabilityResolver visitorAccessCapabilityResolver)
+        IVisitorAccessCapabilityResolver visitorAccessCapabilityResolver,
+        IEventRepository events,
+        TimeProvider timeProvider)
         : base(linkGenerator, detailLinkPolicy, collectionLinkPolicy)
     {
         _intakeGuard = intakeGuard;
         _visitorAccessCapabilityResolver = visitorAccessCapabilityResolver;
         _collectionLinkPolicy = collectionLinkPolicy;
+        _events = events;
+        _timeProvider = timeProvider;
     }
 
+    private readonly IEventRepository _events;
+    private readonly TimeProvider _timeProvider;
     private readonly IVisitorAccessCapabilityResolver _visitorAccessCapabilityResolver;
     private readonly IEventReportingIntakeGuard _intakeGuard;
 
@@ -46,7 +56,17 @@ public sealed class EventResourceAssembler : ResourceAssemblerBase<EventDto, Eve
         HttpContext httpContext)
     {
         EventDto policyInput = await CreatePolicyInputAsync(dto, httpContext.RequestAborted);
-        return await base.GetDetailLinkDefinitionsAsync(policyInput, user, httpContext);
+        IReadOnlyList<LinkDefinition> links = await base.GetDetailLinkDefinitionsAsync(policyInput, user, httpContext);
+        if (links.Any(link => link.Rel == LinkRelations.StartGuestRegistration))
+        {
+            var target = await _events.GetAuthorizationTargetByIdAsync(dto.Id, httpContext.RequestAborted);
+            DateTime? deadline = Explore.Domain.RegistrationOrder.GetGuestStatusDeadline(target?.LastSessionEndUtc);
+            if (target?.TenantId != dto.TenantId || deadline is null || deadline <= _timeProvider.GetUtcNow().UtcDateTime)
+            {
+                return links.Where(link => link.Rel != LinkRelations.StartGuestRegistration).ToArray();
+            }
+        }
+        return links;
     }
 
     protected override async Task<IReadOnlyList<LinkDefinition>> GetListItemLinkDefinitionsAsync(

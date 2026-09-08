@@ -107,7 +107,9 @@ public sealed class CreateOrderWithHoldCommandHandler(
                     }
                 }
 
-                Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(request.EventId, token);
+                Event? eventTarget = request.GuestAccessTokenHash is not null
+                    ? await events.GetRegistrationStatusEventForUpdateAsync(request.EventId, tenant.TenantId, token)
+                    : await events.GetAuthorizationTargetByIdAsync(request.EventId, token);
                 if (eventTarget is null || eventTarget.TenantId != tenant.TenantId ||
                     eventTarget.ParticipationConfiguration is not
                     {
@@ -245,6 +247,13 @@ public sealed class CreateOrderWithHoldCommandHandler(
                     catalog.CurrencyCode,
                     createdAt,
                     expiresAt);
+
+                if (request.GuestAccessTokenHash is not null &&
+                    !order.TryEstablishGuestStatusPromise(eventTarget.LastSessionEndUtc, timeProvider.GetUtcNow().UtcDateTime))
+                {
+                    return BaseCommandResponse.Failure<Guid>("registration_order_finite_status_window_required",
+                        "Guest registration requires a finite event status window.", id: request.EventId);
+                }
 
                 foreach (PreparedLine preparedLine in preparedLines)
                 {

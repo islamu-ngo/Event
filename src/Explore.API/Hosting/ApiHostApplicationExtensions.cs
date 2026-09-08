@@ -87,6 +87,7 @@ public static class ApiHostApplicationExtensions
 
         pipeline.UseHateoas();
         pipeline.UseRouting();
+        pipeline.UseMiddleware<PrivateNoStoreMiddleware>();
         pipeline.UseMiddleware<ApiTenantResolutionMiddleware>();
         pipeline.UseRequestTimeouts();
         pipeline.UseMiddleware<ApiAuthenticationConflictMiddleware>();
@@ -94,7 +95,6 @@ public static class ApiHostApplicationExtensions
         pipeline.UseMiddleware<ApiTenantPostAuthenticationMiddleware>();
         pipeline.UseMiddleware<McpRuntimeGateMiddleware>();
         pipeline.UseRequestLocalization();
-        pipeline.UseMiddleware<PrivateNoStoreMiddleware>();
         pipeline.UseRateLimiter();
         pipeline.UseAuthorization();
         pipeline.UseMiddleware<IdempotencyMiddleware>();

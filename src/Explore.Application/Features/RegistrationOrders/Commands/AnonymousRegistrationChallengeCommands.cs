@@ -62,7 +62,8 @@ public sealed class IssueAnonymousRegistrationChallengeCommandHandler(
     IUnitOfWork unitOfWork,
     ISettingMutationLock mutationLock,
     ISystemSettingRepository systemSettings,
-    ITenantSettingRepository tenantSettings)
+    ITenantSettingRepository tenantSettings,
+    TimeProvider timeProvider)
     : IRequestHandler<IssueAnonymousRegistrationChallengeCommand, AnonymousRegistrationChallengeIssueResult>
 {
     public async Task<AnonymousRegistrationChallengeIssueResult> Handle(
@@ -85,7 +86,9 @@ public sealed class IssueAnonymousRegistrationChallengeCommandHandler(
                 var eventTarget = await events.GetAuthorizationTargetByIdAsync(request.EventId, token);
                 var capability = await visitorCapabilities.ResolveAsync(tenant.TenantId, token);
                 if (!AnonymousRegistrationChallengeIssuePolicy.CanIssue(eventTarget, tenant.TenantId, capability)
-                    || !await events.IsPubliclyEligibleAsync(tenant.TenantId, request.EventId, token))
+                    || !await events.IsPubliclyEligibleAsync(tenant.TenantId, request.EventId, token)
+                    || Explore.Domain.RegistrationOrder.GetGuestStatusDeadline(eventTarget?.LastSessionEndUtc) is not { } deadline
+                    || deadline <= timeProvider.GetUtcNow().UtcDateTime)
                     return AnonymousRegistrationChallengeIssueResult.Denied(request.EventId, "anonymous_registration_challenge_unavailable");
 
                 int? difficulty = await ReadDifficultyAsync(token);

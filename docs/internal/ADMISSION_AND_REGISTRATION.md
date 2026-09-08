@@ -178,6 +178,51 @@ groups join that one outer acquisition in the canonical order. `ExecuteManyAsync
 is not an outer lease: it may open a transaction itself. Rejected mutations leave
 policy, event and allocation state unchanged; notifications follow commit.
 
+## Limited Post-Confirmation Guest Status
+
+`GetGuestRegistrationStatusQuery` uses a separate
+`GuestRegistrationStatusAccessGuard`, not the general checkout guard. It reuses
+the existing random guest capability/hash and returns a PII-free lifecycle DTO.
+The original `ExpiresAt` still bounds checkout, forms, payments and participant
+editing. Status access does not extend those authorities or expose admission
+credentials.
+
+New challenged guest allocation establishes nullable UTC
+`RegistrationOrder.GuestStatusAccessUntilUtc` in its existing serializable
+transaction under the event row fence. `RegistrationOrder.GetGuestStatusDeadline`
+uses finite authoritative `Event.LastSessionEndUtc` plus 30 days. A missing,
+unrepresentable or already elapsed result rejects the new guest allocation before
+order/hold or irreversible payment state; account allocation is unchanged.
+There is no migration default, historical backfill or invented event-end snapshot.
+
+The authorized status read takes existing order/event fences and fresh
+tenant-qualified entity snapshots. Confirmed or post-confirmation Cancelled
+orders require the exact hash and a live persisted promise. A conditional
+stamp/scope/hash/deadline update may extend that live promise to a later current
+event deadline; earlier or null schedules cannot shorten it. Expired or missing
+promises do not revive. If the original promise expires during a CAS wait, the
+extension rolls back. Disclosure rechecks time after read/transaction waits.
+
+The DTO contains only event/order IDs, status lookup IDs, actual confirmation/
+cancellation times, current last-session end and the promised deadline. Event
+cancellation is not inferred to be order cancellation or completed revocation.
+No names, contact, answers, participant IDs, payment details, private location,
+raw capability or hash enter the status projection. P10 cancellation is a
+separate future operation, not an action on this read-only status contract.
+
+The API accepts `X-Registration-Order-Capability` only and returns generic 404
+for invalid, absent, foreign, deleted, expired or unpromised access. Status and
+post-confirmation discovery are private/no-store and no-referrer, including
+short-circuit errors. Status HAL is separate from checkout HAL: self and an
+eligible existing public calendar relation only. Public calendar uses its
+existing query, Ical.Net serializer, stable UID and Public location disclosure;
+`calendar/my-access` is not extended to guests.
+
+The private browser landing scrubs fragment material before analytics/network
+initialization and restores only the exact scoped capability in memory. Explicit
+copy/download is the durable user action, with no bearer URL in server-rendered
+markup. See [the adopter guide](../public/documentation/readme/events-and-ticketing/email-optional-participation.md).
+
 ## 5. End-to-End Lifecycle Sequence
 
 ```mermaid

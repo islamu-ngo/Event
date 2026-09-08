@@ -5,6 +5,25 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 ## 2026-09-08
 
+- **Private post-confirmation guest status.**
+  `GET /api/events/{eventId}/guest-registration-orders/{orderId}/status`
+  (`GetGuestRegistrationStatus`) accepts only the established guest capability
+  header and returns PII-free lifecycle facts and the persisted access deadline.
+  Invalid, foreign, deleted, unpromised or expired access receives generic private
+  404. Self and eligible public-calendar links do not grant checkout, attendee-data,
+  payment, claim or cancellation authority.
+- **Breaking: finite guest-status promise and HAL confirmation discovery.**
+  New guest allocation requires a finite authoritative event-end-plus-30-days
+  window, recorded before payment. Live promises may extend but never shorten
+  across earlier/null schedules; missing or expired promises do not revive.
+  Guest continue/finalize responses now use a typed HAL lifecycle wrapper and
+  advertise `guest-status` only after independent authorization. The general
+  checkout expiry guard is unchanged.
+- **Private bookmark transport.** The status landing page consumes and removes
+  fragment capability material before analytics/network startup; explicit copy
+  or download is the durable save action. BFF landing/status responses enforce
+  private/no-store/no-referrer on success and failure. Public calendar export
+  remains capability-free and does not use authenticated `calendar/my-access`.
 - **Breaking: guest reservation requires bound proof.**
   `POST /api/events/{eventId}/guest-registration-challenges`
   (`CreateAnonymousRegistrationChallenge`) accepts the existing guest-start

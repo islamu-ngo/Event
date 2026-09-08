@@ -460,6 +460,8 @@ public static class LinkRelations
     public const string StartGuestRegistration = "start-guest-registration";
     public const string SignInToRegister = "sign-in-to-register";
     public const string ClaimRegistrationOrder = "claim-registration-order";
+    public const string GuestStatus = "guest-status";
+    public const string Calendar = "calendar";
     public const string ViewRegistrationOrders = "view-registration-orders";
     public const string ViewParticipants = "view-participants";
     public const string ViewRegistrationAnalytics = "view-registration-analytics";

@@ -13,6 +13,7 @@ ISLAMU Event keeps event domain content, attendee registration, payment truth, a
 * **[Modular Event Aspects](modular-event-aspects.md)** — Relational sector models (Islamic-event details, prayer times, speakers, technology tracks) and feature module gating.
 * **[Custom Properties](custom-properties.md)** — Governed custom registration questions, privacy exposure ceilings, property retirement, and GDPR data scrubbing.
 * **[Ticketing & Check-In](ticketing-and-check-in.md)** — Registration vs. admission, cryptographic QR credentials, attendee recovery, and day-of-event check-in gates.
+* **[Guest Participation Without Email](email-optional-participation.md)** — Save a private post-confirmation status link and keep it separate from checkout and public calendar files.
 * **[Paid Events & Payouts](paid-events-and-payouts.md)** — Organizer-direct Stripe Connect onboarding, webhook reconciliation, refund workflows, and payout boundaries.
 
 ---

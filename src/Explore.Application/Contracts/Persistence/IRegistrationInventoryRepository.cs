@@ -22,6 +22,12 @@ public interface IRegistrationInventoryRepository
         CapabilityTokenHash guestAccessTokenHash,
         CancellationToken cancellationToken);
 
+    Task<RegistrationOrder?> GetGuestStatusOrderForUpdateAsync(
+        Guid orderId, Guid tenantId, CancellationToken cancellationToken);
+
+    Task<bool> TryExtendGuestStatusAccessAsync(
+        RegistrationOrder expected, DateTime deadlineUtc, CancellationToken cancellationToken);
+
     Task<RegistrationOrder?> GetOrderWithPiiAsync(
         Guid orderId,
         Guid tenantId,

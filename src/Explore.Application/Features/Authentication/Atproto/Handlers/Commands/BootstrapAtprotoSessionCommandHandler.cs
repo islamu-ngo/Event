@@ -12,6 +12,7 @@ using Explore.Application.Features.Authentication.Atproto.Requests.Commands;
 using Explore.Application.Features.Authentication.Atproto.Services;
 using Explore.Application.Features.Authentication.Atproto.Validators;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
+using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using MediatR;
@@ -30,6 +31,8 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
     AtprotoJitAccountProvisioningOperation jitAccountProvisioning,
     AtprotoSubjectOnboardingOperation onboardingOperation,
     IUnitOfWork unitOfWork,
+    ISettingMutationLock settingMutationLock,
+    IVisitorAccessCapabilityResolver visitorAccessCapabilityResolver,
     IAdminCacheInvalidator adminCacheInvalidator,
     ITenantContext tenantContext,
     IConfiguration configuration,
@@ -87,7 +90,12 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
             .GetByProviderAndKey(accountKey).ConfigureAwait(false);
         InstanceBootstrapState? bootstrap = await bootstrapRepository
             .GetCurrent(cancellationToken).ConfigureAwait(false);
-        bool configuredAccount = bootstrap?.Mode == InstanceBootstrapMode.ConfiguredAdministrator;
+        // Pending configured setup admits only its verified claimant. After completion,
+        // replay that claim only for its exact linked owner, not unrelated visitors.
+        bool configuredAccount = bootstrap?.Mode == InstanceBootstrapMode.ConfiguredAdministrator
+            && (bootstrap.Status != InstanceBootstrapStatus.Completed
+                || IsExactLinkedLogin(login, accountKey)
+                    && bootstrap.CompletedByUserId == login!.UserId);
         if (configuredAccount)
         {
             var claim = await sender.Send(
@@ -121,14 +129,6 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
                 return AtprotoSessionBootstrapResult.Failed("configured_claim_incomplete");
             }
         }
-        else if (!IsExactLinkedLogin(login, accountKey))
-        {
-            if (primaryProvider != AuthenticationProviderKind.Atproto)
-            {
-                return AtprotoSessionBootstrapResult.Failed(
-                    "account_not_linked");
-            }
-        }
 
         var indexedAt = timeProvider.GetUtcNow().UtcDateTime;
         var jitIds = new AtprotoJitAccountIds(
@@ -136,9 +136,32 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
             Guid.CreateVersion7(),
             Guid.CreateVersion7());
         BootstrapPersistenceOutcome persistence =
-            await unitOfWork.ExecuteBootstrapConvergenceAsync(
+            await settingMutationLock.ExecuteOrderedGroupsAsync(
+                [VisitorAccessCapabilityResolver.AuthoritySettingKeys],
+                leaseToken => unitOfWork.ExecuteBootstrapConvergenceAsync(
                 async transactionToken =>
         {
+            // Recheck after acquiring authority and starting the convergence snapshot.
+            // An exact existing DID binding has login authority independently of signup.
+            UserExternalLogin? currentLogin = await externalLoginRepository
+                .GetByProviderAndKey(accountKey).ConfigureAwait(false);
+            if (!IsExactLinkedLogin(currentLogin, accountKey))
+            {
+                if (configuredAccount)
+                {
+                    return BootstrapPersistenceOutcome.Failed("configured_claim_incomplete");
+                }
+
+                var capability = await visitorAccessCapabilityResolver
+                    .ResolveAsync(tenantId, transactionToken).ConfigureAwait(false);
+                if (capability.Mode != VisitorAccessMode.FullRegistrationAndAuth
+                    || !capability.SignupDestinations.Any(destination =>
+                        destination.Provider == AuthenticationProviderKind.Atproto))
+                {
+                    return BootstrapPersistenceOutcome.Failed("account_not_linked");
+                }
+            }
+
             AtprotoPlatformAccount? account =
                 await jitAccountProvisioning.EnsureAsync(
                     accountKey,
@@ -184,6 +207,7 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
                 onboarding.ActorId!.Value,
                 onboarding.ParticipationId);
         },
+                leaseToken),
                 cancellationToken).ConfigureAwait(false);
         if (!persistence.Success)
         {

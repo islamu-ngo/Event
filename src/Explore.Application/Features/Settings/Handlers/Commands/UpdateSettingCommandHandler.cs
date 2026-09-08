@@ -31,6 +31,7 @@ public class UpdateSettingCommandHandler
     private readonly IPublicationPolicyMutationBoundary _publicationPolicyMutationBoundary;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IEmailDeliverySettingsWriter _emailSettingsWriter;
+    private readonly IVisitorAccessSettingsWriter _visitorSettings;
 
     public UpdateSettingCommandHandler(
         IHierarchicalSettingsResolver resolver,
@@ -43,6 +44,7 @@ public class UpdateSettingCommandHandler
         IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary,
         IUnitOfWork unitOfWork,
         IEmailDeliverySettingsWriter emailSettingsWriter,
+        IVisitorAccessSettingsWriter visitorSettings,
         ICerbosConfigResolver? cerbosConfigResolver = null,
         ILocationPrivacyGovernanceMutationService? locationPrivacyMutations = null)
     {
@@ -58,6 +60,7 @@ public class UpdateSettingCommandHandler
         _publicationPolicyMutationBoundary = publicationPolicyMutationBoundary;
         _unitOfWork = unitOfWork;
         _emailSettingsWriter = emailSettingsWriter;
+        _visitorSettings = visitorSettings;
     }
 
     public async Task<BaseCommandResponse<Guid>> Handle(
@@ -114,6 +117,15 @@ public class UpdateSettingCommandHandler
 
         bool isGuardedPublicationPolicyMutation = request.Scope is SettingScope.Tenant or SettingScope.Instance
             && PublicationPolicySettingKeys.All.Contains(request.Key, StringComparer.Ordinal);
+
+        if (VisitorAccessSettingMutationGuard.Handles(request.Key))
+        {
+            Guid? tenantId = request.Scope == SettingScope.Tenant ? _tenantContext.TenantId : null;
+            var result = await _visitorSettings.ApplyAsync(
+                [new(tenantId, request.Key, VisitorAccessSettingMutationKind.SetValue, serializedValue)],
+                resolvedUserId, cancellationToken);
+            return await result.CompleteAsync(_resolver, _mediator, request.Scope, tenantId ?? Guid.Empty);
+        }
 
         if (EmailDeliverySettingKeys.Contains(request.Key))
         {

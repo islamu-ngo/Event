@@ -35,6 +35,8 @@ internal sealed class InstanceSettingsCommandFixture : IDisposable, ITenantConte
         MutationLock = mutationLock ?? new RelationalSettingMutationLock(context, UnitOfWork);
         SystemSettings = new SystemSettingRepository(context, MutationLock);
         EmailDeliverySettingsWriter = EmailDispatchSqliteFixture.CreateEmailSettingsWriter(context, MutationLock);
+        VisitorSettings = new VisitorAccessSettingsWriter(context, MutationLock, UnitOfWork,
+            new EventParticipationConfigurationRepository(context), new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build());
         Settings = new HierarchicalSettingsResolver(SystemSettings, new TenantSettingRepository(context, MutationLock),
             new OrganizationSettingRepository(context), new GroupSettingRepository(context),
             new GroupTenantRepository(context), new UserPreferenceRepository(context), this,
@@ -71,6 +73,7 @@ internal sealed class InstanceSettingsCommandFixture : IDisposable, ITenantConte
     internal RelationalSettingMutationLock MutationLock { get; }
     internal SystemSettingRepository SystemSettings { get; }
     internal EmailDeliverySettingsWriter EmailDeliverySettingsWriter { get; }
+    internal VisitorAccessSettingsWriter VisitorSettings { get; }
     internal HierarchicalSettingsResolver Settings { get; }
     internal AdminContext AdminContext { get; }
     internal CurrentUserService CurrentUserService { get; }

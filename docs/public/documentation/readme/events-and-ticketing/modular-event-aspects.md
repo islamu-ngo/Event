@@ -1,6 +1,8 @@
 ---
 description: Use typed Islamic and technology event data without weakening the core model.
 ---
+<!-- ABOUTME: Explains typed event aspects and the visitor capabilities that bound participation. -->
+<!-- ABOUTME: Separates organizer data extensions from account onboarding and allocation authority. -->
 
 # Modular Event Aspects
 
@@ -33,6 +35,38 @@ Sector capabilities are governed by tenant feature flags (e.g. `Mod_Islamic` or 
 * Use a **Typed Aspect** when the concept possesses universal community semantics, dedicated validation, query indices, or lifecycle hooks (e.g. prayer times, halal catering, tech tracks).
 * Use a **[Governed Custom Property](custom-properties.md)** for organizer-specific, one-off questions (e.g. "T-shirt size", "Dietary allergies", "Emergency contact").
 * Neither mechanism may ever be used to bypass [Authorization](../security-and-identity/authorization.md), [Payment Truth](paid-events-and-payouts.md), or [Admission Issuance](ticketing-and-check-in.md).
+
+## Visitor Access And Account-Required Participation
+
+Tenant public-experience settings distinguish visitor access from the directory's
+display mode:
+
+| Visitor access mode | New native participation |
+| --- | --- |
+| `FullRegistrationAndAuth` | Anonymous participation and only the account-based capabilities actually available from usable providers. |
+| `AnonymousOnly` | Anonymous participation; no new AccountRequired configuration. |
+| `DirectoryListingOnly` | No new native allocations. Existing lawful registration status and cancellation remain available. |
+
+Local sign-in is an operator/existing-credential function, not public signup.
+A Local-only instance can offer guest participation, but Local credentials alone
+do not make AccountRequired event configuration usable.
+
+For configurable providers such as Keycloak or Google, an operator must declare
+public onboarding `Allowed` and configure its actual HTTPS signup destination.
+`Unknown`, `Denied`, a missing URL or a successful provider-discovery probe does
+not establish signup availability. Enabled, usable AT Protocol onboarding can
+contribute even when it is not the primary provider. Follow the provider-specific
+action offered by the server rather than constructing a signup URL.
+
+Create and Studio controls use the server's capability. An unavailable
+AccountRequired choice is not silently converted to anonymous registration.
+Before disabling the last eligible onboarding path or tightening visitor mode,
+explicitly amend affected AccountRequired event configurations, including drafts;
+otherwise the settings change returns a conflict.
+
+Operator login, listing information, walk-in handling and external registration
+remain separate from native allocation. A restrictive visitor setting does not
+erase an existing registration or grant broader authority to access it.
 
 ---
 

@@ -234,7 +234,7 @@ public class EventController : EventControllerBase
         "Response includes links to related resources (sessions, categories, tags).")]
     [ProducesResponseType(typeof(HalResource<EventDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    [OutputCache(PolicyName = "DetailData")]
+    [PrivateNoStore]
     public async Task<ActionResult<HalResource<EventDto>>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
         var @event = await _mediator.Send(new GetEventDetailsRequest { Id = id }, cancellationToken);
@@ -255,7 +255,7 @@ public class EventController : EventControllerBase
     [EndpointDescription("Get full public event details from a clean slug-code URL token.")]
     [ProducesResponseType(typeof(HalResource<EventDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    [OutputCache(PolicyName = "DetailData")]
+    [PrivateNoStore]
     public async Task<ActionResult<HalResource<EventDto>>> GetByPublicCode(string slugCode, CancellationToken cancellationToken = default)
     {
         var @event = await _mediator.Send(new GetPublicEventDetailsRequest { SlugCode = slugCode }, cancellationToken);

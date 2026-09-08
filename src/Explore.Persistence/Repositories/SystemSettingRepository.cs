@@ -4,6 +4,7 @@
 namespace Explore.Persistence.Repositories;
 
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Persistence.Services;
@@ -36,6 +37,7 @@ public class SystemSettingRepository : ISystemSettingRepository
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(setting);
+        VisitorAccessSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
         EmailDeliverySettingKeys.RejectGenericMutation(setting.SettingKey);
         if (PublicationPolicySettingKeys.All.Contains(setting.SettingKey, StringComparer.Ordinal))
         {
@@ -53,6 +55,7 @@ public class SystemSettingRepository : ISystemSettingRepository
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(setting);
+        VisitorAccessSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
         EmailDeliverySettingKeys.RejectGenericMutation(setting.SettingKey);
         if (_dbContext.Database.CurrentTransaction is null)
         {
@@ -79,6 +82,7 @@ public class SystemSettingRepository : ISystemSettingRepository
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(setting);
+        VisitorAccessSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
         EmailDeliverySettingKeys.RejectGenericMutation(setting.SettingKey);
         if (PublicationPolicySettingKeys.All.Contains(setting.SettingKey, StringComparer.Ordinal))
         {

@@ -8,6 +8,7 @@ using Explore.Blazor.Client.Tests.Common;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor;
 using Refit;
+using System.Security.Cryptography;
 
 namespace Explore.Blazor.Client.Tests.Pages.Onboarding;
 
@@ -76,6 +77,128 @@ public sealed class AuthProviderConfigurationTests : IDisposable
     }
 
     [Test]
+    public async Task KeycloakPublicOnboardingControlsBindSeparateVisitorSignupFields()
+    {
+        var model = new AuthProviderConfigurationDto
+        {
+            PrimaryProviderId = 1,
+            PrimaryProviderCode = "KEYCLOAK",
+            KeycloakAuthority = "https://identity.example.test/realms/events",
+            KeycloakClientId = "event-bff",
+            KeycloakPublicOnboardingPolicy = PublicOnboardingPolicy.Allowed,
+            KeycloakPublicSignupUrl = "https://identity.example.test/realms/events/registrations"
+        };
+        _onboarding.GetAuthProviderConfigurationAsync().Returns(model);
+
+        var cut = _context.RenderMudComponent<AuthProviderConfiguration>();
+        MudSelect<PublicOnboardingPolicy?> policy = cut.FindComponents<MudSelect<PublicOnboardingPolicy?>>()
+            .Single(select => select.Instance.Value == PublicOnboardingPolicy.Allowed).Instance;
+        MudTextField<string> signupUrl = cut.FindComponents<MudTextField<string>>()
+            .Single(field => field.Instance.Value == "https://identity.example.test/realms/events/registrations").Instance;
+
+        await Assert.That(policy.Value).IsEqualTo(PublicOnboardingPolicy.Allowed);
+        await Assert.That(signupUrl.Value).IsEqualTo("https://identity.example.test/realms/events/registrations");
+        await Assert.That(cut.FindAll(".auth-provider-configuration__visitor-onboarding")).Count().IsEqualTo(2);
+        await cut.InvokeAsync(() => policy.ValueChanged.InvokeAsync(PublicOnboardingPolicy.Denied));
+        await Assert.That(model.KeycloakPublicOnboardingPolicy).IsEqualTo(PublicOnboardingPolicy.Denied);
+    }
+
+    [Test]
+    public async Task KeycloakBootstrapAppliesVisitorFieldsToReloadedCompleteConfiguration()
+    {
+        var initial = new AuthProviderConfigurationDto
+        {
+            PrimaryProviderId = 1,
+            PrimaryProviderCode = "KEYCLOAK",
+            KeycloakPublicOnboardingPolicy = PublicOnboardingPolicy.Allowed,
+            KeycloakPublicSignupUrl = "https://identity.example.test/registrations",
+            GooglePublicOnboardingPolicy = PublicOnboardingPolicy.Denied,
+            GooglePublicSignupUrl = "https://accounts.example.test/enroll"
+        };
+        var canonical = new AuthProviderConfigurationDto
+        {
+            PrimaryProviderId = 1,
+            PrimaryProviderCode = "KEYCLOAK",
+            KeycloakAuthority = "https://identity.example.test/realms/events",
+            KeycloakClientId = "event-bff",
+            AtprotoLoginEnabled = true,
+            GoogleSsoEnabled = false
+        };
+        AuthProviderConfigurationDto? captured = null;
+        _onboarding.GetAuthProviderConfigurationAsync().Returns(initial, canonical);
+        _onboarding.BootstrapKeycloakRealmAsync(Arg.Any<KeycloakBootstrapRequestDto>())
+            .Returns(new BaseCommandResponseOfGuid { Success = true });
+        _onboarding.UpdateAuthProviderConfigurationAsAdminAsync(
+                Arg.Do<AuthProviderConfigurationDto>(configuration => captured = configuration))
+            .Returns(new BaseCommandResponseOfGuid { Success = true });
+        var cut = _context.RenderMudComponent<AuthProviderConfiguration>();
+        string clientSecret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        string adminSecret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+
+        await cut.Find("[data-testid='keycloak-bootstrap-mode']").ClickAsync(new MouseEventArgs());
+        foreach (var value in new Dictionary<string, string>
+        {
+            ["keycloak-bootstrap-base-url"] = "https://identity.example.test",
+            ["keycloak-bootstrap-realm"] = "events",
+            ["keycloak-bootstrap-client-id"] = "event-bff",
+            ["keycloak-bootstrap-client-secret"] = clientSecret,
+            ["keycloak-bootstrap-admin-username"] = "bootstrap-admin",
+            ["keycloak-bootstrap-admin-password"] = adminSecret
+        })
+        {
+            await cut.Find($"[data-testid='{value.Key}']")
+                .InputAsync(new ChangeEventArgs { Value = value.Value });
+        }
+
+        await cut.Find("button[data-testid='save-auth-provider-configuration']")
+            .ClickAsync(new MouseEventArgs());
+
+        await Assert.That(captured).IsNotNull();
+        await Assert.That(captured!.KeycloakClientId).IsEqualTo("event-bff");
+        await Assert.That(captured.AtprotoLoginEnabled).IsTrue();
+        await Assert.That(captured.KeycloakPublicOnboardingPolicy).IsEqualTo(PublicOnboardingPolicy.Allowed);
+        await Assert.That(captured.KeycloakPublicSignupUrl).IsEqualTo("https://identity.example.test/registrations");
+        await Assert.That(captured.GooglePublicOnboardingPolicy).IsEqualTo(PublicOnboardingPolicy.Denied);
+        await Assert.That(captured.GooglePublicSignupUrl).IsEqualTo("https://accounts.example.test/enroll");
+    }
+
+    [Test]
+    public async Task VisitorPolicyConflictReloadsCanonicalProviderConfiguration()
+    {
+        var attempted = new AuthProviderConfigurationDto
+        {
+            PrimaryProviderId = 1,
+            PrimaryProviderCode = "KEYCLOAK",
+            KeycloakAuthority = "https://identity.example.test/realms/events",
+            KeycloakClientId = "event-bff",
+            KeycloakPublicOnboardingPolicy = PublicOnboardingPolicy.Allowed,
+            KeycloakPublicSignupUrl = "https://identity.example.test/registrations"
+        };
+        var canonical = new AuthProviderConfigurationDto
+        {
+            PrimaryProviderId = 4,
+            PrimaryProviderCode = "LOCAL",
+            KeycloakPublicOnboardingPolicy = PublicOnboardingPolicy.Denied
+        };
+        _onboarding.GetAuthProviderConfigurationAsync().Returns(attempted, canonical);
+        _onboarding.UpdateAuthProviderConfigurationAsAdminAsync(attempted)
+            .Returns(new BaseCommandResponseOfGuid
+            {
+                Success = false,
+                FailureCode = "visitor_access_account_required_conflict",
+                Message = "Existing account-required events conflict with this provider policy."
+            });
+        var cut = _context.RenderMudComponent<AuthProviderConfiguration>();
+
+        await cut.Find("button[data-testid='save-auth-provider-configuration']")
+            .ClickAsync(new MouseEventArgs());
+
+        await Assert.That(cut.FindComponent<MudRadioGroup<int>>().Instance.Value).IsEqualTo(4);
+        await Assert.That(cut.FindAll("[role=alert]")).Count().IsGreaterThanOrEqualTo(1);
+        await _onboarding.Received(2).GetAuthProviderConfigurationAsync();
+    }
+
+    [Test]
     public async Task AtprotoSelectionForcesPasswordlessSoleProviderState()
     {
         var model = new AuthProviderConfigurationDto
@@ -128,22 +251,10 @@ public sealed class AuthProviderConfigurationTests : IDisposable
             _context.Services.GetRequiredService<BunitNavigationManager>();
         var cut = _context.RenderMudComponent<AuthProviderConfiguration>();
 
-        cut.FindAll("button")
-            .Single(button => button.TextContent.Contains(
-                "Save & Continue to Login",
-                StringComparison.Ordinal))
-            .Click();
+        await cut.Find("button[data-testid='save-auth-provider-configuration']")
+            .ClickAsync(new MouseEventArgs());
 
-        cut.WaitForAssertion(() =>
-        {
-            if (!navigation.Uri.Contains(
-                    "/login?provider=atproto",
-                    StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException(
-                    "AT Protocol onboarding did not route through focused login.");
-            }
-        });
+        await Assert.That(navigation.Uri).Contains("/login?provider=atproto");
         await Assert.That(navigation.Uri).Contains(
             "returnUrl=%2Fonboarding%2Finstance");
     }

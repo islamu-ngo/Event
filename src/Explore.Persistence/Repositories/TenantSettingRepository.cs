@@ -4,6 +4,7 @@
 namespace Explore.Persistence.Repositories;
 
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;
@@ -65,6 +66,7 @@ public class TenantSettingRepository : ITenantSettingRepository
         CancellationToken cancellationToken = default,
         Guid? actorId = null)
     {
+        VisitorAccessSettingMutationGuard.RejectGenericMutation(key);
         EmailDeliverySettingKeys.RejectGenericMutation(key);
         if (PublicationPolicySettingKeys.All.Contains(key, StringComparer.Ordinal))
         {
@@ -148,6 +150,7 @@ public class TenantSettingRepository : ITenantSettingRepository
         string key,
         CancellationToken cancellationToken = default)
     {
+        VisitorAccessSettingMutationGuard.RejectGenericMutation(key);
         EmailDeliverySettingKeys.RejectGenericMutation(key);
         if (PublicationPolicySettingKeys.All.Contains(key, StringComparer.Ordinal))
         {
@@ -170,6 +173,7 @@ public class TenantSettingRepository : ITenantSettingRepository
         Guid actorId,
         CancellationToken cancellationToken = default)
     {
+        VisitorAccessSettingMutationGuard.RejectGenericMutation(key);
         EmailDeliverySettingKeys.RejectGenericMutation(key);
         if (PublicationPolicySettingKeys.All.Contains(key, StringComparer.Ordinal))
         {
@@ -199,6 +203,7 @@ public class TenantSettingRepository : ITenantSettingRepository
         Guid actorId,
         CancellationToken cancellationToken = default)
     {
+        VisitorAccessSettingMutationGuard.RejectGenericMutation(key);
         EmailDeliverySettingKeys.RejectGenericMutation(key);
         if (PublicationPolicySettingKeys.All.Contains(key, StringComparer.Ordinal))
         {
@@ -239,7 +244,10 @@ public class TenantSettingRepository : ITenantSettingRepository
     {
         ArgumentNullException.ThrowIfNull(overrides);
         foreach (var setting in overrides)
+        {
+            VisitorAccessSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
             EmailDeliverySettingKeys.RejectGenericMutation(setting.SettingKey);
+        }
         if (overrides.Any(overrideValue => PublicationPolicySettingKeys.All.Contains(
                 overrideValue.SettingKey,
                 StringComparer.Ordinal)))
@@ -302,7 +310,10 @@ public class TenantSettingRepository : ITenantSettingRepository
         ArgumentOutOfRangeException.ThrowIfEqual(tenantId, Guid.Empty);
         ArgumentNullException.ThrowIfNull(overrides);
         foreach (var setting in overrides)
+        {
+            VisitorAccessSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
             EmailDeliverySettingKeys.RejectGenericMutation(setting.SettingKey);
+        }
         if (occurredAtUtc.Kind != DateTimeKind.Utc)
         {
             throw new ArgumentException("Setting creation timestamp must use UTC kind.", nameof(occurredAtUtc));

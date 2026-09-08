@@ -3,7 +3,6 @@
 
 using System.Globalization;
 using Explore.Blazor.Client.Clients;
-using Microsoft.Extensions.Logging;
 
 namespace Explore.Blazor.Client.Services;
 
@@ -24,6 +23,7 @@ public sealed class TenantPublicExperienceAdminService(
 {
     private const string Category = "PublicExperience";
     private const string ModeKey = "public_experience.mode";
+    private const string VisitorAccessModeKey = "public_experience.visitor_access_mode";
     private const string EventCatalogLabelKey = "public_experience.event_catalog_label";
     private const string PrimaryOrganizationIdKey = "public_experience.primary_organization_id";
     private const string HomeBlocksKey = "public_experience.home_blocks";
@@ -69,30 +69,12 @@ public sealed class TenantPublicExperienceAdminService(
                 Category,
                 cancellationToken: cancellationToken);
 
-            Dictionary<string, EffectiveSettingDto> settings = response.Settings
-                .Where(setting => !string.IsNullOrWhiteSpace(setting.Key))
-                .ToDictionary(setting => setting.Key, StringComparer.OrdinalIgnoreCase);
-
-            return new TenantPublicExperienceAdminModel
-            {
-                Mode = GetString(settings, ModeKey, DefaultMode),
-                EventCatalogLabel = GetString(settings, EventCatalogLabelKey, DefaultEventCatalogLabel),
-                PrimaryOrganizationId = GetGuid(settings, PrimaryOrganizationIdKey),
-                HomeBlocksJson = GetString(settings, HomeBlocksKey, DefaultHomeBlocksJson),
-                CtasJson = GetString(settings, CtasKey, DefaultCtasJson),
-                EventSectionPresetsJson = GetString(settings, EventSectionPresetsKey, DefaultEventSectionPresetsJson),
-                CanEditMode = CanEdit(settings, ModeKey),
-                CanEditEventCatalogLabel = CanEdit(settings, EventCatalogLabelKey),
-                CanEditPrimaryOrganization = CanEdit(settings, PrimaryOrganizationIdKey),
-                CanEditHomeBlocks = CanEdit(settings, HomeBlocksKey),
-                CanEditCtas = CanEdit(settings, CtasKey),
-                CanEditEventSectionPresets = CanEdit(settings, EventSectionPresetsKey)
-            };
+            return MapSettings(response);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to load tenant public experience settings.");
-            return new TenantPublicExperienceAdminModel();
+            return TenantPublicExperienceAdminModel.Unavailable();
         }
     }
 
@@ -236,6 +218,12 @@ public sealed class TenantPublicExperienceAdminService(
         TenantPublicExperienceAdminModel model,
         CancellationToken cancellationToken = default)
     {
+        if (!model.IsAvailable || model.VisitorAccessMode is null)
+        {
+            MarkUnavailable(model);
+            return PublicExperienceAdminSaveResult.Unavailable();
+        }
+
         Dictionary<string, string> values = BuildEditableValues(model);
 
         if (values.Count == 0)
@@ -254,14 +242,30 @@ public sealed class TenantPublicExperienceAdminService(
                 },
                 cancellationToken: cancellationToken);
 
-            return response.Success == true
-                ? PublicExperienceAdminSaveResult.Successful()
-                : PublicExperienceAdminSaveResult.Failed(BuildFailureMessage(response));
+            if (response.Success == true)
+            {
+                return PublicExperienceAdminSaveResult.Successful();
+            }
+
+            return await ReloadAfterRejectedSaveAsync(
+                model,
+                BuildFailureMessage(response),
+                cancellationToken);
+        }
+        catch (ApiException ex) when (ex.StatusCode == 409)
+        {
+            logger.LogWarning("Tenant visitor access policy save was rejected with a conflict.");
+            return await ReloadAfterRejectedSaveAsync(
+                model,
+                "Visitor access settings changed or conflict with current event participation.",
+                cancellationToken);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to save tenant public experience settings.");
-            return PublicExperienceAdminSaveResult.Failed("Failed to save public experience settings.");
+            MarkUnavailable(model);
+            return PublicExperienceAdminSaveResult.Failed(
+                "Public experience settings could not be saved. Reload the canonical settings before retrying.");
         }
     }
 
@@ -374,6 +378,11 @@ public sealed class TenantPublicExperienceAdminService(
             values[ModeKey] = string.IsNullOrWhiteSpace(model.Mode) ? DefaultMode : model.Mode;
         }
 
+        if (model.CanEditVisitorAccessMode && model.VisitorAccessMode is { } visitorAccessMode)
+        {
+            values[VisitorAccessModeKey] = visitorAccessMode.ToString();
+        }
+
         if (model.CanEditEventCatalogLabel)
         {
             values[EventCatalogLabelKey] = string.IsNullOrWhiteSpace(model.EventCatalogLabel)
@@ -402,6 +411,107 @@ public sealed class TenantPublicExperienceAdminService(
         }
 
         return values;
+    }
+
+    private async Task<PublicExperienceAdminSaveResult> ReloadAfterRejectedSaveAsync(
+        TenantPublicExperienceAdminModel model,
+        string failureMessage,
+        CancellationToken cancellationToken)
+    {
+        bool restored = await ReloadCanonicalAfterFailureAsync(model, cancellationToken);
+        return restored
+            ? PublicExperienceAdminSaveResult.Failed(
+                $"{failureMessage} The latest settings were restored.",
+                canonicalStateRestored: true)
+            : PublicExperienceAdminSaveResult.Failed(
+                $"{failureMessage} The latest settings could not be reloaded; editing remains unavailable.");
+    }
+
+    private async Task<bool> ReloadCanonicalAfterFailureAsync(
+        TenantPublicExperienceAdminModel model,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            HalResourceOfSettingGroupResponseDto response = await apiClient.GetTenantScopedSettingsAsync(
+                Category,
+                cancellationToken: cancellationToken);
+            TenantPublicExperienceAdminModel canonical = MapSettings(response);
+            if (!canonical.IsAvailable)
+            {
+                MarkUnavailable(model);
+                return false;
+            }
+
+            CopySettings(canonical, model);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to reload canonical tenant visitor access settings after a rejected save.");
+            MarkUnavailable(model);
+            return false;
+        }
+    }
+
+    private static TenantPublicExperienceAdminModel MapSettings(HalResourceOfSettingGroupResponseDto response)
+    {
+        Dictionary<string, EffectiveSettingDto> settings = response.Settings
+            .Where(setting => !string.IsNullOrWhiteSpace(setting.Key))
+            .ToDictionary(setting => setting.Key, StringComparer.OrdinalIgnoreCase);
+
+        bool visitorAccessAvailable = TryGetVisitorAccessMode(settings, out VisitorAccessMode visitorAccessMode);
+        return new TenantPublicExperienceAdminModel
+        {
+            IsAvailable = visitorAccessAvailable,
+            Mode = GetString(settings, ModeKey, DefaultMode),
+            VisitorAccessMode = visitorAccessAvailable ? visitorAccessMode : null,
+            EventCatalogLabel = GetString(settings, EventCatalogLabelKey, DefaultEventCatalogLabel),
+            PrimaryOrganizationId = GetGuid(settings, PrimaryOrganizationIdKey),
+            HomeBlocksJson = GetString(settings, HomeBlocksKey, DefaultHomeBlocksJson),
+            CtasJson = GetString(settings, CtasKey, DefaultCtasJson),
+            EventSectionPresetsJson = GetString(settings, EventSectionPresetsKey, DefaultEventSectionPresetsJson),
+            CanEditMode = CanEdit(settings, ModeKey),
+            CanEditVisitorAccessMode = CanEdit(settings, VisitorAccessModeKey),
+            CanEditEventCatalogLabel = CanEdit(settings, EventCatalogLabelKey),
+            CanEditPrimaryOrganization = CanEdit(settings, PrimaryOrganizationIdKey),
+            CanEditHomeBlocks = CanEdit(settings, HomeBlocksKey),
+            CanEditCtas = CanEdit(settings, CtasKey),
+            CanEditEventSectionPresets = CanEdit(settings, EventSectionPresetsKey)
+        };
+    }
+
+    private static void CopySettings(
+        TenantPublicExperienceAdminModel source,
+        TenantPublicExperienceAdminModel target)
+    {
+        target.IsAvailable = source.IsAvailable;
+        target.Mode = source.Mode;
+        target.VisitorAccessMode = source.VisitorAccessMode;
+        target.EventCatalogLabel = source.EventCatalogLabel;
+        target.PrimaryOrganizationId = source.PrimaryOrganizationId;
+        target.HomeBlocksJson = source.HomeBlocksJson;
+        target.CtasJson = source.CtasJson;
+        target.EventSectionPresetsJson = source.EventSectionPresetsJson;
+        target.CanEditMode = source.CanEditMode;
+        target.CanEditVisitorAccessMode = source.CanEditVisitorAccessMode;
+        target.CanEditEventCatalogLabel = source.CanEditEventCatalogLabel;
+        target.CanEditPrimaryOrganization = source.CanEditPrimaryOrganization;
+        target.CanEditHomeBlocks = source.CanEditHomeBlocks;
+        target.CanEditCtas = source.CanEditCtas;
+        target.CanEditEventSectionPresets = source.CanEditEventSectionPresets;
+    }
+
+    private static void MarkUnavailable(TenantPublicExperienceAdminModel model)
+    {
+        model.IsAvailable = false;
+        model.CanEditMode = false;
+        model.CanEditVisitorAccessMode = false;
+        model.CanEditEventCatalogLabel = false;
+        model.CanEditPrimaryOrganization = false;
+        model.CanEditHomeBlocks = false;
+        model.CanEditCtas = false;
+        model.CanEditEventSectionPresets = false;
     }
 
     private async Task<PublicExperienceAdminSaveResult> SaveBatchAsync(
@@ -444,6 +554,21 @@ public sealed class TenantPublicExperienceAdminService(
         {
             return setting.Value.Trim('"');
         }
+    }
+
+    private static bool TryGetVisitorAccessMode(
+        IReadOnlyDictionary<string, EffectiveSettingDto> settings,
+        out VisitorAccessMode mode)
+    {
+        mode = VisitorAccessMode.FullRegistrationAndAuth;
+        if (!settings.TryGetValue(VisitorAccessModeKey, out EffectiveSettingDto? setting)
+            || string.IsNullOrWhiteSpace(setting.Value))
+        {
+            return false;
+        }
+
+        string value = GetString(settings, VisitorAccessModeKey, string.Empty);
+        return Enum.TryParse(value, ignoreCase: false, out mode) && Enum.IsDefined(mode);
     }
 
     private static bool GetBoolean(
@@ -506,29 +631,43 @@ public sealed class TenantPublicExperienceAdminService(
 
 public sealed class TenantPublicExperienceAdminModel
 {
+    public bool IsAvailable { get; set; }
     public string Mode { get; set; } = "DiscoveryCentric";
+    public VisitorAccessMode? VisitorAccessMode { get; set; }
     public string EventCatalogLabel { get; set; } = "Events";
     public Guid? PrimaryOrganizationId { get; set; }
     public string HomeBlocksJson { get; set; } = "{\"schemaVersion\":1,\"blocks\":[]}";
     public string CtasJson { get; set; } = "{\"schemaVersion\":1,\"ctas\":[]}";
     public string EventSectionPresetsJson { get; set; } = "{\"schemaVersion\":1,\"presets\":[]}";
-    public bool CanEditMode { get; set; } = true;
-    public bool CanEditEventCatalogLabel { get; set; } = true;
-    public bool CanEditPrimaryOrganization { get; set; } = true;
-    public bool CanEditHomeBlocks { get; set; } = true;
-    public bool CanEditCtas { get; set; } = true;
-    public bool CanEditEventSectionPresets { get; set; } = true;
+    public bool CanEditMode { get; set; }
+    public bool CanEditVisitorAccessMode { get; set; }
+    public bool CanEditEventCatalogLabel { get; set; }
+    public bool CanEditPrimaryOrganization { get; set; }
+    public bool CanEditHomeBlocks { get; set; }
+    public bool CanEditCtas { get; set; }
+    public bool CanEditEventSectionPresets { get; set; }
 
-    public bool CanEditAny => CanEditMode
+    public bool CanEditAny => IsAvailable && (CanEditMode
+        || CanEditVisitorAccessMode
         || CanEditEventCatalogLabel
         || CanEditPrimaryOrganization
         || CanEditHomeBlocks
         || CanEditCtas
-        || CanEditEventSectionPresets;
+        || CanEditEventSectionPresets);
+
+    public static TenantPublicExperienceAdminModel Unavailable() => new();
 }
 
-public sealed record PublicExperienceAdminSaveResult(bool Success, string Message)
+public sealed record PublicExperienceAdminSaveResult(
+    bool Success,
+    string Message,
+    bool CanonicalStateRestored = false)
 {
     public static PublicExperienceAdminSaveResult Successful() => new(true, string.Empty);
-    public static PublicExperienceAdminSaveResult Failed(string message) => new(false, message);
+    public static PublicExperienceAdminSaveResult Failed(
+        string message,
+        bool canonicalStateRestored = false) =>
+        new(false, message, canonicalStateRestored);
+    public static PublicExperienceAdminSaveResult Unavailable() =>
+        Failed("Public experience settings are unavailable. Reload them before saving.");
 }

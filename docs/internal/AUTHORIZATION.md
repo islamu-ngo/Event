@@ -95,6 +95,22 @@ The actual logic of "is this user allowed to do this?" is delegated to a runtime
 
 The API uses a Hypermedia as the Engine of Application State (HATEOAS) model. HAL `_links` are the browser/client source of truth for action availability; Blazor and other clients must not recreate action gates from roles, claims, or cached local state.
 
+Visitor participation adds a capability condition, not a new permission or an
+administrator bypass. `VisitorAccessCapabilityResolver` combines effective visitor
+mode with all enabled, tenant-usable account providers. Local credentials do not
+provide public signup. Configurable external providers contribute onboarding only
+with an explicit `Allowed` policy and a trusted configured HTTPS destination;
+unknown policy or a successful discovery probe cannot substitute.
+
+Public settings, shell, provider configuration and event-detail responses project
+the same immutable `visitorAccess` facts. Provider HAL exposes `signup:<provider>`
+destinations separately from operator login. Event start and AccountRequired
+publication candidates consume those facts alongside existing permissions.
+Unavailable facts omit candidate actions. Metadata does not authorize a write:
+event and provider/settings mutations recheck current capability inside their
+shared lease-owned transaction. Listing, walk-in, external registration and
+existing registration access retain their own authority.
+
 -   **Mechanism**: `HateoasAuthorizationEvaluator` is used by resource assemblers and manual sync controllers before links are materialized.
 -   **Behavior**: It evaluates the permissions required to execute each potential link. If the current user is not authorized, the link is omitted from the response. Permission-bound links fail closed when authorization evaluation fails; non-permission navigation links may remain when they only require authentication or static conditions.
 -   **Metadata**: Link permission metadata includes resource kind, resource id, action, optional `AuthorizationScope`, and resource attributes. Descriptor-based links propagate scope and attributes from `ResourceDescriptors`; API-only links use explicit `AuthorizationActions` + `ResourceKinds` constants.

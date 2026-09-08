@@ -228,7 +228,8 @@ public sealed class TenantPlanEmailMutationTests
     private static ApplyControlPlaneTenantPlanAssignmentCommandHandler CreateHandler(InstanceSettingsCommandFixture fixture) =>
         new(new TenantPlanRepository(fixture.Context), new TenantSettingRepository(fixture.Context, fixture.MutationLock), fixture.SystemSettings,
             new TenantPlanStorageQuotaCeilingPolicy(fixture.SystemSettings), fixture.UnitOfWork, fixture.MutationLock,
-            fixture.PublicationPolicyBoundary, fixture.Settings, fixture.Mediator, fixture.EmailDeliverySettingsWriter);
+            fixture.PublicationPolicyBoundary, fixture.Settings, fixture.Mediator, fixture.EmailDeliverySettingsWriter,
+            fixture.VisitorSettings);
 
     private static ApplyControlPlaneTenantPlanAssignmentCommand Request(PlanScenario scenario) =>
         new(TenantId: scenario.TenantId, AssignmentId: scenario.AssignmentId, AppliedByUserId: scenario.ActorId);

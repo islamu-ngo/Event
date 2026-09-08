@@ -580,6 +580,7 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IEmailDispatchEligibilityEvaluator, EmailDispatchEligibilityEvaluator>();
         services.AddScoped<IEmailDeliveryDisableImpactReader, EmailDeliveryDisableImpactReader>();
         services.AddScoped<IEmailDeliverySettingsWriter, EmailDeliverySettingsWriter>();
+        services.AddScoped<IVisitorAccessSettingsWriter, VisitorAccessSettingsWriter>();
         services.AddScoped<IWebPushDispatchOutboxRepository, WebPushDispatchOutboxRepository>();
         services.AddScoped<IIntegrationSyncOutboxRepository, IntegrationSyncOutboxRepository>();
         services.AddScoped<IQueueDrainHealthRepository, QueueDrainHealthRepository>();

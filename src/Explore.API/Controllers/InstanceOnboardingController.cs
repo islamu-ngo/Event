@@ -13,6 +13,8 @@ using Explore.API.Models;
 using Explore.Application.Features.Authentication.Local.Handlers.Queries;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.DTOs.PublicExperience;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
@@ -58,6 +60,8 @@ public class InstanceOnboardingController : EventControllerBase
     private readonly ISetupSecretProvider _setupSecretProvider;
     private readonly IInstanceBootstrapAuditLogger _bootstrapAuditLogger;
     private readonly IAuthProviderConfigurationService _authProviderConfigurationService;
+    private readonly IVisitorAccessCapabilityResolver _visitorAccessCapabilityResolver;
+    private readonly ITenantContext _tenantContext;
     private readonly ILogger<InstanceOnboardingController> _logger;
     private readonly IResourceAssembler<InstanceOnboardingStatusDto, InstanceOnboardingStatusDto> _statusAssembler;
 
@@ -67,7 +71,9 @@ public class InstanceOnboardingController : EventControllerBase
         IInstanceBootstrapAuditLogger bootstrapAuditLogger,
         IAuthProviderConfigurationService authProviderConfigurationService,
         ILogger<InstanceOnboardingController> logger,
-        IResourceAssembler<InstanceOnboardingStatusDto, InstanceOnboardingStatusDto> statusAssembler)
+        IResourceAssembler<InstanceOnboardingStatusDto, InstanceOnboardingStatusDto> statusAssembler,
+        IVisitorAccessCapabilityResolver visitorAccessCapabilityResolver,
+        ITenantContext tenantContext)
     {
         _mediator = mediator;
         _setupSecretProvider = setupSecretProvider;
@@ -75,6 +81,8 @@ public class InstanceOnboardingController : EventControllerBase
         _authProviderConfigurationService = authProviderConfigurationService;
         _logger = logger;
         _statusAssembler = statusAssembler;
+        _visitorAccessCapabilityResolver = visitorAccessCapabilityResolver;
+        _tenantContext = tenantContext;
     }
 
     [AllowAnonymous]
@@ -260,6 +268,11 @@ public class InstanceOnboardingController : EventControllerBase
     public async Task<ActionResult<HalResource<AuthProviderConfigurationDto>>> GetAuthProviderConfiguration(CancellationToken cancellationToken = default)
     {
         var configuration = await _authProviderConfigurationService.ReadConfigurationAsync();
+        configuration = configuration with
+        {
+            VisitorAccess = VisitorAccessCapabilityDto.From(
+                await _visitorAccessCapabilityResolver.ResolveAsync(_tenantContext.TenantId, cancellationToken))
+        };
         var capabilities = await _mediator.Send(new GetLocalIdentityLifecycleCapabilitiesQuery(PublicDiscovery: true), cancellationToken);
         var links = LocalIdentityLifecycleLinkPolicy.GetLinks(capabilities).ToDictionary(
             definition => definition.Rel,
@@ -272,6 +285,11 @@ public class InstanceOnboardingController : EventControllerBase
             });
         links.Add(LinkRelations.Self, HalLink.Create(Url.RouteUrl(RouteNames.GetInstanceOnboardingAuthProviderConfiguration)
             ?? throw new InvalidOperationException("The authentication discovery route is not registered.")));
+        foreach (var destination in configuration.VisitorAccess.SignupDestinations)
+        {
+            links.Add(LinkRelations.VisitorSignupPrefix + destination.Provider.ToString().ToLowerInvariant(),
+                HalLink.Create(destination.Url));
+        }
         return Ok(new HalResource<AuthProviderConfigurationDto>(configuration, links));
     }
 

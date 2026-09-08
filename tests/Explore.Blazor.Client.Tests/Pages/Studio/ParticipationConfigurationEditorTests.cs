@@ -65,6 +65,33 @@ public sealed class ParticipationConfigurationEditorTests : IDisposable
     }
 
     [Test]
+    public async Task ExistingAccountRequired_WhenCapabilityDeniesIt_RemainsVisibleAndCannotBeSaved()
+    {
+        var cut = RenderEditor(
+            CreateConfiguration(4, 2, 1, null),
+            visitorAccess: new VisitorAccessCapabilityDto
+            {
+                AllowsNewNativeAllocation = true,
+                AllowsAnonymousParticipation = true,
+                AllowsAccountRequiredParticipation = false,
+                AllowsExistingAccountLogin = true,
+                SignupDestinations = []
+            });
+
+        IRenderedComponent<MudSelect<int?>> identity = Select(cut, "Identity access");
+        var accountOption = identity.FindComponents<MudSelectItem<int?>>()
+            .Single(item => item.Instance.Value == 1);
+
+        await Assert.That(identity.Instance.Value).IsEqualTo(1);
+        await Assert.That(accountOption.Instance.Disabled).IsTrue();
+        await Assert.That(cut.FindAll("[data-testid='account-required-unavailable'][role='note']")).Count().IsEqualTo(1);
+        await Assert.That(cut.Find("button[data-testid='save-participation-configuration']").HasAttribute("disabled"))
+            .IsTrue();
+        await _eventService.DidNotReceiveWithAnyArgs().ConfigureEventParticipationAsync(
+            default, default!, default, default);
+    }
+
+    [Test]
     public async Task Save_ForwardsCurrentConfigurationAndConcurrencyStamp()
     {
         var eventId = Guid.CreateVersion7();
@@ -78,8 +105,9 @@ public sealed class ParticipationConfigurationEditorTests : IDisposable
             .Returns(new BaseCommandResponseOfGuid { Id = eventId, Success = true });
         var cut = RenderEditor(configuration, eventId, () => saved = true);
 
-        cut.Find("button[data-testid='save-participation-configuration']").Click();
-        cut.WaitForElement("[data-testid='participation-save-status']");
+        await cut.Find("button[data-testid='save-participation-configuration']")
+            .ClickAsync(new MouseEventArgs());
+        await Assert.That(cut.FindAll("[data-testid='participation-save-status']")).Count().IsEqualTo(1);
 
         await _eventService.Received(1).ConfigureEventParticipationAsync(
             eventId,
@@ -111,24 +139,47 @@ public sealed class ParticipationConfigurationEditorTests : IDisposable
                 Errors = ["Refresh the event and try again."],
                 FailureCode = "event_participation_configuration_concurrency_conflict"
             });
-        var cut = RenderEditor(configuration, eventId);
+        var reloadRequested = false;
+        var cut = RenderEditor(configuration, eventId, onReloadRequested: () => reloadRequested = true);
 
-        cut.Find("button[data-testid='save-participation-configuration']").Click();
-        var alert = cut.WaitForElement("[data-testid='participation-save-error'][role='alert']");
+        await cut.Find("button[data-testid='save-participation-configuration']")
+            .ClickAsync(new MouseEventArgs());
+        var alert = cut.Find("[data-testid='participation-save-error'][role='alert']");
 
         await Assert.That(alert.TextContent).Contains("changed since it was loaded");
         await Assert.That(alert.TextContent).Contains("Refresh the event and try again");
+        await Assert.That(reloadRequested).IsTrue();
         await _announcer.Received(1).AnnounceAssertiveAsync("Participation configuration changed since it was loaded.");
     }
 
     private IRenderedComponent<ParticipationConfigurationEditor> RenderEditor(
         ParticipationConfiguration configuration,
         Guid? eventId = null,
-        Action? onSaved = null) =>
+        Action? onSaved = null,
+        VisitorAccessCapabilityDto? visitorAccess = null,
+        Action? onReloadRequested = null) =>
         _ctx.RenderMudComponent<ParticipationConfigurationEditor>(parameters => parameters
             .Add(component => component.EventId, eventId ?? configuration.EventId!.Value)
             .Add(component => component.Configuration, configuration)
-            .Add(component => component.OnSaved, EventCallback.Factory.Create(this, onSaved ?? (() => { }))));
+            .Add(component => component.VisitorAccess, visitorAccess ?? AccountRequiredAllowed())
+            .Add(component => component.OnSaved, EventCallback.Factory.Create(this, onSaved ?? (() => { })))
+            .Add(component => component.OnReloadRequested, EventCallback.Factory.Create(this, onReloadRequested ?? (() => { }))));
+
+    private static VisitorAccessCapabilityDto AccountRequiredAllowed() => new()
+    {
+        AllowsNewNativeAllocation = true,
+        AllowsAnonymousParticipation = true,
+        AllowsAccountRequiredParticipation = true,
+        AllowsExistingAccountLogin = true,
+        SignupDestinations =
+        [
+            new VisitorSignupDestinationDto
+            {
+                Provider = AuthenticationProviderKind.Atproto,
+                Url = "/login?provider=atproto"
+            }
+        ]
+    };
 
     private static IRenderedComponent<MudSelect<int?>> Select(
         IRenderedComponent<ParticipationConfigurationEditor> cut,

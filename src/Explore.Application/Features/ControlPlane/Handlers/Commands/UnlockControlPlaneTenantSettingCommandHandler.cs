@@ -2,6 +2,7 @@
 // ABOUTME: Rejects ineligible targets and illegal state transitions before applying the unlock.
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Features.ControlPlane.Requests.Commands;
 using Explore.Application.Notifications;
 using Explore.Application.Responses;
@@ -20,7 +21,8 @@ public sealed class UnlockControlPlaneTenantSettingCommandHandler(
     IHierarchicalSettingsResolver settingsResolver,
     IMediator mediator,
     IEmailDeliverySettingsWriter emailDeliverySettingsWriter,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    IVisitorAccessSettingsWriter visitorSettings)
     : IRequestHandler<UnlockControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> Handle(
@@ -62,9 +64,10 @@ public sealed class UnlockControlPlaneTenantSettingCommandHandler(
         }
 
         (BaseCommandResponse<Guid> Response, SettingChangedNotification? Notification) outcome =
-            EmailDeliverySettingKeys.Contains(request.Key)
+            EmailDeliverySettingKeys.Contains(request.Key) || VisitorAccessSettingMutationGuard.Handles(request.Key)
                 ? await mutationLock.ExecuteOrderedGroupsAsync(
-                    [EmailDeliverySettingKeys.All],
+                    [VisitorAccessSettingMutationGuard.Handles(request.Key)
+                        ? Explore.Application.Services.VisitorAccessCapabilityResolver.AuthoritySettingKeys : EmailDeliverySettingKeys.All],
                     token => unitOfWork.ExecuteSerializableAsync(ApplyAsync, token),
                     cancellationToken)
                 : await mutationLock.ExecuteAsync(request.Key, ApplyAsync, cancellationToken);
@@ -100,6 +103,14 @@ public sealed class UnlockControlPlaneTenantSettingCommandHandler(
                 {
                     return (ControlPlaneTenantSettingSecurity.Failure(
                         request.TenantId, "setting_state_conflict", "The tenant setting is already unlocked."), null);
+                }
+
+                if (VisitorAccessSettingMutationGuard.Handles(request.Key))
+                {
+                    var result = await visitorSettings.ApplyAsync(
+                        [new(request.TenantId, request.Key, VisitorAccessSettingMutationKind.SetLock, IsLocked: false)],
+                        actorUserId, token);
+                    return (result.ToCommandResponse(request.TenantId), result.DeferredNotifications.SingleOrDefault());
                 }
 
                 if (EmailDeliverySettingKeys.Contains(request.Key))

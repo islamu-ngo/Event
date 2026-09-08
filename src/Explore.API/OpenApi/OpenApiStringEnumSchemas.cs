@@ -41,6 +41,9 @@ internal static class OpenApiStringEnumSchemaCatalog
 {
     private static IReadOnlyCollection<Type> EagerNestedEnumTypes { get; } =
     [
+        typeof(VisitorAccessMode),
+        typeof(PublicOnboardingPolicy),
+        typeof(AuthenticationProviderKind),
         typeof(LocalCredentialState),
         typeof(LocalCredentialOperationKind),
         typeof(LocalCredentialOperationStage),
@@ -63,6 +66,9 @@ internal static class OpenApiStringEnumSchemaCatalog
 
     public static IReadOnlyCollection<Type> EnumTypes { get; } =
     [
+        typeof(VisitorAccessMode),
+        typeof(PublicOnboardingPolicy),
+        typeof(AuthenticationProviderKind),
         typeof(LocalCredentialState),
         typeof(LocalCredentialOperationKind),
         typeof(LocalCredentialOperationStage),

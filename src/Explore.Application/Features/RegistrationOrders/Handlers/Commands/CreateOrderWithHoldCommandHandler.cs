@@ -10,6 +10,7 @@ using Explore.Application.Features.RegistrationOrders.Validators;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Application.Services;
 using MediatR;
 using Microsoft.Extensions.Logging;
 
@@ -26,7 +27,9 @@ public sealed class CreateOrderWithHoldCommandHandler(
     TimeProvider timeProvider,
     IScheduledDeadlineDispatcher deadlines,
     ILogger<CreateOrderWithHoldCommandHandler> logger,
-    IUnitOfWork unitOfWork) :
+    IUnitOfWork unitOfWork,
+    ISettingMutationLock mutationLock,
+    IVisitorAccessCapabilityResolver visitorCapabilities) :
     IRequestHandler<CreateRegistrationOrderWithHoldCommand, BaseCommandResponse<Guid>>,
     IRegistrationOrderStarter
 {
@@ -45,21 +48,6 @@ public sealed class CreateOrderWithHoldCommandHandler(
             return Invalid(request.EventId, validation.Errors.Select(error => error.ErrorMessage));
         }
 
-        Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(request.EventId, cancellationToken);
-        if (eventTarget is null || eventTarget.TenantId != tenant.TenantId ||
-            eventTarget.ParticipationConfiguration is not
-            {
-                ParticipationHandlingModeId: (int)ParticipationHandlingModeEnum.PlatformManaged
-            } participationConfiguration)
-        {
-            return Missing(request.EventId);
-        }
-
-        if (!IsIdentityAccessAllowed(participationConfiguration.IdentityAccessModeId, request))
-        {
-            return IdentityRequired(request.EventId);
-        }
-
         Guid orderId = Guid.CreateVersion7();
         DateTime createdAt = timeProvider.GetUtcNow().UtcDateTime;
         IReadOnlyDictionary<Guid, StableLineIds> stableLineIds = request.Lines
@@ -67,7 +55,6 @@ public sealed class CreateOrderWithHoldCommandHandler(
             .ToDictionary(
                 line => line.TicketTypeId,
                 _ => new StableLineIds(Guid.CreateVersion7(), Guid.CreateVersion7()));
-        RegistrationParticipationSnapshot participation = RegistrationParticipationSnapshot.From(participationConfiguration);
 
         // Captured inside the transaction, acted on only after it commits: scheduling a wake-up for an
         // order that a rollback then erased would leave a trigger pointing at nothing.
@@ -75,8 +62,33 @@ public sealed class CreateOrderWithHoldCommandHandler(
 
         try
         {
-            BaseCommandResponse<Guid> response = await unitOfWork.ExecuteSerializableAsync(async token =>
+            BaseCommandResponse<Guid> response = await mutationLock.ExecuteOrderedGroupsAsync(
+                [VisitorAccessCapabilityResolver.AuthoritySettingKeys],
+                outerToken => unitOfWork.ExecuteSerializableAsync(async token =>
             {
+                Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(request.EventId, token);
+                if (eventTarget is null || eventTarget.TenantId != tenant.TenantId ||
+                    eventTarget.ParticipationConfiguration is not
+                    {
+                        ParticipationHandlingModeId: (int)ParticipationHandlingModeEnum.PlatformManaged
+                    } participationConfiguration)
+                {
+                    return Missing(request.EventId);
+                }
+
+                var capability = await visitorCapabilities.ResolveAsync(tenant.TenantId, token);
+                if (!capability.AllowsNewNativeAllocation)
+                {
+                    return BaseCommandResponse.Failure<Guid>("registration_order_visitor_allocation_disabled",
+                        "New native registration allocations are disabled.", id: request.EventId);
+                }
+
+                if (!IsIdentityAccessAllowed(participationConfiguration.IdentityAccessModeId, request))
+                {
+                    return IdentityRequired(request.EventId);
+                }
+
+                RegistrationParticipationSnapshot participation = RegistrationParticipationSnapshot.From(participationConfiguration);
                 RegistrationOrder? existing = await inventory.GetOrderByIdAsync(orderId, tenant.TenantId, token);
                 if (existing is not null)
                 {
@@ -234,7 +246,7 @@ public sealed class CreateOrderWithHoldCommandHandler(
                 await inventory.SaveChangesAsync(token);
                 earliestHoldExpiry = holds.Length == 0 ? null : holds.Min(hold => hold.ExpiresAt);
                 return Success(order.Id, isWaitlisted ? "Registration order waitlisted." : "Registration order created.");
-            }, cancellationToken);
+            }, outerToken), cancellationToken);
 
             if (response.IsSuccess && earliestHoldExpiry is not null)
             {

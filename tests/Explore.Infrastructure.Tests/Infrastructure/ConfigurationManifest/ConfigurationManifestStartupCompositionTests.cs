@@ -21,6 +21,8 @@ public sealed class ConfigurationManifestStartupCompositionTests
     public async Task DeferredStartupGraph_ResolvesWithoutRuntimeEffectServices()
     {
         var services = new ServiceCollection();
+        IConfiguration configuration = new ConfigurationBuilder().Build();
+        services.AddSingleton(configuration);
         services.AddLogging();
         services.AddSingleton(new ExploreDbContext(
             new DbContextOptionsBuilder<ExploreDbContext>().Options));
@@ -28,7 +30,7 @@ public sealed class ConfigurationManifestStartupCompositionTests
             Substitute.For<IDbContextFactory<ExploreDbContext>>());
         services.AddConfigurationManifestPersistence();
         services.AddConfigurationManifestStartup(
-            new ConfigurationBuilder().Build(),
+            configuration,
             ConfigurationManifestEffectDeliveryMode.DeferredToRuntime);
 
         await using ServiceProvider provider = services.BuildServiceProvider(

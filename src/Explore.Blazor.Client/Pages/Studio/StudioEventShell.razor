@@ -84,7 +84,9 @@
                 {
                     <ParticipationConfigurationEditor EventId="EventId"
                                                       Configuration="Resource.ParticipationConfiguration"
-                                                      OnSaved="ReloadEventAsync" />
+                                                      VisitorAccess="Resource.VisitorAccess"
+                                                      OnSaved="ReloadEventAsync"
+                                                      OnReloadRequested="ReloadEventAsync" />
                 }
             }
             else if (Section == "orders")

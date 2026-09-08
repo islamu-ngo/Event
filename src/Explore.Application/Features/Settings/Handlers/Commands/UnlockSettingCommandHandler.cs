@@ -6,6 +6,7 @@ namespace Explore.Application.Features.Settings.Handlers.Commands;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Features.Settings.Requests.Commands;
 using Explore.Application.Notifications;
 using Explore.Application.Responses;
@@ -27,6 +28,7 @@ public class UnlockSettingCommandHandler
     private readonly IPublicationPolicyMutationBoundary _publicationPolicyMutationBoundary;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IEmailDeliverySettingsWriter _emailSettingsWriter;
+    private readonly IVisitorAccessSettingsWriter _visitorSettings;
 
     public UnlockSettingCommandHandler(
         IHierarchicalSettingsResolver resolver,
@@ -38,6 +40,7 @@ public class UnlockSettingCommandHandler
         IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary,
         IUnitOfWork unitOfWork,
         IEmailDeliverySettingsWriter emailSettingsWriter,
+        IVisitorAccessSettingsWriter visitorSettings,
         ICerbosConfigResolver? cerbosConfigResolver = null)
     {
         _resolver = resolver;
@@ -50,6 +53,7 @@ public class UnlockSettingCommandHandler
         _publicationPolicyMutationBoundary = publicationPolicyMutationBoundary;
         _unitOfWork = unitOfWork;
         _emailSettingsWriter = emailSettingsWriter;
+        _visitorSettings = visitorSettings;
     }
 
     public async Task<BaseCommandResponse<Guid>> Handle(
@@ -80,6 +84,14 @@ public class UnlockSettingCommandHandler
 
         var (scopeId, actorId) = SettingCommandHelper.GetScopeAndActorIds(
             request.Scope, _tenantContext, _currentUserService);
+
+        if (VisitorAccessSettingMutationGuard.Handles(request.Key))
+        {
+            var result = await _visitorSettings.ApplyAsync(
+                [new(request.Scope == SettingScope.Tenant ? scopeId : null, request.Key,
+                    VisitorAccessSettingMutationKind.SetLock, IsLocked: false)], actorId, cancellationToken);
+            return await result.CompleteAsync(_resolver, _mediator, request.Scope, scopeId);
+        }
 
         if (EmailDeliverySettingKeys.Contains(request.Key))
         {

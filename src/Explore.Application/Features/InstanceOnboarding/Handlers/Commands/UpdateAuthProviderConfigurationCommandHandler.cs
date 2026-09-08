@@ -104,7 +104,11 @@ public class UpdateAuthProviderConfigurationCommandHandler :
             GoogleClientId = patch.GoogleClientId,
             GoogleClientSecret = patch.GoogleClientSecret,
             LockAtprotoLoginEnabled = patch.LockAtprotoLoginEnabled,
-            LockGoogleSsoEnabled = patch.LockGoogleSsoEnabled
+            LockGoogleSsoEnabled = patch.LockGoogleSsoEnabled,
+            KeycloakPublicOnboardingPolicy = patch.KeycloakPublicOnboardingPolicy,
+            KeycloakPublicSignupUrl = patch.KeycloakPublicSignupUrl,
+            GooglePublicOnboardingPolicy = patch.GooglePublicOnboardingPolicy,
+            GooglePublicSignupUrl = patch.GooglePublicSignupUrl
         };
         var validator = new AuthProviderConfigurationDtoValidator(currentConfiguration);
         var validationResult = await validator.ValidateAsync(configuration, cancellationToken);
@@ -135,7 +139,7 @@ public class UpdateAuthProviderConfigurationCommandHandler :
             }
         }
 
-        await _configurationService.ApplyConfigurationAsync(configuration);
+        await _configurationService.ApplyConfigurationAsync(configuration, cancellationToken: cancellationToken);
         _authenticationProviderModeCacheInvalidator.InvalidateInstanceMode();
         await _jwtAuthorityRefreshNotifier.ReloadAsync(cancellationToken);
 

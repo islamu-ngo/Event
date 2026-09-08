@@ -20,7 +20,7 @@
 - Classification breakdown: `Admin`=120, `Authenticated`=606, `Public`=167, `PublicTransactional`=18
 - Tenant-mode extension breakdown: `multi-tenant-required`=21
 - Rate-limit policy extension breakdown: `AddressSuggestions`=1, `AiAssistant`=5, `AnalyticsRelay`=1, `Authenticated`=57, `ConfigurationImportUpload`=2, `ControlPlane`=34, `EventOpenGraphImage`=1, `Global`=2, `PublicIngestion`=3, `SetupEnrollmentWrite`=3, `SetupSecret`=10, `SetupSecretBindingWrite`=1, `Write`=240, `admission_check_in`=6, `admission_scanner_capability`=2, `admission_scanner_check_in`=3, `admission_ticket_recovery`=1, `public_transactional`=22
-- Output-cache policy extension breakdown: `DetailData`=40, `EventDiscovery`=1, `ListData`=21, `LookupData`=26, `PublicExperienceShell`=1, `PublicHomeDiscovery`=1, `PublicLegalDocuments`=1, `SitemapData`=1, `SystemConfig`=1, `TenantNav`=1
+- Output-cache policy extension breakdown: `DetailData`=38, `EventDiscovery`=1, `ListData`=21, `LookupData`=26, `PublicHomeDiscovery`=1, `PublicLegalDocuments`=1, `SitemapData`=1, `SystemConfig`=1, `TenantNav`=1
 
 ## Operations
 
@@ -216,9 +216,9 @@
 | 188 | `/api/event/import` | `POST` | `ImportEvent` | Import Event | EventLifecycle | `ImportEvent` | `Authenticated` | no | _(none)_ | _(none)_ | _(none)_ |
 | 189 | `/api/event/management/by-actor/{actorId}` | `GET` | `GetManagedEventsByActor` | Get Managed Events By Actor | EventManagementRead | `GetManagedEventsByActor` | `Authenticated` | no | _(none)_ | _(none)_ | _(none)_ |
 | 190 | `/api/event/my` | `GET` | `GetMyEvents` | Get My Events | Event | `GetMyEvents` | `Authenticated` | no | _(none)_ | _(none)_ | _(none)_ |
-| 191 | `/api/event/public/{slugCode}` | `GET` | `GetEventByPublicCode` | Get Event Details By Public Code | Event | `GetEventByPublicCode` | `Public` | no | _(none)_ | _(none)_ | `DetailData` |
+| 191 | `/api/event/public/{slugCode}` | `GET` | `GetEventByPublicCode` | Get Event Details By Public Code | Event | `GetEventByPublicCode` | `Public` | no | _(none)_ | _(none)_ | _(none)_ |
 | 192 | `/api/event/public/{slugCode}/og-image` | `GET` | `GetEventOpenGraphImage` | Get Public Event Open Graph Image | Event | `GetEventOpenGraphImage` | `Public` | no | _(none)_ | `EventOpenGraphImage` | _(none)_ |
-| 193 | `/api/event/{id}` | `GET` | `GetEventById` | Get Event Details | Event | `GetEventById` | `Public` | no | _(none)_ | _(none)_ | `DetailData` |
+| 193 | `/api/event/{id}` | `GET` | `GetEventById` | Get Event Details | Event | `GetEventById` | `Public` | no | _(none)_ | _(none)_ | _(none)_ |
 | 194 | `/api/event/{id}` | `PATCH` | `UpdateEvent` | Update Event | EventLifecycle | `UpdateEvent` | `Authenticated` | no | _(none)_ | _(none)_ | _(none)_ |
 | 195 | `/api/event/{id}` | `DELETE` | `DeleteEvent` | Delete Event | EventLifecycle | `DeleteEvent` | `Authenticated` | no | _(none)_ | _(none)_ | _(none)_ |
 | 196 | `/api/event/{id}/approve-publish` | `POST` | `ApprovePublishEvent` | Approve And Publish Event | EventLifecycle | `ApprovePublishEvent` | `Authenticated` | no | _(none)_ | `Write` | _(none)_ |
@@ -731,7 +731,7 @@
 | 703 | `/api/privacy-erasure/status` | `GET` | `GetPrivacyErasureStatus` | _(none)_ | PrivacyErasure | `GetPrivacyErasureStatus` | `Authenticated` | yes | _(none)_ | _(none)_ | _(none)_ |
 | 704 | `/api/public-experience/home` | `GET` | `GetHomeDiscovery` | Get Home Discovery | PublicExperience | `GetHomeDiscovery` | `Public` | no | _(none)_ | _(none)_ | `PublicHomeDiscovery` |
 | 705 | `/api/publicexperience/settings` | `GET` | `GetPublicExperienceSettings` | Get Public Experience Settings | PublicExperience | `GetPublicExperienceSettings` | `Public` | no | _(none)_ | _(none)_ | _(none)_ |
-| 706 | `/api/publicexperience/shell` | `GET` | `GetPublicExperienceShell` | Get Public Experience Shell | PublicExperience | `GetPublicExperienceShell` | `Public` | no | _(none)_ | _(none)_ | `PublicExperienceShell` |
+| 706 | `/api/publicexperience/shell` | `GET` | `GetPublicExperienceShell` | Get Public Experience Shell | PublicExperience | `GetPublicExperienceShell` | `Public` | no | _(none)_ | _(none)_ | _(none)_ |
 | 707 | `/api/registration-answer-files/{id}` | `GET` | `GetRegistrationAnswerFile` | _(none)_ | RegistrationAnswerFiles | `GetRegistrationAnswerFile` | `Admin` | no | _(none)_ | _(none)_ | _(none)_ |
 | 708 | `/api/registration-answer-files/{id}/release` | `POST` | `ReleaseRegistrationAnswerFile` | _(none)_ | RegistrationAnswerFiles | `ReleaseRegistrationAnswerFile` | `Admin` | no | _(none)_ | `Write` | _(none)_ |
 | 709 | `/api/registration-form-templates` | `GET` | `GetRegistrationFormTemplates` | _(none)_ | RegistrationForms | `GetRegistrationFormTemplates` | `Authenticated` | no | _(none)_ | _(none)_ | _(none)_ |

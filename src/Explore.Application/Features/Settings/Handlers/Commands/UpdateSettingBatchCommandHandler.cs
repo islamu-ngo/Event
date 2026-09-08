@@ -36,6 +36,7 @@ public class UpdateSettingBatchCommandHandler
     private readonly IUnitOfWork _unitOfWork;
     private readonly ISettingMutationLock _mutationLock;
     private readonly IEmailDeliverySettingsWriter _emailSettingsWriter;
+    private readonly IVisitorAccessSettingsWriter _visitorSettings;
 
     public UpdateSettingBatchCommandHandler(
         IHierarchicalSettingsResolver resolver,
@@ -49,6 +50,7 @@ public class UpdateSettingBatchCommandHandler
         IUnitOfWork unitOfWork,
         ISettingMutationLock mutationLock,
         IEmailDeliverySettingsWriter emailSettingsWriter,
+        IVisitorAccessSettingsWriter visitorSettings,
         ICerbosConfigResolver? cerbosConfigResolver = null,
         ILocationPrivacyGovernanceMutationService? locationPrivacyMutations = null)
     {
@@ -65,6 +67,7 @@ public class UpdateSettingBatchCommandHandler
         _unitOfWork = unitOfWork;
         _mutationLock = mutationLock;
         _emailSettingsWriter = emailSettingsWriter;
+        _visitorSettings = visitorSettings;
     }
 
     public async Task<BatchUpdateResponseDto> Handle(
@@ -101,14 +104,16 @@ public class UpdateSettingBatchCommandHandler
             : [];
         if (request.Scope is SettingScope.Instance or SettingScope.Tenant
             && request.Values.Keys.Any(key => categoryKeys.Contains(key)
-                && EmailDeliverySettingKeys.Contains(key)
+                && (EmailDeliverySettingKeys.Contains(key) || VisitorAccessSettingMutationGuard.Handles(key))
                 && SettingRegistry.Get(key) is { } definition
                 && IsScopeAllowed(definition, request.Scope)))
         {
             // Resolve governance and validate values while the complete SMTP policy is stable.
             // Allocate deferred effects per attempt so transaction retries cannot duplicate them.
             var mutation = await _mutationLock.ExecuteOrderedGroupsAsync(
-                [EmailDeliverySettingKeys.All],
+                [request.Values.Keys.Any(VisitorAccessSettingMutationGuard.Handles)
+                    ? Explore.Application.Services.VisitorAccessCapabilityResolver.AuthoritySettingKeys : [],
+                 request.Values.Keys.Any(EmailDeliverySettingKeys.Contains) ? EmailDeliverySettingKeys.All : []],
                 token => _unitOfWork.ExecuteSerializableAsync(async transactionToken =>
                 {
                     var notifications = new List<SettingChangedNotification>();
@@ -198,7 +203,7 @@ public class UpdateSettingBatchCommandHandler
                 && PublicationPolicySettingKeys.All.Contains(key, StringComparer.Ordinal);
 
             // Guarded publication-policy keys own lock evaluation at their mutation boundary.
-            if (!isGuardedPublicationPolicyMutation)
+            if (!isGuardedPublicationPolicyMutation && !VisitorAccessSettingMutationGuard.Handles(key))
             {
                 var (isBlocked, lockReason) = SettingCommandHelper.CheckLockState(
                     currentResolved, request.Scope);
@@ -289,9 +294,31 @@ public class UpdateSettingBatchCommandHandler
             }
         }
 
+        var visitorEntries = validationResults.Where(result => result.SkipReason is null
+            && VisitorAccessSettingMutationGuard.Handles(result.Key)).ToArray();
+        var appliedVisitorKeys = new HashSet<string>(StringComparer.Ordinal);
+        if (visitorEntries.Length > 0)
+        {
+            var visitorResult = await _visitorSettings.ApplyAsync(
+                [.. visitorEntries.Select(entry => new VisitorAccessSettingMutation(
+                    request.Scope == SettingScope.Tenant ? _tenantContext.TenantId : null,
+                    entry.Key, VisitorAccessSettingMutationKind.SetValue, entry.SerializedValue))],
+                resolvedUserId, cancellationToken);
+            if (!visitorResult.Success)
+                return new BatchUpdateResponseDto
+                {
+                    Success = false,
+                    Results = validationResults.Select(entry => new SettingUpdateResultDto
+                        { Key = entry.Key, Applied = false, SkipReason = entry.SkipReason ?? visitorResult.FailureCode }).ToList(),
+                    Message = visitorResult.FailureCode
+                };
+            appliedVisitorKeys.UnionWith(visitorEntries.Select(entry => entry.Key));
+            deferredNotifications!.AddRange(visitorResult.DeferredNotifications);
+        }
+
         var smtpEntries = validationResults.Where(result => result.SkipReason is null
             && EmailDeliverySettingKeys.Contains(result.Key)).ToArray();
-        var appliedSmtpKeys = new HashSet<string>(StringComparer.Ordinal);
+        var appliedSmtpKeys = new HashSet<string>(appliedVisitorKeys, StringComparer.Ordinal);
         if (smtpEntries.Length > 0)
         {
             var smtpResult = await _emailSettingsWriter.ApplyAsync(

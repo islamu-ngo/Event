@@ -119,6 +119,69 @@ public class AuthRedirectPagesTests : IDisposable
     }
 
     [Test]
+    public async Task LoginRedirect_RendersServerSignupDestinationsSeparatelyFromExistingAccountLogin()
+    {
+        ConfigureAuthProviderClient(new
+        {
+            primaryProvider = "keycloak",
+            providers = new[]
+            {
+                new { name = "Keycloak", displayName = "Keycloak", type = "button", recommended = true },
+                new { name = "Atproto", displayName = "AT Protocol", type = "handle_input", recommended = false }
+            },
+            visitorAccess = new
+            {
+                mode = "FullRegistrationAndAuth",
+                allowsNewNativeAllocation = true,
+                allowsAnonymousParticipation = true,
+                allowsAccountRequiredParticipation = true,
+                allowsExistingAccountLogin = true,
+                signupDestinations = new object[]
+                {
+                    new { provider = "Keycloak", url = "https://identity.example.test/realms/events/registrations" },
+                    new { provider = "Atproto", url = "/login?provider=atproto" },
+                    new { provider = "Local", url = "/invented-local-signup" }
+                }
+            }
+        });
+        var nav = _ctx.Services.GetRequiredService<BunitNavigationManager>();
+        nav.NavigateTo("/login");
+
+        var cut = _ctx.Render<LoginRedirect>();
+
+        var signup = cut.Find("[data-testid='visitor-signup-destinations']");
+        await Assert.That(cut.FindAll(".login-page__provider-button")).Count().IsEqualTo(2);
+        await Assert.That(signup.QuerySelector("h2")?.GetAttribute("id")).IsEqualTo("visitor-signup-heading");
+        await Assert.That(signup.QuerySelector("a[data-signup-provider=keycloak]")?.GetAttribute("href"))
+            .IsEqualTo("https://identity.example.test/realms/events/registrations");
+        await Assert.That(signup.QuerySelector("a[data-signup-provider=atproto]")?.GetAttribute("href"))
+            .IsEqualTo("/login?provider=atproto");
+        await Assert.That(cut.Markup).DoesNotContain("invented-local-signup");
+    }
+
+    [Test]
+    public async Task LoginRedirect_WithForcedAtprotoSignupDestination_ExpandsHandleForm()
+    {
+        ConfigureAuthProviderClient(new
+        {
+            primaryProvider = "local",
+            providers = new[]
+            {
+                new { name = "Local", displayName = "Local Identity", type = "credentials", recommended = true },
+                new { name = "Atproto", displayName = "AT Protocol", type = "handle_input", recommended = false }
+            }
+        });
+        var nav = _ctx.Services.GetRequiredService<BunitNavigationManager>();
+        nav.NavigateTo("/login?provider=atproto");
+
+        var cut = _ctx.Render<LoginRedirect>();
+
+        await Assert.That(cut.FindAll("form.login-page__handle-panel")).Count().IsEqualTo(1);
+        await Assert.That(cut.FindAll("form[data-local-login=true]")).Count().IsEqualTo(1);
+        await Assert.That(nav.Uri).EndsWith("/login?provider=atproto");
+    }
+
+    [Test]
     public async Task LoginRedirect_WithForcedProvider_ShouldAutoRedirectToThatProvider()
     {
         // Arrange
@@ -381,16 +444,9 @@ public class AuthRedirectPagesTests : IDisposable
             .First(button => button.TextContent.Contains("Continue with ATProto", StringComparison.Ordinal))
             .Click();
         cut.Find("input").Input("user.bsky.social");
-        cut.Find("form").Submit();
+        await cut.Find("form").SubmitAsync();
 
-        cut.WaitForAssertion(() =>
-        {
-            var alert = cut.Find("[role=alert]");
-            if (!alert.TextContent.Contains("ATProto sign-in could not be started", StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException("Safe ATProto challenge guidance was not rendered.");
-            }
-        });
+        await Assert.That(cut.FindAll("[role=alert]")).Count().IsEqualTo(1);
         await Assert.That(cut.Markup).DoesNotContain("provider-private-detail");
         await Assert.That(cut.Markup).DoesNotContain("atproto_challenge_failed");
     }

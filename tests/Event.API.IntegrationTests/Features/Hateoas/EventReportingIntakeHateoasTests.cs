@@ -96,7 +96,8 @@ public sealed class EventReportingIntakeHateoasTests
             CreateLinkGenerator(),
             new EventDetailLinkPolicy(),
             new EventCollectionLinkPolicy(),
-            guard);
+            guard,
+            Substitute.For<IVisitorAccessCapabilityResolver>());
 
         HalCollectionResource<EventListDto> resource = await assembler.ToCollectionResource(
             [cachedA, cachedB, cachedA],
@@ -125,11 +126,16 @@ public sealed class EventReportingIntakeHateoasTests
         IEventReportingIntakeGuard guard = Substitute.For<IEventReportingIntakeGuard>();
         guard.ResolveAsync(Arg.Any<Guid>(), cancellation.Token)
             .Returns(Task.FromCanceled<EventReportingIntakeDecision>(cancellation.Token));
+        var visitorResolver = Substitute.For<IVisitorAccessCapabilityResolver>();
+        visitorResolver.ResolveAsync(Arg.Any<Guid>(), cancellation.Token).Returns(
+            Task.FromResult(Explore.Application.Services.VisitorAccessCapabilityResolver.EvaluateProposedState(
+                new Explore.Application.Models.VisitorAccessPolicyState(VisitorAccessMode.FullRegistrationAndAuth, []))));
         var assembler = new EventResourceAssembler(
             CreateLinkGenerator(),
             new EventDetailLinkPolicy(),
             new EventCollectionLinkPolicy(),
-            guard);
+            guard,
+            visitorResolver);
         HttpContext context = CreateHttpContext(cancellation.Token);
 
         await Assert.ThrowsAsync<OperationCanceledException>(() => assembler.ToResource(CreateDetail(Guid.CreateVersion7()), context));

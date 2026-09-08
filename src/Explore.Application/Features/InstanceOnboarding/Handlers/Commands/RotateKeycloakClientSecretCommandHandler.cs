@@ -87,7 +87,11 @@ public class RotateKeycloakClientSecretCommandHandler(
         if (result.Status.Equals("rotated", StringComparison.OrdinalIgnoreCase))
         {
             configuration.KeycloakClientSecret = request.Request.NewClientSecret ?? string.Empty;
-            await configurationService.ApplyConfigurationAsync(configuration);
+            await configurationService.ApplyConfigurationAsync(configuration,
+                new HashSet<string>(StringComparer.Ordinal)
+                {
+                    Explore.Domain.Constants.InfrastructureSecretSettingKeys.Authentication.KeycloakClientSecret
+                }, cancellationToken);
             await jwtAuthorityRefreshNotifier.ReloadAsync(cancellationToken);
             result.AuthSchemesReloaded = true;
         }

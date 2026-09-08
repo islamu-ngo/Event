@@ -3,6 +3,7 @@
 
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.Event.Validators;
 using Explore.Application.Features.Events.Requests.Commands;
@@ -23,7 +24,9 @@ public sealed class ImportEventCommandHandler(
     HybridCache cache,
     IEventLifecyclePolicyProvider policyProvider,
     IEventLifecycleReadinessEvaluator readinessEvaluator,
-    TimeProvider timeProvider) : IRequestHandler<ImportEventCommand, BaseCommandResponse<Guid>>
+    TimeProvider timeProvider,
+    ISettingMutationLock mutationLock,
+    IVisitorAccessCapabilityResolver visitorCapabilities) : IRequestHandler<ImportEventCommand, BaseCommandResponse<Guid>>
 {
     private const string ValidationFailedCode = "event_import_validation_failed";
     private const string ReadinessFailedCode = "event_import_readiness_failed";
@@ -55,8 +58,18 @@ public sealed class ImportEventCommandHandler(
         DateTime utcNow = now.UtcDateTime;
         Guid eventId = Guid.CreateVersion7(now);
         Guid? importedTenantId = null;
-        BaseCommandResponse<Guid> response = await unitOfWork.ExecuteInTransactionAsync(async token =>
+        BaseCommandResponse<Guid> response = await mutationLock.ExecuteOrderedGroupsAsync(
+            [VisitorAccessCapabilityResolver.AuthoritySettingKeys],
+            outerToken => unitOfWork.ExecuteSerializableAsync(async token =>
         {
+            var capability = await visitorCapabilities.ResolveAsync(command.TenantId, token);
+            if (request.ParticipationConfiguration.IdentityAccessModeId == (int)IdentityAccessModeEnum.AccountRequired
+                && !capability.AllowsAccountRequiredParticipation)
+            {
+                return BaseCommandResponse.Failure<Guid>("event_visitor_account_onboarding_required",
+                    "Account-required participation requires an allowed public onboarding provider.");
+            }
+
             Event? existing = await eventRepository.GetById(eventId);
             if (existing is not null)
             {
@@ -123,7 +136,7 @@ public sealed class ImportEventCommandHandler(
             importedTenantId = created.TenantId;
 
             return Success(created.Id, "Event imported successfully.");
-        }, cancellationToken);
+        }, outerToken), cancellationToken);
 
         if (response.IsSuccess && importedTenantId.HasValue)
         {

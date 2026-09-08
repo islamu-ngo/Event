@@ -79,6 +79,8 @@ public class CreateEventCommandHandler : IRequestHandler<CreateEventCommand, Bas
     private readonly EventLocationAttachmentService _eventLocationAttachmentService;
     private readonly AtprotoEventPublicationPlanner _atprotoPublicationPlanner;
     private readonly TimeProvider _timeProvider;
+    private readonly ISettingMutationLock _mutationLock;
+    private readonly IVisitorAccessCapabilityResolver _visitorCapabilities;
 
     public CreateEventCommandHandler(
         IEventRepository eventRepository,
@@ -131,7 +133,9 @@ public class CreateEventCommandHandler : IRequestHandler<CreateEventCommand, Bas
         IEventLifecycleReadinessEvaluator lifecycleReadinessEvaluator,
         EventLocationAttachmentService eventLocationAttachmentService,
         AtprotoEventPublicationPlanner atprotoPublicationPlanner,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        ISettingMutationLock mutationLock,
+        IVisitorAccessCapabilityResolver visitorCapabilities)
     {
         _eventRepository = eventRepository;
         _eventSessionRepository = eventSessionRepository;
@@ -184,6 +188,8 @@ public class CreateEventCommandHandler : IRequestHandler<CreateEventCommand, Bas
         _eventLocationAttachmentService = eventLocationAttachmentService;
         _atprotoPublicationPlanner = atprotoPublicationPlanner;
         _timeProvider = timeProvider;
+        _mutationLock = mutationLock;
+        _visitorCapabilities = visitorCapabilities;
     }
 
     public async Task<BaseCommandResponse<Guid>> Handle(CreateEventCommand request, CancellationToken cancellationToken)
@@ -279,37 +285,45 @@ public class CreateEventCommandHandler : IRequestHandler<CreateEventCommand, Bas
         var notificationFanoutOutboxId = Guid.CreateVersion7();
         var federationCreatedAt = occurredAt;
 
-        if (publishOnCreate)
-        {
-            EventLifecyclePolicy policy = await _lifecyclePolicyProvider.GetEffectivePolicyAsync(
-                eventEntity.TenantId,
-                ValidationProfile.EventPublish,
-                cancellationToken);
-            if (policy.RequiresApproval)
-            {
-                return BaseCommandResponse.Failure<Guid>(
-                    EventPublicationExecutor.ApprovalRequiredCode,
-                    "Event creation failed because approval is required before publication.",
-                    ["This event cannot be published directly because tenant approval is required."]);
-            }
-
-            LifecycleReadinessResult readiness = _lifecycleReadinessEvaluator.Evaluate(eventEntity, policy.Profile, policy);
-            if (!readiness.IsReady)
-            {
-                return BaseCommandResponse.Failure<Guid>(
-                    "event_publish_readiness_failed",
-                    "Event creation failed because the event is not ready to publish.",
-                    readiness.Errors.Select(error => error.Message));
-            }
-
-            eventEntity.Publish(occurredAt);
-        }
-
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            var eventId = await _unitOfWork.ExecuteInTransactionAsync(async ct =>
+            var response = await _mutationLock.ExecuteOrderedGroupsAsync(
+                [VisitorAccessCapabilityResolver.AuthoritySettingKeys],
+                token => _unitOfWork.ExecuteSerializableAsync(async ct =>
             {
+                var capability = await _visitorCapabilities.ResolveAsync(eventEntity.TenantId, ct);
+                if (dto.ParticipationConfiguration.IdentityAccessModeId == (int)IdentityAccessModeEnum.AccountRequired
+                    && !capability.AllowsAccountRequiredParticipation)
+                {
+                    return BaseCommandResponse.Failure<Guid>("event_visitor_account_onboarding_required",
+                        "Account-required participation requires an allowed public onboarding provider.");
+                }
+
+                if (publishOnCreate)
+                {
+                    EventLifecyclePolicy policy = await _lifecyclePolicyProvider.GetEffectivePolicyAsync(
+                        eventEntity.TenantId, ValidationProfile.EventPublish, ct);
+                    if (policy.RequiresApproval)
+                    {
+                        return BaseCommandResponse.Failure<Guid>(
+                            EventPublicationExecutor.ApprovalRequiredCode,
+                            "Event creation failed because approval is required before publication.",
+                            ["This event cannot be published directly because tenant approval is required."]);
+                    }
+
+                    LifecycleReadinessResult readiness = _lifecycleReadinessEvaluator.Evaluate(eventEntity, policy.Profile, policy);
+                    if (!readiness.IsReady)
+                    {
+                        return BaseCommandResponse.Failure<Guid>(
+                            "event_publish_readiness_failed",
+                            "Event creation failed because the event is not ready to publish.",
+                            readiness.Errors.Select(error => error.Message));
+                    }
+
+                    eventEntity.Publish(occurredAt);
+                }
+
                 eventEntity = await _eventRepository.Create(eventEntity);
                 await AssignFeaturedImageActorAsync(dto, actorResult.ActorId);
                 await CreateEventIslamicAspectAsync(dto, eventEntity, ct);
@@ -347,9 +361,14 @@ public class CreateEventCommandHandler : IRequestHandler<CreateEventCommand, Bas
                         publishedAt));
                 }
 
-                return eventEntity.Id;
-            }, cancellationToken);
+                return BaseCommandResponse.Success(eventEntity.Id, "Event created successfully.");
+            }, token), cancellationToken);
+            if (!response.IsSuccess)
+            {
+                return response;
+            }
 
+            Guid eventId = response.Id;
             _metrics.RecordEventCreated();
             try
             {

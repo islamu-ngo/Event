@@ -31,6 +31,7 @@ public class ResetSettingCommandHandler
     private readonly IPublicationPolicyMutationBoundary _publicationPolicyMutationBoundary;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IEmailDeliverySettingsWriter _emailSettingsWriter;
+    private readonly IVisitorAccessSettingsWriter _visitorSettings;
 
     public ResetSettingCommandHandler(
         IHierarchicalSettingsResolver resolver,
@@ -43,6 +44,7 @@ public class ResetSettingCommandHandler
         IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary,
         IUnitOfWork unitOfWork,
         IEmailDeliverySettingsWriter emailSettingsWriter,
+        IVisitorAccessSettingsWriter visitorSettings,
         ICerbosConfigResolver? cerbosConfigResolver = null,
         ILocationPrivacyGovernanceMutationService? locationPrivacyMutations = null)
     {
@@ -58,6 +60,7 @@ public class ResetSettingCommandHandler
         _publicationPolicyMutationBoundary = publicationPolicyMutationBoundary;
         _unitOfWork = unitOfWork;
         _emailSettingsWriter = emailSettingsWriter;
+        _visitorSettings = visitorSettings;
     }
 
     public async Task<BaseCommandResponse<Guid>> Handle(
@@ -90,6 +93,14 @@ public class ResetSettingCommandHandler
         if (!authorized)
         {
             return BaseCommandResponse.Validation<Guid>([authError!], authError);
+        }
+
+        if (VisitorAccessSettingMutationGuard.Handles(request.Key))
+        {
+            Guid? actor = await SettingCommandHelper.ResolveCurrentUserIdAsync(_adminContext, _currentUserService, cancellationToken);
+            var result = await _visitorSettings.ApplyAsync(
+                [new(_tenantContext.TenantId, request.Key, VisitorAccessSettingMutationKind.Remove)], actor, cancellationToken);
+            return await result.CompleteAsync(_resolver, _mediator, request.Scope, _tenantContext.TenantId);
         }
 
         if (EmailDeliverySettingKeys.Contains(request.Key))

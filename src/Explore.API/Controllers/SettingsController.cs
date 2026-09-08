@@ -133,6 +133,7 @@ public class SettingsController : ControllerBase
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> ResetTenantSetting(
         string key, CancellationToken cancellationToken = default)
     {
@@ -236,6 +237,7 @@ public class SettingsController : ControllerBase
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<BatchUpdateResponseDto>> UpdateTenantSettingsBatch(
         string category,
         [FromBody] UpdateSettingBatchDto body,
@@ -252,6 +254,13 @@ public class SettingsController : ControllerBase
 
         if (!result.Success)
         {
+            if (result.Message == CommandResponseResultMapper.VisitorAccessAccountRequiredConflict
+                || result.Results.Any(item => item.SkipReason == CommandResponseResultMapper.VisitorAccessAccountRequiredConflict))
+            {
+                return this.MapCommandResponse(BaseCommandResponse.Failure<Guid>(
+                    CommandResponseResultMapper.VisitorAccessAccountRequiredConflict));
+            }
+
             return this.ToValidationProblem(
                 SettingsValidationProblem,
                 result.Message ?? "Tenant settings batch update failed.");
@@ -271,6 +280,7 @@ public class SettingsController : ControllerBase
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> UpdateTenantSetting(
         string key,
         [FromBody] UpdateSettingValueDto body,
@@ -299,6 +309,7 @@ public class SettingsController : ControllerBase
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> LockTenantSetting(
         string key, CancellationToken cancellationToken = default)
     {
@@ -318,6 +329,7 @@ public class SettingsController : ControllerBase
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> UnlockTenantSetting(
         string key, CancellationToken cancellationToken = default)
     {
@@ -473,7 +485,9 @@ public class SettingsController : ControllerBase
             return this.ToForbiddenProblem(detail: response.Message);
         }
 
-        return this.ToCommandValidationProblem(response, SettingsValidationProblem);
+        return response.FailureCode == CommandResponseResultMapper.VisitorAccessAccountRequiredConflict
+            ? this.MapCommandResponse(response)
+            : this.ToCommandValidationProblem(response, SettingsValidationProblem);
     }
 
 }

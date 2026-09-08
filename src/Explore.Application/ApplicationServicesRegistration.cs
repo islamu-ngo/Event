@@ -303,6 +303,8 @@ public static class ApplicationServicesRegistration
         services.AddScoped<IWebhookAuditEventWriter, WebhookAuditEventWriter>();
         services.AddScoped<IWebhookOwnershipScopeResolver, WebhookOwnershipScopeResolver>();
         services.AddScoped<IAuthProviderConfigurationService, AuthProviderConfigurationService>();
+        services.AddScoped<IVisitorAccessProviderReader, VisitorAccessProviderReader>();
+        services.AddScoped<IVisitorAccessCapabilityResolver, VisitorAccessCapabilityResolver>();
         services.AddScoped<IKeycloakIdentityContractContributor, EventKeycloakIdentityContractContributor>();
         services.AddScoped<IAccountAuthorityLifecycleEmailService, DefaultAccountAuthorityLifecycleEmailService>();
         services.AddScoped<IKeycloakRealmDesiredStateBuilder, KeycloakRealmDesiredStateBuilder>();

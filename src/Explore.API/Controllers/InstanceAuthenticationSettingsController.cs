@@ -82,6 +82,7 @@ public sealed class InstanceAuthenticationSettingsController : InstanceSettingsC
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> UpdateAuthProviderConfiguration(
         [FromBody] PatchAuthProviderConfigurationDto configuration, CancellationToken cancellationToken = default)
     {

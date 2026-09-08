@@ -12,12 +12,18 @@
     gap: var(--isl-space-5);
 }
 
+.participation-configuration-editor__capability-note,
 .participation-configuration-editor__message {
     display: grid;
     gap: var(--isl-space-2);
     padding: var(--isl-space-4);
     border: var(--isl-card-border);
     border-radius: var(--isl-radius-card);
+}
+
+.participation-configuration-editor__capability-note {
+    border-color: var(--isl-color-warning);
+    background: color-mix(in srgb, var(--isl-color-warning) 8%, transparent);
 }
 
 .participation-configuration-editor__message ul {

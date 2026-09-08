@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Event.Validators;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.Events.Requests.Commands;
@@ -38,6 +39,9 @@ public sealed class UpdateEventDraftCommandHandler : IRequestHandler<UpdateEvent
     private readonly IEventRegistrationPolicyRepository _eventRegistrationPolicyRepository;
     private readonly IEventScheduleProjectionCalculator _scheduleProjectionCalculator;
     private readonly HybridCache _cache;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly ISettingMutationLock _mutationLock;
+    private readonly IVisitorAccessCapabilityResolver _visitorCapabilities;
 
     public UpdateEventDraftCommandHandler(
         IEventRepository eventRepository,
@@ -51,7 +55,10 @@ public sealed class UpdateEventDraftCommandHandler : IRequestHandler<UpdateEvent
         IEventSeriesRepository eventSeriesRepository,
         IEventRegistrationPolicyRepository eventRegistrationPolicyRepository,
         IEventScheduleProjectionCalculator scheduleProjectionCalculator,
-        HybridCache cache)
+        HybridCache cache,
+        IUnitOfWork unitOfWork,
+        ISettingMutationLock mutationLock,
+        IVisitorAccessCapabilityResolver visitorCapabilities)
     {
         _eventRepository = eventRepository;
         _participationConfigurationRepository = participationConfigurationRepository;
@@ -65,6 +72,9 @@ public sealed class UpdateEventDraftCommandHandler : IRequestHandler<UpdateEvent
         _eventRegistrationPolicyRepository = eventRegistrationPolicyRepository;
         _scheduleProjectionCalculator = scheduleProjectionCalculator;
         _cache = cache;
+        _unitOfWork = unitOfWork;
+        _mutationLock = mutationLock;
+        _visitorCapabilities = visitorCapabilities;
     }
 
     public async Task<BaseCommandResponse<Guid>> Handle(UpdateEventDraftCommand request, CancellationToken cancellationToken)
@@ -87,10 +97,31 @@ public sealed class UpdateEventDraftCommandHandler : IRequestHandler<UpdateEvent
                 "Event draft update failed.");
         }
 
+        Guid? tenantId = null;
+        BaseCommandResponse<Guid> response = await _mutationLock.ExecuteOrderedGroupsAsync(
+            [VisitorAccessCapabilityResolver.AuthoritySettingKeys],
+            token => _unitOfWork.ExecuteSerializableAsync(async innerToken =>
+            {
+                var result = await UpdateAsync(request, innerToken);
+                tenantId = result.TenantId;
+                return result.Response;
+            }, token), cancellationToken);
+        if (response.IsSuccess && tenantId.HasValue)
+        {
+            await _cache.RemoveAsync($"event:detail:{request.Id}", cancellationToken);
+            await _cache.RemoveByTagAsync(CacheTags.EventListByTenant(tenantId.Value), cancellationToken);
+        }
+
+        return response;
+    }
+
+    private async Task<(BaseCommandResponse<Guid> Response, Guid? TenantId)> UpdateAsync(
+        UpdateEventDraftCommand request, CancellationToken cancellationToken)
+    {
         var eventEntity = await _eventRepository.GetScheduleGraphForUpdateAsync(request.Id, cancellationToken);
         if (eventEntity is null)
         {
-            return BaseCommandResponse.Validation<Guid>(["Event not found."], "Event not found.");
+            return (BaseCommandResponse.Validation<Guid>(["Event not found."], "Event not found."), null);
         }
 
         if (eventEntity.ConcurrencyStamp != request.Draft.ExpectedConcurrencyStamp)
@@ -105,10 +136,10 @@ public sealed class UpdateEventDraftCommandHandler : IRequestHandler<UpdateEvent
         EventStatusEnum currentStatus = (EventStatusEnum)eventEntity.EventStatusId;
         if (!EventLifecycleRules.IsDraftEditable(currentStatus))
         {
-            return BaseCommandResponse.Failure<Guid>(
+            return (BaseCommandResponse.Failure<Guid>(
                 DraftNotEditableCode,
                 "Event draft update failed.",
-                ["Only draft events can be updated through the draft workflow."]);
+                ["Only draft events can be updated through the draft workflow."]), null);
         }
 
         if (!await ImageReferenceEligibility.AreEligibleAsync(
@@ -117,9 +148,9 @@ public sealed class UpdateEventDraftCommandHandler : IRequestHandler<UpdateEvent
                 request.Draft.FeaturedImageId,
                 request.Draft.BackgroundImageId))
         {
-            return BaseCommandResponse.Validation<Guid>(
+            return (BaseCommandResponse.Validation<Guid>(
                 ["Every image must be an active public safe-raster object in the current tenant."],
-                "Event draft update failed.");
+                "Event draft update failed."), null);
         }
 
         EventParticipationConfiguration? participationConfiguration =
@@ -129,9 +160,9 @@ public sealed class UpdateEventDraftCommandHandler : IRequestHandler<UpdateEvent
                 cancellationToken);
         if (participationConfiguration is null)
         {
-            return BaseCommandResponse.Failure<Guid>(
+            return (BaseCommandResponse.Failure<Guid>(
                 "event_participation_configuration_not_found",
-                "Event participation configuration not found.");
+                "Event participation configuration not found."), null);
         }
 
         if (participationConfiguration.ConcurrencyStamp
@@ -142,6 +173,14 @@ public sealed class UpdateEventDraftCommandHandler : IRequestHandler<UpdateEvent
                 "The event participation configuration changed since it was loaded. Refresh the event and try again.",
                 "event_participation_configuration",
                 eventEntity.Id.ToString());
+        }
+
+        var capability = await _visitorCapabilities.ResolveAsync(eventEntity.TenantId, cancellationToken);
+        if (request.Draft.ParticipationConfiguration.IdentityAccessModeId == (int)IdentityAccessModeEnum.AccountRequired
+            && !capability.AllowsAccountRequiredParticipation)
+        {
+            return (BaseCommandResponse.Failure<Guid>("event_visitor_account_onboarding_required",
+                "Account-required participation requires an allowed public onboarding provider."), null);
         }
 
         eventEntity.EnsureDraftEditable();
@@ -179,9 +218,6 @@ public sealed class UpdateEventDraftCommandHandler : IRequestHandler<UpdateEvent
         await _participationConfigurationRepository.UpdateAsync(participationConfiguration, cancellationToken);
         await _eventRepository.Update(eventEntity);
 
-        await _cache.RemoveAsync($"event:detail:{eventEntity.Id}", cancellationToken);
-        await _cache.RemoveByTagAsync(CacheTags.EventListByTenant(eventEntity.TenantId), cancellationToken);
-
-        return BaseCommandResponse.Success(eventEntity.Id, "Event draft updated successfully.");
+        return (BaseCommandResponse.Success(eventEntity.Id, "Event draft updated successfully."), eventEntity.TenantId);
     }
 }

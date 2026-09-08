@@ -102,7 +102,14 @@ public class BootstrapKeycloakRealmCommandHandler
             KeycloakClientSecret = request.BootstrapRequest.BlazorClientSecret
         };
 
-        await _configurationService.ApplyConfigurationAsync(runtimeConfiguration);
+        await _configurationService.ApplyConfigurationAsync(runtimeConfiguration,
+            new HashSet<string>(StringComparer.Ordinal)
+            {
+                Explore.Domain.Constants.GovernanceSettingKeys.Authentication.PrimaryProviderId,
+                Explore.Domain.Constants.GovernanceSettingKeys.Authentication.KeycloakAuthority,
+                Explore.Domain.Constants.GovernanceSettingKeys.Authentication.KeycloakClientId,
+                Explore.Domain.Constants.InfrastructureSecretSettingKeys.Authentication.KeycloakClientSecret
+            }, cancellationToken);
         await _jwtAuthorityRefreshNotifier.ReloadAsync(cancellationToken);
 
         LogKeycloakBootstrapAudit(

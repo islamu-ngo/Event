@@ -2,6 +2,7 @@
 // ABOUTME: Enforces registry, sensitivity, system-lock, and typed-value constraints before persistence.
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Features.ControlPlane.Requests.Commands;
 using Explore.Application.Features.Settings.Handlers;
 using Explore.Application.Notifications;
@@ -22,7 +23,8 @@ public sealed class SetControlPlaneTenantSettingCommandHandler(
     IMediator mediator,
     IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary,
     IUnitOfWork unitOfWork,
-    IEmailDeliverySettingsWriter emailDeliverySettingsWriter)
+    IEmailDeliverySettingsWriter emailDeliverySettingsWriter,
+    IVisitorAccessSettingsWriter visitorSettings)
     : IRequestHandler<SetControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> Handle(
@@ -56,6 +58,14 @@ public sealed class SetControlPlaneTenantSettingCommandHandler(
                 request.TenantId,
                 "setting_validation_failed",
                 "The tenant setting value is invalid.");
+        }
+
+        if (VisitorAccessSettingMutationGuard.Handles(request.Key))
+        {
+            var result = await visitorSettings.ApplyAsync(
+                [new(request.TenantId, request.Key, VisitorAccessSettingMutationKind.SetValue, serializedValue)],
+                actorUserId, cancellationToken);
+            return await result.CompleteAsync(settingsResolver, mediator, SettingScope.Tenant, request.TenantId);
         }
 
         if (EmailDeliverySettingKeys.Contains(request.Key))

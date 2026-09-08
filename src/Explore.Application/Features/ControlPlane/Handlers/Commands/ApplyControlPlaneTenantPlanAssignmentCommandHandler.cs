@@ -3,6 +3,7 @@
 
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Features.ControlPlane.Plans;
 using Explore.Application.Features.ControlPlane.Requests.Commands;
 using Explore.Application.Notifications;
@@ -26,7 +27,8 @@ public sealed class ApplyControlPlaneTenantPlanAssignmentCommandHandler(
     IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary,
     IHierarchicalSettingsResolver settingsResolver,
     IMediator mediator,
-    IEmailDeliverySettingsWriter emailDeliverySettingsWriter)
+    IEmailDeliverySettingsWriter emailDeliverySettingsWriter,
+    IVisitorAccessSettingsWriter visitorSettingsWriter)
     : IRequestHandler<ApplyControlPlaneTenantPlanAssignmentCommand, BaseCommandResponse<Guid>>
 {
     private const string InvalidPublicationPolicyCode = "event_reporting_intake_policy_invalid";
@@ -67,12 +69,14 @@ public sealed class ApplyControlPlaneTenantPlanAssignmentCommandHandler(
             .OrderBy(GuardedKeyOrder)
             .ToArray();
         TenantPlanVersionSetting[] unguardedSettings = version.Settings
-            .Where(setting => !IsGuarded(setting) && !EmailDeliverySettingKeys.Contains(setting.SettingKey))
+            .Where(setting => !IsGuarded(setting) && !EmailDeliverySettingKeys.Contains(setting.SettingKey)
+                && !VisitorAccessSettingMutationGuard.Handles(setting.SettingKey))
             .OrderBy(setting => setting.SettingKey, StringComparer.Ordinal)
             .ToArray();
         TenantPlanVersionSetting[] smtpSettings = version.Settings
             .Where(setting => EmailDeliverySettingKeys.Contains(setting.SettingKey))
             .ToArray();
+        bool hasVisitorSettings = version.Settings.Any(setting => VisitorAccessSettingMutationGuard.Handles(setting.SettingKey));
         TenantSettingOverrideUpsert[] unguardedUpserts = unguardedSettings
             .Select(setting => new TenantSettingOverrideUpsert(setting.SettingKey, setting.JsonValue, setting.IsLocked))
             .ToArray();
@@ -86,13 +90,13 @@ public sealed class ApplyControlPlaneTenantPlanAssignmentCommandHandler(
             ? [.. unguardedMutationKeys, GovernanceSettingKeys.Storage.DefaultTenantQuotaBytes]
             : unguardedMutationKeys;
 
-        if (guardedSettings.Length == 0 && outerMutationKeys.Length == 0 && smtpSettings.Length == 0)
+        if (guardedSettings.Length == 0 && outerMutationKeys.Length == 0 && smtpSettings.Length == 0 && !hasVisitorSettings)
         {
             return Success(request.AssignmentId);
         }
 
         Task<(BaseCommandResponse<Guid> Response, IReadOnlyList<SettingChangedNotification> Notifications)>
-            ApplyTransactionAsync(CancellationToken token) => smtpSettings.Length == 0
+            ApplyTransactionAsync(CancellationToken token) => smtpSettings.Length == 0 && !hasVisitorSettings
                 ? unitOfWork.ExecuteInTransactionAsync(ApplyWithLocksAsync, token)
                 : unitOfWork.ExecuteSerializableAsync(ApplyWithLocksAsync, token);
 
@@ -123,10 +127,13 @@ public sealed class ApplyControlPlaneTenantPlanAssignmentCommandHandler(
         (BaseCommandResponse<Guid> Response, IReadOnlyList<SettingChangedNotification> Notifications) outcome;
         try
         {
-            outcome = smtpSettings.Length == 0
+            outcome = smtpSettings.Length == 0 && !hasVisitorSettings
                 ? await ApplyTransactionAsync(cancellationToken)
                 : await mutationLock.ExecuteOrderedGroupsAsync(
-                    [EmailDeliverySettingKeys.All], ApplyTransactionAsync, cancellationToken);
+                    [hasVisitorSettings ? Explore.Application.Services.VisitorAccessCapabilityResolver.AuthoritySettingKeys : [],
+                     smtpSettings.Length > 0 ? EmailDeliverySettingKeys.All : [],
+                     guardedSettings.Length > 0 ? PublicationPolicySettingKeys.All : [],
+                     outerMutationKeys], ApplyTransactionAsync, cancellationToken);
         }
         catch (TenantPlanApplyRejectedException exception)
         {
@@ -187,6 +194,18 @@ public sealed class ApplyControlPlaneTenantPlanAssignmentCommandHandler(
                 return (result.ToCommandResponse(request.AssignmentId, "Tenant plan applied."), []);
 
             notifications.AddRange(result.ToNotifications(request.AppliedByUserId));
+        }
+
+        var visitorSettings = version.Settings.Where(setting => VisitorAccessSettingMutationGuard.Handles(setting.SettingKey)).ToArray();
+        if (visitorSettings.Length > 0)
+        {
+            var result = await visitorSettingsWriter.ApplyAsync(
+                [.. visitorSettings.Select(setting => new VisitorAccessSettingMutation(request.TenantId, setting.SettingKey,
+                    VisitorAccessSettingMutationKind.SetValue, setting.JsonValue, setting.IsLocked))],
+                request.AppliedByUserId, cancellationToken);
+            if (!result.Success)
+                throw new TenantPlanApplyRejectedException(Failure(request.AssignmentId, result.FailureCode!));
+            notifications.AddRange(result.DeferredNotifications);
         }
 
         if (guardedSettings.Count > 0)

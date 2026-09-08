@@ -8,6 +8,9 @@ using Explore.Application.DTOs.Event;
 using Explore.Application.Features.Events.Handlers.Commands;
 using Explore.Application.Features.Events.Requests.Commands;
 using Explore.Application.Services.Lifecycle;
+using Explore.Application.Services;
+using Explore.Persistence;
+using Microsoft.Extensions.Configuration;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Repositories;
@@ -79,6 +82,11 @@ public sealed class ImportEventAmbiguousCommitPersistenceTests(PostgreSqlContain
                 },
                 RequiredSessionFields = new HashSet<Enum>()
             });
+        var mutationLock = new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context));
+        var systemSettings = new SystemSettingRepository(context, mutationLock);
+        var visitorCapabilities = new VisitorAccessCapabilityResolver(systemSettings,
+            new TenantSettingRepository(context, mutationLock),
+            new VisitorAccessProviderReader(systemSettings, new ConfigurationBuilder().Build()));
         var handler = new ImportEventCommandHandler(
             repository,
             Substitute.For<IStorageObjectRepository>(),
@@ -86,7 +94,9 @@ public sealed class ImportEventAmbiguousCommitPersistenceTests(PostgreSqlContain
             cache,
             policyProvider,
             new EventLifecycleReadinessEvaluator(),
-            new FixedTimeProvider(Now));
+            new FixedTimeProvider(Now),
+            mutationLock,
+            visitorCapabilities);
         var request = new ImportEventRequestDto
         {
             Title = "Committed import",

@@ -111,6 +111,10 @@ public sealed record AuthProviderConfigurationWriteDto
     public string GoogleClientSecret { get; init; } = string.Empty;
     public bool LockAtprotoLoginEnabled { get; init; }
     public bool LockGoogleSsoEnabled { get; init; }
+    public global::Explore.Domain.Enums.PublicOnboardingPolicy KeycloakPublicOnboardingPolicy { get; init; }
+    public string KeycloakPublicSignupUrl { get; init; } = string.Empty;
+    public global::Explore.Domain.Enums.PublicOnboardingPolicy GooglePublicOnboardingPolicy { get; init; }
+    public string GooglePublicSignupUrl { get; init; } = string.Empty;
 }
 
 public sealed record PatchAuthorizationProviderConfigurationDto

@@ -77,6 +77,7 @@ public class GetPublicExperienceShellQueryHandler(
         {
             SchemaVersion = 1,
             IsAvailable = true,
+            VisitorAccess = settings.VisitorAccess,
             DirectoryOperator = settings.DirectoryOperator,
             InstanceOperator = settings.InstanceOperator,
             Revision = BuildRevision(
@@ -507,6 +508,7 @@ public class GetPublicExperienceShellQueryHandler(
         return string.Join(':',
             1,
             settings.TenantId.ToString("N"),
+            JsonSerializer.Serialize(settings.VisitorAccess),
             mode,
             string.IsNullOrWhiteSpace(eventCatalogLabel) ? "Events" : eventCatalogLabel.Trim(),
             railPublicVisibility,

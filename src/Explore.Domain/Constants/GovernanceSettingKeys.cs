@@ -231,10 +231,14 @@ public static class GovernanceSettingKeys
         public const string PrimaryProviderId = "auth.primary_provider_id";
         public const string KeycloakAuthority = "auth.keycloak_authority";
         public const string KeycloakClientId = "auth.keycloak_client_id";
+        public const string KeycloakPublicOnboardingPolicy = "auth.keycloak_public_onboarding_policy";
+        public const string KeycloakPublicSignupUrl = "auth.keycloak_public_signup_url";
         public const string AtprotoLoginEnabled = "auth.atproto_login_enabled";
         public const string AtprotoPublicUrl = "auth.atproto_public_url";
         public const string GoogleSsoEnabled = "auth.google_sso_enabled";
         public const string GoogleClientId = "auth.google_client_id";
+        public const string GooglePublicOnboardingPolicy = "auth.google_public_onboarding_policy";
+        public const string GooglePublicSignupUrl = "auth.google_public_signup_url";
     }
 
     public static class Federation
@@ -409,6 +413,7 @@ public static class GovernanceSettingKeys
     public static class PublicExperience
     {
         public const string Mode = "public_experience.mode";
+        public const string VisitorAccessMode = "public_experience.visitor_access_mode";
         public const string EventCatalogLabel = "public_experience.event_catalog_label";
         public const string PrimaryOrganizationId = "public_experience.primary_organization_id";
         public const string HomeBlocks = "public_experience.home_blocks";

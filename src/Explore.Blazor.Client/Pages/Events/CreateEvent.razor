@@ -462,10 +462,23 @@
                                                Disabled="@AreEventOptionsDisabled"
                                                Class="create-event__option-select"
                                                data-testid="identity-access-select">
-                                        <MudSelectItem T="int?" Value="@((int?)AccountRequired)">Account required</MudSelectItem>
+                                        <MudSelectItem T="int?"
+                                                       Value="@((int?)AccountRequired)"
+                                                       Disabled="@(!AllowsAccountRequiredParticipation)">
+                                            Account required
+                                        </MudSelectItem>
                                         <MudSelectItem T="int?" Value="@((int?)GuestAllowed)">Guests allowed</MudSelectItem>
                                         <MudSelectItem T="int?" Value="@((int?)CapabilityTokenAllowed)">Capability-token access</MudSelectItem>
                                     </MudSelect>
+                                }
+
+                                @if (IsPlatformManagedParticipation && !AllowsAccountRequiredParticipation)
+                                {
+                                    <div class="create-event__visitor-capability-note"
+                                         role="note"
+                                         data-testid="create-event-account-required-unavailable">
+                                        @AccountRequiredUnavailableMessage
+                                    </div>
                                 }
 
                                 @if (UsesEmailParticipationRecovery)

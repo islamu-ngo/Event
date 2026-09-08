@@ -12,10 +12,17 @@ namespace Explore.API.ExceptionHandling;
 
 internal static class CommandResponseResultMapper
 {
+    internal const string VisitorAccessAccountRequiredConflict = "visitor_access_account_required_conflict";
     private static readonly ApiValidationProblemDescriptor CommandValidationProblem = new(
         "command",
         "Command validation failed",
         "The command could not be completed.");
+
+    private static readonly CommandFailurePolicy VisitorAccessFailurePolicy = CommandFailurePolicy
+        .ValidatedBy(CommandValidationProblem)
+        .Conflict("Visitor access conflict",
+            "Existing account-required events must retain an available public onboarding provider.",
+            VisitorAccessAccountRequiredConflict);
 
     private static readonly ApiNotFoundProblemDescriptor CommandNotFoundProblem = new(
         "Resource not found",
@@ -73,6 +80,7 @@ internal static class CommandResponseResultMapper
 
         return response.FailureCode switch
         {
+            VisitorAccessAccountRequiredConflict => VisitorAccessFailurePolicy.Map(controller, response),
             FailureCodes.NotFound => controller.ToNotFoundProblem(
                 CommandNotFoundProblem,
                 response.Message),

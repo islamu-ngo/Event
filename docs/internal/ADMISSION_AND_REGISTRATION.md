@@ -141,6 +141,43 @@ Registration and Admission are kept in separate aggregates for five critical arc
 
 ---
 
+## Visitor Onboarding And New Allocation Policy
+
+`public_experience.visitor_access_mode` is separate from the existing public display
+mode. Its values are `FullRegistrationAndAuth`, `AnonymousOnly` and
+`DirectoryListingOnly`. The default permits only capabilities actually available;
+it does not promise public signup. Local-only hosting can offer anonymous native
+participation and operator login, but cannot configure AccountRequired events on
+the strength of Local sign-in alone.
+
+The Application-owned `VisitorAccessCapabilityResolver` has one pure evaluator
+for current and complete proposed policy states. Keycloak and Google onboarding
+require explicit operator policy and a trusted signup URL; AT Protocol uses its
+provider-selected native onboarding flow. SMTP and the identity of the primary
+provider are not substitutes for the aggregate capability.
+
+Configuration, direct creation, import, draft update and ordinary/privileged
+publication must reject unusable AccountRequired participation. The shared
+`EventPublicationExecutor` preserves this condition when privileged publication
+skips approval. The common new-order starter rejects new native allocation in
+DirectoryListingOnly mode before inventory or order effects. Existing lawful
+status and cancellation access do not inherit that new-allocation restriction.
+
+Provider and visitor-setting writes evaluate their complete final effective state,
+including inherited tenants and configured unpublished events. Removing the last
+eligible public onboarding path conflicts while affected AccountRequired
+configurations remain; the writer never silently rewrites those events.
+Generic, batch, reset, lock/unlock and control-plane writes use the same boundary.
+Configuration import keeps its existing allowed-key contract rather than making
+prohibited authentication keys portable.
+
+Both sides acquire the full `VisitorAccessCapabilityResolver.AuthoritySettingKeys`
+group through `ISettingMutationLock.ExecuteOrderedGroupsAsync` before opening
+their transaction or reading its authority snapshot. Existing SMTP/reporting
+groups join that one outer acquisition in the canonical order. `ExecuteManyAsync`
+is not an outer lease: it may open a transaction itself. Rejected mutations leave
+policy, event and allocation state unchanged; notifications follow commit.
+
 ## 5. End-to-End Lifecycle Sequence
 
 ```mermaid

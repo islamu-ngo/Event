@@ -5,6 +5,22 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 ## 2026-09-08
 
+- **Breaking: visitor onboarding bounds AccountRequired participation.**
+  Create, import, draft/configuration update and ordinary/privileged publication
+  reject AccountRequired participation without an eligible public onboarding
+  path. Provider or visitor-policy changes that remove the last path conflict
+  instead of rewriting events. DirectoryListingOnly rejects new native allocation,
+  not existing lawful registration status or cancellation.
+- **Shared visitor discovery.** Existing public settings, shell, authentication
+  provider configuration and event-detail responses add `visitorAccess`. Typed
+  mode and provider enums match native string JSON. Provider HAL emits
+  `signup:atproto`, `signup:keycloak` or `signup:google` with the exact shared
+  destination; there is no `signup:local`. Public metadata and event-detail
+  candidates remain no-store, and mutations recheck authority transactionally.
+- **Secondary ATProto onboarding.** Verified, enabled, tenant-usable ATProto can
+  create a new visitor's platform account through its provider-selected flow
+  when shared policy permits it. Existing linked login and exact configured
+  administrator authority remain separate; no Local public signup is restored.
 - **Local lifecycle operations.** `POST /api/auth/local/email-verifications`
   (`RequestLocalEmailVerification`) and `/password-recoveries`
   (`RequestLocalPasswordRecovery`) return empty 202 responses without disclosing

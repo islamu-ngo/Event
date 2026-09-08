@@ -489,7 +489,11 @@ public class InstanceOnboardingServiceTests
                 PrimaryProviderId = 4,
                 LockPrimaryProvider = true,
                 AtprotoLoginEnabled = true,
-                AtprotoPublicUrl = "https://events.example.test"
+                AtprotoPublicUrl = "https://events.example.test",
+                KeycloakPublicOnboardingPolicy = PublicOnboardingPolicy.Allowed,
+                KeycloakPublicSignupUrl = "https://identity.example.test/realms/events/registrations",
+                GooglePublicOnboardingPolicy = PublicOnboardingPolicy.Denied,
+                GooglePublicSignupUrl = "https://accounts.example.test/enroll"
             });
         using var document = JsonDocument.Parse(requestBody!);
         JsonElement configuration = document.RootElement
@@ -503,6 +507,14 @@ public class InstanceOnboardingServiceTests
             .IsTrue();
         await Assert.That(configuration.GetProperty("atprotoLoginEnabled").GetBoolean())
             .IsTrue();
+        await Assert.That(configuration.GetProperty("keycloakPublicOnboardingPolicy").GetString())
+            .IsEqualTo("Allowed");
+        await Assert.That(configuration.GetProperty("keycloakPublicSignupUrl").GetString())
+            .IsEqualTo("https://identity.example.test/realms/events/registrations");
+        await Assert.That(configuration.GetProperty("googlePublicOnboardingPolicy").GetString())
+            .IsEqualTo("Denied");
+        await Assert.That(configuration.GetProperty("googlePublicSignupUrl").GetString())
+            .IsEqualTo("https://accounts.example.test/enroll");
     }
 
     #endregion

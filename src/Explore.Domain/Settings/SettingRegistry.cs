@@ -36,6 +36,7 @@ public static class SettingRegistry
         all.AddRange(WebhookDeliverySettingDefinitions.All);
         all.AddRange(StorageSettingDefinitions.All);
         all.AddRange(SecuritySettingDefinitions.All);
+        all.AddRange(AuthenticationSettingDefinitions.All);
         all.AddRange(SupportAccessSettingDefinitions.All);
         all.AddRange(CerbosSettingDefinitions.All);
         all.AddRange(ReportingSettingDefinitions.All);

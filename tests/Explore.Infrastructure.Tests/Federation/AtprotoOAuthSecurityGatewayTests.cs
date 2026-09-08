@@ -17,12 +17,15 @@ using Explore.Application.Features.Authentication.Atproto.Handlers.Commands;
 using Explore.Application.Features.Authentication.Atproto.Models;
 using Explore.Application.Features.Authentication.Atproto.Requests.Commands;
 using Explore.Application.Features.Authentication.Atproto.Services;
+using Explore.Application.Services;
 using Explore.Atproto.Transport;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Explore.Domain.ValueObjects;
 using Explore.Infrastructure.Services.Federation;
+using Explore.Persistence.Repositories;
+using Explore.Tests.Shared.Settings;
 using MediatR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -105,6 +108,9 @@ public sealed class AtprotoOAuthSecurityGatewayTests
     public async Task PdsDidMismatchReturnsTypedFailureBeforeIdentityOrSessionWrites()
     {
         var fixture = CreateFixture("did:plc:substituted-user");
+        await using var visitorSettings = await SmtpSettingsDatabase.CreateAsync();
+        var configuration = new ConfigurationBuilder().Build();
+        var systemSettings = new SystemSettingRepository(visitorSettings.Context, visitorSettings.MutationLock);
         var externalLogins = Substitute.For<IUserExternalLoginRepository>();
         var users = Substitute.For<IUserRepository>();
         var actors = Substitute.For<IActorRepository>();
@@ -143,9 +149,14 @@ public sealed class AtprotoOAuthSecurityGatewayTests
                 Substitute.For<IActorReferenceConsolidationRepository>(),
                 Substitute.For<IGenericRepository<ActorMerge, Guid>>()),
             unitOfWork,
+            visitorSettings.MutationLock,
+            new VisitorAccessCapabilityResolver(
+                systemSettings,
+                new TenantSettingRepository(visitorSettings.Context, visitorSettings.MutationLock),
+                new VisitorAccessProviderReader(systemSettings, configuration)),
             Substitute.For<IAdminCacheInvalidator>(),
             tenantContext,
-            new ConfigurationBuilder().Build(),
+            configuration,
             TimeProvider.System);
         var payload = JsonSerializer.SerializeToUtf8Bytes(CreateSession());
 

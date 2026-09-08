@@ -793,7 +793,11 @@ public sealed class InstanceOnboardingService(
                 GoogleClientId = config.GoogleClientId,
                 GoogleClientSecret = config.GoogleClientSecret,
                 LockAtprotoLoginEnabled = config.LockAtprotoLoginEnabled,
-                LockGoogleSsoEnabled = config.LockGoogleSsoEnabled
+                LockGoogleSsoEnabled = config.LockGoogleSsoEnabled,
+                KeycloakPublicOnboardingPolicy = config.KeycloakPublicOnboardingPolicy,
+                KeycloakPublicSignupUrl = config.KeycloakPublicSignupUrl,
+                GooglePublicOnboardingPolicy = config.GooglePublicOnboardingPolicy,
+                GooglePublicSignupUrl = config.GooglePublicSignupUrl
             }
         }
     };

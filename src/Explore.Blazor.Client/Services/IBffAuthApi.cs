@@ -25,6 +25,7 @@ public sealed class BffAuthProvidersResponse
     public string PrimaryProvider { get; set; } = string.Empty;
     public bool AtprotoLoginEnabled { get; set; }
     public List<BffAuthProviderItem> Providers { get; set; } = [];
+    public Explore.Blazor.Client.Clients.VisitorAccessCapabilityDto? VisitorAccess { get; set; }
     public Dictionary<string, Explore.Blazor.Client.Clients.HalLink>? _links { get; set; }
 }
 

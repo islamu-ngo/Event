@@ -16,14 +16,28 @@ public sealed class EventResourceAssembler : ResourceAssemblerBase<EventDto, Eve
         IHateoasLinkGenerator linkGenerator,
         ILinkPolicy<EventDto> detailLinkPolicy,
         ICollectionLinkPolicy<EventListDto> collectionLinkPolicy,
-        IEventReportingIntakeGuard intakeGuard)
+        IEventReportingIntakeGuard intakeGuard,
+        IVisitorAccessCapabilityResolver visitorAccessCapabilityResolver)
         : base(linkGenerator, detailLinkPolicy, collectionLinkPolicy)
     {
         _intakeGuard = intakeGuard;
+        _visitorAccessCapabilityResolver = visitorAccessCapabilityResolver;
         _collectionLinkPolicy = collectionLinkPolicy;
     }
 
+    private readonly IVisitorAccessCapabilityResolver _visitorAccessCapabilityResolver;
     private readonly IEventReportingIntakeGuard _intakeGuard;
+
+    public override async Task<HalResource<EventDto>> ToResource(EventDto dto, HttpContext httpContext)
+    {
+        // Enrich a request copy, never the cached event projection. Collection items expose
+        // no native registration start, so they require no per-event visitor-policy reads.
+        var capability = await _visitorAccessCapabilityResolver.ResolveAsync(dto.TenantId, httpContext.RequestAborted);
+        return await base.ToResource(dto with
+        {
+            VisitorAccess = Explore.Application.DTOs.PublicExperience.VisitorAccessCapabilityDto.From(capability)
+        }, httpContext);
+    }
     private readonly ICollectionLinkPolicy<EventListDto> _collectionLinkPolicy;
 
     protected override async Task<IReadOnlyList<LinkDefinition>> GetDetailLinkDefinitionsAsync(

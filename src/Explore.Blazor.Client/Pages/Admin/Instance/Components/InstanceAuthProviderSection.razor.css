@@ -1,0 +1,12 @@
+/* ABOUTME: Scoped layout for visitor-onboarding controls inside instance authentication settings. */
+/* ABOUTME: Visually separates public signup policy from operator and existing-account login controls. */
+
+.instance-auth-provider__visitor-onboarding {
+    display: grid;
+    gap: var(--isl-space-3);
+    margin-block: var(--isl-space-3);
+    padding: var(--isl-space-4);
+    border: 1px solid var(--isl-color-divider);
+    border-radius: var(--isl-radius-card);
+    background: color-mix(in srgb, var(--isl-color-surface) 94%, var(--isl-color-primary));
+}

@@ -4,6 +4,7 @@
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.Event.Validators;
 using Explore.Application.Features.Federation.Atproto.Services;
@@ -34,7 +35,9 @@ public sealed class EventPublicationExecutor(
     IEventLifecycleReadinessEvaluator readinessEvaluator,
     IUserContext userContext,
     AtprotoEventPublicationPlanner atprotoPublicationPlanner,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    ISettingMutationLock mutationLock,
+    IVisitorAccessCapabilityResolver visitorCapabilities)
 {
     public const string ConcurrencyConflictCode = "event_publish_concurrency_conflict";
     public const string ReadinessFailedCode = "event_publish_readiness_failed";
@@ -56,29 +59,6 @@ public sealed class EventPublicationExecutor(
                 validationResult.Errors.Select(error => error.ErrorMessage));
         }
 
-        var @event = await eventRepository.GetById(eventId);
-        if (@event is null)
-        {
-            return Failure(eventId, "Event not found.", ["Event not found."], FailureCodes.NotFound);
-        }
-
-        EventStatusEnum currentStatus = (EventStatusEnum)@event.EventStatusId;
-        if (currentStatus == EventStatusEnum.Published)
-        {
-            return Success(@event.Id, "Event is already published.");
-        }
-
-        if (@event.ConcurrencyStamp != request.ExpectedConcurrencyStamp)
-        {
-            return ConcurrencyFailure(eventId);
-        }
-
-        if (!EventLifecycleRules.CanTransition(currentStatus, EventStatusEnum.Published))
-        {
-            return ReadinessFailure(eventId, [PublishTransitionReadinessError(currentStatus)]);
-        }
-
-        Guid currentUserId = userContext.GetRequiredUserId();
         Guid federationOutboxId = Guid.CreateVersion7();
         Guid notificationFanoutOutboxId = Guid.CreateVersion7();
         DateTime occurredAt = timeProvider.GetUtcNow().UtcDateTime;
@@ -86,7 +66,9 @@ public sealed class EventPublicationExecutor(
         Guid? tenantIdToInvalidate = null;
         bool mutationAttempted = false;
 
-        BaseCommandResponse<Guid> response = await unitOfWork.ExecuteInTransactionAsync(async token =>
+        BaseCommandResponse<Guid> response = await mutationLock.ExecuteOrderedGroupsAsync(
+            [VisitorAccessCapabilityResolver.AuthoritySettingKeys],
+            outerToken => unitOfWork.ExecuteSerializableAsync(async token =>
         {
             tenantIdToInvalidate = null;
             var attemptEvent = await eventRepository.GetById(eventId);
@@ -96,10 +78,15 @@ public sealed class EventPublicationExecutor(
             }
 
             EventStatusEnum attemptStatus = (EventStatusEnum)attemptEvent.EventStatusId;
-            if (mutationAttempted && attemptStatus == EventStatusEnum.Published)
+            if (attemptStatus == EventStatusEnum.Published)
             {
-                tenantIdToInvalidate = attemptEvent.TenantId;
-                return Success(attemptEvent.Id, "Event published successfully.");
+                if (mutationAttempted)
+                {
+                    tenantIdToInvalidate = attemptEvent.TenantId;
+                }
+                return Success(attemptEvent.Id, mutationAttempted
+                    ? "Event published successfully."
+                    : "Event is already published.");
             }
 
             if (attemptEvent.ConcurrencyStamp != request.ExpectedConcurrencyStamp)
@@ -110,6 +97,15 @@ public sealed class EventPublicationExecutor(
             if (!EventLifecycleRules.CanTransition(attemptStatus, EventStatusEnum.Published))
             {
                 return ReadinessFailure(eventId, [PublishTransitionReadinessError(attemptStatus)]);
+            }
+
+            Guid currentUserId = userContext.GetRequiredUserId();
+            var capability = await visitorCapabilities.ResolveAsync(attemptEvent.TenantId, token);
+            if (attemptEvent.ParticipationConfiguration?.IdentityAccessModeId == (int)IdentityAccessModeEnum.AccountRequired
+                && !capability.AllowsAccountRequiredParticipation)
+            {
+                return BaseCommandResponse.Failure<Guid>("event_visitor_account_onboarding_required",
+                    "Account-required participation requires an allowed public onboarding provider.", id: eventId);
             }
 
             EventLifecyclePolicy policy = await policyProvider.GetEffectivePolicyAsync(
@@ -159,7 +155,7 @@ public sealed class EventPublicationExecutor(
 
             tenantIdToInvalidate = attemptEvent.TenantId;
             return Success(attemptEvent.Id, "Event published successfully.");
-        }, cancellationToken);
+        }, outerToken), cancellationToken);
 
         if (response.IsSuccess && tenantIdToInvalidate.HasValue)
         {

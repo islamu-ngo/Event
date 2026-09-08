@@ -50,6 +50,7 @@ public partial class CreateEvent : IDisposable
     [Inject] private IAccessibilityFocusService AccessibilityFocusService { get; set; } = default!;
     [Inject] private IAccessibilityAnnouncerService AccessibilityAnnouncerService { get; set; } = default!;
     [Inject] private IEventRegistrationPolicyService RegistrationPolicyService { get; set; } = default!;
+    [Inject] private IPublicExperienceService PublicExperienceService { get; set; } = default!;
     [Inject] private MainContentAppearanceState MainContentAppearanceState { get; set; } = default!;
 
     // Publisher selection state
@@ -96,11 +97,15 @@ public partial class CreateEvent : IDisposable
         || _isUploadingImage
         || _isLoadingTemplatePreview
         || _creationContext is null
-        || _creationContext.CanCreate != true;
+        || _creationContext.CanCreate != true
+        || (IsPlatformManagedParticipation
+            && createDto.ParticipationConfiguration.IdentityAccessModeId == AccountRequired
+            && !AllowsAccountRequiredParticipation);
     private bool isLoading = true;
     private bool _dataLoaded = false;
     private int? selectedMadhabId = null;
     private IReadOnlyList<EventPublishReadinessErrorDto> _publishReadinessErrors = Array.Empty<EventPublishReadinessErrorDto>();
+    private VisitorAccessCapabilityDto? _visitorAccess;
 
     // Image upload state
     private string? imagePreviewUrl;
@@ -157,6 +162,11 @@ public partial class CreateEvent : IDisposable
         IsPlatformManagedParticipation && createDto.ParticipationConfiguration.IdentityAccessModeId == GuestAllowed;
     private bool UsesCapabilityParticipationRecovery =>
         IsPlatformManagedParticipation && createDto.ParticipationConfiguration.IdentityAccessModeId == CapabilityTokenAllowed;
+    private bool AllowsAccountRequiredParticipation =>
+        _visitorAccess?.AllowsAccountRequiredParticipation == true;
+    private string AccountRequiredUnavailableMessage => _visitorAccess is null
+        ? "Visitor access availability could not be loaded. Account-required participation is unavailable until settings are refreshed."
+        : "Account-required participation needs at least one public visitor signup destination. Existing-account and operator sign-in remain separate.";
     // Timezone
     private TimeZoneInfo _selectedTimezone = TimeZoneInfo.Utc;
     private string _selectedTimezoneDisplay => FormatTimezoneShort(_selectedTimezone);
@@ -324,6 +334,11 @@ public partial class CreateEvent : IDisposable
 
     private Task OnParticipationIdentityAccessModeChanged(int? value)
     {
+        if (value == AccountRequired && !AllowsAccountRequiredParticipation)
+        {
+            return Task.CompletedTask;
+        }
+
         var configuration = createDto.ParticipationConfiguration;
         configuration.IdentityAccessModeId = value;
         configuration.GuestRecoveryPolicy = value switch
@@ -356,7 +371,7 @@ public partial class CreateEvent : IDisposable
             PlatformManaged => configuration.AdvanceRegistrationObligationId is Optional or Required
                 && configuration.IdentityAccessModeId switch
                 {
-                    AccountRequired => configuration.GuestRecoveryPolicy is null,
+                    AccountRequired => AllowsAccountRequiredParticipation && configuration.GuestRecoveryPolicy is null,
                     GuestAllowed => ((int?)configuration.GuestRecoveryPolicy) is VerifiedEmailRequired or UnverifiedEmailAccepted or EmailOptional,
                     CapabilityTokenAllowed => ((int?)configuration.GuestRecoveryPolicy) is CapabilityLinkOnly or NoRecovery,
                     _ => false
@@ -884,8 +899,9 @@ public partial class CreateEvent : IDisposable
             var languagesTask = CultureLookupService.GetLanguagesAsync();
             var registrationPoliciesTask = RegistrationPolicyService.GetEventRegistrationPoliciesAsync();
             var eventTemplatesTask = LoadEventTemplatesAsync(createDto.EventTypeId);
+            var publicExperienceTask = PublicExperienceService.GetSettingsAsync();
 
-            await Task.WhenAll(eventTypesTask, audienceGendersTask, audienceAgesTask, eventFormatsTask, visibilityTypesTask, madhabsTask, categoriesTask, tagsTask, registrationModesTask, languagesTask, registrationPoliciesTask, eventTemplatesTask);
+            await Task.WhenAll(eventTypesTask, audienceGendersTask, audienceAgesTask, eventFormatsTask, visibilityTypesTask, madhabsTask, categoriesTask, tagsTask, registrationModesTask, languagesTask, registrationPoliciesTask, eventTemplatesTask, publicExperienceTask);
 
             eventTypes = await eventTypesTask;
             audienceGenders = await audienceGendersTask;
@@ -898,6 +914,7 @@ public partial class CreateEvent : IDisposable
             registrationModes = await registrationModesTask;
             languages = await languagesTask;
             registrationPolicies = await registrationPoliciesTask;
+            _visitorAccess = (await publicExperienceTask)?.VisitorAccess;
 
             SetDefaultValues();
             _dataLoaded = true;
@@ -1195,6 +1212,7 @@ public partial class CreateEvent : IDisposable
             }
             else
             {
+                await RefreshVisitorAccessAfterRejectionAsync();
                 var errorMsg = response?.Message ?? "Failed to create event.";
                 if (response?.Errors != null && response.Errors.Any())
                 {
@@ -1205,6 +1223,7 @@ public partial class CreateEvent : IDisposable
         }
         catch (ApiException ex)
         {
+            await RefreshVisitorAccessAfterRejectionAsync();
             if (!_errorStore.HandleApiError(ex))
             {
                 Logger.LogError(ex, "Exception during event creation");
@@ -1220,6 +1239,14 @@ public partial class CreateEvent : IDisposable
             Logger.LogError(ex, "Exception during event creation");
             _submitState.Fail("Event could not be submitted. Please try again.");
         }
+    }
+
+    private async Task RefreshVisitorAccessAfterRejectionAsync()
+    {
+        // Creation failures do not always retain their policy code at the service boundary.
+        // Invalidate before refreshing so an unavailable read cannot retain stale permission.
+        _visitorAccess = null;
+        _visitorAccess = (await PublicExperienceService.GetSettingsAsync())?.VisitorAccess;
     }
 
     private bool ApplyInlineSessionForIntent(CreateEventSubmitIntent intent)

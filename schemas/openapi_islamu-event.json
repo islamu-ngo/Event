@@ -16868,6 +16868,23 @@
               "application/json": { },
               "application/hal+json": { }
             }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
           }
         },
         "x-endpoint-class": "Admin",
@@ -16970,6 +16987,23 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/json; v=0.1": {
                 "schema": {
@@ -17098,6 +17132,23 @@
               "application/json": { },
               "application/hal+json": { }
             }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
           }
         },
         "x-endpoint-class": "Admin",
@@ -17201,6 +17252,23 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/hal+json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": { },
+              "application/hal+json": { }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/json; v=0.1": {
                 "schema": {
@@ -25919,8 +25987,7 @@
             }
           }
         },
-        "x-endpoint-class": "Public",
-        "x-output-cache-policy": "DetailData"
+        "x-endpoint-class": "Public"
       },
       "patch": {
         "tags": [
@@ -26245,8 +26312,7 @@
             }
           }
         },
-        "x-endpoint-class": "Public",
-        "x-output-cache-policy": "DetailData"
+        "x-endpoint-class": "Public"
       }
     },
     "/api/event/public/{slugCode}/og-image": {
@@ -54439,6 +54505,26 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "x-endpoint-class": "Authenticated",
@@ -76147,8 +76233,7 @@
             }
           }
         },
-        "x-endpoint-class": "Public",
-        "x-output-cache-policy": "PublicExperienceShell"
+        "x-endpoint-class": "Public"
       }
     },
     "/api/public-experience/home": {
@@ -88606,6 +88691,26 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "x-endpoint-class": "Authenticated"
@@ -88724,6 +88829,26 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "text/plain; v=0.1": {
                 "schema": {
@@ -89242,6 +89367,26 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "x-endpoint-class": "Authenticated"
@@ -89359,6 +89504,26 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "x-endpoint-class": "Authenticated"
@@ -89457,6 +89622,26 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "text/plain; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json; v=0.1": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "text/plain; v=0.1": {
                 "schema": {
@@ -108625,6 +108810,16 @@
           }
         }
       },
+      "AuthenticationProviderKind": {
+        "enum": [
+          "Keycloak",
+          "Atproto",
+          "Google",
+          "Local",
+          "Development"
+        ],
+        "type": "string"
+      },
       "AuthorizationPolicyPackageStatusDto": {
         "required": [
           "provider",
@@ -108767,6 +108962,16 @@
       "AuthProviderConfigurationDto": {
         "type": "object",
         "properties": {
+          "visitorAccess": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/VisitorAccessCapabilityDto"
+              }
+            ]
+          },
           "primaryProviderId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
@@ -108812,6 +109017,18 @@
             "type": "string"
           },
           "googleClientSecret": {
+            "type": "string"
+          },
+          "keycloakPublicOnboardingPolicy": {
+            "$ref": "#/components/schemas/PublicOnboardingPolicy"
+          },
+          "keycloakPublicSignupUrl": {
+            "type": "string"
+          },
+          "googlePublicOnboardingPolicy": {
+            "$ref": "#/components/schemas/PublicOnboardingPolicy"
+          },
+          "googlePublicSignupUrl": {
             "type": "string"
           },
           "lockAtprotoLoginEnabled": {
@@ -108865,6 +109082,18 @@
           },
           "lockGoogleSsoEnabled": {
             "type": "boolean"
+          },
+          "keycloakPublicOnboardingPolicy": {
+            "$ref": "#/components/schemas/PublicOnboardingPolicy"
+          },
+          "keycloakPublicSignupUrl": {
+            "type": "string"
+          },
+          "googlePublicOnboardingPolicy": {
+            "$ref": "#/components/schemas/PublicOnboardingPolicy"
+          },
+          "googlePublicSignupUrl": {
+            "type": "string"
           }
         }
       },
@@ -117843,6 +118072,9 @@
               "null",
               "string"
             ]
+          },
+          "visitorAccess": {
+            "$ref": "#/components/schemas/VisitorAccessCapabilityDto"
           },
           "participationConfiguration": {
             "type": "object",
@@ -130850,6 +131082,9 @@
       "HalResourceOfAuthProviderConfigurationDto": {
         "type": "object",
         "properties": {
+          "visitorAccess": {
+            "$ref": "#/components/schemas/VisitorAccessCapabilityDto"
+          },
           "primaryProviderId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
@@ -130918,6 +131153,18 @@
             "type": "string"
           },
           "googleClientSecret": {
+            "type": "string"
+          },
+          "keycloakPublicOnboardingPolicy": {
+            "$ref": "#/components/schemas/PublicOnboardingPolicy"
+          },
+          "keycloakPublicSignupUrl": {
+            "type": "string"
+          },
+          "googlePublicOnboardingPolicy": {
+            "$ref": "#/components/schemas/PublicOnboardingPolicy"
+          },
+          "googlePublicSignupUrl": {
             "type": "string"
           },
           "lockAtprotoLoginEnabled": {
@@ -134032,6 +134279,9 @@
               "null",
               "string"
             ]
+          },
+          "visitorAccess": {
+            "$ref": "#/components/schemas/VisitorAccessCapabilityDto"
           },
           "participationConfiguration": {
             "type": "object",
@@ -143737,6 +143987,788 @@
           }
         }
       },
+      "HalResourceOfPublicExperienceCtaDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "placement": {
+            "$ref": "#/components/schemas/PublicExperienceCtaPlacement"
+          },
+          "style": {
+            "$ref": "#/components/schemas/PublicExperienceCtaStyle"
+          },
+          "sortOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
+      "HalResourceOfPublicExperienceEventCatalogDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
+      "HalResourceOfPublicExperienceEventSectionDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
+      "HalResourceOfPublicExperienceHomeBlockDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PublicExperienceHomeBlockKind"
+          },
+          "title": {
+            "type": "string"
+          },
+          "subtitle": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "linkText": {
+            "type": "string"
+          },
+          "linkUrl": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
+      "HalResourceOfPublicExperienceHomeDto": {
+        "type": "object",
+        "properties": {
+          "preferredHomePage": {
+            "type": "string"
+          },
+          "brandDisplayName": {
+            "type": "string"
+          },
+          "brandLogoUrl": {
+            "type": "string"
+          },
+          "brandFaviconUrl": {
+            "type": "string"
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicExperienceHomeBlockDto"
+            }
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
+      "HalResourceOfPublicExperienceNavigationDto": {
+        "type": "object",
+        "properties": {
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicExperienceNavigationLinkDto"
+            }
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
+      "HalResourceOfPublicExperienceNavigationLinkDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
+      "HalResourceOfPublicExperiencePrimaryOrganizationDto": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/PublicExperiencePrimaryOrganizationState"
+          },
+          "organizationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "actorId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "handle": {
+            "type": "string"
+          },
+          "websiteUrl": {
+            "type": "string"
+          },
+          "profilePictureUri": {
+            "type": "string"
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
+      "HalResourceOfPublicExperienceSettingsDto": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "visitorAccess": {
+            "$ref": "#/components/schemas/VisitorAccessCapabilityDto"
+          },
+          "isAvailable": {
+            "type": "boolean"
+          },
+          "unavailableCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "directoryOperator": {
+            "required": [
+              "documentRevision",
+              "publicName",
+              "legalName",
+              "operatorKindCode",
+              "jurisdictionCountryCode",
+              "publicContactEmail",
+              "legalNoticeUrl",
+              "privacyUrl"
+            ],
+            "type": "object",
+            "properties": {
+              "documentRevision": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "publicName": {
+                "type": "string"
+              },
+              "legalName": {
+                "type": "string"
+              },
+              "operatorKindCode": {
+                "type": "string"
+              },
+              "jurisdictionCountryCode": {
+                "type": "string"
+              },
+              "registrationIdentifier": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "publicContactEmail": {
+                "type": "string"
+              },
+              "legalNoticeUrl": {
+                "type": "string"
+              },
+              "termsUrl": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "privacyUrl": {
+                "type": "string"
+              }
+            }
+          },
+          "instanceOperator": {
+            "required": [
+              "operatorId",
+              "publicName",
+              "legalName",
+              "isOfficialInstance",
+              "officialOrigin",
+              "operatorKindCode",
+              "jurisdictionCountryCode",
+              "publicContactEmail",
+              "websiteUrl",
+              "legalNoticeUrl",
+              "termsUrl",
+              "privacyUrl"
+            ],
+            "type": "object",
+            "properties": {
+              "operatorId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "publicName": {
+                "type": "string"
+              },
+              "legalName": {
+                "type": "string"
+              },
+              "isOfficialInstance": {
+                "type": "boolean"
+              },
+              "officialOrigin": {
+                "type": "string"
+              },
+              "operatorKindCode": {
+                "type": "string"
+              },
+              "jurisdictionCountryCode": {
+                "type": "string"
+              },
+              "registrationIdentifier": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "publicContactEmail": {
+                "type": "string"
+              },
+              "websiteUrl": {
+                "type": "string"
+              },
+              "legalNoticeUrl": {
+                "type": "string"
+              },
+              "termsUrl": {
+                "type": "string"
+              },
+              "privacyUrl": {
+                "type": "string"
+              }
+            }
+          },
+          "mode": {
+            "$ref": "#/components/schemas/PublicExperienceMode"
+          },
+          "deploymentMode": {
+            "type": "string"
+          },
+          "preferredHomePage": {
+            "type": "string"
+          },
+          "brandDisplayName": {
+            "type": "string"
+          },
+          "brandLogoUrl": {
+            "type": "string"
+          },
+          "brandFaviconUrl": {
+            "type": "string"
+          },
+          "brandCustomCssUrl": {
+            "type": "string"
+          },
+          "instanceBaseDomain": {
+            "type": "string"
+          },
+          "subdomain": {
+            "type": "string"
+          },
+          "customDomain": {
+            "type": "string"
+          },
+          "isIslamicModuleEnabled": {
+            "type": "boolean"
+          },
+          "isTechModuleEnabled": {
+            "type": "boolean"
+          },
+          "allowUserSubmittedEvents": {
+            "type": "boolean"
+          },
+          "allowOrganizationSubmittedEvents": {
+            "type": "boolean"
+          },
+          "allowGroupSubmittedEvents": {
+            "type": "boolean"
+          },
+          "allowOrganizationSelfRegistration": {
+            "type": "boolean"
+          },
+          "allowGroupSelfRegistration": {
+            "type": "boolean"
+          },
+          "eventCardClickOpensDetailPage": {
+            "type": "boolean"
+          },
+          "announcementBarEnabled": {
+            "type": "boolean"
+          },
+          "announcementBarMessage": {
+            "type": "string"
+          },
+          "announcementBarLinkText": {
+            "type": "string"
+          },
+          "announcementBarLinkUrl": {
+            "type": "string"
+          },
+          "announcementBarRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "communityGuidelinesContent": {
+            "type": "string"
+          },
+          "enabledModules": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "analyticsProvider": {
+            "type": "string"
+          },
+          "analyticsEnabled": {
+            "type": "boolean"
+          },
+          "analyticsConsentMode": {
+            "type": "string"
+          },
+          "analyticsTransportMode": {
+            "type": "string"
+          },
+          "analyticsAllowIdentify": {
+            "type": "boolean"
+          },
+          "analyticsPublicApiKey": {
+            "type": "string"
+          },
+          "analyticsEndpointUrl": {
+            "type": "string"
+          },
+          "analyticsConsent": {
+            "type": "object",
+            "properties": {
+              "cookieBannerEnabled": {
+                "type": "boolean"
+              },
+              "canRunBeforeConsent": {
+                "type": "boolean"
+              },
+              "declineBehavior": {
+                "type": "string"
+              },
+              "consentCookieKey": {
+                "type": "string"
+              },
+              "consentCookieLifetimeDays": {
+                "pattern": "^-?(?:0|[1-9]\\d*)$",
+                "type": [
+                  "integer",
+                  "string"
+                ],
+                "format": "int32"
+              },
+              "analyticsProvider": {
+                "type": "string"
+              },
+              "posthog": {
+                "type": "object",
+                "properties": {
+                  "cookielessMode": {
+                    "type": "string"
+                  },
+                  "personProfiles": {
+                    "type": "string"
+                  },
+                  "sessionReplay": {
+                    "type": "boolean"
+                  },
+                  "autocapture": {
+                    "type": "boolean"
+                  },
+                  "heatmaps": {
+                    "type": "boolean"
+                  },
+                  "toolbar": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          },
+          "renderPolicyVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "renderPolicyPreset": {
+            "type": "string"
+          },
+          "enableAdvancedRenderPolicyOverrides": {
+            "type": "boolean"
+          },
+          "globalRenderMode": {
+            "type": "string"
+          },
+          "globalPrerenderEnabled": {
+            "type": "boolean"
+          },
+          "publicSeoRenderMode": {
+            "type": "string"
+          },
+          "publicSeoPrerenderEnabled": {
+            "type": "boolean"
+          },
+          "operationalRenderMode": {
+            "type": "string"
+          },
+          "operationalPrerenderEnabled": {
+            "type": "boolean"
+          },
+          "adminRenderMode": {
+            "type": "string"
+          },
+          "adminPrerenderEnabled": {
+            "type": "boolean"
+          },
+          "onboardingRenderMode": {
+            "type": "string"
+          },
+          "onboardingPrerenderEnabled": {
+            "type": "boolean"
+          },
+          "disallowInteractiveServerOnOnboarding": {
+            "type": "boolean"
+          },
+          "isAiAssistantEnabled": {
+            "type": "boolean"
+          },
+          "isAiAssistantAvailable": {
+            "type": "boolean"
+          },
+          "aiAssistantAllowAnonymousAccess": {
+            "type": "boolean"
+          },
+          "footerConfig": {
+            "type": "object",
+            "properties": {
+              "settings": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "template": {
+                    "type": "string"
+                  },
+                  "showDescription": {
+                    "type": "boolean"
+                  },
+                  "descriptionText": {
+                    "type": "string"
+                  },
+                  "showSocialLinks": {
+                    "type": "boolean"
+                  },
+                  "socialLinks": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "platform": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "copyrightText": {
+                    "type": "string"
+                  },
+                  "showCookieSettingsLink": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "linkGroups": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "order": {
+                      "pattern": "^-?(?:0|[1-9]\\d*)$",
+                      "type": [
+                        "integer",
+                        "string"
+                      ],
+                      "format": "int32"
+                    },
+                    "links": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          },
+                          "openInNewTab": {
+                            "type": "boolean"
+                          },
+                          "isActive": {
+                            "type": "boolean"
+                          },
+                          "order": {
+                            "pattern": "^-?(?:0|[1-9]\\d*)$",
+                            "type": [
+                              "integer",
+                              "string"
+                            ],
+                            "format": "int32"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "defaultThemeId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "themeMode": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string"
+          },
+          "clientPickerEnabled": {
+            "type": "boolean"
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
       "HalResourceOfRefundCampaignDto": {
         "type": "object",
         "properties": {
@@ -147831,6 +148863,75 @@
               "null",
               "string"
             ]
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
+      "HalResourceOfVisitorAccessCapabilityDto": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/VisitorAccessMode"
+          },
+          "allowsNewNativeAllocation": {
+            "type": "boolean"
+          },
+          "allowsAnonymousParticipation": {
+            "type": "boolean"
+          },
+          "allowsAccountRequiredParticipation": {
+            "type": "boolean"
+          },
+          "allowsExistingAccountLogin": {
+            "type": "boolean"
+          },
+          "signupDestinations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisitorSignupDestinationDto"
+            }
+          },
+          "_links": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HalLink"
+            },
+            "description": "HAL hypermedia links"
+          },
+          "_embedded": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "description": "Embedded related resources"
+          }
+        }
+      },
+      "HalResourceOfVisitorSignupDestinationDto": {
+        "required": [
+          "provider",
+          "url"
+        ],
+        "type": "object",
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/AuthenticationProviderKind"
+          },
+          "url": {
+            "type": "string"
           },
           "_links": {
             "type": "object",
@@ -160753,6 +161854,16 @@
             "type": "string",
             "format": "uuid"
           },
+          "visitorAccess": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/VisitorAccessCapabilityDto"
+              }
+            ]
+          },
           "isAvailable": {
             "type": "boolean"
           },
@@ -160987,6 +162098,16 @@
             ],
             "format": "int32"
           },
+          "visitorAccess": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/VisitorAccessCapabilityDto"
+              }
+            ]
+          },
           "isAvailable": {
             "type": "boolean"
           },
@@ -161110,6 +162231,14 @@
             "type": "boolean"
           }
         }
+      },
+      "PublicOnboardingPolicy": {
+        "enum": [
+          "Unknown",
+          "Allowed",
+          "Denied"
+        ],
+        "type": "string"
       },
       "PublishEventRequestDto": {
         "type": "object",
@@ -175355,6 +176484,55 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "VisitorAccessCapabilityDto": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/VisitorAccessMode"
+          },
+          "allowsNewNativeAllocation": {
+            "type": "boolean"
+          },
+          "allowsAnonymousParticipation": {
+            "type": "boolean"
+          },
+          "allowsAccountRequiredParticipation": {
+            "type": "boolean"
+          },
+          "allowsExistingAccountLogin": {
+            "type": "boolean"
+          },
+          "signupDestinations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisitorSignupDestinationDto"
+            }
+          }
+        }
+      },
+      "VisitorAccessMode": {
+        "enum": [
+          "FullRegistrationAndAuth",
+          "AnonymousOnly",
+          "DirectoryListingOnly"
+        ],
+        "type": "string"
+      },
+      "VisitorSignupDestinationDto": {
+        "required": [
+          "provider",
+          "url"
+        ],
+        "type": "object",
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/AuthenticationProviderKind"
+          },
+          "url": {
+            "type": "string"
           }
         }
       },

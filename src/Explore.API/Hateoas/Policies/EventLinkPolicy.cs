@@ -548,15 +548,18 @@ public sealed class EventDetailLinkPolicy : ILinkPolicy<EventDto>
                 RequiresAuth: true)
                 .RequirePermission(AuthorizationActions.Update, ResourceDescriptors.Event, dto);
 
-            yield return new LinkDefinition(
-                LinkRelations.Publish,
-                RouteNames.PublishEvent,
-                new { id = dto.Id },
-                "POST",
-                "Publish event",
-                RequiresAuth: true)
-                .RequirePermission(AuthorizationActions.Update, ResourceDescriptors.Event, dto);
-
+            if (dto.ParticipationConfiguration?.IdentityAccessModeId != (int)IdentityAccessModeEnum.AccountRequired
+                || dto.VisitorAccess is { AllowsAccountRequiredParticipation: true })
+            {
+                yield return new LinkDefinition(
+                    LinkRelations.Publish,
+                    RouteNames.PublishEvent,
+                    new { id = dto.Id },
+                    "POST",
+                    "Publish event",
+                    RequiresAuth: true)
+                    .RequirePermission(AuthorizationActions.Update, ResourceDescriptors.Event, dto);
+            }
         }
 
         if (eventStatus != EventStatusEnum.Cancelled
@@ -651,6 +654,13 @@ public sealed class EventDetailLinkPolicy : ILinkPolicy<EventDto>
 
                 yield break;
             case ParticipationHandlingModeEnum.PlatformManaged:
+                if (dto.VisitorAccess is not { AllowsNewNativeAllocation: true }
+                    || dto.ParticipationConfiguration!.IdentityAccessModeId == (int)IdentityAccessModeEnum.AccountRequired
+                        && !dto.VisitorAccess.AllowsAccountRequiredParticipation)
+                {
+                    yield break;
+                }
+
                 var isAuthenticated = user?.Identity?.IsAuthenticated == true;
                 if (isAuthenticated)
                 {

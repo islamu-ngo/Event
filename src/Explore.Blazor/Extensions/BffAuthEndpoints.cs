@@ -1057,16 +1057,18 @@ public static class BffAuthEndpoints
                 providers.Count);
 
             IDictionary<string, HalLink>? lifecycleLinks = null;
+            VisitorAccessCapabilityDto? visitorAccess = null;
             try
             {
                 var discovery = await ctx.RequestServices.GetRequiredService<IInstanceOnboardingClient>()
                     .GetInstanceOnboardingAuthProviderConfigurationAsync(cancellationToken: ctx.RequestAborted);
                 lifecycleLinks = discovery?._links;
+                visitorAccess = discovery?.VisitorAccess;
             }
             catch (Exception exception) when (exception is ApiException or HttpRequestException
                 || exception is OperationCanceledException && !ctx.RequestAborted.IsCancellationRequested)
             {
-                logger.LogWarning("Local lifecycle discovery is unavailable; no lifecycle actions are advertised.");
+                logger.LogWarning("Authentication capability discovery is unavailable; no signup or lifecycle actions are advertised.");
             }
             ctx.Response.Headers.CacheControl = "no-store, private";
             ctx.Response.ContentType = "application/json";
@@ -1075,6 +1077,7 @@ public static class BffAuthEndpoints
                 primaryProvider,
                 atprotoLoginEnabled,
                 providers,
+                visitorAccess,
                 _links = lifecycleLinks
             });
         }

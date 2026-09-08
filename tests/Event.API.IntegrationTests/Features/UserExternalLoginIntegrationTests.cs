@@ -584,6 +584,8 @@ public class UserExternalLoginIntegrationTests
                 logins),
             onboarding,
             unitOfWork,
+            Substitute.For<ISettingMutationLock>(),
+            Substitute.For<IVisitorAccessCapabilityResolver>(),
             Substitute.For<IAdminCacheInvalidator>(),
             tenantContext,
             configuration,

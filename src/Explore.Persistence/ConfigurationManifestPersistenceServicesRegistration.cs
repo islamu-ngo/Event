@@ -20,6 +20,8 @@ public static class ConfigurationManifestPersistenceServicesRegistration
         services.TryAddScoped<ISettingMutationLock, RelationalSettingMutationLock>();
         services.TryAddScoped<IEmailDeliveryDisableImpactReader, EmailDeliveryDisableImpactReader>();
         services.TryAddScoped<IEmailDeliverySettingsWriter, EmailDeliverySettingsWriter>();
+        services.TryAddScoped<Explore.Application.Contracts.Services.IVisitorAccessSettingsWriter, VisitorAccessSettingsWriter>();
+        services.TryAddScoped<IEventParticipationConfigurationRepository, EventParticipationConfigurationRepository>();
         services.TryAddScoped<ICoordinatedSettingMutationStore, CoordinatedSettingMutationRepository>();
         services.TryAddScoped<ITenantRepository, TenantRepository>();
         services.TryAddScoped<ISystemSettingRepository, SystemSettingRepository>();

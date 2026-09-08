@@ -66,7 +66,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
 
     public string SetupSecret { get; } = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
-    private LocalAdmissionWebApplicationFactory(AuthenticationProviderKind primaryProvider)
+    private LocalAdmissionWebApplicationFactory(AuthenticationProviderKind primaryProvider, bool enableAtproto)
     {
         if (primaryProvider is not (AuthenticationProviderKind.Local or AuthenticationProviderKind.Keycloak
             or AuthenticationProviderKind.Atproto))
@@ -76,7 +76,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
 
         _primaryProvider = primaryProvider;
         _externalSigningKey = primaryProvider == AuthenticationProviderKind.Keycloak ? RSA.Create(2048) : null;
-        if (primaryProvider == AuthenticationProviderKind.Atproto)
+        if (primaryProvider == AuthenticationProviderKind.Atproto || enableAtproto)
         {
             _atprotoOAuthKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
             _atprotoSessionKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
@@ -93,9 +93,10 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         ILoggerProvider? logCapture = null,
         IdentityDatabaseTopology identityTopology = IdentityDatabaseTopology.Colocated,
         bool incompleteSetup = false,
-        bool enableRateLimiting = false)
+        bool enableRateLimiting = false,
+        bool enableAtproto = false)
     {
-        var factory = new LocalAdmissionWebApplicationFactory(primaryProvider)
+        var factory = new LocalAdmissionWebApplicationFactory(primaryProvider, enableAtproto)
         {
             _persistenceInterceptor = persistenceInterceptor,
             _logCapture = logCapture,
@@ -196,7 +197,7 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
                     options.ConfigurationManager = new StaticConfigurationManager<OpenIdConnectConfiguration>(metadata);
                 });
             }
-            if (_primaryProvider == AuthenticationProviderKind.Atproto)
+            if (_atprotoOAuthKey is not null)
             {
                 ConfigureAtprotoAuthorities(services);
             }
@@ -206,7 +207,8 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
     public string ExternalIssuer => _externalIssuer;
     public string AtprotoOAuthKeyId => _atprotoOAuthKeyId;
 
-    public string CreateAtprotoBootstrapAssertion(AtprotoDid did, AtprotoSubjectClassification classification)
+    public string CreateAtprotoBootstrapAssertion(AtprotoDid did, AtprotoSubjectClassification classification,
+        Guid? tenantId = null, string? issuer = null)
     {
         if (_atprotoOAuthKey is null)
         {
@@ -216,12 +218,12 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
         DateTime now = DateTime.UtcNow;
         var descriptor = new SecurityTokenDescriptor
         {
-            Issuer = AtprotoJwtOptions.BootstrapIssuer,
+            Issuer = issuer ?? AtprotoJwtOptions.BootstrapIssuer,
             Audience = AtprotoJwtOptions.BootstrapAudience,
             Subject = new ClaimsIdentity([
                 new Claim(JwtRegisteredClaimNames.Sub, "event-blazor-bff"),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.CreateVersion7().ToString("D")),
-                new Claim(AtprotoJwtOptions.TenantClaim, PlatformDefaults.DefaultTenantId.ToString("D")),
+                new Claim(AtprotoJwtOptions.TenantClaim, (tenantId ?? PlatformDefaults.DefaultTenantId).ToString("D")),
                 new Claim(AtprotoJwtOptions.DidClaim, did.Value),
                 new Claim(AtprotoJwtOptions.ClassificationClaim, classification.ToString().ToLowerInvariant()),
                 new Claim(AtprotoJwtOptions.MethodClaim, "POST"),
@@ -560,6 +562,24 @@ internal sealed class LocalAdmissionWebApplicationFactory : CustomWebApplication
             scope: SecretScope.Instance,
             scopeId: null,
             variableName: SigningKeyVariable));
+        if (_atprotoOAuthKey is not null)
+        {
+            database.SystemSettings.AddRange(new SystemSetting
+            {
+                SettingKey = GovernanceSettingKeys.Authentication.AtprotoLoginEnabled,
+                Value = "true",
+                ValueType = SettingValueType.Boolean,
+                Category = "Authentication",
+                CreatedAt = now
+            }, new SystemSetting
+            {
+                SettingKey = GovernanceSettingKeys.Authentication.AtprotoPublicUrl,
+                Value = JsonSerializer.Serialize("https://localhost"),
+                ValueType = SettingValueType.String,
+                Category = "Authentication",
+                CreatedAt = now
+            });
+        }
         await database.SaveChangesAsync();
     }
 

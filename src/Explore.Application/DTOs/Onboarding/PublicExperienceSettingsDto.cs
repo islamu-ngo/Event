@@ -11,6 +11,7 @@ public sealed record PublicExperienceSettingsDto
     private IReadOnlyList<string> _enabledModules = Array.AsReadOnly(Array.Empty<string>());
 
     public Guid TenantId { get; init; }
+    public VisitorAccessCapabilityDto? VisitorAccess { get; init; }
     public bool IsAvailable { get; init; }
     public string? UnavailableCode { get; init; }
     public TenantDirectoryOperatorPublicDto? DirectoryOperator { get; init; }

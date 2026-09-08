@@ -597,3 +597,7 @@ dev/report/visuals/
 evidence/mdb-real-postgres-qa/
 .cursorrules
 jean.json
+dev/backlog/
+dev/next/
+dev/pause/
+dev/report/

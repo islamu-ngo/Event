@@ -44,6 +44,7 @@ public sealed class RecordContractArchitectureTests
         "Explore.Application.Features.Promotions.PromotionCodeIssuedCommandResponseDto",
         "Explore.Application.Features.Promotions.PromotionManagementCommandResponseDto",
         "Explore.Application.Features.Promotions.Requests.Commands.PromotionRedemptionResponseDto",
+        "Explore.Application.Features.RegistrationOrders.Commands.AnonymousRegistrationChallengeIssueResult",
         "Explore.Application.Responses.CreateExternalApiKeyCommandResponse",
         "Explore.Application.Responses.LocalCredentialIssueCommandResponse",
         "Explore.Application.Responses.WebhookProviderPortalAccessCommandResponse",

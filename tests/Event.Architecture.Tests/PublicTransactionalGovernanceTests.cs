@@ -46,6 +46,21 @@ public class PublicTransactionalGovernanceTests
     }
 
     [Test]
+    public async Task PublicTransactionalRules_AcceptNativeCapabilityCancellationWithoutGenericReplay()
+    {
+        var violations = PublicTransactionalEndpointGovernance.FindViolations([typeof(GuestRegistrationStatusController)]);
+        await Assert.That(violations).IsEmpty();
+    }
+
+    [Test]
+    public async Task PublicTransactionalRules_RejectUnrelatedSuppressedPostEvenWithCosmeticRequiredKey()
+    {
+        var violations = PublicTransactionalEndpointGovernance.FindViolations([typeof(SuppressedPublicTransactionalController)]);
+        await Assert.That(violations).Contains("SuppressedPublicTransactionalController.Post: POST actions must declare [RequireIdempotencyKey].");
+        await Assert.That(violations).Contains("SuppressedPublicTransactionalController.PostWithCosmeticKey: suppressed POST must have a reviewed application-owned key or no-replay boundary.");
+    }
+
+    [Test]
     public async Task PublicTransactionalRules_RejectEveryMissingRequiredInvariant()
     {
         var violations = PublicTransactionalEndpointGovernance.FindViolations(
@@ -83,6 +98,17 @@ public class PublicTransactionalGovernanceTests
             new[] { typeof(InheritedActionPublicTransactionalController) });
 
         await Assert.That(violations).Contains("InheritedActionPublicTransactionalController.PostWithoutKey: POST actions must declare [RequireIdempotencyKey].");
+    }
+
+    [EndpointClassification(EndpointClass.PublicTransactional)]
+    [AllowAnonymous, EnableRateLimiting("public_transactional")]
+    private sealed class SuppressedPublicTransactionalController : ControllerBase
+    {
+        [HttpPost, SuppressIdempotencyResponseStorage]
+        public OkResult Post() => Ok();
+
+        [HttpPost, RequireIdempotencyKey, SuppressIdempotencyResponseStorage]
+        public OkResult PostWithCosmeticKey() => Ok();
     }
 
     [EndpointClassification(EndpointClass.PublicTransactional)]
@@ -231,10 +257,24 @@ internal static class PublicTransactionalEndpointGovernance
                     violations.Add($"{actionId}: must not declare API antiforgery metadata.");
                 }
 
+                bool capabilityCancellation = ReviewedAnonymousEndpointGovernance.IsCapabilityCancellation(controller, action);
                 if (UsesHttpMethod(action, HttpMethods.Post)
-                    && !HasEffectiveAttribute<RequireIdempotencyKeyAttribute>(controller, action))
+                    && !HasEffectiveAttribute<RequireIdempotencyKeyAttribute>(controller, action)
+                    && !capabilityCancellation)
                 {
                     violations.Add($"{actionId}: POST actions must declare [RequireIdempotencyKey].");
+                }
+
+                // Suppression bypasses the middleware's required-key check. Only native challenge
+                // issuance owns its key validation separately; cancellation deliberately requires none.
+                bool nativeChallengeIssuance = controller == typeof(AnonymousRegistrationChallengeController)
+                    && action == controller.GetMethod(nameof(AnonymousRegistrationChallengeController.Create))
+                    && action.GetCustomAttribute<HttpPostAttribute>()?.Name == RouteNames.CreateAnonymousRegistrationChallenge;
+                if (UsesHttpMethod(action, HttpMethods.Post)
+                    && HasEffectiveAttribute<SuppressIdempotencyResponseStorageAttribute>(controller, action)
+                    && !capabilityCancellation && !nativeChallengeIssuance)
+                {
+                    violations.Add($"{actionId}: suppressed POST must have a reviewed application-owned key or no-replay boundary.");
                 }
             }
         }
@@ -269,7 +309,10 @@ internal static class PublicTransactionalEndpointGovernance
         HasAntiforgeryMetadata(controller) || HasAntiforgeryMetadata(action);
 
     private static bool HasAntiforgeryMetadata(MemberInfo member) =>
-        member.GetCustomAttributes(inherit: true).Any(attribute =>
+        HasAntiforgeryMetadata(member.GetCustomAttributes(inherit: true));
+
+    internal static bool HasAntiforgeryMetadata(IEnumerable<object> metadata) =>
+        metadata.Any(attribute =>
             AntiforgeryMetadataNames.Contains(attribute.GetType().FullName ?? string.Empty)
             || attribute.GetType().GetInterfaces().Any(interfaceType =>
                 AntiforgeryMetadataNames.Contains(interfaceType.FullName ?? string.Empty)));

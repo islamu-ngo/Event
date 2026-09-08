@@ -82,6 +82,56 @@ This is the core of the fine-grained authorization system, enforced within the M
 -   **Denial Behavior**: If authorization fails, the behavior throws an `AuthorizationException`. This is caught by the `GlobalExceptionHandler`, which returns an HTTP `403 Forbidden` response.
 -   **Trigger Patterns**: The behavior is triggered by decorating CQRS request objects with specific interfaces or attributes. (See Implementation Patterns section below).
 
+### Reviewed Handler And Worker Authorities
+
+Not every authority is a resource role or an ordinary login. The exact reasoned
+`NamedMediatRExceptions` in `AuthorizationSurfaceGuardrailTests` recognize the
+following existing enforced boundaries; they do not add pipeline bypass metadata
+or classify arbitrary Local-named requests. The inventory retains conservative
+command/namespace/command-response discovery (including the preview Query),
+rejects unrelated synthetic requests, and checks that each disposition still
+resolves to a compiled request. Its entries cite native boundary test classes.
+
+Namespace prefixes below are exact: `LC` =
+`Explore.Application.Features.Authentication.Local.Requests.Commands`, `LH` =
+`Explore.Application.Features.Authentication.Local.Handlers.Commands`, `EDC` =
+`Explore.Application.Features.EmailDispatch.Requests.Commands`, `EDQ` =
+`Explore.Application.Features.EmailDispatch.Requests.Queries`, `IOC` =
+`Explore.Application.Features.InstanceOnboarding.Requests.Commands`, `RC` =
+`Explore.Application.Features.RegistrationOrders.Commands`.
+
+| Exact request | Enforced authority |
+|---|---|
+| `LC.ChangeLocalPasswordCommand` | Fresh ordinary Local session, Ready binding, current password and native stamp CAS. |
+| `LC.CompleteLocalPasswordRecoveryCommand` | Exact recovery-purpose token/receipt, one-use password mutation, original-token mirror retry only. |
+| `LC.ConfirmLocalEmailCommand` | Exact verification/change token and operation/subject/actor/link/purpose/generation, native receipt CAS. |
+| `LH.ReconcileLocalIdentityLifecycleMirrorCommand` | Trusted delivery worker only; current consumed native receipt, result stamp and exact binding. No API dependency or pointer-only public dispatch. |
+| `LC.RequestLocalEmailVerificationCommand` | Bounded current-address public admission, or fresh ordinary Local authority for proposed address; no alternate account selection. |
+| `LC.RequestLocalPasswordRecoveryCommand` | Bounded non-enumerating native recovery admission for verified-email Ready Local bindings. |
+| `LC.CompleteLocalCredentialReplacementCommand` | Dedicated restricted replacement proof validated against the current first-use operation; not ordinary authentication. |
+| `LC.CreateLocalIdentityCommand` | Canonical user and fresh persisted instance-admin membership before mutation and one-time disclosure. |
+| `LC.ReconcileLocalCredentialOperationCommand` | Fresh instance-admin membership and exact provisioning receipt graph; conflicting partial bindings denied. |
+| `LC.ResetLocalCredentialCommand` | Fresh instance-admin membership, exact predecessor operation/stamp and current handover receipt. |
+| `EDC.DisableEmailDeliveryCommand` | Current platform admin or exact current tenant/admin grant rechecked under ordered SMTP lease/Serializable transaction; actor/target/revision/token/acknowledgement binding. |
+| `EDQ.PreviewEmailDeliveryDisableQuery` | Same fresh scoped admin checks and lease-owned snapshot before issuing an actionable confirmation. |
+| `IOC.CompleteLocalInstanceOnboardingCommand` | Authenticated SetupSecret identity and durable setup mode, active Local provider, server deployment mode, validation and preflight before native convergence. |
+| `RC.CancelConfirmedGuestRegistrationCommand` | Fresh exact limited guest capability and live deadline under fences, then native transactional cancellation eligibility and effects. |
+| `RC.ConsumeAnonymousRegistrationChallengeCommand` | Trusted canonicalizing adapter and native tenant/event/digest/key/envelope/nonce proof validation; intended typed selection is snapshotted before allocation or disclosure. |
+| `RC.IssueAnonymousRegistrationChallengeCommand` | Current public event/visitor/participation eligibility, live finite end promise, bounded difficulty and transactional tenant/event quota; no allocation. |
+
+The five Local email/password lifecycle commands live in `Requests/Commands`;
+the shared consumption orchestrator remains in the Local feature. Worker repair
+is separate from administrator provisioning reconciliation and from public token
+consumption. Native API lifecycle/credential/onboarding/challenge/status tests,
+Persistence first-use/lifecycle/email-disable/bootstrap/quota/cancellation tests,
+and BFF purpose/antiforgery tests retain runtime rejection evidence. These
+architecture dispositions are not a substitute for running those tests.
+
+See [Endpoint Classification](GOVERNANCE.md#endpoint-classification) for the four
+precise anonymous Local lifecycle actions and capability cancellation's enforced
+no-key/no-generic-replay contract. Neither limited proof nor replayed HTTP output
+grants ordinary login or administrator authority.
+
 ### 3.3. Runtime Authorization Provider
 
 The actual logic of "is this user allowed to do this?" is delegated to a runtime provider. This allows the authorization engine to be swappable.

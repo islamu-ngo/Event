@@ -392,14 +392,37 @@ Every controller action must carry exactly one of the following classifications,
 
 | Class | Semantics | Authorization | Rate limit baseline |
 |---|---|---|---|
-| **Public** | Safe for unauthenticated read. No tenant mutation. | `[AllowAnonymous]` | `global` |
+| **Public** | Safe for unauthenticated read, with only the exact reviewed public authentication/callback exceptions below. Not a general anonymous mutation class. | `[AllowAnonymous]` | `global`; reviewed auth lifecycle uses `public_transactional` |
 | **Authenticated** | Any logged-in user. Tenant-scoped or user-scoped write, or privileged read. | `[Authorize]` (no roles required) | `authenticated` or `write` |
 | **Admin** | Operator / setup / diagnostics. Not exposed to the generated client. | `[Authorize(Roles=...)]` or `[SetupSecretRequired]` | `setup_secret` or `authenticated` |
 | **PublicTransactional** | Anonymous tenant mutation for narrowly scoped guest flows. Unsafe verbs only. | `[AllowAnonymous]`; browser traffic is protected at the BFF boundary, not with API antiforgery metadata. | `public_transactional` |
 
 The classification lives in controller action metadata via the `[EndpointClassification(EndpointClass.X)]` attribute (`Explore.API.Attributes`) and is the single source of truth for OpenAPI tagging (injected as `x-endpoint-class` operation extension by `EndpointClassificationTransformer`), client-generation filters, and Cerbos policy scaffolding. Every controller action must carry exactly one classification (class-level attribute is inherited by actions; action-level attribute overrides). Enforced by `EndpointClassificationArchitectureTests` in `Event.Architecture.Tests`.
 
-`PublicTransactional` endpoints must explicitly use `[EnableRateLimiting("public_transactional")]`. The policy is a fixed window of 10 requests per 60 seconds per effective remote IP, with queue limit 0. `POST` actions also require `[RequireIdempotencyKey]`; the API receives no antiforgery metadata because only browser traffic that crosses the BFF is subject to BFF antiforgery validation.
+`PublicTransactional` endpoints must explicitly use `[EnableRateLimiting("public_transactional")]`. The policy is a fixed window of 10 requests per 60 seconds per effective remote IP, with queue limit 0. The existing challenge issuance/proof-guarded guest-start boundary uses the dedicated `anonymous_registration` policy. Ordinary `POST` actions require an enforced `[RequireIdempotencyKey]`. The API receives no antiforgery metadata: browser traffic crossing the BFF is protected by BFF antiforgery validation.
+
+#### Exact Local authentication lifecycle exceptions
+
+The following four `Public`, `[AllowAnonymous]` POST actions are reviewed authentication operations, not safe reads and not a blanket exception for Local-named controllers:
+
+| Exact action | Server authority |
+|---|---|
+| `LocalEmailVerificationController.RequestVerification` | Bounded, non-enumerating native current-address admission; a proposed address requires fresh ordinary Local session authority and cannot select another account. |
+| `LocalEmailVerificationController.Consume` | Exact native email verification/change purpose, token, operation, subject, actor, external link and generation; one-use mutation and token-authorized mirror synchronization only. |
+| `LocalPasswordRecoveryController.RequestRecovery` | Bounded non-enumerating native lookup restricted to verified email and a Ready linked Local identity; missing/ineligible targets remain uniformly accepted. |
+| `LocalPasswordRecoveryController.Consume` | Exact recovery-purpose native token and receipt; one password mutation, then only original-token-authorized mirror repair on retry. |
+
+All four require effective `PrivateNoStore`, `SuppressIdempotencyResponseStorage`, a 16384-byte request limit, the enabled `public_transactional` rate policy, and their exact named POST routes. They neither require generic idempotency keys nor issue ordinary sessions. Suppression must not be paired with a cosmetic required-key marker. The existing exact login, admission-recovery, callback and setup dispositions remain independently reviewed; none authorizes arbitrary anonymous POSTs.
+
+Both authorization-surface and endpoint-classification guards use the same compiled `ReviewedAnonymousEndpointGovernance` recognition, including exact controller/action identity and effective safeguards. Native API/BFF `LocalIdentityLifecycleHttpTests` own wrong-purpose/extra-authority rejection, one-use behavior, session separation, private responses and browser antiforgery. Handler-owned and trusted-worker authorities are separately enumerated in [Authorization](AUTHORIZATION.md#reviewed-handler-and-worker-authorities); endpoint metadata alone is never MediatR authorization.
+
+#### Exact capability cancellation: no key and no generic replay
+
+`GuestRegistrationStatusController.CancelConfirmed` remains `PublicTransactional` at `POST api/events/{eventId:guid}/guest-registration-orders/{orderId:guid}/cancellation`, named `CancelConfirmedGuestRegistration`. It is the reviewed no-key/no-replay exception: effective `[AllowAnonymous]`, `PrivateNoStore`, `SuppressIdempotencyResponseStorage`, enabled `public_transactional` rate limiting, its exact POST identity, and absence of API antiforgery and required-key metadata are mandatory. An unrelated suppressed POST cannot acquire this disposition.
+
+The handler enters `AnonymousCancellationService`, whose Serializable transaction freshly validates the exact tenant/event/order capability and live deadline under native fences before current eligibility, aggregate transition, admission revocation and exact consumed-hold release. Completed duplicates return 204 only after fresh capability/deadline validation. A missing/expired proof still fails with generic private 404, even with a previously successful key; an ordinary Local session cannot substitute. `GuestRegistrationStatusHttpTests` cancellation partials, `AnonymousCancellationConcurrencyTests` and `GuestRegistrationStatusBffTests` own runtime evidence.
+
+`IdempotencyMiddleware` bypasses suppression before checking `RequireIdempotencyKey`. Adding that attribute to cancellation would therefore claim enforcement that does not occur; removing suppression would incorrectly permit cached authority. Native challenge issuance is different: its exact controller validates the intended start key itself while suppressing response storage. Neither case licenses generic credential/cancellation response replay or broad suppression exceptions.
 
 ### Operation IDs
 

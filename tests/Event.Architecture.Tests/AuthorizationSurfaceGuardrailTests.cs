@@ -32,6 +32,70 @@ public sealed class AuthorizationSurfaceGuardrailTests
             "Explore.Application.Features.Integrations.Listmonk.Requests.Commands.ResolveIntegrationSyncAmbiguityCommand",
             "handler-contained-admin",
             "Tenant administrator authorization is enforced inside ResolveIntegrationSyncAmbiguityCommandHandler before repository mutation."),
+        new(
+            "Explore.Application.Features.Authentication.Local.Requests.Commands.ChangeLocalPasswordCommand",
+            "handler-current-local-session",
+            "Fresh ordinary Local session and exact Ready binding are checked before native current-password/stamp Serializable CAS. Evidence: LocalIdentityLifecycleHttpTests.OrdinaryPasswordChangeRemainsProtectedAndWorksWithoutSmtp; LocalCredentialFirstUseTests."),
+        new(
+            "Explore.Application.Features.Authentication.Local.Requests.Commands.CompleteLocalPasswordRecoveryCommand",
+            "native-recovery-purpose-token",
+            "Recovery-purpose validation and exact native token/receipt CAS authorize one password mutation; mirror retry retains the original token, never login authority. Evidence: LocalIdentityLifecycleHttpTests.RecoveryDeduplicatesDeliveryAndReplayCannotReplacePasswordAgain and ExternalIdentityMirrorFailureRetriesOnlySynchronizationWithOriginalToken."),
+        new(
+            "Explore.Application.Features.Authentication.Local.Requests.Commands.ConfirmLocalEmailCommand",
+            "native-email-purpose-token",
+            "Native token binds operation, subject, actor, external link, email purpose and generation; current stamp/receipt CAS precedes serialized SyncUser mirror repair. Evidence: LocalIdentityLifecycleHttpTests.VerificationChangesOnlyExactNativeAndDomainBindingWithoutSigningIn and PublicInputsRejectExtraAuthorityOversizedValuesAndWrongPurpose."),
+        new(
+            "Explore.Application.Features.Authentication.Local.Handlers.Commands.ReconcileLocalIdentityLifecycleMirrorCommand",
+            "trusted-worker-current-consumed-receipt",
+            "Only LocalIdentityLifecycleDeliveryWorker dispatches this pointer-only production command, never HTTP. Native synchronization checks the current consumed receipt, result stamp and exact binding independently of public token expiry. Evidence: LocalIdentityLifecycleDeliveryWorkerTests; LocalIdentityLifecycleHttpTests.TrustedRepairAfterExpirySynchronizesMirrorAndEvictsCachedProfileWithoutPublicPointerAuthority."),
+        new(
+            "Explore.Application.Features.Authentication.Local.Requests.Commands.RequestLocalEmailVerificationCommand",
+            "handler-public-admission-or-current-local-session",
+            "Bounded anonymous intake requests only current-address verification via native lookup; proposed email requires fresh ordinary Local authority and rejects alternate account selection. Evidence: LocalIdentityLifecycleHttpTests.ProposedAddressRequiresCurrentLocalSessionAndConsumesItsExactPendingAddress; LocalIdentityLifecycleEmailServiceTests."),
+        new(
+            "Explore.Application.Features.Authentication.Local.Requests.Commands.RequestLocalPasswordRecoveryCommand",
+            "handler-non-enumerating-local-admission",
+            "Bounded native lookup restricts recovery to verified email and Ready linked Local credentials; uniform acceptance hides eligibility/delivery outcomes without creating accounts or login authority. Evidence: LocalIdentityLifecycleHttpTests.MissingRecoveryTargetIsAcceptedWithoutSessionOrAccountCreation and IneligibleRecoveryNeverUsesMatchingDomainEmailAsLocalAuthority; LocalIdentityLifecycleEmailServiceTests."),
+        new(
+            "Explore.Application.Features.Authentication.Local.Requests.Commands.CompleteLocalCredentialReplacementCommand",
+            "native-restricted-replacement-proof",
+            "Dedicated replacement authority is not an ordinary Local session; selected-store ReplaceAsync validates the exact current first-use operation. Evidence: LocalCredentialReplacementHttpTests; LocalCredentialFirstUseTests; LocalBffCredentialReplacementTests."),
+        new(
+            "Explore.Application.Features.Authentication.Local.Requests.Commands.CreateLocalIdentityCommand",
+            "handler-current-instance-administrator",
+            "Canonical user and fresh persisted platform-admin membership are rechecked before mutation and one-time disclosure; creation/reconciliation cannot replay plaintext. Evidence: LocalCredentialAdministrationHttpTests.EveryRouteRequiresCurrentPersistedInstanceAuthority and PlaintextIsOneTimeAndNeverStoredByGenericIdempotency."),
+        new(
+            "Explore.Application.Features.Authentication.Local.Requests.Commands.ReconcileLocalCredentialOperationCommand",
+            "handler-current-instance-administrator",
+            "Fresh instance-admin authority and exact provisioning receipt graph gate Serializable binding and separate Identity activation; conflicting partial binding is rejected. Unlike worker repair this requires administrator authority. Evidence: LocalCredentialAdministrationHttpTests.ReconcileCannotAdoptConflictingPartialBinding and ReconcileIdempotencyReplayCannotRestoreRevokedAdministratorAuthority."),
+        new(
+            "Explore.Application.Features.Authentication.Local.Requests.Commands.ResetLocalCredentialCommand",
+            "handler-current-instance-administrator",
+            "Fresh persisted platform-admin authority is rechecked before selected-store reset and disclosure; exact predecessor operation/stamp and current ChangeRequired receipt are required. Evidence: LocalCredentialAdministrationHttpTests.NonLocalAccountCannotReceiveLocalReset and PlaintextIsOneTimeAndNeverStoredByGenericIdempotency."),
+        new(
+            "Explore.Application.Features.EmailDispatch.Requests.Commands.DisableEmailDeliveryCommand",
+            "handler-current-scope-administrator",
+            "Current platform admin or exact ambient tenant/admin grant is rechecked after the ordered SMTP lease inside Serializable execution; writer binds actor, target, revision, protected confirmation and acknowledgement. Evidence: EmailDeliveryDisableCommandHandlerTests.AuthorityRevokedWhileAcquiringLeaseIsRechecked and ConfirmedTokenCannotReplayImmediatelyOrAfterReenable; EmailDeliveryDisableHttpTests."),
+        new(
+            "Explore.Application.Features.EmailDispatch.Requests.Queries.PreviewEmailDeliveryDisableQuery",
+            "handler-current-scope-administrator-proof-preview",
+            "Command-response discovery deliberately includes this Query: fresh scoped admin is checked before and within the lease/Serializable snapshot; only actionable impact issues confirmation. Evidence: EmailDeliveryDisableCommandHandlerTests.UnauthorizedTargetsCannotPreviewOrDisable and LockedOrNoOpPreviewNeverIssuesConfirmation."),
+        new(
+            "Explore.Application.Features.InstanceOnboarding.Requests.Commands.CompleteLocalInstanceOnboardingCommand",
+            "handler-active-setup-secret-bootstrap",
+            "Authenticated SetupSecret principal, durable active setup mode, active Local primary, server deployment mode, manual validation and preflight precede native bootstrap convergence. Evidence: LocalInstanceOnboardingHttpTests; LocalBootstrapConvergenceTests; LocalBootstrapSecretContractTests."),
+        new(
+            "Explore.Application.Features.RegistrationOrders.Commands.CancelConfirmedGuestRegistrationCommand",
+            "native-current-limited-guest-capability",
+            "Exact tenant/event/order capability and live promise are freshly fenced before eligibility, aggregate transition, admission revocation and exact hold release in one Serializable transaction. Authorized duplicates revalidate capability/deadline without generic replay. Evidence: GuestRegistrationStatusHttpTests cancellation partials; AnonymousCancellationConcurrencyTests; AnonymousCancellationRulesTests."),
+        new(
+            "Explore.Application.Features.RegistrationOrders.Commands.ConsumeAnonymousRegistrationChallengeCommand",
+            "trusted-adapter-bound-proof-consumption",
+            "AnonymousRegistrationChallengeBoundary bounds/canonicalizes transport; native validation binds tenant/event/digest/key/envelope/nonce and snapshots intended typed selection before allocation or cached disclosure. Evidence: AnonymousRegistrationChallengeHttpTests.GuestStartWithoutProofFailsBeforeAllocationOrReplay and ChangedTenantAndCapabilityScopeCannotDiscloseCommittedReplay; AnonymousRegistrationChallengeServiceTests."),
+        new(
+            "Explore.Application.Features.RegistrationOrders.Commands.IssueAnonymousRegistrationChallengeCommand",
+            "handler-bounded-public-proof-issuance",
+            "Current tenant, publicly eligible published event, guest visitor/participation mode, finite live end promise, bounded difficulty and transactional tenant/event quotas gate issuance under the settings lease without allocation. Evidence: AnonymousRegistrationChallengeIssueTests; AnonymousRegistrationChallengeQuotaTests; AnonymousRegistrationChallengeHttpTests.EffectiveIpBudgetCoversIssuanceAndStartWithoutLoopbackBypass."),
     ];
     private static readonly string[] NamedMediatRViolations =
     [
@@ -275,6 +339,29 @@ public sealed class AuthorizationSurfaceGuardrailTests
 
     [Test]
     [Category("AuthorizationSurfaceGuardrail")]
+    public async Task NamedHandlerAuthorities_MustResolveToCurrentDiscoveredRequests()
+    {
+        var requests = AuthorizationSurfaceInventory.DiscoverMutatingRequests(ApplicationAssembly.GetTypes())
+            .UnprotectedMutatingRequests.Select(item => item.Id).ToHashSet(StringComparer.Ordinal);
+        await Assert.That(NamedMediatRExceptions.Where(entry => !requests.Contains(entry.Id))).IsEmpty();
+        await Assert.That(NamedMediatRExceptions.Select(entry => entry.Id).Distinct().Count())
+            .IsEqualTo(NamedMediatRExceptions.Length);
+        await Assert.That(NamedMediatRExceptions.Where(entry => NamedMediatRViolations.Contains(entry.Id))).IsEmpty();
+    }
+
+    [Test]
+    [Category("AuthorizationSurfaceGuardrail")]
+    public async Task TrustedLifecycleMirrorRepair_MustNotBeAnApiDependency()
+    {
+        var result = NetArchTest.Rules.Types.InAssembly(ApiAssembly).ShouldNot().HaveDependencyOn(
+            typeof(Explore.Application.Features.Authentication.Local.Handlers.Commands.ReconcileLocalIdentityLifecycleMirrorCommand).FullName!)
+            .GetResult();
+        await Assert.That(result.FailingTypeNames ?? []).IsEmpty()
+            .Because("only the trusted delivery worker may dispatch pointer-only repair; HTTP retains native token authority");
+    }
+
+    [Test]
+    [Category("AuthorizationSurfaceGuardrail")]
     [DisplayName("Mutating MediatR requests must be authorization-classified or named in the Phase 0 inventory")]
     public async Task MutatingMediatRRequests_MustBeAuthorizationClassifiedOrNamed()
     {
@@ -303,7 +390,7 @@ public sealed class AuthorizationSurfaceGuardrailTests
             .ToHashSet(StringComparer.Ordinal);
 
         var unclassified = inventory.AnonymousMutationSurfaces
-            .Where(item => !item.IsPublicTransactional && !item.IsSetupSecretGated)
+            .Where(item => !item.IsPublicTransactional && !item.IsSetupSecretGated && !item.IsReviewedLocalLifecycle)
             .Where(item => !namedIds.Contains(item.Id))
             .Select(item => item.Id)
             .ToArray();
@@ -342,14 +429,14 @@ public sealed class AuthorizationSurfaceGuardrailTests
             MediatRDispositions: [],
             AnonymousReadOrPublicActions: inventory.AnonymousReadOrPublicActions,
             SignatureGatedActions: inventory.SignatureGatedActions,
-            AnonymousMutationExceptions: NamedAnonymousMutationExceptions,
+            AnonymousMutationExceptions: [.. NamedAnonymousMutationExceptions, .. ReviewedAnonymousEndpointGovernance.LocalLifecycleExceptions],
             Violations: NamedAnonymousMutationViolations,
             UnclassifiedMutatingRequests: inventory.UnprotectedMutatingRequests
                 .Where(item => !NamedMediatRExceptions.Any(entry => entry.Id == item.Id))
                 .Where(item => !NamedMediatRViolations.Contains(item.Id, StringComparer.Ordinal))
                 .ToArray(),
             UnclassifiedAnonymousMutationSurfaces: inventory.AnonymousMutationSurfaces
-                .Where(item => !item.IsPublicTransactional && !item.IsSetupSecretGated)
+                .Where(item => !item.IsPublicTransactional && !item.IsSetupSecretGated && !item.IsReviewedLocalLifecycle)
                 .Where(item => !NamedAnonymousMutationExceptions.Concat(NamedAnonymousMutationViolations).Any(entry => entry.Id == item.Id))
                 .ToArray());
 
@@ -363,7 +450,8 @@ public sealed class AuthorizationSurfaceGuardrailTests
     [DisplayName("Guardrail probes reject synthetic unclassified mutating request and anonymous mutation action")]
     public async Task GuardrailProbes_ShouldRejectSyntheticViolations()
     {
-        var mutatingRequests = AuthorizationSurfaceInventory.DiscoverMutatingRequests(new[] { typeof(SyntheticUnclassifiedCommand) });
+        var mutatingRequests = AuthorizationSurfaceInventory.DiscoverMutatingRequests(
+            [typeof(SyntheticUnclassifiedCommand), typeof(SyntheticLocalLifecycleCommand), typeof(SyntheticProofPreviewQuery)]);
         var anonymousMutations = AuthorizationSurfaceInventory.DiscoverControllerActions(new[] { typeof(SyntheticAnonymousMutationController) })
             .AnonymousMutationSurfaces;
 
@@ -371,9 +459,16 @@ public sealed class AuthorizationSurfaceGuardrailTests
             .Contains("Event.Architecture.Tests.AuthorizationSurfaceGuardrailTests+SyntheticUnclassifiedCommand");
         await Assert.That(anonymousMutations.Select(item => item.Id).ToArray())
             .Contains("SyntheticAnonymousMutationController.Post");
+        await Assert.That(mutatingRequests.UnprotectedMutatingRequests.Select(item => item.Id)).Contains(typeof(SyntheticLocalLifecycleCommand).FullName!);
+        await Assert.That(mutatingRequests.UnprotectedMutatingRequests.Select(item => item.Id)).Contains(typeof(SyntheticProofPreviewQuery).FullName!);
+        await Assert.That(mutatingRequests.UnprotectedMutatingRequests.Where(item =>
+            NamedMediatRExceptions.Any(entry => entry.Id == item.Id) || NamedMediatRViolations.Contains(item.Id))).IsEmpty();
+        await Assert.That(anonymousMutations.Any(item => item.IsReviewedLocalLifecycle)).IsFalse();
     }
 
     private sealed record SyntheticUnclassifiedCommand : IRequest<BaseCommandResponse<Guid>>;
+    private sealed record SyntheticLocalLifecycleCommand : IRequest<BaseCommandResponse<Guid>>;
+    private sealed record SyntheticProofPreviewQuery : IRequest<BaseCommandResponse<Guid>>;
 
     private sealed class SyntheticAnonymousMutationController : ControllerBase
     {
@@ -542,7 +637,8 @@ internal static class AuthorizationSurfaceInventory
             IsAnonymous: HasEffectiveAttribute<AllowAnonymousAttribute>(controller, action),
             IsAuthorized: HasEffectiveAttribute<AuthorizeAttribute>(controller, action),
             IsPublicTransactional: classification == EndpointClass.PublicTransactional,
-            IsSetupSecretGated: HasEffectiveAttribute<SetupSecretRequiredAttribute>(controller, action));
+            IsSetupSecretGated: HasEffectiveAttribute<SetupSecretRequiredAttribute>(controller, action),
+            IsReviewedLocalLifecycle: ReviewedAnonymousEndpointGovernance.IsLocalLifecycle(controller, action));
     }
 
     private static string[] GetHttpMethods(MethodInfo method) =>
@@ -598,7 +694,8 @@ internal sealed record ControllerActionInventoryItem(
     bool IsAnonymous,
     bool IsAuthorized,
     bool IsPublicTransactional,
-    bool IsSetupSecretGated);
+    bool IsSetupSecretGated,
+    bool IsReviewedLocalLifecycle);
 
 internal sealed record MutatingRequestDiscovery(RequestInventoryItem[] ProtectedMutatingRequests, RequestInventoryItem[] UnprotectedMutatingRequests);
 

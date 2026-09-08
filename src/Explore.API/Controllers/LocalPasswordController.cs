@@ -8,7 +8,7 @@ using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.Application.Authentication;
-using Explore.Application.Features.Authentication.Local;
+using Explore.Application.Features.Authentication.Local.Requests.Commands;
 using Explore.Application.Features.Authentication.Local.Models;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;

@@ -2,6 +2,7 @@
 // ABOUTME: Keeps token-authorized mirror retry separate from password mutation and ordinary login.
 
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Features.Authentication.Local.Requests.Commands;
 using Explore.Application.Features.Authentication.Local.Validators;
 using Explore.Application.Responses;
 using MediatR;

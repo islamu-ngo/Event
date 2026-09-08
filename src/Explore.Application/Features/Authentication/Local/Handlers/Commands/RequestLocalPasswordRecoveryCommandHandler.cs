@@ -2,6 +2,7 @@
 // ABOUTME: Hides all account-specific eligibility and delivery outcomes behind the same accepted result.
 
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Features.Authentication.Local.Requests.Commands;
 using Explore.Application.Features.Authentication.Local.Validators;
 using Explore.Application.Responses;
 using MediatR;

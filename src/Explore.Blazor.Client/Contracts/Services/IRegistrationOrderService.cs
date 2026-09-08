@@ -2,10 +2,9 @@
 // ABOUTME: Keeps generated API calls, guest headers, and active-actor order aggregation outside Razor components.
 
 using Explore.Blazor.Client.Clients;
+using Explore.Blazor.Client.Models;
 
 namespace Explore.Blazor.Client.Contracts.Services;
-
-public enum GuestRegistrationCancellationOutcome { Unavailable, Succeeded, Conflict }
 
 public interface IRegistrationOrderService
 {

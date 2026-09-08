@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
+using Explore.Blazor.Client.Models;
 using Explore.Blazor.Client.Pages.Registration;
 using Explore.Blazor.Client.Services;
 using Explore.Blazor.Client.Services.Http;

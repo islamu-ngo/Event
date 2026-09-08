@@ -92,6 +92,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IEventOrganizerClaimService, EventOrganizerClaimService>();
         services.AddScoped<IEventModerationService, EventModerationService>();
         services.AddScoped<IRegistrationOrderService, RegistrationOrderService>();
+        services.AddScoped<IAnonymousRegistrationChallengeSolver, AnonymousRegistrationChallengeSolver>();
         services.AddScoped<IRegistrationPaymentService, RegistrationPaymentService>();
         services.AddScoped<IRegistrationProviderIntegrationService, RegistrationProviderIntegrationService>();
         services.AddScoped<Explore.Blazor.Client.Components.Registration.ProviderLaunch.RegistrationProviderLaunchState>();

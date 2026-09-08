@@ -77,6 +77,10 @@ internal sealed class CommandFailurePolicy
     public CommandFailurePolicy Gone(string title, string fallbackDetail, params string[] failureCodes) =>
         With(new GoneRule(Codes(failureCodes), Text(title), Text(fallbackDetail)));
 
+    /// <summary>Routes exhausted bounded intake budgets to 429 without disclosing budget partition keys.</summary>
+    public CommandFailurePolicy RateLimited(params string[] failureCodes) =>
+        With(new RateLimitedRule(Codes(failureCodes)));
+
     /// <summary>Maps a failed command response to the problem response its failure code declares.</summary>
     public ActionResult Map<TKey>(ControllerBase controller, BaseCommandResponse<TKey> response)
     {
@@ -105,6 +109,15 @@ internal sealed class CommandFailurePolicy
                 authentication.Detail!),
             ForbiddenRule forbidden => controller.ToForbiddenProblem(forbidden.Title, forbidden.Detail),
             GoneRule gone => controller.ToGoneProblem(gone.Title, response.Message ?? gone.FallbackDetail, failureCode),
+            RateLimitedRule => ApiProblemFactory.ToProblemResult(new ProblemDetails
+            {
+                Status = StatusCodes.Status429TooManyRequests,
+                Type = ApiProblemTypes.TooManyRequests,
+                Title = "Too Many Requests",
+                Detail = "The registration intake budget is exhausted.",
+                Instance = controller.Request.Path,
+                Extensions = { ["code"] = failureCode }
+            }),
             _ => controller.ToCommandValidationProblem(response, _validation),
         };
     }
@@ -154,4 +167,6 @@ internal sealed class CommandFailurePolicy
 
     private sealed record GoneRule(IReadOnlyCollection<string> FailureCodes, string Title, string FallbackDetail)
         : Rule(FailureCodes);
+
+    private sealed record RateLimitedRule(IReadOnlyCollection<string> FailureCodes) : Rule(FailureCodes);
 }

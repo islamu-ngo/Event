@@ -4,6 +4,10 @@
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Helpers;
+using System.Text.Json;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.JSInterop;
 
 namespace Explore.Blazor.Client.Services;
 
@@ -14,33 +18,158 @@ public sealed class RegistrationOrderService(
     IEventService eventService,
     Explore.Blazor.Client.Services.Shell.UiShellState shellState,
     IGuestRegistrationOrderCapabilityStore capabilityStore,
-    ILogger<RegistrationOrderService> logger) : IRegistrationOrderService
+    ILogger<RegistrationOrderService> logger,
+    IAnonymousRegistrationChallengeClient challengeClient,
+    IAnonymousRegistrationChallengeSolver challengeSolver,
+    NavigationManager navigation,
+    TimeProvider clock,
+    AuthenticationStateProvider authentication) : IRegistrationOrderService
 {
     public Task<RegistrationCheckoutCompositionDto?> GetCheckoutAsync(Guid eventId, CancellationToken cancellationToken = default) =>
         ExecuteAsync(() => orderClient.GetRegistrationCheckoutCompositionAsync(eventId, cancellationToken: cancellationToken));
 
+    private static readonly JsonSerializerOptions IntentJson = EventApiJsonSerializerSettings.Configure(new());
+    private GuestIntent? _guestIntent;
+    private int _guestBusy;
+    public event Action? GuestStartChanged;
+    public GuestRegistrationStartPhase GuestStartPhase { get; private set; }
+    public int GuestProofAttempts { get; private set; }
+    public Guid? PendingGuestEventId => _guestIntent is { Submissions: > 0 } intent ? intent.EventId : null;
+
     public async Task<GuestRegistrationOrderStartDto?> StartGuestAsync(Guid eventId, StartRegistrationOrderRequest request, CancellationToken cancellationToken = default)
     {
+        // A submitted intent may only be resolved through explicit retry, never replaced by a new start.
+        if (Interlocked.CompareExchange(ref _guestBusy, 1, 0) != 0) return null;
         try
         {
-            var started = await guestClient.StartGuestRegistrationOrderWithCapabilityAsync(eventId, request, cancellationToken);
-            if (started.Response.Id is { } orderId)
+            if (PendingGuestEventId.HasValue) return null;
+            if (!await IsAnonymousAsync())
             {
-                capabilityStore.Store(eventId, orderId, new GuestRegistrationOrderCapability(started.Capability));
+                SetGuestPhase(GuestRegistrationStartPhase.IntentChanged);
+                return null;
             }
+            var intent = new GuestIntent(eventId, navigation.BaseUri, JsonSerializer.Serialize(request, IntentJson));
+            _guestIntent = intent;
+            GuestProofAttempts = 0;
+            SetGuestPhase(GuestRegistrationStartPhase.Issuing);
+            using var issueTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            issueTimeout.CancelAfter(TimeSpan.FromSeconds(20));
+            var challenge = await challengeClient.CreateAnonymousRegistrationChallengeAsync(
+                eventId, body: intent.Request(), idempotency_Key: intent.Key, cancellationToken: issueTimeout.Token);
+            intent.Challenge = challenge.ProtectedChallenge;
+            intent.ExpiresAt = challenge.ExpiresAt;
+            SetGuestPhase(GuestRegistrationStartPhase.Solving);
+            intent.Nonce = await challengeSolver.SolveAsync(challenge, attempts =>
+            {
+                GuestProofAttempts = attempts;
+                GuestStartChanged?.Invoke();
+            }, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!await IsAnonymousAsync() || intent.Origin != navigation.BaseUri
+                || intent.Body != JsonSerializer.Serialize(request, IntentJson))
+            {
+                _guestIntent = null;
+                SetGuestPhase(GuestRegistrationStartPhase.IntentChanged);
+                return null;
+            }
+            if (intent.ExpiresAt is null || intent.ExpiresAt <= clock.GetUtcNow())
+            {
+                _guestIntent = null;
+                SetGuestPhase(GuestRegistrationStartPhase.Expired);
+                return null;
+            }
+            return await SubmitGuestIntentAsync(intent, cancellationToken);
+        }
+        catch (Exception exception) when (IsGuestTransportFailure(exception))
+        {
+            RecordGuestFailure(cancellationToken);
+            return null;
+        }
+        finally { Volatile.Write(ref _guestBusy, 0); }
+    }
 
-            return started.Response;
-        }
-        catch (ApiException exception)
+    public async Task<GuestRegistrationOrderStartDto?> RetryGuestAsync(Guid eventId, CancellationToken cancellationToken = default)
+    {
+        if (Interlocked.CompareExchange(ref _guestBusy, 1, 0) != 0) return null;
+        try
         {
-            logger.LogWarning("Guest registration order could not be started. Status: {StatusCode}.", exception.StatusCode);
+            if (_guestIntent is not { Submissions: > 0 } intent) return null;
+            if (!await IsAnonymousAsync() || intent.EventId != eventId || intent.Origin != navigation.BaseUri)
+            {
+                SetGuestPhase(GuestRegistrationStartPhase.IntentChanged);
+                return null;
+            }
+            if (intent.Submissions >= 3)
+            {
+                SetGuestPhase(GuestRegistrationStartPhase.RetryExhausted);
+                return null;
+            }
+            // Original expired proof may authenticate exact committed recovery. Never reissue here.
+            return await SubmitGuestIntentAsync(intent, cancellationToken);
+        }
+        catch (Exception exception) when (IsGuestTransportFailure(exception))
+        {
+            RecordGuestFailure(cancellationToken);
             return null;
         }
-        catch (InvalidOperationException)
+        finally { Volatile.Write(ref _guestBusy, 0); }
+    }
+
+    private async Task<GuestRegistrationOrderStartDto?> SubmitGuestIntentAsync(GuestIntent intent, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        intent.Submissions++;
+        SetGuestPhase(GuestRegistrationStartPhase.Submitting);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(65));
+        var started = await guestClient.StartGuestRegistrationOrderWithCapabilityAsync(
+            intent.EventId, intent.Request(), intent.Key, intent.Challenge!, intent.Nonce!, timeout.Token);
+        if (started.Response is not { Success: true, Id: { } orderId })
         {
-            logger.LogWarning("Guest registration order capability was unavailable.");
+            SetGuestPhase(intent.Submissions >= 3 ? GuestRegistrationStartPhase.RetryExhausted : GuestRegistrationStartPhase.Uncertain);
             return null;
         }
+        capabilityStore.Store(intent.EventId, orderId, new GuestRegistrationOrderCapability(started.Capability));
+        _guestIntent = null;
+        SetGuestPhase(GuestRegistrationStartPhase.Completed);
+        return started.Response;
+    }
+
+    private void RecordGuestFailure(CancellationToken cancellationToken)
+    {
+        if (PendingGuestEventId.HasValue)
+            SetGuestPhase(_guestIntent!.Submissions >= 3 ? GuestRegistrationStartPhase.RetryExhausted : GuestRegistrationStartPhase.Uncertain);
+        else
+        {
+            _guestIntent = null;
+            SetGuestPhase(cancellationToken.IsCancellationRequested
+                ? GuestRegistrationStartPhase.Cancelled : GuestRegistrationStartPhase.Unavailable);
+        }
+    }
+
+    private async Task<bool> IsAnonymousAsync() =>
+        !(await authentication.GetAuthenticationStateAsync()).User.Identities.Any(identity => identity.IsAuthenticated);
+
+    private static bool IsGuestTransportFailure(Exception exception) =>
+        exception is ApiException or HttpRequestException or OperationCanceledException or JSException or InvalidOperationException or JsonException;
+
+    private void SetGuestPhase(GuestRegistrationStartPhase phase)
+    {
+        GuestStartPhase = phase;
+        GuestStartChanged?.Invoke();
+    }
+
+    private sealed class GuestIntent(Guid eventId, string origin, string body)
+    {
+        public Guid EventId { get; } = eventId;
+        public string Origin { get; } = origin;
+        public string Body { get; } = body;
+        public string Key { get; } = Guid.CreateVersion7().ToString("N");
+        public string? Challenge { get; set; }
+        public DateTimeOffset? ExpiresAt { get; set; }
+        public string? Nonce { get; set; }
+        public int Submissions { get; set; }
+        public StartRegistrationOrderRequest Request() => JsonSerializer.Deserialize<StartRegistrationOrderRequest>(Body, IntentJson)!;
     }
 
     public Task<BaseCommandResponseOfGuid?> StartAuthenticatedAsync(Guid eventId, StartRegistrationOrderRequest request, CancellationToken cancellationToken = default) =>

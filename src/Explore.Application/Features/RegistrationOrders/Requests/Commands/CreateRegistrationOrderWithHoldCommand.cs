@@ -1,6 +1,8 @@
 // ABOUTME: Defines internal order-start input for atomic ticket selection and inventory reservation.
 // ABOUTME: Keeps purchaser PII outside the hold transaction; a normalized verified contact is used only for limit lookup.
 
+using System.Text.Json.Serialization;
+using Explore.Application.Contracts.Services.Registration;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
@@ -23,6 +25,9 @@ public sealed record CreateRegistrationOrderWithHoldCommand : IRequest<BaseComma
     public BookingPartyTypeEnum BookingPartyType { get; init; }
 
     public CapabilityTokenHash? GuestAccessTokenHash { get; init; }
+
+    [JsonIgnore]
+    public AnonymousRegistrationChallengeAuthority? ChallengeAuthority { get; internal init; }
 
     public int? PlatformContributionBasisPoints { get; init; }
 

@@ -496,6 +496,11 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `ADMISSIONS__RECOVERY__RATELIMITBUCKETCOUNT` | security | public | None | optional | process |
 | `ADMISSIONS__RECOVERY__RATELIMITPERMITCOUNT` | security | public | None | optional | process |
 | `ADMISSIONS__RECOVERY__RATELIMITWINDOWSECONDS` | security | public | None | optional | process |
+| `RATELIMITING__ANONYMOUSREGISTRATION__IPPERMITLIMIT` | security | public | 10 | defaulted | process |
+| `RATELIMITING__ANONYMOUSREGISTRATION__SUBNETPERMITLIMIT` | security | public | 40 | defaulted | process |
+| `RATELIMITING__ANONYMOUSREGISTRATION__WINDOWSECONDS` | security | public | 60 | defaulted | process |
+| `RATELIMITING__ANONYMOUSREGISTRATION__CONCURRENCYLIMIT` | security | public | 8 | defaulted | process |
+| `RATELIMITING__ANONYMOUSREGISTRATION__QUEUELIMIT` | security | public | 0 | defaulted | process |
 | `TICKETING__RECOVERY__ENABLED` | security | public | None | optional | process |
 | `TICKETING__RECOVERY__EXPECTEDRELEASEREVISION` | security | public | None | optional | process |
 | `TICKETING__RECOVERY__EXPECTEDSCHEMAREVISION` | security | public | None | optional | process |

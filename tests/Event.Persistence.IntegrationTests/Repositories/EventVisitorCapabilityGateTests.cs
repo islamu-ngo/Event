@@ -129,14 +129,15 @@ public sealed class EventVisitorCapabilityGateTests
     public async Task DirectoryOnly_AllNativeStartersRejectNewAllocationWithoutChangingExistingHolds(string surface)
     {
         await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync();
-        var entity = await fixture.SeedEventAsync();
+        var entity = await fixture.SeedEventAsync(published: true);
         var ticket = await fixture.SeedTicketAsync(entity.Id);
         async Task<BaseCommandResponse<Guid>> StartAsync() => surface switch
         {
             "authenticated" => await fixture.ExecuteAsync<StartAuthenticatedRegistrationOrderCommand, BaseCommandResponse<Guid>>(
                 new(entity.Id, ticket.CatalogId, BookingPartyTypeEnum.Individual, [new(ticket.TicketId, 1, null)])),
             "guest" => await fixture.ExecuteAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(
-                new(entity.Id, ticket.CatalogId, BookingPartyTypeEnum.Individual, [new(ticket.TicketId, 1, null)])),
+                (await fixture.IssueGuestProofAsync(new(entity.Id, ticket.CatalogId,
+                    BookingPartyTypeEnum.Individual, [new(ticket.TicketId, 1, null)]))).Request),
             _ => await fixture.ExecuteAsync<CreateRegistrationOrderWithHoldCommand, BaseCommandResponse<Guid>>(new()
             {
                 EventId = entity.Id, TicketCatalogVersionId = ticket.CatalogId, AccountUserId = fixture.UserId,

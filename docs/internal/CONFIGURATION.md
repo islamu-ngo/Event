@@ -8,6 +8,31 @@ The exhaustive environment-variable reference is maintained in
 `.env.example` is intentionally a curated baseline, not a complete catalogue.
 This document owns configuration architecture, source anchors and invariants.
 
+## Anonymous Registration Intake Controls
+
+`AnonymousRegistrationRateLimiting` resolves final host configuration from
+`RateLimiting:AnonymousRegistration` when native rate-limiter options initialize.
+The public environment catalogue owns its environment-key spellings and safe
+defaults. Process controls require restart: IP permits, subnet permits, window,
+concurrency and queue capacity are bounded, and invalid values reject startup.
+These are the first layer, not distributed quota or seat authority.
+
+`AnonymousRegistrationChallengeSettingDefinitions` owns live governed difficulty
+and durable quota limits. Difficulty is the canonical string choice 16 through
+22, default 18. Tenant and event per-minute limits are finite positive choices,
+default 600 and 120. The issuer reads effective values and locks without stale
+caches under the complete visitor/quota/difficulty setting lease before opening
+its serializable transaction. Validity remains 120 seconds; defaults are not
+measured mobile or load guarantees.
+
+The existing API Data Protection authority must be persistent and shared across
+replicas that issue or validate a challenge. No alternate key authority or
+per-instance fallback is introduced. Primary-context
+`AnonymousRegistrationChallengeQuotas` migrations own only the two private
+tenant/event budget tables; no external Identity or reservation schema changes.
+See [the security boundary](SECURITY-MODEL.md#anonymous-registration-challenge-and-replay-boundary)
+and [operator behavior](../public/documentation/readme/events-and-ticketing/modular-event-aspects.md#anonymous-reservations-and-retry).
+
 ## Headless Instance Onboarding (Configured Administrator)
 
 Instance onboarding reads eight keys from the deployment environment or

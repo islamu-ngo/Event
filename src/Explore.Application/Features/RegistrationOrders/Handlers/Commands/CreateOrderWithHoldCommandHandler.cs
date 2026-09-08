@@ -5,6 +5,7 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Contracts.Services.Registration;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.Features.RegistrationOrders.Validators;
 using Explore.Application.Responses;
@@ -41,6 +42,26 @@ public sealed class CreateOrderWithHoldCommandHandler(
         CreateRegistrationOrderWithHoldCommand request,
         CancellationToken cancellationToken)
     {
+        var authority = request.ChallengeAuthority;
+        if ((request.GuestAccessTokenHash is not null || authority is not null) &&
+            (authority is null || !authority.Matches(request) || !AllowsRecovery(authority)))
+        {
+            return ChallengeInvalid(request.EventId);
+        }
+
+        // A verified original request can recover a committed allocation even after publication or
+        // visitor policy changes. This read never reacquires capacity or refreshes a deadline.
+        if (authority is not null &&
+            await ReadCommittedGuestAsync(authority, cancellationToken) is { } committed)
+        {
+            return committed;
+        }
+
+        if (authority is not null && !authority.IsFresh(timeProvider.GetUtcNow()))
+        {
+            return ChallengeExpired(request.EventId);
+        }
+
         var validation = await new CreateRegistrationOrderWithHoldCommandValidator()
             .ValidateAsync(request, cancellationToken);
         if (!validation.IsValid)
@@ -48,7 +69,7 @@ public sealed class CreateOrderWithHoldCommandHandler(
             return Invalid(request.EventId, validation.Errors.Select(error => error.ErrorMessage));
         }
 
-        Guid orderId = Guid.CreateVersion7();
+        Guid orderId = authority?.OrderId ?? Guid.CreateVersion7();
         DateTime createdAt = timeProvider.GetUtcNow().UtcDateTime;
         IReadOnlyDictionary<Guid, StableLineIds> stableLineIds = request.Lines
             .OrderBy(line => line.TicketTypeId)
@@ -66,12 +87,38 @@ public sealed class CreateOrderWithHoldCommandHandler(
                 [VisitorAccessCapabilityResolver.AuthoritySettingKeys],
                 outerToken => unitOfWork.ExecuteSerializableAsync(async token =>
             {
+                earliestHoldExpiry = null;
+                if (authority is not null)
+                {
+                    if (!AllowsRecovery(authority))
+                    {
+                        return ChallengeInvalid(request.EventId);
+                    }
+
+                    // Another owner may have committed while this request waited for the ordered lease.
+                    if (await ReadCommittedGuestAsync(authority, token) is { } recovered)
+                    {
+                        return recovered;
+                    }
+
+                    if (!authority.IsFresh(timeProvider.GetUtcNow()))
+                    {
+                        return ChallengeExpired(request.EventId);
+                    }
+                }
+
                 Event? eventTarget = await events.GetAuthorizationTargetByIdAsync(request.EventId, token);
                 if (eventTarget is null || eventTarget.TenantId != tenant.TenantId ||
                     eventTarget.ParticipationConfiguration is not
                     {
                         ParticipationHandlingModeId: (int)ParticipationHandlingModeEnum.PlatformManaged
                     } participationConfiguration)
+                {
+                    return Missing(request.EventId);
+                }
+
+                if (authority is not null &&
+                    !await events.IsPubliclyEligibleAsync(tenant.TenantId, request.EventId, token))
                 {
                     return Missing(request.EventId);
                 }
@@ -92,7 +139,9 @@ public sealed class CreateOrderWithHoldCommandHandler(
                 RegistrationOrder? existing = await inventory.GetOrderByIdAsync(orderId, tenant.TenantId, token);
                 if (existing is not null)
                 {
-                    return Success(existing.Id, "Registration order already created.");
+                    return authority is null
+                        ? Success(existing.Id, "Registration order already created.")
+                        : ChallengeInvalid(request.EventId);
                 }
 
                 EventTicketCatalogVersion? catalog = await catalogs.GetPublishedCatalogAsync(
@@ -171,6 +220,12 @@ public sealed class CreateOrderWithHoldCommandHandler(
                     return IncompatiblePolicy(request.EventId);
                 }
 
+                // Pool row fences and catalog reads may wait. A historical proof never starts new effects.
+                if (authority is not null && !authority.IsFresh(timeProvider.GetUtcNow()))
+                {
+                    return ChallengeExpired(request.EventId);
+                }
+
                 DateTime? expiresAt = !isWaitlisted && reservesCapacityOnSelection
                     ? poolsById.Values
                         .Where(pool => holdPolicies[pool.Id] == CapacityHoldPolicyEnum.TimedHoldOnSelection)
@@ -242,6 +297,11 @@ public sealed class CreateOrderWithHoldCommandHandler(
                     isWaitlisted,
                     submitsForApproval,
                     createdAt);
+                if (authority is not null && !authority.IsFresh(timeProvider.GetUtcNow()))
+                {
+                    return ChallengeExpired(request.EventId);
+                }
+
                 await inventory.AddOrderWithHoldsAsync(order, holds, token);
                 await inventory.SaveChangesAsync(token);
                 earliestHoldExpiry = holds.Length == 0 ? null : holds.Min(hold => hold.ExpiresAt);
@@ -253,7 +313,9 @@ public sealed class CreateOrderWithHoldCommandHandler(
                 await RegisterHoldExpiryDeadlineAsync(orderId, earliestHoldExpiry.Value, cancellationToken);
             }
 
-            return response;
+            return authority is not null && response.IsSuccess && !AllowsRecovery(authority)
+                ? ChallengeInvalid(request.EventId)
+                : response;
         }
         catch (ArgumentException exception)
         {
@@ -264,6 +326,42 @@ public sealed class CreateOrderWithHoldCommandHandler(
             return Invalid(request.EventId, exception.Message);
         }
     }
+
+    public async Task<BaseCommandResponse<Guid>?> TryRecoverCommittedGuestAsync(
+        StartGuestRegistrationOrderCommand request,
+        CancellationToken cancellationToken)
+    {
+        var authority = request.ChallengeAuthority;
+        if (authority is null || !authority.Matches(request) || !AllowsRecovery(authority))
+        {
+            return ChallengeInvalid(request.EventId);
+        }
+
+        return await ReadCommittedGuestAsync(authority, cancellationToken);
+    }
+
+    private bool AllowsRecovery(AnonymousRegistrationChallengeAuthority authority) =>
+        authority.TenantId == tenant.TenantId && timeProvider.GetUtcNow() < authority.RecoverUntil;
+
+    private async Task<BaseCommandResponse<Guid>?> ReadCommittedGuestAsync(
+        AnonymousRegistrationChallengeAuthority authority,
+        CancellationToken cancellationToken)
+    {
+        RegistrationOrder? order = await inventory.GetExactGuestOrderAsync(
+            authority.OrderId, tenant.TenantId, authority.EventId, authority.GuestAccessTokenHash, cancellationToken);
+        if (!AllowsRecovery(authority))
+        {
+            return ChallengeInvalid(authority.EventId);
+        }
+
+        return order is null ? null : Success(order.Id, "Registration order already created.");
+    }
+
+    private static BaseCommandResponse<Guid> ChallengeInvalid(Guid eventId) => BaseCommandResponse.Failure<Guid>(
+        "registration_order_challenge_invalid", "Registration challenge is invalid.", id: eventId);
+
+    private static BaseCommandResponse<Guid> ChallengeExpired(Guid eventId) => BaseCommandResponse.Failure<Guid>(
+        "registration_order_challenge_expired", "Registration challenge has expired.", id: eventId);
 
     /// <summary>
     /// Asks the scheduler to wake at the order's earliest hold expiry so held capacity returns to sale at

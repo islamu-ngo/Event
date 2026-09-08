@@ -1,10 +1,17 @@
 // ABOUTME: Composes event visitor command gates with production services and a real SQLite database.
 // ABOUTME: Shares the event/provider authority surface so race tests need no repository or unit-of-work substitutes.
 
+using System.Globalization;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using Explore.Application;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Contracts.Services.Registration;
+using Explore.Application.DTOs.RegistrationOrders;
+using Explore.Application.Features.RegistrationOrders.Commands;
+using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Telemetry;
 using Explore.Domain;
@@ -13,6 +20,7 @@ using Explore.Infrastructure;
 using Explore.Persistence;
 using Explore.Secrets.Extensions;
 using MediatR;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
@@ -25,6 +33,7 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
 {
     private readonly string _path = Path.Combine(Path.GetTempPath(), $"event-visitor-{Guid.CreateVersion7():N}.db");
     private ServiceProvider _provider = null!;
+    private IServiceCollection _services = null!;
     private AsyncServiceScope _scope;
     public Guid TenantId { get; } = Guid.CreateVersion7();
     internal Guid UserId { get; } = Guid.CreateVersion7();
@@ -33,7 +42,13 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
     internal ExploreDbContext Context => Services.GetRequiredService<ExploreDbContext>();
     internal string DatabasePath => _path;
 
-    internal static async Task<EventVisitorCapabilitySqliteFixture> CreateAsync()
+    internal AsyncServiceScope CreateScope() => _provider.CreateAsyncScope();
+
+    internal ServiceProvider CreateReplica() =>
+        _services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+
+    internal static async Task<EventVisitorCapabilitySqliteFixture> CreateAsync(
+        Action<IServiceCollection>? configureServices = null)
     {
         var fixture = new EventVisitorCapabilitySqliteFixture();
         await EmailDispatchSqliteFixture.CreateDatabaseAsync(fixture._path);
@@ -70,6 +85,8 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
         });
         services.ConfigureApplicationServices(configuration);
         services.ConfigureInfrastructureServices(configuration);
+        services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(fixture._path + "-keys"))
+            .SetApplicationName("islamu-event");
         services.AddSecretProvider(configuration);
         services.AddSecretResolution();
         services.ConfigurePersistenceServices(configuration, skipLookupCacheInitializer: true);
@@ -82,7 +99,9 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
                     [new Claim(ClaimTypes.NameIdentifier, fixture.UserId.ToString())], "fixture"))
             }
         });
-        fixture._provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+        configureServices?.Invoke(services);
+        fixture._services = services;
+        fixture._provider = fixture.CreateReplica();
         fixture._scope = fixture._provider.CreateAsyncScope();
         var now = DateTime.UtcNow;
         fixture.Context.Tenants.Add(new Tenant
@@ -103,7 +122,8 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
         fixture.Context.TenantUsers.Add(new TenantUser
         {
             Id = Guid.CreateVersion7(), TenantId = fixture.TenantId, Tenant = null!,
-            UserId = fixture.UserId, User = null!, StatusId = (int)TenantUserStatusEnum.Active,
+            UserId = fixture.UserId, User = null!, ActorId = fixture.ActorId,
+            StatusId = (int)TenantUserStatusEnum.Active,
             JoinedAt = now, CreatedAt = now
         });
         await fixture.Context.SaveChangesAsync();
@@ -115,9 +135,9 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
         where TCommand : IRequest<TResponse> =>
         Services.GetRequiredService<IRequestHandler<TCommand, TResponse>>().Handle(command, CancellationToken.None);
 
-    internal async Task<Explore.Domain.Event> SeedEventAsync(bool accountRequired = false)
+    internal async Task<Explore.Domain.Event> SeedEventAsync(bool accountRequired = false, bool published = false)
     {
-        var entity = new Explore.Domain.Event
+        var entity = new Explore.Domain.Event(published ? EventStatusEnum.Published : EventStatusEnum.Draft)
         {
             Id = Guid.CreateVersion7(), Title = "Visitor gate event", TenantId = TenantId, Tenant = null!,
             ActorId = ActorId, Actor = null!, OrganizerActorId = ActorId,
@@ -154,6 +174,51 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
         return (catalog.Id, ticket.Id);
     }
 
+    // The API owns canonical request identity. This native lane supplies an opaque trusted digest and
+    // tests the real protected-envelope/typed-command boundary rather than reimplementing HTTP hashing.
+    internal async Task<GuestAllocationProof> IssueGuestProofAsync(StartGuestRegistrationOrderCommand request)
+    {
+        var binding = new AnonymousRegistrationChallengeBinding(TenantId, request.EventId,
+            Convert.ToHexString(RandomNumberGenerator.GetBytes(32)), Guid.CreateVersion7().ToString("N"));
+        var challenge = Services.GetRequiredService<IAnonymousRegistrationChallengeService>().Issue(binding, 16);
+        string nonce = Solve(challenge);
+        var proof = new GuestAllocationProof(request, binding, challenge, nonce);
+        return proof with { Request = await ValidateGuestProofAsync(Services, proof) };
+    }
+
+    internal static async Task<StartGuestRegistrationOrderCommand> ValidateGuestProofAsync(
+        IServiceProvider services, GuestAllocationProof proof)
+    {
+        var authority = await services.GetRequiredService<IRequestHandler<ConsumeAnonymousRegistrationChallengeCommand,
+            AnonymousRegistrationChallengeAuthority?>>().Handle(new(proof.Request.EventId,
+                proof.Binding.CanonicalRequestDigest, proof.Binding.IdempotencyKey,
+                proof.Challenge.ProtectedChallenge, proof.Nonce, proof.Request), CancellationToken.None);
+        return proof.Request with
+        {
+            ChallengeAuthority = authority ?? throw new InvalidOperationException("Native proof validation failed.")
+        };
+    }
+
+    private static string Solve(AnonymousRegistrationChallengeDto challenge)
+    {
+        // Client work at the protocol's supported minimum difficulty, never a server-side bypass.
+        for (ulong candidate = 0; candidate < ulong.MaxValue; candidate++)
+        {
+            string nonce = candidate.ToString("x16", CultureInfo.InvariantCulture);
+            byte[] digest = SHA256.HashData(Encoding.UTF8.GetBytes(
+                "islamu-event:anonymous-registration:v1\n" + challenge.ProtectedChallenge + "\n" + nonce));
+            if (digest[0] == 0 && digest[1] == 0) return nonce;
+        }
+
+        throw new InvalidOperationException("No proof nonce exists.");
+    }
+
+    internal sealed record GuestAllocationProof(StartGuestRegistrationOrderCommand Request,
+        AnonymousRegistrationChallengeBinding Binding, AnonymousRegistrationChallengeDto Challenge, string Nonce)
+    {
+        public override string ToString() => "GuestAllocationProof { Redacted = true }";
+    }
+
     internal static ConfigureEventParticipationDto Participation(bool accountRequired = true) => new()
     {
         ParticipationHandlingModeId = (int)ParticipationHandlingModeEnum.PlatformManaged,
@@ -176,5 +241,6 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
         File.Delete(_path);
         File.Delete(_path + "-wal");
         File.Delete(_path + "-shm");
+        if (Directory.Exists(_path + "-keys")) Directory.Delete(_path + "-keys", recursive: true);
     }
 }

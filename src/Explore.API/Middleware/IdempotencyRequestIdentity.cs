@@ -7,6 +7,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Explore.API.Authentication;
+using Explore.API.Attributes;
+using Explore.API.Hateoas;
 using Explore.Application.Authentication;
 using Explore.Application.Constants;
 using Microsoft.AspNetCore.Routing;
@@ -34,7 +36,8 @@ internal static class IdempotencyRequestIdentityFactory
     public static async Task<IdempotencyRequestIdentity> CreateAsync(
         HttpContext context,
         RecyclableMemoryStreamManager streamManager,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool preserveAmbiguousMemberOrder = false)
     {
         var method = context.Request.Method.ToUpperInvariant();
         var requestTarget = ResolveRequestTarget(context);
@@ -43,7 +46,9 @@ internal static class IdempotencyRequestIdentityFactory
         var userId = context.User.GetPlatformUserId()?.ToString("D");
         var principalFingerprint = ComputeSha256Hex(
             $"{ResolvePrincipalScope(context.User, identity, userId)}|capabilities:{CapabilityScope(context.Request)}");
-        var bodyHash = await ComputeBodyHashAsync(context.Request, streamManager, cancellationToken);
+        var bodyHash = await ComputeBodyHashAsync(context.Request, streamManager, cancellationToken,
+            preserveAmbiguousMemberOrder || context.GetEndpoint()?.Metadata
+                .GetMetadata<RequireAnonymousRegistrationChallengeAttribute>() is not null);
 
         return new IdempotencyRequestIdentity(
             method,
@@ -54,10 +59,45 @@ internal static class IdempotencyRequestIdentityFactory
             userId);
     }
 
+    internal static async Task<IdempotencyRequestIdentity> CreateIntendedGuestStartAsync(
+        HttpContext context,
+        Guid eventId,
+        RecyclableMemoryStreamManager streamManager,
+        CancellationToken cancellationToken)
+    {
+        var endpoints = context.RequestServices.GetRequiredService<EndpointDataSource>();
+        RouteEndpoint start = endpoints.Endpoints.OfType<RouteEndpoint>().Single(endpoint =>
+            endpoint.Metadata.GetMetadata<IRouteNameMetadata>()?.RouteName == RouteNames.StartGuestRegistrationOrder);
+        var values = new RouteValueDictionary(start.RoutePattern.Defaults) { ["eventId"] = eventId.ToString("D") };
+        string path = context.RequestServices.GetRequiredService<LinkGenerator>().GetPathByName(
+            RouteNames.StartGuestRegistrationOrder,
+            new { eventId },
+            pathBase: context.Request.PathBase)
+            ?? throw new InvalidOperationException("The guest start route is unavailable.");
+        IdempotencyRequestIdentity identity = await CreateAsync(context, streamManager, cancellationToken,
+            preserveAmbiguousMemberOrder: true);
+        return identity with
+        {
+            Method = HttpMethods.Post,
+            RequestTarget = ResolveRequestTarget(start.RoutePattern.RawText, path, values, context.Request.QueryString)
+        };
+    }
+
+    internal static string ComputeGuestStartDigest(
+        IdempotencyRequestIdentity identity, Guid tenantId, Guid eventId, string key) =>
+        ComputeSha256Hex(JsonSerializer.Serialize(new
+        {
+            TenantId = tenantId,
+            EventId = eventId,
+            Key = key,
+            Identity = identity
+        })).ToUpperInvariant();
+
     private static async Task<string> ComputeBodyHashAsync(
         HttpRequest request,
         RecyclableMemoryStreamManager streamManager,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool preserveAmbiguousMemberOrder)
     {
         request.EnableBuffering();
 
@@ -81,7 +121,7 @@ internal static class IdempotencyRequestIdentityFactory
 
         bodyStream.Position = 0;
         if (IsJsonContentType(request.ContentType)
-            && TryCanonicalizeJson(bodyStream, streamManager, out var canonicalJson))
+            && TryCanonicalizeJson(bodyStream, streamManager, preserveAmbiguousMemberOrder, out var canonicalJson))
         {
             using (canonicalJson)
             {
@@ -98,6 +138,7 @@ internal static class IdempotencyRequestIdentityFactory
     private static bool TryCanonicalizeJson(
         Stream jsonStream,
         RecyclableMemoryStreamManager streamManager,
+        bool preserveAmbiguousMemberOrder,
         out MemoryStream canonicalJson)
     {
         canonicalJson = streamManager.GetStream("idempotency-canonical-json");
@@ -106,7 +147,7 @@ internal static class IdempotencyRequestIdentityFactory
         {
             using var document = JsonDocument.Parse(jsonStream);
             using var writer = new Utf8JsonWriter(canonicalJson);
-            WriteCanonicalJson(document.RootElement, writer);
+            WriteCanonicalJson(document.RootElement, writer, preserveAmbiguousMemberOrder);
             writer.Flush();
             canonicalJson.Position = 0;
             return true;
@@ -119,16 +160,24 @@ internal static class IdempotencyRequestIdentityFactory
         }
     }
 
-    private static void WriteCanonicalJson(JsonElement element, Utf8JsonWriter writer)
+    private static void WriteCanonicalJson(
+        JsonElement element, Utf8JsonWriter writer, bool preserveAmbiguousMemberOrder)
     {
         switch (element.ValueKind)
         {
             case JsonValueKind.Object:
                 writer.WriteStartObject();
-                foreach (var property in element.EnumerateObject().OrderBy(p => p.Name, StringComparer.Ordinal))
+                // MVC binds case-insensitively and the last matching member wins. Sorting aliases
+                // would erase a business-significant order change. Other endpoint semantics stay unchanged.
+                IEnumerable<JsonProperty> properties = element.EnumerateObject();
+                if (!preserveAmbiguousMemberOrder || !HasAmbiguousMembers(element))
+                {
+                    properties = properties.OrderBy(property => property.Name, StringComparer.Ordinal);
+                }
+                foreach (var property in properties)
                 {
                     writer.WritePropertyName(property.Name);
-                    WriteCanonicalJson(property.Value, writer);
+                    WriteCanonicalJson(property.Value, writer, preserveAmbiguousMemberOrder);
                 }
                 writer.WriteEndObject();
                 break;
@@ -136,7 +185,7 @@ internal static class IdempotencyRequestIdentityFactory
                 writer.WriteStartArray();
                 foreach (var item in element.EnumerateArray())
                 {
-                    WriteCanonicalJson(item, writer);
+                    WriteCanonicalJson(item, writer, preserveAmbiguousMemberOrder);
                 }
                 writer.WriteEndArray();
                 break;
@@ -162,19 +211,40 @@ internal static class IdempotencyRequestIdentityFactory
         }
     }
 
+    private static bool HasAmbiguousMembers(JsonElement element)
+    {
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (JsonProperty property in element.EnumerateObject())
+        {
+            if (!names.Add(property.Name))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static string ResolveRequestTarget(HttpContext context)
     {
         var endpointPattern = context.GetEndpoint() is RouteEndpoint endpoint
             ? endpoint.RoutePattern.RawText
             : null;
-        string actualPath = context.Request.PathBase.Add(context.Request.Path).ToUriComponent().ToLowerInvariant();
+        return ResolveRequestTarget(endpointPattern,
+            context.Request.PathBase.Add(context.Request.Path).ToUriComponent(),
+            context.Request.RouteValues, context.Request.QueryString);
+    }
+
+    private static string ResolveRequestTarget(
+        string? endpointPattern, string path, RouteValueDictionary values, QueryString query)
+    {
+        string actualPath = path.ToLowerInvariant();
         string routeValues = string.Join(
             '&',
-            context.Request.RouteValues
+            values
                 .OrderBy(pair => pair.Key, StringComparer.Ordinal)
                 .Select(pair => $"{Uri.EscapeDataString(pair.Key.ToLowerInvariant())}={Uri.EscapeDataString(Convert.ToString(pair.Value, System.Globalization.CultureInfo.InvariantCulture)?.ToLowerInvariant() ?? string.Empty)}"));
         string target = $"{endpointPattern?.ToLowerInvariant() ?? actualPath}|path:{actualPath}|route:{routeValues}";
-        return context.Request.QueryString.HasValue ? $"{target}{context.Request.QueryString.Value}" : target;
+        return query.HasValue ? $"{target}{query.Value}" : target;
     }
 
     private static string CapabilityScope(HttpRequest request)

@@ -152,6 +152,26 @@ public sealed class EnvironmentCatalogueInvariantTests
     }
 
     [Test]
+    [Arguments("IPPERMITLIMIT", "10")]
+    [Arguments("SUBNETPERMITLIMIT", "40")]
+    [Arguments("WINDOWSECONDS", "60")]
+    [Arguments("CONCURRENCYLIMIT", "8")]
+    [Arguments("QUEUELIMIT", "0")]
+    public async Task AnonymousChallengeLimiterControlsHavePublicRestartBoundMetadata(string suffix, string defaultValue)
+    {
+        EnvironmentVariableDefinition? definition = CanonicalEnvironmentCatalogue.Catalogue
+            .Lookup("RATELIMITING__ANONYMOUSREGISTRATION__" + suffix);
+
+        await Assert.That(definition).IsNotNull();
+        await Assert.That(definition!.Category).IsEqualTo(EnvironmentVariableCategory.Security);
+        await Assert.That(definition.Sensitivity).IsEqualTo(EnvironmentVariableSensitivity.Public);
+        await Assert.That(definition.Requirement).IsEqualTo(EnvironmentVariableRequirement.Defaulted);
+        await Assert.That(definition.SafeDefault).IsEqualTo(defaultValue);
+        await Assert.That(definition.RestartBehavior).IsEqualTo(EnvironmentRestartBehavior.Process);
+        await Assert.That(definition.Generation.Surfaces.HasFlag(EnvironmentGenerationSurface.Startup)).IsTrue();
+    }
+
+    [Test]
     public async Task LocalIdentityCatalogueDefinesTwoAxisProviderAndExternalDatabaseContract()
     {
         EnvironmentCatalogue catalogue = CanonicalEnvironmentCatalogue.Catalogue;

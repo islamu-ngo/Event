@@ -623,7 +623,9 @@ public sealed class RegistrationOrderControllerTests
         {
             await Assert.That(action.GetCustomAttribute<AllowAnonymousAttribute>()).IsNotNull();
             await Assert.That(action.GetCustomAttribute<EnableRateLimitingAttribute>()?.PolicyName)
-                .IsEqualTo(RateLimitingExtensions.PublicTransactionalPolicy);
+                .IsEqualTo(action.GetCustomAttribute<RequireAnonymousRegistrationChallengeAttribute>() is not null
+                    ? RateLimitingExtensions.AnonymousRegistrationPolicy
+                    : RateLimitingExtensions.PublicTransactionalPolicy);
         }
         else if (endpointClass == EndpointClass.Authenticated)
         {

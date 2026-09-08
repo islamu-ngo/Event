@@ -5,6 +5,7 @@ using System.Data;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Domain.ValueObjects;
 using Explore.Persistence.Database;
 using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +23,21 @@ public sealed class RegistrationInventoryRepository(ExploreDbContext dbContext) 
             .AsNoTracking()
             .FirstOrDefaultAsync(
                 order => order.Id == orderId && order.TenantId == tenantId,
+                cancellationToken);
+
+    public Task<RegistrationOrder?> GetExactGuestOrderAsync(
+        Guid orderId,
+        Guid tenantId,
+        Guid eventId,
+        CapabilityTokenHash guestAccessTokenHash,
+        CancellationToken cancellationToken) =>
+        dbContext.RegistrationOrders
+            .AsNoTracking()
+            .Include(order => order.Lines)
+            .Include(order => order.PlatformContribution)
+            .FirstOrDefaultAsync(
+                order => order.Id == orderId && order.TenantId == tenantId &&
+                         order.EventId == eventId && order.GuestAccessTokenHash == guestAccessTokenHash,
                 cancellationToken);
 
     public Task<RegistrationOrder?> GetOrderWithPiiAsync(

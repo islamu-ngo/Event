@@ -5,6 +5,7 @@ using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Services;
 using Explore.Blazor.Client.Services.Shell;
+using Microsoft.AspNetCore.Components.Authorization;
 
 namespace Explore.Blazor.Client.Tests.Services;
 
@@ -28,6 +29,17 @@ public sealed class RegistrationOrderServiceTests : IDisposable
         _ctx.Services.AddScoped<WorkspaceRouteClassifier>();
         _ctx.Services.AddScoped<UiShellState>();
         var shellState = _ctx.Services.GetRequiredService<UiShellState>();
+        var challengeClient = Substitute.For<IAnonymousRegistrationChallengeClient>();
+        challengeClient.CreateAnonymousRegistrationChallengeAsync(Arg.Any<Guid>(),
+            idempotency_Key: Arg.Any<string>(), body: Arg.Any<StartRegistrationOrderRequest>(),
+            cancellationToken: Arg.Any<CancellationToken>()).Returns(new HalResourceOfAnonymousRegistrationChallengeDto
+            {
+                ProtectedChallenge = Guid.NewGuid().ToString("N"), ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(2),
+                Difficulty = 18, Version = 1
+            });
+        var solver = Substitute.For<IAnonymousRegistrationChallengeSolver>();
+        solver.SolveAsync(Arg.Any<HalResourceOfAnonymousRegistrationChallengeDto>(), Arg.Any<Action<int>>(), Arg.Any<CancellationToken>())
+            .Returns("0000000000000000");
         _service = new RegistrationOrderService(
             _orderClient,
             _authenticatedClient,
@@ -35,7 +47,12 @@ public sealed class RegistrationOrderServiceTests : IDisposable
             eventService,
             shellState,
             capabilityStore,
-            logger);
+            logger,
+            challengeClient,
+            solver,
+            _ctx.Services.GetRequiredService<NavigationManager>(),
+            TimeProvider.System,
+            _ctx.Services.GetRequiredService<AuthenticationStateProvider>());
     }
 
     public void Dispose() => _ctx.Dispose();
@@ -46,6 +63,7 @@ public sealed class RegistrationOrderServiceTests : IDisposable
         _guestClient.StartGuestRegistrationOrderWithCapabilityAsync(
                 Arg.Any<Guid>(),
                 Arg.Any<StartRegistrationOrderRequest>(),
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromException<GuestRegistrationOrderStartResult>(
                 new InvalidOperationException("Guest registration capability was not returned.")));
@@ -53,10 +71,8 @@ public sealed class RegistrationOrderServiceTests : IDisposable
         var result = await _service.StartGuestAsync(Guid.CreateVersion7(), new StartRegistrationOrderRequest());
 
         await Assert.That(result).IsNull();
-        await _guestClient.Received(1).StartGuestRegistrationOrderWithCapabilityAsync(
-            Arg.Any<Guid>(),
-            Arg.Any<StartRegistrationOrderRequest>(),
-            Arg.Any<CancellationToken>());
+        await Assert.That(_service.PendingGuestEventId.HasValue).IsTrue();
+        await Assert.That(_service.GuestStartPhase).IsEqualTo(GuestRegistrationStartPhase.Uncertain);
     }
 
     [Test]

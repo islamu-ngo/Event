@@ -41,44 +41,25 @@ public sealed class NativeRegistrationSubmissionHttpTests
     private const string AttemptCapabilityHeader = "X-Registration-Attempt-Capability";
 
     [Test]
+    [NotInParallel]
     public async Task GuestStartReplayRestoresProtectedCapability()
     {
-        const string capability = "guest-order-capability";
-        var mediator = Substitute.For<IMediator>();
-        Guid orderId = Guid.CreateVersion7();
-        mediator.Send(Arg.Any<StartGuestRegistrationOrderCommand>(), Arg.Any<CancellationToken>())
-            .Returns(GuestRegistrationOrderStartDto.Success(
-                orderId,
-                message: null,
-                guestCapabilityToken: capability));
-        await using WebApplicationFactory<Program> factory = CreateFactory(mediator);
-        using HttpClient client = factory.CreateClient();
-        Guid eventId = Guid.CreateVersion7();
-        string idempotencyKey = Guid.CreateVersion7().ToString("D");
-        object body = new
-        {
-            ticketCatalogVersionId = Guid.CreateVersion7(),
-            bookingPartyType = "Individual",
-            lines = Array.Empty<object>()
-        };
-
-        using HttpResponseMessage first = await PostAsync(
-            client, $"/api/events/{eventId:D}/registration-orders/guest", body, false,
-            idempotencyKey: idempotencyKey);
-        using HttpResponseMessage replay = await PostAsync(
-            client, $"/api/events/{eventId:D}/registration-orders/guest", body, false,
-            idempotencyKey: idempotencyKey);
+        await using var host = await AnonymousRegistrationChallengeHttpTests.NativeHost.CreateAsync();
+        var proof = await host.IssueAsync(host.Key);
+        using HttpResponseMessage first = await host.StartAsync(host.Key, proof);
+        using HttpResponseMessage replay = await host.StartAsync(host.Key, proof);
+        string capability = first.Headers.GetValues(OrderCapabilityHeader).Single();
 
         await Assert.That(first.StatusCode).IsEqualTo(HttpStatusCode.Created);
         await Assert.That(replay.StatusCode).IsEqualTo(HttpStatusCode.Created);
-        await Assert.That(first.Headers.GetValues(OrderCapabilityHeader).Single()).IsEqualTo(capability);
-        await Assert.That(replay.Headers.GetValues(OrderCapabilityHeader).Single()).IsEqualTo(capability);
+        await Assert.That(string.Equals(first.Headers.GetValues(OrderCapabilityHeader).Single(), capability, StringComparison.Ordinal)).IsTrue();
+        await Assert.That(string.Equals(replay.Headers.GetValues(OrderCapabilityHeader).Single(), capability, StringComparison.Ordinal)).IsTrue();
         await Assert.That(replay.Headers.GetValues("X-Idempotency-Replay").Single()).IsEqualTo("true");
-        await mediator.Received(1).Send(Arg.Any<StartGuestRegistrationOrderCommand>(), Arg.Any<CancellationToken>());
+        await Assert.That(await host.OrdersAsync()).Count().IsEqualTo(1);
 
-        using IServiceScope scope = factory.Services.CreateScope();
+        using IServiceScope scope = host.Factory.Services.CreateScope();
         ExploreDbContext db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-        IdempotencyRecord record = await db.IdempotencyRecords.SingleAsync(item => item.Key == idempotencyKey);
+        IdempotencyRecord record = await db.IdempotencyRecords.SingleAsync(item => item.Key == host.Key);
         await Assert.That(record.ResponseBody!.StartsWith("dp:v1:", StringComparison.Ordinal)).IsTrue();
         await Assert.That(record.ResponseBody.Contains(capability, StringComparison.Ordinal)).IsFalse();
     }

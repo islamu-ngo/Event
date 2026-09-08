@@ -187,6 +187,8 @@ public static class PersistenceServicesRegistration
 
         // Unit of Work (wraps EF Core transactions)
         services.AddScoped<IUnitOfWork, EfCoreUnitOfWork>();
+        services.AddScoped<Explore.Application.Contracts.Services.Registration.IAnonymousRegistrationChallengeQuota,
+            AnonymousRegistrationChallengeQuota>();
         services.AddScoped<ISettingMutationLock, RelationalSettingMutationLock>();
         services.AddScoped<ICoordinatedSettingMutationStore, CoordinatedSettingMutationRepository>();
         services.AddScoped<IAtprotoSessionRefreshLock, RelationalAtprotoSessionRefreshLock>();

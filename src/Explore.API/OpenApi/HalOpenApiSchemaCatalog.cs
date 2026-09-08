@@ -141,6 +141,7 @@ internal static class HalOpenApiSchemaCatalog
         typeof(Explore.Application.DTOs.EmailDispatch.EmailDeliveryDisablePreviewDto),
         typeof(Explore.Application.DTOs.EmailDispatch.EmailDeliveryDisableAffectedScopeDto),
 
+        typeof(Explore.Application.DTOs.RegistrationOrders.AnonymousRegistrationChallengeDto),
         typeof(Explore.Application.DTOs.RegistrationOrders.RegistrationOrderDto),
         typeof(Explore.Application.DTOs.RegistrationOrders.GuestRegistrationOrderDto),
         typeof(Explore.Application.DTOs.RegistrationOrders.RegistrationOrderParticipantsDto),
@@ -336,6 +337,7 @@ internal static class HalOpenApiSchemaCatalog
         ["HalResourceOfMyEventReportDto"] = typeof(Explore.Application.DTOs.EventReporting.MyEventReportDto),
         ["HalResourceOfModerationReportDetailDto"] = typeof(Explore.Application.DTOs.EventReporting.ModerationReportDetailDto),
         ["HalResourceOfModerationReportQueueItemDto"] = typeof(Explore.Application.DTOs.EventReporting.ModerationReportQueueItemDto),
+        ["HalResourceOfAnonymousRegistrationChallengeDto"] = typeof(Explore.Application.DTOs.RegistrationOrders.AnonymousRegistrationChallengeDto),
         ["HalResourceOfRegistrationOrderDto"] = typeof(Explore.Application.DTOs.RegistrationOrders.RegistrationOrderDto),
         ["HalResourceOfGuestRegistrationOrderDto"] = typeof(Explore.Application.DTOs.RegistrationOrders.GuestRegistrationOrderDto),
         ["HalResourceOfRegistrationOrderParticipantsDto"] = typeof(Explore.Application.DTOs.RegistrationOrders.RegistrationOrderParticipantsDto),

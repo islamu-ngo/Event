@@ -9,6 +9,7 @@ using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Models;
+using Explore.API.Middleware;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.DTOs.RegistrationSubmissions;
@@ -43,8 +44,10 @@ public sealed class GuestRegistrationOrderController(
 {
     [AllowAnonymous]
     [EndpointClassification(EndpointClass.PublicTransactional)]
-    [EnableRateLimiting(RateLimitingExtensions.PublicTransactionalPolicy)]
+    [EnableRateLimiting(RateLimitingExtensions.AnonymousRegistrationPolicy)]
     [RequireIdempotencyKey]
+    [RequireAnonymousRegistrationChallenge]
+    [PrivateNoStore]
     [ProtectIdempotencyReplay(CapabilityHeader, "Cache-Control", "Location")]
     [HttpPost("guest", Name = RouteNames.StartGuestRegistrationOrder)]
     [EndpointSummary("Start guest registration order")]
@@ -60,7 +63,9 @@ public sealed class GuestRegistrationOrderController(
     public async Task<ActionResult<GuestRegistrationOrderStartDto>> StartGuest(
         Guid eventId,
         [FromBody] StartRegistrationOrderRequest? request,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        [FromHeader(Name = AnonymousRegistrationChallengeBoundary.ChallengeHeader)] string? challenge = null,
+        [FromHeader(Name = AnonymousRegistrationChallengeBoundary.ProofHeader)] string? proof = null)
     {
         if (request is null)
         {
@@ -73,7 +78,10 @@ public sealed class GuestRegistrationOrderController(
                 request.TicketCatalogVersionId,
                 request.BookingPartyType,
                 request.Lines,
-                request.PlatformContributionBasisPoints),
+                request.PlatformContributionBasisPoints)
+            {
+                ChallengeAuthority = AnonymousRegistrationChallengeBoundary.GetAuthority(HttpContext)
+            },
             cancellationToken);
 
         if (!response.IsSuccess)

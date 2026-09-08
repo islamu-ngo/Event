@@ -3,6 +3,52 @@
 
 # Security
 
+## Anonymous Registration Challenge And Replay Boundary
+
+Guest allocation requires a native protected challenge and proof of work in
+addition to the existing intended `Idempotency-Key`. Challenge issuance accepts
+the same business request as guest start and allocates no seat, order or hold.
+The shared API canonicalizer binds the intended start method, resolved route,
+tenant/event, principal/capability scope, content type and complete request digest;
+it does not hash the issuance route or a proof wrapper as the business request.
+
+The versioned Data Protection envelope binds those facts, a server-generated
+UUIDv7 order ID, random guest capability, original expiry and difficulty. It
+contains no raw attendee/contact/network data or raw idempotency key. Version 1
+proof is one SHA-256 check over the exact protected text and fixed-width nonce;
+the server never searches for a solution. Fresh allocation authority lasts 120
+seconds and is rechecked after transaction/lock waits before persistence.
+
+Challenge validation precedes idempotency claim handling and cached capability
+disclosure. Historical validation lasts only until original expiry plus 24 hours
+and permits an exact already-committed read, never a new allocation. Recovery
+matches the protected order ID, tenant, event, guest hash and original typed
+request; the raw capability is reconstructed from the protected envelope, not
+stored in plaintext. A different valid envelope with the same key/body does not
+authorize the old cached capability.
+
+If allocation commits but response persistence fails, an identical retry can
+recover that original order/hold without renewing expiry, rescheduling or charging
+another seat. An in-progress claim with no exact committed result remains a
+conflict; recovery does not take over a live uncommitted owner. New allocation
+still checks current visitor/event/catalog/capacity/approval rules through the
+existing serializable starter and pool fences. No second reservation aggregate
+or process-local lock is treated as cross-replica allocation authority.
+
+Effective-IP, subnet and bounded concurrency/queue limits are process-level
+front-door controls. Private HMAC-bucket partitions expose no raw network
+identifier. Durable tenant/event issue budgets use database-minute conditional
+writes and atomic savepoint rollback under the issuer's existing transaction.
+Quota rows contain only real scope IDs, minute and count, never proof, capability,
+request body or inventory state. Invalid control values fail closed.
+
+The browser solves through native Web Crypto in a cancellable worker, retaining
+the exact original key/body/envelope/solution after an uncertain submitted
+outcome. It must not silently issue replacement authority or start another
+allocation. No new browser storage or tracking receives that material. Existing
+BFF antiforgery and private/no-store response handling remain mandatory; staff
+assistance is an existing authorized alternative, not a public challenge bypass.
+
 ## Legal-Identity Trust Boundaries
 
 Tenant directory identity is tenant-scoped untrusted input until the Application

@@ -410,6 +410,13 @@ public static class GovernanceSettingKeys
         }
     }
 
+    public static class AnonymousRegistrationChallenge
+    {
+        public const string TenantPermitsPerMinute = "registration.anonymous_challenge.tenant_per_minute";
+        public const string EventPermitsPerMinute = "registration.anonymous_challenge.event_per_minute";
+        public const string Difficulty = "registration.anonymous_challenge.difficulty";
+    }
+
     public static class PublicExperience
     {
         public const string Mode = "public_experience.mode";

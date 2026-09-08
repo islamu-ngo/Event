@@ -256,6 +256,7 @@ public static class InfrastructureServicesRegistration
         services.AddScoped<IEmailUnsubscribeTokenService, EmailUnsubscribeTokenService>();
         services.AddScoped<IEmailDeliveryDisableTokenService, EmailDeliveryDisableTokenService>();
         services.AddSingleton<IGuestCapabilityTokenService, GuestCapabilityTokenService>();
+        services.AddSingleton<IAnonymousRegistrationChallengeService, AnonymousRegistrationChallengeService>();
         services.AddScoped<IRegistrationProviderDescriptor, NullRegistrationProviderDescriptor>();
         services.AddScoped<IRegistrationProviderDescriptor, NativeRegistrationProviderDescriptor>();
         services.AddScoped<IRegistrationProviderDescriptor, FormbricksCloudRegistrationProviderDescriptor>();

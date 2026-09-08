@@ -422,6 +422,7 @@ public static class RouteNames
 
     #region Registration Routes
 
+    public const string CreateAnonymousRegistrationChallenge = nameof(CreateAnonymousRegistrationChallenge);
     public const string StartGuestRegistrationOrder = nameof(StartGuestRegistrationOrder);
     public const string GetGuestRegistrationOrder = nameof(GetGuestRegistrationOrder);
     public const string GetRegistrationCheckoutComposition = nameof(GetRegistrationCheckoutComposition);

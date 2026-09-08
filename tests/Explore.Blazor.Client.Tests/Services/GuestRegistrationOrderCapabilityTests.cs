@@ -17,7 +17,8 @@ public sealed class GuestRegistrationOrderCapabilityTests
 
         var result = await client.StartGuestRegistrationOrderWithCapabilityAsync(
             Guid.CreateVersion7(),
-            new StartRegistrationOrderRequest());
+            new StartRegistrationOrderRequest(),
+            Guid.CreateVersion7().ToString("N"), Guid.NewGuid().ToString("N"), "0000000000000000");
 
         await Assert.That(result.HasCapability).IsTrue();
         await Assert.That(handler.HasIdempotencyKey).IsTrue();
@@ -34,7 +35,8 @@ public sealed class GuestRegistrationOrderCapabilityTests
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await client.StartGuestRegistrationOrderWithCapabilityAsync(
                 Guid.CreateVersion7(),
-                new StartRegistrationOrderRequest()));
+                new StartRegistrationOrderRequest(),
+                Guid.CreateVersion7().ToString("N"), Guid.NewGuid().ToString("N"), "0000000000000000"));
     }
 
     [Test]

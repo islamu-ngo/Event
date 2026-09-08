@@ -36820,6 +36820,60 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.ToTable("ie_local_identity_users", (string)null);
                 });
 
+            modelBuilder.Entity("Explore.Persistence.Models.AnonymousChallengeEventQuota", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_id");
+
+                    b.Property<int>("Issued")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("issued");
+
+                    b.Property<long>("WindowMinute")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("window_minute");
+
+                    b.HasKey("TenantId", "EventId")
+                        .HasName("pk_ie_anonymous_challenge_event_quotas");
+
+                    b.ToTable("ie_anonymous_challenge_event_quotas", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_anon_challenge_event_count", "issued >= 0 AND issued <= 10000");
+
+                            t.HasCheckConstraint("ck_anon_challenge_event_minute", "window_minute >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Persistence.Models.AnonymousChallengeTenantQuota", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<int>("Issued")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("issued");
+
+                    b.Property<long>("WindowMinute")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("window_minute");
+
+                    b.HasKey("TenantId")
+                        .HasName("pk_ie_anonymous_challenge_tenant_quotas");
+
+                    b.ToTable("ie_anonymous_challenge_tenant_quotas", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_anon_challenge_tenant_count", "issued >= 0 AND issued <= 10000");
+
+                            t.HasCheckConstraint("ck_anon_challenge_tenant_minute", "window_minute >= 0");
+                        });
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
                     b.Property<int>("Id")
@@ -48682,6 +48736,27 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_local_identity_lifecycle_operations_local_identity_users_local_subject_id");
+                });
+
+            modelBuilder.Entity("Explore.Persistence.Models.AnonymousChallengeEventQuota", b =>
+                {
+                    b.HasOne("Explore.Domain.Event", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "EventId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_anonymous_challenge_event_quotas_events_tenant_id_event_id");
+                });
+
+            modelBuilder.Entity("Explore.Persistence.Models.AnonymousChallengeTenantQuota", b =>
+                {
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_anonymous_challenge_tenant_quotas_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>

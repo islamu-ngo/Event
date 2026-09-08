@@ -14,7 +14,12 @@ public sealed class TicketSelectionTests : IDisposable
     private readonly BlazorTestContext _ctx = new();
     private readonly IRegistrationOrderService _service;
 
-    public TicketSelectionTests() => _service = _ctx.AddMockService<IRegistrationOrderService>();
+    public TicketSelectionTests()
+    {
+        _service = _ctx.AddMockService<IRegistrationOrderService>();
+        _ctx.JSInterop.SetupVoid("Blazor._internal.NavigationLock.enableNavigationPrompt", _ => true);
+        _ctx.JSInterop.SetupVoid("Blazor._internal.NavigationLock.disableNavigationPrompt", _ => true);
+    }
 
     public void Dispose() => _ctx.Dispose();
 
@@ -84,11 +89,11 @@ public sealed class TicketSelectionTests : IDisposable
             .Returns(new GuestRegistrationOrderStartDto { Id = orderId, Success = true });
 
         var cut = _ctx.RenderMudComponent<TicketSelection>(parameters => parameters.Add(component => component.EventId, eventId));
-        cut.WaitForElement("input").Change("1");
-        await cut.FindAll("button").Single(button => button.TextContent.Contains("Reserve selected tickets", StringComparison.Ordinal)).ClickAsync(new());
+        cut.Find("input").Change("1");
+        await cut.Find("[data-testid='ticket-reservation-action']").ClickAsync(new());
 
-        cut.WaitForAssertion(() => Assert.That(_ctx.Services.GetRequiredService<NavigationManager>().Uri)
-            .EndsWith($"/registration/guest/events/{eventId}/orders/{orderId}"));
+        await Assert.That(_ctx.Services.GetRequiredService<NavigationManager>().Uri)
+            .EndsWith($"/registration/guest/events/{eventId}/orders/{orderId}");
         await _service.Received(1).StartGuestAsync(
             eventId,
             Arg.Is<StartRegistrationOrderRequest>(request =>
@@ -126,7 +131,6 @@ public sealed class TicketSelectionTests : IDisposable
             .Returns(new GuestRegistrationOrderStartDto { Id = Guid.CreateVersion7(), Success = true });
 
         var cut = _ctx.RenderMudComponent<TicketSelection>(parameters => parameters.Add(component => component.EventId, eventId));
-        cut.WaitForElement("input");
         cut.FindAll("input").Single(input => input.GetAttribute("type") != "range").Change("1");
         cut.Find("input[type='range']").Input("0");
         await cut.FindAll("button").Single(button => button.TextContent.Contains("Reserve selected tickets", StringComparison.Ordinal)).ClickAsync(new());
@@ -166,7 +170,7 @@ public sealed class TicketSelectionTests : IDisposable
 
         var cut = _ctx.RenderMudComponent<TicketSelection>(parameters => parameters.Add(component => component.EventId, eventId));
 
-        cut.WaitForAssertion(() => Assert.That(cut.Markup).Contains("You pay"));
+        await Assert.That(cut.Find("output")).IsNotNull();
         await Assert.That(cut.Markup).Contains("500 EUR minor units");
         await Assert.That(cut.Markup).Contains("Organizer earns");
         await Assert.That(cut.Markup).Contains("450 EUR minor units");
@@ -183,7 +187,7 @@ public sealed class TicketSelectionTests : IDisposable
             Guid eventId = Guid.CreateVersion7();
             service.GetCheckoutAsync(eventId, Arg.Any<CancellationToken>()).Returns(Composition(eventId, mode));
             var cut = context.RenderMudComponent<TicketSelection>(p => p.Add(c => c.EventId, eventId));
-            cut.WaitForElement("[data-testid='paid-checkout-identity-unavailable']");
+            await Assert.That(cut.FindAll("[data-testid='paid-checkout-identity-unavailable']").Count).IsEqualTo(1);
             await Assert.That(cut.FindAll("button").Any(b => b.TextContent.Contains("Reserve selected tickets"))).IsFalse();
         }
 
@@ -191,7 +195,7 @@ public sealed class TicketSelectionTests : IDisposable
         Guid freeId = Guid.CreateVersion7();
         _service.GetCheckoutAsync(freeId, Arg.Any<CancellationToken>()).Returns(Composition(freeId, "FREE"));
         var free = _ctx.RenderMudComponent<TicketSelection>(p => p.Add(c => c.EventId, freeId));
-        free.WaitForAssertion(() => Assert.That(free.FindAll("button").Any(b => b.TextContent.Contains("Reserve selected tickets"))).IsTrue());
+        await Assert.That(free.FindAll("[data-testid='ticket-reservation-action']").Count).IsEqualTo(1);
     }
 
     [Test]
@@ -203,7 +207,7 @@ public sealed class TicketSelectionTests : IDisposable
         SetDirectoryOperator(composition, typeof(RegistrationCheckoutCompositionDto).GetProperty("DirectoryOperator")!);
         _service.GetCheckoutAsync(eventId, Arg.Any<CancellationToken>()).Returns(composition);
         var cut = _ctx.RenderMudComponent<TicketSelection>(p => p.Add(c => c.EventId, eventId));
-        var slider = cut.WaitForElement("input[type='range']");
+        var slider = cut.Find("input[type='range']");
         string outputId = slider.GetAttribute("aria-describedby")!;
         await Assert.That(slider.GetAttribute("aria-valuetext")).Contains("You pay");
         var output = cut.Find($"#{outputId}");
@@ -226,8 +230,8 @@ public sealed class TicketSelectionTests : IDisposable
             return await completion.Task;
         });
         var cut = _ctx.RenderMudComponent<TicketSelection>(p => p.Add(c => c.EventId, eventId));
-        cut.WaitForElement("input").Change("1");
-        Task click = cut.InvokeAsync(() => cut.FindAll("button").Single(b => b.TextContent.Contains("Reserve selected tickets")).Click());
+        cut.Find("input").Change("1");
+        Task click = cut.Find("[data-testid='ticket-reservation-action']").ClickAsync(new());
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await Assert.That(cut.Find("[data-testid='ticket-reservation-action']").GetAttribute("aria-busy")).IsEqualTo("true");
         await Assert.That(cut.Markup).Contains("Reserving selected tickets");
@@ -306,7 +310,7 @@ public sealed class TicketSelectionTests : IDisposable
         var quantityField = cut.FindComponents<MudNumericField<int>>().Single();
         await Assert.That(quantityField.Instance.Max).IsEqualTo(int.MaxValue);
 
-        cut.WaitForElement("input").Change("123");
+        cut.Find("input").Change("123");
         await cut.FindAll("button").Single(button => button.TextContent.Contains("Reserve selected tickets", StringComparison.Ordinal)).ClickAsync(new());
 
         await _service.Received(1).StartGuestAsync(

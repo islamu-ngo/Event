@@ -5,6 +5,9 @@ namespace Event.Architecture.Tests;
 
 using System.Reflection;
 using Explore.API.Attributes;
+using Explore.API.Controllers;
+using Explore.API.Extensions;
+using Explore.API.Hateoas;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -31,6 +34,14 @@ public class PublicTransactionalGovernanceTests
         var violations = PublicTransactionalEndpointGovernance.FindViolations(
             new[] { typeof(CompliantPublicTransactionalController) });
 
+        await Assert.That(violations).IsEmpty();
+    }
+
+    [Test]
+    public async Task PublicTransactionalRules_AcceptNativeChallengeIssuanceAndProofGuardedAllocation()
+    {
+        var violations = PublicTransactionalEndpointGovernance.FindViolations(
+            [typeof(AnonymousRegistrationChallengeController), typeof(GuestRegistrationOrderController)]);
         await Assert.That(violations).IsEmpty();
     }
 
@@ -200,8 +211,12 @@ internal static class PublicTransactionalEndpointGovernance
                     violations.Add($"{actionId}: must use only unsafe HTTP verbs.");
                 }
 
-                if (ResolveAttribute<EnableRateLimitingAttribute>(controller, action)?.PolicyName
-                    != PublicTransactionalRateLimitPolicy)
+                string? policy = ResolveAttribute<EnableRateLimitingAttribute>(controller, action)?.PolicyName;
+                bool protectedAnonymousIntake = policy == RateLimitingExtensions.AnonymousRegistrationPolicy
+                    && (HasEffectiveAttribute<RequireAnonymousRegistrationChallengeAttribute>(controller, action)
+                        || action.GetCustomAttribute<HttpPostAttribute>()?.Name == RouteNames.CreateAnonymousRegistrationChallenge
+                        && HasEffectiveAttribute<SuppressIdempotencyResponseStorageAttribute>(controller, action));
+                if (policy != PublicTransactionalRateLimitPolicy && !protectedAnonymousIntake)
                 {
                     violations.Add($"{actionId}: must use [EnableRateLimiting(\"public_transactional\")].");
                 }

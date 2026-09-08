@@ -7,6 +7,11 @@ namespace Explore.Blazor.Client.Contracts.Services;
 
 public interface IRegistrationOrderService
 {
+    event Action? GuestStartChanged;
+    GuestRegistrationStartPhase GuestStartPhase { get; }
+    int GuestProofAttempts { get; }
+    Guid? PendingGuestEventId { get; }
+    Task<GuestRegistrationOrderStartDto?> RetryGuestAsync(Guid eventId, CancellationToken cancellationToken = default);
     Task<RegistrationCheckoutCompositionDto?> GetCheckoutAsync(Guid eventId, CancellationToken cancellationToken = default);
     Task<GuestRegistrationOrderStartDto?> StartGuestAsync(Guid eventId, StartRegistrationOrderRequest request, CancellationToken cancellationToken = default);
     Task<BaseCommandResponseOfGuid?> StartAuthenticatedAsync(Guid eventId, StartRegistrationOrderRequest request, CancellationToken cancellationToken = default);

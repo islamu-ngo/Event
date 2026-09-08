@@ -5,6 +5,23 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 ## 2026-09-08
 
+- **Breaking: guest reservation requires bound proof.**
+  `POST /api/events/{eventId}/guest-registration-challenges`
+  (`CreateAnonymousRegistrationChallenge`) accepts the existing guest-start
+  business body and its intended `Idempotency-Key`, returning a private HAL
+  challenge without allocating inventory. `StartGuestRegistrationOrder` keeps
+  its route/body and now requires `X-Registration-Challenge` and
+  `X-Registration-Proof`. Proof validation precedes idempotency replay disclosure.
+- **Exact committed guest recovery.** A retry after allocation commit and response
+  storage failure recovers the same protected order/capability without renewing
+  holds or allocating again. Historical proof only authorizes that exact committed
+  result through original expiry plus 24 hours; expired proof never authorizes
+  new allocation, and a new envelope with the same key/body cannot reveal an older
+  response. Uncommitted live-owner requests retain conflict behavior.
+- **Bounded anonymous intake.** Issuance and guest start use dedicated effective-IP,
+  subnet and concurrency limits alongside durable tenant/event issuance quotas.
+  Existing antiforgery, capability response headers, Location, private/no-store
+  responses and ticket/capacity/approval checks remain authoritative.
 - **Breaking: visitor onboarding bounds AccountRequired participation.**
   Create, import, draft/configuration update and ordinary/privileged publication
   reject AccountRequired participation without an eligible public onboarding

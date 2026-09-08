@@ -13,6 +13,7 @@ public enum AnonymousCancellationOutcome { InvalidAuthority, Ineligible, Eligibl
 
 public sealed class AnonymousCancellationService(
     IRegistrationInventoryRepository inventory,
+    IGuestRegistrationCapabilityRepository guestRegistrations,
     IEventRepository events,
     IGuestCapabilityTokenService capabilities,
     ITenantContext tenant,
@@ -33,7 +34,7 @@ public sealed class AnonymousCancellationService(
             var result = await unitOfWork.ExecuteSerializableAsync(async token =>
             {
                 var authorized = await GuestRegistrationStatusAccessGuard.GetAsync(
-                    inventory, events, capabilities, tenant.TenantId, eventId, orderId,
+                    guestRegistrations, events, capabilities, tenant.TenantId, eventId, orderId,
                     capabilityToken!, timeProvider, token);
                 if (authorized is not { } authority)
                     throw new CancellationRejectedException(AnonymousCancellationOutcome.InvalidAuthority);

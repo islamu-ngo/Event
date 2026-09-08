@@ -17,7 +17,7 @@ public sealed record GetGuestRegistrationStatusQuery(Guid EventId, Guid OrderId,
 }
 
 public sealed class GetGuestRegistrationStatusQueryHandler(
-    IRegistrationInventoryRepository inventory,
+    IGuestRegistrationCapabilityRepository guestRegistrations,
     IEventRepository events,
     IGuestCapabilityTokenService capabilities,
     ITenantContext tenant,
@@ -38,7 +38,7 @@ public sealed class GetGuestRegistrationStatusQueryHandler(
             var result = await unitOfWork.ExecuteSerializableAsync<GuestRegistrationStatusDto?>(async token =>
             {
                 var snapshot = await GuestRegistrationStatusAccessGuard.GetAsync(
-                    inventory, events, capabilities, tenant.TenantId, request.EventId, request.OrderId,
+                    guestRegistrations, events, capabilities, tenant.TenantId, request.EventId, request.OrderId,
                     request.CapabilityToken!, timeProvider, token);
                 if (snapshot is not { } authorized || authorized.Deadline <= timeProvider.GetUtcNow().UtcDateTime)
                 {

@@ -142,7 +142,7 @@ public sealed class GuestRegistrationStatusTests
                     var services = scope.ServiceProvider;
                     services.GetRequiredService<ExploreDbContext>().TenantContext = foreignTenant;
                     var handler = new GetGuestRegistrationStatusQueryHandler(
-                        services.GetRequiredService<IRegistrationInventoryRepository>(),
+                        services.GetRequiredService<IGuestRegistrationCapabilityRepository>(),
                         services.GetRequiredService<IEventRepository>(),
                         services.GetRequiredService<IGuestCapabilityTokenService>(), foreignTenant,
                         services.GetRequiredService<IUnitOfWork>(), clock);

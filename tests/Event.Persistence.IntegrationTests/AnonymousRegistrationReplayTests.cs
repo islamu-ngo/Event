@@ -229,14 +229,14 @@ public sealed class AnonymousRegistrationReplayTests
             await Assert.That(denied.GuestCapabilityToken).IsNull();
             await Assert.That(recovery!.IsSuccess).IsFalse();
         }
-        var inventory = fixture.Services.GetRequiredService<IRegistrationInventoryRepository>();
+        var guestRegistrations = fixture.Services.GetRequiredService<IGuestRegistrationCapabilityRepository>();
         var authority = proof.Request.ChallengeAuthority!;
         var wrongHash = fixture.Services.GetRequiredService<IGuestCapabilityTokenService>().Issue().Hash;
-        await Assert.That(await inventory.GetExactGuestOrderAsync(created.Id, fixture.TenantId, target.Id,
+        await Assert.That(await guestRegistrations.GetExactGuestOrderAsync(created.Id, fixture.TenantId, target.Id,
             wrongHash, CancellationToken.None)).IsNull();
-        await Assert.That(await inventory.GetExactGuestOrderAsync(created.Id, Guid.CreateVersion7(), target.Id,
+        await Assert.That(await guestRegistrations.GetExactGuestOrderAsync(created.Id, Guid.CreateVersion7(), target.Id,
             authority.GuestAccessTokenHash, CancellationToken.None)).IsNull();
-        await Assert.That(await inventory.GetExactGuestOrderAsync(created.Id, fixture.TenantId, Guid.CreateVersion7(),
+        await Assert.That(await guestRegistrations.GetExactGuestOrderAsync(created.Id, fixture.TenantId, Guid.CreateVersion7(),
             authority.GuestAccessTokenHash, CancellationToken.None)).IsNull();
         var newEnvelope = await fixture.IssueGuestProofAsync(proof.Request);
         await Assert.That(await starter.TryRecoverCommittedGuestAsync(newEnvelope.Request, CancellationToken.None)).IsNull();

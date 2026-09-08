@@ -17,7 +17,7 @@ internal static class GuestRegistrationStatusAccessGuard
     // The caller owns a serializable transaction. Both reads are fresh, tenant-filtered entities;
     // neither tracked order graphs nor a second read through the general checkout guard are authority.
     internal static async Task<(RegistrationOrder Order, Event Event, DateTime Deadline)?> GetAsync(
-        IRegistrationInventoryRepository inventory,
+        IGuestRegistrationCapabilityRepository guestRegistrations,
         IEventRepository events,
         IGuestCapabilityTokenService capabilities,
         Guid tenantId,
@@ -27,7 +27,7 @@ internal static class GuestRegistrationStatusAccessGuard
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
-        RegistrationOrder? order = await inventory.GetGuestStatusOrderForUpdateAsync(orderId, tenantId, cancellationToken);
+        RegistrationOrder? order = await guestRegistrations.GetGuestStatusOrderForUpdateAsync(orderId, tenantId, cancellationToken);
         if (order is null || order.EventId != eventId || order.GuestAccessTokenHash is null ||
             order.ConfirmedAt is null ||
             order.RegistrationOrderStatusId is not ((int)RegistrationOrderStatusEnum.Confirmed) and not ((int)RegistrationOrderStatusEnum.Cancelled) ||
@@ -48,7 +48,7 @@ internal static class GuestRegistrationStatusAccessGuard
             ? current : promisedUntil;
         if (deadline > promisedUntil)
         {
-            if (!await inventory.TryExtendGuestStatusAccessAsync(order, deadline, cancellationToken))
+            if (!await guestRegistrations.TryExtendGuestStatusAccessAsync(order, deadline, cancellationToken))
             {
                 return null;
             }

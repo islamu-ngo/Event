@@ -3,7 +3,6 @@
 
 using Explore.Domain;
 using Explore.Domain.Enums;
-using Explore.Domain.ValueObjects;
 
 namespace Explore.Application.Contracts.Persistence;
 
@@ -13,20 +12,6 @@ public interface IRegistrationInventoryRepository
         Guid orderId,
         Guid tenantId,
         CancellationToken cancellationToken);
-
-    // Callers must authenticate the protected original request before invoking this read-only seam.
-    Task<RegistrationOrder?> GetExactGuestOrderAsync(
-        Guid orderId,
-        Guid tenantId,
-        Guid eventId,
-        CapabilityTokenHash guestAccessTokenHash,
-        CancellationToken cancellationToken);
-
-    Task<RegistrationOrder?> GetGuestStatusOrderForUpdateAsync(
-        Guid orderId, Guid tenantId, CancellationToken cancellationToken);
-
-    Task<bool> TryExtendGuestStatusAccessAsync(
-        RegistrationOrder expected, DateTime deadlineUtc, CancellationToken cancellationToken);
 
     Task<RegistrationOrder?> GetOrderWithPiiAsync(
         Guid orderId,

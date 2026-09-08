@@ -27,6 +27,7 @@ public sealed class CreateOrderWithHoldCommandHandler(
     IEventRepository events,
     IEventTicketCatalogRepository catalogs,
     IRegistrationInventoryRepository inventory,
+    IGuestRegistrationCapabilityRepository guestRegistrations,
     IPlatformFeePolicyRepository feePolicies,
     IPlatformContributionSettingRepository contributionSettings,
     ITenantContext tenant,
@@ -379,7 +380,7 @@ public sealed class CreateOrderWithHoldCommandHandler(
         AnonymousRegistrationChallengeAuthority authority,
         CancellationToken cancellationToken)
     {
-        RegistrationOrder? order = await inventory.GetExactGuestOrderAsync(
+        RegistrationOrder? order = await guestRegistrations.GetExactGuestOrderAsync(
             authority.OrderId, tenant.TenantId, authority.EventId, authority.GuestAccessTokenHash, cancellationToken);
         if (!AllowsRecovery(authority))
         {

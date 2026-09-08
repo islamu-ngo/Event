@@ -190,24 +190,82 @@ public sealed class GuestRegistrationStatusTests
     }
 
     [Test]
-    [Arguments(false, false)]
-    [Arguments(true, false)]
-    [Arguments(false, true)]
-    [Arguments(true, true)]
-    public async Task MissingOrExpiredEndRejectsAllocationBeforeCreatingOrderOrHold(bool expired, bool paid)
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task MissingEndRejectsRetentionValidationBeforeCreatingOrderOrHold(bool paid)
     {
-        var clock = new Clock();
+        await using var fixture = await CreateAsync(new Clock());
+        var result = await StartAllocationAsync(fixture, null, paid);
+        await AssertNoAllocationAsync(fixture, result, "registration_order_validation_failed");
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task UnrepresentableStatusPromiseWithValidRetentionRejectsBeforeCreatingOrderOrHold(bool paid)
+    {
+        await using var fixture = await CreateAsync(new Clock());
+        // Seven-day retention fits in DateTime; the separate 30-day status promise does not.
+        var end = new DateTimeOffset(9999, 12, 15, 14, 0, 0, TimeSpan.Zero);
+        var result = await StartAllocationAsync(fixture, end, paid);
+        await AssertNoAllocationAsync(fixture, result, "registration_order_finite_status_window_required");
+    }
+
+    [Test]
+    [Arguments(7, -1, true, false)]
+    [Arguments(7, -1, true, true)]
+    [Arguments(7, 0, false, false)]
+    [Arguments(7, 0, false, true)]
+    [Arguments(7, 1, false, false)]
+    [Arguments(7, 1, false, true)]
+    [Arguments(30, 0, false, false)]
+    [Arguments(30, 0, false, true)]
+    public async Task RetentionBoundaryPrecedesStatusPromiseAndDeniesWithoutAllocation(
+        int daysAfterEnd, long ticks, bool allowed, bool paid)
+    {
+        var clock = new Clock { Now = EventEnd.AddDays(daysAfterEnd).AddTicks(ticks) };
         await using var fixture = await CreateAsync(clock);
+        var result = await StartAllocationAsync(fixture, EventEnd, paid);
+        if (!allowed)
+        {
+            await AssertNoAllocationAsync(fixture, result, "anonymous_registration_retention_expired");
+            return;
+        }
+
+        await Assert.That(result.IsSuccess).IsTrue();
+        await Assert.That(result.GuestCapabilityToken).IsNotNull();
+        var order = await fixture.Context.RegistrationOrders.AsNoTracking().SingleAsync();
+        await Assert.That(order.Id).IsEqualTo(result.Id);
+        await Assert.That(order.AnonymousPiiRetentionUntilUtc)
+            .IsEqualTo(new DateTime(2027, 1, 8, 14, 0, 0, DateTimeKind.Utc));
+        await Assert.That(order.GuestStatusAccessUntilUtc).IsEqualTo(Deadline.UtcDateTime);
+        var hold = await fixture.Context.RegistrationInventoryHolds.AsNoTracking().SingleAsync();
+        await Assert.That(hold.RegistrationOrderId).IsEqualTo(result.Id);
+        await Assert.That(await fixture.Context.RegistrationOrderLines.CountAsync()).IsEqualTo(1);
+        await Assert.That(await fixture.Context.RegistrationOrderPii.CountAsync()).IsEqualTo(0);
+    }
+
+    private static async Task<GuestRegistrationOrderStartDto> StartAllocationAsync(
+        EventVisitorCapabilitySqliteFixture fixture, DateTimeOffset? end, bool paid)
+    {
         var target = await fixture.SeedEventAsync(published: true);
-        await SetEndAsync(fixture, target.Id, expired ? clock.Now.AddDays(-30) : null);
+        await SetEndAsync(fixture, target.Id, end);
         var ticket = paid ? await SeedPaidTicketAsync(fixture, target.Id) : await fixture.SeedTicketAsync(target.Id);
         var proof = await fixture.IssueGuestProofAsync(new(target.Id, ticket.CatalogId,
             BookingPartyTypeEnum.Individual, [new(ticket.TicketId, 1, null)]));
-        var result = await fixture.ExecuteAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(proof.Request);
-        await Assert.That(result.IsSuccess).IsFalse();
-        await Assert.That(result.FailureCode).IsEqualTo("registration_order_finite_status_window_required");
+        return await fixture.ExecuteAsync<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>(proof.Request);
+    }
+
+    private static async Task AssertNoAllocationAsync(EventVisitorCapabilitySqliteFixture fixture,
+        GuestRegistrationOrderStartDto result, string failureCode)
+    {
         await Assert.That(await fixture.Context.RegistrationOrders.CountAsync()).IsEqualTo(0);
         await Assert.That(await fixture.Context.RegistrationInventoryHolds.CountAsync()).IsEqualTo(0);
+        await Assert.That(await fixture.Context.RegistrationOrderLines.CountAsync()).IsEqualTo(0);
+        await Assert.That(await fixture.Context.RegistrationOrderPii.CountAsync()).IsEqualTo(0);
+        await Assert.That(result.IsSuccess).IsFalse();
+        await Assert.That(result.GuestCapabilityToken).IsNull();
+        await Assert.That(result.FailureCode).IsEqualTo(failureCode);
     }
 
     [Test]
@@ -332,14 +390,16 @@ public sealed class GuestRegistrationStatusTests
         EventVisitorCapabilitySqliteFixture fixture, Guid eventId)
     {
         var catalog = EventTicketCatalogVersion.Create(fixture.TenantId, eventId, "USD", 1);
+        var pool = EventCapacityPool.Create(fixture.TenantId, eventId, "Paid allocation", 10, 900,
+            CapacityHoldPolicyEnum.TimedHoldOnSelection, CapacityOversellPolicyEnum.Disallow, true);
         var ticket = EventTicketType.Create(Guid.CreateVersion7(), fixture.TenantId, catalog.Id,
             "Paid admission", "USD", TicketPricingModeEnum.Fixed, Money.Create(100, "USD"), null, null,
-            ParticipantDataCollectionModeEnum.None, null, null, null, false, false, null, null, null, null);
-        catalog.AddTicketType(ticket, null);
+            ParticipantDataCollectionModeEnum.None, pool.Id, null, null, false, false, null, null, null, null);
+        catalog.AddTicketType(ticket, pool);
         catalog.AddEntitlement(ticket, TicketTypeEntitlement.CreateForEvent(ticket.Id, fixture.TenantId, eventId, 1));
         catalog.UpdateCommercialDisclosures("Merchant", "Refund", "Support");
         catalog.Publish();
-        fixture.Context.Add(catalog);
+        fixture.Context.AddRange(catalog, pool);
         await fixture.Context.SaveChangesAsync();
         fixture.Context.ChangeTracker.Clear();
         return (catalog.Id, ticket.Id);

@@ -1,6 +1,3 @@
-// ABOUTME: Validates event-reporting moderation provider configuration.
-// ABOUTME: Rejects unsupported runtime modes and unsafe evidence-sharing combinations.
-
 using Explore.Application.Features.EventReporting.Models;
 using Microsoft.Extensions.Options;
 

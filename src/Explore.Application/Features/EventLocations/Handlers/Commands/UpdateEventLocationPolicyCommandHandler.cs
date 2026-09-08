@@ -1,6 +1,3 @@
-// ABOUTME: Applies an optimistic EventLocation disclosure-policy change with append-only audit evidence.
-// ABOUTME: Commits the aggregate and PII-free audit atomically before evicting projection cache tags.
-
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;

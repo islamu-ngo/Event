@@ -1,6 +1,3 @@
-// ABOUTME: Unified translation resolution contract — single entry point for all translation needs.
-// ABOUTME: Resolves lookup table content and UI strings from TMS (live) or offline bundles.
-
 namespace Explore.Application.Contracts.Infrastructure;
 
 /// <summary>

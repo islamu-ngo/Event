@@ -1,6 +1,3 @@
-// ABOUTME: Stores external API key credentials for direct machine callers across all ownership levels.
-// ABOUTME: TenantId is nullable for platform-scoped InstanceAdmin keys; StatusId FK to lookup table; credit config for quota enforcement.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

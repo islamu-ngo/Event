@@ -1,5 +1,3 @@
-// ABOUTME: Exercises atomic SMTP final-state decisions and confirmed direct disable through real SQLite storage.
-// ABOUTME: Proves rejected changes stay absent even when their caller commits, and harmless multi-scope changes succeed.
 
 using System.Collections.Immutable;
 using Event.Persistence.IntegrationTests.Fixtures;

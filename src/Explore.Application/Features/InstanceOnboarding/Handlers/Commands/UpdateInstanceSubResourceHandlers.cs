@@ -1,6 +1,3 @@
-// ABOUTME: Handlers for per-domain instance settings update commands.
-// ABOUTME: Each handler validates admin access, then delegates to the corresponding service method.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

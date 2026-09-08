@@ -1,5 +1,3 @@
-// ABOUTME: Composes event visitor command gates with production services and a real SQLite database.
-// ABOUTME: Shares the event/provider authority surface so race tests need no repository or unit-of-work substitutes.
 
 using System.Globalization;
 using System.Security.Claims;
@@ -45,7 +43,7 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
     internal AsyncServiceScope CreateScope() => _provider.CreateAsyncScope();
 
     internal ServiceProvider CreateReplica() =>
-        _services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+        _services.BuildIsolatedServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
 
     internal static async Task<EventVisitorCapabilitySqliteFixture> CreateAsync(
         Action<IServiceCollection>? configureServices = null)

@@ -1,6 +1,3 @@
-// ABOUTME: Architecture contracts for reporter-owned event-report consent updates.
-// ABOUTME: Keeps the API action thin and the consent affordance confined to My Reports HAL policies.
-
 namespace Event.Architecture.Tests;
 
 public sealed class EventReportConsentArchitectureTests

@@ -1,6 +1,3 @@
-// ABOUTME: Supplies fail-closed geocoding services when no external provider is configured.
-// ABOUTME: Preserves local address reuse without provider I/O or usable selection tokens.
-
 using Explore.Application.Contracts.Infrastructure.Geocoding;
 
 namespace Explore.Infrastructure.Geocoding;

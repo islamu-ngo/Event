@@ -1,6 +1,3 @@
-// ABOUTME: Handler for first-class event ownership transfer.
-// ABOUTME: Creates the replacement EventOwner assignment before revoking the previous owner inside a transaction.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

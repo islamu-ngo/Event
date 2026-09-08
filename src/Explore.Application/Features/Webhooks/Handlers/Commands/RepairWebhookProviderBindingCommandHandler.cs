@@ -1,6 +1,3 @@
-// ABOUTME: Verifies self-hosted provider ownership before atomically repairing one consumer binding.
-// ABOUTME: Uses optimistic fences and writes secret-free audit evidence in the same transaction.
-
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;

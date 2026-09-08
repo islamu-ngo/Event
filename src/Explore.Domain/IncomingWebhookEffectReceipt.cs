@@ -1,6 +1,3 @@
-// ABOUTME: Durable tenant-scoped proof that one stable incoming webhook effect was committed.
-// ABOUTME: Rejects receipt reuse when message identity, effect kind, payload hash, or generation conflicts.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

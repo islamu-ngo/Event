@@ -1,6 +1,3 @@
-// ABOUTME: Verifies registration-order HAL candidates carry order-scoped authorization metadata.
-// ABOUTME: Keeps opaque guest capabilities out of link routes, parameters, and authorization attributes.
-
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.Authorization;

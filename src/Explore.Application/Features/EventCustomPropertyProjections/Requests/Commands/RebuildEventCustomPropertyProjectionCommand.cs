@@ -1,6 +1,3 @@
-// ABOUTME: Command to trigger a tenant-wide rebuild of event custom-property projection rows.
-// ABOUTME: Authorized through custom-property projection resource metadata; uses Complex request timeout.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.CustomPropertyProjection;

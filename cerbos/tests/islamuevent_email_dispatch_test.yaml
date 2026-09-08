@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos policy test suite for EmailDispatch operator resources.
-# ABOUTME: Ensures tenant-scoped email dispatch status and replay controls are tenant-admin-only.
-
 name: EmailDispatchPolicyTests
 description: "Validates email_dispatch operator permissions across admin hierarchy levels"
 

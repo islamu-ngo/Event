@@ -1,6 +1,3 @@
-// ABOUTME: API controller for tenant Listmonk integration settings and connection testing.
-// ABOUTME: Exposes sanitized reads and authenticated writes without returning secret values.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

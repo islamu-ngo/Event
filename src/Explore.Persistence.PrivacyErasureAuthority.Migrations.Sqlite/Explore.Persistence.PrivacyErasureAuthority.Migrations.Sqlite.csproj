@@ -1,5 +1,3 @@
-<!-- ABOUTME: Owns generated SQLite migrations for the embedded privacy-erasure authority. -->
-<!-- ABOUTME: Keeps authority schema history independent from every primary database provider. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>

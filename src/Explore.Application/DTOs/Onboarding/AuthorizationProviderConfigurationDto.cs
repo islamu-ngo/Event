@@ -1,6 +1,3 @@
-// ABOUTME: DTO for instance-level authorization provider configuration managed during setup and admin UI.
-// ABOUTME: Represents provider choice, redacted deployment credential state, and Cerbos endpoints.
-
 using Explore.Application.DTOs.Secrets;
 
 namespace Explore.Application.DTOs.Onboarding;

@@ -1,6 +1,3 @@
-// ABOUTME: Persists and fairly claims durable fair-return payment observation and refund triggers.
-// ABOUTME: Uses one canonical fence, retry-safe transactions, stable leases, and atomic outbox creation.
-
 using System.Linq.Expressions;
 using Explore.Application.Contracts.Waitlist;
 using Explore.Application.Services.Registration;

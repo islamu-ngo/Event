@@ -1,6 +1,3 @@
-// ABOUTME: Maps retained privacy-erasure facts to the fixed ie_-prefixed SQLite authority table.
-// ABOUTME: Stores UTC ticks and enforces sequence, UUIDv7, subject, reason, and retention invariants.
-
 using Explore.Domain;
 using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;

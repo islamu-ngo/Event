@@ -1,6 +1,3 @@
-// ABOUTME: Kestrel and PostgreSQL runtime coverage for public and attendee calendar privacy boundaries.
-// ABOUTME: Verifies private-home redaction, registration authorization, no-store caching, and retention metadata.
-
 using System.Diagnostics;
 using System.Net;
 using Event.Api.IntegrationTests.Builders;

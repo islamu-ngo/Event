@@ -1,6 +1,3 @@
-// ABOUTME: Shared intake implementation for incoming integration webhooks.
-// ABOUTME: Reads raw request bodies, delegates verification, and writes idempotency ledger rows before dispatch.
-
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;

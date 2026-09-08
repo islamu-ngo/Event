@@ -1,6 +1,3 @@
-// ABOUTME: Computes governed SemVer, prerelease, backport, and renderer-context policy.
-// ABOUTME: Emits deterministic sanitized release-context.v1.json without forge or author identity.
-
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;

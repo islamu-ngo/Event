@@ -1,6 +1,3 @@
-# ABOUTME: Minimal Forgejo/Codeberg preview discovery workflow for mirror candidate feedback.
-# ABOUTME: Runs only no-op-safe preview reporting without final protected operations.
-
 name: Release Adapter Preview Discovery
 
 on:

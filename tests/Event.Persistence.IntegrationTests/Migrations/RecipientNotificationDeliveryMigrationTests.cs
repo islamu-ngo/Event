@@ -1,6 +1,3 @@
-// ABOUTME: Verifies recipient-delivery ledger schema in the rebased PostgreSQL baseline.
-// ABOUTME: Proves model parity and required recipient constraints without deleted migration boundaries.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -28,34 +25,36 @@ public sealed class RecipientNotificationDeliveryMigrationTests(
         await using var context = CreateDbContext();
         await context.Database.MigrateAsync();
         await Assert.That(HasPendingModelChanges(context)).IsFalse();
+        string schema = context.Model.GetDefaultSchema()
+            ?? throw new InvalidOperationException("The event model must declare a default schema.");
 
         await using var connection = new NpgsqlConnection(fixture.ConnectionString);
         await connection.OpenAsync();
-        await Assert.That(await ConstraintExistsAsync(
-            connection,
-            "fk_email_dispatch_outbox_recipient_matches_intent")).IsTrue();
-        await Assert.That(await ConstraintExistsAsync(
-            connection,
-            "fk_notification_deliveries_notification_tenant")).IsTrue();
-        await Assert.That(await IndexExistsAsync(
-            connection,
-            "ux_notification_deliveries_tenant_intent_channel")).IsTrue();
-        await Assert.That(await IsColumnRequiredAsync(connection, "notification_intents", "recipient_user_id")).IsTrue();
-        await Assert.That(await IsColumnRequiredAsync(connection, "email_dispatch_outbox", "recipient_user_id")).IsTrue();
-        await Assert.That(await IsColumnRequiredAsync(connection, "email_dispatch_outbox", "notification_intent_id")).IsTrue();
+        await Assert.That(await NotificationMigrationSchemaContract.HasForeignKeyAsync(
+            connection, schema, "email_dispatch_outbox", ["tenant_id", "notification_intent_id", "recipient_user_id"],
+            "notification_intents", ["tenant_id", "id", "recipient_user_id"])).IsTrue();
+        await Assert.That(await NotificationMigrationSchemaContract.HasForeignKeyAsync(
+            connection, schema, "notification_deliveries", ["tenant_id", "notification_id"],
+            "notifications", ["tenant_id", "id"])).IsTrue();
+        await Assert.That(await NotificationMigrationSchemaContract.HasUniqueIndexAsync(
+            connection, schema, "notification_deliveries", ["tenant_id", "notification_intent_id", "channel_id"])).IsTrue();
+        await Assert.That(await NotificationMigrationSchemaContract.HasColumnAsync(
+            connection, schema, "notification_intents", "recipient_user_id", required: true)).IsTrue();
+        await Assert.That(await NotificationMigrationSchemaContract.HasColumnAsync(
+            connection, schema, "email_dispatch_outbox", "recipient_user_id", required: true)).IsTrue();
+        await Assert.That(await NotificationMigrationSchemaContract.HasColumnAsync(
+            connection, schema, "email_dispatch_outbox", "notification_intent_id", required: true)).IsTrue();
     }
 
     private ExploreDbContext CreateDbContext()
     {
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>()
+        var builder = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString)
             .UseSnakeCaseNamingConvention()
             .ConfigureWarnings(warnings =>
             {
                 warnings.Ignore(RelationalEventId.PendingModelChangesWarning);
-                warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning);
             });
-        builder.EnableServiceProviderCaching(false);
         return new ExploreDbContext(builder.Options);
     }
 
@@ -76,36 +75,4 @@ public sealed class RecipientNotificationDeliveryMigrationTests(
             runtimeModel.GetRelationalModel());
     }
 
-    private static Task<bool> ConstraintExistsAsync(NpgsqlConnection connection, string constraint) =>
-        ExistsAsync(connection, "SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = @name)", constraint);
-
-    private static Task<bool> IndexExistsAsync(NpgsqlConnection connection, string index) =>
-        ExistsAsync(connection, "SELECT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = @name)", index);
-
-    private static async Task<bool> ExistsAsync(
-        NpgsqlConnection connection,
-        string sql,
-        string name)
-    {
-        await using var command = new NpgsqlCommand(sql, connection);
-        command.Parameters.AddWithValue("name", name);
-        return (bool)(await command.ExecuteScalarAsync())!;
-    }
-
-    private static async Task<bool> IsColumnRequiredAsync(
-        NpgsqlConnection connection,
-        string table,
-        string column)
-    {
-        await using var command = new NpgsqlCommand(
-            """
-            SELECT is_nullable = 'NO'
-            FROM information_schema.columns
-            WHERE table_schema = current_schema() AND table_name = @table AND column_name = @column
-            """,
-            connection);
-        command.Parameters.AddWithValue("table", table);
-        command.Parameters.AddWithValue("column", column);
-        return (bool)(await command.ExecuteScalarAsync())!;
-    }
 }

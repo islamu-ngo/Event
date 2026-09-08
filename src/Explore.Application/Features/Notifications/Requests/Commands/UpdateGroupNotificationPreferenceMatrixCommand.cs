@@ -1,6 +1,3 @@
-// ABOUTME: Command for saving group-scoped notification preference cells.
-// ABOUTME: Carries route authority into resource authorization and transactional preference writes.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Notification;
 using Explore.Application.Responses;

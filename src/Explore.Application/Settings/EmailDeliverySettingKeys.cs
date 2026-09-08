@@ -1,5 +1,3 @@
-// ABOUTME: Defines the complete SMTP policy family that must use the dedicated atomic writer.
-// ABOUTME: Recognizes case and surrounding whitespace variants before generic settings can reach a database collation.
 
 using System.Collections.Immutable;
 using Explore.Domain.Constants;

@@ -1,5 +1,3 @@
-// ABOUTME: Reconciles exact Local user, personal actor, and provider binding under current instance authority.
-// ABOUTME: Commits application provisioning before separately activating the Identity-owned credential operation.
 
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;

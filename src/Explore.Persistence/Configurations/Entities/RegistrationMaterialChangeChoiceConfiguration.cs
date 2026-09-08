@@ -1,6 +1,3 @@
-// ABOUTME: Maps tenant-qualified material-change buyer choices and immutable payment authority.
-// ABOUTME: Enforces one choice per campaign, payment, and accepted commercial snapshot.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

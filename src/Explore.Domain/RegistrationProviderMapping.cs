@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral capability, field mapping, option mapping, and schema revision entities.
-// ABOUTME: Stores provider identifiers and revision evidence only, never credential values or provider-specific adapter state.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

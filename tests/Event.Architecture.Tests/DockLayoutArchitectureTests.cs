@@ -1,6 +1,3 @@
-// ABOUTME: Architecture guardrails for the descriptor-driven dock layout refactor.
-// ABOUTME: Prevents central panel enums and page-level shell compensation from returning.
-
 namespace Event.Architecture.Tests;
 
 using System.Text.RegularExpressions;

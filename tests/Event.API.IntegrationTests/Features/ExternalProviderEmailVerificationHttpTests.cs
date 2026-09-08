@@ -1,5 +1,3 @@
-// ABOUTME: Verifies external OIDC and ATProto identity evidence survives instance SMTP changes through native HTTP.
-// ABOUTME: Keeps authentication and persisted account state real while substituting only external provider authorities.
 
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;

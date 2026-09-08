@@ -1,6 +1,3 @@
-// ABOUTME: Characterizes Phase 8.1 registration persistence identities, containment, and retry behavior.
-// ABOUTME: Proves tenant-safe replay classification and existing-row-safe PostgreSQL model derivation.
-
 using System.Security.Cryptography;
 using System.Text;
 using Event.Persistence.IntegrationTests.Fixtures;
@@ -416,11 +413,9 @@ public sealed class RegistrationAttemptPersistenceCharacterizationTests
 
     private static ExploreDbContext CreateModelContext()
     {
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>()
+        var builder = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql("Host=localhost;Database=unused;Username=unused;Password=unused")
-            .UseSnakeCaseNamingConvention()
-            .ConfigureWarnings(warnings => warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning));
-        builder.EnableServiceProviderCaching(false);
+            .UseSnakeCaseNamingConvention();
         return new ExploreDbContext(builder.Options);
     }
 
@@ -428,11 +423,9 @@ public sealed class RegistrationAttemptPersistenceCharacterizationTests
         Guid tenantId,
         SaveChangesInterceptor? interceptor = null)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase($"registration-attempt-{Guid.NewGuid():N}")
-            .UseSnakeCaseNamingConvention()
-            .ConfigureWarnings(warnings => warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning));
-        options.EnableServiceProviderCaching(false);
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase($"registration-attempt-{Guid.NewGuid():N}")
+            .UseSnakeCaseNamingConvention();
         if (interceptor is not null)
         {
             options.AddInterceptors(interceptor);
@@ -528,7 +521,7 @@ public sealed class RegistrationAttemptPostgreSqlPersistenceTests(PostgreSqlCont
     public async Task NativeSubmissionPersistsOneClaimDeduplicatesRevisesFinalizesAndFiltersTenant()
     {
         await fixture.ResetAsync();
-        RuntimeScope scope = await SeedScopeAsync("attempt-native", null);
+        RuntimeScope scope = await SeedScopeAsync("attempt-native");
         RegistrationAttempt attempt = CreateAttempt(scope, 1);
         await using (ExploreDbContext setup = TenantContext(scope.TenantId))
         {
@@ -605,7 +598,7 @@ public sealed class RegistrationAttemptPostgreSqlPersistenceTests(PostgreSqlCont
     public async Task ConcurrentAcceptedConsumersHaveOneWinnerAndOnePersistedRow()
     {
         await fixture.ResetAsync();
-        RuntimeScope scope = await SeedScopeAsync("attempt-race", null);
+        RuntimeScope scope = await SeedScopeAsync("attempt-race");
         RegistrationAttempt seedAttempt = CreateAttempt(scope, 10);
         await using (ExploreDbContext setup = TenantContext(scope.TenantId))
         {
@@ -613,10 +606,14 @@ public sealed class RegistrationAttemptPostgreSqlPersistenceTests(PostgreSqlCont
             await setup.SaveChangesAsync();
         }
 
+        var bothRead = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int readers = 0;
         async Task<RegistrationSubmissionPersistenceOutcome> ConsumeAsync(int evidenceSeed)
         {
             await using ExploreDbContext context = TenantContext(scope.TenantId);
             RegistrationAttempt attempt = await context.RegistrationAttempts.AsNoTracking().SingleAsync();
+            if (Interlocked.Increment(ref readers) == 2) bothRead.TrySetResult();
+            await bothRead.Task.WaitAsync(TimeSpan.FromSeconds(30));
             Guid expectedStamp = attempt.ConcurrencyStamp;
             RegistrationSubmission submission = attempt.SubmitNative(Evidence(evidenceSeed), UtcNow.AddMinutes(1), null);
             return (await new RegistrationSubmissionRepository(context)
@@ -637,14 +634,26 @@ public sealed class RegistrationAttemptPostgreSqlPersistenceTests(PostgreSqlCont
     public async Task ProviderTupleIgnoresMappingRevisionAndDatabaseRejectsMalformedTuple()
     {
         await fixture.ResetAsync();
-        Guid bindingId = Guid.CreateVersion7();
-        RuntimeScope providerScope = await SeedScopeAsync("attempt-provider", bindingId);
-        RegistrationAttempt firstAttempt = CreateAttempt(providerScope, 20, bindingId, Evidence(21));
-        RegistrationAttempt secondAttempt = CreateAttempt(providerScope, 22, bindingId, Evidence(23));
+        RuntimeScope providerScope = await SeedScopeAsync("attempt-provider", true);
+        Guid bindingId = providerScope.ProviderBindingId
+            ?? throw new InvalidOperationException("Provider scope did not create a binding.");
+        RegistrationEvidenceHash mappingRevisionHash = providerScope.ProviderMappingRevisionHash
+            ?? throw new InvalidOperationException("Provider scope did not publish a binding mapping revision.");
+        RegistrationAttempt firstAttempt = CreateAttempt(providerScope, 20, bindingId, mappingRevisionHash);
+        RegistrationAttempt secondAttempt = CreateAttempt(providerScope, 22, bindingId, mappingRevisionHash);
+        await using (ExploreDbContext invalidMapping = TenantContext(providerScope.TenantId))
+        {
+            invalidMapping.RegistrationAttempts.Add(CreateAttempt(providerScope, 23, bindingId, Evidence(23)));
+            await Assert.That(async () => await invalidMapping.SaveChangesAsync()).Throws<InvalidOperationException>();
+        }
         await using (ExploreDbContext setup = TenantContext(providerScope.TenantId))
         {
             setup.RegistrationAttempts.AddRange(firstAttempt, secondAttempt);
             await setup.SaveChangesAsync();
+            PostgresException? rejectedMapping = await Assert.ThrowsAsync<PostgresException>(() =>
+                setup.Database.ExecuteSqlInterpolatedAsync(
+                    $"UPDATE registration_attempts SET provider_mapping_revision_hash = {Evidence(23).Value} WHERE id = {firstAttempt.Id}"));
+            await Assert.That(rejectedMapping!.SqlState).IsEqualTo(PostgresErrorCodes.ForeignKeyViolation);
         }
 
         Guid expectedStamp = firstAttempt.ConcurrencyStamp;
@@ -668,9 +677,18 @@ public sealed class RegistrationAttemptPostgreSqlPersistenceTests(PostgreSqlCont
         }
 
         await using ExploreDbContext verification = TenantContext(providerScope.TenantId);
+        var providerIdentity = verification.Model.FindEntityType(typeof(RegistrationSubmission))!
+            .GetIndexes().Single(index => index.Properties.Select(property => property.Name).SequenceEqual(
+            [
+                nameof(RegistrationSubmission.TenantId),
+                nameof(RegistrationSubmission.RegistrationProviderBindingId),
+                nameof(RegistrationSubmission.ProviderSubmissionId),
+                nameof(RegistrationSubmission.ProviderResponseRevision)
+            ]));
+        await Assert.That(providerIdentity.IsUnique).IsTrue();
         await Assert.That(await verification.RegistrationSubmissions.CountAsync()).IsEqualTo(1);
         RegistrationSubmission persisted = await verification.RegistrationSubmissions.AsNoTracking().SingleAsync();
-        await Assert.That(persisted.ProviderMappingRevisionHash).IsEqualTo(Evidence(21));
+        await Assert.That(persisted.ProviderMappingRevisionHash).IsEqualTo(mappingRevisionHash);
 
         await using NpgsqlConnection connection = new(fixture.ConnectionString);
         await connection.OpenAsync();
@@ -687,10 +705,13 @@ public sealed class RegistrationAttemptPostgreSqlPersistenceTests(PostgreSqlCont
     public async Task ProviderEvidenceOnlyThenAcceptedReturnsTypedConflictWithoutConsumingAttempt()
     {
         await fixture.ResetAsync();
-        Guid bindingId = Guid.CreateVersion7();
-        RuntimeScope scope = await SeedScopeAsync("attempt-provider-evidence-conflict", bindingId);
-        RegistrationAttempt evidenceAttempt = CreateAttempt(scope, 40, bindingId, Evidence(41));
-        RegistrationAttempt acceptedAttempt = CreateAttempt(scope, 42, bindingId, Evidence(43));
+        RuntimeScope scope = await SeedScopeAsync("attempt-provider-evidence-conflict", true);
+        Guid bindingId = scope.ProviderBindingId
+            ?? throw new InvalidOperationException("Provider scope did not create a binding.");
+        RegistrationEvidenceHash mappingRevisionHash = scope.ProviderMappingRevisionHash
+            ?? throw new InvalidOperationException("Provider scope did not publish a binding mapping revision.");
+        RegistrationAttempt evidenceAttempt = CreateAttempt(scope, 40, bindingId, mappingRevisionHash);
+        RegistrationAttempt acceptedAttempt = CreateAttempt(scope, 42, bindingId, mappingRevisionHash);
         await using (ExploreDbContext setup = TenantContext(scope.TenantId))
         {
             setup.RegistrationAttempts.AddRange(evidenceAttempt, acceptedAttempt);
@@ -724,16 +745,56 @@ public sealed class RegistrationAttemptPostgreSqlPersistenceTests(PostgreSqlCont
     public async Task DatabaseRejectsChannelBindingAndOrderWorkflowMismatches()
     {
         await fixture.ResetAsync();
-        Guid bindingId = Guid.CreateVersion7();
-        RuntimeScope scope = await SeedScopeAsync("attempt-lineage-mismatch", bindingId);
-        RegistrationAttempt bindingMismatch = CreateAttempt(scope, 46, Guid.CreateVersion7(), Evidence(47));
+        RuntimeScope scope = await SeedScopeAsync("attempt-lineage-mismatch", true);
+        RegistrationEvidenceHash mappingRevisionHash = scope.ProviderMappingRevisionHash
+            ?? throw new InvalidOperationException("Provider scope did not publish a binding mapping revision.");
         await using (ExploreDbContext bindingContext = TenantContext(scope.TenantId))
         {
+            RegistrationProviderConnection otherConnection = RegistrationProviderConnection.Create(
+                scope.TenantId,
+                "other provider",
+                RegistrationProviderKindEnum.ExternalForm,
+                RegistrationProviderDeploymentKindEnum.HostedSaas,
+                "FORMBRICKS",
+                "HOSTED_SAAS",
+                "v1",
+                "formbricks-policy-v1",
+                "evidence-v1",
+                "https://provider.example/management",
+                "https://provider.example",
+                "workspace-other-provider",
+                null,
+                null,
+                UtcNow);
+            RegistrationProviderBinding otherBinding = RegistrationProviderBinding.Create(
+                scope.TenantId,
+                otherConnection.Id,
+                scope.FormId,
+                scope.FormVersionId,
+                RegistrationProviderPresentationModeEnum.Redirect,
+                RegistrationProviderCollectionModeEnum.ProviderHosted,
+                RegistrationProviderCompletionModeEnum.Callback,
+                RegistrationProviderTrustLevelEnum.SelectedFields,
+                null,
+                UtcNow);
+            otherBinding.Publish(mappingRevisionHash, UtcNow);
+            bindingContext.AddRange(otherConnection, otherBinding);
+            await bindingContext.SaveChangesAsync();
+
+            RegistrationAttempt bindingMismatch = CreateAttempt(scope, 46, otherBinding.Id, mappingRevisionHash);
             bindingContext.RegistrationAttempts.Add(bindingMismatch);
             await Assert.That(async () => await bindingContext.SaveChangesAsync()).Throws<DbUpdateException>();
         }
 
         await using ExploreDbContext setup = TenantContext(scope.TenantId);
+        RegistrationAttempt validAttempt = CreateAttempt(
+            scope, 47, scope.ProviderBindingId, mappingRevisionHash);
+        setup.RegistrationAttempts.Add(validAttempt);
+        await setup.SaveChangesAsync();
+        PostgresException? rejectedBinding = await Assert.ThrowsAsync<PostgresException>(() =>
+            setup.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE registration_attempts SET registration_provider_binding_id = {Guid.CreateVersion7()} WHERE id = {validAttempt.Id}"));
+        await Assert.That(rejectedBinding!.SqlState).IsEqualTo(PostgresErrorCodes.ForeignKeyViolation);
         RegistrationWorkflow otherWorkflow = RegistrationWorkflow.Create(
             scope.TenantId, scope.EventId, "OTHER_WORKFLOW", UtcNow.AddMinutes(1));
         RegistrationRequirement otherRequirement = RegistrationRequirement.Create(
@@ -760,7 +821,7 @@ public sealed class RegistrationAttemptPostgreSqlPersistenceTests(PostgreSqlCont
     public async Task SupersessionCanRotateToAnotherFormVersionWithinTheSameLineage()
     {
         await fixture.ResetAsync();
-        RuntimeScope scope = await SeedScopeAsync("attempt-version-rotation", null);
+        RuntimeScope scope = await SeedScopeAsync("attempt-version-rotation");
         Guid replacementVersionId;
         await using (ExploreDbContext versionContext = TenantContext(scope.TenantId))
         {
@@ -793,7 +854,7 @@ public sealed class RegistrationAttemptPostgreSqlPersistenceTests(PostgreSqlCont
     public async Task ConcurrentSameIdentityAcceptedConsumersPersistOneAndReturnTypedConflict()
     {
         await fixture.ResetAsync();
-        RuntimeScope scope = await SeedScopeAsync("attempt-same-identity-race", null);
+        RuntimeScope scope = await SeedScopeAsync("attempt-same-identity-race");
         RegistrationAttempt seedAttempt = CreateAttempt(scope, 51);
         await using (ExploreDbContext setup = TenantContext(scope.TenantId))
         {
@@ -801,10 +862,14 @@ public sealed class RegistrationAttemptPostgreSqlPersistenceTests(PostgreSqlCont
             await setup.SaveChangesAsync();
         }
 
+        var bothRead = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int readers = 0;
         async Task<RegistrationSubmissionPersistenceOutcome> ConsumeAsync()
         {
             await using ExploreDbContext context = TenantContext(scope.TenantId);
             RegistrationAttempt attempt = await context.RegistrationAttempts.AsNoTracking().SingleAsync();
+            if (Interlocked.Increment(ref readers) == 2) bothRead.TrySetResult();
+            await bothRead.Task.WaitAsync(TimeSpan.FromSeconds(30));
             Guid expectedStamp = attempt.ConcurrencyStamp;
             RegistrationSubmission submission = attempt.SubmitNative(Evidence(52), UtcNow.AddMinutes(1), null);
             return (await new RegistrationSubmissionRepository(context)
@@ -821,12 +886,15 @@ public sealed class RegistrationAttemptPostgreSqlPersistenceTests(PostgreSqlCont
     public async Task SoftDeletedCapabilityNativeAndProviderIdentitiesCannotReplay()
     {
         await fixture.ResetAsync();
-        RuntimeScope nativeScope = await SeedScopeAsync("attempt-soft-delete-native", null);
-        Guid bindingId = Guid.CreateVersion7();
-        RuntimeScope providerScope = await SeedScopeAsync("attempt-soft-delete-provider", bindingId);
+        RuntimeScope nativeScope = await SeedScopeAsync("attempt-soft-delete-native");
+        RuntimeScope providerScope = await SeedScopeAsync("attempt-soft-delete-provider", true);
+        Guid bindingId = providerScope.ProviderBindingId
+            ?? throw new InvalidOperationException("Provider scope did not create a binding.");
+        RegistrationEvidenceHash mappingRevisionHash = providerScope.ProviderMappingRevisionHash
+            ?? throw new InvalidOperationException("Provider scope did not publish a binding mapping revision.");
         RegistrationAttempt nativeAttempt = CreateAttempt(nativeScope, 53);
-        RegistrationAttempt providerAttempt = CreateAttempt(providerScope, 54, bindingId, Evidence(55));
-        RegistrationAttempt providerReplayAttempt = CreateAttempt(providerScope, 56, bindingId, Evidence(57));
+        RegistrationAttempt providerAttempt = CreateAttempt(providerScope, 54, bindingId, mappingRevisionHash);
+        RegistrationAttempt providerReplayAttempt = CreateAttempt(providerScope, 56, bindingId, mappingRevisionHash);
         await using (ExploreDbContext setup = fixture.CreateDbContext())
         {
             setup.RegistrationAttempts.AddRange(nativeAttempt, providerAttempt, providerReplayAttempt);
@@ -882,7 +950,7 @@ public sealed class RegistrationAttemptPostgreSqlPersistenceTests(PostgreSqlCont
     public async Task DistinctNativeAttemptsAndPayloadsRemainDistinct()
     {
         await fixture.ResetAsync();
-        RuntimeScope scope = await SeedScopeAsync("attempt-distinct", null);
+        RuntimeScope scope = await SeedScopeAsync("attempt-distinct");
         RegistrationAttempt first = CreateAttempt(scope, 26);
         RegistrationAttempt second = CreateAttempt(scope, 27);
         await using (ExploreDbContext setup = TenantContext(scope.TenantId))
@@ -912,8 +980,8 @@ public sealed class RegistrationAttemptPostgreSqlPersistenceTests(PostgreSqlCont
     public async Task LateEvidencePersistsButCannotFinalizeAndDatabaseRejectsCrossTenantLineageAndMalformedTuple()
     {
         await fixture.ResetAsync();
-        RuntimeScope first = await SeedScopeAsync("attempt-late-a", null);
-        RuntimeScope second = await SeedScopeAsync("attempt-late-b", null);
+        RuntimeScope first = await SeedScopeAsync("attempt-late-a");
+        RuntimeScope second = await SeedScopeAsync("attempt-late-b");
         RegistrationAttempt replacement = CreateAttempt(first, 30);
         RegistrationAttempt superseded = CreateAttempt(first, 31);
         RegistrationAttempt expired = CreateAttempt(first, 34);
@@ -964,7 +1032,7 @@ public sealed class RegistrationAttemptPostgreSqlPersistenceTests(PostgreSqlCont
     private ExploreDbContext TenantContext(Guid tenantId) =>
         fixture.CreateTenantFilteredDbContext(new TestTenantContext(tenantId));
 
-    private async Task<RuntimeScope> SeedScopeAsync(string slug, Guid? providerBindingId)
+    private async Task<RuntimeScope> SeedScopeAsync(string slug, bool withProviderBinding = false)
     {
         await using ExploreDbContext context = fixture.CreateDbContext();
         Tenant tenant = new() { FullName = slug, Slug = $"{slug}-{Guid.NewGuid():N}", TenantStatusId = 2, TenantStatus = null! };
@@ -1000,12 +1068,53 @@ public sealed class RegistrationAttemptPostgreSqlPersistenceTests(PostgreSqlCont
             RegistrationRequirementCompletionEffectEnum.BlocksRegistration,
             RegistrationAnswerSyncModeEnum.FULL_CANONICAL,
             RegistrationRequirementSubjectTypeEnum.AllOrders, null, UtcNow);
-        RegistrationChannel channel = RegistrationChannel.Create(requirement, 1, providerBindingId is null, providerBindingId, UtcNow);
-        requirement.AddChannel(channel);
-        workflow.AddRequirement(requirement);
         RegistrationForm form = RegistrationForm.Create(tenant.Id, @event.Id, "platform.registration", "runtime", "Runtime", UtcNow);
         RegistrationFormVersion version = RegistrationFormVersion.Create(form, 1, "en", null, null, UtcNow);
         form.AddVersion(version);
+        RegistrationProviderBinding? providerBinding = null;
+        RegistrationEvidenceHash? providerMappingRevisionHash = null;
+        if (withProviderBinding)
+        {
+            RegistrationProviderConnection connection = RegistrationProviderConnection.Create(
+                tenant.Id,
+                $"{slug} provider",
+                RegistrationProviderKindEnum.ExternalForm,
+                RegistrationProviderDeploymentKindEnum.HostedSaas,
+                "FORMBRICKS",
+                "HOSTED_SAAS",
+                "v1",
+                "formbricks-policy-v1",
+                "evidence-v1",
+                "https://provider.example/management",
+                "https://provider.example",
+                $"workspace-{slug}",
+                null,
+                null,
+                UtcNow);
+            providerBinding = RegistrationProviderBinding.Create(
+                tenant.Id,
+                connection.Id,
+                form.Id,
+                version.Id,
+                RegistrationProviderPresentationModeEnum.Redirect,
+                RegistrationProviderCollectionModeEnum.ProviderHosted,
+                RegistrationProviderCompletionModeEnum.Callback,
+                RegistrationProviderTrustLevelEnum.SelectedFields,
+                null,
+                UtcNow);
+            providerMappingRevisionHash = Evidence(19);
+            providerBinding.Publish(providerMappingRevisionHash, UtcNow);
+            context.AddRange(connection, providerBinding);
+        }
+
+        RegistrationChannel channel = RegistrationChannel.Create(
+            requirement,
+            1,
+            !withProviderBinding,
+            providerBinding?.Id,
+            UtcNow);
+        requirement.AddChannel(channel);
+        workflow.AddRequirement(requirement);
         context.AddRange(catalog, workflow, form);
         await context.SaveChangesAsync();
 
@@ -1015,7 +1124,17 @@ public sealed class RegistrationAttemptPostgreSqlPersistenceTests(PostgreSqlCont
             workflow.Id, null, "EUR", UtcNow, UtcNow.AddHours(1));
         context.RegistrationOrders.Add(order);
         await context.SaveChangesAsync();
-        return new(tenant.Id, @event.Id, order.Id, workflow.Id, requirement.Id, channel.Id, form.Id, version.Id);
+        return new(
+            tenant.Id,
+            @event.Id,
+            order.Id,
+            workflow.Id,
+            requirement.Id,
+            channel.Id,
+            form.Id,
+            version.Id,
+            providerBinding?.Id,
+            providerMappingRevisionHash);
     }
 
     private static RegistrationAttempt CreateAttempt(
@@ -1039,7 +1158,9 @@ public sealed class RegistrationAttemptPostgreSqlPersistenceTests(PostgreSqlCont
         Guid RequirementId,
         Guid ChannelId,
         Guid FormId,
-        Guid FormVersionId);
+        Guid FormVersionId,
+        Guid? ProviderBindingId,
+        RegistrationEvidenceHash? ProviderMappingRevisionHash);
 
     private sealed record TestTenantContext(Guid TenantId) : ITenantContext;
 }

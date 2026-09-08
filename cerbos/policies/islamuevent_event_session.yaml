@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos resource policy for event_session resources.
-# ABOUTME: Allows tenant/event administrators to manage sessions, including parent-event pre-create checks.
-
 apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   resource: "islamuevent_event_session"

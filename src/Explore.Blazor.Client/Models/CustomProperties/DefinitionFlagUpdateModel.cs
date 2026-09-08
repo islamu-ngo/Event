@@ -1,6 +1,3 @@
-// ABOUTME: Flag-only projection of the governance flags an admin can toggle.
-// ABOUTME: Used for single-row and bulk updates before fan-out to UpdateCustomPropertyDefinitionDto.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Models.CustomProperties;

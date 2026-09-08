@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for tenant storage settings mapping through the generated Event API client.
-// ABOUTME: Ensures generated HAL edit affordances gate updates and generated DTOs carry saved values.
-
 namespace Explore.Blazor.Client.Tests.Services;
 
 public sealed class TenantStorageSettingsAdminServiceTests

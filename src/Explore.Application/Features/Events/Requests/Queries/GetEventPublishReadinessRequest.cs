@@ -1,6 +1,3 @@
-// ABOUTME: Query for event publish-readiness diagnostics used by management clients before publish.
-// ABOUTME: Carries event resource authorization metadata so readiness checks do not bypass policy.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Event;
 using MediatR;

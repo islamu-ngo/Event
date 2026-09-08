@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for NullAnalyticsProvider safe no-op behavior and feature-flag defaults.
-// ABOUTME: Ensures analytics-disabled mode does not throw and returns predictable defaults.
-
 using Explore.Infrastructure.Analytics;
 using Microsoft.Extensions.Logging;
 using NSubstitute;

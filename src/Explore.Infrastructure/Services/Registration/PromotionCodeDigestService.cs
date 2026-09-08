@@ -1,6 +1,3 @@
-// ABOUTME: Computes versioned HMAC-SHA256 promotion-code lookup digests.
-// ABOUTME: Resolves instance-scoped qualified HMAC keys without exposing raw codes, digests, or secrets.
-
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;

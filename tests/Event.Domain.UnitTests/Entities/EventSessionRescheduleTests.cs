@@ -1,6 +1,3 @@
-// ABOUTME: Tests the EventSession aggregate methods Reschedule and ReprojectLocalTimes for UTC/local projection consistency.
-// ABOUTME: Covers happy path, validation (end <= start), null calculator guard, and cached local field synchronization.
-
 namespace Event.Domain.UnitTests.Entities;
 
 using Explore.Domain.Services.Scheduling;

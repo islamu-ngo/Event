@@ -1,6 +1,3 @@
-// ABOUTME: Reads direct API-key headers while treating blank client placeholders as absent credentials.
-// ABOUTME: Keeps MCP anonymous discovery compatible with clients that emit an empty X-API-Key header.
-
 using Explore.Application.Constants;
 
 namespace Explore.API.Authentication;

@@ -1,6 +1,3 @@
-// ABOUTME: Pins the explicit v1alpha2 tenant setting and document allowlists.
-// ABOUTME: Prevents registry growth, sensitive definitions, or document taxonomy growth from becoming public automatically.
-
 namespace Event.Application.UnitTests.Features.ConfigurationManifest;
 
 using Explore.Application.Features.ConfigurationManifest.Catalog;

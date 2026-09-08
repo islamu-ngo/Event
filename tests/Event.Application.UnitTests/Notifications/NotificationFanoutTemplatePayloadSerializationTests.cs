@@ -1,6 +1,3 @@
-// ABOUTME: Specifies immutable collection and canonical sequence semantics for queued fanout snapshots.
-// ABOUTME: Proves replay JSON ordering explicitly without relying on record equality for array contents.
-
 using System.Text.Json;
 using Explore.Application.Notifications;
 

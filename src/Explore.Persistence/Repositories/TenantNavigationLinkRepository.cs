@@ -1,4 +1,3 @@
-// ABOUTME: Repository implementation for TenantNavigationLink entity providing data access
 // for tenant-scoped custom navigation links.
 
 namespace Explore.Persistence.Repositories;

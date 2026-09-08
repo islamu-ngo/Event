@@ -1,6 +1,3 @@
-// ABOUTME: Resolves private readiness through subject, purchaser, guest capability, or organizer authority.
-// ABOUTME: Maps Domain readiness into bounded PII-free state and server-only HAL affordance facts.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;

@@ -1,6 +1,3 @@
-// ABOUTME: Operator-facing view of whether the PDP is serving the policy package this deployment published.
-// ABOUTME: Carries the observed store revision and a concrete recovery action, never provider credentials.
-
 namespace Explore.Application.DTOs.Onboarding;
 
 /// <summary>

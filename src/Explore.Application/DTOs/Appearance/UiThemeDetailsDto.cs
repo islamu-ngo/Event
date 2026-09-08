@@ -1,6 +1,3 @@
-// ABOUTME: Detail DTO for admin editing of a single UI theme.
-// ABOUTME: Includes both bounded palettes plus the row-version token required for deterministic updates.
-
 namespace Explore.Application.DTOs.Appearance;
 
 public sealed record UiThemeDetailsDto

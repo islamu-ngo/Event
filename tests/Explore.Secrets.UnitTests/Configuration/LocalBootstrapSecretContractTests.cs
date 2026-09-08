@@ -1,5 +1,3 @@
-// ABOUTME: Verifies the deployment-owned Local bootstrap password has one instance-only secret purpose.
-// ABOUTME: Rejects tenant binding and live rotation without introducing source defaults or credential values.
 
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;

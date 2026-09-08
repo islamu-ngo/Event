@@ -1,6 +1,3 @@
-// ABOUTME: Design-time factory for EF Core migrations/scaffolding.
-// ABOUTME: Resolves structured migrator settings through PrimaryDatabaseConfiguration before any provider registration.
-
 using Explore.Persistence.Database;
 using Explore.Secrets.Configuration;
 using Explore.Secrets.Database;

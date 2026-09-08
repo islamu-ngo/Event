@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL query-shape tests for tenant location validation used by anonymous discovery.
-// ABOUTME: Proves exact LocationPii columns are never materialized by the area-validation read path.
-
 using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
@@ -129,7 +126,7 @@ public sealed class LocationDiscoveryRepositoryPrivacyTests(PostgreSqlContainerF
 
     private ExploreDbContext CreateTenantContext(Guid tenantId, DbCommandInterceptor interceptor)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString)
             .UseSnakeCaseNamingConvention()
             .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning))

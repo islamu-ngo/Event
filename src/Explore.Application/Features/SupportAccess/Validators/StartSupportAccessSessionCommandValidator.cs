@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for starting support-access sessions.
-// ABOUTME: Enforces bounded operator-supplied reason, ticket, duration, and target identifiers.
-
 using Explore.Application.Features.SupportAccess.Requests.Commands;
 using Explore.Domain;
 using Explore.Domain.Enums;

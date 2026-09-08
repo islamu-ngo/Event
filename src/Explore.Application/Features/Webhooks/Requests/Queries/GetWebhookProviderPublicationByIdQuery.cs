@@ -1,6 +1,3 @@
-// ABOUTME: Authorized query for one tenant-scoped provider publication and its safe attempt evidence.
-// ABOUTME: Carries only tenant and publication identity into the resource authorization pipeline.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Webhooks;
 using MediatR;

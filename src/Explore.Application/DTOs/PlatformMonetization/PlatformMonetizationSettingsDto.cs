@@ -1,6 +1,3 @@
-// ABOUTME: Defines flat instance-level platform monetization read and complete-replacement update contracts.
-// ABOUTME: Uses basis points and minor units to keep percentage and money values lossless at the API boundary.
-
 namespace Explore.Application.DTOs.PlatformMonetization;
 
 public sealed record PlatformMonetizationSettingsDto

@@ -1,6 +1,3 @@
-// ABOUTME: Real-PostgreSQL acceptance for bounded EventLocation disclosure and exact-read auditing.
-// ABOUTME: Counts SQL and authorization batches while proving tenant-scoped PII joins and no per-row I/O.
-
 using System.Data.Common;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
@@ -290,7 +287,7 @@ public sealed class EventLocationDisclosureBatchTests(RegistrationCoveragePostgr
         Guid tenantId,
         DbCommandInterceptor? interceptor = null)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString)
             .UseSnakeCaseNamingConvention()
             .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning));

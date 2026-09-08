@@ -1,6 +1,3 @@
-// ABOUTME: Implements per-setting transaction-scoped mutation locking for every supported relational provider.
-// ABOUTME: Acquires ordered manifest leases before caller-owned transactions so snapshots start after every wait.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Services;
 using Explore.Domain.Constants;

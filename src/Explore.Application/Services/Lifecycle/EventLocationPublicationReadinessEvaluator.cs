@@ -1,6 +1,3 @@
-// ABOUTME: Adds EventLocation privacy and physical-usability gates to event publication readiness.
-// ABOUTME: Allows explicit TBA while blocking review-required or unusable physical associations.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

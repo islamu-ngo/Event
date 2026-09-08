@@ -1,6 +1,3 @@
-// ABOUTME: Validates optional managed-mode bootstrap settings without affecting standalone Event deployments.
-// ABOUTME: Requires bounded credentials and a secure Control Plane origin only when managed mode is enabled.
-
 using Explore.Application.Management;
 using Microsoft.Extensions.Options;
 

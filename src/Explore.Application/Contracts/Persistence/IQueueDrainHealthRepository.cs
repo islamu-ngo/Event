@@ -1,6 +1,3 @@
-// ABOUTME: Defines tenant-free aggregate readiness data for scheduler-owned durable queue drains.
-// ABOUTME: Exposes bounded counts only, never tenant, payload, provider, destination, DID, or credential data.
-
 namespace Explore.Application.Contracts.Persistence;
 
 public interface IQueueDrainHealthRepository

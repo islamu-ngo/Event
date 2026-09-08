@@ -1,6 +1,3 @@
-// ABOUTME: Validates requested AI data context fields against explicit schema-only allow-lists.
-// ABOUTME: Fails closed for arbitrary EF entity, SQL/LINQ, private content, or model-selected field requests.
-
 namespace Explore.Application.Features.AiAssistant.Context;
 
 public sealed class AiSafeDataContextSummaryPolicy

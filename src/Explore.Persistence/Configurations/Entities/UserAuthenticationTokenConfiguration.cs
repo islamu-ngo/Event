@@ -1,6 +1,3 @@
-// ABOUTME: Maps encrypted tenant-scoped ATProto OAuth session records to PostgreSQL.
-// ABOUTME: Enforces one session per tenant/provider/DID and optimistic concurrency.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

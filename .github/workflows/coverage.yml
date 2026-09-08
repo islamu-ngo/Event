@@ -1,6 +1,3 @@
-# ABOUTME: Advisory artifact-only coverage lane for stable unit test coverage evidence.
-# ABOUTME: Retains Cobertura, TRX, and logs without adding hosted coverage badges or PR-required gates.
-
 name: Coverage Evidence
 
 permissions:

@@ -1,6 +1,3 @@
-// ABOUTME: Safe API evidence for one provider publication or reconciliation attempt.
-// ABOUTME: Exposes normalized outcomes and bounded metadata while omitting payloads and credentials.
-
 namespace Explore.Application.DTOs.Webhooks;
 
 public sealed record WebhookProviderPublicationAttemptDto

@@ -1,6 +1,3 @@
-// ABOUTME: HAL link policies for control-plane tenant lifecycle resources.
-// ABOUTME: Emits only server-authorized tenant fleet and lifecycle affordances.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Security.Claims;

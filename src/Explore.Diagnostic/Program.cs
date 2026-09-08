@@ -1,6 +1,3 @@
-// ABOUTME: Command-line entry point for read-only platform diagnostics.
-// ABOUTME: Runs non-mutating doctor checks and returns a hard-failure exit code only when FAIL checks are present.
-
 using Explore.Diagnostic.AiEvaluation;
 using Explore.Diagnostic.AiReplay;
 using Explore.Diagnostic.Doctor;

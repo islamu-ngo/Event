@@ -1,5 +1,3 @@
-// ABOUTME: Separates anonymous current-address verification from authenticated Local proposed-address authority.
-// ABOUTME: Routes only exact native Local bindings and never accepts another target beside a current session.
 
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;

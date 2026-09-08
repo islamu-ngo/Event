@@ -1,6 +1,3 @@
-// ABOUTME: Command handler for unlocking a previously locked setting, restoring cascade resolution.
-// ABOUTME: Validates scope support and admin authorization before delegating to resolver.
-
 namespace Explore.Application.Features.Settings.Handlers.Commands;
 
 using Explore.Application.Contracts.Identity;

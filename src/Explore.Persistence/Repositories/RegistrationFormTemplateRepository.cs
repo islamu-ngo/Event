@@ -1,6 +1,3 @@
-// ABOUTME: Persists registration-form template catalog rows with platform-readable visibility.
-// ABOUTME: Keeps repositories entity-returning and applies current-tenant/platform bounds in queries.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
 using Explore.Domain;

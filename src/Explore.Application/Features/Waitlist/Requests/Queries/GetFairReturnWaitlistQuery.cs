@@ -1,6 +1,3 @@
-// ABOUTME: Defines the immutable CQRS query for one private fair-return waitlist resource.
-// ABOUTME: Carries route identities and opaque capability while authority remains server-owned.
-
 using Explore.Application.DTOs.Waitlist;
 using MediatR;
 

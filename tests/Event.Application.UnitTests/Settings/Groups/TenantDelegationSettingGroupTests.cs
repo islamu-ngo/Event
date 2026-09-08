@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for tenant delegation lock settings.
-// ABOUTME: Verifies the reporting provider lock defaults closed and can be explicitly opened.
-
 namespace Event.Application.UnitTests.Settings.Groups;
 
 using Explore.Application.Contracts.Infrastructure;

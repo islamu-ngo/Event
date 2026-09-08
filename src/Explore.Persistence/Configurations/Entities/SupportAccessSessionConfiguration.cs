@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for persisted support-access sessions.
-// ABOUTME: Enforces actor/tenant relationships, lifecycle indexes, and optimistic concurrency.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.ValueGenerators;

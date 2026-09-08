@@ -1,6 +1,3 @@
-// ABOUTME: Query request for paginated event-local custom property definition lists.
-// ABOUTME: Scoped to a specific event so organizers see only their event's configuration.
-
 using Explore.Application.DTOs.EventCustomProperty;
 using Explore.Application.Responses;
 using MediatR;

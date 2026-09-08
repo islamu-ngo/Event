@@ -1,6 +1,3 @@
-// ABOUTME: Defines the HAL-authorized admission ticket client boundary for account and guest pages.
-// ABOUTME: Keeps generated API contracts and sensitive recovery outcomes behind one UI service.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.Admissions;

@@ -1,6 +1,3 @@
-// ABOUTME: Builds clean public event URLs from server-owned slug and public code fields.
-// ABOUTME: Keeps public links away from raw event GUIDs while preserving GUID management routes.
-
 using System.Globalization;
 using System.Text;
 

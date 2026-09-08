@@ -1,6 +1,3 @@
-// ABOUTME: Internal workflow result for the Coop decision callback capture stage.
-// ABOUTME: Separates transactional decision capture from post-commit execution dispatch.
-
 using Explore.Application.Responses;
 
 namespace Explore.Application.Features.EventReporting.Models;

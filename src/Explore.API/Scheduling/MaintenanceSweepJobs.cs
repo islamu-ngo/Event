@@ -1,6 +1,3 @@
-// ABOUTME: Quartz jobs for the platform's periodic maintenance sweeps.
-// ABOUTME: Each job owns one iteration; the scheduler owns enablement, cadence, cancellation, and containment.
-
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Webhooks;
@@ -9,6 +6,8 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.OrganizerPaymentConnections;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Managed;
+using Explore.Infrastructure;
+using Explore.Application.Telemetry;
 
 namespace Explore.API.Scheduling;
 
@@ -39,6 +38,31 @@ public sealed class IdempotencyCleanupJob(
 
         await cleanupService.CleanupExpiredAsync(DateTime.UtcNow, context.CancellationToken);
         logger.LogInformation("Scheduled job {JobName} completed.", ScheduledJobNames.IdempotencyCleanup);
+    }
+}
+
+/// <inheritdoc cref="IdempotencyCleanupJob"/>
+[DisallowConcurrentExecution]
+public sealed class AtprotoTransientCleanupJob(
+    AtprotoTransientCleanupService cleanupService,
+    BusinessMetrics metrics,
+    ILogger<AtprotoTransientCleanupJob> logger) : IJob
+{
+    public async Task Execute(IJobExecutionContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        try
+        {
+            var result = await cleanupService.CleanupExpiredAsync(context.CancellationToken);
+            metrics.RecordAtprotoTransientCleanup(true, result.TransientRows, result.ReplayRows);
+        }
+        catch
+        {
+            metrics.RecordAtprotoTransientCleanup(false);
+            throw;
+        }
+        logger.LogInformation("Scheduled job {JobName} completed.", ScheduledJobNames.AtprotoTransientCleanup);
     }
 }
 

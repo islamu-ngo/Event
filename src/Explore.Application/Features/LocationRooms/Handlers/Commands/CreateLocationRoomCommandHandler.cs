@@ -1,6 +1,3 @@
-// ABOUTME: Handler for creating a new room under a location with validation.
-// ABOUTME: Validates location ownership, maps DTO, sets TenantId from parent location.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.LocationRoom.Validators;

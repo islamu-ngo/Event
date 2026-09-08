@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for pagination controls shown below the event grid in Pagination browse mode.
-// ABOUTME: Parameters for current page, total pages, page size, and callbacks for page/size changes.
-
 using Microsoft.AspNetCore.Components;
 
 namespace Explore.Blazor.Client.Pages.Events.Components;

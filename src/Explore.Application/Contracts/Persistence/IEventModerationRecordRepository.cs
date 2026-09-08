@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for event moderation history records.
-// ABOUTME: Exposes entity-first history lookups without leaking EF Core or DTO concerns.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

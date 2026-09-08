@@ -1,6 +1,3 @@
-// ABOUTME: Reporter-facing Blazor service that wraps generated event-report API calls.
-// ABOUTME: Converts HAL collections and ProblemDetails failures into stable UI result models.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.EventReporting;
 using Explore.Blazor.Client.Helpers;

@@ -1,5 +1,3 @@
-// ABOUTME: Verifies durable email-policy revisions and nullable suppression watermarks through real SQLite mutations.
-// ABOUTME: Covers disabled intervals, audit-clock bounds, tenant independence, operator controls, and atomic rollback.
 
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;

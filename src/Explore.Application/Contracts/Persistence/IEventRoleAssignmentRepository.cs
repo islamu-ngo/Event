@@ -1,6 +1,3 @@
-// ABOUTME: Persistence contract for event-scoped operational role assignment lookups.
-// ABOUTME: Keeps authorization handlers and services dependent on Application abstractions, not EF details.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

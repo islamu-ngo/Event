@@ -1,6 +1,3 @@
-// ABOUTME: Defines tenant-scoped reads and acceptance updates for material-change buyer choices.
-// ABOUTME: Keeps entities at the persistence boundary and lets refund reservation own atomic refund choices.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

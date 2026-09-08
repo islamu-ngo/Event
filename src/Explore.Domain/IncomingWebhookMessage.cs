@@ -1,6 +1,3 @@
-// ABOUTME: Owns the tenant-scoped transactional inbox lifecycle for verified incoming webhooks.
-// ABOUTME: Enforces duplicate classification, fenced processing, terminal settlement, and redrive generations.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

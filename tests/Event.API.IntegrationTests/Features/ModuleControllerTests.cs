@@ -1,6 +1,3 @@
-// ABOUTME: API contract tests for module governance endpoints.
-// ABOUTME: Verifies module mutation routes expose write throttling metadata.
-
 using System.Reflection;
 using Explore.API.Controllers;
 using Explore.API.Extensions;

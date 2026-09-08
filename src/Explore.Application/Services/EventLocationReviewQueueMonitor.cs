@@ -1,6 +1,3 @@
-// ABOUTME: Publishes the instance-wide EventLocation privacy remediation backlog to metrics and readiness.
-// ABOUTME: Reads one bounded aggregate count and never materializes EventLocation rows or venue data.
-
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

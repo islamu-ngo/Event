@@ -1,6 +1,3 @@
-// ABOUTME: Verifies external-login bindings are global identity authority independent of tenant context.
-// ABOUTME: Proves repository lookup remains bounded by the exact normalized provider account key.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Infrastructure;

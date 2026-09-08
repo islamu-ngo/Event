@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for safe Guid and int attribute value resolution.
-// ABOUTME: Characterizes accepted runtime shapes and fail-closed conversion failures.
-
 using Explore.Application.Helpers;
 
 namespace Event.Application.UnitTests.Helpers;

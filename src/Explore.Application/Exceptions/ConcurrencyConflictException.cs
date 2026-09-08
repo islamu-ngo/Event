@@ -1,6 +1,3 @@
-// ABOUTME: Application-level exception raised when a write loses an optimistic concurrency race.
-// ABOUTME: Distinct Code values separate technical persistence conflicts from business-level stale sync bases.
-
 namespace Explore.Application.Exceptions;
 
 public class ConcurrencyConflictException : ApplicationException

@@ -1,6 +1,3 @@
-// ABOUTME: Applies analytics taxonomy, consent, and property-governance rules before emission.
-// ABOUTME: Ensures provider calls stay privacy-safe and aligned with the shared event catalog.
-
 using Explore.Application.Analytics;
 using Explore.Application.Models;
 using Explore.Domain.Enums;

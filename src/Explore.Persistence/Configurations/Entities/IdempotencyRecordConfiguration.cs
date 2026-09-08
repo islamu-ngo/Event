@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for IdempotencyRecord entity with unique composite index on (Key, TenantId).
-// ABOUTME: Configures UUID v7 generation, column constraints, and ExpiresAt index for cleanup queries.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

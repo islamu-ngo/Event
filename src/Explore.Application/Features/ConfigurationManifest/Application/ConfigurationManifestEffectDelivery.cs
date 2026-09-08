@@ -1,6 +1,3 @@
-// ABOUTME: Owns transactional manifest-effect enqueue and retry-safe outbox delivery.
-// ABOUTME: Drains prior pending effects before new bootstrap work so startup failures survive restarts.
-
 namespace Explore.Application.Features.ConfigurationManifest.Application;
 
 using Explore.Application.Contracts.Persistence;

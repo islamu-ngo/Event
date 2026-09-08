@@ -1,6 +1,3 @@
-// ABOUTME: Verifies SSH-signed annotated non-SemVer changelog baseline tags.
-// ABOUTME: Writes deterministic baseline evidence without creating, moving, or mutating Git tags.
-
 using System.Diagnostics;
 using System.Globalization;
 using System.Security.Cryptography;
@@ -58,7 +55,8 @@ public static class BaselineCommand
             TrustPolicyResult authorization = SshSignerPolicy.Authorize([signer], new SshTagAuthorizationRequest(true, true, verification.Principal, "release", signer.KeyFingerprint, signer.Algorithm, verificationDate, expectedTagObjectId, observedTagObjectId, ExistingTagObjectId(root, baselineRef)));
             if (!authorization.IsValid) return Reject(output, authorization.Diagnostic!);
 
-            string evidencePath = Path.Combine(root, "docs", "releases", "baselines", baselineRef + ".v1.json");
+            string baselineFileName = Path.GetFileName(baselineRef + ".v1.json");
+            string evidencePath = Path.Join(Path.GetFullPath(root), "docs", "internal", "releases", "baselines", baselineFileName);
             Directory.CreateDirectory(Path.GetDirectoryName(evidencePath)!);
             byte[] manifest = BuildManifest(baselineRef, targetOid, observedTagObjectId, signer);
             if (File.Exists(evidencePath))
@@ -157,7 +155,8 @@ public static class BaselineCommand
 
     private static string? ExistingTagObjectId(string root, string baselineRef)
     {
-        string path = Path.Combine(root, "docs", "releases", "baselines", baselineRef + ".v1.json");
+        string baselineFileName = Path.GetFileName(baselineRef + ".v1.json");
+        string path = Path.Join(Path.GetFullPath(root), "docs", "internal", "releases", "baselines", baselineFileName);
         if (!File.Exists(path)) return null;
         using JsonDocument document = JsonDocument.Parse(ReadFileBounded(path));
         return document.RootElement.TryGetProperty("tagObjectId", out JsonElement value) ? value.GetString() : null;

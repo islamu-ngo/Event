@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for the external API Phase 0 authentication and tenant seam.
-// ABOUTME: Covers direct JWT, API-key-derived tenant resolution, mismatch rejection, and single-tenant short-circuit behavior.
-
 using System.Net;
 using System.Net.Http.Json;
 using Event.Api.IntegrationTests.Fixtures;

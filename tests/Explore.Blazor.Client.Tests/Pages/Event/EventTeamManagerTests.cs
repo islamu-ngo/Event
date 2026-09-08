@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for EventTeamManager authorization-driven affordances.
-// ABOUTME: Ensures read-only team visibility does not expose assign or revoke actions.
-
 using Explore.Blazor.Client.Helpers;
 using Explore.Blazor.Client.Pages.Events.Components;
 using MudBlazor;

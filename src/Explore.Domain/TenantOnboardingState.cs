@@ -1,6 +1,3 @@
-// ABOUTME: Tracks per-tenant onboarding completion state for tenant policy initialization.
-// ABOUTME: Allows startup flow to prompt tenant admins until tenant onboarding is completed.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

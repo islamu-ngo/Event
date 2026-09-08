@@ -1,6 +1,3 @@
-// ABOUTME: Entity-returning persistence boundary for registration-form template catalog rows.
-// ABOUTME: Exposes platform-readable and tenant-isolated template reads plus tracked mutation operations.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

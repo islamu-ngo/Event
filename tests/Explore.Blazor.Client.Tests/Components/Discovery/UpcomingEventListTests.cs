@@ -1,6 +1,3 @@
-// ABOUTME: Focused bUnit coverage for the compact public-home upcoming-event update list.
-// ABOUTME: Verifies vertical column grouping, accessible event links, metadata, and image fallback.
-
 using Explore.Blazor.Client.Components.Discovery;
 
 namespace Explore.Blazor.Client.Tests.Components.Discovery;

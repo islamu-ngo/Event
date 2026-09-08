@@ -1,6 +1,3 @@
-// ABOUTME: Validates bounded server-private ATProto bridge input before any PDS or database work.
-// ABOUTME: Rejects malformed DID, PDS, key identifiers, and oversized OAuth session envelopes.
-
 using Explore.Application.Features.Authentication.Atproto.Requests.Commands;
 using Explore.Domain.ValueObjects;
 using FluentValidation;

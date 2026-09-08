@@ -1,4 +1,3 @@
-// ABOUTME: Contract for resolving Cerbos PDP configuration from the cascading settings engine.
 // Supports BYO (Bring Your Own) Cerbos per tenant and instance-managed isolation.
 
 using Explore.Application.Models;

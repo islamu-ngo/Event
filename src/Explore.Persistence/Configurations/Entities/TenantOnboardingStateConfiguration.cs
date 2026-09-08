@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for tenant onboarding state persistence.
-// ABOUTME: Ensures each tenant has at most one onboarding completion marker.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

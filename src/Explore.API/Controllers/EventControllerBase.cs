@@ -1,6 +1,3 @@
-// ABOUTME: Abstract base controller exposing request-scoped identity and concurrency parsing to API actions.
-// ABOUTME: Derives identity from the request principal so no controller resolves services or parses claims.
-
 using Explore.Application.Authentication;
 using Microsoft.AspNetCore.Mvc;
 
@@ -37,12 +34,12 @@ public abstract class EventControllerBase : ControllerBase
         }
 
         var value = ifMatch.Trim();
-        if (value.StartsWith("W/", StringComparison.OrdinalIgnoreCase))
+        if (value.Length != 38 || value[0] != '"' || value[^1] != '"')
         {
             return false;
         }
 
-        value = value.Trim('"');
-        return Guid.TryParse(value, out concurrencyStamp) && concurrencyStamp != Guid.Empty;
+        return Guid.TryParseExact(value.AsSpan(1, 36), "D", out concurrencyStamp)
+            && concurrencyStamp != Guid.Empty;
     }
 }

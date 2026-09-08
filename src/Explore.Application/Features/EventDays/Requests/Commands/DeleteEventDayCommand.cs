@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for soft-deleting an EventDay.
-// ABOUTME: Secured via AuthorizeResource for the event_day resource kind.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

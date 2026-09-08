@@ -1,6 +1,3 @@
-// ABOUTME: Read DTO for one shared Layer 3 custom-property definition with its option payload.
-// ABOUTME: Used by admin details flows for organization and group extension catalogs.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.DTOs.CustomPropertyDefinition;

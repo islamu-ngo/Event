@@ -1,6 +1,3 @@
-// ABOUTME: Authorized query for one webhook consumer management record.
-// ABOUTME: Requires the authorization pipeline to resolve the persisted consumer owner.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Webhooks;
 using MediatR;

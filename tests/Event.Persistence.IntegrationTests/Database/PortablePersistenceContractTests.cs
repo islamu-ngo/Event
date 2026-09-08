@@ -1,6 +1,3 @@
-// ABOUTME: Directly verifies portable provider, naming, and conflict-classification decisions.
-// ABOUTME: Covers portable persistence decisions without exercising migrations or raw SQL primitives.
-
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Domain;

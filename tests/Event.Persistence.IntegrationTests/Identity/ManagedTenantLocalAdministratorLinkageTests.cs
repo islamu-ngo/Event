@@ -1,5 +1,3 @@
-// ABOUTME: Exercises managed Local administrator linkage with native SQLite Identity and application persistence.
-// ABOUTME: Guards exact shared identity, current authority, replay after replacement/reset, and transactional grants.
 
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -391,7 +389,7 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
                 identity.AddEntityFrameworkStores<ExternalIdentityDbContext>();
             }
             else identity.AddEntityFrameworkStores<ExploreDbContext>();
-            Provider = services.BuildServiceProvider();
+            Provider = services.BuildIsolatedServiceProvider();
             SignIn(Administrator);
             await using (var seed = Provider.CreateAsyncScope())
             {

@@ -1,6 +1,3 @@
-<!-- ABOUTME: Identifies the Noto Sans Arabic font embedded in Explore.API for deterministic OG image rendering. -->
-<!-- ABOUTME: Records immutable upstream provenance and the accompanying SIL Open Font License. -->
-
 # Noto Sans Arabic
 
 `NotoSansArabic[wdth,wght].ttf` is the unmodified variable font from

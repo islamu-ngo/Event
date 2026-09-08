@@ -1,6 +1,3 @@
-// ABOUTME: Normalized lookup entity classifying the physical kind of a location.
-// ABOUTME: The row carries descriptive metadata only and grants no disclosure authority.
-
 namespace Explore.Domain;
 
 public sealed class LocationKind

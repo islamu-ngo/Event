@@ -1,6 +1,3 @@
-// ABOUTME: Handles local moderator decision capture for assigned event-report cases.
-// ABOUTME: Records safe decision metadata, enforces assignment ownership, and marks decisions ready for execution.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventReporting.Requests.Commands;

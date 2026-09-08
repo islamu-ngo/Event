@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped CSS for EventDetail page layout.
-   ABOUTME: Handles hero image sizing and responsive adjustments. */
-
 .event-detail-wrapper {
     --event-detail-container-gutter: var(--isl-space-4);
     min-height: 100vh;

@@ -1,5 +1,3 @@
-// ABOUTME: Defines the purpose-restricted post-confirmation guest status query and authorized DTO mapping.
-// ABOUTME: Keeps capability formatting redacted and tenant authority outside caller-supplied request data.
 
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

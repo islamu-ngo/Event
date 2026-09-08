@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos policy tests for organizer-claim evidence and review authority.
-# ABOUTME: Proves review authority and claimant-controlled withdrawal boundaries.
-
 name: EventOrganizerClaimPolicyTests
 description: "Validates organizer-claim policy boundaries"
 

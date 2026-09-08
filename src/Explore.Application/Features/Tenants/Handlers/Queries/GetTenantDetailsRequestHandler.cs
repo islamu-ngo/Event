@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning full tenant details by ID.
-// ABOUTME: Maps Tenant entity to TenantDto.
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Tenant;

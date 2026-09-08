@@ -1,6 +1,3 @@
-// ABOUTME: Exposes grouped organizer-merchant, tenant-directory, and instance-operator evidence before paid Checkout.
-// ABOUTME: Carries only a revision and explicit acknowledgement back; browser values never author activation facts.
-
 namespace Explore.Application.DTOs.RegistrationOrders;
 
 public sealed record PaidOrderAcceptanceDisclosureDto

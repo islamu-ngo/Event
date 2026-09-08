@@ -1,6 +1,3 @@
-// ABOUTME: Maps the split one-to-one PII extension for registration participants.
-// ABOUTME: Uses tenant-qualified participant lineage so PII cannot cross tenant boundaries.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

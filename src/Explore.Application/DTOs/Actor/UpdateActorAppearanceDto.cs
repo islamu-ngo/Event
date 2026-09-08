@@ -1,6 +1,3 @@
-// ABOUTME: Actor appearance update group with explicit field-operation semantics.
-// ABOUTME: OptionalUpdate distinguishes absent fields from intentional clear/set operations.
-
 using Explore.Application.Models.Common;
 
 namespace Explore.Application.DTOs.Actor;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines the canonical named-lock set for instance branding governance.
-// ABOUTME: Keeps ordinary branding commands and configuration-manifest preflight on one authority fence.
-
 namespace Explore.Application.Settings;
 
 using Explore.Domain.Constants;

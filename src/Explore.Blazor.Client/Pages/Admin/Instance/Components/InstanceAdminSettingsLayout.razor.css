@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped CSS for InstanceAdminSettingsLayout matching the SettingsLayout design. */
-/* ABOUTME: Google Account Settings-inspired sidebar navigation with responsive breakpoints. */
-
 .settings-layout {
     background: var(--mud-palette-background);
 }

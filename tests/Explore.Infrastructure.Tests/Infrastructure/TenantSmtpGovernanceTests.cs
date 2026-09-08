@@ -1,5 +1,3 @@
-// ABOUTME: Rejects dormant tenant SMTP mutations while instance delegation is locked.
-// ABOUTME: Exercises real settings repositories, shared mutation locks, and effective metadata.
 
 using SmtpSettingsDatabase = Explore.Tests.Shared.Settings.SmtpSettingsDatabase;
 using Explore.Application.Contracts.Persistence;

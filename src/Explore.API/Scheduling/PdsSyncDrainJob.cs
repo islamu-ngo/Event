@@ -1,6 +1,3 @@
-// ABOUTME: Runs one bounded AT Protocol PDS outbox drain pass under Quartz.
-// ABOUTME: Leaves leases, gates, provider I/O, retries, and fenced settlement in Infrastructure.
-
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Contracts.Services;
 using Quartz;

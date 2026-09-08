@@ -1,6 +1,3 @@
-// ABOUTME: Contract for redacting AI context field values before persistence or logging.
-// ABOUTME: Applies AiContextDisclosureRegistry rules in reverse to ensure PII never leaks.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Features.AiAssistant.Disclosure;

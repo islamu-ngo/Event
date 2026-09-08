@@ -1,6 +1,3 @@
-// ABOUTME: Handles creation of shared Layer 3 custom-property definitions with governance enforcement and option persistence.
-// ABOUTME: Keeps handlers thin by delegating identity policy to ICustomPropertyGovernancePolicy and persistence to a focused repository.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

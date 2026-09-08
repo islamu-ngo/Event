@@ -1,6 +1,3 @@
-// ABOUTME: Defines tenant-scoped administrative registration-answer-file queries and safe DTO mapping.
-// ABOUTME: Keeps quarantined storage details out of public API contracts.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Registration;
 using Explore.Domain;

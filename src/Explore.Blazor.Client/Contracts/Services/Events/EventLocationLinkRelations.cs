@@ -1,6 +1,3 @@
-// ABOUTME: Names the HAL relations the EventLocation surface publishes for affordance gating.
-// ABOUTME: Components compare against these constants so a renamed server relation fails to compile.
-
 namespace Explore.Blazor.Client.Contracts.Services.Events;
 
 /// <summary>

@@ -1,6 +1,3 @@
-// ABOUTME: Exhaustive Application contract tests for reporting-intake publication-safety evaluation.
-// ABOUTME: Covers every effective policy state, stable reason codes, and monotonic safety transitions.
-
 namespace Event.Application.UnitTests.Settings;
 
 using Explore.Application.Settings;

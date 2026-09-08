@@ -1,6 +1,3 @@
-// ABOUTME: Executes event-public-action test transactions through one shared serial gate.
-// ABOUTME: Makes concurrent handler tests observe the production transaction boundary without provider dependencies.
-
 using Explore.Application.Contracts.Persistence;
 
 namespace Event.Application.UnitTests.Features.EventPublicActions.Commands;

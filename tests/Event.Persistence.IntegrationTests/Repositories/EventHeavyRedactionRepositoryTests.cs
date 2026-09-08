@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL integration tests for the tracked graph used by heavy event redaction.
-// ABOUTME: Verifies EF loading and SaveChanges persist redacted event fields and storage deletion state.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Authorization;
 using Explore.Application.Features.Events.Moderation;

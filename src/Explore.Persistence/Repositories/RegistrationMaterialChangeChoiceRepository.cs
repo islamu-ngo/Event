@@ -1,6 +1,3 @@
-// ABOUTME: Reads tenant-bound material-change choices and records immutable buyer acceptance.
-// ABOUTME: Uses optimistic concurrency so concurrent contradictory choices fail closed.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

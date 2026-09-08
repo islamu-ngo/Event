@@ -1,6 +1,3 @@
-// ABOUTME: Selects the EF Core provider and migrations assembly for the configured primary database.
-// ABOUTME: Keeps runtime, design-time, migration, and Data Protection composition on one closed switch.
-
 using Explore.Persistence.Schema;
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;

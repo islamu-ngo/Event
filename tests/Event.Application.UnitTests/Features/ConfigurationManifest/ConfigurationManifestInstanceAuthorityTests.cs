@@ -1,6 +1,3 @@
-// ABOUTME: Specifies the closed v1alpha2 instance-setting authority boundary before implementation.
-// ABOUTME: Proves unsafe and wrong-scope values fail with safe codes before an apply plan exists.
-
 namespace Event.Application.UnitTests.Features.ConfigurationManifest;
 
 using System.Reflection;

@@ -1,6 +1,3 @@
-// ABOUTME: Specifies role-scoped legal document lifecycle and portability invariants.
-// ABOUTME: Rejects unsafe Markdown, fabricated acceptance, and source-selected target authority.
-
 namespace Event.Domain.UnitTests.ConfigurationManifest;
 
 using System.Collections;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines one scoped runtime registration attempt backed by a hashed guest capability.
-// ABOUTME: Pins order, workflow, requirement, channel, form, expiry, consumption, and supersession facts.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 using Explore.Domain.ValueObjects;

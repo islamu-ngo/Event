@@ -1,6 +1,3 @@
-// ABOUTME: Defines how an open docked panel is projected when a dock host enters mobile layout.
-// ABOUTME: Separates durable open intent from the mobile presentation shell used by renderers.
-
 namespace Explore.Blazor.Client.Services.Docking;
 
 public sealed record DockPanelMobilePresentation

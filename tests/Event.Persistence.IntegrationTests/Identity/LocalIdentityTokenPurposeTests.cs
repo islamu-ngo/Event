@@ -1,5 +1,3 @@
-// ABOUTME: Exercises native Local lifecycle tokens and transactional authority over both SQLite Identity topologies.
-// ABOUTME: Reuses real credential provisioning/binding; only clocks, ephemeral secrets and explicit race signals are controlled.
 
 using System.Data.Common;
 using System.Security.Cryptography;

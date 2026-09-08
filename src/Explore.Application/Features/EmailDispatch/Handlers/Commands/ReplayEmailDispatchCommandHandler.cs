@@ -1,6 +1,3 @@
-// ABOUTME: Handles operator replay of eligible EmailDispatch outbox rows by resetting durable retry state.
-// ABOUTME: Keeps replay semantics PostgreSQL-owned and transport-agnostic for Basic and RabbitMQ dispatch modes.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using Explore.Application.Features.EmailDispatch.Validators;

@@ -1,6 +1,3 @@
-// ABOUTME: Strictly parses and normalizes provider-neutral registration values into typed canonical values.
-// ABOUTME: Rejects type coercion, HTML-bearing text, malformed identifiers, and configured field-boundary violations.
-
 using System.Globalization;
 using System.Net.Mail;
 using System.Text;

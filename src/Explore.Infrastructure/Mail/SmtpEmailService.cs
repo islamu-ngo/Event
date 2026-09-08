@@ -1,6 +1,3 @@
-// ABOUTME: MailKit-based email service implementation that resolves cascading per-tenant SMTP configuration.
-// ABOUTME: Emits fixed non-PII transport telemetry while returning sanitized provider outcomes to callers.
-
 using System.Diagnostics;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Models;

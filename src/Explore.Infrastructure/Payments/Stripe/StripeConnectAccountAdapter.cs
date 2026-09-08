@@ -1,6 +1,3 @@
-// ABOUTME: Stripe Connect implementation of the organizer payment onboarding port.
-// ABOUTME: Keeps Stripe SDK types, secrets, retries, and failure mapping inside Infrastructure.
-
 using System.Net;
 using System.Text.Json;
 using Explore.Application.Contracts.Secrets;

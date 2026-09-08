@@ -1,6 +1,3 @@
-// ABOUTME: Real PostgreSQL acceptance tests for EventLocation dual-write carrier behavior.
-// ABOUTME: Proves races, physical-key integrity, final detach, fresh reattach, moves, and rollback.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
@@ -315,7 +312,9 @@ public sealed class EventLocationDualWriteTests(PostgreSqlContainerFixture fixtu
     }
 
     [Test]
-    public async Task ConcurrentGroupAndSessionAgendaFinalDetachRetiresOrphanedAssociation()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ConcurrentGroupAndSessionAgendaFinalDetachRetiresOrphanedAssociation(bool rejectGroupDelete)
     {
         await fixture.ResetAsync();
         DualWriteGraph graph = await SeedGraphAsync();
@@ -349,6 +348,7 @@ public sealed class EventLocationDualWriteTests(PostgreSqlContainerFixture fixtu
         }
 
         var bothDeletesSaved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         int deleteCount = 0;
         Task DeleteGroupAsync() => DeleteAfterBarrierAsync<EventSessionGroup>(
             groupId,
@@ -362,22 +362,50 @@ public sealed class EventLocationDualWriteTests(PostgreSqlContainerFixture fixtu
         {
             await using var context = CreateTenantContext(graph.TenantId);
             var service = CreateService(context, graph);
-            await new EfCoreUnitOfWork(context).ExecuteInTransactionAsync(async token =>
+            try
             {
-                TCarrier carrier = await context.Set<TCarrier>().SingleAsync(
-                    item => EF.Property<Guid>(item, "Id") == id,
-                    token);
-                prepareDelete(carrier);
-                context.Remove(carrier);
-                await context.SaveChangesAsync(token);
-                if (Interlocked.Increment(ref deleteCount) == 2)
+                await new EfCoreUnitOfWork(context).ExecuteInTransactionAsync(async token =>
                 {
-                    bothDeletesSaved.SetResult();
-                }
+                    TCarrier carrier = await context.Set<TCarrier>().SingleAsync(
+                        item => EF.Property<Guid>(item, "Id") == id,
+                        token);
+                    prepareDelete(carrier);
+                    context.Remove(carrier);
+                    await context.SaveChangesAsync(token);
+                    if (rejectGroupDelete && typeof(TCarrier) == typeof(EventSessionGroup))
+                    {
+                        throw new InvalidOperationException("Synthetic detach failure.");
+                    }
+                    if (Interlocked.Increment(ref deleteCount) == 2)
+                    {
+                        bothDeletesSaved.TrySetResult();
+                    }
 
-                await bothDeletesSaved.Task.WaitAsync(token);
-                await service.DetachIfUnreferencedAsync(placementId, token);
-            }, CancellationToken.None);
+                    await bothDeletesSaved.Task.WaitAsync(token);
+                    await service.DetachIfUnreferencedAsync(placementId, token);
+                }, cancellation.Token);
+            }
+            catch (Exception exception)
+            {
+                bothDeletesSaved.TrySetException(exception);
+                throw;
+            }
+        }
+
+        if (rejectGroupDelete)
+        {
+            InvalidOperationException? failure = await Assert.That(async () => await Task.WhenAll(DeleteGroupAsync(), DeleteSessionAgendaAsync()))
+                .Throws<InvalidOperationException>();
+            await Assert.That(failure!.Message).IsEqualTo("Synthetic detach failure.");
+            await using var retainedContext = CreateTenantContext(graph.TenantId);
+            EventSessionGroup retainedGroup = await retainedContext.EventSessionGroups.SingleAsync(item => item.Id == groupId);
+            EventSessionAgendaItem retainedAgenda = await retainedContext.EventSessionAgendaItems.SingleAsync(item => item.Id == sessionAgendaId);
+            await Assert.That(retainedGroup.EventLocationId).IsEqualTo(placementId);
+            await Assert.That(retainedGroup.LocationId).IsEqualTo(graph.LocationOneId);
+            await Assert.That(retainedAgenda.EventLocationId).IsEqualTo(placementId);
+            await Assert.That(retainedAgenda.LocationId).IsEqualTo(graph.LocationOneId);
+            await Assert.That(await retainedContext.EventLocations.AnyAsync(item => item.Id == placementId)).IsTrue();
+            return;
         }
 
         await Task.WhenAll(DeleteGroupAsync(), DeleteSessionAgendaAsync());
@@ -599,6 +627,16 @@ public sealed class EventLocationDualWriteTests(PostgreSqlContainerFixture fixtu
             await context.SaveChangesAsync(token);
             await service.DetachIfUnreferencedAsync(eventLocationId, token);
         }, CancellationToken.None);
+
+        if (carrier is EventSession or EventSessionGroup or EventAgendaItem)
+        {
+            var entry = context.Entry(carrier);
+            await entry.ReloadAsync();
+            await Assert.That(entry.Property<bool>(nameof(EventSession.IsDeleted)).CurrentValue).IsTrue();
+            await Assert.That(entry.Property<Guid?>(nameof(EventSession.EventLocationId)).CurrentValue).IsNull();
+            await Assert.That(entry.Property<Guid?>(nameof(EventSession.LocationId)).CurrentValue).IsNull();
+            await Assert.That(entry.Property<Guid?>(nameof(EventSession.RoomId)).CurrentValue).IsNull();
+        }
     }
 
     private async Task AssertZeroCarrierGapsAsync()

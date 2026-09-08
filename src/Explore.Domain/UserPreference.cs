@@ -1,4 +1,3 @@
-// ABOUTME: User-specific preference for the hierarchical settings engine.
 // Allows users to customize settings unless locked at a higher scope.
 
 namespace Explore.Domain;

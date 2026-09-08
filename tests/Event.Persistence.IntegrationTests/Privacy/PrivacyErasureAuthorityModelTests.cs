@@ -1,6 +1,3 @@
-// ABOUTME: Verifies generalized privacy-erasure EF models, retained composition, and function-only ACL contracts.
-// ABOUTME: Pins User-only fact retention, replay coverage keys, receipt hashing, and topology isolation.
-
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Domain;
 using Explore.Infrastructure;
@@ -26,7 +23,7 @@ public sealed class PrivacyErasureAuthorityModelTests
     [Test]
     public async Task RetainedAuthorityModel_IsMinimizedTypedAndRetentionBounded()
     {
-        var options = new DbContextOptionsBuilder<PrivacyErasureAuthorityDbContext>()
+        var options = TestDbContextOptions.Create<PrivacyErasureAuthorityDbContext>()
             .UseNpgsql("Host=localhost;Database=model_only;Username=unused;Password=unused")
             .UseSnakeCaseNamingConvention()
             .Options;
@@ -85,7 +82,7 @@ public sealed class PrivacyErasureAuthorityModelTests
     [Test]
     public async Task DataProtectionModel_RemainsUnchanged()
     {
-        var options = new DbContextOptionsBuilder<DataProtectionKeyContext>()
+        var options = TestDbContextOptions.Create<DataProtectionKeyContext>()
             .UseNpgsql("Host=localhost;Database=model_only;Username=unused;Password=unused")
             .UseSnakeCaseNamingConvention()
             .Options;
@@ -206,11 +203,11 @@ public sealed class PrivacyErasureAuthorityModelTests
     {
         await using ExploreDbContext application = CreateExploreContext();
         await using var external = new PrivacyErasureAuthorityDbContext(
-            new DbContextOptionsBuilder<PrivacyErasureAuthorityDbContext>()
+            TestDbContextOptions.Create<PrivacyErasureAuthorityDbContext>()
                 .UseNpgsql("Host=localhost;Database=model_only;Username=unused;Password=unused")
                 .UseSnakeCaseNamingConvention()
                 .Options);
-        var coLocatedOptions = new DbContextOptionsBuilder<CoLocatedPrivacyErasureAuthorityDbContext>();
+        var coLocatedOptions = TestDbContextOptions.Create<CoLocatedPrivacyErasureAuthorityDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureCoLocatedPrivacyErasureAuthority(
             coLocatedOptions,
             new PrimaryDatabaseConnectionOptions
@@ -227,7 +224,7 @@ public sealed class PrivacyErasureAuthorityModelTests
         await using var coLocated = new CoLocatedPrivacyErasureAuthorityDbContext(
             coLocatedOptions.Options);
         await using var embedded = new EmbeddedPrivacyErasureAuthorityDbContext(
-            new DbContextOptionsBuilder<EmbeddedPrivacyErasureAuthorityDbContext>()
+            TestDbContextOptions.Create<EmbeddedPrivacyErasureAuthorityDbContext>()
                 .UseSqlite("Data Source=:memory:")
                 .Options);
 
@@ -246,9 +243,10 @@ public sealed class PrivacyErasureAuthorityModelTests
     }
 
     [Test]
+    [TUnit.Core.Executors.TestExecutor<FreshEfProcessExecutor>]
     public async Task AuthorityTopologies_HaveExactMigrationOwnersAndHistoryNamespaces()
     {
-        var embeddedOptions = new DbContextOptionsBuilder<EmbeddedPrivacyErasureAuthorityDbContext>();
+        var embeddedOptions = TestDbContextOptions.Create<EmbeddedPrivacyErasureAuthorityDbContext>();
         EmbeddedPrivacyErasureAuthorityDbContextFactory.Configure(
             embeddedOptions,
             new EmbeddedPrivacyErasureAuthorityOptions
@@ -258,7 +256,7 @@ public sealed class PrivacyErasureAuthorityModelTests
         await using var embedded = new EmbeddedPrivacyErasureAuthorityDbContext(embeddedOptions.Options);
 
         var coLocatedSqliteOptions =
-            new DbContextOptionsBuilder<EmbeddedPrivacyErasureAuthorityDbContext>();
+            TestDbContextOptions.Create<EmbeddedPrivacyErasureAuthorityDbContext>();
         EmbeddedPrivacyErasureAuthorityDbContextFactory.ConfigureCoLocated(
             coLocatedSqliteOptions,
             new PrimaryDatabaseConnectionOptions
@@ -268,7 +266,7 @@ public sealed class PrivacyErasureAuthorityModelTests
                 Database = "model-only.db"
             });
 
-        var coLocatedOptions = new DbContextOptionsBuilder<CoLocatedPrivacyErasureAuthorityDbContext>();
+        var coLocatedOptions = TestDbContextOptions.Create<CoLocatedPrivacyErasureAuthorityDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureCoLocatedPrivacyErasureAuthority(
             coLocatedOptions,
             new PrimaryDatabaseConnectionOptions
@@ -350,7 +348,7 @@ public sealed class PrivacyErasureAuthorityModelTests
 
     private static ExploreDbContext CreateExploreContext()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql("Host=localhost;Database=model_only;Username=unused;Password=unused")
             .UseSnakeCaseNamingConvention()
             .Options;

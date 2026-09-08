@@ -1,6 +1,3 @@
-// ABOUTME: Tests cryptographic issuance and matching for guest capability-token primitives.
-// ABOUTME: Verifies opaque URL-safe tokens, hash-only results, fail-closed matches, and the minimal contract.
-
 using System.Reflection;
 using Explore.Application.Contracts.Services;
 using Explore.Domain.ValueObjects;

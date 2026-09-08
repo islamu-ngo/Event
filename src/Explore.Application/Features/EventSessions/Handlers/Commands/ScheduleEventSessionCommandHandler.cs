@@ -1,6 +1,3 @@
-// ABOUTME: Handler for assigning a concrete schedule to an existing event session.
-// ABOUTME: Persists retry-safe schedule changes, parent summaries, and published attendee fanout atomically.
-
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

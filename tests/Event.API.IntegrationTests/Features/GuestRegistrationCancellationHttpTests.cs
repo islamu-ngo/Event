@@ -1,5 +1,3 @@
-// ABOUTME: Verifies private confirmed-guest cancellation through real HTTP, challenge allocation and SQLite.
-// ABOUTME: Guards capability-only authority, aggregate idempotence, live HAL actions and bounded failure responses.
 
 using System.Net;
 using System.Security.Cryptography;

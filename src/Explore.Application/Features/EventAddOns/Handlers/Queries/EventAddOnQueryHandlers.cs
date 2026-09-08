@@ -1,6 +1,3 @@
-// ABOUTME: Implements add-on catalog, selection, fulfillment, refund, and read CQRS authority.
-// ABOUTME: Keeps tenant, organizer, buyer, prices, totals, inventory, and replay server-owned.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

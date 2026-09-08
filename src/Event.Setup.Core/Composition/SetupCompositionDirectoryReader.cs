@@ -1,6 +1,3 @@
-// ABOUTME: Captures and revalidates bounded Linux directory snapshots through no-link file handles.
-// ABOUTME: Rejects unsafe identity, path ambiguity, mutation, and unsupported filesystem semantics before publication.
-
 namespace ISLAMU.Event.Setup.Core.Composition;
 
 using System.Runtime.InteropServices;

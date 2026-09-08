@@ -1,6 +1,3 @@
-// ABOUTME: Maps tenant/user/source ownership for records published by local lifecycle authority.
-// ABOUTME: Enforces one outbound record per tenant aggregate while canonical record identity stays global.
-
 using Explore.Domain.Federation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

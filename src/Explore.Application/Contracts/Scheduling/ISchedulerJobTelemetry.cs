@@ -1,6 +1,3 @@
-// ABOUTME: Narrow port for recording one scheduled job execution's outcome and duration.
-// ABOUTME: Segregates the scheduler's telemetry need from the platform's full business-metrics surface.
-
 namespace Explore.Application.Contracts.Scheduling;
 
 /// <summary>

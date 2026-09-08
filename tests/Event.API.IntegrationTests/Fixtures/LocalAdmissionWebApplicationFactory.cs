@@ -1,5 +1,3 @@
-// ABOUTME: Hosts production Local, OIDC, and ATProto authentication with real account persistence over isolated SQLite.
-// ABOUTME: Separates ephemeral Local environment authority from external issuer public metadata and signing material.
 
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;

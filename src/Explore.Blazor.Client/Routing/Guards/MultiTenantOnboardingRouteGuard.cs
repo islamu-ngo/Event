@@ -1,6 +1,3 @@
-// ABOUTME: Route guard for first-run instance onboarding and multi-tenant-only onboarding routes.
-// ABOUTME: Keeps completed single-tenant deployments out while allowing launch onboarding to finish.
-
 using Blazouter.Interfaces;
 using Blazouter.Models;
 using Explore.Blazor.Client.Services;

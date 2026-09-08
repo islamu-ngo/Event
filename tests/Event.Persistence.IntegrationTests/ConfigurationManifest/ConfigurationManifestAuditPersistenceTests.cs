@@ -1,6 +1,3 @@
-// ABOUTME: Verifies configuration-manifest audit persistence is safe, append-oriented, and tenant isolated.
-// ABOUTME: Proves failed operations survive through a fresh context without reviving rolled-back writes.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -24,7 +21,7 @@ public sealed class ConfigurationManifestAuditPersistenceTests
     [Test]
     public async Task Model_StoresOnlyBoundedSafeAuditMetadata()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite("Data Source=:memory:")
             .UseSnakeCaseNamingConvention()
             .Options;
@@ -175,7 +172,7 @@ public sealed class ConfigurationManifestAuditPersistenceTests
         string connectionString = $"Data Source={databasePath}";
         try
         {
-            DbContextOptions<ExploreDbContext> options = new DbContextOptionsBuilder<ExploreDbContext>()
+            DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>()
                 .UseSqlite(connectionString)
                 .UseSnakeCaseNamingConvention()
                 .Options;
@@ -254,7 +251,7 @@ public sealed class ConfigurationManifestAuditPersistenceTests
     private static ExploreDbContext CreateContext(SqliteConnection connection, Guid? tenantId = null)
     {
         var context = new ExploreDbContext(
-            new DbContextOptionsBuilder<ExploreDbContext>()
+            TestDbContextOptions.Create<ExploreDbContext>()
                 .UseSqlite(connection)
                 .UseSnakeCaseNamingConvention()
                 .Options);

@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped styles for render-policy preset cards and advanced controls in InstanceGovernanceSection. */
-/* ABOUTME: Highlights the recommended preset and selected state while preserving admin settings visual language. */
-
 .instance-governance__preset-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

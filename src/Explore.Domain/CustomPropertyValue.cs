@@ -1,6 +1,3 @@
-// ABOUTME: Shared Layer 3 custom-property value for an organization or group entity instance.
-// ABOUTME: Uses one row per value with Ordinal for deterministic multi-value ordering.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

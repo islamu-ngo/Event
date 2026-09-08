@@ -1,5 +1,3 @@
-// ABOUTME: Reads durable Local credential status without activating or replacing credentials.
-// ABOUTME: Rechecks fresh instance authority before disclosing operation audit information.
 
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;

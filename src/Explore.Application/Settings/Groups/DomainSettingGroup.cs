@@ -1,6 +1,3 @@
-// ABOUTME: Strongly-typed Domain configuration setting group resolved via batch loading.
-// ABOUTME: Keys align to DomainSettingDefinitions via GovernanceSettingKeys.Domains.
-
 namespace Explore.Application.Settings.Groups;
 
 using Explore.Application.Contracts.Infrastructure;

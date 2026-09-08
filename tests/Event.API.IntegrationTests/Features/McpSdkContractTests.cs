@@ -1,6 +1,3 @@
-// ABOUTME: Reflection tests for the official C# MCP SDK contract surface.
-// ABOUTME: Ensures tools, resources, prompts, and exposed parameters stay LLM-descriptive.
-
 using System.ComponentModel;
 using System.Reflection;
 using Event.Api.IntegrationTests.Fixtures;

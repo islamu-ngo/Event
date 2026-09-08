@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for notification queries and bulk operations.
-// ABOUTME: Extends generic repository with user-scoped queries, unread count, and bulk mark-as-read.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

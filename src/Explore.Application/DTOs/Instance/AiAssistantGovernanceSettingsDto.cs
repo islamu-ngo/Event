@@ -1,6 +1,3 @@
-// ABOUTME: Instance-level AI assistant governance settings exposed through the admin settings API.
-// ABOUTME: Carries runtime defaults, allowed model IDs, and tenant override lock state for AI configuration.
-
 using System.Text.Json.Serialization;
 
 namespace Explore.Application.DTOs.Instance;

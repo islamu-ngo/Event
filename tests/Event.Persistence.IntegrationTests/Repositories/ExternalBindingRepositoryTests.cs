@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL-backed tests for provider-neutral ExternalBinding persistence.
-// ABOUTME: Verifies scoped uniqueness, repository lookup semantics, and tenant-specific user actor indexing.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Constants;

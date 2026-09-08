@@ -1,6 +1,3 @@
-// ABOUTME: Supplies deterministic webhook-retention horizons to persistence integration tests.
-// ABOUTME: Keeps audit and inbox fixtures independent of mutable runtime configuration.
-
 using Explore.Application.Contracts.Webhooks;
 
 namespace Event.Persistence.IntegrationTests.Fixtures;

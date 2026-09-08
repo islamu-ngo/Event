@@ -1,6 +1,3 @@
-// ABOUTME: Implements nonblocking shared and exclusive projection locks for every relational provider.
-// ABOUTME: Contains provider commands and SQLite lock adaptation behind one capability-focused API.
-
 using System.Data;
 using System.Data.Common;
 using System.Globalization;

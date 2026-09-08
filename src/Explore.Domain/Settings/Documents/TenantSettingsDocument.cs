@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-owned typed settings document stored as non-secret JSONB payload.
-// ABOUTME: Additive Phase 2 storage that does not replace legacy scalar settings yet.
-
 namespace Explore.Domain.Settings.Documents;
 
 using System.Text.Json;

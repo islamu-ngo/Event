@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the first-class OpenAI Responses API chat provider adapter.
-// ABOUTME: Verifies /v1/responses request shape, output mapping, tools, and safe failures.
-
 using System.Diagnostics.Metrics;
 using System.Net;
 using System.Net.Http.Headers;

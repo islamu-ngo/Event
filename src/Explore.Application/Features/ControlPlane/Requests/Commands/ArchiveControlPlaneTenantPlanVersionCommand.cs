@@ -1,6 +1,3 @@
-// ABOUTME: Secured command for archiving a tenant plan version.
-// ABOUTME: Removes archived versions from future provisioning without mutating assigned tenants.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

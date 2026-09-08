@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for EventDayService covering CRUD operations.
-// ABOUTME: Tests GetDaysByEvent, GetDayById, CreateDay, UpdateDay, DeleteDay with success and error paths.
-
 namespace Explore.Blazor.Client.Tests.Services;
 
 public class EventDayServiceTests

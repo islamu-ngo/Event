@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for event session groups such as tracks, devrooms, stages, and program sections.
-// ABOUTME: Keeps program-section reads entity-first and tenant-filtered through persistence.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

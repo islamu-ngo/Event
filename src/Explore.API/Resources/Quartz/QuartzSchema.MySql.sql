@@ -1,5 +1,3 @@
--- ABOUTME: Idempotent MySQL/MariaDB DDL for the co-located Quartz.NET scheduler tables in the primary application database.
--- ABOUTME: {prefix} is substituted with the validated Scheduler:Quartz:TablePrefix; GO on its own line separates batches.
 -- Secondary indexes are declared inline because MySQL lacks CREATE INDEX IF NOT EXISTS; the guarded
 -- CREATE TABLE IF NOT EXISTS therefore keeps the whole script idempotent on repeated startups.
 

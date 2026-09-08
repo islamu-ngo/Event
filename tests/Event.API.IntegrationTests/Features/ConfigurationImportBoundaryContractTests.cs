@@ -1,6 +1,3 @@
-// ABOUTME: Specifies size, rate, timeout, and value-safe HTTP import-session boundaries.
-// ABOUTME: Keeps transport protections explicit before upload controllers are implemented.
-
 namespace Event.Api.IntegrationTests.Features;
 
 using System.Reflection;

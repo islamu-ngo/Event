@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for instance onboarding governance endpoints and render-policy flows.
-// ABOUTME: Verifies save/retrieve behavior with setup-secret gating and preset validation rules.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
@@ -10,6 +7,7 @@ using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Controllers;
 using Explore.API.Extensions;
+using Explore.Application.Authentication;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Instance;
 using Explore.Application.DTOs.Onboarding;
@@ -40,15 +38,8 @@ public class InstanceOnboardingControllerTests
 {
     private const string BaseUrl = "/api/instanceonboarding";
     private const string SettingsBaseUrl = "/api/instance/settings";
-    private static readonly string SetupSecret = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+    private static string SetupSecret => OnboardingWebApplicationFactory.SetupSecret;
     private const string CerbosBootstrapEndpoint = "http://cerbos-bootstrap.test:3593";
-    private string? _previousSetupSecret;
-
-    [Before(Test)]
-    public void CaptureSetupSecret() => _previousSetupSecret = Environment.GetEnvironmentVariable("SETUP_SECRET");
-
-    [After(Test)]
-    public void RestoreSetupSecret() => Environment.SetEnvironmentVariable("SETUP_SECRET", _previousSetupSecret);
 
     [Test]
     public async Task GetStatus_Anonymous_ShouldReturnOk()
@@ -66,7 +57,7 @@ public class InstanceOnboardingControllerTests
     {
         using var factory = CreateFactoryWithSetupSecret();
         using var client = factory.CreateClient();
-        var userId = Guid.NewGuid();
+        var userId = Guid.CreateVersion7();
         var profile = new SelfHostOnboardingProfileDto
         {
             SiteName = "  Community Events  ",
@@ -76,6 +67,16 @@ public class InstanceOnboardingControllerTests
             TimeZone = "UTC",
             Purpose = "Keep this operator note out of persisted settings."
         };
+
+        string originalFromAddress;
+        using (var baselineScope = factory.Services.CreateScope())
+        {
+            var baselineDbContext = baselineScope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            originalFromAddress = await baselineDbContext.SystemSettings
+                .Where(setting => setting.SettingKey == GovernanceSettingKeys.Email.FromAddress)
+                .Select(setting => setting.Value)
+                .SingleAsync();
+        }
 
         using var request = CreateInstanceAdminRequest(
             HttpMethod.Patch,
@@ -91,16 +92,21 @@ public class InstanceOnboardingControllerTests
         var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         var settings = await dbContext.SystemSettings
             .Where(setting => setting.SettingKey == GovernanceSettingKeys.Branding.DisplayName
-                || setting.SettingKey == GovernanceSettingKeys.Email.FromAddress
+                || setting.SettingKey == GovernanceSettingKeys.Branding.SupportEmail
                 || setting.SettingKey == GovernanceSettingKeys.Domains.InstanceBaseDomain
                 || setting.SettingKey == GovernanceSettingKeys.Localization.DefaultLanguage)
             .ToDictionaryAsync(setting => setting.SettingKey, setting => setting.Value);
 
         await Assert.That(settings[GovernanceSettingKeys.Branding.DisplayName]).IsEqualTo(JsonSerializer.Serialize("Community Events"));
-        await Assert.That(settings[GovernanceSettingKeys.Email.FromAddress]).IsEqualTo(JsonSerializer.Serialize("support@example.org"));
+        await Assert.That(settings[GovernanceSettingKeys.Branding.SupportEmail]).IsEqualTo(JsonSerializer.Serialize("support@example.org"));
         await Assert.That(settings[GovernanceSettingKeys.Domains.InstanceBaseDomain]).IsEqualTo(JsonSerializer.Serialize("events.example.org"));
         await Assert.That(settings[GovernanceSettingKeys.Localization.DefaultLanguage]).IsEqualTo(JsonSerializer.Serialize("en"));
         await Assert.That(settings.Count).IsEqualTo(4);
+        var fromAddress = await dbContext.SystemSettings
+            .Where(setting => setting.SettingKey == GovernanceSettingKeys.Email.FromAddress)
+            .Select(setting => setting.Value)
+            .SingleAsync();
+        await Assert.That(fromAddress).IsEqualTo(originalFromAddress);
     }
 
     [Test]
@@ -108,7 +114,7 @@ public class InstanceOnboardingControllerTests
     {
         using var factory = CreateFactoryWithSetupSecret();
         using var client = factory.CreateClient();
-        var userId = Guid.NewGuid();
+        var userId = Guid.CreateVersion7();
 
         using var request = CreateInstanceAdminRequest(
             HttpMethod.Patch,
@@ -131,7 +137,7 @@ public class InstanceOnboardingControllerTests
     {
         using var factory = CreateFactoryWithSetupSecret();
         using var client = factory.CreateClient();
-        var userId = Guid.NewGuid();
+        var userId = Guid.CreateVersion7();
 
         using var request = CreateInstanceAdminRequest(
             HttpMethod.Patch,
@@ -157,10 +163,11 @@ public class InstanceOnboardingControllerTests
     {
         using var factory = CreateFactoryWithSetupSecret();
         using var client = factory.CreateClient();
-        var userId = Guid.NewGuid();
+        var userId = Guid.CreateVersion7();
         var allowedSettingKeys = new[]
         {
             GovernanceSettingKeys.Branding.DisplayName,
+            GovernanceSettingKeys.Branding.SupportEmail,
             GovernanceSettingKeys.Email.FromAddress,
             GovernanceSettingKeys.Domains.InstanceBaseDomain,
             GovernanceSettingKeys.Localization.DefaultLanguage
@@ -287,7 +294,7 @@ public class InstanceOnboardingControllerTests
         using var factory = CreateFactoryWithSetupSecret();
         using var client = factory.CreateClient();
 
-        var userId = Guid.NewGuid();
+        var userId = Guid.CreateVersion7();
         await EnsureUserExistsAsync(factory, userId);
 
         var completePayload = CreateValidOnboardingRequest();
@@ -317,7 +324,7 @@ public class InstanceOnboardingControllerTests
     {
         using var factory = CreateFactoryWithSetupSecret();
         using var client = factory.CreateClient();
-        var userId = Guid.NewGuid();
+        var userId = Guid.CreateVersion7();
         await EnsureUserExistsAsync(factory, userId);
         var actorId = await EnsureUserActorExistsAsync(factory, userId);
 
@@ -338,12 +345,12 @@ public class InstanceOnboardingControllerTests
     }
 
     [Test]
-    public async Task Complete_WithSidOnlyPrincipalAndExternalLogin_ShouldResolveCurrentUserIdWithoutClaimsTransformation()
+    public async Task Complete_WithSidOnlyPrincipalAndExternalLogin_ShouldRejectSessionIdAsAccountAuthority()
     {
         using var factory = CreateFactoryWithSetupSecretWithoutClaimsTransformation();
         using var client = factory.CreateClient();
 
-        var internalUserId = Guid.NewGuid();
+        var internalUserId = Guid.CreateVersion7();
         const string providerId = "keycloak-external-subject";
 
         await EnsureUserExistsAsync(factory, internalUserId);
@@ -356,12 +363,17 @@ public class InstanceOnboardingControllerTests
             includeSetupSecret: true,
             new(ClaimTypes.Name, "Sid Only User"),
             new("sid", providerId),
+            new("iss", OnboardingWebApplicationFactory.Issuer),
             new("idp", "keycloak"),
             new("email", $"{internalUserId:N}@integration.test"));
 
         var response = await client.SendAsync(request);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await Assert.That(await dbContext.InstanceBootstrapStates.AnyAsync()).IsFalse();
+        await Assert.That(await dbContext.PlatformUserRoles.AnyAsync()).IsFalse();
     }
 
     [Test]
@@ -378,7 +390,8 @@ public class InstanceOnboardingControllerTests
             CreateValidOnboardingRequest(),
             includeSetupSecret: true,
             new(ClaimTypes.Name, "Unlinked Bootstrap User"),
-            new("sid", providerId),
+            new("sub", providerId),
+            new("iss", OnboardingWebApplicationFactory.Issuer),
             new("idp", "keycloak"),
             new("email", email),
             new("email_verified", bool.TrueString));
@@ -389,10 +402,12 @@ public class InstanceOnboardingControllerTests
 
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        var accountKey = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
+            OnboardingWebApplicationFactory.Issuer, providerId).Value;
         var externalLogin = await dbContext.UserExternalLogins
             .SingleAsync(candidate =>
                 candidate.AuthenticationProviderId == (int)AuthenticationProviderKind.Keycloak
-                && candidate.ProviderKey == providerId);
+                && candidate.ProviderKey == accountKey);
         var user = await dbContext.Users.SingleAsync(candidate => candidate.Id == externalLogin.UserId);
 
         await Assert.That(user.Id).IsNotEqualTo(Guid.Empty);
@@ -400,12 +415,12 @@ public class InstanceOnboardingControllerTests
     }
 
     [Test]
-    public async Task Complete_WithSidOnlyPrincipal_ShouldPersistSidAsAuthProviderId()
+    public async Task Complete_WithStableSubjectAndSessionId_ShouldPersistIssuerBoundSubjectNotSessionId()
     {
         using var factory = CreateFactoryWithSetupSecret();
         using var client = factory.CreateClient();
 
-        var internalUserId = Guid.NewGuid();
+        var internalUserId = Guid.CreateVersion7();
         const string providerId = "keycloak-sid-only-subject";
         var email = $"{internalUserId:N}@integration.test";
 
@@ -416,7 +431,9 @@ public class InstanceOnboardingControllerTests
             includeSetupSecret: true,
             new(ClaimTypes.Name, "Sid Only User"),
             new("internal_user_id", internalUserId.ToString()),
-            new("sid", providerId),
+            new("sub", providerId),
+            new("iss", OnboardingWebApplicationFactory.Issuer),
+            new("sid", "separate-authentication-session"),
             new("idp", "keycloak"),
             new("email", email));
 
@@ -426,13 +443,21 @@ public class InstanceOnboardingControllerTests
 
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-        var createdUser = await dbContext.Users.SingleAsync(x => x.Id == internalUserId);
-        var externalLogin = await dbContext.UserExternalLogins.SingleAsync(x => x.UserId == internalUserId);
+        string accountKey = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
+            OnboardingWebApplicationFactory.Issuer, providerId).Value;
+        var externalLogin = await dbContext.UserExternalLogins.SingleAsync(x =>
+            x.AuthenticationProviderId == (int)AuthenticationProviderKind.Keycloak
+            && x.ProviderKey == accountKey);
+        var createdUser = await dbContext.Users
+            .Include(user => user.Pii)
+            .SingleAsync(x => x.Id == externalLogin.UserId);
 
+        await Assert.That(createdUser.Id).IsNotEqualTo(internalUserId);
+        await Assert.That(await dbContext.Users.AnyAsync(user => user.Id == internalUserId)).IsFalse();
         await Assert.That(createdUser.Pii.Email).IsEqualTo(email);
         await Assert.That(externalLogin.AuthenticationProviderId)
             .IsEqualTo((int)AuthenticationProviderKind.Keycloak);
-        await Assert.That(externalLogin.ProviderKey).IsEqualTo(providerId);
+        await Assert.That(externalLogin.ProviderKey).IsEqualTo(accountKey);
     }
 
     [Test]
@@ -440,15 +465,25 @@ public class InstanceOnboardingControllerTests
     {
         using var factory = CreateFactoryWithSetupSecret(new Dictionary<string, string?>
         {
-            ["Keycloak:Authority"] = string.Empty,
-            ["Keycloak:Audience"] = string.Empty,
-            ["Keycloak:ClientId"] = string.Empty,
-            ["PublicBaseUrl"] = "https://integration.test"
+            ["Authentication:Provider"] = "local",
+            ["PublicBaseUrl"] = string.Empty,
+            ["App:PublicBaseUrl"] = string.Empty,
+            ["ASPNETCORE_URLS"] = string.Empty
         });
         using var client = factory.CreateClient();
 
-        var userId = Guid.NewGuid();
+        var userId = Guid.CreateVersion7();
         await EnsureUserExistsAsync(factory, userId);
+
+        using var preflightResponse = await client.GetAsync("/api/system/onboarding-preflight");
+        await Assert.That(preflightResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        var preflight = await preflightResponse.Content.ReadFromJsonAsync<OnboardingPreflightDto>(TestJsonOptions.Default);
+        await Assert.That(preflight).IsNotNull();
+        await Assert.That(preflight!.IsReadyToLaunch).IsFalse();
+        await Assert.That(preflight.BlockingChecks.Single(check => check.Status == OnboardingPreflightCheckStatus.Fail).Code)
+            .IsEqualTo("canonical_host");
+        await Assert.That(preflight.BlockingChecks.Single(check => check.Code == "auth_config").Status)
+            .IsEqualTo(OnboardingPreflightCheckStatus.Pass);
 
         using var request = CreateInstanceAdminRequest(
             HttpMethod.Post,
@@ -463,7 +498,15 @@ public class InstanceOnboardingControllerTests
 
         var problemDetails = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
         await Assert.That(problemDetails).IsNotNull();
-        await Assert.That(problemDetails!.Detail).IsEqualTo("Instance cannot be launched because critical launch requirements are not met. Please review the blocking issues and try again.");
+        await Assert.That(problemDetails!.Status).IsEqualTo(StatusCodes.Status400BadRequest);
+        await Assert.That(problemDetails.Errors.ContainsKey("instanceOnboarding")).IsTrue();
+
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await Assert.That(await dbContext.InstanceBootstrapStates.AnyAsync()).IsFalse();
+        await Assert.That(await dbContext.PlatformUserRoles.AnyAsync(role => role.UserId == userId)).IsFalse();
+        var setupSecretProvider = scope.ServiceProvider.GetRequiredService<ISetupSecretProvider>();
+        await Assert.That(await setupSecretProvider.IsSetupModeActiveAsync()).IsTrue();
     }
 
     [Test]
@@ -472,7 +515,7 @@ public class InstanceOnboardingControllerTests
         using var factory = CreateFactoryWithSetupSecret();
         using var client = factory.CreateClient();
 
-        var nonAdminUserId = Guid.NewGuid();
+        var nonAdminUserId = Guid.CreateVersion7();
         await EnsureUserExistsAsync(factory, nonAdminUserId);
 
         using var request = CreateInstanceAdminRequest(HttpMethod.Patch, $"{SettingsBaseUrl}/modules", nonAdminUserId,
@@ -513,7 +556,7 @@ public class InstanceOnboardingControllerTests
         using var factory = CreateFactoryWithSetupSecret();
         using var client = factory.CreateClient();
 
-        var userId = Guid.NewGuid();
+        var userId = Guid.CreateVersion7();
         await EnsureUserExistsAsync(factory, userId);
 
         var clientPayload = CreateValidOnboardingRequest();
@@ -539,7 +582,7 @@ public class InstanceOnboardingControllerTests
         });
         using var client = factory.CreateClient();
 
-        var userId = Guid.NewGuid();
+        var userId = Guid.CreateVersion7();
         await EnsureUserExistsAsync(factory, userId);
 
         var clientPayload = new CompleteInstanceOnboardingRequest
@@ -580,7 +623,7 @@ public class InstanceOnboardingControllerTests
         using var factory = CreateFactoryWithSetupSecret();
         using var client = factory.CreateClient();
 
-        var userId = Guid.NewGuid();
+        var userId = Guid.CreateVersion7();
         await EnsureUserExistsAsync(factory, userId);
 
         using var request = CreateInstanceAdminRequest(
@@ -656,7 +699,7 @@ public class InstanceOnboardingControllerTests
         var getResponse = await client.SendAsync(getRequest);
         await Assert.That(getResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
 
-        var config = await getResponse.Content.ReadFromJsonAsync<AuthProviderConfigurationDto>();
+        var config = await getResponse.Content.ReadFromJsonAsync<AuthProviderConfigurationDto>(TestJsonOptions.Default);
         await Assert.That(config).IsNotNull();
         await Assert.That(config!.PrimaryProviderId)
             .IsEqualTo((int)AuthenticationProviderKind.Local);
@@ -671,6 +714,7 @@ public class InstanceOnboardingControllerTests
         const string clientSecret = "must-not-leave-the-server";
         using var factory = CreateFactoryWithSetupSecret(new Dictionary<string, string?>
         {
+            ["Authentication:Provider"] = "keycloak",
             ["Keycloak:Authority"] = authority,
             ["Keycloak:ClientId"] = clientId,
             ["Keycloak:ClientSecret"] = clientSecret
@@ -713,31 +757,11 @@ public class InstanceOnboardingControllerTests
         using var factory = CreateFactoryWithSetupSecret();
         using var client = factory.CreateClient();
 
-        var userId = Guid.CreateVersion7();
-        await EnsureUserExistsAsync(factory, userId);
-        await EnsureInstanceAdminRoleAsync(factory, userId);
-        await EnsureUserExternalLoginAsync(factory, userId, "google", $"google-{userId:N}");
-
-        using var saveRequest = CreateInstanceAdminRequest(
-            HttpMethod.Patch,
-            $"{SettingsBaseUrl}/auth-provider",
-            userId,
-            CreateGoogleOnlyAuthProviderPatch(),
-            includeSetupSecret: false);
-        var saveResponse = await client.SendAsync(saveRequest);
-        await Assert.That(saveResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
-
-        using var adminGetRequest = CreateInstanceAdminRequest(
-            HttpMethod.Get,
-            $"{SettingsBaseUrl}/auth-provider",
-            userId,
-            body: null,
-            includeSetupSecret: false);
-        var adminResponse = await client.SendAsync(adminGetRequest);
-        await Assert.That(adminResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        var adminConfig = await adminResponse.Content.ReadFromJsonAsync<AuthProviderConfigurationDto>();
-        await Assert.That(adminConfig).IsNotNull();
-        await Assert.That(adminConfig!.GoogleClientSecret).IsEqualTo(string.Empty);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var configuration = scope.ServiceProvider.GetRequiredService<IAuthProviderConfigurationService>();
+            await configuration.ApplyConfigurationAsync(CreateGoogleOnlyAuthProviderConfiguration());
+        }
 
         using var internalWithoutSecretRequest = new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/auth-provider-configuration/internal");
         var internalWithoutSecretResponse = await client.SendAsync(internalWithoutSecretRequest);
@@ -748,10 +772,28 @@ public class InstanceOnboardingControllerTests
         var internalWithSecretResponse = await client.SendAsync(internalWithSecretRequest);
         await Assert.That(internalWithSecretResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
 
-        var internalConfig = await internalWithSecretResponse.Content.ReadFromJsonAsync<AuthProviderConfigurationDto>();
+        var internalConfig = await internalWithSecretResponse.Content.ReadFromJsonAsync<AuthProviderConfigurationDto>(TestJsonOptions.Default);
         await Assert.That(internalConfig).IsNotNull();
         await Assert.That(internalConfig!.GoogleSsoEnabled).IsTrue();
-        await Assert.That(internalConfig.GoogleClientSecret).IsEqualTo("google-client-secret");
+        await Assert.That(internalConfig.GoogleClientSecret).IsEqualTo(
+            CreateGoogleOnlyAuthProviderConfiguration().GoogleClientSecret);
+
+        var userId = Guid.CreateVersion7();
+        await EnsureInstanceAdminRoleAsync(factory, userId);
+        using var adminGetRequest = CreateInstanceAdminRequest(
+            HttpMethod.Get, $"{SettingsBaseUrl}/auth-provider", userId,
+            body: null, includeSetupSecret: false);
+        var adminResponse = await client.SendAsync(adminGetRequest);
+        await Assert.That(adminResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        var adminConfig = await adminResponse.Content.ReadFromJsonAsync<AuthProviderConfigurationDto>(TestJsonOptions.Default);
+        await Assert.That(adminConfig).IsNotNull();
+        await Assert.That(adminConfig!.GoogleClientSecret).IsEqualTo(string.Empty);
+
+        using var closedSetupRequest = new HttpRequestMessage(
+            HttpMethod.Get, $"{BaseUrl}/auth-provider-configuration/internal");
+        closedSetupRequest.Headers.Add("X-Setup-Secret", SetupSecret);
+        var closedSetupResponse = await client.SendAsync(closedSetupRequest);
+        await Assert.That(closedSetupResponse.StatusCode).IsEqualTo(HttpStatusCode.Gone);
     }
 
     [Test]
@@ -801,7 +843,7 @@ public class InstanceOnboardingControllerTests
         var internalWithSecretResponse = await client.SendAsync(internalWithSecretRequest);
 
         await Assert.That(internalWithSecretResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        var internalConfig = await internalWithSecretResponse.Content.ReadFromJsonAsync<AuthProviderConfigurationDto>();
+        var internalConfig = await internalWithSecretResponse.Content.ReadFromJsonAsync<AuthProviderConfigurationDto>(TestJsonOptions.Default);
         await Assert.That(internalConfig).IsNotNull();
         await Assert.That(internalConfig!.PrimaryProviderId)
             .IsEqualTo((int)AuthenticationProviderKind.Keycloak);
@@ -932,7 +974,7 @@ public class InstanceOnboardingControllerTests
         using var factory = CreateFactoryWithSetupSecret();
         using var client = factory.CreateClient();
 
-        var userId = Guid.NewGuid();
+        var userId = Guid.CreateVersion7();
         await EnsureUserExistsAsync(factory, userId);
 
         using var request = CreateInstanceAdminRequest(
@@ -1021,18 +1063,11 @@ public class InstanceOnboardingControllerTests
         });
         using var client = factory.CreateClient();
 
-        var userId = Guid.CreateVersion7();
-        await EnsureUserExistsAsync(factory, userId);
-        await EnsureInstanceAdminRoleAsync(factory, userId);
-
-        using var saveRequest = CreateInstanceAdminRequest(
-            HttpMethod.Patch,
-            $"{SettingsBaseUrl}/authz-provider",
-            userId,
-            CreateLocalAuthorizationProviderPatch(),
-            includeSetupSecret: false);
-        var saveResponse = await client.SendAsync(saveRequest);
-        await Assert.That(saveResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var configuration = scope.ServiceProvider.GetRequiredService<IAuthorizationProviderConfigurationService>();
+            await configuration.ApplyConfigurationAsync(CreateLocalAuthorizationProviderConfiguration());
+        }
 
         using var internalWithoutSecretRequest = new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/authz-provider-configuration/internal");
         var internalWithoutSecretResponse = await client.SendAsync(internalWithoutSecretRequest);
@@ -1054,6 +1089,23 @@ public class InstanceOnboardingControllerTests
     {
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+
+        await EnsureUserExistsAsync(factory, userId);
+        await EnsureUserExternalLoginAsync(factory, userId, "keycloak", userId.ToString());
+        if (!await dbContext.PlatformUserRoles.AnyAsync(role => role.UserId == userId
+                && role.RoleId == (int)RoleEnum.Admin))
+        {
+            dbContext.PlatformUserRoles.Add(new PlatformUserRole
+            {
+                Id = Guid.CreateVersion7(),
+                UserId = userId,
+                User = null!,
+                RoleId = (int)RoleEnum.Admin,
+                Role = null!,
+                GrantedAt = DateTime.UtcNow,
+                GrantedBy = userId
+            });
+        }
 
         var bootstrap = await dbContext.InstanceBootstrapStates
             .OrderByDescending(x => x.CreatedAt)
@@ -1083,6 +1135,9 @@ public class InstanceOnboardingControllerTests
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
 
+        providerKey = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
+            provider == "google" ? "https://accounts.google.com" : OnboardingWebApplicationFactory.Issuer,
+            providerKey).Value;
         var exists = await dbContext.UserExternalLogins
             .AnyAsync(x =>
                 x.UserId == userId
@@ -1094,7 +1149,7 @@ public class InstanceOnboardingControllerTests
             return;
         }
 
-        dbContext.UserExternalLogins.Add(new UserExternalLogin { Id = Guid.NewGuid(),
+        dbContext.UserExternalLogins.Add(new UserExternalLogin { Id = Guid.CreateVersion7(),
         UserId = userId,
         User = null!,
         AuthenticationProviderId = (int)provider.ParseAuthenticationProviderKind(), AuthenticationProvider = null!, ProviderKey = providerKey,
@@ -1127,6 +1182,7 @@ public class InstanceOnboardingControllerTests
         } });
 
         await dbContext.SaveChangesAsync();
+        await EnsureUserExternalLoginAsync(factory, userId, "keycloak", userId.ToString());
     }
 
     private static async Task<Guid> EnsureUserActorExistsAsync(
@@ -1166,19 +1222,17 @@ public class InstanceOnboardingControllerTests
     private static AuthenticatedWebApplicationFactory CreateFactoryWithSetupSecret(
         IReadOnlyDictionary<string, string?>? configurationOverrides = null)
     {
-        Environment.SetEnvironmentVariable("SETUP_SECRET", SetupSecret);
         return configurationOverrides is null
-            ? new AuthenticatedWebApplicationFactory()
+            ? new OnboardingWebApplicationFactory()
             : new ConfigurableAuthenticatedWebApplicationFactory(configurationOverrides);
     }
 
     private static AuthenticatedWebApplicationFactory CreateFactoryWithSetupSecretWithoutClaimsTransformation()
     {
-        Environment.SetEnvironmentVariable("SETUP_SECRET", SetupSecret);
         return new PassthroughClaimsTransformationFactory();
     }
 
-    private sealed class ConfigurableAuthenticatedWebApplicationFactory : AuthenticatedWebApplicationFactory
+    private sealed class ConfigurableAuthenticatedWebApplicationFactory : OnboardingWebApplicationFactory
     {
         private readonly IReadOnlyDictionary<string, string?> _configurationOverrides;
 
@@ -1200,7 +1254,10 @@ public class InstanceOnboardingControllerTests
     private static HttpRequestMessage CreateInstanceAdminRequest(HttpMethod method, string url, Guid userId, object? body, bool includeSetupSecret)
     {
         var request = new HttpRequestMessage(method, url);
-        request.Headers.Add(TestAuthHandler.AuthHeaderName, TestAuthHandler.CreateInstanceAdminHeaderValue(userId));
+        request.Headers.Add(TestAuthHandler.AuthHeaderName,
+            TestAuthHandler.CreateAuthHeaderValue(userId, "Instance Admin",
+                ("iss", OnboardingWebApplicationFactory.Issuer),
+                ("idp", "keycloak")));
 
         if (includeSetupSecret)
         {
@@ -1373,11 +1430,10 @@ public class InstanceOnboardingControllerTests
 
     private static AuthenticatedWebApplicationFactory CreateFactoryWithKeycloakBootstrapService(FakeKeycloakBootstrapService bootstrapService)
     {
-        Environment.SetEnvironmentVariable("SETUP_SECRET", SetupSecret);
         return new KeycloakBootstrapFactory(bootstrapService);
     }
 
-    private sealed class KeycloakBootstrapFactory : AuthenticatedWebApplicationFactory
+    private sealed class KeycloakBootstrapFactory : OnboardingWebApplicationFactory
     {
         private readonly FakeKeycloakBootstrapService _bootstrapService;
 
@@ -1485,7 +1541,7 @@ public class InstanceOnboardingControllerTests
         }
     }
 
-    private sealed class PassthroughClaimsTransformationFactory : AuthenticatedWebApplicationFactory
+    private sealed class PassthroughClaimsTransformationFactory : OnboardingWebApplicationFactory
     {
         protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
         {

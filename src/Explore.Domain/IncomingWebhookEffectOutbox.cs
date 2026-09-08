@@ -1,6 +1,3 @@
-// ABOUTME: Stores one tenant-scoped pending pointer from a verified incoming webhook to later effect execution.
-// ABOUTME: Carries only provider identity and payload hash, never retained callback bytes or business payload data.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

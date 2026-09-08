@@ -1,6 +1,3 @@
-// ABOUTME: Authorized command that queues one idempotent tenant-scoped webhook bulk replay operation.
-// ABOUTME: Freezes explicit filters, bounded selection, operator reason, and stable operation identity.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

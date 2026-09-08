@@ -1,6 +1,3 @@
-// ABOUTME: Red BFF contract tests for the bounded whole-instance configuration-manifest download.
-// ABOUTME: Pins HAL revalidation, fixed downstream routing, response validation, and token-safe failures.
-
 using System.Net.Http.Headers;
 using System.Text;
 using Explore.Blazor.Client.Clients;

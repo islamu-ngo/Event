@@ -1,4 +1,3 @@
-// ABOUTME: Fast API contract test fixture using EF InMemory database and TestAuthHandler authentication.
 // Shared per assembly for lightweight contract validation (serialization, headers, ProblemDetails).
 
 using TUnit.Core.Interfaces;

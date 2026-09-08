@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for Event aggregate reads and tracked schedule-graph updates.
-// ABOUTME: Repositories return domain entities so handlers and domain methods own mapping and invariants.
-
 using Explore.Application.Specifications.Events;
 using Explore.Domain;
 

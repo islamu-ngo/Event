@@ -1,6 +1,3 @@
-// ABOUTME: Verifies public legal routes render only server-composed immutable publication output.
-// ABOUTME: Covers role labels, semantic headings, safe unavailability, and static-authority removal.
-
 namespace Explore.Blazor.Client.Tests.Pages.Legal;
 
 using Explore.Blazor.Client.Contracts.Services.LegalDocuments;

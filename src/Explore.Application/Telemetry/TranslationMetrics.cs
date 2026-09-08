@@ -1,6 +1,3 @@
-// ABOUTME: Custom OpenTelemetry metrics for the translation/localization system.
-// ABOUTME: Tracks fetch latency, fallback activations, language changes, and TMS test connections at boundaries only.
-
 using System.Diagnostics.Metrics;
 
 namespace Explore.Application.Telemetry;

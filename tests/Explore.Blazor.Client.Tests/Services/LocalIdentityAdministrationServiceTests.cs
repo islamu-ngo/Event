@@ -1,5 +1,3 @@
-// ABOUTME: Exercises Local administration through real generated clients and controlled HTTP responses.
-// ABOUTME: Preserves nullable credential authority and native HAL contracts without transport-model substitutes.
 
 using System.Net;
 using System.Text;

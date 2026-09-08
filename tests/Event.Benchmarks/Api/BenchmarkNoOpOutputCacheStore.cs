@@ -1,6 +1,3 @@
-// ABOUTME: Benchmark-only output-cache store that never replays cached API responses.
-// ABOUTME: Keeps PostgreSQL endpoint benchmarks focused on controller, EF Core, Npgsql, and database work.
-
 using Microsoft.AspNetCore.OutputCaching;
 
 namespace Event.Benchmarks.Api;

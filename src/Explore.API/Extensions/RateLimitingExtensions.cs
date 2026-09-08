@@ -1,6 +1,3 @@
-// ABOUTME: Registers tiered rate limiting policies for the API.
-// ABOUTME: Provides global, authenticated, public transactional, write, and control-plane rate/concurrency tiers.
-
 using System.Globalization;
 using System.Net;
 using System.Security.Claims;
@@ -137,6 +134,8 @@ public static partial class RateLimitingExtensions
                 options.AddPolicy(AuthenticatedPolicy, _ =>
                     RateLimitPartition.GetNoLimiter<string>("test"));
                 options.AddPolicy(WritePolicy, _ =>
+                    RateLimitPartition.GetNoLimiter<string>("test"));
+                options.AddPolicy(AtprotoTransientAuthenticationDefaults.RatePolicy, _ =>
                     RateLimitPartition.GetNoLimiter<string>("test"));
                 options.AddPolicy(
                     SetupLiveContractMetadata.EnrollmentWriteRatePolicy,
@@ -288,6 +287,16 @@ public static partial class RateLimitingExtensions
                         QueueLimit = 0
                     });
             });
+
+            // Instance-wide admission bounds pre-authentication crypto and replay storage, not a forged user id.
+            options.AddPolicy(AtprotoTransientAuthenticationDefaults.RatePolicy, _ =>
+                RateLimitPartition.GetFixedWindowLimiter("atproto-transient", _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = section.GetValue("AtprotoTransient:PermitLimit", 60),
+                    Window = TimeSpan.FromSeconds(section.GetValue("AtprotoTransient:WindowSeconds", 60)),
+                    QueueLimit = 0,
+                    AutoReplenishment = true
+                }));
 
             // Write operations: stricter fixed window per user
             options.AddPolicy(WritePolicy, httpContext =>
@@ -618,6 +627,7 @@ public static partial class RateLimitingExtensions
 
         int ResolvePolicyLimit(string policyName) => policyName switch
         {
+            AtprotoTransientAuthenticationDefaults.RatePolicy => section.GetValue("AtprotoTransient:PermitLimit", 60),
             AuthenticatedPolicy => authPermitLimit,
             WritePolicy => writePermitLimit,
             SetupLiveContractMetadata.EnrollmentWriteRatePolicy =>
@@ -698,6 +708,10 @@ public static partial class RateLimitingExtensions
 
         string? endpointPolicy = context.GetEndpoint()?
             .Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName;
+        if (endpointPolicy == AtprotoTransientAuthenticationDefaults.RatePolicy)
+        {
+            return AtprotoTransientAuthenticationDefaults.RatePolicy;
+        }
         if (endpointPolicy ==
             ConfigurationImportApiBoundary.UploadRateLimitPolicy)
         {

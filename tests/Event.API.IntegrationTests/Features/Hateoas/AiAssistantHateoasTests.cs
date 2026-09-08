@@ -1,6 +1,3 @@
-// ABOUTME: Contract tests for AI assistant HAL link policies and fail-closed auth gating.
-// ABOUTME: Verifies create/send affordances use standard HATEOAS policy metadata before UI exposure.
-
 namespace Event.Api.IntegrationTests.Features.Hateoas;
 
 using System.Security.Claims;

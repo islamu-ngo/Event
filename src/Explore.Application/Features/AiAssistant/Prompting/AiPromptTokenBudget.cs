@@ -1,6 +1,3 @@
-// ABOUTME: Tracks remaining input-token budget while prompt sections are selected.
-// ABOUTME: Centralizes token consumption so messages, references, and tool schemas share one budget model.
-
 namespace Explore.Application.Features.AiAssistant.Prompting;
 
 public sealed class AiPromptTokenBudget

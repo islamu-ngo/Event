@@ -1,6 +1,3 @@
-// ABOUTME: Contract for sending emails through a provider-agnostic transport boundary.
-// ABOUTME: Supports multi-tenant configuration via the cascading settings engine.
-
 using Explore.Application.Models;
 
 namespace Explore.Application.Contracts.Infrastructure;

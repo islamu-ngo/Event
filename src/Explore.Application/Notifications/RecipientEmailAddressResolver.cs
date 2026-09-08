@@ -1,6 +1,3 @@
-// ABOUTME: Resolves the current persisted verified email for recipient notification materialization.
-// ABOUTME: Centralizes stable typed skip reasons without accepting caller-submitted destination addresses.
-
 using Explore.Domain;
 
 namespace Explore.Application.Notifications;

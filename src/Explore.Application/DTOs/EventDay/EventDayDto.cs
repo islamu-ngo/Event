@@ -1,6 +1,3 @@
-// ABOUTME: Detail read-model DTO for a single EventDay entity.
-// ABOUTME: Includes all fields needed for admin surfaces and day-detail views.
-
 namespace Explore.Application.DTOs.EventDay;
 
 public sealed record EventDayDto

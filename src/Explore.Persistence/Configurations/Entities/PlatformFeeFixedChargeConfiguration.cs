@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for currency-qualified fixed platform fee charges.
-// ABOUTME: Preserves bigint minor-unit storage and one charge per policy/currency pair.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

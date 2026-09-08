@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for CultureRegistry + RtlLanguages — normalise, contains, TryGetEntry, RTL flag.
-// ABOUTME: The registry is the compile-time allowlist; these tests lock its contract.
-
 using Explore.Domain.Common.Localization;
 
 namespace Event.Application.UnitTests.Domain.Common.Localization;

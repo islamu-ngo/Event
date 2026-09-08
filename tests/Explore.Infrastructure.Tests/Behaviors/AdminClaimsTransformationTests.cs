@@ -1,4 +1,3 @@
-// ABOUTME: Unit tests for AdminClaimsTransformation IClaimsTransformation implementation.
 // Verifies DB-first admin authority claims are correctly added to the ClaimsPrincipal.
 
 using System.Security.Claims;

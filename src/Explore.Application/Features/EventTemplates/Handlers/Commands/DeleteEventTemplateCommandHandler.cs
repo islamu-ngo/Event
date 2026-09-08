@@ -1,6 +1,3 @@
-// ABOUTME: Handles deletion of event templates with cascaded definition and option cleanup.
-// ABOUTME: Uses hard delete so template keys can be reused without stale-row conflicts.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventTemplate;
 using Explore.Application.Features.EventTemplates.Requests.Commands;

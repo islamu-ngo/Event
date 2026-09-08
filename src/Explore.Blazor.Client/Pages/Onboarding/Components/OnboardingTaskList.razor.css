@@ -1,6 +1,3 @@
-/* ABOUTME: Isolated BEM styling for the semantic onboarding task list. */
-/* ABOUTME: Keeps task metadata responsive, token-driven, keyboard-visible, and RTL-safe. */
-
 .onboarding-task-list {
     display: grid;
     grid-template-columns: minmax(0, 1fr);

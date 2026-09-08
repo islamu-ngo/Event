@@ -1,6 +1,3 @@
-// ABOUTME: Handles cloning a published event ticket catalog to a draft.
-// ABOUTME: Enforces platform-managed event authority and rejects duplicate drafts.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;

@@ -1,6 +1,3 @@
-// ABOUTME: Promotes one eligible governed Location address to tenant-wide reuse after named authorization.
-// ABOUTME: Derives tenant and actor from trusted context and preserves provenance, organization, and exact PII.
-
 using System.Diagnostics.CodeAnalysis;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;

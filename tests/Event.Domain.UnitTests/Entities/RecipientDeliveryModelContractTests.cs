@@ -1,6 +1,3 @@
-// ABOUTME: Contract tests for the explicit logical-intent, channel-delivery, and SMTP-work model.
-// ABOUTME: Locks stable lookup values and required tenant-safe recipient relationship fields.
-
 using System.Reflection;
 using Explore.Domain;
 

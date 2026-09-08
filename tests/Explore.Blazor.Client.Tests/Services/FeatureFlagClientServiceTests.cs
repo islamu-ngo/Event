@@ -1,6 +1,3 @@
-// ABOUTME: Verifies feature-flag client loading through the shared API executor.
-// ABOUTME: Locks authenticated flag hydration and safe unauthenticated fallback behavior.
-
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Explore.Blazor.Client.Tests.Services;

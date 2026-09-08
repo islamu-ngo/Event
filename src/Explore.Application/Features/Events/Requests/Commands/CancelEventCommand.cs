@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for cancelling an event via the explicit lifecycle transition.
-// ABOUTME: Supplies event resource context for authorization before the cancel handler runs.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Responses;

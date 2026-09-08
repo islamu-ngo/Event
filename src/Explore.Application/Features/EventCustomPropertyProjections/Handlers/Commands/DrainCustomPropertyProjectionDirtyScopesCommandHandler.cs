@@ -1,6 +1,3 @@
-// ABOUTME: Handles operator self-service dirty-scope drain without triggering a full rebuild.
-// ABOUTME: Dispatches to the correct projection updater based on the projection name.
-
 using System.Diagnostics;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.CustomPropertyProjection;

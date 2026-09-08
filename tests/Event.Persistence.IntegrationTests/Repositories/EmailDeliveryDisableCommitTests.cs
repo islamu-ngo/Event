@@ -1,5 +1,3 @@
-// ABOUTME: Exercises guarded email-disable previews and commits through real handlers, role authority, and SQLite repositories.
-// ABOUTME: Verifies protected impact binding, atomic policy suppression, replay rejection, and retained configuration/operator metadata.
 
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;

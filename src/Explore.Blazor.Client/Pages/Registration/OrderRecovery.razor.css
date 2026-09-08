@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped layout for authenticated registration-order recovery. */
-/* ABOUTME: Uses logical spacing and tokenized surfaces for recovery states and order details. */
-
 .registration-order-recovery {
     display: grid;
     gap: var(--isl-space-section);

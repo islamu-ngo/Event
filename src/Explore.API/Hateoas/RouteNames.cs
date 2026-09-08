@@ -1,6 +1,3 @@
-// ABOUTME: Central route name catalog for API endpoint metadata and HAL link generation.
-// ABOUTME: Keeps controller route names stable and discoverable for OpenAPI and clients.
-
 namespace Explore.API.Hateoas;
 
 /// <summary>
@@ -810,6 +807,10 @@ public static class RouteNames
 
     #region ATProto Routes
 
+    public const string CreateAtprotoTransient = nameof(CreateAtprotoTransient);
+    public const string ReadAtprotoTransient = nameof(ReadAtprotoTransient);
+    public const string ConsumeAtprotoTransient = nameof(ConsumeAtprotoTransient);
+    public const string ProbeAtprotoTransient = nameof(ProbeAtprotoTransient);
     public const string BootstrapAtprotoSession = nameof(BootstrapAtprotoSession);
     public const string GetCurrentAtprotoSession = nameof(GetCurrentAtprotoSession);
     public const string RefreshCurrentAtprotoSession = nameof(RefreshCurrentAtprotoSession);

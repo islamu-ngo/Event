@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for tenant-local actor subscription persistence.
-// ABOUTME: Returns domain entities for CQRS handlers and fanout services to map or mutate.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

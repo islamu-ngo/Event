@@ -1,5 +1,3 @@
-// ABOUTME: Expresses generated-only administrative Local identity creation with stable client operation intent.
-// ABOUTME: Excludes actor authority and credential plaintext from the immutable command.
 
 using Explore.Application.Responses;
 using MediatR;

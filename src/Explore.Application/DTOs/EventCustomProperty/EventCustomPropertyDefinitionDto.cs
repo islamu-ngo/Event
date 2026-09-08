@@ -1,6 +1,3 @@
-// ABOUTME: Read-only detail DTO for event runtime custom property definitions with provenance tracking.
-// ABOUTME: Includes source template references for sync/drift detection and nested options.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.DTOs.EventCustomProperty;

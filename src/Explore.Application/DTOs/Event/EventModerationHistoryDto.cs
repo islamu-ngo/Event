@@ -1,6 +1,3 @@
-// ABOUTME: Safe operator-facing projection of event moderation history.
-// ABOUTME: Exposes audit metadata only and excludes event text, URLs, image identifiers, and payloads.
-
 namespace Explore.Application.DTOs.Event;
 
 public sealed record EventModerationHistoryDto

@@ -1,6 +1,3 @@
-// ABOUTME: Authenticates direct machine callers using the Phase 0 API-key spike configuration.
-// ABOUTME: Produces a claims principal carrying tenant and owner context for post-auth tenant validation.
-
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Explore.Application.Authentication;

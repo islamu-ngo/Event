@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped single-column layout for the authoritative tenant onboarding task flow. */
-/* ABOUTME: Uses logical properties and project tokens for responsive, RTL-safe onboarding states. */
-
 .tenant-onboarding {
     display: grid;
     grid-template-columns: minmax(0, 1fr);

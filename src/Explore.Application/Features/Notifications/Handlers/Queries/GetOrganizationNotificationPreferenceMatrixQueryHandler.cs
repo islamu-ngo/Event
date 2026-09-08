@@ -1,6 +1,3 @@
-// ABOUTME: Handles organization-scoped notification preference matrix projection.
-// ABOUTME: Reuses the preference resolver to expose effective choices and lock metadata.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

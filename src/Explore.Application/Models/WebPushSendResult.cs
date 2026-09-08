@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral Web Push send result and failure classification.
-// ABOUTME: Separates stale-subscription cleanup, retryable failures, and permanent non-retryable provider errors.
-
 namespace Explore.Application.Models;
 
 public sealed record WebPushSendResult(

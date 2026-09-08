@@ -1,6 +1,3 @@
-// ABOUTME: Validated HTTPS destination used by public event actions.
-// ABOUTME: Stores a normalized URL and disclosure-safe destination domain without credentials or fragments.
-
 namespace Explore.Domain.ValueObjects;
 
 public sealed record ExternalActionUrl

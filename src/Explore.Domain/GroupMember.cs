@@ -1,6 +1,3 @@
-// ABOUTME: Domain entity representing a user's membership within a Group.
-// ABOUTME: Links Group to User with a role, similar to OrganizationMember but without position.
-
 using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;

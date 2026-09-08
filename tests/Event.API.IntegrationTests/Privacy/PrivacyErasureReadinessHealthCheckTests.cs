@@ -1,6 +1,3 @@
-// ABOUTME: Verifies privacy-erasure readiness emits only bounded aggregate diagnostics.
-// ABOUTME: Proves authority failures are sanitized without leaking provider or connection details.
-
 using Explore.API.HealthChecks;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Persistence;

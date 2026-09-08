@@ -1,6 +1,3 @@
-// ABOUTME: DTO for non-secret instance SMTP settings managed through governance.
-// ABOUTME: Credentials remain exclusively in the selected external secret authority.
-
 using System.Text.Json.Serialization;
 
 namespace Explore.Application.DTOs.Onboarding;

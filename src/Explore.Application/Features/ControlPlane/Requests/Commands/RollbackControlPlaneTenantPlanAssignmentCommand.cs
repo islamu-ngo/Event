@@ -1,6 +1,3 @@
-// ABOUTME: Secured command for rolling a tenant back to a previous plan assignment.
-// ABOUTME: Reactivates the chosen assignment and marks the current active row as rolled back.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

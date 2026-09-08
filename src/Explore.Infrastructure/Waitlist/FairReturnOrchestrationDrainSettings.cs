@@ -1,6 +1,3 @@
-// ABOUTME: Configures bounded fair-return orchestration batches, tenant fairness, and restart leases.
-// ABOUTME: Validates operator-controlled limits before any durable effect can be claimed.
-
 namespace Explore.Infrastructure.Waitlist;
 
 public sealed class FairReturnOrchestrationDrainSettings

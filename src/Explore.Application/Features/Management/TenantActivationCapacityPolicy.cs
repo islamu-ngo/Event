@@ -1,6 +1,3 @@
-// ABOUTME: Evaluates the shared active-tenant and durable-reservation ceiling for every tenant activation path.
-// ABOUTME: Uses persisted deployment mode and becomes a no-op when optional managed mode is disabled.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Management;
 using Explore.Domain;

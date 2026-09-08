@@ -1,6 +1,3 @@
-// ABOUTME: Breaks selected-authority Setup secret writes and purpose-specific HMAC commitments.
-// ABOUTME: Proves exact-source dispatch, no fallback, canonical evidence, and value-free outcomes.
-
 namespace Explore.Secrets.UnitTests.SetupLive;
 
 using System.Security.Cryptography;

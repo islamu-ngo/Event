@@ -1,6 +1,3 @@
-// ABOUTME: Typed exception for API errors received as ProblemDetails responses.
-// ABOUTME: Carries status code, title, and detail for structured error propagation from API to BFF/client.
-
 using System.Net;
 namespace Explore.Blazor.Client.Exceptions;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Defines one event-owned target that a ticket type grants admission to.
-// ABOUTME: Stores explicit selection semantics so event, day, and session references remain valid.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 using Explore.Domain.Services.Registration;

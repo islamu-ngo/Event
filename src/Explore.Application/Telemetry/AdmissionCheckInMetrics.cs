@@ -1,6 +1,3 @@
-// ABOUTME: Emits bounded admission check-in duration, outcome, batch, saturation, backlog, and health measurements.
-// ABOUTME: Uses only closed category labels and never accepts identifiers, bearer material, labels, or reasons.
-
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;

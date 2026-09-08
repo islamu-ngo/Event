@@ -1,6 +1,3 @@
-// ABOUTME: Handler for retrieving all EventDays belonging to a specific event.
-// ABOUTME: Returns a sorted list via the repository; mapping is handled by AutoMapper.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventDay;

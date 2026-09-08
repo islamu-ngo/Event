@@ -1,5 +1,2 @@
-/* ABOUTME: Scoped styles for the Minimal footer template layout.
-   ABOUTME: No additional layout needed — uses shared site-footer__bottom styles from parent. */
-
 /* Minimal template has no grid or extra layout.
    The site-footer__bottom styles from Footer.razor.css handle the row arrangement. */

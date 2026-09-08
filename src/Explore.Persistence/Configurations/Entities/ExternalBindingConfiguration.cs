@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for ExternalBinding with filtered unique indexes for nullable tenant scope.
-// ABOUTME: Uses jsonb metadata and CHECK constraints to keep provider/internal identity columns well-formed.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.References;

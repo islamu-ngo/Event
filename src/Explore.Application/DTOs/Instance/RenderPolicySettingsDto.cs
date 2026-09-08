@@ -1,6 +1,3 @@
-// ABOUTME: Sub-resource DTO for render policy configuration.
-// ABOUTME: Controls Blazor InteractiveAuto/Server/WASM render modes per page context.
-
 namespace Explore.Application.DTOs.Instance;
 
 public sealed record RenderPolicySettingsDto

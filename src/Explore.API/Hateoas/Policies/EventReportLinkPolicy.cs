@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS link policies for reporter-facing event-report resources.
-// ABOUTME: Emits only public event navigation and authenticated submit/status affordances.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Security.Claims;

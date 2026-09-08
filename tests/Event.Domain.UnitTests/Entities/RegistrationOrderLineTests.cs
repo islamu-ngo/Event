@@ -1,6 +1,3 @@
-// ABOUTME: Covers immutable order-line ticket and pricing snapshots for pinned catalog revisions.
-// ABOUTME: Proves buyer-priced lines honor pinned minimums and retain zero-allowed donation semantics.
-
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Captures the safe metadata needed to resolve notification ownership.
-// ABOUTME: Excludes provider clients, raw evidence, and delivery transport details by design.
-
 using Explore.Application.Contracts.Identity;
 
 namespace Explore.Application.Notifications;

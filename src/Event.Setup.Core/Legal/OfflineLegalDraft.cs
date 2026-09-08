@@ -1,6 +1,3 @@
-// ABOUTME: Adapts portable Wire legal source into typed role-correct review-only offline drafts.
-// ABOUTME: Delegates normalization, inspection, and preview rendering to the single Wire Markdown codec.
-
 namespace ISLAMU.Event.Setup.Core;
 
 using System.Collections.ObjectModel;

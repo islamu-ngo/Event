@@ -1,7 +1,3 @@
-// ABOUTME: Bounded theme palette value object covering MudBlazor tokens used by the layouts.
-// ABOUTME: Mapped as explicit owned columns for light and dark palettes instead of JSON blobs.
-// ABOUTME: Normalizes opaque hex colors while preserving supported translucent rgba values.
-
 namespace Explore.Domain.ValueObjects;
 
 public class UiThemePalette

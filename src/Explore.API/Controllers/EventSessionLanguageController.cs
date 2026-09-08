@@ -1,6 +1,3 @@
-// ABOUTME: API controller for managing language assignments on event sessions.
-// ABOUTME: Exposes the existing session-language Application commands for composer language pickers.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

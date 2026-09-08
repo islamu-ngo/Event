@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for Permission entity with dynamic RBAC queries.
-// ABOUTME: Supports capability ceiling, role-based permission lookups, and scope filtering.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

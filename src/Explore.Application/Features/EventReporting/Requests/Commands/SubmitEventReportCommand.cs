@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for authenticated event-report intake.
-// ABOUTME: Carries user-entered report details plus server-derived reporter hashes for deduplication.
-
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Responses;
 using MediatR;

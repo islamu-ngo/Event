@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for the moderation report detail panel.
-// ABOUTME: Verifies HAL-gated workflow affordances and safe rendering of detail evidence.
-
 using System.Collections;
 using Explore.Blazor.Client.Components.Moderation;
 

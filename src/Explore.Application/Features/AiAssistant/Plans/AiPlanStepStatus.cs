@@ -1,6 +1,3 @@
-// ABOUTME: Defines preview-only lifecycle states for AI proposed plan steps.
-// ABOUTME: Separates review and confirmation readiness from side-effect execution.
-
 namespace Explore.Application.Features.AiAssistant.Plans;
 
 public enum AiPlanStepStatus

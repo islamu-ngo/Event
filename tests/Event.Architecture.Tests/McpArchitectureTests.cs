@@ -1,6 +1,3 @@
-// ABOUTME: Architecture guardrails for the API-hosted MCP adapter boundary.
-// ABOUTME: Ensures MCP SDK dependencies and direct repository access do not leak across layers.
-
 namespace Event.Architecture.Tests;
 
 using System.Reflection;

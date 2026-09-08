@@ -1,6 +1,3 @@
-// ABOUTME: Builds guest registration-order HAL resources outside the route controller.
-// ABOUTME: Preserves exact named routes while keeping payment and lifecycle affordances server-authoritative.
-
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Hateoas;
 using Explore.Application.Services.Registration;

@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation validator for grouped UpdateEventSeriesDto PATCH payloads.
-// ABOUTME: Enforces wrapper presence and explicit clear semantics for nullable groups.
-
 using Explore.Application.DTOs.EventSeries;
 using FluentValidation;
 

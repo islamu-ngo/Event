@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for aggregate scheduler-owned queue readiness and privacy-safe health data.
-// ABOUTME: Verifies per-lane degradation thresholds without exposing tenant or payload identity.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Services.Webhooks;

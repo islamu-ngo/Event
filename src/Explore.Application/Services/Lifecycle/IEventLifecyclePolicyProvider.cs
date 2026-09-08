@@ -1,5 +1,3 @@
-// ABOUTME: Central authority for composing effective lifecycle validation policies per profile.
-// ABOUTME: Merges hard invariants with tenant/instance overrides so readiness checks stay consistent.
 using System;
 using System.Threading;
 using System.Threading.Tasks;

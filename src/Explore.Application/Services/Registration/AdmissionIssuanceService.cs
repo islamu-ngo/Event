@@ -1,6 +1,3 @@
-// ABOUTME: Issues admission tickets under a finalization-effect database lock with retry-stable identities.
-// ABOUTME: Reconciles commit acknowledgement loss and dispatches recoverable protected delivery only after commit.
-
 using System.Data.Common;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Persistence;

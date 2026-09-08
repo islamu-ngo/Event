@@ -1,6 +1,3 @@
-// ABOUTME: Publishes bounded participant admission state without participant identity or response content.
-// ABOUTME: Keeps server-computed HAL affordance facts out of the serialized wire contract.
-
 using System.Text.Json.Serialization;
 
 namespace Explore.Application.DTOs.Admissions;

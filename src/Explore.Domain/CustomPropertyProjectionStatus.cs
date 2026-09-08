@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-scoped rebuild status row for a named custom-property projection version.
-// ABOUTME: Tracks last rebuild window, checkpoint, row counters, and failure metadata for operator observability.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;

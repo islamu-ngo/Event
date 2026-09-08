@@ -1,6 +1,3 @@
-// ABOUTME: Lookup-table entity for tenant plan version lifecycle statuses.
-// ABOUTME: Keeps SaaS tier draft, published, and archived states normalized in persistence.
-
 namespace Explore.Domain;
 
 public class TenantPlanStatus

@@ -1,5 +1,3 @@
-// ABOUTME: Contract for resolving the actor (org/group/personal) that owns a new event.
-// ABOUTME: Encapsulates permission checks and publishing-policy enforcement.
 using System;
 using System.Threading;
 using System.Threading.Tasks;

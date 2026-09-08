@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for EmailDispatch admin request authorization metadata.
-// ABOUTME: Prevents email dispatch status/control operations from bypassing MediatR resource authorization.
-
 using System.Reflection;
 using Explore.Application.Authorization;
 using Explore.Application.Features.EmailDispatch.Requests.Commands;

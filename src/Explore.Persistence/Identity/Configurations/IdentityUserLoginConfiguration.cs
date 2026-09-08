@@ -1,6 +1,3 @@
-// ABOUTME: Configures composite provider keys for embedded Identity external-login records.
-// ABOUTME: Bounds provider-controlled key material consistently across all supported databases.
-
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

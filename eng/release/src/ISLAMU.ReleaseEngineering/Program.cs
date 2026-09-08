@@ -1,6 +1,3 @@
-// ABOUTME: Dispatches the release-engineering CLI and verifies the pinned local git-cliff binary.
-// ABOUTME: Fails closed on untrusted locks, platforms, files, digests, processes, or versions.
-
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;

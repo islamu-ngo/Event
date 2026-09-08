@@ -1,6 +1,3 @@
-// ABOUTME: Proves organizer payment-provider connections are actor-bound and provider-neutral.
-// ABOUTME: Covers bounded readiness, replacement lineage, and immutable recipient snapshots.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

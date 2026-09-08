@@ -1,6 +1,3 @@
-// ABOUTME: Defines event-authorized refund campaign reads for organizer and trust/safety operations.
-// ABOUTME: Carries event lineage as typed authorization facts and exposes no buyer or provider identifiers.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.RegistrationOrders;
 using MediatR;

@@ -1,6 +1,3 @@
-// ABOUTME: Query for the operator-visible authorization policy package health and observed store revision.
-// ABOUTME: Answers "is the PDP enforcing the policy this deployment published?" without exposing credentials.
-
 using Explore.Application.DTOs.Onboarding;
 using MediatR;
 

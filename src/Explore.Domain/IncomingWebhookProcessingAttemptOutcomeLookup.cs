@@ -1,6 +1,3 @@
-// ABOUTME: Stable relational lookup rows for incoming webhook processing-attempt outcomes.
-// ABOUTME: Mirrors append-only claim, settlement, retry, conflict, and lease-recovery evidence identifiers.
-
 namespace Explore.Domain;
 
 public sealed class IncomingWebhookProcessingAttemptOutcomeLookup

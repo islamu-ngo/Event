@@ -1,6 +1,3 @@
-// ABOUTME: Creates concrete PII-free erasure and correction messages for the transactional outbox.
-// ABOUTME: Payloads contain only UUIDv7 intent identity, opaque IDs, versions, and closed reason codes.
-
 using System.Text.Json;
 using Explore.Domain;
 

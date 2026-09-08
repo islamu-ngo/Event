@@ -1,6 +1,3 @@
-// ABOUTME: HAL policy for event-scoped organizer promotion management resources.
-// ABOUTME: Uses paid-commerce event authority and promotion state to expose only valid server actions.
-
 using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;

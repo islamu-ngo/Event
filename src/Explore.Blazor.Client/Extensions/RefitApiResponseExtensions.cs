@@ -1,6 +1,3 @@
-// ABOUTME: Converts Refit response wrappers into the client application's typed API result model.
-// ABOUTME: Preserves response ProblemDetails while handling request failures and response-less errors safely.
-
 using Explore.Blazor.Client.Exceptions;
 using Explore.Blazor.Client.Services.Http;
 using Refit;

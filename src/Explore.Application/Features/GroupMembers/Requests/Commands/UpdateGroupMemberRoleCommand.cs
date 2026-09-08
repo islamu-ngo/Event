@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for updating a group member's role.
-// ABOUTME: Carries the member ID and new role ID.
 using Explore.Application.DTOs.GroupMember;
 using Explore.Application.Responses;
 using MediatR;

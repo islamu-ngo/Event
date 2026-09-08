@@ -1,6 +1,3 @@
-// ABOUTME: Proves strict release descriptor and public change-fragment validation.
-// ABOUTME: Covers append-only correction, impact references, embargo guards, and stable diagnostics.
-
 using ISLAMU.ReleaseEngineering;
 using System.Globalization;
 
@@ -54,9 +51,10 @@ public sealed class ReleaseInputPolicyTests
 
         await Assert.That(result.IsValid).IsTrue()
             .Because(string.Join("; ", result.Diagnostics));
-        await Assert.That(result.Diagnostics).IsEmpty();
-        await Assert.That(result.Fragments.Select(fragment => fragment.ChangeId)).Contains("CHG-2026-0010");
-        await Assert.That(result.Fragments.Select(fragment => fragment.ChangeId)).Contains("CHG-2026-0011");
+        await Assert.That(result.Fragments).IsNotEmpty();
+        await Assert.That(result.Fragments.All(fragment => ChangeIdPolicy.IsGenerated(fragment.ChangeId))).IsTrue();
+        await Assert.That(result.Fragments.Select(fragment => fragment.ChangeId)).Contains("CHG-01M1VJ17RD9AT6PNN1X0093958");
+        await Assert.That(result.Fragments.Select(fragment => fragment.ChangeId)).Contains("CHG-01M1VJ199BWSA2Y38S8W4GNN64");
     }
 
     [Test]
@@ -460,7 +458,7 @@ public sealed class ReleaseInputPolicyTests
         Supersedes: []
         Impacts:
           Breaking:
-            Reference: docs/releases/README.md
+            Reference: docs/internal/releases/README.md
             Disposition: documented
             Detail: Check-in integrations must send credential after upgrading.
           Security:

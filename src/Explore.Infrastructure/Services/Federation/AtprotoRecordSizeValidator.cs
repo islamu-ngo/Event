@@ -1,6 +1,3 @@
-// ABOUTME: Measures complete generated records in UTF-8 JSON and DAG-CBOR before any PDS write.
-// ABOUTME: Applies inclusive protocol budgets exactly and returns permanent validation errors without truncation.
-
 using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;

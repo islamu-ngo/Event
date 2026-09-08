@@ -1,6 +1,3 @@
-// ABOUTME: Authorized command for creating outgoing webhook consumers under one typed owner scope.
-// ABOUTME: Carries only owner selection and configuration input; the pipeline resolves canonical ownership.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

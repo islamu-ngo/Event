@@ -1,6 +1,3 @@
-// ABOUTME: Application contract for resolving effective moderation reporting routing policy.
-// ABOUTME: Keeps tenant/provider routing decisions consumable without leaking Infrastructure implementation details.
-
 namespace Explore.Application.Contracts.Infrastructure;
 
 using Explore.Application.Features.EventReporting.Models;

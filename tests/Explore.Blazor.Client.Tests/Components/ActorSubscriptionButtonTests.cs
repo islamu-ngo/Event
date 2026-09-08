@@ -1,6 +1,3 @@
-// ABOUTME: bUnit tests for the HAL-gated actor subscription button component.
-// ABOUTME: Verifies affordance gating, accessible labels, and service-driven subscribe/unsubscribe flows.
-
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Shared;
 using Microsoft.Extensions.DependencyInjection.Extensions;

@@ -1,5 +1,3 @@
-// ABOUTME: Classifies the origin of a lifecycle readiness error for diagnostics and policy UI.
-// ABOUTME: Distinguishes hard invariants from domain rules, instance/tenant policy, and command profile rules.
 namespace Explore.Application.Services.Lifecycle;
 
 /// <summary>

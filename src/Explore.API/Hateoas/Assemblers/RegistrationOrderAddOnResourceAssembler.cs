@@ -1,6 +1,3 @@
-// ABOUTME: Embeds each add-on line as its own HAL resource inside an order summary.
-// ABOUTME: Preserves per-line fulfillment and refund affordances without local claim inspection.
-
 using Explore.API.Hateoas.Policies;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.DTOs.EventAddOns;

@@ -1,0 +1,38 @@
+# ABOUTME: Public change fragment for Domain-owned Event and EventSession lifecycle enforcement.
+# ABOUTME: Records breaking transition, HAL, and session parent-status contract changes.
+Change-Id: CHG-01M1VJ0XMHMBBTZ3XK8P00KR8M
+Title: One lifecycle contract across event workflows
+Type: feat
+Scope: events
+Summary: >-
+  Event and session transitions now use one Domain-owned lifecycle contract across
+  command enforcement, retry handling, readiness checks, and HAL affordances.
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: documented
+    Detail: >-
+      Unsupported transitions, including Published to Archived, are rejected;
+      same-target writes are idempotent; and session responses expose
+      parentEventStatusId for authoritative HAL action decisions.
+  Security:
+    Reference: docs/SECURITY-MODEL.md
+    Disposition: not-applicable
+    Detail: Existing authorization, tenant isolation, and moderation permissions remain unchanged.
+  Migration:
+    Reference: docs/TESTING.md
+    Disposition: not-applicable
+    Detail: No relational schema or data migration is required.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+    Detail: No deployment configuration changes are required.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: documented
+    Detail: Session detail, list, and HAL schemas now include parentEventStatusId.
+  Operator:
+    Reference: docs/API.md
+    Disposition: documented
+    Detail: Clients and operators should use server-authored HAL links as lifecycle action authority.

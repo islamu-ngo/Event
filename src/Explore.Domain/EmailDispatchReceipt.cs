@@ -1,6 +1,3 @@
-// ABOUTME: Idempotency receipt for email-dispatch consume/processing attempts keyed by tenant and publish event id.
-// ABOUTME: Lets Basic and future RabbitMQ dispatch modes share duplicate protection around the same durable intent.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

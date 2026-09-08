@@ -1,6 +1,3 @@
-// ABOUTME: Maps typed current contact-share consent scope and subject-specific nullable FKs.
-// ABOUTME: Enforces one subject identity shape plus unique active scope per recipient/purpose.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Microsoft.EntityFrameworkCore;

@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL-backed WebApplicationFactory used by deeper API endpoint benchmarks.
-// ABOUTME: Creates current-model schema, PostgreSQL constraints, lookup seeding, and benchmark-owned API seed data.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
 using Explore.Domain.Constants;

@@ -1,6 +1,3 @@
-// ABOUTME: Secured Control Plane query for the deployment-mode migration runbook.
-// ABOUTME: Exposes operator-visible transition preconditions without allowing casual settings toggles.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.ControlPlane;
 using MediatR;

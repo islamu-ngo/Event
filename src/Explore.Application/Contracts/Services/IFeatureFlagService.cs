@@ -1,6 +1,3 @@
-// ABOUTME: Thin abstraction over OpenFeature for feature flag evaluation in the Application layer.
-// ABOUTME: Keeps handlers decoupled from the OpenFeature API while enabling typed flag lookups.
-
 using OpenFeature.Model;
 
 namespace Explore.Application.Contracts.Services;

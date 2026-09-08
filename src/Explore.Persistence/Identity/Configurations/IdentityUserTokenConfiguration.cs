@@ -1,6 +1,3 @@
-// ABOUTME: Configures composite provider keys for embedded Identity user tokens.
-// ABOUTME: Bounds provider and token names while leaving token values protected by their owning service.
-
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

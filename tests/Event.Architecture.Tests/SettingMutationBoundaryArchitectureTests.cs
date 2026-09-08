@@ -1,6 +1,3 @@
-// ABOUTME: Architecture guards for coordinated system and tenant setting mutation contracts.
-// ABOUTME: Prevents generic CRUD APIs from bypassing per-key locks and safe repository operations.
-
 using System.Reflection;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

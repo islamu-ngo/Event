@@ -1,6 +1,3 @@
-// ABOUTME: API contract tests for authenticated notification command error responses.
-// ABOUTME: Verifies notification write failures use RFC7807 ProblemDetails instead of anonymous JSON.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;

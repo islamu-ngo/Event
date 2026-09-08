@@ -1,6 +1,3 @@
-// ABOUTME: API controller for registration scope lookup table (read-only enumeration).
-// ABOUTME: Provides registration scope options (Event, Day, SessionSelection) for registration flows.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Hateoas;

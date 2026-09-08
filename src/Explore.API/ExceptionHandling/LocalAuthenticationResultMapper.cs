@@ -1,6 +1,3 @@
-// ABOUTME: Declaratively maps Local Identity application outcomes to RFC 7807 HTTP responses.
-// ABOUTME: Keeps credential failures generic and prevents controllers from branching on failure codes.
-
 using Explore.Application.Features.Authentication.Local.Models;
 using Microsoft.AspNetCore.Mvc;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Unit-level HATEOAS policy tests for event detail affordance metadata.
-// ABOUTME: Guards event mutation authorization context and aspect lifecycle affordances.
-
 namespace Event.Api.IntegrationTests.Features.Hateoas;
 
 using System.Security.Claims;

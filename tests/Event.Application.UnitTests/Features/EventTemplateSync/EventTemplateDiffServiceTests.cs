@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for EventTemplateDiffService covering explicit add/modify/retire/local-warning and option-diff behavior.
-// ABOUTME: Uses substituted repositories to verify the boring hand-coded diff logic stays deterministic.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Services;
 using Explore.Domain;

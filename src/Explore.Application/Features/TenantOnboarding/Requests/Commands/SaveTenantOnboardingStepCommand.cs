@@ -1,5 +1,3 @@
-// ABOUTME: Command contract for persisting tenant onboarding step progress without completing onboarding.
-
 using Explore.Application.Responses;
 using MediatR;
 

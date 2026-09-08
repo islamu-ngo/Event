@@ -1,6 +1,3 @@
-// ABOUTME: Repository interface for first-class UI theme aggregates used by appearance settings and runtime composition.
-// ABOUTME: Supports platform-owned and tenant-owned theme catalogs without storing themes in generic settings rows.
-
 namespace Explore.Application.Contracts.Persistence;
 
 using Explore.Domain;

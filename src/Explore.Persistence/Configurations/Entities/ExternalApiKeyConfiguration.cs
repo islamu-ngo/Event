@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for persisted external API key credentials.
-// ABOUTME: Enforces unique public key ids, optional tenant ownership, status/credit-period FK lookups, and credit quota fields.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.ValueGenerators;

@@ -1,6 +1,3 @@
-// ABOUTME: Maps untrusted AI Tech aspect proposals into explicit grouped update commands.
-// ABOUTME: Validates Tech module context, event concurrency, and bounded competition fields.
-
 using System.Text.Json;
 using Explore.Application.DTOs.EventAspects;
 using Explore.Application.Features.AiAssistant.Prompting;

@@ -1,6 +1,3 @@
-// ABOUTME: Deterministic same-event authority ceiling for event-role delegation.
-// ABOUTME: Prevents assigners from granting roles containing permissions they cannot delegate.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Domain;

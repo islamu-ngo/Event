@@ -1,6 +1,3 @@
-// ABOUTME: Generates local data-URI previews for image upload flows.
-// ABOUTME: Keeps browser preview generation separate from storage upload orchestration.
-
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.Extensions.Logging;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Factory for durable event-report provider synchronization outbox messages.
-// ABOUTME: Keeps provider sync payloads safe and separate from sensitive reporter evidence.
-
 using System.Text.Json;
 using Explore.Application.Models.InternalEvents;
 using Explore.Domain;

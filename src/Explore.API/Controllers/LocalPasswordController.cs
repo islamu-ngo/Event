@@ -1,5 +1,3 @@
-// ABOUTME: Exposes ordinary protected Local password change separately from anonymous recovery and first-use replacement.
-// ABOUTME: Derives current session authority from the validated principal and never returns replacement session credentials.
 
 using Asp.Versioning;
 using Explore.API.Attributes;

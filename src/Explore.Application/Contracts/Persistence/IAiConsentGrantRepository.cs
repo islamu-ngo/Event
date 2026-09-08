@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for AI consent grants authored by data subjects.
-// ABOUTME: Implements tenant-scoped lookup of granted field-disclosure permissions.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

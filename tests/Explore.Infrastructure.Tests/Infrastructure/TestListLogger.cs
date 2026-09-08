@@ -1,6 +1,3 @@
-// ABOUTME: Small test logger for asserting formatted structured log output.
-// ABOUTME: Captures structured state, argument values, rendered text, level, and exceptions without external providers.
-
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Infrastructure.Tests.Infrastructure;

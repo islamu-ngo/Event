@@ -1,6 +1,3 @@
-// ABOUTME: Specialized durable email-dispatch intent used by Basic Dispatch Mode before any SMTP side effect runs.
-// ABOUTME: Stores tenant-safe recipient/body snapshots plus delivery state for retry, dead-letter, parking, and replay.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

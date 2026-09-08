@@ -1,6 +1,3 @@
-// ABOUTME: Defines transaction-bound suppression of linked recipient work for superseded fanout occurrences.
-// ABOUTME: Hides stale in-app rows while keeping SMTP evidence immutable after the provider fence exists.
-
 namespace Explore.Application.Contracts.Persistence;
 
 public interface INotificationFanoutEmailSuppressionRepository

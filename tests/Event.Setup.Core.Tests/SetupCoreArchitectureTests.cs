@@ -1,6 +1,3 @@
-// ABOUTME: Verifies Setup Core purity, immutable ownership, and deterministic workflow behavior through public seams.
-// ABOUTME: Exercises synthetic violations to prove compiled metadata and IL ratchets fail closed.
-
 namespace ISLAMU.Setup.Core.Tests;
 
 using System.Collections;

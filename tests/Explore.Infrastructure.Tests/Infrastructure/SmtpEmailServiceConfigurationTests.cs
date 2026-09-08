@@ -1,6 +1,3 @@
-// ABOUTME: No-container configuration tests for SmtpEmailService failure behavior.
-// ABOUTME: Verifies missing SMTP configuration fails safely before provider handoff.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Models;
 using Explore.Infrastructure.Mail;

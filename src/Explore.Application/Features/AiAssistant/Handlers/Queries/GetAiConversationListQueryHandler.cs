@@ -1,6 +1,3 @@
-// ABOUTME: Lists recent AI assistant conversations for the authenticated user.
-// ABOUTME: Uses repository tenant filters and maps entities to safe summary DTOs.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Ai;

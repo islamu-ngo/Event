@@ -1,6 +1,3 @@
-// ABOUTME: Tests the bounded exact-collection Jetstream v2 subscriber with fake stream and fenced store boundaries.
-// ABOUTME: Covers ingestion, replay, filter reconnects, governed PDS recovery, lease fencing, and cancellation.
-
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading.Channels;

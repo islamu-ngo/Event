@@ -1,6 +1,3 @@
-// ABOUTME: API integration tests for the provider-neutral incoming webhook framework.
-// ABOUTME: Verifies verifier lookup, Svix signature verification, route metadata, and raw-body capture behavior.
-
 using System.Diagnostics.Metrics;
 using System.Reflection;
 using System.Text;

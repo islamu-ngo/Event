@@ -1,6 +1,3 @@
-// ABOUTME: bUnit tests for EventCard component verifying layout rendering and field visibility.
-// ABOUTME: Tests settings-driven fields, schedule formatting, and external-platform links across every layout.
-
 using System.Globalization;
 using EventCardComponent = Explore.Blazor.Client.Pages.Events.Components.EventCard;
 

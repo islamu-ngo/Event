@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for BFF /auth/status endpoint behavior under anonymous and authenticated requests.
-// ABOUTME: Uses TestAuthHandler headers to assert server-side HttpContext.User projection.
-
 namespace Explore.Blazor.IntegrationTests.Endpoints;
 
 public class BffAuthStatusTests

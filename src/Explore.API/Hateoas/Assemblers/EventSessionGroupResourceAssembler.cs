@@ -1,6 +1,3 @@
-// ABOUTME: Resource assembler for event program sections/tracks/devrooms.
-// ABOUTME: Converts session group DTOs to HAL resources with HATEOAS links.
-
 namespace Explore.API.Hateoas.Assemblers;
 
 using System.Security.Claims;

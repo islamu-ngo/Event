@@ -1,6 +1,3 @@
-// ABOUTME: Enforces the instance storage ceiling for tenant-plan quotas from one shared policy.
-// ABOUTME: Keeps plan assignment and managed tenant bootstrap quota decisions byte-for-byte consistent.
-
 using System.Globalization;
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;

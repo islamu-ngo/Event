@@ -1,6 +1,3 @@
-// ABOUTME: Enum mirror for stable capacity-hold policy lookup identities.
-// ABOUTME: Defines when capacity is reserved or converted to a waitlist request.
-
 namespace Explore.Domain.Enums;
 
 public enum CapacityHoldPolicyEnum

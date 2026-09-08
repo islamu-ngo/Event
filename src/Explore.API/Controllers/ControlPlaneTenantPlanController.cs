@@ -1,6 +1,3 @@
-// ABOUTME: Control-plane tenant plan authoring endpoints for drafting, versioning, and publishing plans.
-// ABOUTME: Plan definition only; assignment to tenants and tenant lifecycle live in sibling controllers.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

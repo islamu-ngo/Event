@@ -1,6 +1,3 @@
-// ABOUTME: Persists or clears the instance-wide SMTP rate-limit override.
-// ABOUTME: Keeps the configured rate effective whenever no durable override is present.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using Explore.Application.Features.EmailDispatch.Validators;

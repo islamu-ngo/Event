@@ -1,6 +1,3 @@
-// ABOUTME: Actor list DTO returned by paginated actor collection endpoints.
-// ABOUTME: Carries lightweight actor display, federation, appearance, and concurrency metadata.
-
 using System;
 using System.Text.Json.Serialization;
 

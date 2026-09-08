@@ -1,6 +1,3 @@
-// ABOUTME: Outbox entry for guaranteed at-least-once delivery of policy change events.
-// ABOUTME: Written atomically with policy set mutations; background worker processes fan-out.
-
 using Explore.Domain.Settings;
 
 namespace Explore.Domain.Policies;

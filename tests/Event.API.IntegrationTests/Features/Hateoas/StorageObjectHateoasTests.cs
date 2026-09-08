@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS contract tests for storage object metadata collection and detail endpoints.
-// ABOUTME: Verifies storage UI affordances are exposed through HAL links instead of client-side role checks.
-
 using System.Net;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;

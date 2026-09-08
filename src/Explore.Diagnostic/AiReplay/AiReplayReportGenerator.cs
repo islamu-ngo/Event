@@ -1,6 +1,3 @@
-// ABOUTME: Generates deterministic fake/replay AI usability reports for assistant and MCP flows.
-// ABOUTME: Exercises registry, HAL catalog, plan validation, and recovery without live providers or persistence writes.
-
 using System.Globalization;
 using System.Text;
 using Explore.Application.Features.AiAssistant.Plans;

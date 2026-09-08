@@ -1,6 +1,3 @@
-// ABOUTME: Applies grouped route-ID updates to event session groups without changing ownership.
-// ABOUTME: Enforces concurrency, merged placement validity, slug uniqueness, and parent cache convergence.
-
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionGroup.Validators;

@@ -1,6 +1,3 @@
-// ABOUTME: bUnit tests for the tenant branding typed settings section.
-// ABOUTME: Verifies field locks, stamp-chained autosave, conflict reload, and accessible feedback.
-
 using Explore.Blazor.Client.Pages.Admin.Tenant.Components;
 using MudBlazor;
 

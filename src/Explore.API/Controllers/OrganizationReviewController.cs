@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for organization review CRUD operations with rating support.
-// ABOUTME: Manages user reviews and ratings for verified organizations to build community trust.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Hateoas;

@@ -1,5 +1,3 @@
-// ABOUTME: Protects explicit delivery intent and fail-closed SMTP capability states.
-// ABOUTME: Rejects inherited or foreign credentials for tenant-owned transports.
 
 using Explore.Domain.Enums;
 using Explore.Domain.Services;

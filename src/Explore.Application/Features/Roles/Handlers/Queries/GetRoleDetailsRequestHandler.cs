@@ -1,6 +1,3 @@
-// ABOUTME: Handler for unified role detail query by ID.
-// ABOUTME: Uses IRoleRepository, maps Role entity to RoleDto.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Role;

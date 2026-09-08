@@ -1,6 +1,3 @@
-// ABOUTME: Category detail DTO returned by category read endpoints.
-// ABOUTME: Includes concurrency metadata required by PATCH If-Match updates.
-
 using System;
 
 namespace Explore.Application.DTOs.Category;

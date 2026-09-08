@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for moderation report status badge presentation rules.
-// ABOUTME: Maps normalized status categories to MudBlazor color and icon affordances.
-
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
 

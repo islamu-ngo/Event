@@ -1,6 +1,3 @@
-// ABOUTME: API-facing DTOs for support-access session management and audit review.
-// ABOUTME: Exposes bounded support metadata while keeping Domain entities internal.
-
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
 using System.Text.Json.Serialization;

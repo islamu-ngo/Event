@@ -1,6 +1,3 @@
-// ABOUTME: Query handler for a tenant's active control-plane plan assignment.
-// ABOUTME: Exposes plan/version assignment metadata for later provisioning and audit flows.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ControlPlane;
 using Explore.Application.Features.ControlPlane;

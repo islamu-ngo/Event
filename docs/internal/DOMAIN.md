@@ -230,6 +230,7 @@ The platform isolates **physical venue master records** from **per-event disclos
 - Rather than pointing directly to an unmediated `LocationId`, sessions and agenda items reference `EventLocationId`.
 - This ensures session schedules cannot accidentally leak physical addresses, violate parent event privacy policies, or reference a physical venue in a different city from the event.
 - Enforced at the database level by check constraints (`ck_event_session_physical_location_requires_event_location`).
+- Deleting a session, session group, or agenda item clears its canonical event-location reference and the physical location/room keys and navigations together. EF persists deletion as an audited soft-delete UPDATE, so retaining a physical key after detachment would violate the same mediation constraint. The reusable venue and other carriers remain intact.
 
 ### Location Address Source, Visibility, And Promotion
 
@@ -248,6 +249,38 @@ Private Homes, and erased rows fail closed.
 Address visibility controls local application reuse only. It does not alter EventLocation disclosure,
 and application-owned address data is never submitted, exported, merged, or backfilled into a
 geocoding-provider dataset.
+
+### Location Unicode Search Text
+
+`LocationTextNormalization` validates complete names and addresses before aggregate mutation:
+non-null, non-whitespace, at most 500 UTF-16 code units, strict Rune decoding, and no NUL or
+Unicode noncharacters. It derives NFC → invariant uppercase → NFC text and rejects a result
+over 2,000 UTF-16 code units. Neither source nor output is truncated or silently trimmed.
+The complete source remains the display value. Combining marks, joiners, emoji modifiers,
+variation selectors, supplementary letters, and private-use scalars remain valid.
+
+`DisplaySortKey` and the removable `LocationPii.AddressSubstringKey` share normalization
+revision 2. Database constraints accept only current, nonempty keys; the suggestion predicate
+also rejects unsupported revisions. Explicit authorized promotion repairs stale derived state
+before publishing, while erased rows cannot regain PII. Grouped PATCH prevalidates every
+effective name/address before changing tracked fields, including protected provider selections.
+
+Search is a literal substring of normalized text. Canonical `é`/`e` plus combining acute match;
+accent removal, transliteration, full Unicode case folding, and Turkish linguistic casing are
+not promised (`Straße` need not match `STRASSE`, and `İstanbul` does not match `ISTANBUL`).
+Tenant, current membership, privacy, and governance filtering happen in SQL before projection
+and limit. `%`, `_`, backslash, and brackets are literals. Derived text is PII and never becomes
+display text, an external geocoder request, or diagnostic output.
+
+Provider-specific Unicode binary collations protect match membership: PostgreSQL `C`, SQLite
+`BINARY`, SQL Server Unicode `nvarchar` with `Latin1_General_100_BIN2`, and MySQL/MariaDB
+`utf8mb4_bin`. Ordering stays `DisplaySortKey`, then ID, then SQL limit; it is stable within a
+provider, with no universal alphabetical or UUID ordering guarantee. Substring matching can
+scan filtered candidates; a result limit does not bound scanned rows.
+
+Runtime/ICU changes can change persisted normalization even without a revision change. Follow
+the coordinated stopped-write procedure in [OPERATIONS.md](OPERATIONS.md#location-unicode-runtime-compatibility)
+and [ADR-028](adr/ADR-028-location-unicode-search-text.md); mixed normalizer writers are unsupported.
 
 ### 2) Optional Event Aspects (Layer 2 typed schema)
 

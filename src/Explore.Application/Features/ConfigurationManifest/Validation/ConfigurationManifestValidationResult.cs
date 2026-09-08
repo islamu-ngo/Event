@@ -1,6 +1,3 @@
-// ABOUTME: Defines safe structured validation outcomes for configuration manifests.
-// ABOUTME: Carries stable codes and paths while excluding supplied configuration values.
-
 namespace Explore.Application.Features.ConfigurationManifest.Validation;
 
 public static class ConfigurationManifestFailureCodes

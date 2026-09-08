@@ -1,6 +1,3 @@
-# ABOUTME: Validates GitHub Actions workflow supply-chain policy for action references.
-# ABOUTME: Always reports a check and scans workflow/Docker governance inputs when they change.
-
 name: Workflow Security
 
 permissions:

@@ -1,5 +1,3 @@
-// ABOUTME: Proves durable challenge budgets using real SQLite stores, transactions, scope constraints and replica barriers.
-// ABOUTME: Replaces only the external database-clock scalar; no quota, repository, UoW or internal lock mocks.
 
 using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;
@@ -188,7 +186,7 @@ public sealed class AnonymousRegistrationChallengeQuotaTests
     private static ExploreDbContext Context(EventVisitorCapabilitySqliteFixture fixture, Guid tenantId, params IInterceptor[] interceptors)
     {
         var connection = new SqliteConnectionStringBuilder { DataSource = fixture.DatabasePath, Pooling = false, DefaultTimeout = 15 };
-        return new ExploreDbContext(new DbContextOptionsBuilder<ExploreDbContext>().UseSqlite(connection.ToString())
+        return new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>().UseSqlite(connection.ToString())
             .UseSnakeCaseNamingConvention().AddInterceptors(interceptors.OfType<DatabaseClock>().Any()
                 ? interceptors : [.. interceptors, new DatabaseClock()]).Options)
         { TenantContext = new TenantScope(tenantId) };

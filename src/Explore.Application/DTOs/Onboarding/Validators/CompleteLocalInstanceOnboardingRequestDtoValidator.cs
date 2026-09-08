@@ -1,5 +1,3 @@
-// ABOUTME: Manually validates bounded Local setup credentials and explicit directory-operator settings.
-// ABOUTME: Rejects malformed transient inputs without including their values in validation messages.
 
 using System.Net.Mail;
 using Explore.Application.Configuration;

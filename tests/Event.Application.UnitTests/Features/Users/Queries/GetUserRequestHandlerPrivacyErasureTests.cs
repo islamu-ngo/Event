@@ -1,6 +1,3 @@
-// ABOUTME: Verifies fenced Users cannot be served from the user-detail cache.
-// ABOUTME: Covers the OREA-420 cache-rematerialization boundary independently of cache convergence timing.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Exercises Stripe connected-account refund creation and retrieval through deterministic HTTP fixtures.
-// ABOUTME: Proves pinned routing, stable idempotency, bounded state mapping, and timeout ambiguity.
-
 using System.Net;
 using System.Security.Cryptography;
 using Explore.Application.Contracts.Payments;

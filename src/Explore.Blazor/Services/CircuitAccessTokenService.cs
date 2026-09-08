@@ -1,6 +1,3 @@
-// ABOUTME: Manages circuit-scoped token storage, irreversible session revocation, and API token forwarding.
-// ABOUTME: Preserves exact-session cleanup and prevents revoked circuits from adopting another session's token.
-
 using System.Collections.Concurrent;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;

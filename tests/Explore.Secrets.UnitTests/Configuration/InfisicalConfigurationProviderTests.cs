@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for isolated Infisical bootstrap and key conversion rules.
-// ABOUTME: Proves merged configuration cannot supply or override secret-zero credentials.
-
 using System.Reflection;
 using Explore.Secrets.Configuration;
 using Explore.Secrets.Extensions;

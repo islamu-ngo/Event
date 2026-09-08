@@ -1,6 +1,3 @@
-// ABOUTME: Command for updating the authenticated user's appearance preferences.
-// ABOUTME: Persists sparse user overrides while allowing inherited values to flow from parent scopes.
-
 namespace Explore.Application.Features.Appearance.Requests.Commands;
 
 using Explore.Application.DTOs.Appearance;

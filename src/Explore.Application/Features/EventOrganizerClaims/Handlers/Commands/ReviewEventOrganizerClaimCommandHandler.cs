@@ -1,6 +1,3 @@
-// ABOUTME: Applies curator organizer-claim decisions with optimistic concurrency and transactionality.
-// ABOUTME: Approval atomically assigns future organizer authority and is retry-idempotent after commit.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventOrganizerClaim;

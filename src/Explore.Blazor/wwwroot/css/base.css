@@ -1,6 +1,3 @@
-/* ABOUTME: HTML and body defaults — scroll behavior, font family, overflow control.
-   ABOUTME: Loaded into @layer base via layers.css. */
-
 html {
     overflow-x: hidden;
 }

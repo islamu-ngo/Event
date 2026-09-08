@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for grouped EventDay PATCH update DTOs.
-// ABOUTME: Enforces group presence, explicit clear operations, event lookup, and date uniqueness.
-
 using Explore.Application.Contracts.Persistence;
 using FluentValidation;
 

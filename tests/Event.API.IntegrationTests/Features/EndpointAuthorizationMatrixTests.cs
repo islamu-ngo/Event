@@ -1,6 +1,3 @@
-// ABOUTME: Discovers every API route/verb and verifies its unique authorization classification.
-// ABOUTME: Probes public and protected HTTP behavior without duplicating critical feature scenarios.
-
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;

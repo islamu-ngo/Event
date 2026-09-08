@@ -1,5 +1,3 @@
-// ABOUTME: Changes an ordinary Local password using a current session and the exact persisted Ready binding.
-// ABOUTME: Does not use SMTP, supervised replacement authority, or authentication response generation.
 
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;

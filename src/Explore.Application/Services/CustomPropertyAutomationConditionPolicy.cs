@@ -1,6 +1,3 @@
-// ABOUTME: Application-layer guardrail for using event custom properties in automation conditions.
-// ABOUTME: Requires governed tenant-owned projected metadata and rejects workflow-critical state in EAV.
-
 using Explore.Application.Contracts.Services;
 using Explore.Domain;
 using Explore.Domain.Constants;

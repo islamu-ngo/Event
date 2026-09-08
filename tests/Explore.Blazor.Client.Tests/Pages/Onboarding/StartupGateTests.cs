@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for the startup gate handoff driven by the typed startup route decision.
-// ABOUTME: Covers setup, exact provider challenges, completed routing, and the accessible fail-closed status.
-
 using Explore.Blazor.Client.Pages.Onboarding;
 using Explore.Blazor.Client.Routing.ControlPlane;
 

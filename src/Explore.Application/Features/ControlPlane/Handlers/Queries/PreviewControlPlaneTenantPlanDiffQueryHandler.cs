@@ -1,6 +1,3 @@
-// ABOUTME: Query handler for side-effect-free tenant plan assignment previews.
-// ABOUTME: Compares current effective settings to a proposed plan draft before assignment.
-
 using Explore.Application.Features.ControlPlane.Plans;
 using Explore.Application.Features.ControlPlane.Requests.Queries;
 using MediatR;

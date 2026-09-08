@@ -1,6 +1,3 @@
-// ABOUTME: Replays import preview authority under ordered leases and one serializable transaction.
-// ABOUTME: Commits selected canonical mutations, protected snapshots, receipts, and outbox atomically.
-
 namespace Explore.Application.Features.ConfigurationManifest.Importing;
 
 using System.Collections.Immutable;

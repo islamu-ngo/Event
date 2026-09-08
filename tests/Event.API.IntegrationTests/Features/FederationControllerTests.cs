@@ -1,6 +1,3 @@
-// ABOUTME: API absence contracts for retired generic federation CRUD surfaces.
-// ABOUTME: Proves provider-owned keys, cursors, indexes, and records stay behind dedicated workflows.
-
 using System.Net;
 using System.Net.Http.Json;
 using Event.Api.IntegrationTests.Fixtures;

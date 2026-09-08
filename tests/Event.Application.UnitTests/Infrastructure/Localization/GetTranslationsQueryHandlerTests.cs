@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for GetTranslationsQueryHandler — verifies translation export via MediatR.
-// ABOUTME: Tests the query handler delegates to ITranslationManagementProvider and returns dictionary.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Localization.Handlers.Queries;
 using Explore.Application.Features.Localization.Requests.Queries;

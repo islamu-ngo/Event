@@ -1,6 +1,3 @@
-// ABOUTME: Detail DTO for the authenticated user's subscription to an actor.
-// ABOUTME: Exposes lookup labels and concurrency stamp for safe preference updates.
-
 namespace Explore.Application.DTOs.ActorSubscription;
 
 public sealed record ActorSubscriptionDto

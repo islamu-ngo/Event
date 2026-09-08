@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for setting and configuration scope lookup values.
-// ABOUTME: Maps SettingScopeLookup to the setting_scopes table.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

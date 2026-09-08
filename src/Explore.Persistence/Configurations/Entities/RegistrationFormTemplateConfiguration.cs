@@ -1,6 +1,3 @@
-// ABOUTME: Maps thin registration-form template catalog rows to published source versions.
-// ABOUTME: Supports nullable platform ownership plus tenant-scoped template isolation and concurrency.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

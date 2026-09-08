@@ -1,5 +1,3 @@
-<!-- ABOUTME: Builds the repository-owned syntax transformer for generated NSwag contracts. -->
-<!-- ABOUTME: Uses the pinned .NET SDK Roslyn assemblies without adding a package dependency. -->
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>

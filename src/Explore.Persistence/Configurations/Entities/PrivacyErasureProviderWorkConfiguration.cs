@@ -1,6 +1,3 @@
-// ABOUTME: Maps typed privacy-erasure provider work and its lease-fencing state.
-// ABOUTME: Enforces stable target idempotency and bounded operational failure codes.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

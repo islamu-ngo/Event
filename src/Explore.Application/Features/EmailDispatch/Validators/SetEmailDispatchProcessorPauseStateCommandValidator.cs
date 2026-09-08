@@ -1,6 +1,3 @@
-// ABOUTME: Validates instance-wide SMTP processor pause and resume commands.
-// ABOUTME: Bounds operator-supplied audit text before it reaches durable control state.
-
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using FluentValidation;
 

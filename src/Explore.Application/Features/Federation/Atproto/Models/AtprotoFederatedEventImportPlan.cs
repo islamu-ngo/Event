@@ -1,6 +1,3 @@
-// ABOUTME: Describes one validated tenant-local Event and EventSession import from a canonical ATProto record.
-// ABOUTME: Preserves source identity and mapped optional calendar fields for atomic persistence.
-
 namespace Explore.Application.Features.Federation.Atproto.Models;
 
 using Explore.Application.DTOs.Event;

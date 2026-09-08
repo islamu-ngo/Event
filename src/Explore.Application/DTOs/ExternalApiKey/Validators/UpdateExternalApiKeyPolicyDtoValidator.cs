@@ -1,6 +1,3 @@
-// ABOUTME: Validates editable policy changes for persisted external API keys.
-// ABOUTME: Enforces owner-scoped name uniqueness without allowing ownership changes.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ExternalApiKey;
 using Explore.Application.Features.ExternalApiKeys;

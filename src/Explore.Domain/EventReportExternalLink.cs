@@ -1,6 +1,3 @@
-// ABOUTME: Provider synchronization state for externally mirrored event reports.
-// ABOUTME: Tracks safe provider IDs, retry state, and bounded error categories only.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

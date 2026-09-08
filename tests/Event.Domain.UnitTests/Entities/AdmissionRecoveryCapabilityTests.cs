@@ -1,6 +1,3 @@
-// ABOUTME: Specifies tenant-bound admission recovery capability lifecycle and expiry invariants.
-// ABOUTME: Proves one-time consumption, monotonic rotation, UUIDv7 lineage, and redacted diagnostics.
-
 namespace Event.Domain.UnitTests.Entities;
 
 public sealed class AdmissionRecoveryCapabilityTests

@@ -1,6 +1,3 @@
-// ABOUTME: Maps value-minimized configuration import receipts and protected snapshot references.
-// ABOUTME: Enforces trusted target shape, bounded evidence, and append-only rollback linkage.
-
 namespace Explore.Persistence.Configurations.Entities;
 
 using Explore.Domain;

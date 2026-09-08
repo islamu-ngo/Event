@@ -1,6 +1,3 @@
-// ABOUTME: Enforces staff-provider or persisted scanner authority for every admission mutation.
-// ABOUTME: Rechecks exact tenant, event, target, action, expiry, and revocation at command time.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;

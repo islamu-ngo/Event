@@ -1,6 +1,3 @@
-// ABOUTME: MediatR query for organisation members to view shared contacts with pagination.
-// ABOUTME: Authorised via Cerbos — requires ViewSharedContacts permission on the event_contact_share_consent resource.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.ContactShareConsent;
 using Explore.Application.Responses;

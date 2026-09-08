@@ -1,6 +1,3 @@
-// ABOUTME: Architecture tests enforcing authorization parity across ResourceKinds, descriptors, Cerbos policies, schemas, and fallback.
-// ABOUTME: Catches drift when resource kinds, actions, descriptors, or policies are added/removed without updating all layers.
-
 namespace Event.Architecture.Tests;
 
 using System.Reflection;

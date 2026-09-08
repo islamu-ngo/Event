@@ -1,6 +1,3 @@
-// ABOUTME: Maps the private global Jetstream cursor and renewable fenced lease.
-// ABOUTME: Prevents public SyncState CRUD from becoming an authority over federation ingestion.
-
 using Explore.Domain.Federation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

@@ -1,6 +1,3 @@
-// ABOUTME: Evaluates persisted managed-registration compatibility for tenant provisioning reads and writes.
-// ABOUTME: Keeps managed instance, API version, and deployment-mode checks identical across preflight and scheduling.
-
 using Explore.Application.DTOs.Management;
 using Explore.Application.Management;
 using Explore.Domain;

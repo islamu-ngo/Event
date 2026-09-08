@@ -1,6 +1,3 @@
-// ABOUTME: HAL policy for instance-wide SMTP processor controls.
-// ABOUTME: Emits only state-valid pause, resume, set-rate, and clear-rate instance-admin affordances.
-
 using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;

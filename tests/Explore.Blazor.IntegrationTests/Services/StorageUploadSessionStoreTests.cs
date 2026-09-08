@@ -1,6 +1,3 @@
-// ABOUTME: Unit-style tests for BFF storage upload session binding.
-// ABOUTME: Proves upload destinations must be server-issued, user-bound, and content-type-bound.
-
 using System.Security.Claims;
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;

@@ -1,6 +1,3 @@
-// ABOUTME: Regression tests for EventAgendaItem HAL link policy authorization metadata.
-// ABOUTME: Prevents event-detail child agenda requests from failing during link generation.
-
 namespace Event.Api.IntegrationTests.Features.Hateoas;
 
 using Explore.API.Hateoas.Policies;

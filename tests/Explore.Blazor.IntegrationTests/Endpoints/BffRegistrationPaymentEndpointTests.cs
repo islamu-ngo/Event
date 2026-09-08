@@ -1,6 +1,3 @@
-// ABOUTME: Pins the BFF payment navigation boundary to server-resolved checkout targets and local callbacks.
-// ABOUTME: Prevents browser-supplied external URLs and callback-driven payment confirmation.
-
 using Explore.Blazor.Extensions;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;

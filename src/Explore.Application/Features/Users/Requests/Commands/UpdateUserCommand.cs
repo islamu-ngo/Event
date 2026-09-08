@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for updating a user's profile fields.
-// ABOUTME: Carries the route user ID and grouped UpdateUserDto payload.
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.User;
 using Explore.Application.Responses;

@@ -1,6 +1,3 @@
-// ABOUTME: Reads the exact tenant-owned directory-operator identity typed document.
-// ABOUTME: Returns null for missing or non-exact documents without provisioning or fallback resolution.
-
 namespace Explore.Application.Features.TenantSettingsDocuments.Handlers.Queries;
 
 using Explore.Application.Contracts.Infrastructure;

@@ -1,6 +1,3 @@
-// ABOUTME: Unified REST controller for hierarchical settings management at user, tenant, and instance scopes.
-// ABOUTME: Exposes generic CRUD, lock, and unlock endpoints with instance-admin HAL affordances.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

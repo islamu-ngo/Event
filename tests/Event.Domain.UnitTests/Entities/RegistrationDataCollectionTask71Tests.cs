@@ -1,6 +1,3 @@
-// ABOUTME: Pins public registration workflow, requirement, channel, and lookup behavior for Task 7.1.
-// ABOUTME: Covers ALL/ANY evaluation, pure skips, applicability, tenant isolation, and malformed inputs.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

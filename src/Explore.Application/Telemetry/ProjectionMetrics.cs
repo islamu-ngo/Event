@@ -1,6 +1,3 @@
-// ABOUTME: Custom OpenTelemetry metrics for EAV custom property projection operations.
-// ABOUTME: Tracks rebuild/drain counts, durations, and failures with tenant + projection type dimensions.
-
 using System.Diagnostics.Metrics;
 
 namespace Explore.Application.Telemetry;

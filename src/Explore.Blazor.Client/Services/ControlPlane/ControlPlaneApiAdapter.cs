@@ -1,6 +1,3 @@
-// ABOUTME: Adapts control-plane UI service contracts to the generated Event API client.
-// ABOUTME: Preserves generated HAL resources and command responses without local model mapping.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.ControlPlane;
 

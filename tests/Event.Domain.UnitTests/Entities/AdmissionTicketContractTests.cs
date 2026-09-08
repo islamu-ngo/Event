@@ -1,6 +1,3 @@
-// ABOUTME: Specifies one admission issuance plus credential-child rotation, terminal, and refund behavior.
-// ABOUTME: Characterizes existing confirmed-order assignment authority before the future admission aggregate exists.
-
 using System.Collections;
 using System.Globalization;
 using System.Reflection;

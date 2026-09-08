@@ -1,6 +1,3 @@
-// ABOUTME: Service for managing actor-related operations.
-// ABOUTME: Reads canonical and tenant-contextual Actor HAL resources from the API.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Constants;
 using Explore.Blazor.Client.Contracts.Services.Lookup;

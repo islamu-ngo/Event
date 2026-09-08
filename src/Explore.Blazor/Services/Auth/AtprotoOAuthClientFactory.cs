@@ -1,6 +1,3 @@
-// ABOUTME: Creates confidential CarpaNet OAuth sessions over the hardened AT Protocol transport pipeline.
-// ABOUTME: Makes the rotation-pinned signing key and durable state/session prerequisites explicit and fail-closed.
-
 using System.Text.Json;
 using CarpaNet.Identity;
 using CarpaNet.OAuth;

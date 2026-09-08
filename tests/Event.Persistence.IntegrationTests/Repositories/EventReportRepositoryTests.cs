@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL repository tests for event-report intake and moderation queue queries.
-// ABOUTME: Verifies tenant-bounded lookups, no-tracking reads, queue specifications, and duplicate checks.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Specifications.EventReports;

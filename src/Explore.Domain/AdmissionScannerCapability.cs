@@ -1,6 +1,3 @@
-// ABOUTME: Owns one digest-only scanner authority for one tenant, event, and admission target.
-// ABOUTME: Enforces bounded actions, expiry, immutable issuance audit, and idempotent revocation.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: Tests operator-facing custom-property projection status signals.
-// ABOUTME: Verifies dirty-scope backlog and stale rebuild states are exposed without raw property keys.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

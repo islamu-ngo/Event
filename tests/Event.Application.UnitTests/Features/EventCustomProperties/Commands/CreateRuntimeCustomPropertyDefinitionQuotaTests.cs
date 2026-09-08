@@ -1,6 +1,3 @@
-// ABOUTME: Quota regression tests for event and session runtime custom-property definition creation.
-// ABOUTME: Verifies create handlers fail before persistence when definition or option quotas are exceeded.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

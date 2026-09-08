@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for EventSessionTag junction with tenant-scoped uniqueness on (EventSessionId, TagId).
-// ABOUTME: Cascades on session/tag deletion; tenant FK is restrict-only.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

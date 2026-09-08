@@ -1,5 +1,3 @@
-// ABOUTME: Clones the published ticket catalog into an event draft.
-// ABOUTME: Authorizes against the parent event ticket-management action.
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

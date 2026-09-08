@@ -1,6 +1,3 @@
-// ABOUTME: Implements local organizer payment connection commands without provider I/O.
-// ABOUTME: Enforces explicit actor control, scoped idempotency, uniqueness, replacement, and safe query mapping.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

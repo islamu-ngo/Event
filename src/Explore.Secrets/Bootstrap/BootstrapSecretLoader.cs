@@ -1,6 +1,3 @@
-// ABOUTME: Loads Postgres bootstrap credentials from one explicit deployment authority.
-// ABOUTME: Supports Environment or Infisical without per-field fallback between sources.
-
 using System.Globalization;
 using Explore.Secrets.Abstractions;
 using Explore.Secrets.Configuration;

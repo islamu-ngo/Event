@@ -1,4 +1,3 @@
-// ABOUTME: Rich email message DTO supporting HTML, plain text, attachments, CC/BCC,
 // reply-to, and custom headers. Provider-agnostic — works with any SMTP server.
 
 namespace Explore.Application.Models;

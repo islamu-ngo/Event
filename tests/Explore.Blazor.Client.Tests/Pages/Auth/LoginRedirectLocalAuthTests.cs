@@ -1,6 +1,3 @@
-// ABOUTME: Verifies accessible Local Identity credentials rendering and typed BFF submission behavior.
-// ABOUTME: Guards safe navigation and prevents credential or provider-detail disclosure.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;

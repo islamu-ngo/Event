@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for local report decision capture.
-// ABOUTME: Requires safe bounded metadata and duplicate grouping only for duplicate decisions.
-
 using Explore.Application.Features.EventReporting.Requests.Commands;
 using Explore.Domain;
 using Explore.Domain.Enums;

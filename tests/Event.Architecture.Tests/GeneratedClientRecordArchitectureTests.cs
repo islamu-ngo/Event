@@ -1,6 +1,3 @@
-// ABOUTME: Ratchets generated NSwag record output and every reasoned mutable class exclusion.
-// ABOUTME: Verifies compiled record/init semantics, generator ownership, and protected protocol shapes.
-
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;

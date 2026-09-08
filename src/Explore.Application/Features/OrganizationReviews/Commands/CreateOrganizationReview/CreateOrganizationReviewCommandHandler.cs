@@ -1,5 +1,3 @@
-// ABOUTME: Handler for creating a new organization review with validation.
-// ABOUTME: Validates input, maps DTO, links to actor, persists review.
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

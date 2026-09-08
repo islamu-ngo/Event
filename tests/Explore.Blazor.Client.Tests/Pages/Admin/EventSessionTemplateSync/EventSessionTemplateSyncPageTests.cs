@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for EventSessionTemplateSyncPage.
-// ABOUTME: Covers HAL-gated render, 409 handling, and slug confirmation tests.
-
 using Explore.Blazor.Client.Components.EventTemplateSync;
 using Explore.Blazor.Client.Pages.Admin.EventSessionTemplateSync;
 using Explore.Blazor.Client.Services.EventSessionTemplateSync;

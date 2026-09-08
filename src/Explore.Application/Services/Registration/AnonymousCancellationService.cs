@@ -1,5 +1,3 @@
-// ABOUTME: Owns the single serializable transaction for limited-capability free anonymous cancellation.
-// ABOUTME: Shares exact read-only eligibility with mutation and rolls back deadline crossings and rejected authority.
 
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;

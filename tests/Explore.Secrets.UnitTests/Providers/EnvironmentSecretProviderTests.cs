@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for EnvironmentSecretProvider.
-// ABOUTME: Tests key mapping, secret retrieval, and health status.
-
 using Explore.Secrets.Abstractions;
 using Explore.Secrets.Providers;
 using Microsoft.Extensions.Logging;

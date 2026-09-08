@@ -1,6 +1,3 @@
-// ABOUTME: Stable relational lookup for operator decisions applied when webhook configuration changes.
-// ABOUTME: Makes preserving or explicitly migrating eligible pending delivery work a required choice.
-
 namespace Explore.Domain;
 
 public sealed class WebhookPendingWorkDecisionLookup

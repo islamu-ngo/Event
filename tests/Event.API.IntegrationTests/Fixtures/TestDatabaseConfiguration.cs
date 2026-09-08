@@ -1,6 +1,3 @@
-// ABOUTME: Projects PostgreSQL Testcontainers settings into the structured primary database contract.
-// ABOUTME: Keeps raw connection strings process-local and never logs their credential-bearing values.
-
 using System.Globalization;
 using Npgsql;
 

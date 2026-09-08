@@ -1,5 +1,3 @@
-// ABOUTME: Query handler checking whether a user account exists for a given email or ID.
-// ABOUTME: Returns a boolean existence check result.
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Users.Requests.Queries;
 using MediatR;

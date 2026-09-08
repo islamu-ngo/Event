@@ -1,6 +1,3 @@
-// ABOUTME: Cryptographic HMAC-SHA256 redactor for pseudonymized correlation without PII disclosure.
-// ABOUTME: Implements deterministic hashing using a server-side pepper key into fixed 64-char hex strings.
-
 using System.Buffers;
 using System.Security.Cryptography;
 using System.Text;

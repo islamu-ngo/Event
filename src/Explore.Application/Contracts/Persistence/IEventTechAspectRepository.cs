@@ -1,6 +1,3 @@
-// ABOUTME: Repository interface for EventTechAspect entity.
-// ABOUTME: Extends generic repository with tech-specific queries.
-
 namespace Explore.Application.Contracts.Persistence;
 
 using System;

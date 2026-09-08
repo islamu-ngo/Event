@@ -1,6 +1,3 @@
-// ABOUTME: Handles Keycloak realm sync preview requests from instance settings.
-// ABOUTME: Reads redacted auth config and delegates read-only Keycloak inspection to Infrastructure.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;

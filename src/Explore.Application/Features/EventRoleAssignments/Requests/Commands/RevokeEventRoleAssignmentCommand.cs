@@ -1,6 +1,3 @@
-// ABOUTME: Command for revoking an event role assignment while preserving audit history.
-// ABOUTME: Enforces last-owner protection and same-event authority ceiling.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using Explore.Domain.Constants;

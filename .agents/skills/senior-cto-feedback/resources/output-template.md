@@ -1,180 +1,80 @@
-<!-- ABOUTME: Response structure for Senior CTO reviews of implementation-plan workstreams. -->
-<!-- ABOUTME: Forces decisive verdicts, artifact-specific critique, and actionable rewrite guidance for /dev-docs plans. -->
-# Output Template
+<!-- ABOUTME: Chat response structure for Senior CTO feedback and direct triad updates. -->
+<!-- ABOUTME: Outlines the crisp, high-signal reporting format for chat without generating review markdown files. -->
+# Output Template — Chat Response Structure
 
-Write the full review to `dev/active/<task-name>/<task-name>-cto-review.md`; the chat response names the file, decision, top blocker, and next required gate without duplicating it. Normal review is read-only except for this artifact.
+Senior CTO feedback **never** writes or generates any `*-cto-review.md` or feedback files in `dev/active/<task>/`. Zero review files on disk.
 
-## Required Structure
+Instead:
+1. **Direct Triad Refinement**: 100% of the CTO's review brain and architectural rigor goes directly into updating the workstream triad in place:
+   - `dev/active/<task>/<task>-plan.md`
+   - `dev/active/<task>/<task>-context.md`
+   - `dev/active/<task>/<task>-tasks.md`
+2. **Autonomous Execution Without Approval**: The CTO skill does not pause to request user approval before applying these edits; it applies them directly.
+3. **Crisp Chat Reporting**: All findings, decisions, and applied modifications are reported back to the user in a crisp, high-signal chat response.
+
+## Required Chat Response Structure
+
+The finishing chat response must follow this structure:
 
 ```markdown
-# Senior CTO Feedback
+## Senior CTO Feedback & Triad Refinements Applied
 
-Last Updated: YYYY-MM-DD Europe/Brussels
+### Executive Verdict & Direction
+**Verdict:** [Approved as Refined | Split Applied | Scope Pruned & Aligned]
+[A direct, punchy 2-3 sentence executive statement explaining the architectural assessment, why the triad was updated, and the overall readiness of the workstream.]
 
-## Review Metadata
+---
 
-- Review mode: Read-only | Rewrite requested
-- Reviewed plan revision: `<Git object or SHA-256 digest>`
-- Reviewed tasks revision: `<Git object or SHA-256 digest>`
-- Reviewed I-VSD revision: `<Git object or SHA-256 digest>`
-- I-VSD freshness: Current | Stale | Missing
-- Decision: Approve | Approve with required changes | Split before approval | Reject | Defer
-- User approval: Not granted by this review
+### Key Decisions Made
+- **[Decision 1 — e.g. Architectural Boundary]**: [Decision summary, e.g., Enforced server-side HAL link affordances and moved validation out of Blazor UI into CQRS command pipeline.]
+- **[Decision 2 — e.g. Breaking Change / Simplification]**: [Eliminated deprecated route aliases and legacy adapter shims in favor of clean V1 contracts.]
+- **[Decision 3 — e.g. Sequencing / PR Right-Sizing]**: [Split UI enablement into follow-up backlog item dev/backlog/...; narrowed this workstream strictly to core migration and API contract.]
+- **[Decision 4 — e.g. Invariant Verification]**: [Mandated failing Red-phase tests for concurrency race on order capture before handler implementation.]
 
-## Executive Verdict
+---
 
-[One direct paragraph. State whether the plan is strong, weak, risky, over-scoped, under-evidenced, or ready.]
+### Changes Applied to the Triad
 
-**Decision:** Approve | Approve with required changes | Split before approval | Reject | Defer
+#### 1. Implementation Plan (`<task>-plan.md`)
+- **Architecture & Boundaries**: [Key modifications made in Section 5]
+- **Behavioral Scenarios**: [Added/refined WHEN/THEN specifications in Section 3]
+- **Phasing & Exit Criteria**: [Restructured phases, clarified exit criteria]
+- **Breaking Changes**: [Explicitly documented deleted legacy paths in Section 12]
+- **Metadata**: Updated CTO Review status to `Applied & Aligned (YYYY-MM-DD)`
 
-## 3-Dimensional Scorecard
+#### 2. Context (`<task>-context.md`)
+- **Quick Resume & Status**: [Synchronized active status, updated NEXT pointer to Phase 1 Red task]
+- **Key Decisions**: [Recorded architectural forks, breaking change positions, and scoping boundaries]
+- **Validation Baseline**: [Updated targeted test commands and baseline verification checks]
+- **Blockers & Risks**: [Removed stale items, documented active dependency gates]
 
-| Dimension | Status (Pass / Warning / Blocker) | Key Finding |
-|---|---|---|
-| **Completeness** | [Pass / Issues] | [Coverage of capabilities, I-VSD mitigations, Red/Green tasks] |
-| **Correctness** | [Pass / Issues] | [Scenario validity, worst-break tests, query performance] |
-| **Coherence** | [Pass / Issues] | [Clean Architecture boundaries, HAL affordances, tenant isolation] |
+#### 3. Task Checklist (`<task>-tasks.md`)
+- **Test-First Invariant Ordering**: [Restructured tasks into explicit Task N.1 Red Phase (failing tests) -> Task N.2 Green Phase (handler) -> Task N.3 Refactor]
+- **Anti-Tautology**: [Replaced shallow mock assertions with domain invariant and contract assertions]
+- **Atomic Commit Contracts**: [Authored complete Conventional Commit packets for every phase, with path-limited git commands and benefit-led titles]
+- **Scope Right-Sizing**: [Pruned un-actionable tasks; graduated deferred items to backlog]
 
-## Top Risks
+---
 
-### 1. [CRITICAL/WARNING] [Severity: Blocker/Critical/Major] — [Issue]
+### Top Risks Resolved / Mitigated
+- **"The Worst Break" Adversarial Scenario**: [Named catastrophic failure mode and how the Red phase invariant test prevents it]
+- **Tenant Isolation & Security**: [How fail-closed tenant checks or authz boundaries were tightened]
+- **Delivery & Rollback**: [How migration safety or self-hoster recovery was ensured]
 
-**Why it matters:**  
-[Enterprise/platform/operator reason.]
+---
 
-**Evidence from the plan/codebase:**  
-[Concrete evidence. Name plan sections and files when available.]
-
-**Minimum acceptable fix:**  
-[Specific correction.]
-
-## What I Would Keep
-
-[Short list of the strongest parts of the plan.]
-
-## What Must Change Before Implementation
-
-[Ranked list. Keep this sharper than “nice to have” improvements.]
-
-## Dev-Docs Quality Assessment
-
-### `...-plan.md`
-[Does it satisfy the /dev-docs planning contract? What is missing or strong?]
-
-### `...-context.md`
-[Does it preserve resume-critical context, decisions, blockers, and validation baseline?]
-
-### `...-tasks.md`
-[Are tasks executable, sequenced, and verifiable?]
-
-## Islamic Value-Sensitive Design (I-VSD) Assessment
-
-[Name the linked report and reviewed revision. Assess freshness, provider-controlled risks, stable `IVSD-*` mappings, mitigations, evidence limits, refresh triggers, and scholarly escalation needs. Missing, stale, or unmapped I-VSD evidence blocks approval.]
-
-## Socratic Stress-Testing & "Worst Break" Audit Findings
-
-### "The Worst Break" Catastrophic Scenario Check
-[Name the single most catastrophic failure mode if this workstream fails in production. Does Phase Red have a dedicated Invariant-Breaker test proving it is prevented?]
-
-### Grill-Me Stress-Test Findings
-[List the strongest challenged claims and findings for rollback safety, tenant boundaries, query-performance thresholds, operator clarity, failure modes, and edge cases. For each unresolved material claim, name the evidence or decision required before approval.]
-
-## Enterprise / Self-Hosting Assessment
-
-[Discuss config, secrets, deployment, health checks, operations, upgrades, backup/restore/recovery, and operator clarity.]
-
-## Security and Multi-Tenancy Assessment
-
-[Discuss auth/authz, tenant isolation, trust boundaries, BFF/browser boundary, admin scope, and fail-closed behavior.]
-
-## Architecture and Maintainability Assessment
-
-[Discuss layering, CQRS, data ownership, API contracts, UI responsibility, abstractions, and deletion of obsolete paths.]
-
-## Breaking-Change Position
-
-[State which breaking changes are acceptable, which compatibility paths should be deleted, and what migration/docs are required.]
-
-## Implementation Sequencing I Recommend
-
-1. [Foundation / migration / contract]
-2. [Application/API behavior]
-3. [UI/BFF enablement]
-4. [Tests/observability/docs]
-5. [Cleanup/removal]
-
-## Verification Bar
-
-[Commands, projects, and specific risk-oriented tests expected before merge.]
-
-## Recommended Plan Rewrite
-
-[Provide a concise improved version of the plan or the precise changes that must be made to the existing plan/context/tasks files.]
-
-Optional sections
-
-## Missing Evidence
-
-[What the current workstream does not prove.]
-
-## Red-Team Failure Scenarios
-
-[How this could fail in production/self-hosted deployments.]
-
-## Alternative Architecture
-
-[Better design if current plan is materially wrong.]
-
-## PR Split Recommendation
-
-[Proposed PR boundaries and why.]
-
-## Operator Runbook Requirements
-
-[What self-hosters need for install/upgrade/recovery.]
+### Execution Readiness & Next Step
+[Clear, direct guidance on the exact next step for the developer or implementing agent to run, e.g.:
+"The triad is fully refined and execution-ready. Begin implementation with **Phase 1, Task 1.1** (authoring the failing invariant tests in `tests/...`). Run:
+`dotnet test --treenode-filter '/*/*/*<TestClass>/*'`"]
 ```
 
 ## Answer Style Rules
 
-- Start with the verdict, not background.
-- Avoid generic praise.
-- Do not bury blockers at the end.
-- Use file paths and plan sections when available.
-- Be explicit about what would block approval.
-- Prefer fewer, sharper recommendations over long unfocused lists.
-- When the user asks to improve the plan, make the rewrite guidance directly actionable for the existing `plan.md`, `context.md`, and `tasks.md`.
-- A rewrite-mode review cannot approve the revision it just changed; mark I-VSD freshness and the required revalidation path.
-- Do not write code unless explicitly requested.
-- Do not ask for clarification when a useful review can be produced with assumptions.
-
-## Example Verdicts
-
-### Strong but over-scoped
-
-```markdown
-## Executive Verdict
-
-The direction is right, but I would not approve this as one implementation stream. It mixes persistence changes, API contract changes, UI behavior, and operator documentation in a way that makes regressions hard to isolate. Because breaking changes are acceptable, the plan should simplify the contract first, then rebuild the UI around the new canonical shape.
-
-**Decision:** Split before approval.
-```
-
-### Wrong layer
-
-```markdown
-## Executive Verdict
-
-I would reject the current plan because it places policy decisions in the Blazor/UI layer instead of the API/Application boundary. For an enterprise self-hostable platform, the UI can express affordances, but it cannot be the source of authorization truth.
-
-**Decision:** Reject.
-```
-
-### Ready with changes
-
-```markdown
-## Executive Verdict
-
-This is a strong plan and the target architecture is credible. I would approve it after adding explicit tenant-isolation tests, a self-hoster upgrade note, and OpenAPI/client regeneration sequencing.
-
-**Decision:** Approve with required changes.
-```
+- **Zero review markdown files**: Never create `*-cto-review.md` in `dev/active/<task>/`.
+- **Direct in-place edits**: Always edit the triad files (`plan.md`, `context.md`, `tasks.md`) directly before delivering the chat response.
+- **Durable triad preservation (Never chat-only)**: Chat is strictly an executive summary. All technical rigor, scorecards, worst-break invariants, and risk mitigations MUST be written into `plan.md`, `context.md`, and `tasks.md` first. Never leave critical review insights only in ephemeral chat.
+- **Start with the verdict**: Be decisive and direct.
+- **High-signal, bounded length**: Crisp and clear—do not overwhelm the user with walls of text, but never skip critical technical details (concrete class names, endpoints, test classes).
+- **Concrete evidence**: Cite real project paths, types, commands, and phase numbers.
+- **No generic praise**: Provide blunt, senior architectural leadership.

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for converting untrusted AI event aspect proposals into safe aspect commands.
-// ABOUTME: Covers Islamic and Tech aspect grouped-update/delete validation, module context, and destructive metadata.
-
 using Explore.Application.Features.AiAssistant.Actions;
 using Explore.Application.Features.AiAssistant.Prompting;
 using Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: Tests MCP assistant tools, resources, and prompts over MediatR boundaries.
-// ABOUTME: Verifies MCP surfaces remain proposal-first and omit raw tool payload details.
-
 using System.Text.Json;
 using Explore.API.Mcp;
 using Explore.Application.DTOs.Ai;

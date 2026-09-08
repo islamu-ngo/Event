@@ -1,4 +1,3 @@
-// ABOUTME: TUnit test fixture providing HttpClient with TestAuthHandler for auth integration tests.
 // Uses AuthenticatedWebApplicationFactory. Auth is per-request via X-Test-Auth header (no shared state).
 
 using Explore.Application.Contracts.Infrastructure;

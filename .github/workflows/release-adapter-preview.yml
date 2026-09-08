@@ -1,5 +1,3 @@
-# ABOUTME: Advertises the GitHub release-adapter preview check without activating releases.
-# ABOUTME: Runs only for pull requests with read-only permissions and no final lane.
 name: Release Adapter Preview Discovery
 
 on:

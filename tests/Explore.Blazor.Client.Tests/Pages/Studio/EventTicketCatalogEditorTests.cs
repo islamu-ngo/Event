@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for HAL-gated ticket catalog controls and draft mutations.
-// ABOUTME: Proves authoring controls fail closed while read-only catalog content remains visible.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Contracts.Services.Events;

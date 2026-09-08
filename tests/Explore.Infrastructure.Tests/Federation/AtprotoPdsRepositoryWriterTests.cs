@@ -1,6 +1,3 @@
-// ABOUTME: Verifies idempotent ATProto repository writes over CarpaNet's generic XRPC client surface.
-// ABOUTME: Covers stable-rkey reconciliation, create conflicts, compare-and-swap updates, and tombstone deletes.
-
 using System.Net;
 using System.Text.Json;
 using CarpaNet;

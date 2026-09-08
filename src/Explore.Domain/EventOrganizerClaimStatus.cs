@@ -1,6 +1,3 @@
-// ABOUTME: Normalized lookup describing an organizer claim lifecycle state.
-// ABOUTME: Keeps persisted state IDs stable while domain methods own transitions.
-
 namespace Explore.Domain;
 
 public sealed class EventOrganizerClaimStatus

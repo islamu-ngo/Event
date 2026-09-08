@@ -1,6 +1,3 @@
-// ABOUTME: Handles retrieval of one event-local custom property definition with options.
-// ABOUTME: Maps entity returned from repository to the detail DTO for organizer configuration views.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventCustomProperty;

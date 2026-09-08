@@ -1,4 +1,3 @@
-// ABOUTME: Stores organization-identifying contact/location fields in an extension table.
 // Uses a 1:1 shared primary-key relationship with Organization for hard-deleteable PII.
 
 namespace Explore.Domain;

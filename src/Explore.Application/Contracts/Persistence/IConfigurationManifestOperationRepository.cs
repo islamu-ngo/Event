@@ -1,6 +1,3 @@
-// ABOUTME: Append-only persistence contracts for configuration-manifest operation and tenant-result evidence.
-// ABOUTME: Separates transaction-bound outcomes from isolated post-rollback failure recording.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Captures one redacted advisory AI evaluation scenario result.
-// ABOUTME: Avoids storing prompts, provider responses, raw tool payloads, tenant IDs, or secrets.
-
 namespace Explore.Diagnostic.AiEvaluation;
 
 public sealed record AiEvaluationScenarioResult(

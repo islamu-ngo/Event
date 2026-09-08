@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for TestTmsConnectionCommandHandler — verifies TMS connection test flow.
-// ABOUTME: Tests success and failure scenarios for TMS provider connectivity checks.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Localization.Handlers.Commands;

@@ -1,6 +1,3 @@
-// ABOUTME: Deployment mode for the application instance (single-tenant vs multi-tenant).
-// ABOUTME: Defined in Domain so Application and Infrastructure layers can both reference it.
-
 namespace Explore.Domain.Enums;
 
 /// <summary>

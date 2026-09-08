@@ -1,6 +1,3 @@
-// ABOUTME: Public AT Protocol OAuth client configuration for the Blazor BFF.
-// ABOUTME: Defines the canonical URL-derived client identity and optional presentation metadata.
-
 using Microsoft.AspNetCore.Authentication;
 
 namespace Explore.Blazor.Authentication;
@@ -13,11 +10,7 @@ public class AtprotoAuthenticationOptions : AuthenticationSchemeOptions
 
     public bool AllowDevelopmentLoopback { get; set; }
 
-    public bool UseSingleNodeMemoryStore { get; set; }
-
     public int StateLifetimeSeconds { get; set; } = 300;
-
-    public int HandoffLifetimeSeconds { get; set; } = 60;
 
     public List<AtprotoTenantOrigin> TenantOrigins { get; set; } = [];
 

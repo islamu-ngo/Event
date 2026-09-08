@@ -1,6 +1,3 @@
-// ABOUTME: Secured query for validating a tenant plan draft without persistence side effects.
-// ABOUTME: Reuses the same SaaS-tier validator used by tenant plan commands.
-
 using Explore.Application.Authorization;
 using Explore.Application.Features.ControlPlane.Plans;
 using MediatR;

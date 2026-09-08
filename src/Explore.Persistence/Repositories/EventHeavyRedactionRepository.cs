@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for heavy event redaction workflows.
-// ABOUTME: Loads tracked event-owned entities so Application can apply redaction without depending on DbContext.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Events.Moderation;
 using Explore.Domain;

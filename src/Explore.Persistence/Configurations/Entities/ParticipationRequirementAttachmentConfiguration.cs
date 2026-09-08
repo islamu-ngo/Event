@@ -1,6 +1,3 @@
-// ABOUTME: Maps participation-owned requirement attachments with composite tenant/event lineage.
-// ABOUTME: Enforces one active attachment per requirement and one standalone questionnaire per configuration.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

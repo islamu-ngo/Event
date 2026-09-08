@@ -1,6 +1,3 @@
-// ABOUTME: Creates one new secret artifact with owner-only Unix permissions and no overwrite or plaintext fallback.
-// ABOUTME: Removes only a newly created partial file when a protected write cannot complete safely.
-
 namespace ISLAMU.Event.SetupAssistant.Terminal;
 
 using System.Buffers;

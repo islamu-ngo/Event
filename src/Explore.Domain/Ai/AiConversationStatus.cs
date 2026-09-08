@@ -1,6 +1,3 @@
-// ABOUTME: Defines lifecycle states for persisted AI assistant conversations.
-// ABOUTME: Keeps conversation availability explicit for persistence, API, and HAL policy decisions.
-
 namespace Explore.Domain.Ai;
 
 public enum AiConversationStatus

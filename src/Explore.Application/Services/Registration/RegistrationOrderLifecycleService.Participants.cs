@@ -1,6 +1,3 @@
-// ABOUTME: Resolves registration participants for lifecycle finalization.
-// ABOUTME: Keeps deferred assignment and placeholder creation rules outside the main seam.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;

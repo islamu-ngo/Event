@@ -1,6 +1,3 @@
-// ABOUTME: Provides Change-Id allocation, fragment creation, hook preflight, and commit-bound repair commands.
-// ABOUTME: Prevents target collisions before commit or merge while preserving immutable Git provenance.
-
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
@@ -87,7 +84,7 @@ public static class ChangeWorkflowCommand
         }
 
         string id = AllocateUnused(root, timeout);
-        string directory = Path.Combine(root, "docs", "releases", "changes");
+        string directory = Path.Join(Path.GetFullPath(root), "docs", "internal", "releases", "changes");
         Directory.CreateDirectory(directory);
         string path = Path.Combine(directory, id + ".yaml");
         WriteAtomic(path, StrictUtf8.GetBytes(Fragment(id, title, type, scope, summary, group)));
@@ -154,7 +151,7 @@ public static class ChangeWorkflowCommand
                 "--name-only",
                 "--diff-filter=AM",
                 "--",
-                "docs/releases/changes")
+                "docs/internal/releases/changes")
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         string[] modified = RunGit(
                 root,
@@ -164,7 +161,7 @@ public static class ChangeWorkflowCommand
                 "--name-only",
                 "--diff-filter=M",
                 "--",
-                "docs/releases/changes")
+                "docs/internal/releases/changes")
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (modified.Length != 0)
         {
@@ -281,7 +278,7 @@ public static class ChangeWorkflowCommand
             throw new ChangeWorkflowException($"change_rename_target_used:{newId}");
         }
 
-        string fragments = Path.Combine(root, "docs", "releases", "changes");
+        string fragments = Path.Join(Path.GetFullPath(root), "docs", "internal", "releases", "changes");
         string oldFragment = Path.Combine(fragments, oldId + ".yaml");
         string newFragment = Path.Combine(fragments, newId + ".yaml");
         if (!File.Exists(newFragment))
@@ -309,7 +306,7 @@ public static class ChangeWorkflowCommand
         }
 
         var rename = new ChangeIdRename(commitOid, oldId, newId, reason);
-        string directory = Path.Combine(root, "docs", "releases", "change-id-renames");
+        string directory = Path.Join(Path.GetFullPath(root), "docs", "internal", "releases", "change-id-renames");
         Directory.CreateDirectory(directory);
         string path = Path.Combine(directory, commitOid + ".yaml");
         WriteAtomic(path, StrictUtf8.GetBytes(ChangeIdRenamePolicy.Serialize(rename)));
@@ -392,7 +389,7 @@ public static class ChangeWorkflowCommand
     {
         HashSet<string> result = CollectCommittedIds(root, timeout);
 
-        string fragments = Path.Combine(root, "docs", "releases", "changes");
+        string fragments = Path.Combine(root, "docs", "internal", "releases", "changes");
         if (Directory.Exists(fragments))
         {
             foreach (string file in Directory.EnumerateFiles(fragments, "*.yaml", SearchOption.TopDirectoryOnly))
@@ -449,7 +446,7 @@ public static class ChangeWorkflowCommand
 
     private static void ValidateFragment(string root, string id)
     {
-        string path = Path.Combine(root, "docs", "releases", "changes", id + ".yaml");
+        string path = Path.Combine(root, "docs", "internal", "releases", "changes", id + ".yaml");
         if (!File.Exists(path) || IsLink(path) || !string.Equals(ReadFragmentId(path), id, StringComparison.Ordinal))
         {
             throw new ChangeWorkflowException($"change_fragment_missing_or_mismatched:{id}");
@@ -461,7 +458,7 @@ public static class ChangeWorkflowCommand
         string id,
         TimeSpan timeout)
     {
-        string relative = $"docs/releases/changes/{id}.yaml";
+        string relative = $"docs/internal/releases/changes/{id}.yaml";
         if (!TryRunGit(root, timeout, out string text, "show", $":{relative}") ||
             !string.Equals(ParseFragmentId(text), id, StringComparison.Ordinal))
         {
@@ -476,7 +473,7 @@ public static class ChangeWorkflowCommand
         string id,
         TimeSpan timeout)
     {
-        string relative = $"docs/releases/changes/{id}.yaml";
+        string relative = $"docs/internal/releases/changes/{id}.yaml";
         if (!TryRunGit(
                 root,
                 timeout,
@@ -494,8 +491,8 @@ public static class ChangeWorkflowCommand
     {
         string[] paths =
         [
-            "docs/releases/changes",
-            "docs/releases/change-id-renames",
+            "docs/internal/releases/changes",
+            "docs/internal/releases/change-id-renames",
         ];
         if (!TryRunGit(
                 root,

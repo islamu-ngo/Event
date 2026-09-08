@@ -1,6 +1,3 @@
-// ABOUTME: Enum mirror for stable registration-requirement subject lookup identities.
-// ABOUTME: Defines order, ticket, participant, lead-booker, child, and session applicability.
-
 namespace Explore.Domain.Enums;
 
 public enum RegistrationRequirementSubjectTypeEnum

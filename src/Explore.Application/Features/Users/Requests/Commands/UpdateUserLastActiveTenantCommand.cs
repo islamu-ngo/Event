@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command to update the user's last active tenant ID.
-// ABOUTME: Returns a boolean indicating success.
-
 using System;
 using MediatR;
 

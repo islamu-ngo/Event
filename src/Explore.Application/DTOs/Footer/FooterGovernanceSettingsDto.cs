@@ -1,6 +1,3 @@
-// ABOUTME: DTO for instance-level footer governance settings (lock flags and defaults).
-// ABOUTME: Used in the instance admin UI to control what tenants can override.
-
 namespace Explore.Application.DTOs.Footer;
 
 public sealed record FooterGovernanceSettingsDto

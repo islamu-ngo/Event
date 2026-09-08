@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for trusted provider automation to provision a customer tenant and admin identity.
-// ABOUTME: Keeps provider customer authority tenant-scoped; endpoint-level provider/operator authorization is added by API composition.
-
 using Explore.Application.DTOs.ManagedProviderProvisioning;
 using Explore.Application.DTOs.Management;
 using Explore.Application.Responses;

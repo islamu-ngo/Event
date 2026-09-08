@@ -1,6 +1,3 @@
-// ABOUTME: Authorized command for verifying or rebinding one consumer provider application.
-// ABOUTME: Uses persisted typed ownership as authority while treating provider identity as untrusted input.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

@@ -1,6 +1,3 @@
-// ABOUTME: SQLite integration tests for IntegrationSync stale-lease recovery and exact fenced settlement.
-// ABOUTME: Proves provider-handoff ambiguity is parked while reclaimed owners reject stale completion.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -157,7 +154,7 @@ public sealed class IntegrationSyncOutboxRepositoryTests
     }
 
     private static ExploreDbContext CreateContext(SqliteConnection connection) => new(
-        new DbContextOptionsBuilder<ExploreDbContext>()
+        TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connection)
             .UseSnakeCaseNamingConvention()
             .Options);

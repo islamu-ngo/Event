@@ -1,6 +1,3 @@
-// ABOUTME: Command to create a new link inside a footer link group.
-// ABOUTME: Order is auto-assigned as max+1 within the group.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

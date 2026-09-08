@@ -1,6 +1,3 @@
-// ABOUTME: Persistence contract for fair, fenced Local webhook target claims and settlement loads.
-// ABOUTME: Keeps immutable target snapshots authoritative while HTTP attempts remain append-only evidence.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

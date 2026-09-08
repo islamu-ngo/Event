@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for EventDay - first-class event-local day aggregate with authored labels and publishing state.
-// ABOUTME: Enforces (EventId, LocalDate) uniqueness and cascades on event deletion so orphaned day rows cannot exist.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

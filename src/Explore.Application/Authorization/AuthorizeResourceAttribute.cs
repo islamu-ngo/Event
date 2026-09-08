@@ -1,6 +1,3 @@
-// ABOUTME: Metadata attribute for marking MediatR commands with resource/action authorization requirements.
-// ABOUTME: Used by AuthorizationBehavior as the attribute-based authorization path.
-
 namespace Explore.Application.Authorization;
 
 /// <summary>

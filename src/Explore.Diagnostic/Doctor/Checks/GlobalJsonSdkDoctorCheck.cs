@@ -1,6 +1,3 @@
-// ABOUTME: Compares installed dotnet SDK output with repository global.json.
-// ABOUTME: Reports SDK drift without attempting installation or repair.
-
 using System.Text.Json;
 using Explore.Diagnostic.Doctor.Infrastructure;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Diagnostic reason codes explaining why the resolver chose a particular analytics profile.
-// ABOUTME: Internal/admin only — never exposed in public bootstrap DTOs.
-
 namespace Explore.Domain.Enums.Analytics;
 
 /// <summary>

@@ -1,6 +1,3 @@
-// ABOUTME: Validator for changing a Group approval status through admin-managed workflows.
-// ABOUTME: Ensures approval transitions reference a seeded ApprovalStatus lookup row.
-
 using Explore.Application.Contracts.Persistence;
 using FluentValidation;
 

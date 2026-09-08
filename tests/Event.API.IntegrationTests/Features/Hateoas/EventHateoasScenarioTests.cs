@@ -1,6 +1,3 @@
-// ABOUTME: Scenario-based HATEOAS tests for EventController using RealRuntimeApiFixture with seeded data.
-// ABOUTME: Validates event-specific item links (sessions, actor) and pagination with actual data present.
-
 using System.Buffers.Binary;
 using System.Net;
 using System.Text.Json;

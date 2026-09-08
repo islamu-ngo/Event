@@ -1,5 +1,3 @@
-// ABOUTME: Maps bounded private challenge counters with tenant and composite tenant/event foreign keys.
-// ABOUTME: Portable primary keys and checks prevent duplicate scopes and invalid counter/window state.
 
 using Explore.Domain;
 using Explore.Persistence.Models;

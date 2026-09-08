@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for GetUnreadCountRequestHandler.
-// ABOUTME: Tests unread count retrieval with user scoping.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Notifications.Handlers.Queries;

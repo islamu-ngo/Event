@@ -1,6 +1,3 @@
-// ABOUTME: Guards untrusted Application and generated machine request contracts from acquiring raw coordinate authority.
-// ABOUTME: Explicitly allowlists governed coordinate reads while structurally discovering writable request graphs.
-
 using System.CodeDom.Compiler;
 using System.Collections.Immutable;
 using System.Reflection;

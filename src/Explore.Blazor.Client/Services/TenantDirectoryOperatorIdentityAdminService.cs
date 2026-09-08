@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-admin BFF service for the typed directory-operator identity document.
-// ABOUTME: Maps exact HAL edit authority and submits one grouped optimistic-concurrency PATCH.
-
 using System.Net;
 using Explore.Blazor.Client.Clients;
 

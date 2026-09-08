@@ -1,6 +1,3 @@
-// ABOUTME: Query request for the unread notification count of the authenticated user.
-// ABOUTME: Returns UnreadCountDto with the count, leverages partial index for performance.
-
 using Explore.Application.DTOs.Notification;
 using MediatR;
 

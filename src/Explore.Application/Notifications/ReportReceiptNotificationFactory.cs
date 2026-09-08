@@ -1,6 +1,3 @@
-// ABOUTME: Builds the immutable reporter receipt intent, in-app delivery, and optional email snapshot.
-// ABOUTME: Uses only persisted recipient authority and the resolved canonical SLA hour value.
-
 using System.Globalization;
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Features.EventReporting;

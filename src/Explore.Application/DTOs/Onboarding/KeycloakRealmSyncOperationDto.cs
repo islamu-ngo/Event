@@ -1,6 +1,3 @@
-// ABOUTME: Describes one read-only Keycloak drift finding or future additive repair action.
-// ABOUTME: Never contains provider secrets, tokens, or raw Keycloak response payloads.
-
 namespace Explore.Application.DTOs.Onboarding;
 
 public sealed record KeycloakRealmSyncOperationDto

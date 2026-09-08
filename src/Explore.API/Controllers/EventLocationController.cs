@@ -1,6 +1,3 @@
-// ABOUTME: Purpose-specific EventLocation endpoints for public, attendee, and event-management access.
-// ABOUTME: Keeps private reads no-store and maps organizer disclosure updates through secured CQRS commands.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

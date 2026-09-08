@@ -1,6 +1,3 @@
-// ABOUTME: Shared Layer 3 custom-property option for a tenant-scoped definition.
-// ABOUTME: Uses namespaced machine keys so labels can change without breaking semantics.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

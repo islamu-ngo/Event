@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for recording a local moderator decision on an assigned report case.
-// ABOUTME: Persists safe decision metadata and leaves enforcement to the execute-decision slice.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;

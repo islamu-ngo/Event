@@ -1,6 +1,3 @@
-// ABOUTME: Partial class containing SaveChangesAsync override with automatic audit and generated field population.
-// ABOUTME: Preserves pre-generated Added stamps while rotating Modified IConcurrencyAware entities and audit metadata.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;

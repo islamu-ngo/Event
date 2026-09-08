@@ -1,6 +1,3 @@
-// ABOUTME: Probes ATProto OAuth session protection in the rebased PostgreSQL baseline.
-// ABOUTME: Verifies encrypted-session constraints, uniqueness, and rejection of invalid ciphertext.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;

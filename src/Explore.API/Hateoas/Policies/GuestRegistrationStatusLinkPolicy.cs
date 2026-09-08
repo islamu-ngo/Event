@@ -1,5 +1,3 @@
-// ABOUTME: Defines private guest status links using server-evaluated cancellation eligibility only.
-// ABOUTME: Calendar eligibility remains isolated to the existing public-purpose export, never guest authority.
 
 using System.Security.Claims;
 using Explore.Application.Contracts.Hateoas;

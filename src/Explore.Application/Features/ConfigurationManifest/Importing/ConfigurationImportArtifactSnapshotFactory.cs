@@ -1,6 +1,3 @@
-// ABOUTME: Projects strict portability artifacts into canonical digest-only preview sections.
-// ABOUTME: Sorts JSON and tenant identities so preview freshness never depends on source ordering.
-
 namespace Explore.Application.Features.ConfigurationManifest.Importing;
 
 using System.Buffers;

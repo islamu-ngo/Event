@@ -1,6 +1,3 @@
-// ABOUTME: Verifies paid Checkout metrics emit only bounded outcome and reason categories.
-// ABOUTME: Uses an exact MeterListener signal to prove arbitrary failure text never becomes telemetry.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Services.Registration;
 using Explore.Application.Telemetry;

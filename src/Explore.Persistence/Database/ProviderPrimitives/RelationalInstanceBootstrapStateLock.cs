@@ -1,6 +1,3 @@
-// ABOUTME: Loads the current bootstrap generation under the provider-native exclusive row lock.
-// ABOUTME: Keeps lock syntax out of repositories while serializable transactions classify claim races.
-
 using System.Linq.Expressions;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

@@ -1,6 +1,3 @@
-// ABOUTME: Registers CORS policies for the API with configurable allowed origins.
-// ABOUTME: Provides 5 named policies: InternalApp, ExternalApp, InternalWebsite, ExternalWebsite, Dev.
-
 namespace Explore.API.Extensions;
 
 public static class CorsExtensions

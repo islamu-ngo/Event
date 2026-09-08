@@ -1,6 +1,3 @@
-// ABOUTME: Stripe.net hosted Checkout create and retrieve adapter for connected-account direct charges.
-// ABOUTME: Shapes immutable money requests and maps transport/provider ambiguity into bounded Application results.
-
 using System.Net;
 using Explore.Application.Contracts.Payments;
 using Explore.Application.Contracts.Secrets;

@@ -1,5 +1,3 @@
-// ABOUTME: Exercises supervised Local reset, replay, rollback, and competing writes in both native Identity stores.
-// ABOUTME: Preserves exact application binding and original verification provenance without recovering handed-over credentials.
 
 using System.Data.Common;
 using System.Security.Cryptography;
@@ -564,7 +562,7 @@ public sealed class LocalCredentialResetTests
                 identity.AddEntityFrameworkStores<ExternalIdentityDbContext>();
             }
             else identity.AddEntityFrameworkStores<ExploreDbContext>();
-            _provider = services.BuildServiceProvider();
+            _provider = services.BuildIsolatedServiceProvider();
             await using (AsyncServiceScope seed = Provider.CreateAsyncScope())
             {
                 var application = seed.ServiceProvider.GetRequiredService<ExploreDbContext>();

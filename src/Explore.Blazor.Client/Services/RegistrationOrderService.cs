@@ -1,6 +1,3 @@
-// ABOUTME: Orchestrates generated registration-order client calls for Studio and recovery pages.
-// ABOUTME: Reuses authorized managed-event reads and never logs or persists guest bearer capabilities.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Helpers;

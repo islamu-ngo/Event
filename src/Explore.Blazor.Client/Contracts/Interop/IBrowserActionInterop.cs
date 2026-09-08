@@ -1,6 +1,3 @@
-// ABOUTME: Contract for browser-only actions such as share, clipboard, scrolling, and downloads.
-// ABOUTME: Keeps Blazor components behind typed JS-module calls instead of raw evaluated script.
-
 namespace Explore.Blazor.Client.Contracts.Interop;
 
 public interface IBrowserActionInterop

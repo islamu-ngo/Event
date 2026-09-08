@@ -1,6 +1,3 @@
-// ABOUTME: Verifies promoted release bundles, SSH signer authorization, and immutable tag identity.
-// ABOUTME: Projects restricted security input into a minimal approved public disposition without leaking private fields.
-
 using System.Security.Cryptography;
 using System.Diagnostics;
 using System.Globalization;

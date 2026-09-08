@@ -1,6 +1,3 @@
-// ABOUTME: Global Actor identity with exactly one concrete User, Organization, Group, external, or service owner.
-// ABOUTME: Enforces verified external promotion, retirement, and idempotent global moderation transitions.
-
 using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Enums;

@@ -1,6 +1,3 @@
-// ABOUTME: Sub-resource DTO for instance-level branding defaults and lock flags.
-// ABOUTME: Controls default brand identity and whether tenants can override branding.
-
 namespace Explore.Application.DTOs.Instance;
 
 public sealed record BrandingSettingsDto

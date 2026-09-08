@@ -1,6 +1,3 @@
-// ABOUTME: Validates presence-aware tenant branding patch requests and their merged payloads.
-// ABOUTME: Rejects blank stamps and empty groups while keeping all branding strings bounded.
-
 namespace Explore.Application.DTOs.TenantSettingsDocuments.Validators;
 
 using FluentValidation;

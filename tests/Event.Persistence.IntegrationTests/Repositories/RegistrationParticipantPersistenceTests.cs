@@ -1,6 +1,3 @@
-// ABOUTME: Verifies participant admissions and ticket-assignment invariants against real PostgreSQL.
-// ABOUTME: Exercises tenant-safe foreign keys, per-line quantity enforcement, and concurrent final-slot insertion.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;

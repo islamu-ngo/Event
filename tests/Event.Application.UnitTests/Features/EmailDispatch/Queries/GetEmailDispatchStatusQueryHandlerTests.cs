@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the operator-safe Basic Dispatch Mode status query handler.
-// ABOUTME: Verifies sanitized projection behavior and request validation without leaking email content.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EmailDispatch.Handlers.Queries;
 using Explore.Application.Features.EmailDispatch.Requests.Queries;

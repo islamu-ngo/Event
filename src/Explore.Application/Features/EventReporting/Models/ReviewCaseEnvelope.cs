@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral review case envelope for external queue mirroring.
-// ABOUTME: Keeps review sync payloads limited to case/report metadata and explicit evidence policy.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Features.EventReporting.Models;

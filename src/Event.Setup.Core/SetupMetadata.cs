@@ -1,6 +1,3 @@
-// ABOUTME: Defines normalized setup identity, capability, topology, and portable section metadata.
-// ABOUTME: Snapshots ordered caller inputs without carrying deployment coordinates or live authority.
-
 namespace ISLAMU.Event.Setup.Core;
 
 using System.Collections.ObjectModel;

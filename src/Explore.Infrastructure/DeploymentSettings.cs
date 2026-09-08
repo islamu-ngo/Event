@@ -1,6 +1,3 @@
-// ABOUTME: Configuration settings for deployment mode (single-tenant vs multi-tenant).
-// ABOUTME: Enables a single binary to run in both modes based on configuration.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Infrastructure;

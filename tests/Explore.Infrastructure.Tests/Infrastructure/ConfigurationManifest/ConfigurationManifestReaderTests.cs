@@ -1,6 +1,3 @@
-// ABOUTME: Exercises bounded, duplicate-aware, strict UTF-8 configuration-manifest ingestion.
-// ABOUTME: Verifies safe failure codes, exact digests, cancellation, and no permissive coercion.
-
 namespace Explore.Infrastructure.Tests.Infrastructure.ConfigurationManifest;
 
 using System.Security.Cryptography;

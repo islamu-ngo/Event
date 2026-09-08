@@ -1,6 +1,3 @@
-// ABOUTME: Publishes a validated draft ticket catalog for a platform-managed event.
-// ABOUTME: Maps ticketing failures and invalidates the event detail cache after successful publication.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;

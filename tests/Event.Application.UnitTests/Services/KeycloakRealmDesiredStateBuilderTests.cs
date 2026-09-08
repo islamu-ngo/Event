@@ -1,6 +1,3 @@
-// ABOUTME: Tests composable Keycloak realm desired-state registry behavior.
-// ABOUTME: Verifies default Event requirements and future contributor extension points.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Services;

@@ -1,6 +1,3 @@
-// ABOUTME: Resolves Event-owned plan, module, domain, branding, and setting policy before tenant mutation.
-// ABOUTME: Produces one closed bootstrap snapshot used by both operation scheduling and transactional execution.
-
 using System.Globalization;
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: DTO representing a single resolved setting with full metadata for client rendering.
-// ABOUTME: Includes editability info (CanEdit/Reason) so UIs can render disabled controls with explanations.
-
 namespace Explore.Application.DTOs.Settings;
 
 using Explore.Application.Contracts.Infrastructure;

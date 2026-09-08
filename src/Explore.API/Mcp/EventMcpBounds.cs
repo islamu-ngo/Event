@@ -1,6 +1,3 @@
-// ABOUTME: Size and truncation ceilings for every Event MCP tool response.
-// ABOUTME: Keeps the disclosure budget in one reviewable place instead of scattered magic numbers.
-
 namespace Explore.API.Mcp;
 
 /// <summary>

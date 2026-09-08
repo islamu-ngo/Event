@@ -1,6 +1,3 @@
-// ABOUTME: Trusted Application-owned facts for pre-create storage upload authorization.
-// ABOUTME: Binds upload intent to authenticated subject, tenant, and loaded owning-resource evidence.
-
 using Explore.Domain;
 
 namespace Explore.Application.Authorization;

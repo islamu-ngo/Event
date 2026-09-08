@@ -1,6 +1,3 @@
-// ABOUTME: Defines the typed atomic registration-answer domain contract before persistence implementation.
-// ABOUTME: Covers value families, subject applicability, ordinals, exclusions, and ciphertext-only sensitive values.
-
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Domain;

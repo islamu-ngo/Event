@@ -1,6 +1,3 @@
-// ABOUTME: Exposes instance-authorized configuration manifest upload, preview, refresh, and cancellation.
-// ABOUTME: Uses a one-time header capability and private no-store responses for every session operation.
-
 namespace Explore.API.Controllers;
 
 using System.ComponentModel.DataAnnotations;

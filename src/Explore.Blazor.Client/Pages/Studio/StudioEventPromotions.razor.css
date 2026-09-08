@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped BEM layout for Studio promotion management and one-time-code feedback. */
-/* ABOUTME: Uses design tokens and logical spacing so the surface remains RTL-safe. */
-
 .studio-event-promotions {
     display: grid;
     gap: var(--isl-space-4);

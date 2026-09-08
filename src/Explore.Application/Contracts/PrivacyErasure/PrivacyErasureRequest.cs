@@ -1,6 +1,3 @@
-// ABOUTME: Defines the bounded Application request for a typed platform privacy-erasure append.
-// ABOUTME: Accepts only UUIDv7 intent identity, executable User subject data, reason code, and policy version.
-
 using System.Text.Json.Serialization;
 using Explore.Domain;
 

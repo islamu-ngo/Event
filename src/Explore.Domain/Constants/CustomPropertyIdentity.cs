@@ -1,6 +1,3 @@
-// ABOUTME: Normalization helpers for Layer 3 custom-property machine identity.
-// ABOUTME: Ensures Namespace + Key stay lowercase slug-like identifiers before persistence and comparison.
-
 using System.Text;
 
 namespace Explore.Domain.Constants;

@@ -1,5 +1,3 @@
-// ABOUTME: Defines complete SMTP policy mutations and evidence-bearing direct disable writes.
-// ABOUTME: Keeps atomic multi-scope changes immutable and returns closed outcomes with committed-value notification inputs.
 
 using System.Collections.Immutable;
 

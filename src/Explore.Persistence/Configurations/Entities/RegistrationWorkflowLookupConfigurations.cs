@@ -1,6 +1,3 @@
-// ABOUTME: Maps the four normalized Task 7.1 registration-workflow lookup families.
-// ABOUTME: Reuses the provider-neutral lookup contract for stable integer IDs and bounded metadata.
-
 using Explore.Domain;
 
 namespace Explore.Persistence.Configurations.Entities;

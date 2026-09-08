@@ -1,6 +1,3 @@
-// ABOUTME: Enforces project CQRS namespace placement for commands, queries, and handlers.
-// ABOUTME: Reports exact violating type names so architecture regressions are actionable.
-
 namespace Event.Architecture.Tests;
 
 using System.Reflection;

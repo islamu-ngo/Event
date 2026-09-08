@@ -1,6 +1,3 @@
-// ABOUTME: Pure helpers for computing the normalized searchable/facet value stored on projection rows.
-// ABOUTME: Kept as static functions so both event and session updaters stay boring and reflection-free.
-
 using System.Globalization;
 using Explore.Domain.Enums;
 

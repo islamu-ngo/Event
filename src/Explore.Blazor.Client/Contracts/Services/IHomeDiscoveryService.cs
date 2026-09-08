@@ -1,6 +1,3 @@
-// ABOUTME: Frontend contract for loading and selecting tenant-aware public home discovery context.
-// ABOUTME: Keeps browser origin transient by exposing only coarse-area selection to API and preference calls.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services;

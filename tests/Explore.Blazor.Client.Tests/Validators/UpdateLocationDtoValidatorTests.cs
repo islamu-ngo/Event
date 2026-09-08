@@ -1,6 +1,3 @@
-// ABOUTME: Tests the coordinate-free grouped Location update validator at the browser boundary.
-// ABOUTME: Requires at least one legitimate manual update group without prose or timing assertions.
-
 using Explore.Blazor.Client.Validators;
 
 namespace Explore.Blazor.Client.Tests.Validators;

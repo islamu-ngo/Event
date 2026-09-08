@@ -1,6 +1,3 @@
-// ABOUTME: Handles bulk replacement of all values for a multi-value session custom property definition.
-// ABOUTME: Atomically removes existing values and inserts the new set with sequential ordinals.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

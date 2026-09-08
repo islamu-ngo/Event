@@ -1,6 +1,3 @@
-// ABOUTME: HAL policies for instance onboarding status and its setup/admin affordances.
-// ABOUTME: Emits provider, completion, and tenant-management links only for trusted server authority.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Security.Claims;

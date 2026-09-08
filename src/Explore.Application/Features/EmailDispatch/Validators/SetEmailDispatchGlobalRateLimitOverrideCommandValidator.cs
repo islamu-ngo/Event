@@ -1,6 +1,3 @@
-// ABOUTME: Validates the nullable global SMTP rate-limit override.
-// ABOUTME: Accepts null for clear and otherwise enforces the processor's operational bound.
-
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using FluentValidation;
 

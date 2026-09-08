@@ -1,6 +1,3 @@
-// ABOUTME: Category list item DTO used by lookup, filter, and HAL collection responses.
-// ABOUTME: Includes concurrency metadata so list-driven editors can issue PATCH If-Match updates.
-
 using System;
 
 namespace Explore.Application.DTOs.Category;

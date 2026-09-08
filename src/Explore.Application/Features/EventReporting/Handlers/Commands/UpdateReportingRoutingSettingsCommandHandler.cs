@@ -1,6 +1,3 @@
-// ABOUTME: Handles tenant moderation reporting routing-setting updates through hierarchical settings.
-// ABOUTME: Enforces tenant delegation locks and preserves omitted provider secrets.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

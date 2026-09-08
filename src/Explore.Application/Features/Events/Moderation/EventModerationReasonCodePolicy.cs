@@ -1,6 +1,3 @@
-// ABOUTME: Normalizes structured reason metadata for event moderation commands.
-// ABOUTME: Keeps moderation audit codes bounded and machine-readable before they reach domain history.
-
 using Explore.Application.Features.Events.Requests.Commands;
 
 namespace Explore.Application.Features.Events.Moderation;

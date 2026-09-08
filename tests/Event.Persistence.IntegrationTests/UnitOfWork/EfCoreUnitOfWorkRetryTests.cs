@@ -1,6 +1,3 @@
-// ABOUTME: Deterministic non-Docker tests for unit-of-work retry and rollback exception safety.
-// ABOUTME: Forces an EF execution-strategy retry and verifies failed-attempt tracking is discarded.
-
 using System.Data.Common;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -100,7 +97,7 @@ public sealed class EfCoreUnitOfWorkRetryTests
 
     private static ExploreDbContext CreateContext()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql("Host=localhost;Database=unused;Username=unused;Password=unused")
             .Options;
         return new ExploreDbContext(options);

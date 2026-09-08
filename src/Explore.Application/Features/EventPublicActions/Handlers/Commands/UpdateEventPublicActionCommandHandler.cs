@@ -1,6 +1,3 @@
-// ABOUTME: Updates one event public action with optimistic concurrency enforcement.
-// ABOUTME: Destination changes return the action to pending review and preserve tenant ownership.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventPublicAction.Validators;

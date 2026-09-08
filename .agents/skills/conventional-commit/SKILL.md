@@ -16,7 +16,7 @@ priority: high
 3. **No Layer Scopes**: Scopes describe capability/engineering concern—never code layers (`api`, `domain`, `persistence`, `blazor`, `client`, `dto` are forbidden).
 4. **Cross-Domain Precedence**: When a feature spans domains, select the primary initiating capability (`registration`).
 5. **Subject Quality**: State user/operator benefit in imperative mood; clear without reading the body.
-6. **Breaking Work & Change-Id**: Breaking changes require `!` and `BREAKING CHANGE:` footer. Governed security/migration work requires its change fragment and matching `Change-Id: CHG-...` footer.
+6. **Breaking Work & Change-Id**: Breaking changes require `!` and `BREAKING CHANGE:` footer. Governed security/migration work requires its change fragment in `docs/internal/releases/changes/` and matching `Change-Id: CHG-...` footer.
 7. **Internal Nonbreaking Work**: Commits of type `test`, `build`, `ci`, `refactor`, `style`, or internal `docs`/`fix` must carry both `Changelog: skip` and non-empty `Changelog-Reason: <reason>`.
 8. **Safe Staging**: Never use blind `git add .` on mixed trees. Explicitly name staged files per atomic commit. On a shared checkout, inspect the existing index first; never unstage another contributor's work. If unrelated paths are already staged, use an explicit path-limited commit only when you own the complete diff of every named file, then verify the resulting commit file list. A file containing another contributor's hunks is a blocker until ownership is separated or coordinated.
 9. **Self-Sufficient Planned Contract**: Planning writes exact metadata, commit paths, inspection commands, `git add`, path-limited `git commit`, and post-commit verification in `tasks.md`. Pathspecs equal declared paths and the command encodes metadata/trailers. A truthful packet executes without loading this skill.
@@ -108,6 +108,7 @@ git show --name-only --format=fuller HEAD
 
 ## Resources
 
+- [Governed releases](../../../docs/internal/releases/README.md)
 - [Release policy](../../../docs/internal/RELEASE_POLICY.md)
 - [Release policy schema](../../../eng/release/policy/release-policy.yaml)
 - [Scope registry](../../../eng/release/policy/scope-registry.yaml)

@@ -1,6 +1,3 @@
-// ABOUTME: Fluent builder for User domain entities in integration tests.
-// ABOUTME: Produces EF-compatible User instances with UserPii for test data seeding.
-
 using Explore.Domain;
 
 namespace Event.Api.IntegrationTests.Builders;

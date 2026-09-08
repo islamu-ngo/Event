@@ -1,6 +1,3 @@
-// ABOUTME: Retrieves an owned AI assistant conversation with messages, runs, references, and proposals.
-// ABOUTME: Enforces user ownership in the Application layer before returning private history.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Ai;

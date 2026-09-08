@@ -1,6 +1,3 @@
-// ABOUTME: Repository for normalized notification intent, delivery, and external delegation rows.
-// ABOUTME: Uses exact tenant predicates for worker-safe lookup without leaking IQueryable.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
 using Explore.Application.Notifications;

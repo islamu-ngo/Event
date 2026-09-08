@@ -1,6 +1,3 @@
-/* ABOUTME: Tokenized responsive layout for the pinned native registration form renderer. */
-/* ABOUTME: Keeps progress, fields, actions, and status readable across direction, contrast, and zoom preferences. */
-
 .registration-form { container-type: inline-size; display: grid; gap: var(--isl-space-6); color: var(--isl-color-text); }
 .registration-form__header { display: grid; gap: var(--isl-space-2); padding-block-end: var(--isl-space-4); border-block-end: 1px solid var(--isl-color-border); }
 .registration-form__header h2 { margin: 0; }

@@ -1,6 +1,3 @@
-// ABOUTME: Validates session runtime custom property definition creation with PropertyType-dependent rules.
-// ABOUTME: Mirrors CreateEventCustomPropertyDefinitionDtoValidator with EventSessionId scope.
-
 using Explore.Domain.Enums;
 using FluentValidation;
 

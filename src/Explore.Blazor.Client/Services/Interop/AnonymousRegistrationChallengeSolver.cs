@@ -1,5 +1,3 @@
-// ABOUTME: Runs anonymous proof work in a dedicated native Web Crypto worker via JS interop.
-// ABOUTME: Terminates work on cancellation, disposal or timeout without persisting protected challenges.
 
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;

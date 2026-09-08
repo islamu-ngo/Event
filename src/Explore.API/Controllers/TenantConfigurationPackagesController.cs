@@ -1,6 +1,3 @@
-// ABOUTME: Exposes tenant-authorized deterministic configuration package download.
-// ABOUTME: Returns only route-selected tenant bytes with private no-store containment.
-
 namespace Explore.API.Controllers;
 
 using Asp.Versioning;

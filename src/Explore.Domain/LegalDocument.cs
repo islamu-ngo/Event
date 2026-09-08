@@ -1,6 +1,3 @@
-// ABOUTME: Owns target-scoped legal draft, review, publication, and retirement lifecycle.
-// ABOUTME: Preserves immutable version/publication evidence while excluding acceptance facts.
-
 namespace Explore.Domain;
 
 using System.Globalization;

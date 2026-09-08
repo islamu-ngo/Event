@@ -1,5 +1,3 @@
-// ABOUTME: Owns fresh Local credential authority and atomic creation, activation, and first-use replacement.
-// ABOUTME: Fences selected-store mutations with current operation/state/stamps while preserving native password policy.
 
 using System.Data;
 using System.Data.Common;

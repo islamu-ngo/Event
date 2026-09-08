@@ -1,5 +1,3 @@
-// ABOUTME: Holds the Identity-owned durable receipt for Local credential creation and handover.
-// ABOUTME: Preserves stable cross-store identifiers and verification provenance without credential material.
 
 using Explore.Application.Contracts.Identity;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Public API controller for retrieving translations and available languages.
-// ABOUTME: All endpoints are AllowAnonymous — Blazor frontend fetches translations without auth.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Hateoas;

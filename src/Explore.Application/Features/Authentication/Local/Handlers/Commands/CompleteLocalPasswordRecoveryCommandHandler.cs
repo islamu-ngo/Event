@@ -1,5 +1,3 @@
-// ABOUTME: Validates recovery-only Local token and password input before native one-use mutation.
-// ABOUTME: Keeps token-authorized mirror retry separate from password mutation and ordinary login.
 
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Features.Authentication.Local.Requests.Commands;

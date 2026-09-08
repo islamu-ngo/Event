@@ -1,6 +1,3 @@
-// ABOUTME: Setting definitions for group self-registration policies.
-// ABOUTME: Controls whether users can self-register groups within a tenant.
-
 namespace Explore.Domain.Settings.Definitions;
 
 public static class GroupSettingDefinitions

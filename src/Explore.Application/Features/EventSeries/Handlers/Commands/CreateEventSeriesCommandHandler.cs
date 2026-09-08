@@ -1,6 +1,3 @@
-// ABOUTME: Handler for creating new event series with validation and tenant context.
-// ABOUTME: Validates input, sets tenant, initializes defaults, and generates slug if not provided.
-
 using System.Linq;
 using System.Text.RegularExpressions;
 using AutoMapper;

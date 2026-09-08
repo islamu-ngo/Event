@@ -1,5 +1,3 @@
-// ABOUTME: Exercises first-use Local credential replacement over both native SQLite Identity topologies.
-// ABOUTME: Separates signed challenge issuance from transactional password, lifecycle, and replay invariants.
 
 using System.Data.Common;
 using System.IdentityModel.Tokens.Jwt;
@@ -815,7 +813,7 @@ public sealed class LocalCredentialFirstUseTests
                 identity.AddEntityFrameworkStores<ExternalIdentityDbContext>();
             }
             else identity.AddEntityFrameworkStores<ExploreDbContext>();
-            _provider = services.BuildServiceProvider();
+            _provider = services.BuildIsolatedServiceProvider();
             Guid initiatorId = Guid.CreateVersion7();
             await using (AsyncServiceScope seed = Provider.CreateAsyncScope())
             {

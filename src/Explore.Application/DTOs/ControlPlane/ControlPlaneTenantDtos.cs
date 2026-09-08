@@ -1,6 +1,3 @@
-// ABOUTME: Control-plane tenant lifecycle DTOs for instance-operator tenant management.
-// ABOUTME: Exposes bounded tenant metadata, normalized status fields, and audit trail entries.
-
 namespace Explore.Application.DTOs.ControlPlane;
 
 public sealed record ControlPlaneTenantListItemDto

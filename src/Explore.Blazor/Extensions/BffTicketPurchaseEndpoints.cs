@@ -1,6 +1,3 @@
-// ABOUTME: Maps antiforgery-protected BFF endpoints for authenticated and capability guest purchases.
-// ABOUTME: Creates operation identity server-side and forwards no caller-controlled tenant or quantity facts.
-
 using Explore.Blazor.Client.Clients;
 using Microsoft.AspNetCore.Mvc;
 

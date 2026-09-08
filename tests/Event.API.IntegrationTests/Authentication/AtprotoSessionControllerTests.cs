@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the private ATProto bootstrap bridge requires exact canonical Actor target claim/body parity.
-// ABOUTME: Keeps malformed paired target input out of the Application command and public API surface.
-
 using System.Security.Claims;
 using System.Text.Json;
 using Explore.API.Authentication;

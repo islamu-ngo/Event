@@ -1,6 +1,3 @@
-// ABOUTME: In-memory queue for AI assistant runs that must outlive the HTTP send request.
-// ABOUTME: Feeds the background worker with tenant, conversation, run, and Ask/Build mode metadata.
-
 using System.Threading.Channels;
 
 namespace Explore.API.BackgroundServices;

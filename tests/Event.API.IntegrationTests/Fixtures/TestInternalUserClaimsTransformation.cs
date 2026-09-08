@@ -1,6 +1,3 @@
-// ABOUTME: Supplies a deterministic application-user identity to real-JWT authorization fixtures.
-// ABOUTME: Keeps authentication tests independent from external-login synchronization and domain seeding.
-
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 

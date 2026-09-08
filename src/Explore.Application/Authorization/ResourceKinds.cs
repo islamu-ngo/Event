@@ -1,6 +1,3 @@
-// ABOUTME: Canonical catalog of resource kind string constants matching Cerbos policy resource names.
-// ABOUTME: Replaces magic strings in [AuthorizeResource] attributes and ResourceDescriptorRegistry lookups.
-
 namespace Explore.Application.Authorization;
 
 /// <summary>

@@ -1,4 +1,3 @@
-// ABOUTME: Result record for the Postgres bootstrap credential resolution.
 // Carries the composed connection string and a label describing which source won.
 
 namespace Explore.Secrets.Bootstrap;

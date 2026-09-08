@@ -1,6 +1,3 @@
-// ABOUTME: Publisher option available during event creation.
-// ABOUTME: Represents personal, organization, or group publishing with create affordance metadata.
-
 namespace Explore.Application.DTOs.Event;
 
 public sealed record EventCreationPublisherOptionDto

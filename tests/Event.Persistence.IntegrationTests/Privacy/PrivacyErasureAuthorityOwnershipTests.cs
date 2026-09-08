@@ -1,6 +1,3 @@
-// ABOUTME: Guards EF Persistence as the sole retained platform-erasure authority storage owner.
-// ABOUTME: Rejects obsolete Infrastructure adapters, embedded schema resources, and DI registrations.
-
 using Explore.Application.Contracts.PrivacyErasure;
 using Explore.Infrastructure;
 using Microsoft.Extensions.Configuration;

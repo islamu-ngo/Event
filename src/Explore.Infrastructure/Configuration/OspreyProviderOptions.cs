@@ -1,6 +1,3 @@
-// ABOUTME: Static configuration for the Osprey moderation signal provider adapter.
-// ABOUTME: Keeps endpoint credentials and transport choices inside Infrastructure only.
-
 namespace Explore.Infrastructure.Configuration;
 
 public sealed class OspreyProviderOptions

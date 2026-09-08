@@ -1,6 +1,3 @@
-// ABOUTME: Osprey moderation signal provider adapter over a configurable HTTP JSON evaluation endpoint.
-// ABOUTME: Maps local report metadata into safe Osprey requests and normalizes returned signals.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;

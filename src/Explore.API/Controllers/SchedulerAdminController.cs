@@ -1,6 +1,3 @@
-// ABOUTME: Instance-admin API surface for inspecting and controlling the background job scheduler.
-// ABOUTME: Dispatches MediatR and assembles HAL affordances; it never touches a scheduler library directly.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

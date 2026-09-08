@@ -1,6 +1,3 @@
-// ABOUTME: Distinguishes Location aggregate invariants across materialization, governance, and privacy transitions.
-// ABOUTME: Verifies state and typed failures without coupling tests to exception prose.
-
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using Explore.Domain.Enums;
@@ -61,7 +58,7 @@ public sealed class LocationSemanticInvariantTests
         await Assert.That(erased.Country).IsEqualTo("BE");
         await Assert.That(erased.City).IsEqualTo(string.Empty);
         await Assert.That(erased.DisplaySortKey)
-            .IsEqualTo(LocationDisplaySortKeyV1.Create(Location.ErasedPrivateVenueLabel));
+            .IsEqualTo("PRIVATE VENUE");
     }
 
     [Test]

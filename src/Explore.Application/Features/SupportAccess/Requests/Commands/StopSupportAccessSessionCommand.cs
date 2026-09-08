@@ -1,6 +1,3 @@
-// ABOUTME: Authorized command for an actor to stop their own active support-access session.
-// ABOUTME: Uses the persisted session ID rather than browser authority to end support mode.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.SupportAccess;
 using MediatR;

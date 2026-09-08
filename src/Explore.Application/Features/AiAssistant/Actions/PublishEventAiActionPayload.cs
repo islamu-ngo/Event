@@ -1,6 +1,3 @@
-// ABOUTME: Defines the safe AI-proposed payload shape for event publish proposals.
-// ABOUTME: Carries only event identity, optimistic concurrency, and bounded readiness context.
-
 namespace Explore.Application.Features.AiAssistant.Actions;
 
 public sealed class PublishEventAiActionPayload

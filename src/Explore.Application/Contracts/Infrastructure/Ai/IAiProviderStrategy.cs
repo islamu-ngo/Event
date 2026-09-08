@@ -1,6 +1,3 @@
-// ABOUTME: Strategy interface for AI provider dispatch using lookup-backed integer provider IDs.
-// ABOUTME: Each strategy handles one or more provider kinds from the ai_provider_kinds lookup table.
-
 namespace Explore.Application.Contracts.Infrastructure.Ai;
 
 public interface IAiProviderStrategy

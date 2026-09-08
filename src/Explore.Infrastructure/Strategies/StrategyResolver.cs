@@ -1,4 +1,3 @@
-// ABOUTME: Resolves and orchestrates event strategies based on tenant capabilities.
 // Uses module service to check which strategies are available for a tenant.
 
 using Explore.Application.Contracts.Infrastructure;

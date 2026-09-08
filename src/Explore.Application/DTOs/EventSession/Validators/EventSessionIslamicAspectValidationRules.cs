@@ -1,6 +1,3 @@
-// ABOUTME: Shared validation helpers for event-session Islamic aspect scheduling DTOs.
-// ABOUTME: Keeps create-event, create-session, and update-session rules aligned with domain invariants.
-
 using System;
 using Explore.Domain;
 using Explore.Domain.Enums;

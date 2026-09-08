@@ -1,6 +1,3 @@
-// ABOUTME: Defines typed native admission QR scanner capabilities and fail-closed detection outcomes.
-// ABOUTME: Keeps HID and manual input explicitly available while redacting transient credential material.
-
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;

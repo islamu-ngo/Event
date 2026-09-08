@@ -1,6 +1,3 @@
-// ABOUTME: Owns atomic persistence and ordered post-commit effects for onboarding completion.
-// ABOUTME: Shares one deep operation between interactive completion and verified configured claims.
-
 using System.Text.Json;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;

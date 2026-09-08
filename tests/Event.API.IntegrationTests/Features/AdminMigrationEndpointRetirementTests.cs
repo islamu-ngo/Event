@@ -1,6 +1,3 @@
-// ABOUTME: Regression tests for retired runtime admin migration endpoint exposure.
-// ABOUTME: Keeps database migration execution on startup and out of HTTP routing.
-
 using System.Net;
 using Event.Api.IntegrationTests.Fixtures;
 using TUnit.Core;

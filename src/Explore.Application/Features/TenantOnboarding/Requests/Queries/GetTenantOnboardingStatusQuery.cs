@@ -1,6 +1,3 @@
-// ABOUTME: Query contract for retrieving tenant onboarding completion and current user eligibility.
-// ABOUTME: Used by startup flow to route tenant administrators to policy onboarding.
-
 using Explore.Application.DTOs.Onboarding;
 using MediatR;
 

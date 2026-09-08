@@ -1,6 +1,3 @@
-// ABOUTME: MCP tool surface for safe discovery of AI tool contracts.
-// ABOUTME: Exposes registry metadata only and never executes mutating tools directly.
-
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text.Json;

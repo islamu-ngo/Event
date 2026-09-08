@@ -1,6 +1,3 @@
-// ABOUTME: Shared real-repository harness for configuration-manifest transaction integration tests.
-// ABOUTME: Builds bounded sources and an existence-aware preflight without weakening production writes.
-
 using System.Collections.Immutable;
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;

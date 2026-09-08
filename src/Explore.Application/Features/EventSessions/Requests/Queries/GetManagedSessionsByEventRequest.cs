@@ -1,6 +1,3 @@
-// ABOUTME: Organizer-facing query request for all sessions attached to an event.
-// ABOUTME: Used after API/HAL management gating so draft sessions are visible to management surfaces.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventSession;
 using MediatR;

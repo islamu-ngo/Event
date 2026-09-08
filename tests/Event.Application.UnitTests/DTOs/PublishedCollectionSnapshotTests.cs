@@ -1,6 +1,3 @@
-// ABOUTME: Verifies custom-property and template DTO collection ownership boundaries.
-// ABOUTME: Guards defensive snapshots for create, PATCH, projection, value, and response contracts.
-
 using System.Text.Json;
 using System.Collections;
 using System.Reflection;

@@ -1,6 +1,3 @@
-// ABOUTME: Repository implementation for tenant onboarding completion state.
-// ABOUTME: Provides per-tenant onboarding marker retrieval.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

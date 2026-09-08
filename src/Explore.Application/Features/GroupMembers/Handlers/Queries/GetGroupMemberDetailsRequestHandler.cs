@@ -1,6 +1,3 @@
-// ABOUTME: Handler for retrieving a single group member with full details.
-// ABOUTME: Uses repository eager loading for user, role, and position.
-
 using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;

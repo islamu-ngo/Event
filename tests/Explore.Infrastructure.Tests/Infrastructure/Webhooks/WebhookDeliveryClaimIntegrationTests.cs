@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL integration tests for canonical Local webhook target claiming and recovery.
-// ABOUTME: Proves retry compatibility, single-owner fencing, expiry evidence, and endpoint archive rehydration.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

@@ -1,6 +1,3 @@
-// ABOUTME: Red bUnit specifications for the whole-instance configuration-manifest administration section.
-// ABOUTME: Proves HAL-only rendering, safe focus recovery, localization, and live download announcements.
-
 using Explore.Blazor.Client.Contracts.ControlPlane;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Contracts.Services.ControlPlane;

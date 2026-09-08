@@ -1,6 +1,3 @@
-/* ABOUTME: Keeps Studio refund campaign facts readable with logical, token-based spacing. */
-/* ABOUTME: Uses responsive grid flow without introducing campaign-specific colors. */
-
 .studio-refund-campaigns > ul {
     display: grid;
     gap: var(--space-3);

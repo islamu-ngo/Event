@@ -1,6 +1,3 @@
-// ABOUTME: Lookup-table entity for system setting value data types.
-// ABOUTME: IDs mirror SettingValueType values for validation and storage metadata.
-
 namespace Explore.Domain;
 
 public class SettingValueTypeLookup

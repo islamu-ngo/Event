@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL acceptance for the generated initial schema's mediated physical venue references.
-// ABOUTME: Proves every carrier rejects raw LocationId use and the development baseline rolls back cleanly.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Persistence;
@@ -185,11 +182,8 @@ public sealed class EventLocationContractionMigrationTests(RecipientDeliveryMigr
             Password = connection.Password,
             TlsMode = PrimaryDatabaseTlsMode.Disabled,
         };
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>();
-        builder.EnableServiceProviderCaching(false);
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(builder, options);
-        builder.ConfigureWarnings(warnings =>
-            warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning));
         return new ExploreDbContext(builder.Options);
     }
 

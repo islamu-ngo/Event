@@ -1,6 +1,3 @@
-// ABOUTME: Appends and reads tenant-filtered PII-free evidence for exceptional exact location reads.
-// ABOUTME: Validates aggregate ownership and enforces a bounded no-tracking read surface.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

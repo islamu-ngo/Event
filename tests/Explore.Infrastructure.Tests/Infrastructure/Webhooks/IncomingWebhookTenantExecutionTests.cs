@@ -1,6 +1,3 @@
-// ABOUTME: Verifies fresh per-claim tenant and machine-principal execution for incoming webhook workers.
-// ABOUTME: Covers concurrent isolation, narrow authorization, and ambient-context cleanup after every exit path.
-
 using System.Collections.Concurrent;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;

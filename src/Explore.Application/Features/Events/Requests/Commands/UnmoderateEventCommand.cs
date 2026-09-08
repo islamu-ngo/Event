@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for restoring reversibly moderated events to Published.
-// ABOUTME: Uses explicit unmoderation authorization separate from event editing authority.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

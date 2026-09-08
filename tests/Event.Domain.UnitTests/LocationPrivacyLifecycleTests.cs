@@ -1,6 +1,3 @@
-// ABOUTME: Verifies irreversible Location privacy lifecycle and consent-backed Private Home ownership.
-// ABOUTME: Covers optional PII, erasure tombstones, resurrection rejection, and fresh replacement records.
-
 using Explore.Domain.Enums;
 
 namespace Event.Domain.UnitTests;

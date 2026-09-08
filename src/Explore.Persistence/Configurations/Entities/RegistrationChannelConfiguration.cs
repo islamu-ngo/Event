@@ -1,6 +1,3 @@
-// ABOUTME: Maps requirement-owned native and provider-bound registration channels.
-// ABOUTME: Enforces tenant-safe lineage, deterministic ordinals, soft deletion, and concurrency.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;

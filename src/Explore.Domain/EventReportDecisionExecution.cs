@@ -1,6 +1,3 @@
-// ABOUTME: Durable one-to-one execution state for a captured event-report decision.
-// ABOUTME: Fences enforcement leases and records the exact receipt before atomic case completion.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

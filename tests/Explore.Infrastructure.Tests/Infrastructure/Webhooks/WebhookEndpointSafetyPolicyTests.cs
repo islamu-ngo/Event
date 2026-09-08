@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for LocalProvider webhook endpoint SSRF protections.
-// ABOUTME: Verifies private networks, metadata addresses, and explicit CIDR allow-list behavior.
-
 using Explore.Infrastructure.Configuration;
 using Explore.Infrastructure.Webhooks;
 using Microsoft.Extensions.Options;

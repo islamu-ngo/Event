@@ -1,6 +1,3 @@
-// ABOUTME: Readiness health check for the active Blazor BFF Data Protection key store.
-// ABOUTME: Verifies Redis persistence or the native local fallback without exposing key material.
-
 using Explore.Blazor.Extensions;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;

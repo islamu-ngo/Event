@@ -1,6 +1,3 @@
-// ABOUTME: Repository implementation for AuditLog entity writes used by template sync workflows.
-// ABOUTME: Keeps Application layer audit logging entity-first while reusing the generic repository base.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

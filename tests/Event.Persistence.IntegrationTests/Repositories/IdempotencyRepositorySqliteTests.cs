@@ -1,6 +1,3 @@
-// ABOUTME: File-backed SQLite contention contracts for EF-native idempotency key claims.
-// ABOUTME: Proves one owner, durable winner lookup, and atomic replacement of expired records.
-
 using System.Data.Common;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
@@ -116,7 +113,7 @@ public sealed class IdempotencyRepositorySqliteTests
             ForeignKeys = true,
             Pooling = true
         }.ToString();
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>()
+        var builder = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connectionString)
             .UseSnakeCaseNamingConvention()
             .AddInterceptors(

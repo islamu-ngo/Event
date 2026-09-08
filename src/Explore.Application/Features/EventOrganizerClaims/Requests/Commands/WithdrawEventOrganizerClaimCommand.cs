@@ -1,6 +1,3 @@
-// ABOUTME: Authorized CQRS request for a claimant to withdraw an active organizer claim.
-// ABOUTME: Carries optimistic concurrency while authorization resolves persisted claimant ownership.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

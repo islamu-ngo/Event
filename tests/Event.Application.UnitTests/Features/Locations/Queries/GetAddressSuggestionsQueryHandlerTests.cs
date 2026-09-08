@@ -1,6 +1,3 @@
-// ABOUTME: Specifies the tenant-private local address suggestion Application flow.
-// ABOUTME: Proves trusted context, bounded validation, cancellation, and semantic result mapping.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Infrastructure.Geocoding;

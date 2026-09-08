@@ -1,6 +1,3 @@
-// ABOUTME: Completes split-phase tenant handling after authentication for API-key callers and mismatch checks.
-// ABOUTME: Sets tenant context from authenticated machine principals and fail-closes when tenant hints conflict.
-
 using Explore.API.Authentication;
 using Explore.API.Configuration;
 using Explore.API.ExceptionHandling;
@@ -34,6 +31,14 @@ public sealed class ApiTenantPostAuthenticationMiddleware
         var isMcpPath = IsEnabledMcpPath(context, mcpAdapterOptions.Value);
         if (!context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase) && !isMcpPath)
         {
+            await _next(context);
+            return;
+        }
+
+        if (AtprotoTransientAuthenticationDefaults.IsPrivatePath(context.Request.Path)
+            && context.User.Identity is { IsAuthenticated: true, AuthenticationType: AtprotoTransientAuthenticationDefaults.Scheme })
+        {
+            // The machine can operate only on instance-owned transient infrastructure, not as a tenant or user.
             await _next(context);
             return;
         }

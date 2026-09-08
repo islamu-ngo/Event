@@ -1,6 +1,3 @@
-// ABOUTME: Verifies authority EF tooling consumes only structured migrator settings.
-// ABOUTME: Locks design-time composition to the shared PostgreSQL contract and distinct history table.
-
 using System.Data;
 using Explore.Persistence.Privacy.ErasureAuthority;
 using Explore.Secrets.Database;
@@ -17,6 +14,7 @@ namespace Event.Persistence.IntegrationTests.Privacy;
 public sealed class PrivacyErasureAuthorityDbContextFactoryTests
 {
     [Test]
+    [TUnit.Core.Executors.TestExecutor<FreshEfProcessExecutor>]
     public async Task CreateDbContext_UsesStructuredMigratorTargetWithoutOpeningIt()
     {
         IConfiguration configuration = StructuredMigratorConfiguration();
@@ -33,6 +31,7 @@ public sealed class PrivacyErasureAuthorityDbContextFactoryTests
     }
 
     [Test]
+    [TUnit.Core.Executors.TestExecutor<FreshEfProcessExecutor>]
     public async Task CreateDbContext_UsesDistinctAuthorityMigrationHistoryTable()
     {
         await using PrivacyErasureAuthorityDbContext context =
@@ -50,13 +49,31 @@ public sealed class PrivacyErasureAuthorityDbContextFactoryTests
     {
         const string secret = "raw-connection-secret";
 
-        OptionsValidationException exception = Assert.Throws<OptionsValidationException>(() =>
-            new PrivacyErasureAuthorityDbContextFactory().CreateDbContext(
-                ["--connection", $"Host=127.0.0.1;Database=raw;Username=raw;Password={secret}"]));
+        const string structuredProvider = "PrivacyErasureAuthorityDatabase__Provider";
+        const string providerAlias = "PRIVACY_ERASURE_AUTHORITY_PROVIDER";
+        string? originalStructured = Environment.GetEnvironmentVariable(structuredProvider);
+        string? originalAlias = Environment.GetEnvironmentVariable(providerAlias);
+        try
+        {
+            Environment.SetEnvironmentVariable(structuredProvider, null);
+            Environment.SetEnvironmentVariable(providerAlias, null);
+            OptionsValidationException exception = Assert.Throws<OptionsValidationException>(() =>
+                new PrivacyErasureAuthorityDbContextFactory().CreateDbContext(
+                [
+                    "--SecretProvider:Provider", "Environment",
+                    "--PrivacyErasureAuthorityDatabase:Provider", "Unsupported",
+                    "--connection", $"Host=127.0.0.1;Database=raw;Username=raw;Password={secret}"
+                ]));
 
-        await Assert.That(exception.Message).DoesNotContain(secret);
-        await Assert.That(exception.OptionsName)
-            .IsEqualTo(PrivacyErasureAuthorityDatabaseConfiguration.SectionName);
+            await Assert.That(exception.Message).DoesNotContain(secret);
+            await Assert.That(exception.OptionsName)
+                .IsEqualTo(PrivacyErasureAuthorityDatabaseConfiguration.SectionName);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(structuredProvider, originalStructured);
+            Environment.SetEnvironmentVariable(providerAlias, originalAlias);
+        }
     }
 
     private static IConfiguration StructuredMigratorConfiguration() =>

@@ -1,6 +1,3 @@
-// ABOUTME: Manages tenant module capability records (Core, Islamic, Tech modules).
-// ABOUTME: Extracted from InstanceGovernanceSettingService per Guardrail 1: capabilities ≠ settings.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Domain.Modules;

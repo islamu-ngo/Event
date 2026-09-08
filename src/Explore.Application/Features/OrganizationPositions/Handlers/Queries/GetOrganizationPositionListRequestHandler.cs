@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning all organization positions.
-// ABOUTME: Maps entities to OrganizationPositionDto list.
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;

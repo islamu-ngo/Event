@@ -1,6 +1,3 @@
-// ABOUTME: Handles AI reference search by mapping tenant-filtered events and actors into safe DTOs.
-// ABOUTME: Enforces bounded result counts and prevents full event or actor content from entering AI reference output.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Ai;
 using Explore.Application.Features.AiAssistant.Requests.Queries;

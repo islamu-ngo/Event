@@ -1,6 +1,3 @@
-// ABOUTME: Admin API controller for managing TMS (Translation Management System) configuration.
-// ABOUTME: Provides endpoints to test TMS connection, view config, export bundles, and health probes.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

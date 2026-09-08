@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for explicit event-session scheduling transitions.
-// ABOUTME: Validates optimistic concurrency and UTC schedule window shape before policy readiness runs.
-
 using Explore.Application.DTOs.EventSession;
 using FluentValidation;
 

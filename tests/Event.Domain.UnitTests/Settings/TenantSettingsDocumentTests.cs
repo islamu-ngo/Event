@@ -1,6 +1,3 @@
-// ABOUTME: Domain tests for typed tenant settings documents and their non-secret taxonomy gate.
-// ABOUTME: Verifies schema-version, JSON-object, interface, and infrastructure-secret boundaries.
-
 namespace Event.Domain.UnitTests.Settings;
 
 using Explore.Domain.Constants;

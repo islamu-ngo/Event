@@ -1,6 +1,3 @@
-// ABOUTME: Handles GetAnalyticsGovernanceSettingsQuery for admin UI.
-// ABOUTME: Resolves analytics settings via hierarchical resolver and computes advisory info.
-
 using Explore.Application.Analytics;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;

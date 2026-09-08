@@ -1,6 +1,3 @@
-// ABOUTME: Centralizes privileged browser-BFF header names owned by the hosting boundary.
-// ABOUTME: Keeps proxy sanitization independent from Application/API project references.
-
 namespace Event.Web.BffHosting.Security;
 
 public static class EventBffHeaderNames
@@ -11,6 +8,7 @@ public static class EventBffHeaderNames
     public const string SetupSecret = "X-Setup-Secret";
     public const string AtprotoBootstrapAssertion = "X-Atproto-Bootstrap-Assertion";
     public const string AtprotoSessionBridgeAssertion = "X-Atproto-Session-Bridge-Assertion";
+    public const string AtprotoTransientAssertion = "X-Atproto-Transient-Assertion";
     public const string SupportAccessSessionId = "X-Support-Access-Session-Id";
     public const string SupportAccessTargetTenantId = "X-Support-Access-Target-Tenant-Id";
     public const string SupportAccessMode = "X-Support-Access-Mode";

@@ -1,6 +1,3 @@
-// ABOUTME: Writes canonical deterministic UTF-8 for whole-instance configuration manifest exports.
-// ABOUTME: Enforces the import-compatible four MiB aggregate ceiling before any byte array is exposed.
-
 namespace Explore.Application.Features.ConfigurationManifest.Application;
 
 using System.Text.Json;

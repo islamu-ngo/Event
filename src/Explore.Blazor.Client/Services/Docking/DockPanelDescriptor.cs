@@ -1,6 +1,3 @@
-// ABOUTME: Immutable metadata that describes how a dock panel should be hosted.
-// ABOUTME: Separates panel capabilities from mutable open, active, width, and ordering state.
-
 namespace Explore.Blazor.Client.Services.Docking;
 
 public sealed record DockPanelDescriptor

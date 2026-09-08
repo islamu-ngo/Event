@@ -1,5 +1,3 @@
-// ABOUTME: Exercises visitor-policy mutation races, generic bypasses and inherited AccountRequired scopes on SQLite.
-// ABOUTME: Uses production handlers, repositories and grants with preinstalled lock barriers rather than timing waits.
 
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;

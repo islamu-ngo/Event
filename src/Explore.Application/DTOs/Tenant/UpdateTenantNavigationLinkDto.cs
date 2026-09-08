@@ -1,8 +1,4 @@
 using System;
-
-// ABOUTME: Wrapper DTO for partial tenant navigation-link updates using nullable property groups.
-// ABOUTME: Route and tenant context own identity; reorder remains a separate action.
-
 using Explore.Application.Models.Common;
 
 namespace Explore.Application.DTOs.Tenant;

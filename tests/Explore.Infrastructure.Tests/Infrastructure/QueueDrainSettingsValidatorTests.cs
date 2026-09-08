@@ -1,6 +1,3 @@
-// ABOUTME: Verifies every scheduler-owned queue health threshold is startup-bounded.
-// ABOUTME: Prevents zero or negative thresholds from degrading readiness permanently.
-
 using System.ComponentModel.DataAnnotations;
 using Explore.Application.Services.Webhooks;
 using Explore.Infrastructure.Webhooks;

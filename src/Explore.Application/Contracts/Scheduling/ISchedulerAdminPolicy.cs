@@ -1,6 +1,3 @@
-// ABOUTME: Host-owned policy describing whether the scheduler administration surface is enabled and mutable.
-// ABOUTME: Lets handlers and HAL policies agree on one answer instead of each reading host configuration directly.
-
 namespace Explore.Application.Contracts.Scheduling;
 
 /// <summary>

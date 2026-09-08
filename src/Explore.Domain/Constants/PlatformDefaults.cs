@@ -1,6 +1,3 @@
-// ABOUTME: Shared platform-level defaults for tenant bootstrap and deterministic fallback behavior.
-// ABOUTME: Keeps critical default identifiers consistent across services and layers.
-
 namespace Explore.Domain.Constants;
 
 public static class PlatformDefaults

@@ -1,4 +1,3 @@
-// ABOUTME: Contract for recording configuration change audit entries.
 // Every administrative settings change is logged with who, what, old/new values, and scope.
 
 using Explore.Domain.Enums;

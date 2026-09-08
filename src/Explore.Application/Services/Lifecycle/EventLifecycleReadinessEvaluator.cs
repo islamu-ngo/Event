@@ -1,5 +1,3 @@
-// ABOUTME: Policy-aware readiness evaluator that checks an Event against required fields per validation profile.
-// ABOUTME: Replaces the static EventPublishReadinessEvaluator with an injectable, machine-readable error model.
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Lifecycle;

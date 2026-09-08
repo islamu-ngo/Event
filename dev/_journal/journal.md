@@ -1,5 +1,9 @@
 ## Key Decisions
 
+- [2026-09-06 Europe/Brussels] **3-Ring Progressive Verification and Yak-Shaving Quarantine Standards** — Resolved the engineering bottleneck where test diagnosis and failure triage consumed ~50% of developer and agent effort. Codified the 3-Ring Progressive Verification Model: Ring 1 in-memory sliced tests (< 2s) for active coding loops, Ring 2 single-provider integration tests (< 15s) for phase exit gates, and Ring 3 full multi-provider matrix and architecture tests reserved strictly for workstream exit milestones and CI. Codified the Yak-Shaving Quarantine Rule: agents encountering pre-existing, out-of-scope test failures are strictly forbidden from opportunistically fixing them; failures are quarantined in the task context, execution filters are narrowed via `--treenode-filter`, and planned scope is preserved. Hardened persistence integration tests with dynamic schema-per-run PostgreSQL isolation (`SET search_path = test_<run_id>`) and isolated SQLite memory URIs to eliminate container deadlocks and table collision flakes. Re-balanced algorithmic Unicode normalization/casing invariants into sub-millisecond in-memory domain tests. Key files: `AGENTS.md`, `docs/internal/QUICK_REFERENCE.md`, `docs/internal/adr/ADR-028-progressive-testing-and-quarantine.md`, `.agents/CONTEXT_ENGINEERING.md`, `docs/internal/AGENTIC_CONTEXT_ENGINEERING.md`, `tests/Event.Persistence.IntegrationTests/Fixtures/PostgreSqlContainerFixture.cs`, `tests/Event.Persistence.IntegrationTests/Fixtures/SqliteTestDatabaseFactory.cs`, `tests/Event.Domain.UnitTests/UnicodeNormalizationInvariantTests.cs`.
+
+- [2026-09-06 Europe/Brussels] **Self-Contained Agent Interaction & Zero Plan-Opening UX Standard** — Codified Critical Rule #14 and repository-wide interaction policies prohibiting agents from prompting for approval, reporting milestone status, or asking questions using cryptic bare codes (e.g. "P04/P06 with P03 gates open") that force developers to open active plan files in `dev/active/<task>/`. Established the Decision Brief standard: all agent prompts must provide inline context, descriptive feature names, trade-offs, structured options with recommendations, and immediate next actions. The implementation plan serves strictly as internal working memory; the chat response is the developer console. Key files: `AGENTS.md`, `docs/internal/QUICK_REFERENCE.md`, `.agents/CONTEXT_ENGINEERING.md`, `.agents/skills/implement-tasks/SKILL.md`, `.agents/skills/implementation-plan/resources/quality-gates.md`, `.agents/skills/grill-me/SKILL.md`.
+
 - [2026-09-04 Europe/Brussels] **Automated Documentation Quality Gating and Dual-Documentation Parity** — Established strict separation of concerns between public documentation (`docs/public/` synced to GitBook for adopters/operators) and internal technical documentation (`docs/internal/` for C# architecture, DDD invariants, and AI agents). Complex visual diagrams (such as state machines and gate validation sequences) belong exclusively in internal docs to maintain clean, accessible public guides. Enforced zero raw HTML in `docs/public/` (GitBook compatibility), bidirectional link resolution with 0 broken links tolerance across 1,400+ relative markdown links, and automated verification of GitBook URLs in `README.md` via `.github/workflows/docs-lint.yml`. Key files: `.github/workflows/docs-lint.yml`, `docs/README.md`, `docs/internal/HOSTING_ARCHITECTURE.md`, `docs/internal/PAYMENTS.md`, `docs/internal/ADMISSION_AND_REGISTRATION.md`.
 
 - [2026-08-24 Europe/Brussels] **Secrets source-of-truth and agent tooling boundary rules codified** — Sourced secrets strictly to Infisical or runtime `.env` variables (documented in `.env.example`); prohibited hardcoding passwords/keys in `AppHost.cs`, test fixtures, or source files. Banned ad-hoc Python/Node scripts across agent workflows in favor of native edit tools, Bash commands, and persistent C# scripts in `eng/` (last resort only); isolated `.ci/scripts/` exclusively for CI/CD pipelines. Key files: `AGENTS.md`, `.agents/CONTEXT_ENGINEERING.md`, `docs/QUICK_REFERENCE.md`.
@@ -1623,6 +1627,54 @@ uninitializable.
 
 ---
 
+[2026-09-06 Europe/Brussels] — Unicode match parity does not imply universal ordering
+
+**Context**: Replacing location scalar-token encoding with whole-value normalized Unicode under the migration and repository-query intents.
+
+**Symptom / Observation**: The five real engines agreed on authorized literal substring membership, but SQL Server's binary Unicode ordering placed a supplementary display name before the BMP private-use display name; the other tested providers ordered that pair the other way. PostgreSQL and MySQL-family persisted audit timestamps also had lower precision than the original in-memory test values.
+
+**Root Cause**: Binary text collations act on provider-specific Unicode representations and padding rules. Native UUID ordering is another independent comparator. A result limit cannot supply a universal order, and unchanged-state assertions cannot compare pre-round-trip timestamp precision with persisted precision.
+
+**Resolution**: Keep one validated NFC → invariant uppercase → NFC Domain helper and targeted Unicode collation metadata; require membership parity and explicit provider-local stable ordering. Reload seeded values before capturing a persistence atomicity baseline, then compare every scalar before/after rejected writes without weakening assertions. The shared structured-provider Unicode corpus passed on all five engines. No third-party source or new dependencies were retained; only source-free official behavior requirements informed the independently chosen repository-native design.
+
+**Why This Matters for Future Work**: Treat normalization, substring membership, result ordering, and persisted precision as separate contracts. Runtime/ICU upgrades still require stopped-traffic compatibility checks and authorized rebuild/reset; an unchanged revision number does not detect normalization-table drift.
+
+**References**:
+- `src/Explore.Domain/ValueObjects/LocationTextNormalization.cs`
+- `tests/Event.Persistence.IntegrationTests/Database/PrimaryDatabaseProviderBehaviorContractTests.cs`
+- `tests/Event.Persistence.IntegrationTests/Repositories/LocationUnicodeWriteAtomicityTests.cs`
+- `docs/internal/adr/ADR-028-location-unicode-search-text.md`
+- `docs/internal/OPERATIONS.md#location-unicode-runtime-compatibility`
+- PR / commit: pending
+
+**Promotion Consideration**:
+- [x] Candidate for ADR / `MAJOR_DECISIONS.md`: recorded in ADR-028.
+- [ ] Candidate for skill update.
+- [ ] Stays in journal only (one-off debugging lesson).
+
+[2026-09-06 Europe/Brussels] — ATProto controller tests missed named rate-policy failures
+
+**Context**: While replacing transient ATProto storage, two Production BFF hosts were connected to the real API authentication pipeline and PostgreSQL. The tests retained the real bootstrap handler, PDS verification, session encryption and token issuance.
+
+**Symptom / Observation**: After successful OAuth state consumption, `/api/auth/atproto/session` failed with `This endpoint requires a rate limiting policy with name write, but no such policy exists.` The failure occurred before the PDS verification gateway, despite the Testing profile disabling quota enforcement.
+
+**Root Cause**: `AtprotoSessionController` used lowercase `write` and `authenticated` literals, while `RateLimitingExtensions` registered `Write` and `Authenticated`. The Testing no-limiter policies still require matching names. Direct action invocation and a fabricated BFF bootstrap response bypass this middleware boundary and cannot establish usable login.
+
+**Resolution**: All four session-controller actions now reference the existing policy constants; quota values and authorization remain unchanged. `dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release -- --treenode-filter "/*/*/AtprotoRelationalLoginFlowTests/*" --minimum-expected-tests 2 --maximum-parallel-tests 1 --no-progress` passed both initial same-origin and unrelated-domain flows, including private HTTP retrieval of the encrypted persisted session. Later expansion of that class adds further expiry coverage; phase acceptance remains separate.
+
+**Why This Matters for Future Work**: Keep a complete real-HTTP authentication flow in addition to focused controller/adapter tests. Middleware metadata is executable configuration, including when a test substitutes a no-limiter partition; use the registering component's constants instead of duplicating policy names.
+
+**References**:
+- `src/Explore.API/Controllers/AtprotoSessionController.cs:38`
+- `src/Explore.API/Extensions/RateLimitingExtensions.cs:38`
+- `tests/Event.API.IntegrationTests/Authentication/AtprotoRelationalLoginFlowTests.cs`
+- `tests/Event.API.IntegrationTests/Authentication/AtprotoRelationalLoginFixture.cs`
+
+**Promotion Consideration**:
+- [x] Stays in journal only (one-off debugging lesson)
+
+---
+
 [2026-09-06 Europe/Brussels] — SQLite lock fixtures need transaction interceptors
 
 **Context**: While adding real Local-admission security tests, an existing Identity fixture began using `SystemSettingRepository` and its relational mutation lock.
@@ -2222,5 +2274,41 @@ are unmeasured. Setup 22/22, catalogue 20/20, dotenv 19/19, native Compose parsi
 and the successful API schema build do not close pending native zero-email host,
 restart/restore, or final workstream acceptance. This entry indexes the domain
 findings; it does not supersede earlier evidence or quarantine dispositions.
+
+---
+
+[2026-09-09 Europe/Brussels] - Native EF removal can reconcile only the snapshot
+
+**Context**: Consolidating seven unapplied email-optional application migration
+stages onto retained upstream Init catalogs for four provider assemblies.
+
+**Symptom / Observation**: The first native `dotnet ef migrations remove` in
+each catalog exited successfully but left every migration ID present. Each
+catalog required eight calls to remove its seven tails.
+
+**Root Cause**: The merged snapshot differed from the latest historical
+designer. Native EF first reconciled that snapshot; a successful command exit
+did not establish that the catalog head had been removed.
+
+**Resolution**: Count actual remaining migration IDs after each native call,
+rebuild before the next removal, and stop at the retained Init. Generate the
+integration tail from the settled model rather than editing snapshots. All
+four final catalogs passed generation and ten primary/external Identity
+pending-model checks. The populated lifecycle packet passed 12 cases across
+PostgreSQL, SQLite, SQL Server, MySQL and MariaDB.
+
+**Why This Matters for Future Work**: A fixed successful-call count can leave
+an old tail in place or encourage an unsafe extra removal. Native catalog
+identity, not exit-code counting, defines the removal boundary. Full-head
+roundtrips must also include the feature tail rather than stopping at Init.
+
+**References**:
+- `docs/internal/OPERATIONS.md#development-application-migration-rebaseline`
+- `tests/Event.Persistence.IntegrationTests/Migrations/ApplicationInitialLifecycleProviderTests.cs`
+- `tests/Event.Persistence.IntegrationTests/Migrations/GeneratedInitMigrationBehaviorTests.cs`
+
+**Promotion Consideration**:
+- [ ] Candidate for skill update: `dotnet-efcore-guidelines`
+- [x] Stays in journal only (native generation observation)
 
 ---

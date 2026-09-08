@@ -1,6 +1,3 @@
-// ABOUTME: Handles archiving or unarchiving a single notification for the authenticated user.
-// ABOUTME: Idempotent — archiving an already-archived notification succeeds silently.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Notifications.Requests.Commands;

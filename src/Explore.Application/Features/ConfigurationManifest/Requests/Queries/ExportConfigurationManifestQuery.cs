@@ -1,6 +1,3 @@
-// ABOUTME: Declares the instance-authorized whole-instance configuration manifest export request.
-// ABOUTME: Carries only the selected view because trusted server context selects the current instance.
-
 namespace Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 
 using Explore.Application.Authorization;

@@ -1,6 +1,3 @@
-// ABOUTME: Client-facing event ticket catalog authoring contract over generated API models.
-// ABOUTME: Keeps Razor components isolated from the generated client while preserving HAL and write DTOs.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Pages.Studio;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Exposes private order add-on selection, fulfillment, and refund lifecycle resources.
-// ABOUTME: Accepts caller intent only and delegates tenant, pricing, inventory, and authority to CQRS.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

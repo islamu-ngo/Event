@@ -1,6 +1,3 @@
-// ABOUTME: Stable failure codes and safe operator messages for coordinated publication-policy mutations.
-// ABOUTME: Gives handlers, API contracts, and the mutation boundary one source of truth for rejection semantics.
-
 namespace Explore.Application.Settings;
 
 public static class PublicationPolicyMutationFailureCodes

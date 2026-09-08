@@ -1,6 +1,3 @@
-// ABOUTME: Entity-first persistence contract for tenant-scoped EventLocation associations.
-// ABOUTME: Separates tracked mutation reads from bounded no-tracking disclosure batches.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

@@ -1,5 +1,3 @@
-// ABOUTME: Exercises native guest status HTTP authorization and checkout isolation with SQLite and Identity.
-// ABOUTME: Uses real challenge allocation and confirmation, advancing only the injected external clock.
 
 using System.Net;
 using System.Data.Common;

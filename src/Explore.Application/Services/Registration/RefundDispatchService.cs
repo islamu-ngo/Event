@@ -1,6 +1,3 @@
-// ABOUTME: Dispatches one durable refund attempt after persisting its pre-provider handoff state.
-// ABOUTME: Uses only the attempt's pinned account, payment, amount, currency, and stable idempotency key.
-
 using Explore.Application.Contracts.Payments;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

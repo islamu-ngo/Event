@@ -3,7 +3,7 @@
 
 # Email-Optional Self-Hosting - I-VSD Consultancy And Planning Report
 
-Last Updated: 2026-09-08
+Last Updated: 2026-09-09
 
 ## Review Metadata
 
@@ -11,12 +11,12 @@ Last Updated: 2026-09-08
 - Subject: email-optional self-hosting and mailbox-free participation
 - Workstream: email-optional-self-hosting
 - Report kind: consolidated consultancy and planning assessment
-- Report status: current
-- Disposition: plan-aligned
-- Evidence cutoff: 2026-09-08, including the parent-run bounded native host, restart and complete Standalone gate
-- Reviewed input revision: P01-P11 source Git object `6b6da88047675fbd1bdddc2e51059272314a6192` plus the final P12 working-tree packet and parent native QA evidence. Earlier exact planning/graduation SHA-256 snapshots remain historical provenance in Evidence Reviewed; they are not hashes of the subsequently corrected runtime or ledger.
+- Report status: stale
+- Disposition: changes-required
+- Evidence cutoff: 2026-09-09, including the integrated five-engine migration lifecycle, complete Domain/Application checks, bounded native host/restart, onboarding and relational ATProto verification.
+- Reviewed input revision: the integrated working tree of feature parent `9966068b9affe5b72df1503291011acc22367747` and upstream `425e4b48343690094637dda860304f3bfb04a5cd`, with natively consolidated application migrations and recorded fixture/contract corrections. Earlier exact planning/graduation SHA-256 snapshots and phase IDs remain historical provenance, not hashes of this integration.
 - Supersedes: the two separate subject reports identified in Evidence Reviewed; this file remains their single canonical successor, not a new consultation or report identity.
-- Review boundary: source-current and mapped to the approved plan, not closed implementation verification, CTO approval, release acceptance or demonstrated ethical outcomes. All seven findings remain open with implemented mechanisms and remaining validation. Bounded P12 host/restart proof passes; closure review and Ring 3 gates remain pending.
+- Review boundary: targeted integration verification is current, including 12 five-engine lifecycle cases, 1,181 Domain and 2,161 Application tests, and successful native zero-email/restart and relational ATProto flows. The unfiltered Persistence run ended without finalized results; browser/assistive-technology, latency and empirical outcome limits remain. This factual evidence update is not a new ethical assessment, an all-green release gate, or outcome certification.
 
 ## Scope
 
@@ -436,13 +436,13 @@ Initial source guidance spans security/privacy and the sovereign registration in
 ## Planning Handoff
 
 - Workstream: email-optional-self-hosting
-- Status: current
+- Status: stale
 - Reviewed input revision: P01-P11 Git object `6b6da88047675fbd1bdddc2e51059272314a6192` plus the exact `plan-r2`, tasks/context and P12 SHA-256 snapshots in Evidence Reviewed.
 - Findings and mitigations: IVSD-F001 -> IVSD-M001 through IVSD-F007 -> IVSD-M007; all remain open.
 - Required plan mappings: the implementation evidence matrix below reproduces all seven mappings from plan Section 9 and adds mechanisms, saved evidence and remaining validation. No S01-S26 behavior is silently deferred into empirical research or tenant delegation.
 - Escalations required before: release/workstream closure for outstanding verification/review; before any separate tenant-delegation implementation for user authority approval.
 - Refresh triggers: administrator identifier/provider scope; visitor defaults; communication guarantees; SMTP disable/tenant override behavior; capability lifecycle; abuse challenge; retention; credential recovery authority; changed mapped mitigation; P12 host proof or final gate disposition changing an evidence claim.
-- Plan-aligned: Yes, as an approved-plan evidence mapping only. The plan and execution ledger exist; their checked implementation tasks, non-green inherited gates and pending P12/Ring 3 acceptance remain distinct. This is not a new implementation approval or final CTO/I-VSD outcome acceptance.
+- Plan-aligned: historical plan-r2 mapping retained; the combined upstream integration awaits revalidation.
 
 ## Review Lifecycle
 
@@ -456,7 +456,9 @@ Initial source guidance spans security/privacy and the sovereign registration in
 | 2026-09-05 | draft | draft | Relocated planning artifacts to canonical main-repository paths under the updated planning workflow | Product revision and behavioral decisions unchanged; native artifact relocation only |
 | 2026-09-05 | draft | draft | User mandated SMTP-enabled Local verification and directly verified administrative provisioning, rejecting permissive sign-in preservation | Corrected Local admission/event eligibility contract; instance versus tenant provisioning authority remains open |
 | 2026-09-05 | two subject reports | draft (single canonical report) | User explicitly required a lossless consolidation instead of duplicate reports | Both input hashes, all seven stable findings/mitigations, source locators, corrected claims and decision history retained here |
+| 2026-09-05 | draft | current / plan-aligned | Completed `plan-r1` with 12 phases, 36 implementation tasks and all seven I-VSD mappings | Canonical plan/task links, selected authority boundaries and bounded verification/commit contracts; implementation not started |
 | 2026-09-08 | draft / stale implementation prose | current (source-current; findings open) | Approved P12 knowledge graduation reconciles the same report to plan-r2 and implemented P01-P11 mechanisms | C11 `6b6da88047675fbd1bdddc2e51059272314a6192`, SHA-256-bound working inputs and saved scoped evidence; P12 host/restart, Ring 3, inherited gates and empirical outcomes remain unclosed |
+| 2026-09-08 | current (source-current; findings open) | stale / changes-required | Upstream integration changes the authentication/storage and migration basis | Preserve historical evidence and stable findings; revalidate the combined source and verification dispositions before closure |
 
 ## Consolidation Coverage And Corrections
 

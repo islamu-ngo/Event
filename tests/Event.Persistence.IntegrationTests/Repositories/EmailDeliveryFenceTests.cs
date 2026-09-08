@@ -1,5 +1,3 @@
-// ABOUTME: Proves committed delivery disablement prevents SMTP handoff and consumes no attempt budget.
-// ABOUTME: Uses real SQLite settings locks and explicit barriers to test disable-versus-admission ordering.
 
 using System.Data.Common;
 using Explore.Application.Contracts.Notifications;

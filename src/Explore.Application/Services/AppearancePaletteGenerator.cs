@@ -1,7 +1,3 @@
-// ABOUTME: Generates complete 18-token MudBlazor palettes from a natural color (surface/background/text) and brand color (primary/secondary/accent).
-// ABOUTME: Produces accessible themes that pass WCAG AA contrast requirements by deriving all tokens algorithmically.
-// ABOUTME: Includes high-contrast variants for Light HC and Dark HC modes that prioritize maximum readability.
-
 namespace Explore.Application.Services;
 
 using Explore.Application.DTOs.Appearance;

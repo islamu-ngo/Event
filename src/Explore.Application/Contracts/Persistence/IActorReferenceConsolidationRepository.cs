@@ -1,6 +1,3 @@
-// ABOUTME: Defines the atomic persistence operation for moving mutable Actor operational references.
-// ABOUTME: Keeps collision detection in Persistence while immutable evidence stays on the source.
-
 namespace Explore.Application.Contracts.Persistence;
 
 public interface IActorReferenceConsolidationRepository

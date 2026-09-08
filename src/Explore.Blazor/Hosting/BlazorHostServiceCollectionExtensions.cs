@@ -1,6 +1,3 @@
-// ABOUTME: Registers the reusable Explore.Blazor BFF, UI, health, localization, and host service graph.
-// ABOUTME: Keeps YARP and downstream API readiness exclusive to the Split transport profile.
-
 using Blazouter.Extensions;
 using Event.Web.BffHosting.Authentication;
 using Event.Web.BffHosting.Extensions;

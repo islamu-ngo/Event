@@ -1,6 +1,3 @@
-// ABOUTME: Central runtime service for composing MudBlazor themes and managing appearance state.
-// ABOUTME: Supports preset-based selection, user-owned profiles, custom theme generation, and System mode resolution.
-
 using Explore.Blazor.Client.Clients;
 using MudBlazor;
 using MudBlazor.Utilities;

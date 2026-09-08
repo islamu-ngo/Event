@@ -1,6 +1,3 @@
-// ABOUTME: Handles idempotent current-user unsubscribe requests for actor subscriptions.
-// ABOUTME: Transitions status to Unsubscribed and keeps the durable row for future reactivation.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ActorSubscription.Validators;

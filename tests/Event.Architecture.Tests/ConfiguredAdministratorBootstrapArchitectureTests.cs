@@ -1,6 +1,3 @@
-// ABOUTME: Enforces configured-administrator bootstrap boundaries through compiled and machine contracts.
-// ABOUTME: Guards clean layering, offline Setup, canonical identity, generated ownership, and provider composition.
-
 namespace Event.Architecture.Tests;
 
 using System.Reflection;

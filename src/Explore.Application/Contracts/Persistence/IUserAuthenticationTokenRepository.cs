@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for persisted external authentication token records.
-// ABOUTME: Exposes user-scoped reads so handlers cannot accidentally enumerate credentials.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

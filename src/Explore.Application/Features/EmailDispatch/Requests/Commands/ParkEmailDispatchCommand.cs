@@ -1,6 +1,3 @@
-// ABOUTME: Command contract for operator parking of an unsafe EmailDispatch outbox row.
-// ABOUTME: Captures tenant scope, target row, audit actor, and bounded reason before durable state mutation.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

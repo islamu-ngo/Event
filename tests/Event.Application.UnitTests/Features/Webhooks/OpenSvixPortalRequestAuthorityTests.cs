@@ -1,6 +1,3 @@
-// ABOUTME: Contract tests that freeze the caller-controlled Svix portal request surface.
-// ABOUTME: Ensures provider identity and capability authority remain server-derived.
-
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.DTOs.Webhooks;
 

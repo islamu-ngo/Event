@@ -1,6 +1,3 @@
-// ABOUTME: Contract for interim tenant branding typed-document lock metadata.
-// ABOUTME: Provides provider-neutral lock state for HAL, command authorization, and replacement validation.
-
 namespace Explore.Application.Contracts.Services;
 
 using Explore.Domain.Settings.Documents.Payloads;

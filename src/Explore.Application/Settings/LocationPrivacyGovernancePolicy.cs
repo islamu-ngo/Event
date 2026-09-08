@@ -1,6 +1,3 @@
-// ABOUTME: Parses and compares one location-privacy setting on its restrictive policy lattice.
-// ABOUTME: Reused by tenant-write validation and transactional EventLocation invalidation.
-
 namespace Explore.Application.Settings;
 
 using System.Text.Json;

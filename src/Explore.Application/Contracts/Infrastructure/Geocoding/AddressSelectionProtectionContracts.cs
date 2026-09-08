@@ -1,6 +1,3 @@
-// ABOUTME: Defines target-bound opaque address-selection protection contracts for Application writes.
-// ABOUTME: Keeps normalized provider facts and provenance private while exposing bounded failure categories.
-
 namespace Explore.Application.Contracts.Infrastructure.Geocoding;
 
 public interface IAddressSelectionProtector

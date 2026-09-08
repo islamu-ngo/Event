@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for adding a category to an event.
-// ABOUTME: Carries the CreateEventCategoriesDto payload.
 using System;
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventCategories;

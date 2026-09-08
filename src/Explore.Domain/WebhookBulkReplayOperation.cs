@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-scoped durable operation for bounded Local webhook replay scheduling.
-// ABOUTME: Freezes filters, idempotency identity, preview evidence, lifecycle, and execution counts.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

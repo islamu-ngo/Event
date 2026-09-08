@@ -1,6 +1,3 @@
-// ABOUTME: Generates the canonical API contract inventory markdown from schemas/openapi_islamu-event.json.
-// ABOUTME: Explicit tooling reads the OpenAPI contract and writes the committed docs artifact.
-
 using System.Globalization;
 using System.Text;
 using System.Text.Json;

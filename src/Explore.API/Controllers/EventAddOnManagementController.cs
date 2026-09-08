@@ -1,6 +1,3 @@
-// ABOUTME: Exposes organizer add-on catalog authoring through authenticated CQRS writes.
-// ABOUTME: Returns generic no-store resources and server-owned HAL management affordances.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

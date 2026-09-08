@@ -1,6 +1,3 @@
-// ABOUTME: Resolves image storage references and applies the shared safe-raster eligibility policy.
-// ABOUTME: Rejects missing, cross-tenant, inactive, unsafe, or non-public image references before mutation.
-
 using Explore.Application.Contracts.Persistence;
 
 namespace Explore.Application.Services;

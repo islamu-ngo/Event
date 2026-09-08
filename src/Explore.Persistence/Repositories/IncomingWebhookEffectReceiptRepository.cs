@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for tenant-scoped incoming webhook effect receipts.
-// ABOUTME: Provides tracked receipt creation and exact identity lookup for replay-free settlement recovery.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;

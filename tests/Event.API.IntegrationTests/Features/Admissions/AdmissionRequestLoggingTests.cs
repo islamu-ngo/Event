@@ -1,6 +1,3 @@
-// ABOUTME: Verifies admission request logs use route templates and exclude authority-bearing identities.
-// ABOUTME: Keeps raw event/check-in IDs, actors, tenants, and slugs out of admission observability.
-
 using Explore.API.Middleware;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Services;

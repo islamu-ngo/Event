@@ -1,6 +1,3 @@
-// ABOUTME: Performs direct admission credential handoff through the production tenant-aware email transport.
-// ABOUTME: Uses the stable delivery-intent ID as channel idempotency lineage without persisting message plaintext.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Models;

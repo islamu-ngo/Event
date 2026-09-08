@@ -1,6 +1,3 @@
-// ABOUTME: Production adapter around the official Svix C# SDK for outgoing webhook delivery.
-// ABOUTME: Resolves backend-only auth token secrets and maps canonical messages to Svix applications/messages.
-
 using System.Text;
 using System.Text.Json;
 using Explore.Application.Contracts.Secrets;

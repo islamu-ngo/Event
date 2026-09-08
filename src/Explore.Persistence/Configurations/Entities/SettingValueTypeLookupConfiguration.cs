@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for setting value type lookup values.
-// ABOUTME: Maps SettingValueTypeLookup to the setting_value_types table.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

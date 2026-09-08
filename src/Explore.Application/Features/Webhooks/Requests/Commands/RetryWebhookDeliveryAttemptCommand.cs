@@ -1,6 +1,3 @@
-// ABOUTME: Authorized command for scheduling a manual retry of a failed LocalProvider webhook attempt.
-// ABOUTME: Delegates retry eligibility and new attempt creation to the delivery drain service boundary.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

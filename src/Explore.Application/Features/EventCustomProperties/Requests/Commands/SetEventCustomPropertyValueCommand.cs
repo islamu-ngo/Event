@@ -1,6 +1,3 @@
-// ABOUTME: Command request for setting a single event custom property value (upsert by definition+event+ordinal).
-// ABOUTME: Single-value definitions use Ordinal=0; multi-value definitions use ascending ordinals.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventCustomProperty;
 using Explore.Application.Responses;

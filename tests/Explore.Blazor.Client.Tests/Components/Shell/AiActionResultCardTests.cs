@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for the AI action result card showing rich event card after CreateEventDraft.
-// ABOUTME: Verifies visual event card rendering, clickable navigation link, and payload detail display.
-
 using Explore.Blazor.Client.Components.Shell.AiAssistant;
 
 namespace Explore.Blazor.Client.Tests.Components.Shell;

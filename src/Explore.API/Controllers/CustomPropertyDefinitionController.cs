@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for custom property definition CRUD operations.
-// ABOUTME: Allows organizations to define custom fields for events and registrations with type validation.
-
 using System.ComponentModel.DataAnnotations;
 using Asp.Versioning;
 using Explore.API.Attributes;

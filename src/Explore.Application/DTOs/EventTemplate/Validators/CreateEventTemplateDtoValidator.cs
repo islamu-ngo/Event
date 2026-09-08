@@ -1,6 +1,3 @@
-// ABOUTME: Validates event template creation payload shape before persistence.
-// ABOUTME: Checks field lengths, version positivity, and nested definition validation.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.EventTemplate.Validators;

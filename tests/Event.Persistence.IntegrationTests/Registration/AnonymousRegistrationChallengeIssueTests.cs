@@ -1,5 +1,3 @@
-// ABOUTME: Exercises the actual challenge issue command with native SQLite policy, quota and Data Protection services.
-// ABOUTME: Proves public visitor eligibility and no allocation at issue without substituting repositories or unit of work.
 
 using System.Security.Cryptography;
 using Event.Persistence.IntegrationTests.Fixtures;

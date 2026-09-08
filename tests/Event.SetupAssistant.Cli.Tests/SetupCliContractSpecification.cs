@@ -1,6 +1,3 @@
-// ABOUTME: Defines source-free machine-command grammar, exit, explicit-I/O, and leak expectations for SA-410.
-// ABOUTME: Keeps independent vectors executable before the final CLI command owners exist.
-
 using System.Collections.ObjectModel;
 using System.Text;
 

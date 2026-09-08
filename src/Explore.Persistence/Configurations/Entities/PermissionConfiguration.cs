@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for Permission entity with unique MasterCode and resource kind indexes.
-// ABOUTME: Permissions define the vocabulary for dynamic RBAC (resource:action pairs).
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

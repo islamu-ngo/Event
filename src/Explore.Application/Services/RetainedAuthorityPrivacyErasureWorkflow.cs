@@ -1,6 +1,3 @@
-// ABOUTME: Executes one authority-first User erasure workflow for both supported storage topologies.
-// ABOUTME: Persists the fence before enumeration, replays policy versions, and reveals receipts once.
-
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Configuration;

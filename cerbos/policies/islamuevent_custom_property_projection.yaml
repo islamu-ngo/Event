@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos resource policy for custom_property_projection resources.
-# ABOUTME: Projection admin operations (rebuild, drain, status) are tenant-scoped admin actions.
-
 apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   resource: "islamuevent_custom_property_projection"

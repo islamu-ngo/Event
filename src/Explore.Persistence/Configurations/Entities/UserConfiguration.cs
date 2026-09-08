@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for User identity aggregates.
-// ABOUTME: Configures UUIDv7 IDs, optional actor linkage, PII extension mapping, and optimistic concurrency.
-
 using Explore.Domain;
 using Explore.Persistence.Seed;
 using Explore.Persistence.ValueGenerators;

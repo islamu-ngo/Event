@@ -1,6 +1,3 @@
-// ABOUTME: Secured query for a single control-plane tenant lifecycle detail resource.
-// ABOUTME: Returns bounded tenant metadata plus lifecycle audit history for instance operators.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.ControlPlane;
 using MediatR;

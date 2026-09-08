@@ -1,5 +1,3 @@
-// ABOUTME: Defines the transaction-bound, non-secret impact of disabling email delivery at one scope.
-// ABOUTME: Carries actual affected scope revisions without exposing SMTP settings or credential coordinates.
 
 using System.Collections.Immutable;
 

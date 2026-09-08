@@ -1,6 +1,3 @@
-// ABOUTME: Projects PostgreSQL Testcontainers settings into benchmark-local structured database configuration.
-// ABOUTME: Parses connection strings without logging or preserving the raw credential-bearing input.
-
 using System.Globalization;
 using Npgsql;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Keeps scanner authority in scoped memory and clears it on navigation or disposal.
-// ABOUTME: Never persists, formats, logs, or exposes the opaque capability to UI callers.
-
 using Explore.Blazor.Client.Contracts.Services.Admissions;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Routing;

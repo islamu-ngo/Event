@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests verifying security headers are present on all API responses.
-// ABOUTME: Validates X-Content-Type-Options, X-Frame-Options, Referrer-Policy, CSP, and cache directives.
-
 using System.Net;
 using Event.Api.IntegrationTests.Fixtures;
 

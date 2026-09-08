@@ -1,6 +1,3 @@
-// ABOUTME: Publishes the current event add-on catalog and exact buyer disclosures.
-// ABOUTME: Keeps the anonymous resource no-store while HAL owns all management affordances.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

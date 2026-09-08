@@ -1,6 +1,3 @@
-// ABOUTME: Contract for asking the Jetstream sealed archive which repositories changed since a cursor.
-// ABOUTME: Lets governed PDS recovery skip repositories with no sealed evidence of calendar activity.
-
 namespace Explore.Application.Contracts.Infrastructure;
 
 /// <summary>

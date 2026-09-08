@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for a reporter changing communication consent on their own report.
-// ABOUTME: Carries the route-owned report id separately from the two explicit consent purposes.
-
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Responses;
 using MediatR;

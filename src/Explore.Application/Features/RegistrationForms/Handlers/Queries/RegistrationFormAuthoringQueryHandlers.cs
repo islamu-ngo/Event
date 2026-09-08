@@ -1,6 +1,3 @@
-// ABOUTME: Handles explicit registration workflow, form, version, and publish-preflight reads.
-// ABOUTME: Maps repository-returned entities in Application and propagates cancellation end to end.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.RegistrationForms;
 using Explore.Application.Features.RegistrationForms.Requests.Queries;

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies custom-property projection inspection queries fail closed through resource authorization metadata.
-// ABOUTME: Covers tenant, event, and session projection read surfaces that feed Cerbos/fallback resource context.
-
 using System.Reflection;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Services;

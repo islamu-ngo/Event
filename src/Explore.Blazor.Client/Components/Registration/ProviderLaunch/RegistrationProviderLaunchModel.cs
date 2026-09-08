@@ -1,6 +1,3 @@
-// ABOUTME: Attendee-side provider launch state contract for external registration channels.
-// ABOUTME: Uses server HAL/DTO status as authority; iframe browser events never complete a requirement.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Interop;
 using Explore.Blazor.Client.Contracts.Services;

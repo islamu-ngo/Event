@@ -1,6 +1,3 @@
-// ABOUTME: Runs one bounded registration-provider submission-write drain pass under Quartz.
-// ABOUTME: Keeps tenant claims, provider ambiguity, retry, and fenced settlement in Application.
-
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Services.Registration.Commands;
 using MediatR;

@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped layout styles for fixed app chrome, dock content, and responsive workspace projection. */
-/* ABOUTME: Uses logical properties and shared shell insets so rail and dock panels never overlap. */
-
 /* ==========================================================================
    MainLayout Component - BEM Methodology
    Block: main-layout

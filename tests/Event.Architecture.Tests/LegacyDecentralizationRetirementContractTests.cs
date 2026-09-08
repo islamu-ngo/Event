@@ -1,6 +1,3 @@
-// ABOUTME: Verifies obsolete decentralization persistence is absent from the current canonical schema.
-// ABOUTME: Guards the EF snapshot, setting registry, and compiled seed rows from regression.
-
 using Explore.Domain.Constants;
 using Explore.Domain.Settings;
 using Explore.Domain.Settings.Definitions;

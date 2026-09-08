@@ -1,6 +1,3 @@
-// ABOUTME: Event aggregate root owning tenant-scoped event metadata, publication state, and schedule rollup projections.
-// ABOUTME: UTC session instants are authoritative; timezone and local projection updates flow through aggregate methods.
-
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;

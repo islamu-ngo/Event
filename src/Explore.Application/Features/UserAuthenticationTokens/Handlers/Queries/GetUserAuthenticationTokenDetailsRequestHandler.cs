@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning a single authentication token by ID.
-// ABOUTME: Maps entity to UserAuthenticationTokenDto.
 using AutoMapper;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;

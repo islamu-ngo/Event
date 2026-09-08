@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the global marker distinguishes interactive rendering from static prerendering.
-// ABOUTME: Protects browser automation from clicking visible UI before Blazor event handlers attach.
-
 using Explore.Blazor.Client.Components;
 
 namespace Explore.Blazor.Client.Tests.Components;

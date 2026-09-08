@@ -1,6 +1,3 @@
-// ABOUTME: Exposes bounded non-PII refund campaign progress for organizer and trust/safety operations.
-// ABOUTME: Separates generation, provider outcomes, unknowns, and operator cases without leaking payment identities.
-
 namespace Explore.Application.DTOs.RegistrationOrders;
 
 public sealed record RefundCampaignDto

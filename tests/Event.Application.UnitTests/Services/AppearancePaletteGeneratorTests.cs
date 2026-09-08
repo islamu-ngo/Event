@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for AppearancePaletteGenerator — verifies algorithmic palette generation from natural + brand colors.
-// ABOUTME: Covers light, dark, and high-contrast palette generation ensuring all 18 tokens are populated.
-
 namespace Explore.Application.UnitTests.Services;
 
 using Explore.Application.DTOs.Appearance;

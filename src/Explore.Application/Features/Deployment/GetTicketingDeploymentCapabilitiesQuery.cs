@@ -1,6 +1,3 @@
-// ABOUTME: Queries the canonical ticketing deployment capability matrix.
-// ABOUTME: Maps the infrastructure-owned machine artifact into immutable application DTOs.
-
 using Explore.Application.Contracts.Deployment;
 using Explore.Application.DTOs.Deployment;
 using MediatR;

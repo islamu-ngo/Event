@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for SessionEditorModel summary mapping used by event shell pages.
-// ABOUTME: Keeps list DTO projection coverage after drawer-era editor helpers were removed.
-
 using Explore.Blazor.Client.Pages.Events.Models;
 
 namespace Explore.Blazor.Client.Tests.Models;

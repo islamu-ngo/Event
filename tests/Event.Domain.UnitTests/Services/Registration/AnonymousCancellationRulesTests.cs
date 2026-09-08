@@ -1,5 +1,3 @@
-// ABOUTME: Proves explicit anonymous cancellation cannot widen generic terminal or active-only transitions.
-// ABOUTME: Rejects paid, attended, and non-anonymous authority using pinned facts rather than missing PII.
 
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;

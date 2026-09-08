@@ -1,6 +1,3 @@
-// ABOUTME: Resolves the effective provider trust tier from endpoint and ownership evidence.
-// ABOUTME: Returns the most restrictive tier when evidence is ambiguous (CTO correction #6).
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Features.AiAssistant.Disclosure;

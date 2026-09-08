@@ -1,6 +1,3 @@
-// ABOUTME: Validates provider proposed actions before they become persisted AI proposals.
-// ABOUTME: Enforces allow-listed action kinds and JSON-object payload boundaries for untrusted model output.
-
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Features.AiAssistant.Tools;
 using Explore.Domain.Ai;

@@ -1,6 +1,3 @@
-// ABOUTME: Shared HTTP helper for Cerbos PDP check resource requests in integration tests.
-// ABOUTME: Eliminates duplication of JSON payload construction and response parsing across test suites.
-
 using System.Net.Http.Json;
 using System.Text.Json;
 

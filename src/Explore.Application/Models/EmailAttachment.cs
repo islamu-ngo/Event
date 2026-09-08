@@ -1,4 +1,3 @@
-// ABOUTME: Email attachment DTO supporting file attachments and inline images (CID).
 // Used by EmailMessage for the provider-agnostic email service.
 
 namespace Explore.Application.Models;

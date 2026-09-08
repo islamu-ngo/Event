@@ -1,6 +1,3 @@
-// ABOUTME: Serializes participant readiness transitions on the tenant-qualified assignment row.
-// ABOUTME: Evaluates bounded Domain readiness without loading or returning participant PII.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Domain;
 using Explore.Domain.Enums;

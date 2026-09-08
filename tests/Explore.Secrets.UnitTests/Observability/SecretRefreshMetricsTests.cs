@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for SecretRefreshMetrics.
-// ABOUTME: Tests metric recording, consecutive failure tracking, and refresh timestamp.
-
 using Explore.Secrets.Abstractions;
 using Explore.Secrets.Observability;
 using TUnit.Core;

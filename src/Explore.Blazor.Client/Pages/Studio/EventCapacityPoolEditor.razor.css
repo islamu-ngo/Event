@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped responsive layout for Studio shared-capacity pool authoring. */
-/* ABOUTME: Matches ticket editor spacing and keeps actions usable on narrow screens. */
-
 .capacity-pool-editor {
     display: grid;
     gap: var(--isl-space-4);

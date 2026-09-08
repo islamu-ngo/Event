@@ -1,6 +1,3 @@
-// ABOUTME: Durable Event-owned operation for asynchronous managed tenant provisioning.
-// ABOUTME: Keeps request idempotency, bounded failure state, cancellation, and safe result references inside Event.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

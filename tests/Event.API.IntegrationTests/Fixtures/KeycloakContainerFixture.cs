@@ -1,6 +1,3 @@
-// ABOUTME: Manages Keycloak container lifecycle for security integration tests using Testcontainers.
-// ABOUTME: Injects instance-owned ephemeral credentials into the test realm and waits for OIDC readiness.
-
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using System.Security.Cryptography;

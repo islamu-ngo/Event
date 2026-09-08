@@ -1,5 +1,3 @@
-// ABOUTME: Reads authoritative non-secret email policy through the shared settings merge inside caller-owned transactions.
-// ABOUTME: Avoids process caches, credential resolution, and network I/O during final delivery admission.
 
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Models;

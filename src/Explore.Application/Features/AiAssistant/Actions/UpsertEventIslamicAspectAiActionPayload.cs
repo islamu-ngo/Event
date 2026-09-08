@@ -1,6 +1,3 @@
-// ABOUTME: Defines the safe AI-proposed payload shape for Islamic aspect upsert proposals.
-// ABOUTME: Excludes tenant, actor, lifecycle, audit, and event shell mutation fields.
-
 namespace Explore.Application.Features.AiAssistant.Actions;
 
 public sealed class UpsertEventIslamicAspectAiActionPayload

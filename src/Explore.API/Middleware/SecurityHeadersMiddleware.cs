@@ -1,6 +1,3 @@
-// ABOUTME: Adds security headers to all HTTP responses to mitigate common web vulnerabilities.
-// ABOUTME: Implements X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy, and CSP.
-
 namespace Explore.API.Middleware;
 
 /// <summary>

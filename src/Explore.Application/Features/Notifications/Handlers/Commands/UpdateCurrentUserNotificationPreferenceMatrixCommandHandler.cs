@@ -1,6 +1,3 @@
-// ABOUTME: Updates privacy-unfenced user category-by-channel notification preferences.
-// ABOUTME: Enforces required categories, broader locks, and an atomic persisted fence before writes.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

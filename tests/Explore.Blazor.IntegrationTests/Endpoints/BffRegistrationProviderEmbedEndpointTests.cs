@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for the BFF registration provider embed host security boundary.
-// ABOUTME: Proves descriptor-derived iframe HTML never trusts browser-supplied provider URLs or titles.
-
 using System.Text.RegularExpressions;
 using System.Text.Json;
 using System.Net.Http.Json;

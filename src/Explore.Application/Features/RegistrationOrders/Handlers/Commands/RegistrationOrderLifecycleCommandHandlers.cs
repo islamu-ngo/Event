@@ -1,6 +1,3 @@
-// ABOUTME: Handles one registration-order lifecycle command per handler with manual validation.
-// ABOUTME: Delegates transaction-sensitive state changes to the order lifecycle service.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Responses;

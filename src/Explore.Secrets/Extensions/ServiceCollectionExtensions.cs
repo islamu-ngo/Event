@@ -1,4 +1,3 @@
-// ABOUTME: Dependency injection extensions for secret management.
 // Provides AddSecretProvider and AddSecretManagement extension methods.
 // Includes observability setup with metrics, health checks, and audit logging.
 

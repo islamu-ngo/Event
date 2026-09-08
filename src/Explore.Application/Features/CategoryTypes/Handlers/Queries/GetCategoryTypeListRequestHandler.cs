@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning all category types.
-// ABOUTME: Maps CategoryType entities to CategoryTypeDto list.
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.CategoryType;

@@ -1,4 +1,3 @@
-// ABOUTME: Unit tests for EmailResult model verifying static factory methods,
 // property initialization, and success/failure behavior.
 
 using Explore.Application.Models;

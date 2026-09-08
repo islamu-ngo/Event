@@ -1,6 +1,3 @@
-// ABOUTME: Secured query for the multi-tenant control-plane tenant list.
-// ABOUTME: Uses instance-setting authorization so only instance operators can inspect tenant fleet state.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.ControlPlane;
 using MediatR;

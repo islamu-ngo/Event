@@ -1,6 +1,3 @@
-// ABOUTME: MediatR query for retrieving all EventDays belonging to a specific event.
-// ABOUTME: Returns a list (not paginated) since days per event are typically small (< 30).
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventDay;
 using MediatR;

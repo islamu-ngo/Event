@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for webhook endpoints and event type subscription resolution.
-// ABOUTME: Powers LocalProvider fanout queries with tenant predicates and provider-mode filtering.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;

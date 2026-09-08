@@ -1,6 +1,3 @@
-// ABOUTME: Issues, reads, and revokes narrow admission scanner capabilities through Domain entities.
-// ABOUTME: Maps entities to descriptors and returns plaintext only to the atomic issue-request winner.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

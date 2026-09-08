@@ -1,6 +1,3 @@
-// ABOUTME: Handles current-user lookup for one actor subscription.
-// ABOUTME: Fails closed by returning null when authentication or tenant-local user state is missing.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

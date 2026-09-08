@@ -1,6 +1,3 @@
-// ABOUTME: Verifies bounded concurrency and aggregate result reporting for incoming webhook batch drains.
-// ABOUTME: Uses claim-only repository doubles while exercising the real lease-aware drain coordinator.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;

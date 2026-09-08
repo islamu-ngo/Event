@@ -1,0 +1,62 @@
+# ABOUTME: Public change fragment for the whole-instance ConfigurationManifest cutover.
+# ABOUTME: Records breaking configuration, migration, API, security, and operator actions.
+Change-Id: CHG-01M1VJ1EH9EMK3Q5BK4GRPY054
+Title: One ConfigurationManifest bootstraps the complete instance
+Type: feat
+Scope: architecture
+Summary: >-
+  A strict versioned ConfigurationManifest can validate or atomically bootstrap
+  approved instance state and every declared tenant, while secrets, topology,
+  personal data, provider custody, and sovereign payment operations stay out.
+Group: configuration-manifest
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: documented
+    Detail: >-
+      The development-only tenant-shaped contract, routes, HAL relations,
+      generated client methods, environment keys, schema path, and service
+      identities are removed without aliases. Callers must use the canonical
+      whole-instance contract and control-plane export route.
+  Security:
+    Reference: docs/SECURITY-MODEL.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Instance authority remains server-resolved, tenant sections cannot select
+      instance or sovereign state, HAL remains the browser capability source,
+      and exports omit secrets, credentials, topology, PII, and payment
+      execution records.
+  Migration:
+    Reference: docs/OPERATIONS.md
+    Disposition: documented
+    Detail: >-
+      Regenerated provider migrations persist canonical bootstrap operation,
+      tenant-result, digest, audit, and durable-effect state. Development
+      environments carrying the removed unapplied model must reset or recreate
+      their database before rehearsal.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: documented
+    Detail: >-
+      Mount configuration-manifest.json read-only and set
+      CONFIGURATION_MANIFEST_MODE plus CONFIGURATION_MANIFEST_PATH. Secrets
+      continue to originate only from Infisical or environment bindings.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: documented
+    Detail: >-
+      Instance administrators export Overrides or Portable views through
+      GET /api/control-plane/configuration-manifest/export. The exact media
+      type, bounded file response, HAL relations, inventory, and NSwag client
+      are regenerated from the canonical contract.
+  Operator:
+    Reference: docs/SELF_HOSTING.md
+    Disposition: documented
+    Detail: >-
+      Remove obsolete keys and mounts, install the canonical schema and file,
+      run MigrationService before the owning host, rehearse ValidateOnly before
+      Bootstrap, verify the digest/audit result, and remove or disable the
+      bootstrap file after first success. Bootstrap is not reconciliation and
+      the exported file is not an application-data or secret backup.

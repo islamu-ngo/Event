@@ -1,6 +1,3 @@
-// ABOUTME: Authorized query for one LocalProvider webhook delivery attempt audit row.
-// ABOUTME: Resolves persisted configuration ownership for HAL retry affordance generation.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Webhooks;
 using MediatR;

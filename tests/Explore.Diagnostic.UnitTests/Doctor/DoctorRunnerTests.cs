@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for bounded doctor runner behavior.
-// ABOUTME: Ensures failed checks become visible WARN results rather than being swallowed.
-
 using Explore.Diagnostic.Doctor;
 
 namespace Explore.Diagnostic.UnitTests.Doctor;

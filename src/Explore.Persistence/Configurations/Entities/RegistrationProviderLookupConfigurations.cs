@@ -1,6 +1,3 @@
-// ABOUTME: EF Core lookup mappings for provider-neutral registration provider metadata.
-// ABOUTME: Uses shared lookup configuration so runtime seeding remains authoritative and HasData-free.
-
 using Explore.Domain;
 
 namespace Explore.Persistence.Configurations.Entities;

@@ -1,6 +1,3 @@
-// ABOUTME: Typed desired-state contract for platform-owned Keycloak realm requirements.
-// ABOUTME: Supports additive drift planning while explicitly excluding destructive operations.
-
 namespace Explore.Application.DTOs.Onboarding;
 
 public sealed record KeycloakRealmDesiredStateDto

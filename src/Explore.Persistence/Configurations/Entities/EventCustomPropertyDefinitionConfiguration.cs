@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for event-local custom-property definitions used at runtime.
-// ABOUTME: Enforces event-scoped namespaced keys plus template provenance metadata.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

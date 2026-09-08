@@ -1,5 +1,3 @@
-// ABOUTME: Defines opaque, short-lived confirmation tokens bound to email-disable preview impacts.
-// ABOUTME: Keeps protection details in Infrastructure and current administrator checks in Application handlers.
 
 using Explore.Application.Contracts.Persistence;
 

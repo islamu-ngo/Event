@@ -1,5 +1,3 @@
-// ABOUTME: Defines mandatory typed Local credential state stored in the existing Identity token slot.
-// ABOUTME: Validates versioned nonsecret metadata without treating missing or unknown state as ready.
 
 using System.Text.Json.Serialization;
 

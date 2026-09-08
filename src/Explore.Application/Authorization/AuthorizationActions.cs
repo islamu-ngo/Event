@@ -1,6 +1,3 @@
-// ABOUTME: Canonical catalog of authorization action strings matching Cerbos policy definitions.
-// ABOUTME: Organizes canonical authorization action strings by resource kind for discoverability.
-
 namespace Explore.Application.Authorization;
 
 /// <summary>

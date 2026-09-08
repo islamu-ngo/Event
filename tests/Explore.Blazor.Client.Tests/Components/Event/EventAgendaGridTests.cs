@@ -1,6 +1,3 @@
-// ABOUTME: bUnit tests for EventAgendaGrid verifying agenda item rendering, day filtering, and grid vs list modes.
-// ABOUTME: Tests day chip selector, empty state, and manage controls for agenda items.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Events;
 using Microsoft.Extensions.Logging;

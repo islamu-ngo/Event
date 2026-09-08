@@ -1,6 +1,3 @@
-// ABOUTME: Query handler returning all available event registration policies.
-// ABOUTME: Maps EventRegistrationPolicy entities to EventRegistrationPolicyListDto list.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventRegistrationPolicy;

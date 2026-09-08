@@ -1,6 +1,3 @@
-// ABOUTME: Readiness health check for the background job scheduler's live operating posture.
-// ABOUTME: Reports bounded scheduling metadata only; no job payloads, tenant data, or error text.
-
 using Explore.API.Configuration;
 using Explore.Application.Contracts.Scheduling;
 using Microsoft.Extensions.Diagnostics.HealthChecks;

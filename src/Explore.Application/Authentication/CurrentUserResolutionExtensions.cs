@@ -1,6 +1,3 @@
-// ABOUTME: Single authority for resolving the local user id behind a provider-authenticated principal.
-// ABOUTME: Composes the canonical claim chain with the provider-link query so callers never parse claims.
-
 using System.Security.Claims;
 using Explore.Application.Features.Users.Requests.Queries;
 using MediatR;

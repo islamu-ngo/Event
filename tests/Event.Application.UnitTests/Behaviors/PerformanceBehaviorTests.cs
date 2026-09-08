@@ -1,6 +1,3 @@
-// ABOUTME: Verifies PerformanceBehavior emits only bounded slow-request metadata.
-// ABOUTME: Protects tokens, free text, user and tenant IDs, and record values from logging.
-
 using Explore.Application.Behaviors;
 using MediatR;
 using Microsoft.Extensions.Logging;

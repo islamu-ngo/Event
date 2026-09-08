@@ -1,5 +1,4 @@
-// ABOUTME: OpenAPI document transformer that registers inner DTO schemas from HAL wrapper types.
-// ABOUTME: Ensures NSwag generates proper DTO classes by adding them as explicit schemas in the OpenAPI document.
+// Ensures NSwag generates proper DTO classes by adding them as explicit schemas in the OpenAPI document.
 
 using System.Text.Json.Serialization;
 using Explore.Application.Hateoas;

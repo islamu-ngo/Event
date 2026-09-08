@@ -1,6 +1,3 @@
-// ABOUTME: Architecture guardrails for mutating MediatR requests and anonymous mutation surfaces.
-// ABOUTME: Enforces the authorization surface directly from compiled reflection discovery without session artifacts.
-
 namespace Event.Architecture.Tests;
 
 using System.Reflection;
@@ -24,6 +21,18 @@ public sealed class AuthorizationSurfaceGuardrailTests
 
     private static readonly InventoryEntry[] NamedMediatRExceptions =
     [
+        new(
+            "Explore.Application.Features.Authentication.Atproto.Requests.Commands.ProbeAtprotoTransientCommand",
+            "private-pre-authentication-machine",
+            "Approved instance-owned health authority: the exact private probe route accepts only the dedicated ES256 scheme, exact signed health_probe body and durable replay admission. The no-input handler generates tenantless non-secret synthetic data with thirty-second expiry and verifies create/read/conditional consumption; it accepts no caller tenant or locator and exposes no row. AtprotoTransientProbeTests proves purpose isolation, caller-field rejection and failed-probe expiry through real API/PostgreSQL."),
+        new(
+            "Explore.Application.Features.Authentication.Atproto.Requests.Commands.CreateAtprotoTransientCommand",
+            "private-pre-authentication-machine",
+            "Approved instance-owned transient authority: the exact private POST route accepts only the AtprotoTransient ES256 scheme, binds exact request bytes and claims P1 replay before dispatch. The handler checks the enabled target tenant without user identity or business filter bypass. AtprotoTransientAuthenticationTests and AtprotoTransientStoreControllerTests exercise the real HTTP/P1 boundary."),
+        new(
+            "Explore.Application.Features.Authentication.Atproto.Requests.Commands.ConsumeAtprotoTransientCommand",
+            "private-pre-authentication-machine",
+            "Approved instance-owned transient authority: the dedicated exact-body machine scheme admits durable replay before dispatch; the handler validates the enabled expected tenant and P1 grants a payload only after an exact single-winner row deletion. AtprotoTransientStoreControllerTests proves tenant mismatch and concurrent loser rejection with no ambient transaction or generic idempotency replay."),
         new(
             "Explore.Application.Features.ConfigurationManifest.Requests.Commands.ApplyConfigurationManifestCommand",
             "host-local-bootstrap",

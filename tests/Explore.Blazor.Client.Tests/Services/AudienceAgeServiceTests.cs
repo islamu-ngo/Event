@@ -1,4 +1,3 @@
-// ABOUTME: Unit tests for AudienceAgeService covering age lookup list and by-id retrieval behavior.
 // Verifies successful pass-through and exception propagation from the API client.
 
 namespace Explore.Blazor.Client.Tests.Services;

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies fenced lifecycle transitions for durable incoming-webhook effect pointers.
-// ABOUTME: Covers claim contention, stale fences, bounded retries, quarantine, redrive, and cancellation safety.
-
 using Explore.Domain;
 
 namespace Event.Domain.UnitTests.Entities;

@@ -1,6 +1,3 @@
-// ABOUTME: Captures immutable, versioned evidence that a registration subject granted a consent field.
-// ABOUTME: Retains the exact shown text and permits only a one-way withdrawal timestamp transition.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for the AppWorkspaceRail permanent shell chrome.
-// ABOUTME: Verifies workspace link rendering, auth filtering, active state, and Settings pinning.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.Shell;
 using Explore.Blazor.Client.Contracts.Services;

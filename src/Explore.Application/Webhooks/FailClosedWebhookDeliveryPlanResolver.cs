@@ -1,6 +1,3 @@
-// ABOUTME: Default outgoing webhook plan resolver used until verified binding and capability resolution is registered.
-// ABOUTME: Produces no runnable provider or Local work when authoritative routing facts are unavailable.
-
 using Explore.Application.Contracts.Webhooks;
 
 namespace Explore.Application.Webhooks;

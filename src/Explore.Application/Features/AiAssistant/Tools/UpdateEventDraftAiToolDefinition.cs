@@ -1,6 +1,3 @@
-// ABOUTME: Defines the governed UpdateEventDraft AI tool contract for MCP proposal workflows.
-// ABOUTME: Keeps event update proposal schema, field allow-lists, and HAL guidance centralized.
-
 using Explore.Application.Authorization;
 using Explore.Application.Features.AiAssistant.Actions;
 using Explore.Domain.Ai;

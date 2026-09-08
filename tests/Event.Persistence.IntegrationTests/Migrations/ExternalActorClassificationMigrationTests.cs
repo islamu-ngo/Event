@@ -1,7 +1,5 @@
-// ABOUTME: Verifies the external-unclassified Actor lookup, backfill migration, and ownership/type constraint in PostgreSQL.
-// ABOUTME: Proves legacy BOT classification cannot be reintroduced for an Actor owned by ExternalActorSubject.
-
 using Event.Persistence.IntegrationTests.Fixtures;
+using Explore.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using TUnit.Assertions.Enums;
@@ -23,9 +21,18 @@ public sealed class ExternalActorClassificationMigrationTests(PostgreSqlContaine
         await Assert.That(await ScalarAsync(
             "SELECT COUNT(*) FROM pg_constraint WHERE conname = 'ck_actors_external_type_matches_owner'"))
             .IsEqualTo(1L);
-        await using var context = fixture.CreateDbContext();
+        await using ExploreDbContext context = fixture.CreateDbContext();
+        string[] availableMigrations = context.Database.GetMigrations().ToArray();
+        await Assert.That(availableMigrations[0]).EndsWith("_Init");
         await Assert.That(await context.Database.GetAppliedMigrationsAsync())
-            .IsEquivalentTo(context.Database.GetMigrations(), CollectionOrdering.Matching);
+            .IsEquivalentTo(availableMigrations, CollectionOrdering.Matching);
+        long availableMigrationCount = context.Database.GetMigrations().LongCount();
+        await Assert.That(await ScalarAsync(
+            "SELECT COUNT(*) FROM \"__EFMigrationsHistory\""))
+            .IsEqualTo(availableMigrationCount);
+        await Assert.That(await ScalarAsync(
+            "SELECT COUNT(*) FROM \"__EFMigrationsHistory\" WHERE migration_id LIKE '%_Init'"))
+            .IsEqualTo(1L);
     }
 
     [Test]

@@ -1,6 +1,3 @@
-// ABOUTME: Validates current Local session authority before projecting API-backed administrative claims.
-// ABOUTME: Binds private current-user probes to the original subject and rejects stale cached enrichment.
-
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;

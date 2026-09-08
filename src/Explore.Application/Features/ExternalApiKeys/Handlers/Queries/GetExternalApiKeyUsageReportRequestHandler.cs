@@ -1,6 +1,3 @@
-// ABOUTME: Handles instance-admin usage report queries with optional per-tenant filtering.
-// ABOUTME: Requires instance-admin or tenant-admin authority; maps repository summaries to safe DTOs.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ExternalApiKey;

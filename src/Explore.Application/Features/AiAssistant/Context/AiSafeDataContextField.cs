@@ -1,6 +1,3 @@
-// ABOUTME: Describes one explicitly allow-listed field for AI schema-only context summaries.
-// ABOUTME: Carries no data access behavior and cannot expose EF entities, SQL, LINQ, or private content.
-
 namespace Explore.Application.Features.AiAssistant.Context;
 
 public sealed class AiSafeDataContextField

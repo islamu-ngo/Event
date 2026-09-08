@@ -1,6 +1,3 @@
-// ABOUTME: Normalizes AI assistant image attachment payloads for storage and provider use.
-// ABOUTME: Keeps base64 image data private on read DTOs while preserving it for queued AI runs.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Services;

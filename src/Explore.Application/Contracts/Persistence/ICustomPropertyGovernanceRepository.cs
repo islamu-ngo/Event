@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for the Rule 12 governance report aggregation queries.
-// ABOUTME: Aggregates across event and event-session runtime definitions for promotion analysis.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Contracts.Persistence;

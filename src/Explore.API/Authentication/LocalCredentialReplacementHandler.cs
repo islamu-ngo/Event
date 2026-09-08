@@ -1,5 +1,3 @@
-// ABOUTME: Defines the isolated bearer scheme for short-lived Local credential replacement challenges.
-// ABOUTME: Fails closed with a private bounded problem response and never exposes native token-validation details.
 
 using System.Text.Encodings.Web;
 using System.Net.Http.Headers;

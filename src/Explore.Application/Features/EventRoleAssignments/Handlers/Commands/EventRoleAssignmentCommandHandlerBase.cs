@@ -1,6 +1,3 @@
-// ABOUTME: Shared command helpers for event-role assignment write handlers.
-// ABOUTME: Centralizes response failure codes and same-event authority checks.
-
 using System.Text.Json;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Persistence;

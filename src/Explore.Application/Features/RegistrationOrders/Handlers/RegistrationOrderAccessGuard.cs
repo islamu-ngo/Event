@@ -1,6 +1,3 @@
-// ABOUTME: Centralizes tenant, event, account, expiry, and capability checks for order-facing CQRS wrappers.
-// ABOUTME: Returns no distinction between malformed, missing, cross-scope, expired, and mismatched guest access.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

@@ -1,6 +1,3 @@
-// ABOUTME: Validates private AI assistant send-message requests before provider orchestration.
-// ABOUTME: Keeps prompt-sized user input and idempotency keys bounded at the Application boundary.
-
 using Explore.Application.DTOs.Ai;
 using Explore.Application.Services;
 using Explore.Domain.Ai;

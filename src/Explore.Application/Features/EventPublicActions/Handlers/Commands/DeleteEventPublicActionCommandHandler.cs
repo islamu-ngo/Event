@@ -1,6 +1,3 @@
-// ABOUTME: Soft-deletes one event public action after tenant and concurrency validation.
-// ABOUTME: Authorization remains bound to the parent event resource.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventPublicActions.Requests.Commands;

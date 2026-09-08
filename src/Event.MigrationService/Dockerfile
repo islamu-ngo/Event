@@ -1,6 +1,3 @@
-# ABOUTME: Builds the one-shot Event migration service for application and optional authority databases.
-# ABOUTME: Keeps external authority migrator credentials out of the API runtime image.
-
 FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:7644f992230d35cf230017189d4038c0ae0f7388b13f4f7ae1900a155bafb597 AS base
 USER $APP_UID
 WORKDIR /app

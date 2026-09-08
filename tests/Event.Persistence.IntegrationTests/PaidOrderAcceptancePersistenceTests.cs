@@ -1,6 +1,3 @@
-// ABOUTME: Verifies paid-order acceptance persistence is tenant-qualified, immutable, and optional only for historical attempts.
-// ABOUTME: Guards the generated model against synthetic acceptance backfills and cross-tenant payment references.
-
 using Explore.Domain;
 using Explore.Persistence;
 using Explore.Persistence.QueryFilters;
@@ -17,7 +14,7 @@ public sealed class PaidOrderAcceptancePersistenceTests
     [Test]
     public async Task ModelKeepsHistoricalAcceptanceNullableAndUsesTenantQualifiedForeignKeys()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite("Data Source=:memory:")
             .UseSnakeCaseNamingConvention()
             .Options;

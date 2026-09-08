@@ -1,6 +1,3 @@
-// ABOUTME: Verifies Cerbos gRPC typed-request projection and response normalization for a closed adapter corpus.
-// ABOUTME: Decision parity lives in LocalProviderParityLaneTests and CerbosProviderParityLaneTests; this file is adapter-only.
-
 // This suite seeds the Cerbos response on purpose: its subject is the *adapter* — that a typed request
 // projects to the right gRPC shape and that a PDP response normalizes to the right decision. It cannot and
 // does not establish policy behaviour.

@@ -1,6 +1,3 @@
-// ABOUTME: Calls private participant readiness BFF endpoints through the shared browser credential pipeline.
-// ABOUTME: Sends guest capability only as a request header and deserializes PII-minimal generated contracts.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Admissions;
 using Explore.Blazor.Client.Services.Http;

@@ -1,6 +1,3 @@
-// ABOUTME: Emits local event affordances or the governed internal source relation for public discovery items.
-// ABOUTME: Delegates local authorization to the canonical event collection policy and invents no federated writes.
-
 using System.Security.Claims;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.DTOs.Event;

@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for tenant-local user role grants and authority checks.
-// ABOUTME: Provides tenant/user lookup helpers for tenant-level authorization workflows.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

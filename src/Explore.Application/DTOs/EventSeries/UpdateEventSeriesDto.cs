@@ -1,6 +1,3 @@
-// ABOUTME: PATCH wrapper DTO for event series property updates using nullable logical groups.
-// ABOUTME: Route ID targets the row; groups express independent property update intent.
-
 using Explore.Application.Models.Common;
 
 namespace Explore.Application.DTOs.EventSeries;

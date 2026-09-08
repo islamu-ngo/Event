@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for the unified SettingsController verifying auth gates and endpoint availability.
-// ABOUTME: Tests both anonymous (401) and authenticated access for all 9 user/tenant settings endpoints.
-
 using System.Net;
 using System.Net.Http.Json;
 using Event.Api.IntegrationTests.Fixtures;

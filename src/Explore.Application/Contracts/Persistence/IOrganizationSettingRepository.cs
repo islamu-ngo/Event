@@ -1,4 +1,3 @@
-// ABOUTME: Repository interface for OrganizationSetting entity providing data access
 // for organization-specific setting overrides.
 
 namespace Explore.Application.Contracts.Persistence;

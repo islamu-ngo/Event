@@ -1,6 +1,3 @@
-// ABOUTME: Rendered tests for compact path-based Personal Settings navigation.
-// ABOUTME: Prevents query-state and large sidebar navigation from returning.
-
 using Blazouter.Models;
 using Blazouter.Services;
 using Explore.Blazor.Client.Components.Webhooks;

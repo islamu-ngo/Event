@@ -1,6 +1,3 @@
-// ABOUTME: Write DTO for creating template property options, used nested within CreateEventTemplateDefinitionDto.
-// ABOUTME: Mirrors CreateCustomPropertyOptionDto shape for consistency across the EAV system.
-
 namespace Explore.Application.DTOs.EventTemplate;
 
 public sealed record CreateEventTemplateOptionDto

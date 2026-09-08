@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for reporter-facing event-report submission and status reads.
-// ABOUTME: Hashes request fingerprints at the API boundary before dispatching CQRS commands.
-
 using System.Security.Cryptography;
 using System.Text;
 using Asp.Versioning;

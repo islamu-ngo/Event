@@ -1,6 +1,3 @@
-// ABOUTME: HAL policies for organizer-claim detail and collection resources.
-// ABOUTME: Filters claimant withdrawal and curator review affordances through organizer-claim authorization.
-
 using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;

@@ -1,6 +1,3 @@
-// ABOUTME: Persistence port for lock-scoped publication-policy snapshots and atomic batch writes.
-// ABOUTME: Returns neutral committed value changes without publishing or invalidating external effects.
-
 namespace Explore.Application.Contracts.Persistence;
 
 using System.Collections.Immutable;

@@ -1,6 +1,3 @@
-// ABOUTME: Releases MySQL and MariaDB transaction-associated named locks after EF transaction completion.
-// ABOUTME: Closes the physical connection when release fails so pooled sessions cannot leak lock ownership.
-
 using System.Collections.Concurrent;
 using System.Data;
 using System.Data.Common;

@@ -1,6 +1,3 @@
-// ABOUTME: Writes or checks the event-setup command schema from compiled closed CLI metadata.
-// ABOUTME: Uses exact UTF-8 bytes, repository-root discovery, and non-mutating deterministic check mode.
-
 using ISLAMU.Event.SetupAssistant.Cli;
 
 if (args.Length != 1 || args[0] is not ("--write" or "--check"))

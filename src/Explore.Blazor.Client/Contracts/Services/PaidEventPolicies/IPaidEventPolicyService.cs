@@ -1,6 +1,3 @@
-// ABOUTME: Defines the Blazor-facing paid-event policy seam over generated API resources and commands.
-// ABOUTME: Keeps components on typed HAL resources while hiding direct generated-client access.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.PaidEventPolicies;

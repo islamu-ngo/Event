@@ -1,6 +1,3 @@
-// ABOUTME: Application boundary for testing the instance email provider connection.
-// ABOUTME: Keeps SMTP client and transport details outside controllers, health checks, and handlers.
-
 using Explore.Application.Models;
 
 namespace Explore.Application.Contracts.Infrastructure;

@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for local moderation queue cases created from event reports.
-// ABOUTME: Enforces tenant/report ownership, queue indexes, assignment metadata, and optimistic concurrency.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

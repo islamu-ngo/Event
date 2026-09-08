@@ -1,5 +1,3 @@
-<!-- ABOUTME: Hosts focused in-process security tests for the combined Event standalone bridge. -->
-<!-- ABOUTME: References the standalone composition root without duplicating API or Blazor suites. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>

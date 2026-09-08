@@ -1,6 +1,3 @@
-// ABOUTME: Full detail DTO for an event series, including its associated events list.
-// ABOUTME: Returned by GetEventSeriesDetailRequest and GetTopEventSeriesRequest.
-
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;

@@ -1,5 +1,3 @@
-// ABOUTME: Exercises email-disable discovery and confirmation through native HTTP, MediatR, and persisted SQLite grants.
-// ABOUTME: Proves scope binding, current authority, stale confirmation rejection, and enable/disable policy readback.
 
 using System.Net;
 using System.Net.Http.Headers;

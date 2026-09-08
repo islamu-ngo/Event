@@ -1,6 +1,3 @@
-// ABOUTME: Exposes one private PII-minimal readiness resource and its subject or organizer actions.
-// ABOUTME: Delegates identity, capability, tenant, lifecycle, and HAL authority to Application policies.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

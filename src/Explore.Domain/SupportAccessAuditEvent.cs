@@ -1,6 +1,3 @@
-// ABOUTME: Append-only audit evidence for support-access lifecycle and request activity.
-// ABOUTME: Stores bounded metadata only, preserving actor and target tenant identity separately.
-
 using System.Text.Json;
 using Explore.Domain.Enums;
 

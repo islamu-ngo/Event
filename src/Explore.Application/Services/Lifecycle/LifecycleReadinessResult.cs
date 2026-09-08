@@ -1,5 +1,3 @@
-// ABOUTME: Aggregated readiness result for a lifecycle validation pass.
-// ABOUTME: IsReady is true only when no errors with Error severity are present.
 namespace Explore.Application.Services.Lifecycle;
 
 /// <summary>

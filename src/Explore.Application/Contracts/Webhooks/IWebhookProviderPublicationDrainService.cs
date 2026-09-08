@@ -1,6 +1,3 @@
-// ABOUTME: Application boundary for bounded asynchronous provider-publication queue draining.
-// ABOUTME: Exposes safe aggregate outcomes without payload, credential, tenant, or provider identifiers.
-
 namespace Explore.Application.Contracts.Webhooks;
 
 public interface IWebhookProviderPublicationDrainService

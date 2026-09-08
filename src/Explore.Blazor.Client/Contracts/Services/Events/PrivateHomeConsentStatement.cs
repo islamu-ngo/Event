@@ -1,6 +1,3 @@
-// ABOUTME: Version stamp for the household-consent statement rendered by the private home dialog.
-// ABOUTME: Bumping the wording must bump this constant so stored consents stay traceable.
-
 namespace Explore.Blazor.Client.Contracts.Services.Events;
 
 /// <summary>

@@ -1,6 +1,3 @@
-// ABOUTME: Focused tests for development auth diagnostics after endpoint extraction.
-// ABOUTME: Verifies debug snapshots preserve existing safe shape without touching endpoint routing.
-
 using System.Net;
 using Explore.Blazor.Services.Auth;
 using Microsoft.Extensions.Options;

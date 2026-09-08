@@ -1,6 +1,3 @@
-// ABOUTME: Global binding from one external authentication authority to one platform user.
-// ABOUTME: Keeps tenant participation separate while preserving exact provider-account uniqueness.
-
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;

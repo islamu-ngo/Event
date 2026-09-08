@@ -1,6 +1,3 @@
-// ABOUTME: Proves the sole terminal target clears transient secrets and writes only protected new files.
-// ABOUTME: Guards argument rejection, value-free outcomes, owner-only mode, and overwrite refusal.
-
 namespace ISLAMU.SetupAssistant.Terminal.Tests;
 
 using System.Security.Cryptography;

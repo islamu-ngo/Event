@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for creating an unscheduled event-session draft.
-// ABOUTME: Supplies parent event context for pre-create authorization and lifecycle readiness policy.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventSession;
 using Explore.Application.Responses;

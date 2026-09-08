@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for tenant-scoped storage upload reservation sessions.
-// ABOUTME: Applies expiry/idempotency indexes, provider metadata constraints, and optimistic concurrency.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

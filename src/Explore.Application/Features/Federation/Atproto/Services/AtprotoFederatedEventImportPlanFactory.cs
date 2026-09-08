@@ -1,6 +1,3 @@
-// ABOUTME: Builds validated tenant-local import plans from one canonical inbound ATProto event projection.
-// ABOUTME: Keeps Jetstream and bounded PDS recovery on the same mapping and validation path.
-
 using System.Text.Json;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Features.Federation.Atproto.Models;

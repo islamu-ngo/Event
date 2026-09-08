@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for actor-bound organizer payment provider connections.
-// ABOUTME: Uses entity-only reads, exact tenant predicates, and approved tenant-filter bypass for historical identity checks.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

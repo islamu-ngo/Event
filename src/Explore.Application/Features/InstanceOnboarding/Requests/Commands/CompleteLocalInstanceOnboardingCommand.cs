@@ -1,5 +1,3 @@
-// ABOUTME: Dispatches transient first-run Local enrollment with the actual authenticated setup principal.
-// ABOUTME: Separates trusted adapter authority from caller-supplied settings and hides diagnostic values.
 
 using System.Security.Claims;
 using Explore.Application.DTOs.Onboarding;

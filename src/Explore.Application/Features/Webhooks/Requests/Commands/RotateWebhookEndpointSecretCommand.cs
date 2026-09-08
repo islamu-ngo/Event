@@ -1,6 +1,3 @@
-// ABOUTME: Authorized command for rotating an outgoing webhook endpoint signing secret reference.
-// ABOUTME: Uses persisted endpoint ownership for webhook rotate-secret authorization checks.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

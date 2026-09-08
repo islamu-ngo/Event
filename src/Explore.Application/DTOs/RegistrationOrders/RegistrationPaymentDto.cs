@@ -1,6 +1,3 @@
-// ABOUTME: Safe authoritative payment projection for purchaser and Studio registration-order surfaces.
-// ABOUTME: Excludes provider accounts, request identifiers, idempotency values, capabilities, PII, and raw errors.
-
 namespace Explore.Application.DTOs.RegistrationOrders;
 
 using Explore.Application.Responses;

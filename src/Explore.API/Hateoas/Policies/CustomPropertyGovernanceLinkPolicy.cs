@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS link policies for custom-property governance report endpoints.
-// ABOUTME: Provides discovery links to the governance report and related projection admin actions.
-
 using System.Security.Claims;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.DTOs.CustomPropertyGovernance;

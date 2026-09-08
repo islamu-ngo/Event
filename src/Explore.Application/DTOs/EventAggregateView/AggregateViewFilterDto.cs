@@ -1,6 +1,3 @@
-// ABOUTME: Filter DTO for aggregate event-with-sessions read-model queries.
-// ABOUTME: Keeps list-query filtering narrow to title, date, status, and visibility.
-
 namespace Explore.Application.DTOs.EventAggregateView;
 
 public sealed record AggregateViewFilterDto

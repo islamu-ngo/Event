@@ -1,6 +1,3 @@
-// ABOUTME: Maps immutable add-on order-line snapshots under the registration order.
-// ABOUTME: Preserves tenant, event, catalog, item, currency, and disclosure lineage.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

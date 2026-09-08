@@ -1,6 +1,3 @@
-// ABOUTME: Exposes the authenticated actor-scoped Studio navigation context.
-// ABOUTME: Returns only a private HAL resource; the optional actor hint is authorized by the application handler.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Filters;

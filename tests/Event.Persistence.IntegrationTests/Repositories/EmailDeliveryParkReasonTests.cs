@@ -1,5 +1,3 @@
-// ABOUTME: Verifies typed email park provenance through real SQLite admission, settlement, and operator mutations.
-// ABOUTME: Keeps optional suppression terminal, distinguishes required capability waits from operator holds, and clears replay metadata.
 
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Notifications;

@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL integration tests for event moderation race handling.
-// ABOUTME: Verifies stale moderation transactions roll back audit and outbox side effects.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Authorization;
 using Explore.Application.Exceptions;

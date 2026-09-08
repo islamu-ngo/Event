@@ -1,6 +1,3 @@
-// ABOUTME: Defines public-safe promotion code metadata without storing plaintext, digests, or key versions.
-// ABOUTME: Keeps code scope attached to the published promotion definition version for future lookup wiring.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

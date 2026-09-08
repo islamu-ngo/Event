@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped styles for the program sections management dialog. */
-/* ABOUTME: Uses BEM naming and design tokens for accessible grouped section editing. */
-
 .program-sections-dialog {
     display: grid;
     gap: var(--isl-space-4);

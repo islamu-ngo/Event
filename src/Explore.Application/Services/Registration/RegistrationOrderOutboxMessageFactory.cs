@@ -1,6 +1,3 @@
-// ABOUTME: Creates PII-free general outbox envelopes for durable registration-order lifecycle events.
-// ABOUTME: Outbox rows are persisted with the order transition and dispatched only after commit.
-
 using System.Text.Json;
 using Explore.Domain;
 using Explore.Domain.Enums;

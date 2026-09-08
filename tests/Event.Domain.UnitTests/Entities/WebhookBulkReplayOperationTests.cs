@@ -1,6 +1,3 @@
-// ABOUTME: Tests durable webhook bulk replay identity, lifecycle, bounds, and optimistic versioning.
-// ABOUTME: Proves normalized immutable evidence and queued-only cancellation or execution transitions.
-
 using Explore.Domain;
 
 namespace Event.Domain.UnitTests.Entities;

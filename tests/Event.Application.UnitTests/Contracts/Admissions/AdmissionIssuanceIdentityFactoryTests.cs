@@ -1,6 +1,3 @@
-// ABOUTME: Proves retry-stable UUIDv7 issuance identities are separated by tenant and purpose.
-// ABOUTME: Rejects malformed lineage instead of deriving ambiguous identities.
-
 using Explore.Application.Services.Registration;
 
 namespace ApplicationUnitTests.Contracts.Admissions;

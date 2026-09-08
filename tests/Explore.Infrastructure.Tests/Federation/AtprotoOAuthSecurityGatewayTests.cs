@@ -1,6 +1,3 @@
-// ABOUTME: Integrates the ATProto security gateway with real CarpaNet restore, DPoP, and XRPC paths.
-// ABOUTME: Uses deterministic in-process transports to prove encrypted restore and mismatch zero-write behavior.
-
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;

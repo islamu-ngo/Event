@@ -1,6 +1,3 @@
-// ABOUTME: Verifies provider-pinned headless submissions retain canonical lineage and durable effect fencing.
-// ABOUTME: Proves retry and ambiguous parking are terminally separate from registration finalization state.
-
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Domain;

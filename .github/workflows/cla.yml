@@ -1,5 +1,3 @@
-# ABOUTME: Enforces the ISLAMU Contributor License Agreement via cla-assistant/github-action.
-# ABOUTME: Features pre-flight signature check, isolated cla-signatures branch, expanded bot allowlist, and GitHub Actions summary.
 name: Contributor License Agreement
 on:
   pull_request_target: # zizmor: ignore[dangerous-triggers] Metadata-only CLA legal-record workflow: no PR-head checkout, write token used only for signature JSON commit on cla-signatures branch, PR comments, and status checks.

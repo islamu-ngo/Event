@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for TenantCapability entity.
-// ABOUTME: Links modules to tenants with seed data for default tenant.
-
 using Explore.Domain.Modules;
 using Explore.Persistence.Seed;
 using Microsoft.EntityFrameworkCore;

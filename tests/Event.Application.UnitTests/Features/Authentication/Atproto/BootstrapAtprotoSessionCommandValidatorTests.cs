@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the private ATProto bootstrap command rejects incomplete canonical Actor target binding.
-// ABOUTME: Keeps the optional target pair both-or-neither before any PDS or persistence work.
-
 using Explore.Application.Features.Authentication.Atproto.Models;
 using Explore.Application.Features.Authentication.Atproto.Requests.Commands;
 using Explore.Application.Features.Authentication.Atproto.Validators;

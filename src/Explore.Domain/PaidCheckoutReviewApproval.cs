@@ -1,6 +1,3 @@
-// ABOUTME: Models first-event and high-value paid Checkout review approval with separation of duties.
-// ABOUTME: Binds approval to tenant, event, organizer, policy, currency, trigger, and explicit amount authority.
-
 using Explore.Domain.Interfaces;
 using Explore.Domain.ValueObjects;
 

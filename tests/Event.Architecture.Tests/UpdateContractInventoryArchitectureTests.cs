@@ -1,6 +1,3 @@
-// ABOUTME: Architecture guard comparing current update operations with the generated API client.
-// ABOUTME: Fails when a PUT/PATCH OpenAPI operation is duplicated or absent from the generated client.
-
 using System.Text.Json;
 
 namespace Event.Architecture.Tests;

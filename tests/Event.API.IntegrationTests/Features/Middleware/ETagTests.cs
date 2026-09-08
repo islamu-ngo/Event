@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests verifying ETag middleware behavior for conditional requests.
-// ABOUTME: Tests ETag generation, If-None-Match 304 responses, and non-GET request bypass.
-
 using System.Net;
 using Event.Api.IntegrationTests.Fixtures;
 

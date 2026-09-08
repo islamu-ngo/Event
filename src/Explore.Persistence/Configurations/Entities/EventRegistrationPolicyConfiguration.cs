@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for EventRegistrationPolicy lookup - stable int ids, unique master code, seeded at runtime by LookupTableSeeder.
-// ABOUTME: Referenced by Event.RegistrationPolicyId as a nullable FK during rollout.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

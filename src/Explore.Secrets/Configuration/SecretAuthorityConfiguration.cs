@@ -1,6 +1,3 @@
-// ABOUTME: Builds configuration from exactly one deployment-selected secret authority.
-// ABOUTME: Supports explicit Environment, Infisical, and local User Secrets modes without fallback.
-
 using Explore.Secrets.Abstractions;
 using Explore.Secrets.Extensions;
 using Microsoft.Extensions.Configuration;

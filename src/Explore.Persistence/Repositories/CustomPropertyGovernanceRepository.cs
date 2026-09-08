@@ -1,6 +1,3 @@
-// ABOUTME: EF Core implementation for Rule 12 governance report aggregation queries.
-// ABOUTME: Unions event and event-session runtime definitions with instance counts for promotion analysis.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain.Enums;
 using Microsoft.EntityFrameworkCore;

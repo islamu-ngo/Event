@@ -1,4 +1,3 @@
-// ABOUTME: Repository interface for SecretBinding entity - the DB control plane
 // for secret resolution. Stores where a secret value lives, never the value itself.
 
 namespace Explore.Application.Contracts.Persistence;

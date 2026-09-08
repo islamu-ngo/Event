@@ -1,6 +1,3 @@
-// ABOUTME: Defines organizer promotion management queries for safe list and detail projections.
-// ABOUTME: Uses paid-commerce authorization metadata without exposing internal authority identifiers in JSON.
-
 using Explore.Application.Authorization;
 using Explore.Application.Features.Promotions;
 using MediatR;

@@ -1,6 +1,3 @@
-// ABOUTME: Handles redacted moderation reporting provider routing-state reads for tenant administrators.
-// ABOUTME: Maps centralized routing policy output to safe DTOs without exposing provider secrets or endpoints.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Models;

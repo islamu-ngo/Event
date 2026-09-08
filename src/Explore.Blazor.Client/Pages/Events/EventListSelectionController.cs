@@ -1,6 +1,3 @@
-// ABOUTME: Event-list selection coordinator for loaded event navigation state.
-// ABOUTME: Keeps previous/next event traversal rules out of the EventList page rendering flow.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Pages.Events;

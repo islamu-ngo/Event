@@ -1,6 +1,3 @@
-// ABOUTME: Specifies the final package-free v1alpha2 JSON and constrained legal Markdown ownership contract.
-// ABOUTME: Keeps SA-210 intentionally Red only while old Application and Domain owners remain.
-
 namespace ISLAMU.Wire.Contracts.UnitTests.ConfigurationPortability;
 
 using System.Collections;

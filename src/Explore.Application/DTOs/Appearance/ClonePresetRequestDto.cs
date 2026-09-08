@@ -1,6 +1,3 @@
-// ABOUTME: Input DTO for cloning a preset into a user-owned appearance profile.
-// ABOUTME: The system checks for existing clones to avoid duplicates before creating a new profile.
-
 namespace Explore.Application.DTOs.Appearance;
 
 public sealed record ClonePresetRequestDto

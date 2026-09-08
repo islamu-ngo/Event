@@ -1,6 +1,3 @@
-// ABOUTME: Admin API surface for shared Control Plane read models and fleet-only actions.
-// ABOUTME: Keeps shared instance operations mode-agnostic while gating tenant-fleet endpoints.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

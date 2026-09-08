@@ -1,6 +1,3 @@
-// ABOUTME: Command for operator self-service dirty-scope drain without triggering a full rebuild.
-// ABOUTME: Idempotent — draining an already-empty backlog returns zero count.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Application.Responses;

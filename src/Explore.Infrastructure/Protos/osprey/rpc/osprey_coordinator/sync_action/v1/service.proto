@@ -1,5 +1,3 @@
-// ABOUTME: Local copy of the upstream Osprey coordinator synchronous action gRPC service.
-// ABOUTME: Allows Islamu Event to call the real ProcessAction endpoint instead of a fake HTTP facade.
 syntax = "proto3";
 
 package osprey.rpc.osprey_coordinator.sync_action.v1;

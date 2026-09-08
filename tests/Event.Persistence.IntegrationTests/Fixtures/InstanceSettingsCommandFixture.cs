@@ -1,5 +1,3 @@
-// ABOUTME: Composes real settings command dependencies and database-backed administrator authority.
-// ABOUTME: Callers own the relational context; this fixture owns caches and observes committed MediatR notifications.
 
 using System.Security.Claims;
 using Explore.Application.Contracts.Infrastructure;

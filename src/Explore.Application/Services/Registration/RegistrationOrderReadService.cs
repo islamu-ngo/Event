@@ -1,6 +1,3 @@
-// ABOUTME: Projects tenant-qualified registration-order reads and current paid-checkout availability.
-// ABOUTME: Keeps read-model assembly separate from the write-oriented lifecycle coordinator.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.RegistrationOrders;

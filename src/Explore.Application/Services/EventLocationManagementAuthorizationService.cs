@@ -1,6 +1,3 @@
-// ABOUTME: Normalizes EventLocation candidates into one batched parent-event management authorization call.
-// ABOUTME: Denies provider failures and persists PII-free allow/deny evidence before returning decisions.
-
 using System.Collections.Immutable;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;

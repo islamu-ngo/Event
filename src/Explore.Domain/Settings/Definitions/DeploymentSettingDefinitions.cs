@@ -1,6 +1,3 @@
-// ABOUTME: Setting definitions for deployment mode configuration.
-// ABOUTME: Controls single-tenant vs multi-tenant deployment behavior.
-
 namespace Explore.Domain.Settings.Definitions;
 
 public static class DeploymentSettingDefinitions

@@ -1,4 +1,3 @@
-// ABOUTME: Production-faithful integration test fixture backed by real PostgreSQL via Testcontainers.
 // Rate limiting disabled; focused on end-to-end API behavior with migrations and data seeding.
 
 namespace Event.Api.IntegrationTests.Fixtures;

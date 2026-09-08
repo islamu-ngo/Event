@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral classification for artifacts included in an authorization policy package.
-// ABOUTME: Keeps package manifests independent from Cerbos file formats, transport, and storage details.
-
 namespace Explore.Application.Authorization;
 
 /// <summary>

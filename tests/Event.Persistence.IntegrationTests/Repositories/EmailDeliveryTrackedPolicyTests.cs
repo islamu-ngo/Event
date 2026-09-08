@@ -1,5 +1,3 @@
-// ABOUTME: Guards SMTP policy writes against stale tracked rows after another context commits a newer policy.
-// ABOUTME: Verifies committed values, previous-value reporting, lock flags, and preservation of unrelated pending changes.
 
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;

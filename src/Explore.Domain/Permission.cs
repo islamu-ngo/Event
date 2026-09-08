@@ -1,6 +1,3 @@
-// ABOUTME: Permission vocabulary entity defining granular resource:action permissions for dynamic RBAC.
-// ABOUTME: Used by RolePermission join table and CapabilityCeilingService for runtime permission management.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

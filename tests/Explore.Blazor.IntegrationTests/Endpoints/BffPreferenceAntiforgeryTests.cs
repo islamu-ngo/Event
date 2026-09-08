@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for antiforgery coverage on preference BFF mutation endpoints.
-// ABOUTME: Proves unsafe cookie-authenticated BFF requests require the X-CSRF-TOKEN header.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;

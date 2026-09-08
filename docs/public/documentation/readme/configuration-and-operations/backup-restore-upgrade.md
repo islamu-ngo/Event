@@ -236,7 +236,56 @@ upgrade is not explicitly image-only reversible, use a tested recovery plan that
 retains newer erasure facts. Keep the prior software and verified artifacts until
 acceptance completes; a successful startup is not itself a restore rehearsal.
 
+### Email-optional development migration consolidation
+
+The current application history uses the supported provider Init followed by one
+email-optional integration migration. Seven earlier unapplied development stages
+are consolidated; their intermediate rollback targets no longer exist. External
+Local Identity, Data Protection and privacy-erasure histories stay independent.
+
+Do not edit migration-history rows to reuse a database created with retired Init
+or feature migration IDs. Select an explicitly disposable application target for
+a rebuild, or use a tested backup with its matching software. Preserve independent
+Identity/key stores and the newest erasure authority before any recovery action.
+
+Reversing the integration migration removes the whole feature's application
+state, including lifecycle receipts, delivery controls and retention deadlines;
+it is not a safe way to undo one setting or recover a populated instance.
+A retained Local bootstrap row can also prevent restoration of the old constraint.
+Prefer forward correction or the coordinated restore procedure above.
+
+For a retained database already on the supported Init, check for duplicate
+nonnull normalized Local email identities before the uniqueness transition.
+There is no automatic account deduplication or historical guest-deadline backfill.
+Run the migration service twice and require exit code zero both times, then
+perform the restore/runbook checks before reopening traffic.
+
 ---
+
+## Location Search Upgrade and Runtime Changes
+
+The Unicode location-search upgrade replaces the development application's old
+encoded search fields. Existing pre-release application databases require recreation
+from the matching release; an incremental upgrade of the retired history is unsupported.
+Stop writers, take a matching backup or confirm that the exact application target is
+disposable, and identify the separate Identity, Data Protection, and retained privacy
+authority stores before resetting anything. Preserve those independent histories and
+never remove a shared database volume as a reset shortcut. Run the migration service
+twice and require successful completion both times before starting the application.
+
+Search retains complete accepted names and addresses (up to 500 UTF-16 code units).
+Canonically equivalent accents match, while accents, Arabic marks, joiners, and emoji
+details remain significant. Search treats percent signs, underscores, backslashes,
+and brackets literally. It does not promise transliteration, accent-free search,
+German full case folding, Turkish linguistic casing, or identical sorting between
+database engines. Suggestions remain restricted to authorized tenant addresses.
+
+When changing .NET, the operating system, ICU/NLS, or globalization settings, test the
+release's Unicode corpus with the new profile while traffic is stopped. Normalized
+stored text can change even when the schema revision does not. Coordinate a supported
+current-key rebuild or disposable application reset before restarting all readers and
+writers on the same profile; mixed old/new normalizer operation is unsupported.
+Rollback needs matching binaries and a matching backup, not only a code revert.
 
 ## Related Guides & Next Steps
 

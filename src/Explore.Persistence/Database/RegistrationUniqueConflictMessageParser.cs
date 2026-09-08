@@ -1,6 +1,3 @@
-// ABOUTME: Parses provider unique-conflict messages into normalized machine identifiers.
-// ABOUTME: Keeps pure provider-neutral classification logic independently testable and mutable.
-
 namespace Explore.Persistence.Database;
 
 internal static class RegistrationUniqueConflictMessageParser

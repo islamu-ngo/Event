@@ -1,6 +1,3 @@
-// ABOUTME: Resource assemblers for reporter-facing event-report HAL payloads.
-// ABOUTME: Connects report option/status DTOs to the shared HATEOAS authorization pipeline.
-
 namespace Explore.API.Hateoas.Assemblers;
 
 using Explore.Application.Contracts.Hateoas;

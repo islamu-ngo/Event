@@ -1,6 +1,3 @@
-// ABOUTME: HAL assemblers for instance and tenant paid-event policy settings resources.
-// ABOUTME: Wraps paid-policy management DTOs without placing authorization logic in controllers.
-
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.DTOs.PaidEventPolicies;
 

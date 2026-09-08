@@ -1,5 +1,3 @@
-# ABOUTME: Cerbos PDP runtime configuration for local and self-hosted authorization.
-# ABOUTME: Uses mutable PostgreSQL policy storage for Admin API synchronization and fail-closed startup.
 # ============================================================================
 # Cerbos Policy Decision Point (PDP) Configuration
 # ============================================================================

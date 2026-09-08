@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped CSS for the Luma-inspired EventEdit layout (mirrors CreateEvent styling). */
-/* ABOUTME: Uses BEM methodology with edit-event__ prefix. All selectors use ::deep for MudBlazor component tree. */
-
 /* ===== Block: edit-event ===== */
 
 .edit-event {

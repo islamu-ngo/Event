@@ -1,6 +1,3 @@
-// ABOUTME: Persists tenant/event-scoped participation requirement attachment graphs.
-// ABOUTME: Uses tracked mutation loads, detached descriptor reads, and translated optimistic concurrency.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
 using Explore.Domain;

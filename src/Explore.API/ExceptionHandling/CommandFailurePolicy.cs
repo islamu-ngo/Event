@@ -1,6 +1,3 @@
-// ABOUTME: Declarative failure-code routing so a controller states its command failure semantics once.
-// ABOUTME: Replaces per-action switch statements while keeping every emitted problem shape explicit.
-
 using Explore.Application.Responses;
 using Microsoft.AspNetCore.Mvc;
 

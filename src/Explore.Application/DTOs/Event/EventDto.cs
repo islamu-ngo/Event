@@ -1,6 +1,3 @@
-// ABOUTME: Detailed event DTO returned by event detail APIs and HAL resources.
-// ABOUTME: Separates short card description from longer event content for full detail views.
-
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;

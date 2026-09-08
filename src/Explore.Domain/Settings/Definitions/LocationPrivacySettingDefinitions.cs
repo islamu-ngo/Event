@@ -1,6 +1,3 @@
-// ABOUTME: Defines instance-to-tenant ceilings for EventLocation disclosure governance.
-// ABOUTME: Defaults deny exact public disclosure and apply the most restrictive home audience and reveal delay.
-
 namespace Explore.Domain.Settings.Definitions;
 
 using Explore.Domain.Constants;

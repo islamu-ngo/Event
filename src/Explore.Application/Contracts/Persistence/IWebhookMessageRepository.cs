@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for immutable canonical outgoing webhook messages.
-// ABOUTME: Enables idempotent creation, tenant-scoped reads, and payload-retention cleanup.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

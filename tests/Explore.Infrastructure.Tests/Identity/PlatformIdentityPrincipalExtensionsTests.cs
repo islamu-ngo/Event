@@ -1,6 +1,3 @@
-// ABOUTME: Exercises platform identity resolution with hostile and purpose-bound principals.
-// ABOUTME: Pins the canonical fallback order and exposes the remaining duplicated caller divergence.
-
 using System.Security.Claims;
 using System.Globalization;
 using Explore.Application.Authentication;
@@ -520,6 +517,28 @@ public sealed class PlatformIdentityPrincipalExtensionsTests
             PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
                 "https://accounts.google.com",
                 subject).Value);
+    }
+
+    [Test]
+    [Arguments("https://accounts.google.com", AuthenticationProviderKind.Google, "google")]
+    [Arguments("https://ACCOUNTS.GOOGLE.COM:443/", AuthenticationProviderKind.Google, "google")]
+    [Arguments("https://auth.example.test/realms/events", AuthenticationProviderKind.Keycloak, "keycloak")]
+    [Arguments("https://accounts.google.com.example.test", AuthenticationProviderKind.Keycloak, "keycloak")]
+    public async Task OidcAccountKeyUsesIssuerAuthorityRatherThanBrokeredProviderHint(
+        string issuer,
+        AuthenticationProviderKind expectedProviderKind,
+        string expectedProvider)
+    {
+        ClaimsPrincipal principal = Principal(
+            "provider",
+            new Claim("sub", "exact-subject"),
+            new Claim("iss", issuer),
+            new Claim("idp", "google"));
+
+        ProviderIdentity? identity = principal.GetProviderIdentity();
+        await Assert.That(identity?.AccountKey.ProviderKind)
+            .IsEqualTo(expectedProviderKind);
+        await Assert.That(identity?.Provider).IsEqualTo(expectedProvider);
     }
 
     [Test]

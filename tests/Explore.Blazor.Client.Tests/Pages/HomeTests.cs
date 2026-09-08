@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for the public Home page shell and public-experience rendering.
-// ABOUTME: Verifies discovery parity, organization-centric projection, and encoded rich text.
-
 using Blazouter.Enums;
 using Blazouter.Extensions;
 using Blazouter.Models;

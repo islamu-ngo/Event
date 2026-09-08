@@ -1,6 +1,3 @@
-// ABOUTME: API contract tests for authenticated EmailDispatch operator replay and park actions.
-// ABOUTME: Verifies route metadata, MediatR command dispatch, and RFC7807 transition failure mapping.
-
 using System.ComponentModel.DataAnnotations;
 using System.Net;
 using System.Reflection;

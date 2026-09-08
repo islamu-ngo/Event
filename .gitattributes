@@ -1,6 +1,3 @@
-# ABOUTME: Marks EF Core migration output as generated so reviews and language statistics ignore it.
-# ABOUTME: These files are produced by dotnet ef; fix the model or configuration and regenerate, never hand-edit them.
-
 src/Explore.Persistence/Migrations/** linguist-generated=true
 src/Explore.Persistence.Migrations.*/Migrations/** linguist-generated=true
 src/Explore.Persistence.DataProtection.Migrations.*/Migrations/** linguist-generated=true

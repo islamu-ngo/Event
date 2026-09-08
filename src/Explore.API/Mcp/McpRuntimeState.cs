@@ -1,6 +1,3 @@
-// ABOUTME: Resolves effective API-hosted MCP adapter runtime state from startup ceilings and DB governance.
-// ABOUTME: Keeps route/stateless configuration startup-only while tenant-aware enablement can change without restart.
-
 using Explore.API.Configuration;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;

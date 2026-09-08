@@ -1,6 +1,3 @@
-// ABOUTME: Query handler for authorization provider configuration used in setup and admin flows.
-// ABOUTME: Returns the provider intent resolved by the authoritative configuration service without endpoint inference.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;

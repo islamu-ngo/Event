@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for Layer 3 custom-property identity normalization and governance reservations.
-// ABOUTME: Keeps namespace and reserved-semantic rules stable before CQRS/API/UI layers are added.
-
 namespace Event.Domain.UnitTests.CustomProperties;
 
 using Explore.Domain.Constants;

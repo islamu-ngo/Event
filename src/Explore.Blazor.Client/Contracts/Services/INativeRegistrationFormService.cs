@@ -1,6 +1,3 @@
-// ABOUTME: Defines the attendee-side native registration requirement workflow boundary.
-// ABOUTME: Keeps generated API transport, capability headers, and idempotency outside Razor components.
-
 using Explore.Blazor.Client.Components.Registration.FormRenderer;
 
 namespace Explore.Blazor.Client.Contracts.Services;

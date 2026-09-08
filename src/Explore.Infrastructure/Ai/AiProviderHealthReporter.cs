@@ -1,6 +1,3 @@
-// ABOUTME: Evaluates AI provider readiness from validated deployment/admin-controlled settings.
-// ABOUTME: Produces safe health metadata without prompts, secrets, endpoints, or provider request IDs.
-
 using Explore.Application.Contracts.Infrastructure.Ai;
 
 namespace Explore.Infrastructure.Ai;

@@ -1,6 +1,3 @@
-// ABOUTME: Pins the generated OpenAPI contract for the canonical whole-instance manifest download.
-// ABOUTME: Rejects tenant aliases, JSON byte arrays, and numeric views.
-
 namespace Event.Api.IntegrationTests.Features.ConfigurationManifest;
 
 using System.Net;

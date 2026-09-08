@@ -1,6 +1,3 @@
-// ABOUTME: Safe authenticated projection of OrganizationTenant legitimacy evidence and review state.
-// ABOUTME: Exposes application document identity and display metadata without provider keys, locators, content, or reviewer identity.
-
 using System.Text.Json.Serialization;
 
 namespace Explore.Application.DTOs.OrganizationTenantEvidence;

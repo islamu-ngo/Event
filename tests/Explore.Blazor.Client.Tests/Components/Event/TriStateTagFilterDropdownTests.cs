@@ -1,6 +1,3 @@
-// ABOUTME: Behavioral bUnit tests for TriStateTagFilterDropdown component.
-// ABOUTME: Verifies tag filter cycling, reset, and filter state via public API and rendered markup.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Models;
 using Explore.Blazor.Client.Pages.Events.Components;

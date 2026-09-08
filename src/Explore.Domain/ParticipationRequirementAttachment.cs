@@ -1,6 +1,3 @@
-// ABOUTME: Models one tenant/event-safe requirement attachment owned by a participation configuration.
-// ABOUTME: Retains optional published-form identity for the single walk-in standalone questionnaire.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

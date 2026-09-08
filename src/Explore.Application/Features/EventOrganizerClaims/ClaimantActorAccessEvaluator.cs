@@ -1,6 +1,3 @@
-// ABOUTME: Verifies that the current user controls the actor used for an organizer claim.
-// ABOUTME: Supports personal actors and organization/group actors through existing event-create authority.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Services;
 using Explore.Domain.Constants;

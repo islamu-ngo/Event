@@ -1,6 +1,3 @@
-// ABOUTME: HAL link policy for webhook consumer management resources.
-// ABOUTME: Emits provider portal authority only from verified governed binding capability.
-
 using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;

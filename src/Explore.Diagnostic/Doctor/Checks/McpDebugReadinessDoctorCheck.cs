@@ -1,6 +1,3 @@
-// ABOUTME: Reports review-first MCP debug and contract-test readiness.
-// ABOUTME: Verifies docs/tests are present without starting servers, clients, or printing secrets.
-
 using Explore.Diagnostic.Doctor.Infrastructure;
 
 namespace Explore.Diagnostic.Doctor.Checks;

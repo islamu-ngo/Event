@@ -1,4 +1,3 @@
-// ABOUTME: EF Core configuration for SystemSetting entity with UUID v7 generation
 // and unique constraint on Key.
 
 namespace Explore.Persistence.Configurations.Entities;

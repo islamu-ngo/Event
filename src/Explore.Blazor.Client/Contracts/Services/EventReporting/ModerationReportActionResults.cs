@@ -1,6 +1,3 @@
-// ABOUTME: UI result model for Blazor moderation report actions.
-// ABOUTME: Preserves safe command failures while requests use generated API client DTOs directly.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.EventReporting;

@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped styles for EventListCustomizationDrawer sidebar component.
-   ABOUTME: BEM naming, 320px width, flex column layout. Parent controls visibility. */
-
 .customization-drawer {
     display: flex;
     flex-direction: column;

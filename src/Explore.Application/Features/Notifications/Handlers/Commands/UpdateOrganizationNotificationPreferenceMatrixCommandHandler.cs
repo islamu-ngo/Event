@@ -1,6 +1,3 @@
-// ABOUTME: Handles organization-scoped notification preference cell saves.
-// ABOUTME: Validates required and locked cells before writing organization overrides transactionally.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

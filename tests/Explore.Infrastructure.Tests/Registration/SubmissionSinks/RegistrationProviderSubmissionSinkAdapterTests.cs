@@ -1,6 +1,3 @@
-// ABOUTME: Verifies generic approved-field registration submission sinks in Infrastructure.
-// ABOUTME: Covers CSV storage, Google Sheets, and webhook payload/idempotency behavior without external calls.
-
 using System.Net;
 using System.Text;
 using System.Text.Json;

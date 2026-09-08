@@ -1,6 +1,3 @@
-// ABOUTME: Verifies Svix application identity against one persisted consumer provider binding.
-// ABOUTME: Requires exact UID and canonical typed-owner metadata without fallback identities.
-
 using Explore.Domain;
 
 namespace Explore.Infrastructure.Webhooks;

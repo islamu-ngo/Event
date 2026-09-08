@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for structured database validation in secret resolver readiness.
-// ABOUTME: Proves invalid runtime settings fail closed without exposing credential values.
-
 using Explore.Application.Contracts.Secrets;
 using Explore.Secrets.Abstractions;
 using Explore.Secrets.Configuration;

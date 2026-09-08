@@ -1,6 +1,3 @@
-// ABOUTME: Entity-returning persistence boundary for registration workflow and form authoring graphs.
-// ABOUTME: Separates read snapshots from tracked mutation loads and persists aggregate roots atomically.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

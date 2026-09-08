@@ -1,6 +1,3 @@
-// ABOUTME: Excel-compatible CSV registration submission sink using post-commit storage writes.
-// ABOUTME: Stores only approved mapped fields under a stable submission object key without provider I/O in transactions.
-
 using System.Text;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

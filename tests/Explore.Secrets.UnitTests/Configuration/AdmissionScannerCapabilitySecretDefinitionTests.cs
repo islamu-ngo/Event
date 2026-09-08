@@ -1,6 +1,3 @@
-// ABOUTME: Specifies the dedicated server-only scanner capability HMAC secret definition.
-// ABOUTME: Prevents scanner bearer digests from reusing credential, recovery, or promotion keys.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 

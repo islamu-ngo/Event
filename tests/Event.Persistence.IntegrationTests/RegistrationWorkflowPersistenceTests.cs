@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the Task 7.1 registration-workflow EF model, lookup seeding, and tenant isolation.
-// ABOUTME: Covers portable relational metadata and runtime behavior without inspecting private implementation details.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
@@ -191,7 +188,7 @@ public sealed class RegistrationWorkflowPersistenceTests
 
     private static ExploreDbContext CreateModelContext()
     {
-        DbContextOptions<ExploreDbContext> options = new DbContextOptionsBuilder<ExploreDbContext>()
+        DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql("Host=localhost;Database=task71_model;Username=unused;Password=unused")
             .UseSnakeCaseNamingConvention()
             .Options;
@@ -199,10 +196,12 @@ public sealed class RegistrationWorkflowPersistenceTests
         return new ExploreDbContext(options);
     }
 
-    private static ExploreDbContext CreateInMemoryContext(string databaseName)
+    private readonly Microsoft.EntityFrameworkCore.Storage.InMemoryDatabaseRoot _databaseRoot = new();
+
+    private ExploreDbContext CreateInMemoryContext(string databaseName)
     {
-        DbContextOptions<ExploreDbContext> options = new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase(databaseName)
+        DbContextOptions<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase(databaseName, _databaseRoot)
             .Options;
         return new ExploreDbContext(options);
     }

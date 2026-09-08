@@ -1,6 +1,3 @@
-// ABOUTME: Handles backup-confirmed additive Keycloak realm sync apply commands.
-// ABOUTME: Delegates Keycloak Admin API mutation details to Infrastructure service contracts.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;

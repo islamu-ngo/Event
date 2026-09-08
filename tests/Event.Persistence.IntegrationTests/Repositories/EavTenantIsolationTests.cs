@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL-backed certification tests for EAV tenant query-filter isolation.
-// ABOUTME: Proves custom-property source rows and projections stay tenant-scoped during normal and historical reads.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;

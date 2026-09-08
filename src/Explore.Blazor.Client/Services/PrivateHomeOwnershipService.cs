@@ -1,6 +1,3 @@
-// ABOUTME: Calls the consent-backed private home classification and ownership acceptance operations.
-// ABOUTME: Converts transport failures into failed commands so stale concurrency stamps are never reused.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Events;
 using Microsoft.Extensions.Logging;

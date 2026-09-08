@@ -1,6 +1,3 @@
-// ABOUTME: Lifecycle states for event-scoped operational role assignments.
-// ABOUTME: Authorization treats only time-effective Active assignments as grants.
-
 namespace Explore.Domain.Enums;
 
 public enum EventRoleAssignmentStatus

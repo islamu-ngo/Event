@@ -1,4 +1,3 @@
-// ABOUTME: Contract for module governance service that controls which modules
 // (aspect categories) are available to each tenant.
 
 namespace Explore.Application.Contracts.Infrastructure;

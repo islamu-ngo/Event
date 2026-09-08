@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for Studio registration-provider integration management.
-// ABOUTME: Proves HAL-gated mutations, validation, status rendering, and route accessibility basics.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Pages.Studio;

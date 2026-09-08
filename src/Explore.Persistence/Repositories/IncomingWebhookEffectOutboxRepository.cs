@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for tenant-scoped incoming-webhook effect pointers.
-// ABOUTME: Reads exact provider identities and tracks pending pointer inserts in the active inbox transaction.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
 using Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for normalized webhook provider-binding identities.
-// ABOUTME: Uses tenant-scoped queries and dual version/fence predicates for authority changes.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;

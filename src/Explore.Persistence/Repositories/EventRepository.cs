@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for Event aggregate queries, schedule graph updates, and listing specifications.
-// ABOUTME: Query methods return domain entities; mapping and schedule invariant decisions stay in application/domain layers.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Specifications.Events;
 using Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL-backed tests for AI event reference search tenant and visibility filtering.
-// ABOUTME: Verifies reference search returns bounded domain entities without bypassing EF tenant filters.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;

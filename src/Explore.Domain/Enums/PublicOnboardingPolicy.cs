@@ -1,5 +1,3 @@
-// ABOUTME: Captures the operator-declared public onboarding policy of a configurable account provider.
-// ABOUTME: Unknown is deliberately distinct from existing-account login availability.
 
 namespace Explore.Domain.Enums;
 

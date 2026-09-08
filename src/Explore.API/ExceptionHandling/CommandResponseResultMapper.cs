@@ -1,6 +1,3 @@
-// ABOUTME: Maps Application command response failures to API-owned RFC 7807 results.
-// ABOUTME: Keeps controllers thin while avoiding HTTP concerns inside Application handlers.
-
 using Explore.Application.DTOs.StorageObject;
 using Explore.Application.Features.EmailDispatch;
 using Explore.Application.Features.EventReporting;

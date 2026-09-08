@@ -1,6 +1,3 @@
-// ABOUTME: Handler for soft-deleting an event series.
-// ABOUTME: Fetches the entity and delegates to the repository; DbContext converts hard-delete to soft-delete.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;

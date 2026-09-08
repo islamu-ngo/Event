@@ -1,6 +1,3 @@
-// ABOUTME: Per-source retrieval contract. Each ISecretSource implementation handles exactly one SecretSourceType.
-// ABOUTME: Implementations return bounded typed outcomes and never expose provider diagnostics.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 

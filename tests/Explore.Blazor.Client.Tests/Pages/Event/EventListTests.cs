@@ -1,6 +1,3 @@
-// ABOUTME: Focused bUnit tests for EventList loading and empty-state behavior.
-// ABOUTME: Verifies stable UX state transitions with Virtualize-backed API paging.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Components.Shell;
 using Explore.Blazor.Client.Pages.Events;

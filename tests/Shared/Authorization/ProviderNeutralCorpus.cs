@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral authorization scenario corpus shared by the Local and live-Cerbos parity lanes.
-// ABOUTME: One declaration per scenario; each lane materializes the same subject and facts in its own vocabulary.
-
 using Explore.Application.Authorization;
 
 namespace Explore.Authorization.ParityCorpus;

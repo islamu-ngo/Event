@@ -1,6 +1,3 @@
-/* ABOUTME: Token-driven layout for repeatable registration participant field groups. */
-/* ABOUTME: Keeps buyer-copy and deferred-assignment controls readable at narrow widths. */
-
 .registration-participant-editor {
     display: grid;
     gap: var(--isl-space-5);

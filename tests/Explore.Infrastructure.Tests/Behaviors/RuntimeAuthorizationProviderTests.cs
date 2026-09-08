@@ -1,6 +1,3 @@
-// ABOUTME: Tests runtime authorization provider routing between local RBAC and Cerbos instance mode.
-// ABOUTME: Verifies JSON-serialized system settings are honored after provider-mode cache invalidation.
-
 using Explore.Infrastructure.Tests.Authorization;
 using Explore.Infrastructure.Tests.Infrastructure;
 using System.Diagnostics.Metrics;

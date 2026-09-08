@@ -1,6 +1,3 @@
-// ABOUTME: Session-level tag junction distinct from event-level EventTags for program-grain precision.
-// ABOUTME: Unique per (TenantId, EventSessionId, TagId); event-level umbrella taxonomy is enforced separately on Event.
-
 using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;

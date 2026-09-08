@@ -1,6 +1,3 @@
-// ABOUTME: Support-access BFF endpoints for current-session UX, start, and actor-owned stop.
-// ABOUTME: Keeps impersonation session references server-side while streaming API HAL responses to the browser.
-
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Explore.Blazor.Client.Clients;

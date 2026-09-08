@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos policy test suite for tenant_user_role_grant resources.
-# ABOUTME: Ensures identity-bearing role grant reads are tenant-admin-only.
-
 name: TenantUserRoleGrantPolicyTests
 description: "Validates tenant_user_role_grant read and mutation policies across admin hierarchy levels"
 

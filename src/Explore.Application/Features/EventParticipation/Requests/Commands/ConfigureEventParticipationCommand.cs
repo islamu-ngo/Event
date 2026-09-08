@@ -1,6 +1,3 @@
-// ABOUTME: Authorized command that reconfigures one event's explicit participation policy.
-// ABOUTME: Carries the configuration concurrency stamp separately from ordinary event-shell updates.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Responses;

@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for Coop decision callback commands.
-// ABOUTME: Validates bounded provider metadata before Application state is loaded.
-
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Features.EventReporting.Policies;
 using Explore.Application.Features.EventReporting.Requests.Commands;

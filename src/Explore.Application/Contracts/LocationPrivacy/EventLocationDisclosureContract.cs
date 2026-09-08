@@ -1,6 +1,3 @@
-// ABOUTME: Immutable vocabulary and purpose ceilings for contextual event-location disclosure fields.
-// ABOUTME: Makes public, attendee, management, exact-data, and operational-secret boundaries executable.
-
 using System.Collections.Frozen;
 using System.Text.Json;
 using System.Text.Json.Serialization;

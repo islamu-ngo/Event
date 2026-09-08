@@ -1,6 +1,3 @@
-// ABOUTME: Client service for anonymous-safe public experience settings used by startup routing and white-label UI.
-// ABOUTME: Provides a single route-resolution helper for event-list versus landing-page entry behavior.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Services;

@@ -1,6 +1,3 @@
-// ABOUTME: Immutable result contract for read-only platform doctor checks.
-// ABOUTME: Carries redacted evidence and remediation links without exposing secrets.
-
 namespace Explore.Diagnostic.Doctor;
 
 public sealed record DoctorCheckResult(

@@ -1,5 +1,3 @@
-// ABOUTME: Writes normalized container image digest evidence from Docker build workflow environment data.
-// ABOUTME: Keeps release evidence generation in C# instead of embedding JSON assembly in workflow YAML.
 #:property RestorePackagesWithLockFile=false
 
 using System.Text.Json;

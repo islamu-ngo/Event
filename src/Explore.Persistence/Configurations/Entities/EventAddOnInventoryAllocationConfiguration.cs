@@ -1,6 +1,3 @@
-// ABOUTME: Maps add-on inventory allocations with operation replay and active-line uniqueness.
-// ABOUTME: Enforces exact quantities and restrictive tenant-qualified order-line ownership.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

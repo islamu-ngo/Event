@@ -1,6 +1,3 @@
-// ABOUTME: Provides a minimal native BarcodeDetector gate for caller-owned image sources.
-// ABOUTME: Returns transient typed data without DOM, storage, network, logging, or URL side effects.
-
 async function hasNativeQrSupport() {
     if (!globalThis.isSecureContext || typeof globalThis.BarcodeDetector !== "function") {
         return false;

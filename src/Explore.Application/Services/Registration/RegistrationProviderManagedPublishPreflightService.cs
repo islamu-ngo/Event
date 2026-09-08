@@ -1,6 +1,3 @@
-// ABOUTME: Orchestrates provider-managed survey and callback readiness before a binding is published.
-// ABOUTME: Checkpoints accepted remote identities locally and fails closed on ambiguous remote writes.
-
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Explore.Application.Contracts.Persistence;

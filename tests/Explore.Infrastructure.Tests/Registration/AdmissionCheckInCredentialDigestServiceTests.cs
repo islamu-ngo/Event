@@ -1,6 +1,3 @@
-// ABOUTME: Proves check-in lookup candidates exactly match issuance digests across bounded key rotation.
-// ABOUTME: Verifies current-first ordering, cancellation propagation, and diagnostic redaction.
-
 using System.Security.Cryptography;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Admissions;

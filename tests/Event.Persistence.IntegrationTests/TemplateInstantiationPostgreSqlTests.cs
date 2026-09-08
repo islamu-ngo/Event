@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL certification for template-to-runtime custom-property instantiation.
-// ABOUTME: Verifies persisted runtime definitions, options, defaults, values, provenance, and projections.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

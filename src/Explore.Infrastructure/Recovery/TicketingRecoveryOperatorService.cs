@@ -1,6 +1,3 @@
-// ABOUTME: Coordinates explicit stop, pause, reconcile, ambiguity resolution, and reopen operator actions.
-// ABOUTME: Keeps Quartz as pointer-only scheduling authority and persistence as durable recovery truth.
-
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;

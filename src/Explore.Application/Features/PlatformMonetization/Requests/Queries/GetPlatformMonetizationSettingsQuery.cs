@@ -1,6 +1,3 @@
-// ABOUTME: Requests the singleton instance-admin platform monetization settings document.
-// ABOUTME: Carries instance-setting view authorization metadata for the platform-monetization key.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.PlatformMonetization;
 using MediatR;

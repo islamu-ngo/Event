@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for instance- or tenant-scoped webhook provider bindings.
-// ABOUTME: Enforces normalized application identity, verified scope consistency, and fenced concurrency.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;

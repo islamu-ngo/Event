@@ -1,6 +1,3 @@
-// ABOUTME: Runtime guards for regular setting repositories that reject coordinated publication-policy keys.
-// ABOUTME: Proves rejected writes acquire no mutation lock, call no SaveChanges, and leave persisted rows unchanged.
-
 namespace Event.Persistence.IntegrationTests.Settings;
 
 using Event.Persistence.IntegrationTests.Fixtures;

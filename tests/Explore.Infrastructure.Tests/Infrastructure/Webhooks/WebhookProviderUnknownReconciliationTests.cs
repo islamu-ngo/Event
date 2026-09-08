@@ -1,6 +1,3 @@
-// ABOUTME: Tests conservative lookup-only reconciliation for ambiguous provider publication acceptance.
-// ABOUTME: Proves exact-match settlement, unchanged-identity retry, bounded deferral, and manual fallback.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Infrastructure.Webhooks;

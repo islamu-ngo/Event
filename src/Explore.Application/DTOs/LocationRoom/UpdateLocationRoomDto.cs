@@ -1,6 +1,3 @@
-// ABOUTME: Wrapper DTO for PATCH-based LocationRoom updates using nullable per-property groups.
-// ABOUTME: Route ID targets the row while groups express independent room field update intent.
-
 using Explore.Application.Models.Common;
 
 namespace Explore.Application.DTOs.LocationRoom;

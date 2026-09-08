@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind helpers for rendering moderation report detail sections.
-// ABOUTME: Centralizes HAL affordance checks and safe formatting for generated DTO projections.
-
 using System.Globalization;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Helpers;

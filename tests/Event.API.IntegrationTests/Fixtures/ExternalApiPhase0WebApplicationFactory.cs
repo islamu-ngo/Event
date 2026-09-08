@@ -1,6 +1,3 @@
-// ABOUTME: Test host factory for the Phase 0 external API access seam.
-// ABOUTME: Provides deterministic JWT validation, API-key config, and tenant lookup stubs for split-phase tenant tests.
-
 using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;

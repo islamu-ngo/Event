@@ -1,6 +1,3 @@
-// ABOUTME: Maps LocalProvider webhook delivery attempts into safe operations DTOs.
-// ABOUTME: Preserves bounded response previews while keeping endpoint secrets and payload bodies out of reads.
-
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Lookups;
 using Explore.Domain;

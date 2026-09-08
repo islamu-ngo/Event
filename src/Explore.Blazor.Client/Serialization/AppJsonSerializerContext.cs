@@ -1,6 +1,3 @@
-// ABOUTME: System.Text.Json source generator context for AOT compilation.
-// ABOUTME: Registers browser-safe generated DTOs without provider credential contracts.
-
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Explore.Blazor.Client.Clients;

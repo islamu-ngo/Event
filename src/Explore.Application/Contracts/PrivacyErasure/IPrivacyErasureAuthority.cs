@@ -1,6 +1,3 @@
-// ABOUTME: Defines the application boundary for the independently retained privacy-erasure authority.
-// ABOUTME: Exposes append and checkpoint-oriented reads only, with no update or delete capability.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.PrivacyErasure;

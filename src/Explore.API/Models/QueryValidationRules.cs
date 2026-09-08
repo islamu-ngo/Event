@@ -1,6 +1,3 @@
-// ABOUTME: Shared syntactic validation rules for public API query-binding models.
-// ABOUTME: Keeps high-risk list, search, sort, date-range, and custom-property query checks consistent.
-
 using System.ComponentModel.DataAnnotations;
 using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Application.Responses;

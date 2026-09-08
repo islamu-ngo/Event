@@ -1,6 +1,3 @@
-/* ABOUTME: Responsive, direction-safe presentation for the public featured-event hero. */
-/* ABOUTME: Uses design tokens and disables decorative transitions for reduced-motion users. */
-
 .hero-carousel {
     --hero-carousel-slide-duration: 300ms;
     --hero-carousel-slide-easing: ease-in-out;

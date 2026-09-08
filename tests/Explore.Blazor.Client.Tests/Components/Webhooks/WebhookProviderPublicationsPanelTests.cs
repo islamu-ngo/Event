@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for HAL-governed provider publication operator controls.
-// ABOUTME: Verifies reconciliation and abandonment remain service-backed and optimistic-version aware.
-
 using Explore.Blazor.Client.Components.Common;
 using Explore.Blazor.Client.Components.Webhooks;
 using Explore.Blazor.Client.Contracts.Services.Webhooks;

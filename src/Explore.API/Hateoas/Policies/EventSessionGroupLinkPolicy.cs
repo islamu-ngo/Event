@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS link policies for event program sections, tracks, devrooms, and stages.
-// ABOUTME: Exposes read navigation to the owning event and sibling session groups.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Collections.Generic;

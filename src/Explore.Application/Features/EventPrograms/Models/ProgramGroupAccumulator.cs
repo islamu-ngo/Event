@@ -1,6 +1,3 @@
-// ABOUTME: Internal accumulator used while assembling server-backed event program summaries.
-// ABOUTME: Lives outside handler namespaces so architecture rules only inspect real handler classes there.
-
 using Explore.Application.DTOs.EventProgram;
 using Explore.Application.DTOs.Location;
 using Explore.Domain;

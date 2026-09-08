@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for the unified Role entity with scope-based queries.
-// ABOUTME: Supports permission lookups for dynamic RBAC authorization.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

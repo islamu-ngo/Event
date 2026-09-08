@@ -1,6 +1,3 @@
-// ABOUTME: Canonical governance setting keys used across onboarding, runtime policy resolution, and admin configuration.
-// ABOUTME: Organized as nested static classes for discoverable, compile-time key references.
-
 namespace Explore.Domain.Constants;
 
 public static class GovernanceSettingKeys

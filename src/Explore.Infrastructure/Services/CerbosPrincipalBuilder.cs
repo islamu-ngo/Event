@@ -1,6 +1,3 @@
-// ABOUTME: Builds a Cerbos SDK Principal for either a human user or an API-key-authenticated machine caller.
-// ABOUTME: Centralises principal shape so Cerbos policies see the same attribute contract regardless of authentication scheme.
-
 using Cerbos.Sdk.Builder;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;

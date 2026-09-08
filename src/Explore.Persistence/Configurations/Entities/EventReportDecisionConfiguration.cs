@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for report review decisions before moderation enforcement.
-// ABOUTME: Ensures decisions stay bound to the same tenant/report/case graph and moderator identity.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

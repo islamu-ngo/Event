@@ -1,6 +1,3 @@
-// ABOUTME: Mutable form state for creating or revising one event promotion definition.
-// ABOUTME: Converts accessible Studio inputs into generated API requests without retaining issued codes.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Pages.Studio;

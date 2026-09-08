@@ -1,6 +1,3 @@
-// ABOUTME: Characterizes opaque BFF provider-subject and session partitions through runtime seams.
-// ABOUTME: Locks setup, rate-limit, circuit, and purpose-bound fail-closed behavior before helper migration.
-
 using System.Threading.RateLimiting;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Extensions;

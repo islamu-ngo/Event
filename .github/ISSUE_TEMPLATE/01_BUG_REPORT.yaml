@@ -1,6 +1,3 @@
-# ABOUTME: Comprehensive bug report template for ISLAMU Event.
-# ABOUTME: Collects reproduction steps, environment, version, topology, logs, and safety checks.
-
 name: 🐞 Bug Report
 description: "File a new bug report."
 title: "[Bug]: "

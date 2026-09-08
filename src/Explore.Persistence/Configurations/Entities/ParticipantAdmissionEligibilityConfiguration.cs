@@ -1,6 +1,3 @@
-// ABOUTME: Maps participant admission readiness to tenant-qualified assignment and participant authority.
-// ABOUTME: Persists bounded non-PII state with portable timestamp and approval constraints.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

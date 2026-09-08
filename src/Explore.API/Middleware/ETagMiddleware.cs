@@ -1,6 +1,3 @@
-// ABOUTME: Computes ETag headers for GET responses and handles If-None-Match conditional requests.
-// ABOUTME: Returns 304 Not Modified when the client already has the current representation.
-
 using System.Buffers;
 using System.Security.Cryptography;
 using Microsoft.IO;

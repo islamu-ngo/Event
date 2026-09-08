@@ -1,6 +1,3 @@
-// ABOUTME: Stress tests for rate limiting middleware using StressApiFixture (rate limiting enabled).
-// ABOUTME: Verifies 429 responses, ProblemDetails structure, Retry-After header, and rate limit headers.
-
 using System.Net;
 using System.Text;
 using System.Text.Json;

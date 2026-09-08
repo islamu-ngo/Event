@@ -1,5 +1,3 @@
-/* ABOUTME: Logical, reflow-safe layout for the private guest registration status page. */
-/* ABOUTME: Keeps explicit save feedback and keyboard focus visible at narrow viewport widths. */
 
 .guest-registration-status {
     display: grid;

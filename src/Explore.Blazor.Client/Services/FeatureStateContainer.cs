@@ -1,6 +1,3 @@
-// ABOUTME: Lightweight scoped service storing the authenticated user's feature flags as booleans.
-// ABOUTME: Hydrated from GET /api/features/my-flags on login; components check IsEnabled("key").
-
 namespace Explore.Blazor.Client.Services;
 
 public class FeatureStateContainer

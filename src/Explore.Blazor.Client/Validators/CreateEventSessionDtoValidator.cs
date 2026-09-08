@@ -1,6 +1,3 @@
-// ABOUTME: Validates generated event-session create requests used by the Blazor composer.
-// ABOUTME: Keeps client-side validation aligned with the generated API contract.
-
 using Explore.Blazor.Client.Clients;
 using FluentValidation;
 

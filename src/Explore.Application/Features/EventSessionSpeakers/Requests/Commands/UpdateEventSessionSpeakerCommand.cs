@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for route-ID event-session speaker link updates.
-// ABOUTME: Carries expected concurrency and grouped relationship update payload.
 using System;
 using System.Collections.Generic;
 using Explore.Application.Authorization;

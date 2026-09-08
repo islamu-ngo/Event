@@ -1,6 +1,3 @@
-// ABOUTME: Canonical lookup metadata for enum-backed lookup rows exposed through API DTOs.
-// ABOUTME: Mirrors LookupTableSeeder stable IDs/codes so handlers can map without loading navigations.
-
 using Explore.Domain.Enums;
 using ExternalApiKeyOwnerTypeEnum = Explore.Domain.Enums.ExternalApiKeyOwnerType;
 

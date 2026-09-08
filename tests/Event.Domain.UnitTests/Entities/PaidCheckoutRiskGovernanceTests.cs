@@ -1,6 +1,3 @@
-// ABOUTME: Specifies configured count/amount windows and independently reviewed paid Checkout approvals.
-// ABOUTME: Proves ceilings evaluate conservative exposure rather than categorically disabling Checkout.
-
 using Explore.Domain;
 using TUnit.Assertions;
 using TUnit.Core;

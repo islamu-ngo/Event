@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for immutable PDS delivery intent and token-bearing fenced state transitions.
-// ABOUTME: Excludes every unfenced legacy mutation so stale workers cannot settle or overwrite reclaimed claims.
-
 using Explore.Domain.Federation;
 
 namespace Explore.Application.Contracts.Persistence;

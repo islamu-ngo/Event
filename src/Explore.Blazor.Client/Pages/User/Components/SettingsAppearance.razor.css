@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped CSS for the user Appearance settings section (theme picker, custom builder, and profile management). */
-/* ABOUTME: BEM classes under the settings-appearance root; ::deep not required. */
-
 .settings-appearance__theme-card {
     cursor: pointer;
     transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;

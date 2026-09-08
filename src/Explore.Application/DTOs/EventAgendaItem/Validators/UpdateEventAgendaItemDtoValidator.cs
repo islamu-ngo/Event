@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for grouped EventAgendaItem PATCH updates.
-// ABOUTME: Enforces group presence, clear-null operations, lookups, and schedule ordering.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Models.Common;
 using FluentValidation;

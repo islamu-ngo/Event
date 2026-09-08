@@ -1,6 +1,3 @@
-// ABOUTME: Verifies a disabled browser target publishes no bundle, remote channel, or release claim.
-// ABOUTME: Keeps source, service workers, telemetry, reporters, and developer assets absent until approval.
-
 namespace Event.SetupAssistant.Browser.Tests;
 
 using System.Text.Json;

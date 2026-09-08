@@ -1,6 +1,3 @@
-// ABOUTME: API contract tests for custom-property projection row inspection exposure ceilings.
-// ABOUTME: Proves authenticated admin projection reads do not leak internal rows when a public ceiling is requested.
-
 using System.Net;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;

@@ -1,6 +1,3 @@
-// ABOUTME: Propagates or generates a correlation ID for every request.
-// ABOUTME: Pushes the correlation ID into Serilog LogContext and the response headers.
-
 using Serilog.Context;
 
 namespace Explore.API.Middleware;

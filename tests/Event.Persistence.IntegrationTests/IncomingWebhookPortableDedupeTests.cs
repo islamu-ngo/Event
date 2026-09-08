@@ -1,6 +1,3 @@
-// ABOUTME: Proves SQLite webhook event and object-transition races resolve as duplicates.
-// ABOUTME: Exercises the same portable unique-conflict classifier used by all five persistence providers.
-
 using Explore.Domain;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
@@ -111,7 +108,7 @@ public sealed class IncomingWebhookPortableDedupeTests
             await command.ExecuteNonQueryAsync();
         }
 
-        DbContextOptionsBuilder<ExploreDbContext> options = new DbContextOptionsBuilder<ExploreDbContext>()
+        DbContextOptionsBuilder<ExploreDbContext> options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connection)
             .UseSnakeCaseNamingConvention();
         if (interceptor is not null)

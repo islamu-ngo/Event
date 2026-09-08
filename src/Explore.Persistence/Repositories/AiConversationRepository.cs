@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for AI assistant conversation aggregates and proposed actions.
-// ABOUTME: Uses tenant query filters, no-tracking reads, and tracking lookups for state transitions.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Models;
 using Explore.Domain.Ai;

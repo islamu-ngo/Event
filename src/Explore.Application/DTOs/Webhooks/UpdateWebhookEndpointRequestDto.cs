@@ -1,6 +1,3 @@
-// ABOUTME: Grouped PATCH contract for webhook endpoint configuration.
-// ABOUTME: Keeps concurrency and pending-work governance atomic with supplied configuration groups.
-
 namespace Explore.Application.DTOs.Webhooks;
 
 public sealed record UpdateWebhookEndpointRequestDto

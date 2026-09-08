@@ -1,6 +1,3 @@
-// ABOUTME: Defines admin HAL affordances for quarantined registration answer files.
-// ABOUTME: Suppresses the release transition once the immutable release audit exists.
-
 using System.Security.Claims;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.DTOs.Registration;

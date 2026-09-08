@@ -1,6 +1,3 @@
-// ABOUTME: Defines RED API, HAL, OpenAPI, privacy, and bounded-state contracts for readiness.
-// ABOUTME: Requires exact-resource reads and subject/organizer actions without participant roster leakage.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Reflection;

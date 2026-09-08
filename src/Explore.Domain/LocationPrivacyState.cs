@@ -1,6 +1,3 @@
-// ABOUTME: Normalized lookup entity for the physical-location PII lifecycle.
-// ABOUTME: Stable rows distinguish not-provided, active, and erased states.
-
 namespace Explore.Domain;
 
 public sealed class LocationPrivacyState

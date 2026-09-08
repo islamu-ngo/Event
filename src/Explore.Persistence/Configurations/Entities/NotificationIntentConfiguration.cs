@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mappings for durable notification intent, local delivery, and delegation audit rows.
-// ABOUTME: Enforces tenant scoping, safe-payload metadata bounds, and normalized routing foreign keys.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

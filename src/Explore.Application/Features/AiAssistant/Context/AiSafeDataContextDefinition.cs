@@ -1,6 +1,3 @@
-// ABOUTME: Defines an explicit schema-only AI context summary allow-list.
-// ABOUTME: Keeps future prompt grounding limited to safe projection fields selected by the platform.
-
 namespace Explore.Application.Features.AiAssistant.Context;
 
 public sealed class AiSafeDataContextDefinition

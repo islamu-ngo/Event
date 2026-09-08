@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for the authenticated event-report submission dialog.
-// ABOUTME: Verifies client validation mirrors the report-intake command contract before API submission.
-
 using System.Reflection;
 using Explore.Blazor.Client.Components.EventReporting;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;

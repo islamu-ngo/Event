@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for atomic session custom-property projection rows derived from value rows.
-// ABOUTME: Optimizes discovery, moderation, and export query paths while keeping projections rebuildable.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

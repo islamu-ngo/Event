@@ -1,6 +1,3 @@
-// ABOUTME: Projects exact-target admission summaries and bounded event audit pages without loading aggregates.
-// ABOUTME: Applies tenant and event lineage in SQL and returns only Domain entities from reporting repository reads.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Domain;
 using Explore.Domain.Enums;

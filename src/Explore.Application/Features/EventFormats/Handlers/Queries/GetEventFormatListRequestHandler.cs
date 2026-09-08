@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning all event formats.
-// ABOUTME: Maps EventFormat entities to EventFormatDto list.
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;

@@ -1,6 +1,3 @@
-// ABOUTME: Cross-tenant isolation tests — proves that tenant-scoped resources are isolated
-// ABOUTME: between tenants. Tenant admin of Tenant A cannot access Tenant B's resources.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Security;

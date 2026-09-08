@@ -1,6 +1,3 @@
-// ABOUTME: Maps versioned purchase policy, authority usage, and durable operation identity.
-// ABOUTME: Enforces tenant-qualified uniqueness and portable semantic constraints for every provider.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

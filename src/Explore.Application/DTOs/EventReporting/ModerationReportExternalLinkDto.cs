@@ -1,6 +1,3 @@
-// ABOUTME: Management projection for provider mirror and synchronization state.
-// ABOUTME: Includes provider type, retry state, and safe error categories without raw provider pointers.
-
 namespace Explore.Application.DTOs.EventReporting;
 
 public sealed record ModerationReportExternalLinkDto

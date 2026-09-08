@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for tenant-safe AI RAG ingestion and search filter guardrails.
-// ABOUTME: Proves future vector indexing starts with bounded public summaries and citation metadata only.
-
 using Explore.Application.Features.AiAssistant.Rag;
 
 namespace Event.Application.UnitTests.Features.AiAssistant.Rag;

@@ -1,6 +1,3 @@
-// ABOUTME: API-facing projection of a reviewed external action attached to an event.
-// ABOUTME: Exposes normalized lookup metadata and destination disclosure without capability flags.
-
 using System.Text.Json.Serialization;
 
 namespace Explore.Application.DTOs.Event;

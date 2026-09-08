@@ -1,6 +1,3 @@
-// ABOUTME: Shared BenchmarkDotNet configuration for Event benchmark suites.
-// ABOUTME: Enables diagnostics, stable exporters, validators, and the current .NET runtime job.
-
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Diagnosers;
 using BenchmarkDotNet.Environments;

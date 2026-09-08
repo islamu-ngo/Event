@@ -1,6 +1,3 @@
-// ABOUTME: Scoped UI state engine for generic shell and workspace dock panels.
-// ABOUTME: Manages registration, open/close, sizing, activation, and layout snapshots.
-
 using Microsoft.AspNetCore.Components;
 
 namespace Explore.Blazor.Client.Services.Docking;

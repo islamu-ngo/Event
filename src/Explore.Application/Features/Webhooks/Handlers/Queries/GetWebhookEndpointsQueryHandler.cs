@@ -1,6 +1,3 @@
-// ABOUTME: Handles typed owner-scoped webhook endpoint list queries.
-// ABOUTME: Resolves canonical ownership before bounded secret-safe entity mapping.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.DTOs.Webhooks;

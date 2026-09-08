@@ -1,5 +1,3 @@
-// ABOUTME: Exercises lifecycle forwarding with native BFF cookies, antiforgery, and generated HTTP serialization.
-// ABOUTME: Replaces only outbound API transport to guard nonenumeration, session isolation, and no-retry failures.
 
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Cryptography;

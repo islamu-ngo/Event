@@ -1,6 +1,3 @@
-// ABOUTME: Repository interface for EventContactShareConsent entities.
-// ABOUTME: Provides scoped lookups by organizer, user, and the per-organizer unique scope query.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

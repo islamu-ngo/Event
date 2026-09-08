@@ -1,6 +1,3 @@
-// ABOUTME: Resolves a verified recovery identity to bounded active admission ticket authority.
-// ABOUTME: Keeps normalized PII matching inside Persistence and returns only provider-neutral identities.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;

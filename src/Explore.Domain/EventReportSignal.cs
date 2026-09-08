@@ -1,6 +1,3 @@
-// ABOUTME: Automated moderation signal attached to a report or event.
-// ABOUTME: Stores bounded provider verdict metadata without raw provider payloads.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

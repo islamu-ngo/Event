@@ -1,4 +1,3 @@
-// ABOUTME: Query contract for retrieving the count of active tenants in the system.
 // Used by deployment mode toggle to enforce single-tenant revert safeguards.
 
 using MediatR;

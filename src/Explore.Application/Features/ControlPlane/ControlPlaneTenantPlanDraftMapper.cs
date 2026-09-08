@@ -1,6 +1,3 @@
-// ABOUTME: Maps validated tenant plan drafts into normalized domain plan/version rows.
-// ABOUTME: Keeps SaaS tier pricing, setting, and quota materialization shared by plan commands.
-
 using Explore.Application.Features.ControlPlane.Plans;
 using Explore.Domain;
 using Explore.Domain.Enums;

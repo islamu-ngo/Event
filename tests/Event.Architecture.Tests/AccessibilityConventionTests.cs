@@ -1,6 +1,3 @@
-// ABOUTME: Architecture tests enforcing accessibility conventions across Blazor files.
-// ABOUTME: Scans .razor files for h1 headings, MainLayout landmarks, and .razor.css for physical-direction CSS.
-
 namespace Event.Architecture.Tests;
 
 using System.Text.RegularExpressions;

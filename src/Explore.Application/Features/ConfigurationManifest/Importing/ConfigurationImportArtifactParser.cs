@@ -1,6 +1,3 @@
-// ABOUTME: Parses bounded browser-import bytes into the strict v1alpha2 manifest contract.
-// ABOUTME: Rejects duplicate/unknown members and returns only exact-byte digest metadata.
-
 namespace Explore.Application.Features.ConfigurationManifest.Importing;
 
 using System.Text.Json;

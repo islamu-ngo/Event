@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for Blazor client ContactShareConsentService over its generated tag client.
-// ABOUTME: Tests API call delegation, error handling, and view model mapping.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Services;

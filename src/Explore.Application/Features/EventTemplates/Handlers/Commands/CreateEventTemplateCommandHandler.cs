@@ -1,6 +1,3 @@
-// ABOUTME: Handles creation of event templates with nested definition and option persistence.
-// ABOUTME: Validates governance per definition, ensures template-key uniqueness, and persists three-level hierarchy transactionally.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

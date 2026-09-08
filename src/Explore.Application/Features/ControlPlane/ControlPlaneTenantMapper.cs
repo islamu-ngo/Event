@@ -1,6 +1,3 @@
-// ABOUTME: Mapping helpers for control-plane tenant read and lifecycle DTOs.
-// ABOUTME: Keeps tenant lifecycle projection logic centralized inside the Application layer.
-
 using Explore.Application.DTOs.ControlPlane;
 using Explore.Domain;
 using Explore.Domain.Enums;

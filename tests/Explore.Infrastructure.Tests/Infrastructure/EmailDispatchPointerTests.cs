@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for pointer-only EmailDispatch RabbitMQ payload contracts.
-// ABOUTME: Guards against leaking recipient, subject, body, or provider payload into broker messages.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;

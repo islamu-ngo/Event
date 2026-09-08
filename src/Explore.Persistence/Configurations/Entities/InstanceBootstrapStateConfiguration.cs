@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for typed instance bootstrap generation persistence.
-// ABOUTME: Enforces lifecycle evidence, generation identity, and local completion lineage.
-
 using Explore.Domain;
 using Explore.Persistence.Schema;
 using Explore.Persistence.ValueGenerators;

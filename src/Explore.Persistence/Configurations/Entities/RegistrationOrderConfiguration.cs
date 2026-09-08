@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for the tenant-scoped registration order aggregate and immutable snapshots.
-// ABOUTME: Maps restrictive tenant-safe relationships so order history cannot be cascade-deleted.
-
 using Explore.Domain;
 using Explore.Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;

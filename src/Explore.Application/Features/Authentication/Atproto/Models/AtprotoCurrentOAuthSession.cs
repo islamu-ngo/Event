@@ -1,6 +1,3 @@
-// ABOUTME: Carries the authenticated tenant/user/DID binding and opaque current OAuth session payload.
-// ABOUTME: Keeps CarpaNet storage types outside Application while supporting the private BFF adapter.
-
 using Explore.Domain.ValueObjects;
 
 namespace Explore.Application.Features.Authentication.Atproto.Models;

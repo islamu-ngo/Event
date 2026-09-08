@@ -1,6 +1,3 @@
-// ABOUTME: Dynamic test proxy for the RED typed address-suggestion service response contract.
-// ABOUTME: Avoids pinning test doubles to the obsolete list-only service signature.
-
 using System.Reflection;
 
 namespace Explore.Blazor.Client.Tests.Common;

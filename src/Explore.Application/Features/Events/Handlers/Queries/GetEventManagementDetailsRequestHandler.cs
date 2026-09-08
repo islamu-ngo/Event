@@ -1,6 +1,3 @@
-// ABOUTME: Handles authorized management event detail reads, including moderated events.
-// ABOUTME: Reuses the shared projection service so management and public detail DTOs stay aligned.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Event;

@@ -1,6 +1,3 @@
-// ABOUTME: Persists fenced refund-campaign claims, bounded captured-payment pages, and atomic cursor advancement.
-// ABOUTME: Stores continuation and dispatch outbox messages in the same transaction as campaign progress.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

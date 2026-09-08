@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning a single registration mode by ID.
-// ABOUTME: Maps RegistrationMode entity to RegistrationModeDto.
 using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;

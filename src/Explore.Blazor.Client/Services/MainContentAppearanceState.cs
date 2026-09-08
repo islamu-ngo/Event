@@ -1,6 +1,3 @@
-// ABOUTME: Observable UI state for page-owned styling of the shell main content canvas.
-// ABOUTME: Allows routed pages to theme #main-content while MainLayout retains shell ownership.
-
 namespace Explore.Blazor.Client.Services;
 
 public sealed class MainContentAppearanceState

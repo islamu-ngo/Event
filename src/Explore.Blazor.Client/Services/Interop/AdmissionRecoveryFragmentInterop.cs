@@ -1,6 +1,3 @@
-// ABOUTME: Imports the admission recovery fragment module and returns its one-shot capability.
-// ABOUTME: Fails closed when browser interop is unavailable and never logs fragment material.
-
 using Explore.Blazor.Client.Contracts.Interop;
 using Microsoft.JSInterop;
 

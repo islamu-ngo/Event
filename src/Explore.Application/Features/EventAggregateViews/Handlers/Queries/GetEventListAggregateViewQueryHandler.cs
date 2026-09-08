@@ -1,6 +1,3 @@
-// ABOUTME: Handles paginated aggregate list queries against the EventWithSessions keyless view.
-// ABOUTME: Normalizes pagination, caches filtered listings, and emits capped searchable facet previews per item.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventAggregateView;
 using Explore.Application.Features.EventAggregateViews.Requests.Queries;

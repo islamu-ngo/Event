@@ -1,5 +1,3 @@
-// ABOUTME: Exposes anonymous native Local recovery admission and purpose-bound one-use completion.
-// ABOUTME: Keeps public account eligibility private and never issues an ordinary session on recovery.
 
 using Asp.Versioning;
 using Explore.API.Attributes;

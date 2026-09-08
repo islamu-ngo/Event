@@ -1,6 +1,3 @@
-/* ABOUTME: Styles the address suggestion combobox with logical-direction properties. */
-/* ABOUTME: Keeps focus, active option, status, and semantic badges WCAG-visible. */
-
 .address-suggestion {
     --address-suggestion-control-block-size: 2.75rem;
     --address-suggestion-list-max-block-size: min(18rem, 40vh);

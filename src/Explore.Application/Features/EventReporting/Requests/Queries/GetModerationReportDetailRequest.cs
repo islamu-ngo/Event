@@ -1,6 +1,3 @@
-// ABOUTME: Secured MediatR query for one event-report management detail projection.
-// ABOUTME: Requires the caller to authorize against the report's concrete event before evidence is loaded.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventReporting;
 using MediatR;

@@ -1,6 +1,3 @@
-// ABOUTME: Real-runtime endpoint tests for event program section write paths.
-// ABOUTME: Verifies authenticated session-group create, update, and delete persist through PostgreSQL.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;

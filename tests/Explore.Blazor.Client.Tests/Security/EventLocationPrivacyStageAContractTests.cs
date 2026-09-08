@@ -1,6 +1,3 @@
-// ABOUTME: Characterizes Stage-A event-location privacy on public Blazor surfaces.
-// ABOUTME: Prevents public URLs, rendered copy, and JSON-LD from disclosing physical location data.
-
 using System.Text.Json;
 using Blazouter.Services;
 using Explore.Blazor.Client.Components.EventReporting;

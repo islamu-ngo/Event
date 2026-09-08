@@ -1,5 +1,3 @@
-// ABOUTME: Hosts native SQLite API, Identity, routing, MediatR and global lifecycle delivery with controlled SMTP and time.
-// ABOUTME: Uses supervised exact Local provisioning and real HTTP login; only external handoff and clock are substituted.
 
 using System.Net;
 using System.Net.Http.Headers;

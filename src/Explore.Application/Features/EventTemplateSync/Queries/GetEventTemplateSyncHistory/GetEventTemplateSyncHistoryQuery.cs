@@ -1,6 +1,3 @@
-// ABOUTME: Requests a paged audit-backed history of prior event template sync executions for one event.
-// ABOUTME: Authorizes history retrieval with the same custom-property template view resource metadata used by HAL links.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventTemplateSync;
 using Explore.Application.Responses;

@@ -1,6 +1,3 @@
-// ABOUTME: Exposes private tenant-safe address acquisition through a bounded POST contract.
-// ABOUTME: Dispatches trusted tenant context and returns HAL without accepting provider authority.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Extensions;

@@ -1,6 +1,3 @@
-// ABOUTME: Maps PII-free append-only security evidence for exceptional exact EventLocation reads.
-// ABOUTME: Enforces tenant-safe association ownership and mandatory correlation or trace identity.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

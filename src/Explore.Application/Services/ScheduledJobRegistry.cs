@@ -1,6 +1,3 @@
-// ABOUTME: Default catalog of platform-owned scheduled jobs.
-// ABOUTME: Separates implemented scheduler work from planned migrations while preserving stable job names.
-
 using Explore.Application.Contracts.Scheduling;
 
 namespace Explore.Application.Services;

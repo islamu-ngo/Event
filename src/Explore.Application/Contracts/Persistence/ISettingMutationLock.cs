@@ -1,6 +1,3 @@
-// ABOUTME: Application port for linearizing setting mutations by canonical setting key.
-// ABOUTME: Supports transaction locks and ordered outer leases around caller-owned transactions.
-
 namespace Explore.Application.Contracts.Persistence;
 
 public interface ISettingMutationLock

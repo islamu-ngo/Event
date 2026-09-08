@@ -1,6 +1,3 @@
-// ABOUTME: Hardcoded emergency fallback palettes used when no system preset is in the database.
-// ABOUTME: Matches the Enterprise Blue theme seeded during migration. Includes high-contrast variants.
-
 namespace Explore.Application.Services;
 
 using Explore.Domain.ValueObjects;

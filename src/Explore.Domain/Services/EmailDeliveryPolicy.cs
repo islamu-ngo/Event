@@ -1,5 +1,3 @@
-// ABOUTME: Pure delivery-state and credential-ownership rules for instance and tenant SMTP.
-// ABOUTME: Prevents SMTP capability from granting authentication or cross-scope secret authority.
 
 using Explore.Domain.Enums;
 

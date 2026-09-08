@@ -1,6 +1,3 @@
-// ABOUTME: Maps the typed public ATProto event projection as a one-to-one child of its canonical record.
-// ABOUTME: Bounds public text and source fields while indexing stable discovery sorts.
-
 using Explore.Domain.Federation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

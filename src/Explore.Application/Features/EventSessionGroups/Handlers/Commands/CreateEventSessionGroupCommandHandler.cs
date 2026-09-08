@@ -1,6 +1,3 @@
-// ABOUTME: Handler for creating event session groups used as tracks, devrooms, stages, or program sections.
-// ABOUTME: Derives TenantId from the parent Event and validates location/room references via tenant-filtered repositories.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionGroup.Validators;

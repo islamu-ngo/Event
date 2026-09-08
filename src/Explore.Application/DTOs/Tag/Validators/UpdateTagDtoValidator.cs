@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for grouped Tag PATCH payloads.
-// ABOUTME: Rejects empty wrappers while validating only groups the caller supplied.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.Tag.Validators;

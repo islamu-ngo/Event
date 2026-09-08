@@ -1,6 +1,3 @@
-// ABOUTME: Maps paid-event policy domain revisions to Application DTOs.
-// ABOUTME: Keeps paid-event policy query and command handlers free of mapping duplication.
-
 using Explore.Application.DTOs.PaidEventPolicies;
 using Explore.Domain;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Handles paged query for pending dirty-scope backlog rows for operator inspection.
-// ABOUTME: Maps from CustomPropertyProjectionDirtyScope entities to ProjectionDirtyScopeDto.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.CustomPropertyProjection;

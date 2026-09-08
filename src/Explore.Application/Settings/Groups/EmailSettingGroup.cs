@@ -1,6 +1,3 @@
-// ABOUTME: Strongly-typed Email/SMTP setting group resolved via batch loading.
-// ABOUTME: Contains governance-only SMTP settings; credentials resolve through ISecretResolver.
-
 namespace Explore.Application.Settings.Groups;
 
 using Explore.Application.Contracts.Infrastructure;

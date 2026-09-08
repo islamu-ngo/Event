@@ -1,6 +1,3 @@
-// ABOUTME: Aggregate event-template sync diff describing all add/modify/retire buckets for a requested target version.
-// ABOUTME: Returned by the read-only diff query before an operator chooses a subset to apply.
-
 namespace Explore.Application.DTOs.EventTemplateSync;
 
 public sealed record TemplateDiffDto(

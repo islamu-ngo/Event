@@ -1,5 +1,3 @@
-// ABOUTME: Exercises scoped guest intent with real generated clients, HTTP serialization and rendered ticket selection.
-// ABOUTME: Guards original replay authority, capability scope, cancellation and field locking with exact async signals.
 
 using System.Net;
 using System.Text;

@@ -1,6 +1,3 @@
-// ABOUTME: Snapshot of a definition that would be added to an event from the target template during sync.
-// ABOUTME: Includes full mutable/runtime-visible definition metadata plus its template option set.
-
 namespace Explore.Application.DTOs.EventTemplateSync;
 
 public sealed record AddedDefinitionDto(

@@ -1,6 +1,3 @@
-// ABOUTME: SQLite portability regression tests for EventSessionRepository query translation boundaries.
-// ABOUTME: Proves schedule ordering and prefixed-table move mutations remain portable on SQLite.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -222,7 +219,7 @@ public sealed class EventSessionRepositorySqliteTests
     }
 
     private static ExploreDbContext CreateContext(SqliteConnection connection, Guid tenantId) =>
-        new(new DbContextOptionsBuilder<ExploreDbContext>()
+        new(TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connection)
             .UseSnakeCaseNamingConvention()
             .Options)

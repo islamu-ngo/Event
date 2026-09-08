@@ -1,6 +1,3 @@
-// ABOUTME: Stable relational lookup rows for webhook bulk replay operation states.
-// ABOUTME: Keeps queued, executing, completed, cancelled, and failed lifecycle values normalized.
-
 namespace Explore.Domain;
 
 public sealed class WebhookBulkReplayStatusLookup

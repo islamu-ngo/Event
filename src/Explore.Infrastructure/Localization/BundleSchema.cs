@@ -1,6 +1,3 @@
-// ABOUTME: Shared validation for flat localization bundle JSON read from embedded resources or writable storage.
-// ABOUTME: Keeps offline bundle keys aligned with TMS key shapes before providers cache or persist them.
-
 using System.Text.Json;
 
 namespace Explore.Infrastructure.Localization;

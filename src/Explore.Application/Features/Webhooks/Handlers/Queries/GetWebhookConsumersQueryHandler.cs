@@ -1,6 +1,3 @@
-// ABOUTME: Handles typed owner-scoped webhook consumer list reads for management APIs.
-// ABOUTME: Resolves canonical ownership before bounded repository access and entity mapping.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.DTOs.Webhooks;

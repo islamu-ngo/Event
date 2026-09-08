@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL proofs for the owner-bounded cross-tenant Private Home erasure query.
-// ABOUTME: Prevents global account deletion from enumerating unrelated owners or non-Home locations.
-
 using DotNet.Testcontainers.Containers;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Configuration;
@@ -615,7 +612,7 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
     {
         var services = new ServiceCollection();
         services.AddHybridCache();
-        ServiceProvider cacheProvider = services.BuildServiceProvider();
+        ServiceProvider cacheProvider = services.BuildIsolatedServiceProvider();
         var userRepository = new UserRepository(context);
         var userPiiRepository = new GenericRepository<UserPii, Guid>(context);
         var tokenRepository = new UserAuthenticationTokenRepository(context);
@@ -658,6 +655,17 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
         ExploreDbContext context,
         string identitySuffix = "")
     {
+        if (!await context.Set<AuthenticationProvider>()
+            .AnyAsync(provider => provider.Id == (int)AuthenticationProviderKind.Keycloak))
+        {
+            context.Add(new AuthenticationProvider
+            {
+                Id = (int)AuthenticationProviderKind.Keycloak,
+                MasterCode = "KEYCLOAK",
+                FullName = "Keycloak"
+            });
+        }
+
         var tenantA = CreateTenant("workflow-a");
         var tenantB = CreateTenant("workflow-b");
         var owner = CreateUser("workflow-owner");
@@ -1069,7 +1077,7 @@ public sealed class GlobalLocationPrivacyErasureTests(ExternalDatabasePrivacyEra
     private sealed record TestTenantContext(Guid TenantId) : ITenantContext;
 }
 [Category("EventLocationPrivacy")]
-[ClassDataSource<ExternalDatabasePrivacyErasurePostgreSqlFixture>(Shared = SharedType.PerClass)]
+[ClassDataSource<ExternalDatabasePrivacyErasurePostgreSqlFixture>(Shared = SharedType.None)]
 [NotInParallel("PersistenceDb")]
 public sealed class ExternalDatabasePrivacyErasureAuthorityTests(
     ExternalDatabasePrivacyErasurePostgreSqlFixture fixture)
@@ -1137,6 +1145,7 @@ public sealed class ExternalDatabasePrivacyErasureAuthorityTests(
         await using var transaction = await context.Database.BeginTransactionAsync();
         try
         {
+            DateTime databaseNow = await PrepareRetentionScenarioAsync(context);
             var repository = new EfCorePrivacyErasureAuthorityRepository(
                 context,
                 Options.Create(new PrivacyErasureOptions()));
@@ -1156,13 +1165,13 @@ public sealed class ExternalDatabasePrivacyErasureAuthorityTests(
                 + "UPDATE privacy_erasure_authority.erasure_intents "
                 + "SET requested_at_utc = {0}, recorded_at_utc = {0}, retention_expires_at_utc = {1} "
                 + "WHERE authority_sequence >= {2} AND authority_sequence <= {3};",
-                DateTime.UtcNow.AddDays(-2),
-                DateTime.UtcNow.AddDays(-1),
+                databaseNow.AddDays(-2),
+                databaseNow.AddDays(-1),
                 facts[0].AuthoritySequence,
                 facts[^1].AuthoritySequence);
 
             var request = new PrivacyErasureRetentionRequest(
-                DateTime.UtcNow,
+                databaseNow,
                 100,
                 [facts[1].AuthoritySequence]);
             PrivacyErasureRetentionEvaluation dryRun =
@@ -1198,6 +1207,7 @@ public sealed class ExternalDatabasePrivacyErasureAuthorityTests(
         await using var transaction = await context.Database.BeginTransactionAsync();
         try
         {
+            DateTime databaseNow = await PrepareRetentionScenarioAsync(context);
             var repository = new EfCorePrivacyErasureAuthorityRepository(
                 context,
                 Options.Create(new PrivacyErasureOptions()));
@@ -1216,10 +1226,10 @@ public sealed class ExternalDatabasePrivacyErasureAuthorityTests(
                 + "UPDATE privacy_erasure_authority.erasure_intents "
                 + "SET requested_at_utc = {0}, recorded_at_utc = {0}, retention_expires_at_utc = {1}; "
                 + "DELETE FROM privacy_erasure_authority.erasure_intents WHERE authority_sequence = {2};",
-                DateTime.UtcNow.AddDays(-2),
-                DateTime.UtcNow.AddDays(-1),
+                databaseNow.AddDays(-2),
+                databaseNow.AddDays(-1),
                 facts[^1].AuthoritySequence);
-            var request = new PrivacyErasureRetentionRequest(DateTime.UtcNow, 100, []);
+            var request = new PrivacyErasureRetentionRequest(databaseNow, 100, []);
 
             await transaction.CreateSavepointAsync("before_evaluation");
             await Assert.ThrowsAsync<Explore.Application.Exceptions.PrivacyErasureSequenceGapException>(
@@ -1240,6 +1250,19 @@ public sealed class ExternalDatabasePrivacyErasureAuthorityTests(
             await transaction.RollbackAsync();
             await context.Database.CloseConnectionAsync();
         }
+    }
+
+    private static async Task<DateTime> PrepareRetentionScenarioAsync(
+        PrivacyErasureAuthorityDbContext context)
+    {
+        // The caller's rollback restores other tests' authority facts and sequence state.
+        await context.Database.ExecuteSqlRawAsync(
+            "SELECT set_config('privacy_erasure_authority.maintenance', 'on', true); "
+            + "DELETE FROM privacy_erasure_authority.erasure_intents; "
+            + "UPDATE privacy_erasure_authority.authority_counter "
+            + "SET last_sequence = 0, retained_floor_sequence = 0 WHERE singleton;");
+        return await context.Database.SqlQueryRaw<DateTime>(
+            "SELECT statement_timestamp() AS \"Value\"").SingleAsync();
     }
 
     [Test]
@@ -1704,6 +1727,7 @@ public sealed class ExternalDatabasePrivacyErasurePostgreSqlFixture : IAsyncInit
             FullName = "Private",
         });
         await context.SaveChangesAsync();
+        await LookupTableSeeder.SeedAuthenticationProvidersAsync(context, CancellationToken.None);
         await LookupTableSeeder.SeedLocationPrivacyLookupsAsync(context, CancellationToken.None);
         await LookupTableSeeder.SeedLocationAddressGovernanceLookupsAsync(context, CancellationToken.None);
         await LookupTableSeeder.SeedEventAuthorityLookupsAsync(context, CancellationToken.None);
@@ -1720,7 +1744,7 @@ public sealed class ExternalDatabasePrivacyErasurePostgreSqlFixture : IAsyncInit
 
     public PrivacyErasureAuthorityDbContext CreateAuthorityDbContext()
     {
-        var options = new DbContextOptionsBuilder<PrivacyErasureAuthorityDbContext>()
+        var options = TestDbContextOptions.Create<PrivacyErasureAuthorityDbContext>()
             .UseNpgsql(_authorityRuntimeConnectionString)
             .UseSnakeCaseNamingConvention()
             .Options;
@@ -1729,7 +1753,7 @@ public sealed class ExternalDatabasePrivacyErasurePostgreSqlFixture : IAsyncInit
 
     public PrivacyErasureAuthorityDbContext CreateAuthorityAdminDbContext()
     {
-        var options = new DbContextOptionsBuilder<PrivacyErasureAuthorityDbContext>()
+        var options = TestDbContextOptions.Create<PrivacyErasureAuthorityDbContext>()
             .UseNpgsql(_authorityContainer.GetConnectionString())
             .UseSnakeCaseNamingConvention()
             .Options;
@@ -1828,7 +1852,7 @@ public sealed class ExternalDatabasePrivacyErasurePostgreSqlFixture : IAsyncInit
         {
             Database = database,
         }.ConnectionString;
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(connectionString, npgsql =>
             {
                 if (enableRetryOnFailure)

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies TenantUserRepository tenant-filter bypasses stay bounded by explicit tenant/user predicates.
-// ABOUTME: Proves tenant membership and actor lookups do not leak ambient wrong-tenant rows.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;

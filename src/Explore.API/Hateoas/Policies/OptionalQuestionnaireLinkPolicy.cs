@@ -1,6 +1,3 @@
-// ABOUTME: Defines public HAL links for a resolved optional questionnaire descriptor.
-// ABOUTME: Emits only immutable navigation and never advertises submission or registration actions.
-
 using System.Security.Claims;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.DTOs.RegistrationForms;

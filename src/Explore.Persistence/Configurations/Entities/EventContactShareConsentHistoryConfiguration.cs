@@ -1,6 +1,3 @@
-// ABOUTME: Maps append-only contact-share consent history with immutable provenance snapshots.
-// ABOUTME: Restrictive relationships retain audit evidence after current consent and source rows evolve.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

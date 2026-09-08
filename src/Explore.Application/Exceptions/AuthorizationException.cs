@@ -1,4 +1,3 @@
-// ABOUTME: Exception thrown when a Cerbos authorization check denies access.
 // Caught by API middleware and mapped to HTTP 403 Forbidden.
 
 namespace Explore.Application.Exceptions;

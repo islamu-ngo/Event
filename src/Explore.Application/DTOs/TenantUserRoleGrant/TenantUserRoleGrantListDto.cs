@@ -1,6 +1,3 @@
-// ABOUTME: List DTO for tenant-local role grant rows with user, tenant, and role labels.
-// ABOUTME: Used by GetTenantUserRoleGrantListRequest for collection responses.
-
 namespace Explore.Application.DTOs.TenantUserRoleGrant;
 
 public sealed record TenantUserRoleGrantListDto

@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for EventContactShareExportItem entity — individual exported consent rows.
-// ABOUTME: Composite PK (ExportId, ConsentId) with cascade delete on export, restrict on consent.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

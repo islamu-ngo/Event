@@ -258,6 +258,11 @@ The check requires the `## Release Impact` section in `.github/PULL_REQUEST_TEMP
 
 ### GitHub Actions Supply-Chain Pins
 
+The reusable API integration test step creates disposable setup and Keycloak
+client-rotation credentials, masks them before running tests, and injects them
+only into its process environment using the existing `.env.example` keys.
+This test authority grants no access to operator or repository secrets.
+
 External `uses:` references in `.github/workflows/*.yml` are pinned to full-length commit SHAs with a same-line version comment, for example `owner/action@<sha> # vX.Y.Z`. This makes the executable action reference immutable while preserving human-readable upgrade intent.
 
 Local reusable workflows remain path-based (`./.github/workflows/...`) because they are controlled by this repository's review history. Dependabot's `github-actions` ecosystem in `.github/dependabot.yml` keeps external SHA pins maintainable through a weekly grouped update lane with conventional `ci` commit messages.

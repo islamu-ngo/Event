@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped MangaDex-inspired update-list layout for upcoming home-discovery events. */
-/* ABOUTME: Uses tokenized flat columns, compact 7:10 thumbnails, and responsive vertical source order. */
-
 .upcoming-event-list {
     display: grid;
     grid-template-columns: minmax(0, 1fr);

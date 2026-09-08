@@ -1,6 +1,3 @@
-// ABOUTME: Bogus-based fake data generators for generated Blazor client contracts.
-// ABOUTME: Keeps test fixtures aligned with typed event participation and current API DTOs.
-
 using Bogus;
 
 namespace Explore.Blazor.Client.Tests.Common;

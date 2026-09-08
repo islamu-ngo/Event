@@ -1,6 +1,3 @@
-// ABOUTME: Defines one immutable version of the instance-scoped organizer fee policy.
-// ABOUTME: Stores percentage fees as basis points and fixed fees as currency-qualified minor units.
-
 using Explore.Domain.Interfaces;
 using Explore.Domain.ValueObjects;
 

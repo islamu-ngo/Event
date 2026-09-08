@@ -1,6 +1,3 @@
-// ABOUTME: Typed, test-only governance inventory for durable User-linked personal-data copies.
-// ABOUTME: Classifies primary, dedicated-authority, and external copies without executable erasure instructions.
-
 namespace Event.Architecture.Tests.Privacy;
 
 internal enum UserPiiDisposition

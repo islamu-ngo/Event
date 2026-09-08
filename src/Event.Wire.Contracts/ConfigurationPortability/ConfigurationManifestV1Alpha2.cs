@@ -1,6 +1,3 @@
-// ABOUTME: Declares strict v1alpha2 instance and tenant configuration portability artifacts.
-// ABOUTME: Keeps source provenance separate from trusted target authority.
-
 namespace ISLAMU.Wire.Contracts.ConfigurationPortability;
 
 using System.Collections.ObjectModel;

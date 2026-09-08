@@ -1,6 +1,3 @@
-// ABOUTME: Client-side validator for grouped category update dialogs.
-// ABOUTME: Mirrors the PATCH wrapper shape generated from the API contract.
-
 using Explore.Blazor.Client.Clients;
 using FluentValidation;
 

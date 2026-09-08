@@ -1,6 +1,3 @@
-// ABOUTME: Converts event-local wall times through an explicit event timezone without machine-local assumptions.
-// ABOUTME: Rejects DST gaps and preserves an existing ambiguous occurrence only when its wall value is unchanged.
-
 namespace Explore.Blazor.Client.Helpers;
 
 public static class DateTimeHelper

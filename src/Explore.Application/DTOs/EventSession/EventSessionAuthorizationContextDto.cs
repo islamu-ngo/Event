@@ -1,6 +1,3 @@
-// ABOUTME: Minimal event-session context returned to API composition before management mutations.
-// ABOUTME: Carries only parent event and tenant identifiers needed for resource authorization.
-
 using System;
 
 namespace Explore.Application.DTOs.EventSession;

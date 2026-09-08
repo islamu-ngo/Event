@@ -1,5 +1,3 @@
-// ABOUTME: Resolves Local lifecycle discovery from current native session/binding and instance email capability.
-// ABOUTME: Separates public login discovery from linked account authority and keeps password change independent of SMTP.
 
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;

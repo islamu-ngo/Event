@@ -1,5 +1,3 @@
-// ABOUTME: Defines the fail-closed command boundary for purpose-authorized Local password replacement.
-// ABOUTME: Returns no ordinary session or user synchronization result from a replacement operation.
 
 using Explore.Application.Features.Authentication.Local.Requests.Commands;
 using Explore.Application.Contracts.Identity;

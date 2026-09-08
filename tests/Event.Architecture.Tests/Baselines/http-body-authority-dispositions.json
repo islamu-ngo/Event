@@ -1,5 +1,26 @@
 [
   {
+    "fullyQualifiedMember": "Explore.API.Models.ConsumeAtprotoTransientRequest.ExpectedTenantId",
+    "category": "legitimate-target",
+    "reason": "The private AtprotoTransient scheme authenticates exact request bytes and claims durable replay before dispatch. ExpectedTenantId binds the recovered target, never ambient tenant authority; the handler checks an enabled tenant and P1 conditionally deletes only the exact row identity, purpose, digest and tenant. AtprotoTransientStoreControllerTests proves mismatches and concurrent losers reveal no payload.",
+    "owner": "API/Application ATProto Transient Authentication",
+    "removalTrigger": "Remove when the private transient capability is retired or its target moves to authenticated transport metadata; never replace this binding with a fabricated user or tenant-filter bypass."
+  },
+  {
+    "fullyQualifiedMember": "Explore.API.Models.CreateAtprotoTransientRequest.TenantId",
+    "category": "legitimate-target",
+    "reason": "The exact-body AtprotoTransient machine assertion authorizes an instance-owned protected-record creation target. The handler independently requires an enabled persisted tenant; it does not set ITenantContext or grant business authority. AtprotoTransientStoreControllerTests covers disabled and missing targets.",
+    "owner": "API/Application ATProto Transient Authentication",
+    "removalTrigger": "Remove when private transient creation is retired or its target moves to authenticated transport metadata; retain enabled-tenant validation and dedicated machine authentication."
+  },
+  {
+    "fullyQualifiedMember": "Explore.API.Models.ReadAtprotoTransientRequest.ExpectedTenantId",
+    "category": "legitimate-target",
+    "reason": "The dedicated exact-body machine assertion authenticates the expected lookup target. Only initial OAuth state recovery can omit it; handoff lookup requires an enabled tenant matching P1 row metadata. The handler never changes ambient tenant authority. AtprotoTransientStoreControllerTests exercises both purposes and cross-tenant rejection.",
+    "owner": "API/Application ATProto Transient Authentication",
+    "removalTrigger": "Remove when the private lookup capability is retired or its target moves to authenticated transport metadata; preserve the sole OAuth-state pre-tenant recovery exception."
+  },
+  {
     "fullyQualifiedMember": "Explore.Application.DTOs.CustomPropertyProjection.DrainDirtyScopesRequestDto.TenantId",
     "category": "legitimate-target",
     "reason": "CustomPropertyProjectionAdminController explicitly body-binds a tenant-wide drain target; CustomPropertyProjectionAuthorizationFacts uses that exact tenant and projection scope as the server-side authorization boundary before the handler validates both fields and drains only that tenant's dirty scopes.",

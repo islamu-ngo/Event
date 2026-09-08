@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-scoped channel/category preference override for the notification matrix.
-// ABOUTME: Supports user, group, organization, tenant, and instance scope resolution with locks.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

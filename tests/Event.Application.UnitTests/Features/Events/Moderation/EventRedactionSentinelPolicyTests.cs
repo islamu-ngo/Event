@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for heavy event redaction sentinel and field-class rules.
-// ABOUTME: Verifies future redaction handlers can satisfy EF text constraints without retaining unsafe content.
-
 using Explore.Application.Features.Events.Moderation;
 using TUnit.Core;
 

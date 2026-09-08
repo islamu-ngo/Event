@@ -1,6 +1,3 @@
-// ABOUTME: Command contract for updating instance-level tenant resolver configuration.
-// ABOUTME: Keeps resolver toggles and path-prefix settings isolated from general governance updates.
-
 using Explore.Application.DTOs.Instance;
 using Explore.Application.Responses;
 using MediatR;

@@ -1,6 +1,3 @@
-// ABOUTME: Bounded cleanup service for expired privacy-erasure receipt and provider locator credentials.
-// ABOUTME: Delegates only aggregate, dry-run-capable persistence operations and never claims provider work.
-
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

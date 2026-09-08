@@ -1,6 +1,3 @@
-// ABOUTME: Reports optional instance SMTP availability without evicting a healthy core application.
-// ABOUTME: Resolves explicit delivery intent before probing and publishes only bounded diagnostic codes.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Models;

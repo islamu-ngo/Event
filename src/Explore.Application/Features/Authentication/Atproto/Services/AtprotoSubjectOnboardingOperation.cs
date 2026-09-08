@@ -1,6 +1,3 @@
-// ABOUTME: Applies ATProto subject promotion, explicit same-kind consolidation, and tenant onboarding inside its caller's transaction.
-// ABOUTME: Enforces canonical-target authority and preserves immutable evidence while the handler owns retries and session persistence.
-
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Authentication;

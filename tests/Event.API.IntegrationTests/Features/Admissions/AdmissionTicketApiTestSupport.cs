@@ -1,6 +1,3 @@
-// ABOUTME: Shared route, HTTP, JSON, and HAL helpers for Phase 20 admission API RED tests.
-// ABOUTME: Keeps machine metadata discovery separate from live scenario behavior.
-
 using System.Reflection;
 using System.Text.Json;
 using System.Net.Http.Json;

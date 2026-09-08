@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for the reusable tag/category management popup component.
-// ABOUTME: Handles loading all tags/categories, tracking applied vs available, and firing save callbacks.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.Forms;
 using Explore.Blazor.Client.Services;

@@ -1,6 +1,3 @@
-// ABOUTME: Tests schema-versioned dock layout snapshot serialization used by localStorage persistence.
-// ABOUTME: Protects corrupt data handling and layout-key isolation before production UI hydration is wired.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Services.Docking;
 

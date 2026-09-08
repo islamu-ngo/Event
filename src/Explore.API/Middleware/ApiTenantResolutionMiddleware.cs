@@ -1,6 +1,3 @@
-// ABOUTME: Resolves tenant identity authoritatively inside the API host from trusted forwarded context.
-// ABOUTME: Uses slug and host hints to set the shared tenant accessor before application code touches tenant-scoped data.
-
 using Explore.API.Authentication;
 using Explore.API.Configuration;
 using Explore.Application.Constants;
@@ -166,7 +163,8 @@ public sealed class ApiTenantResolutionMiddleware
 
     private static bool IsTenantExemptPath(PathString path)
     {
-        return path.StartsWithSegments("/api/InstanceOnboarding", StringComparison.OrdinalIgnoreCase)
+        return AtprotoTransientAuthenticationDefaults.IsPrivatePath(path)
+            || path.StartsWithSegments("/api/InstanceOnboarding", StringComparison.OrdinalIgnoreCase)
             || path.StartsWithSegments("/api/System", StringComparison.OrdinalIgnoreCase)
             || path.StartsWithSegments("/api/admin/control-plane", StringComparison.OrdinalIgnoreCase)
             || path.StartsWithSegments("/api/managed-provider-provisioning", StringComparison.OrdinalIgnoreCase)

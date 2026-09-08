@@ -1,6 +1,3 @@
-// ABOUTME: Shared persistence mapping for the non-secret instance onboarding profile.
-// ABOUTME: Keeps completion and setup-time profile saves constrained to the same established system settings.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Onboarding;

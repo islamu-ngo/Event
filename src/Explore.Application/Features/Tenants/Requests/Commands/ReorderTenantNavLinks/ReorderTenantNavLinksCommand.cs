@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for reordering tenant navigation links.
-// ABOUTME: Carries the ordered list of nav link IDs.
 using System.Collections.Generic;
 using Explore.Application.DTOs.Tenant;
 using Explore.Application.Responses;

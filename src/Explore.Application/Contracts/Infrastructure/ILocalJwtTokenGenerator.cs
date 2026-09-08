@@ -1,6 +1,3 @@
-// ABOUTME: Application boundary and immutable subject contract for Local Identity JWT issuance.
-// ABOUTME: Keeps signing keys and cryptographic implementation details in Infrastructure.
-
 using System.Collections.ObjectModel;
 
 namespace Explore.Application.Contracts.Infrastructure;

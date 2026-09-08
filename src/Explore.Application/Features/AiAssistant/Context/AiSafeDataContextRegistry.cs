@@ -1,6 +1,3 @@
-// ABOUTME: Provides the canonical allow-list for AI schema-only data context summaries.
-// ABOUTME: Allows selected event reference metadata only and excludes private/full event content by default.
-
 namespace Explore.Application.Features.AiAssistant.Context;
 
 public sealed class AiSafeDataContextRegistry

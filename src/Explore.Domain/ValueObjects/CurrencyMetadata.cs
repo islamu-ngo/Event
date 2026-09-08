@@ -1,6 +1,3 @@
-// ABOUTME: Defines supported currencies and their integer minor-unit scales for Domain money values.
-// ABOUTME: Rejects unknown codes and identifies XXX as the free-only no-currency sentinel.
-
 namespace Explore.Domain.ValueObjects;
 
 public readonly record struct CurrencyMetadata(

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for Svix App Portal access generation.
-// ABOUTME: Verifies backend-only portal URL creation, app mapping, expiry bounds, and disabled-mode behavior.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Domain;

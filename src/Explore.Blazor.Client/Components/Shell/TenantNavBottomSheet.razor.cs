@@ -1,6 +1,3 @@
-// ABOUTME: Lifecycle and navigation behavior for the accessible tenant Links bottom sheet.
-// ABOUTME: Saves and restores focus, locks background scrolling, and dismisses after activation.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Microsoft.AspNetCore.Components;

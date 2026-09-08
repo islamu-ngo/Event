@@ -1,6 +1,3 @@
-// ABOUTME: DTO representing the current localization configuration for admin display.
-// ABOUTME: Combines governance settings (provider, languages, kill-switches) into a single view.
-
 namespace Explore.Application.DTOs.Localization;
 
 public sealed record LocalizationConfigDto

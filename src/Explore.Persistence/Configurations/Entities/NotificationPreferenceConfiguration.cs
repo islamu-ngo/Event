@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mappings for notification preference matrix lookup and scoped override rows.
-// ABOUTME: Enforces category/channel stability plus tenant-safe scope target constraints for resolver reads.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Microsoft.EntityFrameworkCore;

@@ -1,6 +1,3 @@
-// ABOUTME: S3-compatible object storage service that resolves config per-tenant via cascading settings.
-// ABOUTME: Supports attachment-bound presigned downloads and server-side file retrieval.
-
 using System;
 using System.Collections.Generic;
 using System.IO;

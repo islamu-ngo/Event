@@ -1,6 +1,3 @@
-// ABOUTME: Maps tenant-filtered refund campaign entities to bounded operational DTOs.
-// ABOUTME: Verifies event lineage before returning progress and counter facts.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.RegistrationOrders;

@@ -1,6 +1,3 @@
-// ABOUTME: Shared helpers for explicit audited custom-property purge command responses.
-// ABOUTME: Centralizes dependency summaries so shared/event/session purge handlers stay consistent.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.CustomPropertyDefinition;

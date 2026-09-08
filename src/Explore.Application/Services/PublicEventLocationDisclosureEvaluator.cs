@@ -1,6 +1,3 @@
-// ABOUTME: Supplies restrictive governance and public authority to the canonical EventLocation disclosure evaluator.
-// ABOUTME: Gives federation projections one memoizable boundary without any raw Location fallback.
-
 using Explore.Application.Contracts.LocationPrivacy;
 using Explore.Application.Contracts.Services;
 using Explore.Domain;

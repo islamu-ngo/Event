@@ -1,6 +1,3 @@
-// ABOUTME: Restores a submitted CarpaNet OAuth session and independently verifies it against the user's PDS.
-// ABOUTME: Persists only a verified DID/PDS-bound session through the encrypted repository-backed store.
-
 using System.Text.Json;
 using CarpaNet.OAuth.Storage;
 using Explore.Application.Contracts.Infrastructure;

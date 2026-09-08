@@ -1,6 +1,3 @@
-/* ABOUTME: Styles recursive condition clauses with tokenized semantic grouping. */
-/* ABOUTME: Keeps nested condition controls readable and RTL-safe at narrow widths. */
-
 .registration-form-condition {
     display: grid;
     gap: var(--isl-space-3);

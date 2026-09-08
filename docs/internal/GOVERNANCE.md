@@ -43,6 +43,7 @@ These rules are **non-negotiable**. Violations break architectural integrity.
 | 8 | GET = AllowAnonymous, Write = Authorize | Public discovery; protected writes |
 | 9 | UserId extraction fallback is `sub` -> `nameidentifier` -> `sid` | Provider compatibility; claim name variations |
 | 10 | Use file-scoped namespaces | C# 10+ convention; cleaner code |
+| 11 | Source code is self-documenting; legacy ABOUTME retired for code | Clean Architecture naming + XML doc summaries; see [policy below](#header--file-metadata-policy-natural-metadata--code-retirement) |
 
 **For detailed examples**: See `QUICK_REFERENCE.md` and relevant skills.
 
@@ -170,6 +171,26 @@ Explore.Persistence/
 ├── Services/
 └── ExploreDbContext.cs
 ```
+
+### Header & File Metadata Policy (Natural Metadata & Code Retirement)
+
+The repository previously mandated a two-line `ABOUTME:` comment summary on source files under the theoretical premise that agents would inspect the top two lines before loading full files. In practice, modern AI agent workflows discover code via **knowledge graphs** (`code-review-graph` MCP), **ripgrep**, and **Clean Architecture folder/naming conventions** rather than sequential file-peeking. The synthetic comment prefix generated substantial text-search pollution (18,000+ matches), comment rot, and tooling friction.
+
+#### 1. Retirement of ABOUTME for Source Code
+- **No Headers on Code**: The mandatory `ABOUTME:` convention is **retired** for all source code (`.cs`, `.razor`, `.css`, `.csproj`, shell scripts).
+- **Agent Instruction**: AI agents must **never** generate `ABOUTME:` comments in new or modified source code files.
+- **Legacy Files**: Existing legacy `ABOUTME:` lines in source code do not require immediate churn and may be cleaned up opportunistically.
+- **Standard Code Documentation**: Use idiomatic C# XML documentation comments (`/// <summary>`) for complex public APIs, domain invariants, or non-inferable architectural behavior.
+
+#### 2. Natural Documentation Metadata
+Documentation files rely on standard, human-readable metadata structures rather than synthetic comment tags:
+
+| Documentation Boundary | Format | Location | Purpose |
+|---|---|---|---|
+| **Public Documentation** (`docs/public/**`) | GitBook YAML frontmatter `description: "..."` | Top of file | Serves as page subtitle, search snippet, and SEO meta-description. Strictly exempt from AI comment tags. |
+| **Internal Engineering Docs** (`docs/internal/**`) | Markdown blockquote metadata block (`> **Audience:** ...`) | Immediately below title | States audience, status, owner, last-verified date, and source anchors. |
+| **Agent Skills** (`.agents/skills/**/SKILL.md`) | YAML frontmatter `description: "..."` | Top of file | Parsed dynamically by agent harnesses for just-in-time skill discovery. |
+| **Architectural Decision Records** (`docs/internal/adr/**`) | Standard ADR title & context metadata | Top of file | Records architectural context, options, and decisions. |
 
 ---
 

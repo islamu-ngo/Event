@@ -119,6 +119,11 @@ external inboxes. Disabled email can be Healthy; a reported SMTP outage degrades
 email without making otherwise healthy core readiness fail. Required database,
 security and authority failures still fail.
 
+{% hint style="success" %}
+**Up and running?**
+ISLAMU Event is 100% free, community-owned open-source software. If this platform brings value to your organization, consider [supporting its ongoing maintenance with a donation](https://donate.stripe.com/14A6oIesc0Oc2KYg35aR200) or learning about our [Sponsorship & Sustainability model](../contributing/sponsorship.md).
+{% endhint %}
+
 ---
 
 ## Related Guides & Next Steps

@@ -1,6 +1,3 @@
-/* ABOUTME: Quiet Studio attendee rows and outstanding-assignment notices. */
-/* ABOUTME: Uses the shared token scale and logical layout properties. */
-
 .studio-attendee-list,
 .studio-attendee-list__order,
 .studio-attendee-list__rows {

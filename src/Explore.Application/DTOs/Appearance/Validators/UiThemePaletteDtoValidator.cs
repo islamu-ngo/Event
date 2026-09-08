@@ -1,6 +1,3 @@
-// ABOUTME: Validates the bounded palette token set used by UI theme commands.
-// ABOUTME: Enforces hex colors for core tokens and allows rgba only where the current layout model already needs translucency.
-
 namespace Explore.Application.DTOs.Appearance.Validators;
 
 using FluentValidation;

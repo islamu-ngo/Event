@@ -1,6 +1,3 @@
-// ABOUTME: TestServer factory, explicit MediatR substitute, fixed clock, and log sink for admission API RED tests.
-// ABOUTME: Dispatches only the eight planned Phase 20 request contracts.
-
 using System.Collections.Concurrent;
 using System.Threading.RateLimiting;
 using Event.Api.IntegrationTests.Fixtures;

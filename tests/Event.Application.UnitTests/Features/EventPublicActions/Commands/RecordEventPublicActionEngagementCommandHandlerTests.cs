@@ -1,6 +1,3 @@
-// ABOUTME: Verifies public-action redirect engagement metrics stay bounded and identity-free.
-// ABOUTME: Ensures the command records one OpenTelemetry measurement with closed labels only.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Telemetry;
 using Explore.Domain.Enums;

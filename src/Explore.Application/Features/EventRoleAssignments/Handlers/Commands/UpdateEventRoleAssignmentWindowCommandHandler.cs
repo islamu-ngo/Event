@@ -1,6 +1,3 @@
-// ABOUTME: Handler for updating event-role validity windows.
-// ABOUTME: Reuses authority ceiling and domain lifecycle validation.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventRoleAssignments.Requests.Commands;

@@ -1,6 +1,3 @@
-// ABOUTME: Handles admin static bundle export requests from merged offline bundle storage.
-// ABOUTME: Uses the static bundle reader so exports never call Tolgee or Weblate.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Localization.Requests.Queries;
 using Explore.Application.Telemetry;

@@ -1,6 +1,3 @@
-// ABOUTME: Exposes the instance-admin platform monetization settings document through protected GET and PUT routes.
-// ABOUTME: Delegates authorization, validation, revisions, and conflict mapping to the Application and exception layers.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Extensions;

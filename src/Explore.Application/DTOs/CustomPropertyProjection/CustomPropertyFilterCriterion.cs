@@ -1,6 +1,3 @@
-// ABOUTME: Structured filter criterion for custom property projection-backed discovery queries.
-// ABOUTME: Maps API request parameters to EventCustomPropertyProjectionFilter specification objects.
-
 namespace Explore.Application.DTOs.CustomPropertyProjection;
 
 public sealed record CustomPropertyFilterCriterion

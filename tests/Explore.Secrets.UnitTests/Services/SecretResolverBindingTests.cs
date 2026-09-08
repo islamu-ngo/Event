@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests exact binding resolution and registry-owned instance defaults.
-// ABOUTME: Proves qualified tenant bindings dispatch through one declared source without fallback.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Secrets;

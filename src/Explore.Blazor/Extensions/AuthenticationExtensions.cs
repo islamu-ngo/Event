@@ -1,6 +1,3 @@
-// ABOUTME: Configures Cookie authentication and registers the DynamicAuthSchemeManager for the BFF.
-// ABOUTME: No longer hardcodes Keycloak — OIDC schemes are registered dynamically from DB/env at startup.
-
 using Event.Web.BffHosting.Authentication;
 using Explore.Blazor.Authentication;
 using Explore.Blazor.Services;

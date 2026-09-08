@@ -1,6 +1,3 @@
-// ABOUTME: Unit-style API tests for the storage readiness health check.
-// ABOUTME: Verifies selected-provider health is reported safely for local and S3-compatible modes.
-
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.HealthChecks;
 using Explore.Application.Contracts.Infrastructure;

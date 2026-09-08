@@ -1,6 +1,3 @@
-// ABOUTME: API integration tests for moderation reporting routing-state endpoints.
-// ABOUTME: Verifies authenticated access, authorization denial, HAL links, and secret redaction.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;

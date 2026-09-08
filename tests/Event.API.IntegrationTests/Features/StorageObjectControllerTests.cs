@@ -1,6 +1,3 @@
-// ABOUTME: Runtime API integration tests for storage object and upload-session routes.
-// ABOUTME: Verifies storage endpoint auth, route constraints, and basic HTTP contracts.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;

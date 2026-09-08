@@ -1,6 +1,3 @@
-// ABOUTME: Architecture checks for Phase 9 provider-neutral persisted registration-provider foundation.
-// ABOUTME: Proves credential-reference-only modeling, lookup parity, Domain purity, and migration discipline.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;

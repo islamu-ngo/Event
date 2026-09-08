@@ -1,6 +1,3 @@
-// ABOUTME: Canonical authorization lifecycle phase constants shared by commands and HATEOAS links.
-// ABOUTME: Keeps pre-create resource checks consistent before aggregate rows exist.
-
 namespace Explore.Application.Authorization;
 
 /// <summary>

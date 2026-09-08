@@ -1,5 +1,3 @@
-// ABOUTME: Adds public-calendar discovery and authoritative cancellation affordances to private guest status.
-// ABOUTME: Rechecks core eligibility after calendar awaits without propagating guest authority into public queries.
 
 using System.Security.Claims;
 using Explore.API.Hateoas.Policies;

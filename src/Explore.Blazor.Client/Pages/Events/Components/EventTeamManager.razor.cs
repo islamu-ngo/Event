@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for EventTeamManager component — loads team data, gates affordances via HAL links.
-// ABOUTME: Exposes search, filter, and role assignment/revoke operations for event team management.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Contracts.Services.Events;

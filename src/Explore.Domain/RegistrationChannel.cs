@@ -1,6 +1,3 @@
-// ABOUTME: Defines one tenant-bound collection channel owned by a registration requirement.
-// ABOUTME: Represents native collection without a provider binding and external collection with one binding.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

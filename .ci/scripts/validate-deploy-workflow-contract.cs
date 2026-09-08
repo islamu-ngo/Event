@@ -1,5 +1,3 @@
-// ABOUTME: Validates deploy workflow callers keep the shared Coolify action evidence contract intact.
-// ABOUTME: Guards production/staging deployment inputs before workflow changes can merge.
 #:property RestorePackagesWithLockFile=false
 
 var failures = new List<string>();

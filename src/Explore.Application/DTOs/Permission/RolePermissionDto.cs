@@ -1,6 +1,3 @@
-// ABOUTME: DTO representing a permission assigned to a role.
-// ABOUTME: Used by GetRolePermissions query to show role's granted permissions.
-
 namespace Explore.Application.DTOs.Permission;
 
 public sealed record RolePermissionDto

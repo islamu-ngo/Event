@@ -1,6 +1,3 @@
-// ABOUTME: Stable lookup rows for webhook provider binding verification states.
-// ABOUTME: Provides relational governance metadata for binding eligibility decisions.
-
 namespace Explore.Domain;
 
 public sealed class WebhookProviderBindingVerificationStateLookup

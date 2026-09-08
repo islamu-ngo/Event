@@ -1,6 +1,3 @@
-// ABOUTME: Contract tests proving webhook management and telemetry surfaces omit sensitive or high-cardinality data.
-// ABOUTME: Guards response bodies, full destinations, capability flags, tenant labels, and invalid provider target types.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Telemetry;

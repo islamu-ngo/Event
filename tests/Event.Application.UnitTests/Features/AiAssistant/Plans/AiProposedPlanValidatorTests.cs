@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for AI multi-step proposed plan preview validation.
-// ABOUTME: Proves plans stay proposal-only and fail closed on stale, unauthorized, unsupported, or duplicate steps.
-
 using Explore.Application.Features.AiAssistant.Plans;
 using Explore.Application.Features.AiAssistant.Tools;
 using Explore.Domain.Ai;

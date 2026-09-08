@@ -1,6 +1,3 @@
-// ABOUTME: Exercises local event-remedy submissions through the real authenticated HTTP pipeline.
-// ABOUTME: Proves each route selects its server-owned channel before CQRS dispatch.
-
 namespace Event.Api.IntegrationTests.Features;
 
 using System.Net;

@@ -1,6 +1,3 @@
-// ABOUTME: HTTP client for acquiring real JWT tokens from a containerized Keycloak instance.
-// ABOUTME: Uses Resource Owner Password Credentials (ROPC) grant for programmatic test token acquisition.
-
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 

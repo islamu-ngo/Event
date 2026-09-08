@@ -1,6 +1,3 @@
-// ABOUTME: Domain tests for tenant/provider storage quota accounting.
-// ABOUTME: Covers reservation, finalization, recalculation, and quota rejection behavior.
-
 namespace Event.Domain.UnitTests.Entities;
 
 using Explore.Domain;

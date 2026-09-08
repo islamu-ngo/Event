@@ -1,6 +1,3 @@
-// ABOUTME: Typed result for single-authority secret resolution without ambiguous null failures.
-// ABOUTME: Separates resolved, unconfigured, unavailable, unauthorized, and invalid outcomes.
-
 namespace Explore.Application.Contracts.Secrets;
 
 using Explore.Domain.Enums;

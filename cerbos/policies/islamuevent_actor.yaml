@@ -1,4 +1,3 @@
-# ABOUTME: Cerbos resource policy for actor resources.
 # Actors are system-managed (created via user/org registration). Read-only for most users.
 
 apiVersion: api.cerbos.dev/v1

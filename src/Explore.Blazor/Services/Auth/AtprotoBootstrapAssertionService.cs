@@ -1,6 +1,3 @@
-// ABOUTME: Issues short-lived ES256 assertions for server-private ATProto bootstrap and session operations.
-// ABOUTME: Uses purpose-separated trust domains and binds tenant, identity, method, route, and single-use jti.
-
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
 

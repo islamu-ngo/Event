@@ -1,6 +1,3 @@
-// ABOUTME: Red contract for value-free local rotation acknowledgements and replica convergence.
-// ABOUTME: Prevents one process or an unverified candidate from being reported as deployment success.
-
 using System.Reflection;
 using Explore.Secrets.Configuration;
 using Explore.Secrets.Services;

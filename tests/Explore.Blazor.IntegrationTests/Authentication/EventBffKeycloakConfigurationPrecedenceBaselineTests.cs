@@ -1,6 +1,3 @@
-// ABOUTME: Characterizes reusable BFF Keycloak configuration precedence through registered handler options.
-// ABOUTME: Locks section, public fallback, environment, and private-host fail-closed behavior before migration.
-
 using Event.Web.BffHosting.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;

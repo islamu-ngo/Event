@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for TenantFooterLinkGroup.
-// ABOUTME: TenantId is nullable — null means instance-default group visible when tenant has no own groups.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

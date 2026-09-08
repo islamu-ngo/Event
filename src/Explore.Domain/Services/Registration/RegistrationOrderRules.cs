@@ -1,6 +1,3 @@
-// ABOUTME: Centralizes exhaustive legal transitions for the pre-payment registration-order state machine.
-// ABOUTME: Keeps rejected, confirmed, expired, and cancelled orders terminal before persistence executes transitions.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Domain.Services.Registration;

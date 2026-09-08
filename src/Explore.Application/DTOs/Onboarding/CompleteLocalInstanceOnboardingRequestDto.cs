@@ -1,5 +1,3 @@
-// ABOUTME: Carries setup-only Local administrator enrollment and existing nonsecret instance settings.
-// ABOUTME: Keeps temporary credentials transient and suppresses diagnostic value formatting.
 
 using System.Text.Json.Serialization;
 

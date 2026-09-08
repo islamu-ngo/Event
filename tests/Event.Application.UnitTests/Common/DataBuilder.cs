@@ -1,6 +1,3 @@
-// ABOUTME: Central Bogus test-data factory for application unit test domain entities.
-// ABOUTME: Keeps builders reusable while preserving explicit defaults for authorization models.
-
 using Bogus;
 using Explore.Domain;
 using Explore.Domain.Enums;

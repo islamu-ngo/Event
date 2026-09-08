@@ -1,6 +1,3 @@
-// ABOUTME: UI-facing webhook management snapshot and result models.
-// ABOUTME: Preserves generated HAL resources while centralizing link-rel checks and command outcomes.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.Webhooks;

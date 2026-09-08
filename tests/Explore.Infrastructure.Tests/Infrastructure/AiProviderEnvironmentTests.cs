@@ -1,6 +1,3 @@
-// ABOUTME: Verifies FakeAI registration and validation are limited to safe host environments.
-// ABOUTME: Prevents deterministic test providers from being available in production-like deployments.
-
 using Explore.Infrastructure.Ai;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

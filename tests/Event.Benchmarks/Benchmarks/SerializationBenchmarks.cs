@@ -1,6 +1,3 @@
-// ABOUTME: JSON serialization benchmark suite for high-traffic Event DTO payloads.
-// ABOUTME: Compares source-generated System.Text.Json metadata against reflection-based serialization.
-
 using System.Text.Json;
 
 using BenchmarkDotNet.Attributes;

@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos policy tests for support-access session management.
-# ABOUTME: Verifies instance-admin management and tenant-admin audit visibility boundaries.
-
 name: SupportAccessSessionPolicyTests
 description: "Validates support-access session lifecycle and audit authorization"
 

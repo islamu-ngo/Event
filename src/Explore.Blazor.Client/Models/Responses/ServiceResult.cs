@@ -1,6 +1,3 @@
-// ABOUTME: Generic result wrapper for service method returns, distinguishing success from error.
-// ABOUTME: Enables callers to handle "no data" vs "error" and show appropriate UI states.
-
 namespace Explore.Blazor.Client.Models.Responses;
 
 /// <summary>

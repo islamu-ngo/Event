@@ -1,5 +1,3 @@
-// ABOUTME: Executes HAL-gated SMTP delivery actions through the native generated clients.
-// ABOUTME: Requires current typed confirmation authority and never retries destructive delivery updates.
 
 using Explore.Blazor.Client.Clients;
 

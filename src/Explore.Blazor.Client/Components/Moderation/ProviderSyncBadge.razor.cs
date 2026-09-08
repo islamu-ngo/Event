@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for provider sync state badge rendering.
-// ABOUTME: Maps safe sync-state codes to bounded reviewer-facing visual states.
-
 using Microsoft.AspNetCore.Components;
 using MudBlazor;
 

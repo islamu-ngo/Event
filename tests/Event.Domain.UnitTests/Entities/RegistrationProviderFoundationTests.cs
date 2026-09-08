@@ -1,6 +1,3 @@
-// ABOUTME: Covers Phase 9 provider-neutral domain guards for credentials, channel shape, and immutable mappings.
-// ABOUTME: Keeps provider configuration tests in Domain with no adapter or persistence dependency.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;

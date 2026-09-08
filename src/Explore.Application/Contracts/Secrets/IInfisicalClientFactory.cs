@@ -1,6 +1,3 @@
-// ABOUTME: Factory abstraction so the Infisical SDK client lifetime is owned by Infrastructure
-// ABOUTME: while Application code remains library-agnostic, swappable, and unit-testable.
-
 namespace Explore.Application.Contracts.Secrets;
 
 /// <summary>

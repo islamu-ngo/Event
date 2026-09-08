@@ -1,5 +1,3 @@
-// ABOUTME: Maps one canonical or tenant-contextual public Actor profile.
-// ABOUTME: Applies safe participation overrides and request-local HAL discoverability.
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

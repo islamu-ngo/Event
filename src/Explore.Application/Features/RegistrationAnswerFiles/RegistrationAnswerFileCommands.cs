@@ -1,6 +1,3 @@
-// ABOUTME: Defines the authorized command that releases one quarantined registration answer file.
-// ABOUTME: Preserves the immutable release audit and validates operator identity before persistence.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Responses;

@@ -1,6 +1,3 @@
-// ABOUTME: Proves refund reservations cannot exceed captured money or bypass open disputes.
-// ABOUTME: Covers deterministic allocation, immutable provider authority, and monotonic refund truth.
-
 using Explore.Domain.Enums;
 
 namespace Event.Domain.UnitTests.Entities;

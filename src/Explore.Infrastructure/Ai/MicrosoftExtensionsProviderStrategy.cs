@@ -1,6 +1,3 @@
-// ABOUTME: Strategy for SDK-backed Azure OpenAI providers via MEAI IChatClient.
-// ABOUTME: Delegates to MicrosoftExtensionsAiChatProvider for Azure-specific SDK dispatch.
-
 using Explore.Application.Contracts.Infrastructure.Ai;
 
 namespace Explore.Infrastructure.Ai;

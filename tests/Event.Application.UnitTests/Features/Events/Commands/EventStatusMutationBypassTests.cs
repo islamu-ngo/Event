@@ -1,6 +1,3 @@
-// ABOUTME: Regression tests preventing generic event update status mutation from bypassing lifecycle policy.
-// ABOUTME: Ensures status changes remain isolated to explicit lifecycle commands such as publish, archive, and cancel.
-
 using Explore.Application.DTOs.Event;
 using Explore.Application.Features.Events.Requests.Commands;
 using TUnit.Assertions;

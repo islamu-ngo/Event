@@ -1,6 +1,3 @@
-// ABOUTME: Architecture guard for the retired broad tenant settings write contract.
-// ABOUTME: Keeps post-onboarding changes on exact-key, category, or dedicated action APIs.
-
 namespace Event.Architecture.Tests;
 
 public sealed class TenantSettingsBroadWriteAbsenceTests

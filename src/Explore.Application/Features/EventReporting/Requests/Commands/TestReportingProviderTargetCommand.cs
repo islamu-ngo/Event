@@ -1,6 +1,3 @@
-// ABOUTME: Command contract for tenant moderation reporting provider configuration tests.
-// ABOUTME: Authorizes provider test actions as tenant-setting updates without exposing secrets.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;

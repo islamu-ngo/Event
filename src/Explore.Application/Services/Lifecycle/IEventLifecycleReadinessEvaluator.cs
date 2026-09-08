@@ -1,5 +1,3 @@
-// ABOUTME: Application contract for evaluating event lifecycle readiness against a validation profile.
-// ABOUTME: Replaces the static EventPublishReadinessEvaluator with a policy-aware, injectable service.
 using Explore.Domain;
 
 namespace Explore.Application.Services.Lifecycle;

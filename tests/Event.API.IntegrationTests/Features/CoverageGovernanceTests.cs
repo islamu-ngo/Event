@@ -1,6 +1,3 @@
-// ABOUTME: Coverage governance — verifies that all security-critical endpoint categories
-// ABOUTME: are covered by the test suite and no regressions in auth enforcement can slip through.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Security;

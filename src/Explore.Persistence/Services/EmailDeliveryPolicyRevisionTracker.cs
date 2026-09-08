@@ -1,5 +1,3 @@
-// ABOUTME: Commits one delivery-policy revision per transaction and scope with SMTP setting mutations.
-// ABOUTME: Reuses existing processor and tenant controls while preserving operator pauses and rate state.
 
 using System.Runtime.CompilerServices;
 using Explore.Application.Models;

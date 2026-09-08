@@ -1,6 +1,3 @@
-// ABOUTME: Verifies startup-owned payment operations and activation status fail closed.
-// ABOUTME: Confirms checkout governance no longer owns general instance legal-identity fields.
-
 using Explore.Application.Contracts.Services;
 using TUnit.Assertions;
 using TUnit.Core;

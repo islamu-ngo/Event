@@ -1,6 +1,3 @@
-// ABOUTME: Centralized permission MasterCode constants following the {resource_kind}:{action} convention.
-// ABOUTME: Used by authorization checks and matches Permission.MasterCode values in the database.
-
 namespace Explore.Domain.Constants;
 
 /// <summary>

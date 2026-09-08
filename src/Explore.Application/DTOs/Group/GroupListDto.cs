@@ -1,6 +1,3 @@
-// ABOUTME: List DTO for Group collections and HAL item affordances.
-// ABOUTME: Includes ConcurrencyStamp for list-driven editors that issue route-authoritative PATCH updates.
-
 using System;
 
 namespace Explore.Application.DTOs.Group;

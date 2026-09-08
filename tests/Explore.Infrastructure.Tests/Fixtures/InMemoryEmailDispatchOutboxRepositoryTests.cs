@@ -1,6 +1,3 @@
-// ABOUTME: Locks the in-memory email outbox fake to reminder suppression and rescheduling behavior.
-// ABOUTME: Proves authority matching, pre-handoff fencing, and reminder schedule state transitions.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Domain;

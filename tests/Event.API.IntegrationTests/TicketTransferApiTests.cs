@@ -1,6 +1,3 @@
-// ABOUTME: Defines RED API, HAL, OpenAPI, capability, and privacy contracts for ticket transfer.
-// ABOUTME: Pins authorized lifecycle actions, generic failures, bounded output, and header-only bearer transport.
-
 using System.Net;
 using System.Reflection;
 using System.Text;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines the tenant, event, and purpose-owned registration workflow aggregate.
-// ABOUTME: Evaluates required child requirements with ALL semantics and deterministic tenant isolation.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Typed client boundary for account and capability-scoped registration order reads and lifecycle actions.
-// ABOUTME: Keeps generated API calls, guest headers, and active-actor order aggregation outside Razor components.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Models;
 

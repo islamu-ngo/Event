@@ -1,6 +1,3 @@
-// ABOUTME: Command for updating current-tenant moderation reporting provider routing settings.
-// ABOUTME: Carries tenant-setting authorization metadata so locked routing updates fail closed.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Responses;

@@ -1,6 +1,3 @@
-// ABOUTME: Reconciles an Unknown SMTP outcome through one durable delivered/not-delivered transaction.
-// ABOUTME: Rejects stale, redacted, or non-Unknown rows before updating every delivery ledger.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using Explore.Application.Features.EmailDispatch.Validators;

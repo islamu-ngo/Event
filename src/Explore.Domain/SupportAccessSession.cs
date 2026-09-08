@@ -1,6 +1,3 @@
-// ABOUTME: Persisted, actor-bound support-access session aggregate.
-// ABOUTME: Enforces time-boxed lifecycle transitions without mutating tenant roles or actor identity.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

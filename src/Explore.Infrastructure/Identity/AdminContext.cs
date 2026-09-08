@@ -1,6 +1,3 @@
-// ABOUTME: Database-first identity service resolving admin authority from database tables only.
-// ABOUTME: Caches per-user authority profiles in IMemoryCache with 5-minute sliding expiration.
-
 using System.Security.Claims;
 using Explore.Application.Authentication;
 using Explore.Application.Constants;

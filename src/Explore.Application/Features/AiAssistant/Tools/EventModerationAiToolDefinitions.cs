@@ -1,6 +1,3 @@
-// ABOUTME: Defines governed event-moderation AI tool contracts for MCP proposal workflows.
-// ABOUTME: Keeps light moderation, heavy moderation, and unmoderation schemas centralized and proposal-first.
-
 using Explore.Application.Authorization;
 using Explore.Application.Features.AiAssistant.Actions;
 using Explore.Application.Hateoas;

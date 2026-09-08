@@ -1,5 +1,3 @@
-// ABOUTME: Replaces the Application handler doubles with native SQLite authority, tokens, locks, and serializable writes.
-// ABOUTME: Retains all original handler cases and observes confirmation binding and real cache/audit effects after commit.
 
 using System.Data;
 using System.Data.Common;

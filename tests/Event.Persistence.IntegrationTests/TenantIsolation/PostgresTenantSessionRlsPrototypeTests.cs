@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL RLS prototype tests for tenant session variables on EF Core connection open.
-// ABOUTME: Proves forced RLS policies honor app.current_tenant_id across pooled EF Core/Npgsql connections.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Persistence;
@@ -247,7 +244,7 @@ public class PostgresTenantSessionRlsPrototypeTests(PostgreSqlContainerFixture f
 
     private PooledDbContextFactory<ExploreDbContext> CreateDbContextFactory()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString)
             .UseSnakeCaseNamingConvention()
             .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning))

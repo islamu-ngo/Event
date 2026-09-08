@@ -1,6 +1,3 @@
-// ABOUTME: JS interop functions for localization: document direction (RTL/LTR) and language attribute.
-// ABOUTME: Called from LanguageProvider.razor when the active language changes.
-
 window.localization = {
     setDirection: function (dir, lang) {
         document.documentElement.setAttribute('dir', dir);

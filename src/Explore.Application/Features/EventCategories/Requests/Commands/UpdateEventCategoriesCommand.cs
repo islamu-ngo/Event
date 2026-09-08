@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for route-ID event-category link updates.
-// ABOUTME: Carries expected concurrency and grouped relationship update payload.
 using System;
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventCategories;

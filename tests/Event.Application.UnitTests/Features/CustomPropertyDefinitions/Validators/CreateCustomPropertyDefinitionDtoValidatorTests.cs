@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the shared custom-property definition DTO validator.
-// ABOUTME: Confirms the first CQRS slice rejects invalid option/default payload shapes before governance checks run.
-
 using Explore.Application.DTOs.CustomPropertyDefinition;
 using Explore.Application.DTOs.CustomPropertyDefinition.Validators;
 using Explore.Domain.Enums;

@@ -1,6 +1,3 @@
-// ABOUTME: Fail-closed exact-Type dispatcher for planned Phase 20 admission API requests.
-// ABOUTME: Reads only the explicitly registered top-level machine properties.
-
 namespace Event.Api.IntegrationTests.Features;
 
 internal sealed class AdmissionScenarioDispatcher(

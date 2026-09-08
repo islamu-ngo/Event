@@ -1,6 +1,3 @@
-// ABOUTME: Verifies production admission check-in transport maps exact RFC7807 pressure responses.
-// ABOUTME: Keeps outage and saturation typed without retaining Retry-After or credential material.
-
 using System.Net;
 using System.Text;
 using System.Text.Json;

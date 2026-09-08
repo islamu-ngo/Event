@@ -1,5 +1,3 @@
-// ABOUTME: Maps closed SMTP writer outcomes to existing application failures and deferred setting notifications.
-// ABOUTME: Redacts transport values before audit publication while retaining bounded delivery and delegation booleans.
 
 using System.Collections.Immutable;
 using Explore.Application.Contracts.Infrastructure;

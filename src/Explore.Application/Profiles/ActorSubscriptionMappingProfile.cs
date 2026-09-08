@@ -1,6 +1,3 @@
-// ABOUTME: AutoMapper profile for actor subscription entities and response DTOs.
-// ABOUTME: Maps lookup and target actor labels without leaking EF navigation details.
-
 using AutoMapper;
 using Explore.Application.DTOs.ActorSubscription;
 using Explore.Domain;

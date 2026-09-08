@@ -20,8 +20,9 @@ ISLAMU Event powers ISLAMU’s Islamic events instance, but the software itself 
 [![Discussions][github-discussions-shield]][github-discussions-link]
 [![Discord][discord-shield]][discord-link]
 [![Documentation][docs-shield]][official-docs-link]
+[![Donate via Stripe][stripe-shield]][stripe-donation-link]
 
-[**ISLAMU Live Instance**][islamu-platform] · [**Official Docs (GitBook)**](https://islamu.gitbook.io/islamu-event) · [**5-Minute Quickstart**](https://islamu.gitbook.io/islamu-event/documentation/readme/getting-started/5-minute-quickstart) · [**Self-Hosting**](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting) · [**Roadmap**][roadmap-link] · [**Developer Guide**](#-documentation-for-developers--contributors)
+[**ISLAMU Live Instance**][islamu-platform] · [**Official Docs (GitBook)**](https://islamu.gitbook.io/islamu-event) · [**5-Minute Quickstart**](https://islamu.gitbook.io/islamu-event/documentation/readme/getting-started/5-minute-quickstart) · [**Self-Hosting**](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting) · [**Roadmap**][roadmap-link] · [**Developer Guide**](#-documentation-for-developers--contributors) · [**Sponsor**](#-sponsors)
 
 </div>
 
@@ -93,7 +94,7 @@ ISLAMU Event is architected for sovereign self-hosting across diverse hardware r
 | **[PaaS Deployment (Coolify)](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/coolify-cerbos-traefik)** | Self-hosted PaaS deployment behind Traefik with an external Cerbos PDP container. | 📖 **[Coolify with Cerbos & Traefik](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/coolify-cerbos-traefik)** |
 | **[Developer Orchestration](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/dotnet-aspire-and-cloud)** | Local development and cloud-native adaptation via .NET Aspire AppHost. | 📖 **[.NET Aspire & Cloud](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/dotnet-aspire-and-cloud)** |
 
-For hardware sizing benchmarks, real-world Hetzner CX22 performance metrics, and capacity planning, consult the **[Deployment Tiers & Sizing Guide](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/deployment-tiers)** and the master **[Environment Variables Reference](https://islamu.gitbook.io/islamu-event/documentation/readme/configuration-and-operations/environment-variables)**.
+For hardware sizing benchmarks, real-world Hetzner CPX32 reference metrics, and capacity planning, consult the **[Deployment Tiers & Sizing Guide](https://islamu.gitbook.io/islamu-event/documentation/readme/self-hosting/deployment-tiers)** and the master **[Environment Variables Reference](https://islamu.gitbook.io/islamu-event/documentation/readme/configuration-and-operations/environment-variables)**.
 
 ---
 
@@ -290,9 +291,43 @@ I am deeply grateful to all our amazing contributors.
 
 [![Contributors Image][contributors-image]][contributors-link]
 
-## 📊📈 Repo Stats
+## 💖 Sponsors
 
-![Repo Stats][repobeats-image]
+Support ISLAMU Event's ongoing development, infrastructure, and open-source mission by becoming a financial sponsor.
+
+### 🥇 Gold Sponsors
+
+*No active Gold sponsors yet.*
+
+[👉 Become a Gold Sponsor →][contact-email]
+
+### 🥈 Silver Sponsors
+
+*No active Silver sponsors yet.*
+
+[👉 Become a Silver Sponsor →][contact-email]
+
+### 🥉 Bronze Sponsors
+
+*No active Bronze sponsors yet.*
+
+[👉 Become a Bronze Sponsor →][contact-email]
+
+### ☕ Community Sponsors
+
+*No active Community sponsors yet.*
+
+[![Donate via Stripe][stripe-shield]][stripe-donation-link] &nbsp; [👉 Become a Community Sponsor →][stripe-donation-link]
+
+## 🤝 In-Kind Supporters
+
+Special thanks to the organizations providing free tooling, infrastructure, and licenses to support ISLAMU Event's open-source development:
+
+| Organization | Contribution & Usage |
+|:---:|---|
+| <a href="https://www.gitbook.com"><img src="https://api.iconify.design/simple-icons:gitbook.svg?color=%233884FF" width="48" height="48" alt="GitBook Logo" /><br />**GitBook**</a> | Generously provides their **Community Plan** to host and power our [Official Public Documentation](https://islamu.gitbook.io/islamu-event). |
+
+> If your organization would like to support ISLAMU Event with in-kind tooling, infrastructure, or software licenses, please reach out to us at [contact@openislamu.org][contact-email].
 
 ## ISLAMU Solutions
 
@@ -409,7 +444,8 @@ The AGPL-3.0-or-later license and any alternative license offered by ISLAMU appl
 [github-discussions-shield]: https://img.shields.io/github/discussions/islamu-ngo/Event?color=594ae2&logo=github&style=flat-square
 [discord-shield]: https://img.shields.io/discord/1357505436479131668?color=%237289da&label=Discord&logo=discord&logoColor=%237289da&style=flat-square
 [discord-link]: https://discord.gg/wrkY824Yv5
-[docs-shield]: https://img.shields.io/badge/Documentation-Official-594ae2?style=flat-square
+[docs-shield]: https://img.shields.io/badge/Docs-GitBook-3884FF?style=flat-square&logo=gitbook&logoColor=white
+[stripe-shield]: https://img.shields.io/badge/Donate-Stripe-635BFF?style=flat-square&logo=stripe&logoColor=white
 
 [repobeats-image]: https://repobeats.axiom.co/api/embed/a0f11a3d9b80342b5f5965127c2c45871c9d3397.svg
 [contributors-image]: https://contrib.rocks/image?repo=islamu-ngo/Event
@@ -432,6 +468,8 @@ The AGPL-3.0-or-later license and any alternative license offered by ISLAMU appl
 [smoke-signals-link]: https://smokesignal.events/
 [mangadex-link]: https://mangadex.org/
 [hi.events-link]: https://hi.events/
+[gitbook-link]: https://www.gitbook.com/
+[stripe-donation-link]: https://donate.stripe.com/14A6oIesc0Oc2KYg35aR200
 
 [ivsd-github-repo-link]: https://github.com/islamu-ngo/Islamic-Value-Sensitive-Design
 

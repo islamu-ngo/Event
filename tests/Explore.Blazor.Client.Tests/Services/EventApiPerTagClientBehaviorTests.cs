@@ -1,6 +1,3 @@
-// ABOUTME: Verifies operation-specific transport hooks on representative per-tag NSwag clients.
-// ABOUTME: Covers explicit idempotency context and one-time guest capability response capture.
-
 using System.Net;
 using System.Text;
 using Explore.Blazor.Client.Clients;

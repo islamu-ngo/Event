@@ -1,6 +1,3 @@
-// ABOUTME: Authenticates short-lived privacy-erasure receipts after account login removal.
-// ABOUTME: Exposes only the matching intent claim and returns indistinguishable failures.
-
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Explore.Application.Constants;

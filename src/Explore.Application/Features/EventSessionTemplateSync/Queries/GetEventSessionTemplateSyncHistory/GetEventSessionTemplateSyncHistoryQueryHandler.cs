@@ -1,6 +1,3 @@
-// ABOUTME: Reads event-session template sync history from AuditLog records and maps persisted JSON payloads into DTOs.
-// ABOUTME: Keeps the API history endpoint read-only while respecting repository boundaries and pagination rules.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionTemplateSync;

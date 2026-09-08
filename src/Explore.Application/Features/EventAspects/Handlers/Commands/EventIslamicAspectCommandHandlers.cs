@@ -1,6 +1,3 @@
-// ABOUTME: Handles explicit Event Islamic aspect creation and grouped partial updates.
-// ABOUTME: Keeps REST create/update semantics separate while preserving tenant-scoped cache convergence.
-
 using AutoMapper;
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Persistence;

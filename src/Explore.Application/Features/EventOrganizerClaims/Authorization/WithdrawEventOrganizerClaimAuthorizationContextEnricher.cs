@@ -1,6 +1,3 @@
-// ABOUTME: Resolves persisted organizer-claim ownership attributes for claim withdrawal authorization.
-// ABOUTME: Keeps claimant context lookup read-only so withdrawal mutation stays inside the handler.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Infrastructure;

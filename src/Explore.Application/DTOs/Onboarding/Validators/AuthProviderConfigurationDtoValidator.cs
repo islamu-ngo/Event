@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation validator for auth provider configuration during instance setup.
-// ABOUTME: Enforces at least one provider enabled and required credentials when a provider is toggled on.
-
 using FluentValidation;
 using Explore.Domain.Enums;
 

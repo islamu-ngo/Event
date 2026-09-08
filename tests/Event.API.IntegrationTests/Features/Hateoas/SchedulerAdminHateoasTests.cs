@@ -1,6 +1,3 @@
-// ABOUTME: Link-policy contract tests for scheduler administration HAL affordances.
-// ABOUTME: Protects the rule that scheduler controls appear only when the host and permissions both allow them.
-
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.Authorization;

@@ -1,6 +1,3 @@
-// ABOUTME: Records ticketing handler transaction boundaries for deterministic unit assertions.
-// ABOUTME: Runs delegates synchronously so tests can verify post-commit cache invalidation.
-
 using Explore.Application.Contracts.Persistence;
 
 namespace Event.Application.UnitTests.Features.EventTicketing;

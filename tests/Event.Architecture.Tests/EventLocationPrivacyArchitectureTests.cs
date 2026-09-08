@@ -1,6 +1,3 @@
-// ABOUTME: Architecture guardrails separating tenant membership removal from global privacy erasure.
-// ABOUTME: Prevents TenantUsers code from acquiring cross-tenant, Home, or global-account deletion authority.
-
 using Explore.Application.Features.TenantUsers.Handlers.Commands;
 
 namespace Event.Architecture.Tests;

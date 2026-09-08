@@ -1,6 +1,3 @@
-// ABOUTME: Supported target categories for event reports.
-// ABOUTME: Starts with event-level reports while preserving future target extensibility.
-
 namespace Explore.Domain.Enums;
 
 public enum EventReportTargetKind

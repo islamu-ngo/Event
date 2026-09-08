@@ -1,6 +1,3 @@
-// ABOUTME: Claims one bounded AT Protocol PDS outbox batch and executes fenced deliveries in parallel.
-// ABOUTME: Owns no timer; Quartz or another host invokes the same scheduler-neutral one-pass boundary.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.Federation.Atproto.Services;

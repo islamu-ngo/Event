@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for external authentication token records.
-// ABOUTME: Provides user-scoped queries to keep credential metadata self-service only.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

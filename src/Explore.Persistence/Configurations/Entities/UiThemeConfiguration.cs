@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for first-class UiTheme rows with explicit owned palette columns and optimistic concurrency.
-// ABOUTME: Supports both platform-owned themes and tenant-owned themes without storing theme catalogs in generic setting JSON.
-
 namespace Explore.Persistence.Configurations.Entities;
 
 using Explore.Domain;

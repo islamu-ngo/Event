@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for Docker tooling doctor checks.
-// ABOUTME: Proves checks use read-only version commands and fail hard when Compose is unavailable.
-
 using Explore.Diagnostic.Doctor;
 using Explore.Diagnostic.Doctor.Checks;
 using Explore.Diagnostic.Doctor.Infrastructure;

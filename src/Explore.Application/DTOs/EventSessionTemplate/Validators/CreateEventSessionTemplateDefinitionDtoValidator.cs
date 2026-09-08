@@ -1,6 +1,3 @@
-// ABOUTME: Validates session template property definition payload shape with PropertyType-dependent rules.
-// ABOUTME: Mirrors CreateEventTemplateDefinitionDtoValidator pattern for session templates.
-
 using Explore.Domain.Enums;
 using FluentValidation;
 

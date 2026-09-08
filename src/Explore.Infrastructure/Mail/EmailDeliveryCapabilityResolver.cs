@@ -1,5 +1,3 @@
-// ABOUTME: Resolves explicit email intent and coherent SMTP ownership through existing settings and secret authorities.
-// ABOUTME: Disabled delivery never resolves secrets; tenant transports never inherit instance credentials.
 
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

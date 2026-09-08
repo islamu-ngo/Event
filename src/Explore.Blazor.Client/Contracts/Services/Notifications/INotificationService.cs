@@ -1,6 +1,3 @@
-// ABOUTME: Contract for notification operations consumed by Blazor UI components.
-// ABOUTME: Wraps NSwag-generated notification client methods with a clean async API.
-
 using Explore.Blazor.Client.Models;
 
 namespace Explore.Blazor.Client.Contracts.Services.Notifications;

@@ -1,6 +1,3 @@
-// ABOUTME: Authorized query for recent tenant-scoped webhook bulk replay operations.
-// ABOUTME: Returns bounded normalized operation metadata for management polling and history.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Webhooks;
 using MediatR;

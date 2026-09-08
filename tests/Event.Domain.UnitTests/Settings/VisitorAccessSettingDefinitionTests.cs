@@ -1,5 +1,3 @@
-// ABOUTME: Verifies machine-consumed visitor and configurable-provider setting declarations.
-// ABOUTME: Guards conservative defaults, enum names, and instance-to-tenant ownership boundaries.
 
 using System.Text.Json;
 using Explore.Domain.Constants;

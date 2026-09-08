@@ -1,6 +1,3 @@
-// ABOUTME: Separately authorized query for one persisted-owner retained webhook payload.
-// ABOUTME: Keeps sensitive payload access independent from ordinary delivery-history reads.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

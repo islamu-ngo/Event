@@ -1,6 +1,3 @@
-// ABOUTME: Machine-readable error codes for invalid event participation identifiers and combinations.
-// ABOUTME: Enables callers to handle Domain validation failures without parsing exception messages.
-
 namespace Explore.Domain.Enums;
 
 public enum EventParticipationConfigurationErrorCode

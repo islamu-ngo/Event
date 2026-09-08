@@ -1,6 +1,3 @@
-// ABOUTME: Defines Phase 5 event sub-resource AI tool contracts for MCP proposal workflows.
-// ABOUTME: Keeps session, program, agenda, custom-property, registration, team, and template proposal schemas centralized.
-
 using Explore.Application.Authorization;
 using Explore.Application.Features.AiAssistant.Actions;
 using Explore.Domain.Ai;

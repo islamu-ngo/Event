@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS link policy for EmailDispatch operator status rows.
-// ABOUTME: Emits server-authored replay and park affordances from durable PostgreSQL state.
-
 using System.Security.Claims;
 using Explore.API.Hateoas;
 using Explore.Application.Authorization;

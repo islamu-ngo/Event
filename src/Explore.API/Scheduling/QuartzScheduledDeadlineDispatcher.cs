@@ -1,6 +1,3 @@
-// ABOUTME: Quartz implementation of the Application deadline port, attaching one-off triggers to stored jobs.
-// ABOUTME: Keeps scheduler rows pointer-only and treats every infrastructure fault as a reported failure.
-
 using Explore.Application.Contracts.Scheduling;
 using Quartz;
 

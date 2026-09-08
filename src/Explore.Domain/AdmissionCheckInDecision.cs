@@ -1,6 +1,3 @@
-// ABOUTME: Returns one immutable admission rule outcome with an optional fact and next projection.
-// ABOUTME: Keeps deterministic result codes separate from persistence and projection mutation.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Domain;

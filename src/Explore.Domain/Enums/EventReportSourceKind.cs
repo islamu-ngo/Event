@@ -1,6 +1,3 @@
-// ABOUTME: Source classifications for reports entering the event-reporting bounded context.
-// ABOUTME: Separates user reports from local rules and external provider sync.
-
 namespace Explore.Domain.Enums;
 
 public enum EventReportSourceKind

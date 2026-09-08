@@ -1,6 +1,3 @@
-// ABOUTME: Grouped request DTO for governed webhook consumer provider-mode transitions.
-// ABOUTME: Keeps mode, concurrency, pending-work, and uncertainty acknowledgement atomic.
-
 namespace Explore.Application.DTOs.Webhooks;
 
 public sealed record UpdateWebhookConsumerProviderModeRequestDto

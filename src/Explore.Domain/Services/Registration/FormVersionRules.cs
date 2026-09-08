@@ -1,6 +1,3 @@
-// ABOUTME: Pure validation rules for immutable registration-form versions and their field graph.
-// ABOUTME: Normalizes provider-neutral identities and BCP-47 tags without persistence or I/O.
-
 using System.Globalization;
 using Explore.Domain.Common.Localization;
 using Explore.Domain.Constants;

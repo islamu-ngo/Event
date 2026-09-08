@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the legacy policy sync facade over the package publisher.
-// ABOUTME: Ensures role mutation sync cannot bypass resolver-driven Admin API safety/redaction.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Infrastructure.Services;

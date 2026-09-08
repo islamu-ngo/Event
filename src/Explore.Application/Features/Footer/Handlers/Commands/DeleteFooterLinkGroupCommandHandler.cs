@@ -1,6 +1,3 @@
-// ABOUTME: Handles DeleteFooterLinkGroupCommand — removes a group and all its child links atomically.
-// ABOUTME: Validates group ownership before deletion.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;

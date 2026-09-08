@@ -1,6 +1,3 @@
-// ABOUTME: Registers the Blazor BFF Data Protection key ring with optional Redis persistence.
-// ABOUTME: Uses the native local key store when Redis is absent in lightweight deployments.
-
 using Microsoft.AspNetCore.DataProtection;
 using StackExchange.Redis;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Entity-first persistence contract for registration payment attempts and Checkout dispatch effects.
-// ABOUTME: Keeps active-claim dedupe and worker fencing behind Application without exposing provider I/O.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

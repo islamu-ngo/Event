@@ -1,6 +1,3 @@
-// ABOUTME: Static definition of a single secret-backed setting the platform knows about.
-// ABOUTME: The SecretDefinitionRegistry is the source-of-truth for allowed keys, scopes, sources, and Infisical defaults.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Domain.Secrets;

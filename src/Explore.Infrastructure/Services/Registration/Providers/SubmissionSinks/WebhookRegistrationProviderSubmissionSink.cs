@@ -1,6 +1,3 @@
-// ABOUTME: Generic outbound webhook registration submission sink using approved mapped fields only.
-// ABOUTME: Applies existing secret binding, endpoint safety, bounded payloads, and idempotency headers post-commit.
-
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;

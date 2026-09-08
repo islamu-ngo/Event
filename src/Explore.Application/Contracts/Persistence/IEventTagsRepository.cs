@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for event-tag link entities.
-// ABOUTME: Returns domain entities for handler-owned mapping and relationship validation.
-
 using System;
 using System.Collections.Generic;
 using System.Text;

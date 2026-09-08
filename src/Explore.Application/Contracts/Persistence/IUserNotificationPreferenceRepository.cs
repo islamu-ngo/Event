@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for per-user notification category preferences.
-// ABOUTME: Keeps unsubscribe and email dispatch checks entity-first without leaking EF queries upward.
-
 namespace Explore.Application.Contracts.Persistence;
 
 using Explore.Domain;

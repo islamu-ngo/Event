@@ -1,6 +1,3 @@
-// ABOUTME: Transport tests for one-time guest registration-order capability capture.
-// ABOUTME: Proves the generated client reads the response header without putting bearer data in request URLs or JSON.
-
 using System.Net;
 using System.Text;
 using Explore.Blazor.Client.Clients;

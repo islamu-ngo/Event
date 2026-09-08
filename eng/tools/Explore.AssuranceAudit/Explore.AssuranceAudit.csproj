@@ -1,5 +1,3 @@
-<!-- ABOUTME: Builds the repository-owned Roslyn audit for prohibited test assurance patterns. -->
-<!-- ABOUTME: Reuses the .NET SDK Roslyn assemblies without adding a package dependency. -->
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>

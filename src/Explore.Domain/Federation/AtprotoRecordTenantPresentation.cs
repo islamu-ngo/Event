@@ -1,6 +1,3 @@
-// ABOUTME: Associates a global canonical AT Protocol record with one tenant's governed presentation decision.
-// ABOUTME: Keeps tenant visibility isolated without duplicating inbound records or stream consumers.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain.Federation;

@@ -1,6 +1,3 @@
-# ABOUTME: Defines required owner review for privileged workflow, dependency, deployment, and release files.
-# ABOUTME: Keeps CI/CD, legal contribution, and operator-governance changes routed to platform maintainers.
-
 # GitHub Actions, issue templates, PR templates, CODEOWNERS, and Dependabot configuration.
 .github/** @amirakrari
 .ci/** @amirakrari

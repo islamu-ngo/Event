@@ -1,6 +1,3 @@
-// ABOUTME: Declares immutable snapshots, mutations, inputs, and outputs for publication-policy compilation.
-// ABOUTME: Uses nullable tenant identity as the explicit discriminator between tenant and system mutations.
-
 namespace Explore.Application.Settings;
 
 using System.Collections.Immutable;

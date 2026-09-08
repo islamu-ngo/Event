@@ -1,6 +1,3 @@
-// ABOUTME: Repository implementation for TenantSetting entity providing data access.
-// ABOUTME: Coordinates SMTP policy mutations and resolves exact-tenant overrides and normalized domain-host ownership.
-
 namespace Explore.Persistence.Repositories;
 
 using Explore.Application.Contracts.Persistence;

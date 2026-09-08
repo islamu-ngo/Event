@@ -1,6 +1,3 @@
-// ABOUTME: Specifies fail-fast startup binding for general instance operator identity.
-// ABOUTME: Proves public legal identity is validated independently from paid checkout governance.
-
 namespace Event.Application.UnitTests.Services.Registration;
 
 using Explore.Application;

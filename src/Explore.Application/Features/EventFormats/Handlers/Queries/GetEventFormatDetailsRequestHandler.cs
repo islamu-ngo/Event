@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning a single event format by ID.
-// ABOUTME: Maps EventFormat entity to EventFormatDto.
 using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;

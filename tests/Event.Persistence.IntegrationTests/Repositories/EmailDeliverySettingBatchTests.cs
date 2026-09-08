@@ -1,5 +1,3 @@
-// ABOUTME: Verifies SMTP batch atomicity and category boundaries against real relational settings.
-// ABOUTME: Uses database-backed administrator authority and observes notifications only after commit.
 
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.DTOs.Settings;

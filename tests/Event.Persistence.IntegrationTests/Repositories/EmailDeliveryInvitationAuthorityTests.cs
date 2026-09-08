@@ -1,5 +1,3 @@
-// ABOUTME: Verifies retired managed-administrator invitations fail closed through real SQLite eligibility and drainage.
-// ABOUTME: Preserves terminal audit/redaction policy across re-enable, stale recovery, and explicit replay.
 
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
@@ -184,7 +182,7 @@ public sealed class EmailDeliveryInvitationAuthorityTests
                 settings.MaxConcurrentDispatchesPerTenant = 1;
             });
             services.AddSingleton<EmailDispatchDrainService>();
-            await using var provider = services.BuildServiceProvider();
+            await using var provider = services.BuildIsolatedServiceProvider();
             var drain = provider.GetRequiredService<EmailDispatchDrainService>();
             var recovered = await drain.RecoverStaleProcessingAsync(CancellationToken.None);
             await Assert.That(recovered.RecoveredCount).IsEqualTo(initialStatus == EmailDispatchStatus.Processing ? 1 : 0);

@@ -1,6 +1,3 @@
-/* ABOUTME: Styles the read-only ticketing capability matrix with logical properties. */
-/* ABOUTME: Preserves visible status distinction without relying on color alone. */
-
 .ticketing-capabilities {
     max-inline-size: 72rem;
     margin-inline: auto;

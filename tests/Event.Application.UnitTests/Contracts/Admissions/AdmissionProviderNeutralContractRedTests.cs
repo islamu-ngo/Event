@@ -1,6 +1,3 @@
-// ABOUTME: Ratchets the explicit repository-native Task 20.2 issuance contract against provider leakage.
-// ABOUTME: Later revocation and recovery service contracts remain owned by Tasks 20.4 and 20.6.
-
 using ApplicationUnitTests.Contracts.Admissions.Support;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Services.Registration;

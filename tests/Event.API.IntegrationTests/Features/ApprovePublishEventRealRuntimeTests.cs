@@ -1,6 +1,3 @@
-// ABOUTME: Specifies the privileged event approval-publication endpoint through real HTTP and PostgreSQL.
-// ABOUTME: Keeps provider authorization claims in the shared parity lanes because this host uses an allow-all provider.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;

@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS link policies for actor detail and collection resources.
-// ABOUTME: Adds public navigation plus locally discoverable subscription affordances for organization and group actors.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Security.Claims;

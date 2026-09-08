@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for public event session detail query handler mapping behavior.
-// ABOUTME: Verifies public repository reads are mapped to nullable detail DTO responses.
-
 using AutoMapper;
 using Event.Application.UnitTests.Common;
 using Explore.Application.Contracts.Infrastructure;

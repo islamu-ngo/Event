@@ -1,6 +1,3 @@
-// ABOUTME: Lightweight list DTO for event series, used in paginated list views.
-// ABOUTME: Includes event count but not the full events collection.
-
 using System;
 
 namespace Explore.Application.DTOs.EventSeries;

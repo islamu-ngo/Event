@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for durable notification fanout processor coordination.
-// ABOUTME: Enforces one backpressure state row per processor code.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

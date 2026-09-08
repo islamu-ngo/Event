@@ -1,6 +1,3 @@
-// ABOUTME: Proves generated initials install semantic constraints on non-transactional DDL providers.
-// ABOUTME: Exercises fresh application and idempotent reapplication on MariaDB and MySQL.
-
 #nullable enable
 
 using System.Data.Common;
@@ -81,7 +78,7 @@ public sealed class SemanticValueNonTransactionalMigrationTests(
     private static ExploreDbContext CreateContext(
         PrimaryDatabaseConnectionOptions options)
     {
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>();
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(builder, options);
         return new ExploreDbContext(builder.Options);
     }

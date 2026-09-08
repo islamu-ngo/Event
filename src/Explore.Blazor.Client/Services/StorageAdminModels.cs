@@ -1,6 +1,3 @@
-// ABOUTME: Presentation helpers for generated instance and tenant storage API models.
-// ABOUTME: Supplies display labels, editing defaults, HAL affordance checks, and update request conversion.
-
 using Explore.Blazor.Client.Clients;
 using InstanceStorageRouteDto = Explore.Blazor.Client.Clients.Routes;
 using TenantStorageRouteDto = Explore.Blazor.Client.Clients.Routes2;

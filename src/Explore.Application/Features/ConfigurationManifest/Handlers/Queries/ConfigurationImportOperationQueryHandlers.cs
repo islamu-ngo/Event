@@ -1,6 +1,3 @@
-// ABOUTME: Serves target-qualified configuration import receipts and bounded history.
-// ABOUTME: Returns no protected bytes, configuration values, tokens, or cross-target evidence.
-
 namespace Explore.Application.Features.ConfigurationManifest.Handlers.Queries;
 
 using System.Collections.Immutable;

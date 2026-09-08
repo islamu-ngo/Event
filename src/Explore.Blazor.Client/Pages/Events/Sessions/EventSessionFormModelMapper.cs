@@ -1,6 +1,3 @@
-// ABOUTME: Page-local mapper for dedicated program item create/edit composers.
-// ABOUTME: Keeps session request normalization out of Razor components while preserving page-owned orchestration.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Helpers;
 

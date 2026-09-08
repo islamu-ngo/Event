@@ -1,6 +1,3 @@
-// ABOUTME: Shared constants for API communication defaults.
-// ABOUTME: Replaces hardcoded pageSize: 100 across 10 service call sites.
-
 namespace Explore.Blazor.Client.Constants;
 
 /// <summary>

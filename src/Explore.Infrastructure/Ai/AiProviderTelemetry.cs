@@ -1,6 +1,3 @@
-// ABOUTME: Emits redacted AI provider tracing metadata for platform-owned observability.
-// ABOUTME: Keeps prompts, responses, tool payloads, model IDs, endpoints, tenant IDs, and provider request IDs out of spans.
-
 using System.Diagnostics;
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Domain.Ai;

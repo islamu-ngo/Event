@@ -1,6 +1,3 @@
-// ABOUTME: Verifies refund metrics expose only bounded operational dimensions.
-// ABOUTME: Prevents money, tenant, order, payment, refund, and personal data from becoming labels.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Telemetry;
 using NSubstitute;

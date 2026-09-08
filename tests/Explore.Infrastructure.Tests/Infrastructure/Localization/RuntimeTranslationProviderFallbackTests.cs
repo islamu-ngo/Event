@@ -1,6 +1,3 @@
-// ABOUTME: Smoke tests for RuntimeTranslationProvider — force_offline_mode short-circuit + exception fallback.
-// ABOUTME: Verifies that a failing live provider never bubbles errors out of the runtime wrapper.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Secrets;

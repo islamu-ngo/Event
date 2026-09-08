@@ -1,6 +1,3 @@
-// ABOUTME: Focused tests for BFF auth provider readiness and scheme mapping behavior.
-// ABOUTME: Keeps provider-selection logic covered after extraction from auth endpoints.
-
 using System.Security.Cryptography;
 using System.Text.Json;
 using CarpaNet.OAuth.Storage;
@@ -14,16 +11,19 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Caching.Memory;
 using NSubstitute;
 
 namespace Explore.Blazor.IntegrationTests.Services;
 
-public sealed class BffProviderReadinessServiceTests
+public sealed class BffProviderReadinessServiceTests : IDisposable
 {
+    private readonly MemoryCache cache = new(new MemoryCacheOptions());
+    public void Dispose() => cache.Dispose();
     [Test]
     public async Task ResolveProviderScheme_WithKnownProvider_ReturnsAuthSchemeName()
     {
-        var service = CreateService();
+        using var service = CreateService();
 
         var scheme = service.ResolveProviderScheme("Google");
 
@@ -33,7 +33,7 @@ public sealed class BffProviderReadinessServiceTests
     [Test]
     public async Task MapSchemeToProviderQueryValue_WithKeycloak_ReturnsProviderValue()
     {
-        var service = CreateService();
+        using var service = CreateService();
 
         var provider = service.MapSchemeToProviderQueryValue(AuthSchemeNames.Keycloak);
 
@@ -44,7 +44,7 @@ public sealed class BffProviderReadinessServiceTests
     public async Task IsProviderReadyAsyncWithOmittedAtprotoFactoryFailsClosedWithoutOidcOptions()
     {
         var optionsMonitor = Substitute.For<IOptionsMonitor<OpenIdConnectOptions>>();
-        var service = CreateService(optionsMonitor: optionsMonitor);
+        using var service = CreateService(optionsMonitor: optionsMonitor);
 
         var ready = await service.IsProviderReadyAsync(AuthSchemeNames.Atproto, CancellationToken.None);
 
@@ -55,7 +55,7 @@ public sealed class BffProviderReadinessServiceTests
     }
 
     [Test]
-    public async Task IsProviderReadyAsyncWithConfiguredAtprotoFactoryReturnsReadyWithoutOidcDiscovery()
+    public async Task ConfiguredAtprotoFactoryDoesNotCertifyAnUnavailableOperationalStore()
     {
         var optionsMonitor = Substitute.For<IOptionsMonitor<OpenIdConnectOptions>>();
         var environment = Substitute.For<IWebHostEnvironment>();
@@ -77,14 +77,14 @@ public sealed class BffProviderReadinessServiceTests
             environment,
             availability,
             transportFactory);
-        var service = CreateService(optionsMonitor: optionsMonitor, atprotoFactory: factory);
+        using var service = CreateService(optionsMonitor: optionsMonitor, atprotoFactory: factory);
 
         var readiness = await service.GetProviderReadinessAsync(
             AuthSchemeNames.Atproto,
             CancellationToken.None);
 
-        await Assert.That(readiness.IsReady).IsTrue();
-        await Assert.That(readiness.FailureCode).IsNull();
+        await Assert.That(readiness.IsReady).IsFalse();
+        await Assert.That(readiness.FailureCode).IsEqualTo("state_store_unavailable");
         await Assert.That(service.HasMinimalProviderConfig(AuthSchemeNames.Atproto)).IsTrue();
         optionsMonitor.DidNotReceiveWithAnyArgs().Get(default!);
         transportFactory.DidNotReceiveWithAnyArgs().CreatePrimaryHandler(default!, default);
@@ -100,7 +100,7 @@ public sealed class BffProviderReadinessServiceTests
             ClientId = "not-a-google-client-id",
             ClientSecret = "present"
         });
-        var service = CreateService(optionsMonitor: optionsMonitor);
+        using var service = CreateService(optionsMonitor: optionsMonitor);
 
         var ready = await service.IsProviderReadyAsync(AuthSchemeNames.Google, CancellationToken.None);
 
@@ -116,7 +116,7 @@ public sealed class BffProviderReadinessServiceTests
             Authority = "https://idp.example.test/realms/islamu",
             ClientId = "islamu-event-blazor"
         });
-        var service = CreateService(optionsMonitor: optionsMonitor);
+        using var service = CreateService(optionsMonitor: optionsMonitor);
 
         var hasConfig = service.HasMinimalProviderConfig(AuthSchemeNames.Keycloak);
 
@@ -128,14 +128,14 @@ public sealed class BffProviderReadinessServiceTests
     {
         var schemeManager = Substitute.For<IDynamicAuthSchemeManager>();
         schemeManager.GetRegisteredProviderSchemesAsync().Returns([AuthSchemeNames.Atproto]);
-        var service = CreateService(schemeManager: schemeManager);
+        using var service = CreateService(schemeManager: schemeManager);
 
         var provider = await service.ResolvePreferredProviderForDirectLoginAsync(CancellationToken.None);
 
         await Assert.That(provider).IsNull();
     }
 
-    private static BffProviderReadinessService CreateService(
+    private BffProviderReadinessService CreateService(
         IDynamicAuthSchemeManager? schemeManager = null,
         IOptionsMonitor<OpenIdConnectOptions>? optionsMonitor = null,
         AtprotoOAuthClientFactory? atprotoFactory = null)
@@ -144,6 +144,11 @@ public sealed class BffProviderReadinessServiceTests
         optionsMonitor ??= Substitute.For<IOptionsMonitor<OpenIdConnectOptions>>();
         var environment = Substitute.For<IWebHostEnvironment>();
         environment.EnvironmentName.Returns(Environments.Production);
+        var clients = Substitute.For<IHttpClientFactory>();
+        clients.CreateClient(Arg.Any<string>()).Returns(_ => throw new HttpRequestException("Unavailable transport."));
+        var keys = new AtprotoClientKeyProvider(Options.Create(new AtprotoClientKeyOptions { OAuthClientPrivateJwks = CreatePrivateJwks() }));
+        var transientStore = new ApiBackedAtprotoTransientStore(clients,
+            new AtprotoTransientAssertionService(keys, TimeProvider.System), TimeProvider.System);
 
         return new BffProviderReadinessService(
             schemeManager,
@@ -151,6 +156,9 @@ public sealed class BffProviderReadinessServiceTests
             environment,
             NullLogger<BffProviderReadinessService>.Instance,
             new AtprotoAuthenticationMetrics(),
+            transientStore,
+            cache,
+            TimeProvider.System,
             atprotoFactory);
     }
 

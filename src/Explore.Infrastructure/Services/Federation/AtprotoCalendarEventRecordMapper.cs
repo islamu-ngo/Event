@@ -1,6 +1,3 @@
-// ABOUTME: Maps the canonical application event snapshot to the generated community calendar event record.
-// ABOUTME: Keeps native lexicon mapping typed while all remaining public values stay in the single description.
-
 using System.Collections.Immutable;
 using System.Globalization;
 using CommunityLexicon.Calendar;

@@ -1,6 +1,3 @@
-// ABOUTME: EF model and source parity tests for normalized webhook lookup tables.
-// ABOUTME: Verifies stable enum IDs/codes, runtime seeds, literal migration rows, relational FKs, and DTO metadata.
-
 using System.Text;
 using System.Text.RegularExpressions;
 using Explore.Application.DTOs.Webhooks;
@@ -148,7 +145,7 @@ public sealed class WebhookLookupParityTests
 
     private static ExploreDbContext CreateModelContext()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql("Host=localhost;Database=webhook_model;Username=unused;Password=unused")
             .UseSnakeCaseNamingConvention()
             .Options;

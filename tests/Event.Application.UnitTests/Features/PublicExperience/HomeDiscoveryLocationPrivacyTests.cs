@@ -1,6 +1,3 @@
-// ABOUTME: Application contract tests for location minimization in public home discovery projections.
-// ABOUTME: Proves generic DTO coordinates stay absent and internal mappings, addresses, and origin are not serialized.
-
 using System.Text.Json;
 using Explore.Application.DTOs.Location;
 using Explore.Application.DTOs.PublicExperience;

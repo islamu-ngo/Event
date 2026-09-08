@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for effective moderation reporting routing policy resolution.
-// ABOUTME: Verifies local-first reporting, instance baselines, and tenant provider lock semantics.
-
 namespace Explore.Infrastructure.Tests.Infrastructure.Moderation;
 
 using Explore.Application.Contracts.Infrastructure;

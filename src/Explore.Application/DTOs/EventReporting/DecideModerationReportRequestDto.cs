@@ -1,6 +1,3 @@
-// ABOUTME: API request body for recording a local moderation decision on a report case.
-// ABOUTME: Includes only safe decision metadata and duplicate grouping information.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.DTOs.EventReporting;

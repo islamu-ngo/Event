@@ -1,6 +1,3 @@
-// ABOUTME: History row DTO for prior event template sync executions reconstructed from AuditLog records.
-// ABOUTME: Exposes operator-facing provenance versions, applied/skipped keys, conflicts, actor, and timestamp.
-
 namespace Explore.Application.DTOs.EventTemplateSync;
 
 public sealed record EventTemplateSyncHistoryItemDto(

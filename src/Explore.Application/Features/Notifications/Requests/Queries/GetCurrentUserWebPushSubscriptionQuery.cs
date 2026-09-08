@@ -1,6 +1,3 @@
-// ABOUTME: Query request for the authenticated user's Web Push subscription on one browser device.
-// ABOUTME: Returns a safe status DTO without endpoint or browser key material.
-
 using Explore.Application.DTOs.Notification;
 using MediatR;
 

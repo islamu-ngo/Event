@@ -1,4 +1,3 @@
-// ABOUTME: EF Core configuration for GroupSetting entity with UUID v7 generation
 // and composite unique constraint on (GroupId, SettingKey).
 
 namespace Explore.Persistence.Configurations.Entities;

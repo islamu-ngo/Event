@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped styles for EventListPagination — responsive flexbox layout with BEM naming. */
-/* ABOUTME: Summary on left, pagination center, page size right. Stacks vertically on mobile. */
-
 .event-list-pagination {
     display: flex;
     align-items: center;

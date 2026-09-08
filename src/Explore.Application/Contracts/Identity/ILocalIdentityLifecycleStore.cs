@@ -1,5 +1,3 @@
-// ABOUTME: Defines transport-neutral, immutable Local lifecycle operation authority.
-// ABOUTME: Durable pointers and mirror receipts contain no token, password intent, or session authority.
 
 using Explore.Application.Contracts.Infrastructure;
 

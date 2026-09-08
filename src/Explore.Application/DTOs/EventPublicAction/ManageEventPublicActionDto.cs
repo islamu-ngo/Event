@@ -1,6 +1,3 @@
-// ABOUTME: Input contract for creating or replacing an event public action destination.
-// ABOUTME: Carries semantic action metadata while server code owns review health state.
-
 namespace Explore.Application.DTOs.EventPublicAction;
 
 public sealed record ManageEventPublicActionDto

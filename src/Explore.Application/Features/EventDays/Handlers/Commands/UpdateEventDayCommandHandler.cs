@@ -1,6 +1,3 @@
-// ABOUTME: Handler for grouped EventDay PATCH updates.
-// ABOUTME: Applies explicit groups, checks concurrency, and invalidates parent event caches.
-
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventDay;

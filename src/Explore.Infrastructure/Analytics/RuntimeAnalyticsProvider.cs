@@ -1,6 +1,3 @@
-// ABOUTME: Runtime analytics provider wrapper that resolves active provider from tenant settings at runtime.
-// ABOUTME: Uses short-lived cache and safe fallback to NullAnalyticsProvider on provider errors.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain.Enums;
 using Microsoft.Extensions.Caching.Memory;

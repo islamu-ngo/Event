@@ -1,6 +1,3 @@
-// ABOUTME: Abstract base fixture managing PostgreSQL container lifecycle, migrations, seeding, and Respawn reset.
-// ABOUTME: Subclassed by RealRuntimeApiFixture and StressApiFixture with profile-specific configuration.
-
 using System.Threading.Channels;
 using System.Security.Cryptography;
 using Explore.Persistence;

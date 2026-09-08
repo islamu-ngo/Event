@@ -1,6 +1,3 @@
-// ABOUTME: Handles authenticated-user Web Push subscription removal by subscription id.
-// ABOUTME: Deactivates only rows owned by the current tenant and user.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Notifications.Requests.Commands;

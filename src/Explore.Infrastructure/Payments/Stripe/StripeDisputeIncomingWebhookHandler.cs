@@ -1,6 +1,3 @@
-// ABOUTME: Projects verified normalized Stripe dispute evidence without performing provider I/O.
-// ABOUTME: Resolves the original account and payment before storing independent monotonic disputes.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Domain;

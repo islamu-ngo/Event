@@ -1,6 +1,3 @@
-// ABOUTME: Normalized lookup rows used by registration-form lifecycle and field governance.
-// ABOUTME: Provides stable integer identities for statuses, portable types, and organizer visibility.
-
 namespace Explore.Domain;
 
 public sealed class RegistrationFormStatus

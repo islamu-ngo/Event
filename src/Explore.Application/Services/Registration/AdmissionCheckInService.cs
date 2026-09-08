@@ -1,6 +1,3 @@
-// ABOUTME: Orchestrates online admission check-in and undo with one tenant-qualified digest lookup.
-// ABOUTME: Executes each scan independently and maps all authority or lineage failures to bounded door results.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;

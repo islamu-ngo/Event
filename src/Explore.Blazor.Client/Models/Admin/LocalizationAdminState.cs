@@ -1,6 +1,3 @@
-// ABOUTME: View-model for the InstanceLocalizationSection — binds to form fields, tracks dirty/loading state.
-// ABOUTME: Maps to/from NSwag-generated localization configuration and governance DTOs.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Localization;
 

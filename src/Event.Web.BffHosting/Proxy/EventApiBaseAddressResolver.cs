@@ -1,6 +1,3 @@
-// ABOUTME: Resolves the API base address for browser-BFF hosts from config and Aspire service discovery.
-// ABOUTME: Keeps API proxy resolution shared without depending on a specific host project.
-
 using Microsoft.Extensions.Configuration;
 
 namespace Event.Web.BffHosting.Proxy;

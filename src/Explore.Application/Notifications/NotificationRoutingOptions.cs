@@ -1,6 +1,3 @@
-// ABOUTME: Configuration model for notification ownership routing defaults.
-// ABOUTME: Validates account-authority and external-delegation rules before resolver decisions are used.
-
 namespace Explore.Application.Notifications;
 
 public sealed class NotificationRoutingOptions

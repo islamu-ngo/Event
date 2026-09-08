@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query for fetching all sessions in an event.
-// ABOUTME: Returns IEnumerable<EventSessionDto>.
 using System;
 using System.Collections.Generic;
 using Explore.Application.DTOs.EventSession;

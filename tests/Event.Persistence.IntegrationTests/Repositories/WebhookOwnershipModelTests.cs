@@ -1,6 +1,3 @@
-// ABOUTME: EF Core model tests for typed webhook ownership and instance/tenant scope isolation.
-// ABOUTME: Verifies typed owner FKs, computed configuration scopes, composite containment, and checks.
-
 using Explore.Domain;
 using Explore.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -128,7 +125,7 @@ public sealed class WebhookOwnershipModelTests
 
     private static ExploreDbContext CreateModelContext()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql("Host=localhost;Database=webhook_ownership_model;Username=unused;Password=unused")
             .UseSnakeCaseNamingConvention()
             .Options;

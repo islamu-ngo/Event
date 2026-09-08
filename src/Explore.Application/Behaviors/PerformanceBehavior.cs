@@ -1,6 +1,3 @@
-// ABOUTME: Logs bounded metadata for MediatR requests that exceed the slow-operation threshold.
-// ABOUTME: Keeps request payloads and generated record string representations out of logs.
-
 using System.Diagnostics;
 using MediatR;
 using Microsoft.Extensions.Logging;

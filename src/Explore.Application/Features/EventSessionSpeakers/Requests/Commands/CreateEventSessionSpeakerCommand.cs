@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for adding a speaker to an event session.
-// ABOUTME: Carries the CreateEventSessionSpeakerDto payload.
 using System;
 using System.Collections.Generic;
 using Explore.Application.Authorization;

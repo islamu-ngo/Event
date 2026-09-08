@@ -1,6 +1,3 @@
-// ABOUTME: Application port for versioned promotion-code lookup digest operations.
-// ABOUTME: Keeps plaintext promotion codes and HMAC key material behind infrastructure implementations.
-
 namespace Explore.Application.Contracts.Services.Registration;
 
 public interface IPromotionCodeDigestService

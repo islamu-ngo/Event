@@ -1,6 +1,3 @@
-// ABOUTME: Defines authorized organizer analytics reads over governed registration answers.
-// ABOUTME: Carries exact event, form, and version scope into MediatR authorization.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.RegistrationAnalytics;
 using MediatR;

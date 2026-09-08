@@ -1,6 +1,3 @@
-// ABOUTME: Generates the governed ConfigurationManifest JSON Schema from explicit Wire metadata.
-// ABOUTME: Emits culture-invariant ordered UTF-8 bytes with every typed object closed by construction.
-
 namespace ISLAMU.ConfigurationManifest.SchemaGenerator;
 
 using System.Text;

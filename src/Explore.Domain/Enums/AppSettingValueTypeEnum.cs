@@ -1,4 +1,3 @@
-// ABOUTME: Enum defining data type hints for AppSetting values after decryption.
 // Used for validation and UI rendering in the secret management system.
 
 namespace Explore.Domain.Enums;

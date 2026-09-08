@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for RotationAwareHttpClientFactory.
-// ABOUTME: Tests client creation, credential rotation, atomic swap, and graceful disposal.
-
 using Explore.Secrets.Configuration;
 using Explore.Secrets.Services;
 using Microsoft.Extensions.Logging;

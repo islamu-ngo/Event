@@ -1,6 +1,3 @@
-// ABOUTME: Exact registry guard for public update operations that intentionally remain outside grouped PATCH.
-// ABOUTME: Requires every action, replacement, transition, and content upload exception to retain a route-specific rationale.
-
 using System.Text.Json;
 
 namespace Event.Architecture.Tests;

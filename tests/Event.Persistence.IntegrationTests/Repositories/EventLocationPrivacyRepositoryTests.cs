@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL integration tests for EventLocation repositories, filters, audits, and concurrency.
-// ABOUTME: Uses the current EF model without migrations so the expand-migration wave remains independently owned.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
@@ -657,7 +654,7 @@ public sealed class EventLocationPrivacyRepositoryTests(ProjectionTestContainerF
 
     private ExploreDbContext CreateTenantlessContext()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString)
             .UseSnakeCaseNamingConvention()
             .Options;

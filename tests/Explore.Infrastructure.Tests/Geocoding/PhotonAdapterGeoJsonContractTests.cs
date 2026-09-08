@@ -1,6 +1,3 @@
-// ABOUTME: RED contracts for bounded untrusted Photon GeoJSON parsing and mapping.
-// ABOUTME: Proves coordinate order, finite bounds, partial-feature rejection, and result ceilings.
-
 using System.Net;
 
 namespace Explore.Infrastructure.Tests.Geocoding;

@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation validator for grouped Group PATCH updates.
-// ABOUTME: Manually instantiated in UpdateGroupCommandHandler rather than DI-injected.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.Group.Validators;

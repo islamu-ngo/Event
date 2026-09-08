@@ -1,6 +1,3 @@
-// ABOUTME: Tests the EventScheduleProjectionCalculator which converts UTC intervals to cached local projection fields.
-// ABOUTME: Covers timezone conversion, DST transitions, fallback logic, cross-midnight events, and minute-of-day calculations.
-
 namespace Event.Domain.UnitTests.Services.Scheduling;
 
 using Explore.Domain.Services.Scheduling;

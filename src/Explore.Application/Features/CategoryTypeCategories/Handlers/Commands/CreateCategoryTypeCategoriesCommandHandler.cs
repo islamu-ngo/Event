@@ -1,5 +1,3 @@
-// ABOUTME: Handler for creating category-to-category-type link records with validation.
-// ABOUTME: Validates input, creates the junction entity, persists via repository.
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Factory for default tenant branding typed settings documents.
-// ABOUTME: Centralizes schema/default metadata so provisioning and seeding create identical JSONB payloads.
-
 namespace Explore.Domain.Settings.Documents;
 
 using System.Text.Json;

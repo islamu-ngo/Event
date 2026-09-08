@@ -1,6 +1,3 @@
-// ABOUTME: Represents one validated finite latitude/longitude pair without spatial dependencies.
-// ABOUTME: Redacts exact values from diagnostic formatting because coordinates are location PII.
-
 namespace Explore.Domain.ValueObjects;
 
 public sealed record GeoCoordinate

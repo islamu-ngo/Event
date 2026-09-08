@@ -1,6 +1,3 @@
-// ABOUTME: Query request for an authenticated user's AI assistant conversation detail.
-// ABOUTME: Handlers must preserve tenant filters and user ownership before returning history.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Ai;
 using MediatR;

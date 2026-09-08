@@ -1,6 +1,3 @@
-// ABOUTME: Bit flags for the physical-location fields governed by one EventLocation disclosure policy.
-// ABOUTME: Provides a compact PII-free policy snapshot for evaluation and append-only audit evidence.
-
 namespace Explore.Domain.Enums;
 
 [Flags]

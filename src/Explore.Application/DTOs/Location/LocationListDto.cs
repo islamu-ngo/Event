@@ -1,6 +1,3 @@
-// ABOUTME: List read-model DTO for Location collection responses.
-// ABOUTME: Includes concurrency metadata so list-driven editors can issue PATCH If-Match updates.
-
 using System.Text.Json.Serialization;
 
 namespace Explore.Application.DTOs.Location;

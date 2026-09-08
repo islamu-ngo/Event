@@ -1,6 +1,3 @@
-// ABOUTME: Extension methods for selectively ignoring named query filters in EF Core 10+ queries.
-// ABOUTME: Requires explicit reasons for tenant or full-filter bypasses while preserving tenant-safe soft-delete access.
-
 namespace Explore.Persistence.QueryFilters;
 
 using Microsoft.EntityFrameworkCore;

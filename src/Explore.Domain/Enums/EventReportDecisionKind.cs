@@ -1,6 +1,3 @@
-// ABOUTME: Decision outcomes available to report reviewers.
-// ABOUTME: Keeps review results separate from existing moderation enforcement records.
-
 namespace Explore.Domain.Enums;
 
 public enum EventReportDecisionKind

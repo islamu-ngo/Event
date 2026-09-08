@@ -1,6 +1,3 @@
-// ABOUTME: Immutable evidence that one proven global Actor was consolidated into another canonical Actor.
-// ABOUTME: Records proof without treating names, handles, URLs, or profile similarity as merge authority.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Domain;

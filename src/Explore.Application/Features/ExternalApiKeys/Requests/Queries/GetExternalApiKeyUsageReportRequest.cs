@@ -1,6 +1,3 @@
-// ABOUTME: Query for instance-admin usage reporting across tenants.
-// ABOUTME: Returns aggregated request counts and credit usage per API key without secret material.
-
 using Explore.Application.DTOs.ExternalApiKey;
 using MediatR;
 

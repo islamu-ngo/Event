@@ -1,6 +1,3 @@
-// ABOUTME: Maps support-access Domain entities to API DTOs without exposing aggregate internals.
-// ABOUTME: Derives stable lookup names from canonical enums when navigation rows are not loaded.
-
 using Explore.Application.DTOs.SupportAccess;
 using Explore.Domain;
 using Explore.Domain.Enums;

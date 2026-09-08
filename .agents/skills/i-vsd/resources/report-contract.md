@@ -39,11 +39,11 @@ Every new or materially updated report includes this block after `Last Updated`:
 - Report status: draft | current | stale | superseded | closed
 - Disposition: advisory | ready-for-planning | plan-aligned | changes-required | escalation-required
 - Evidence cutoff: YYYY-MM-DD
-- Reviewed input revision: <sha256 digest, Git object, or none>
-- Supersedes: <report revision/path or none>
+- Reviewed input: <workstream name, Git object, or working-tree>
+- Supersedes: <report path or none>
 ```
 
-Use a Git object when all reviewed artifacts are committed. Otherwise use a SHA-256 digest of the exact reviewed inputs and name those inputs under `Evidence Reviewed`. A date alone is not a revision.
+For committed repository audits, reference the Git commit object. For active implementation workstreams, name the workstream and list reviewed artifacts under `Evidence Reviewed`.
 
 ## Finding Contract
 

@@ -1,6 +1,3 @@
-// ABOUTME: API controller for event series CRUD operations with HATEOAS support.
-// ABOUTME: GET endpoints are public, write endpoints require authorization.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

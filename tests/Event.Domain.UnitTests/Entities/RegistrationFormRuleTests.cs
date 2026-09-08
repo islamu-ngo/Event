@@ -1,6 +1,3 @@
-// ABOUTME: Specifies the bounded registration-form condition language and rule aggregate behavior.
-// ABOUTME: Covers all nine operators, typed values, reference ordering, immutability, and cloning.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;

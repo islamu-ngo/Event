@@ -1,6 +1,3 @@
-// ABOUTME: bUnit tests for AgendaMillerColumns verifying day selection, item filtering, and column rendering.
-// ABOUTME: Tests the 3-column cascade (Days → Items → Detail) in both view and manage modes.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Events;
 using Microsoft.Extensions.Logging;

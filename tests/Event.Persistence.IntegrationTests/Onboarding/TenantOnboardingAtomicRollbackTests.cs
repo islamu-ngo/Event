@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL failure-injection coverage for tenant onboarding's mandatory identity write.
-// ABOUTME: Proves policy, branding, onboarding, and identity persistence share one rollback boundary.
-
 using Explore.Domain;
 using Explore.Domain.Settings.Documents;
 using Explore.Domain.Settings.Documents.Payloads;
@@ -26,7 +23,7 @@ public sealed class TenantOnboardingAtomicRollbackTests
             .WithPassword("postgres")
             .Build();
         await database.StartAsync();
-        DbContextOptions<ExploreDbContext> seedOptions = new DbContextOptionsBuilder<ExploreDbContext>()
+        DbContextOptions<ExploreDbContext> seedOptions = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(database.GetConnectionString())
             .Options;
         await using (var schema = new NpgsqlConnection(database.GetConnectionString()))
@@ -60,7 +57,7 @@ public sealed class TenantOnboardingAtomicRollbackTests
 
         Guid tenantId = Guid.CreateVersion7();
 
-        DbContextOptions<ExploreDbContext> writeOptions = new DbContextOptionsBuilder<ExploreDbContext>()
+        DbContextOptions<ExploreDbContext> writeOptions = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(database.GetConnectionString())
             .AddInterceptors(new FailMandatoryIdentitySaveInterceptor())
             .Options;

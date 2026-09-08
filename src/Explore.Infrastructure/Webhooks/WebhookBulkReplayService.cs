@@ -1,6 +1,3 @@
-// ABOUTME: Executes durable webhook bulk replay operations in bounded fresh dependency scopes.
-// ABOUTME: Atomically re-evaluates Local eligibility, schedules targets, closes lifecycle state, and audits outcomes.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;

@@ -1,6 +1,3 @@
-// ABOUTME: Handler for retrieving a single EventDay by Id.
-// ABOUTME: Returns null when not found; the controller translates to 404.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventDay;

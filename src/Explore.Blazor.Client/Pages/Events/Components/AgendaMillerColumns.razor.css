@@ -1,6 +1,3 @@
-ABOUTME: Scoped CSS for AgendaMillerColumns with BEM methodology.
-ABOUTME: Three-column responsive layout with selection highlighting and smooth transitions.
-
 .agenda-miller {
     border: 1px solid var(--mud-palette-lines-default);
     border-radius: var(--isl-radius-md, 12px);

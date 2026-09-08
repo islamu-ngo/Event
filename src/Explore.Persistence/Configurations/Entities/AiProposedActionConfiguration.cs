@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for AI-proposed actions that require explicit confirmation before side effects.
-// ABOUTME: Stores validated JSON payloads and indexes pending actions for tenant/user workflows.
-
 using Explore.Domain.Ai;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

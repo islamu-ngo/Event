@@ -1,6 +1,3 @@
-// ABOUTME: Unit-style tests for the API-hosted EmailDispatch fallback processor cycle.
-// ABOUTME: Proves hosted-service triggering delegates to the shared drain boundary with configured worker settings.
-
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.BackgroundServices;
 using Explore.Application.Contracts.Services;

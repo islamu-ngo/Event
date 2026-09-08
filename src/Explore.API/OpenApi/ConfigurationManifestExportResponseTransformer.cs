@@ -1,6 +1,3 @@
-// ABOUTME: Shapes canonical instance and tenant configuration exports as binary OpenAPI downloads.
-// ABOUTME: Removes versioned JSON byte-array variants so NSwag generates typed file responses.
-
 namespace Explore.API.OpenApi;
 
 using Explore.API.Controllers;

@@ -1,6 +1,3 @@
-// ABOUTME: Holds SQLite process named locks until their caller-owned EF transaction completes.
-// ABOUTME: Releases tracked semaphores on commit, rollback, failure, or connection cleanup.
-
 using System.Collections.Concurrent;
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -18,6 +15,16 @@ internal sealed class SqliteNamedLockTransactionInterceptor
         _locks.TryGetValue(transaction, out TransactionLocks? locks)
         && locks.Contains(resource);
 
+    public void ReleaseCompletedTransactionsFor(DbConnection connection)
+    {
+        foreach (DbTransaction transaction in _locks.Where(candidate =>
+                     ReferenceEquals(candidate.Value.Connection, connection)
+                     && candidate.Key.Connection is null).Select(candidate => candidate.Key))
+        {
+            Release(transaction);
+        }
+    }
+
     public void Track(
         DbTransaction transaction,
         string resource,
@@ -25,7 +32,7 @@ internal sealed class SqliteNamedLockTransactionInterceptor
     {
         TransactionLocks locks = _locks.GetOrAdd(
             transaction,
-            static _ => new TransactionLocks());
+            static owner => new TransactionLocks(owner.Connection));
         if (!locks.TryAdd(resource, semaphore))
         {
             throw new InvalidOperationException(
@@ -72,28 +79,34 @@ internal sealed class SqliteNamedLockTransactionInterceptor
         return Task.CompletedTask;
     }
 
-    public InterceptionResult ConnectionClosing(
+    public void ConnectionClosed(
         DbConnection connection,
-        ConnectionEventData eventData,
-        InterceptionResult result)
+        ConnectionEndEventData eventData) => ReleaseTransactionsFor(connection);
+
+    public Task ConnectionClosedAsync(
+        DbConnection connection,
+        ConnectionEndEventData eventData)
     {
         ReleaseTransactionsFor(connection);
-        return result;
+        return Task.CompletedTask;
     }
 
-    public ValueTask<InterceptionResult> ConnectionClosingAsync(
+    public void ConnectionDisposed(
         DbConnection connection,
-        ConnectionEventData eventData,
-        InterceptionResult result)
+        ConnectionEndEventData eventData) => ReleaseTransactionsFor(connection);
+
+    public Task ConnectionDisposedAsync(
+        DbConnection connection,
+        ConnectionEndEventData eventData)
     {
         ReleaseTransactionsFor(connection);
-        return ValueTask.FromResult(result);
+        return Task.CompletedTask;
     }
 
     private void ReleaseTransactionsFor(DbConnection connection)
     {
-        foreach (DbTransaction transaction in _locks.Keys.Where(candidate =>
-                     ReferenceEquals(candidate.Connection, connection)))
+        foreach (DbTransaction transaction in _locks.Where(candidate =>
+                     ReferenceEquals(candidate.Value.Connection, connection)).Select(candidate => candidate.Key))
         {
             Release(transaction);
         }
@@ -112,8 +125,9 @@ internal sealed class SqliteNamedLockTransactionInterceptor
         }
     }
 
-    private sealed class TransactionLocks
+    private sealed class TransactionLocks(DbConnection? connection)
     {
+        public DbConnection? Connection { get; } = connection;
         private readonly object _gate = new();
         private readonly Dictionary<string, SemaphoreSlim> _semaphores =
             new(StringComparer.Ordinal);

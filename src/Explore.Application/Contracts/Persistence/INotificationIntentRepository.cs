@@ -1,6 +1,3 @@
-// ABOUTME: Persistence boundary for durable notification intent and delegation audit records.
-// ABOUTME: Keeps notification ownership persistence entity-based and Application-owned.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

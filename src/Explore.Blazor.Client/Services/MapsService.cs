@@ -1,6 +1,3 @@
-// ABOUTME: Service for maps-related operations.
-// ABOUTME: Resolves map embed URLs through the BFF proxy.
-
 namespace Explore.Blazor.Client.Services;
 
 public interface IMapsService

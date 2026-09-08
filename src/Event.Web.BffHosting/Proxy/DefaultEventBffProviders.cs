@@ -1,6 +1,3 @@
-// ABOUTME: Provides safe no-op/default adapter implementations for optional BFF proxy context.
-// ABOUTME: Lets hosts opt into tenant/setup/support forwarding explicitly through their own adapters.
-
 using Event.Web.BffHosting.Abstractions;
 using Event.Web.BffHosting.Security;
 using Microsoft.AspNetCore.Authentication;

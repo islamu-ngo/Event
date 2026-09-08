@@ -1,6 +1,3 @@
-// ABOUTME: Verifies AT Protocol DID value object syntax, character validation, and case-sensitive equality.
-// ABOUTME: Enforces strict ingress parsing for live DIDs and rejects malformed or tombstoned identifiers.
-
 using Explore.Domain.ValueObjects;
 
 namespace Event.Domain.UnitTests.ValueObjects;

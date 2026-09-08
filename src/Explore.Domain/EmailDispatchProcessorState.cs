@@ -1,6 +1,3 @@
-// ABOUTME: Persists cross-replica coordination and operator state for an email dispatch processor.
-// ABOUTME: Keeps operator controls, delivery-policy revisions, and optional suppression history durable across replicas.
-
 namespace Explore.Domain;
 
 public sealed class EmailDispatchProcessorState

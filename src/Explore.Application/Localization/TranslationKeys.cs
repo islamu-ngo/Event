@@ -1,6 +1,3 @@
-// ABOUTME: Centralizes translation key construction for API/TMS-backed localization.
-// ABOUTME: Keeps lookup translation keys tied to stable MasterCode values, not database IDs or labels.
-
 namespace Explore.Application.Localization;
 
 public static class TranslationKeys

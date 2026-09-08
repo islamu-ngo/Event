@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query for fetching all categories on a given event.
-// ABOUTME: Returns IEnumerable<CategoryDto>.
 using System;
 using System.Collections.Generic;
 using Explore.Application.DTOs.Category;

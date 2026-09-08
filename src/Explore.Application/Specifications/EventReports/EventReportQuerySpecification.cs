@@ -1,6 +1,3 @@
-// ABOUTME: Immutable event-report query specification for queue filters and sorting.
-// ABOUTME: Reuses the application specification pattern while keeping EF Core in Persistence.
-
 using Explore.Domain;
 
 namespace Explore.Application.Specifications.EventReports;

@@ -1,4 +1,3 @@
-# ABOUTME: Cerbos policy test suite for event resources.
 # Tests the 3-level admin hierarchy: islamuevent_instance_admin > islamuevent_tenant_admin > islamuevent_org_admin > islamuevent_authenticated_user.
 
 name: EventPolicyTests

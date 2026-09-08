@@ -1,6 +1,3 @@
-// ABOUTME: Effective storage policy resolved from instance and tenant governance settings.
-// ABOUTME: Captures provider routing, byte ceilings, quota, and delegation lock state for upload flows.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
 

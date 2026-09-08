@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL integration tests for atomic provider-publication claims and fenced completion.
-// ABOUTME: Verifies entity-returning claims, bounded concurrency, tenant isolation, and immutable uniqueness.
-
 using System.Diagnostics;
 using System.Text;
 using Event.Persistence.IntegrationTests.Fixtures;
@@ -410,7 +407,7 @@ public sealed class WebhookPublicationClaimRepositoryTests(PostgreSqlContainerFi
 
     private ExploreDbContext CreateRetryingDbContext()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString, npgsql => npgsql.EnableRetryOnFailure())
             .UseSnakeCaseNamingConvention()
             .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning))

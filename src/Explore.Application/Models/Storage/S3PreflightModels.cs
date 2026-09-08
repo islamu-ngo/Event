@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral request and result models for S3-compatible storage preflight checks.
-// ABOUTME: Carries bounded step diagnostics without provider responses or credential material.
-
 using Explore.Application.Models;
 
 namespace Explore.Application.Models.Storage;

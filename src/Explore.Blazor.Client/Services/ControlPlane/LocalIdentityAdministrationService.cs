@@ -1,5 +1,3 @@
-// ABOUTME: Defines the generated-client boundary for Local identity administration and safe operation recovery.
-// ABOUTME: Keeps native HAL contracts and one-time credential responses out of shared caches and DTO mirrors.
 
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.ControlPlane;

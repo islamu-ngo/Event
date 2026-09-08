@@ -1,6 +1,3 @@
-// ABOUTME: Specifies normalized, nonnegative, currency-qualified minor-unit money values.
-// ABOUTME: Prevents invalid construction, hidden arithmetic, conversions, and sensitive formatting.
-
 using System.Reflection;
 using Explore.Domain.ValueObjects;
 

@@ -1,5 +1,3 @@
-// ABOUTME: Defines global pointer-only Local lifecycle delivery ownership in the selected Identity store.
-// ABOUTME: Admission records uncertainty before transient token issuance; unknown acceptance is never replayed.
 
 using Explore.Application.Models;
 

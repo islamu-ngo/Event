@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for UserAppearanceProfile — user-owned theme snapshots with lineage tracking.
-// ABOUTME: Preserves palette snapshots so tenant preset changes do not affect active user themes.
-
 namespace Explore.Persistence.Configurations.Entities;
 
 using Explore.Domain;

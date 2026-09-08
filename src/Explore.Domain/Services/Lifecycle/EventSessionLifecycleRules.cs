@@ -1,6 +1,3 @@
-// ABOUTME: Centralizes fixed EventSession lifecycle predicates for schedule and semantic status actions.
-// ABOUTME: Keeps session lifecycle authority pure and reusable by HAL/readiness without DI or generic engines.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Domain.Services.Lifecycle;

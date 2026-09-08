@@ -1,6 +1,3 @@
-// ABOUTME: Verifies API DI can activate every EventTicketing MediatR handler.
-// ABOUTME: Prevents stale handler constructor dependencies after feature-slice refactors.
-
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Features.EventTicketing.Handlers.Commands;
 using MediatR;

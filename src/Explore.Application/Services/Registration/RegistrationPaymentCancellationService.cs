@@ -1,6 +1,3 @@
-// ABOUTME: Cancels handed-off uncaptured payments for an event-cancellation campaign outside database transactions.
-// ABOUTME: Reuses stable provider idempotency and turns late capture into the campaign's normal refund path.
-
 using Explore.Application.Contracts.Payments;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

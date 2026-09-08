@@ -56,7 +56,7 @@ dotnet run .ci/scripts/generate-release-evidence-bundle.cs -- artifacts release-
      verify-baseline changelog-baseline-YYYY-MM-DD <full-target-oid> <full-tag-object-id>
    ```
 
-   The verifier writes `docs/releases/baselines/changelog-baseline-YYYY-MM-DD.v1.json`.
+   The verifier writes `docs/internal/releases/baselines/changelog-baseline-YYYY-MM-DD.v1.json`.
    It never creates, deletes, moves, signs, pushes, publishes, or fetches tags. If the
    tag is lightweight, unsigned, unauthorized, recreated, moved, date-malformed,
    target-mismatched, or supplied with a short object ID, stop and restart from a
@@ -145,13 +145,13 @@ releases, or update protected refs by themselves.
 
 ### Preparation command
 
-After `docs/releases/<version>/release.yaml` and `summary.md` are reviewed, check out
+After `docs/internal/releases/<version>/release.yaml` and `summary.md` are reviewed, check out
 the commit the release should end at and run the command from that working tree. The
 range end is the checked-out `HEAD`; no branch name is derived from the line label.
 
 ```sh
 dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj -- \
-  prepare docs/releases/<version>
+  prepare docs/internal/releases/<version>
 ```
 
 The protected environment supplies the promoted bundle, receipt, detached
@@ -184,7 +184,7 @@ works identically in a clone that fetched only `refs/tags/*`:
 
 ```sh
 dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj -- \
-  verify-candidate docs/releases/<version> <full-B-oid>
+  verify-candidate docs/internal/releases/<version> <full-B-oid>
 ```
 
 The command reads the same protected environment variables as `prepare`. It validates
@@ -195,7 +195,7 @@ and requires `B`'s terminal footers to be exactly
 `Changelog: skip` and `Changelog-Reason: release metadata commit`. It recomputes the
 release context through `B`, rerenders the notes with the separately promoted trusted
 bundle, and compares both committed generated artifacts byte-for-byte. It then writes
-or verifies `docs/releases/<version>/release-candidate.v1.json`.
+or verifies `docs/internal/releases/<version>/release-candidate.v1.json`.
 
 `release-candidate.v1.json` is pre-tag evidence only. It records schema/object format,
 full `B` and range commit IDs, version/line-label/date, base and previous tag commit
@@ -209,7 +209,7 @@ bodies, tokens, and secrets.
 Successful output is one bounded line:
 
 ```text
-release_candidate_verified: docs/releases/<version>/release-candidate.v1.json
+release_candidate_verified: docs/internal/releases/<version>/release-candidate.v1.json
 ```
 
 Failures are also bounded and use stable diagnostic codes, for example:
@@ -235,7 +235,7 @@ release sources. Operators do not edit the tag narrative independently:
 
 ```sh
 dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj -- \
-  tag-message docs/releases/<version> > /tmp/islamu-release-tag-message.txt
+  tag-message docs/internal/releases/<version> > /tmp/islamu-release-tag-message.txt
 ```
 
 The message contains only the canonical tag name, version, release line, exact
@@ -254,7 +254,7 @@ Verify the named tag locally; the command resolves and records its full tag obje
 
 ```sh
 dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj -- \
-  verify-tag docs/releases/<version> v<version>
+  verify-tag docs/internal/releases/<version> v<version>
 ```
 
 The promoted verifier retains the internal exact-object seam for prior published tag
@@ -268,13 +268,13 @@ hashes still match, and the existing `release-evidence.v1.json` is byte-identica
 rerun. It writes or verifies:
 
 ```text
-docs/releases/<version>/release-evidence.v1.json
+docs/internal/releases/<version>/release-evidence.v1.json
 ```
 
 Successful output is one bounded line:
 
 ```text
-release_tag_verified: docs/releases/<version>/release-evidence.v1.json
+release_tag_verified: docs/internal/releases/<version>/release-evidence.v1.json
 ```
 
 Stable failure diagnostics include:
@@ -307,7 +307,7 @@ adapter updates `main`:
 old_main_oid=$(git rev-parse --verify refs/remotes/origin/main^{commit})
 tag_object_id=$(git rev-parse --verify refs/tags/v<version>^{object})
 dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj -- \
-  verify-main docs/releases/<version> "$old_main_oid" "$tag_object_id"
+  verify-main docs/internal/releases/<version> "$old_main_oid" "$tag_object_id"
 ```
 
 The command reads only local Git objects, refs, and `release-evidence.v1.json`. It never
@@ -380,7 +380,7 @@ To report drift between what is published and what was signed:
 
 ```sh
 dotnet run --file .ci/scripts/report-publication-drift.cs -- \
-  --release-directory docs/releases/<version> \
+  --release-directory docs/internal/releases/<version> \
   --projections publication-projection.v1.json \
   --output publication-drift
 ```
@@ -419,7 +419,7 @@ there is no source argument to get wrong:
 
 ```sh
 dotnet run --project eng/release/src/ISLAMU.ReleaseEngineering/ISLAMU.ReleaseEngineering.csproj -- \
-  open-maintenance-line docs/releases/<version> <full-tag-object-id>
+  open-maintenance-line docs/internal/releases/<version> <full-tag-object-id>
 ```
 
 It re-verifies the tag through the promoted bundle, refuses prereleases, derives

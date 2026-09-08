@@ -1,6 +1,3 @@
-// ABOUTME: RED Data Protection contracts for opaque Photon selection tokens.
-// ABOUTME: Proves purpose/version/tenant binding, expiry, tamper rejection, and key-ring continuity.
-
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.DataProtection;
 

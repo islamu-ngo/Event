@@ -1,6 +1,3 @@
-# ABOUTME: Docker Compose topology for the ISLAMU Event platform.
-# ABOUTME: Uses explicit env mappings, health-gated dependencies, and profiles for optional infrastructure.
-
 name: islamu-event-platform
 
 x-keycloak-env: &keycloak-env

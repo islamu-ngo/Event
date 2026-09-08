@@ -1,6 +1,3 @@
-// ABOUTME: Immutable attendee-registration authority fact for one requested EventLocation.
-// ABOUTME: Carries order-derived admission coverage and an audience ceiling without exposing persistence entities.
-
 using System.Collections.Immutable;
 using Explore.Domain.Enums;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Manages Cerbos container lifecycle for security integration tests using Testcontainers.
-// ABOUTME: Mounts project policies and waits for gRPC health check readiness.
-
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using TUnit.Core.Interfaces;

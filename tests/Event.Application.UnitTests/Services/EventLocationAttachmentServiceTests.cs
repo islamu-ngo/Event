@@ -1,6 +1,3 @@
-// ABOUTME: Task-specific unit tests for server-owned EventLocation attachment and detachment behavior.
-// ABOUTME: Proves fail-closed policy creation, reuse, TBA, fresh reattachment, and handler authority wiring.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

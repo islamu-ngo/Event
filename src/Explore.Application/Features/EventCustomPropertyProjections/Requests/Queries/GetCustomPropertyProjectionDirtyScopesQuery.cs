@@ -1,6 +1,3 @@
-// ABOUTME: Query to retrieve pending dirty-scope backlog rows for operator inspection.
-// ABOUTME: Paged to prevent excessive memory use on large backlogs.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Application.Responses;

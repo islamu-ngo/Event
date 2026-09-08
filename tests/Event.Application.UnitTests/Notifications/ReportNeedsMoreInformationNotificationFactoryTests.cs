@@ -1,6 +1,3 @@
-// ABOUTME: Specifies the non-final NeedsMoreInfo reporter delivery graph and its privacy ceiling.
-// ABOUTME: Covers follow-up consent gating, typed email skips, and decision-scoped deduplication.
-
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Notifications;
 using Explore.Domain;

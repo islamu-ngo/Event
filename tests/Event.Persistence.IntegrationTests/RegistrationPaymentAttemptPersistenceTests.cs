@@ -1,6 +1,3 @@
-// ABOUTME: Proves payment-attempt active-slot and checkout-dispatch effect persistence semantics.
-// ABOUTME: Uses SQLite for deterministic duplicate, tenant isolation, terminal release, and lease-fence checks.
-
 using System.Data.Common;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -1360,7 +1357,7 @@ public sealed class RegistrationPaymentAttemptPersistenceTests
 
     private static async Task<ExploreDbContext> CreateContextAsync()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite("Data Source=:memory:")
             .UseSnakeCaseNamingConvention()
             .AddInterceptors(
@@ -1380,7 +1377,7 @@ public sealed class RegistrationPaymentAttemptPersistenceTests
         bool ensureCreated = true,
         IInterceptor? interceptor = null)
     {
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>()
+        var builder = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(new SqliteConnectionStringBuilder { DataSource = databasePath }.ToString())
             .UseSnakeCaseNamingConvention()
             .AddInterceptors(

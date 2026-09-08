@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped CSS for NotificationBell — bell trigger button, badge positioning, overlay. */
-/* ABOUTME: BEM block: notification-bell. Uses glass effect consistent with navbar styling. */
-
 .notification-bell {
     position: relative;
     display: inline-flex;

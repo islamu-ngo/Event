@@ -1,5 +1,4 @@
 /* ===== Block: org-profile ===== */
-/* ABOUTME: Luma-inspired organization profile layout with banner, overlapping avatar, and event timeline. */
 
 ::deep .org-profile {
     padding-bottom: var(--isl-space-16);

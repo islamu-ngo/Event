@@ -1,6 +1,3 @@
-// ABOUTME: Event-level agenda band with cached local schedule projections and mediated EventLocation placement.
-// ABOUTME: Aggregate methods own time projection and retain room keys only for the same physical location.
-
 using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
@@ -131,5 +128,9 @@ public class EventAgendaItem : ITenantEntity, IAuditableEntity, ISoftDeletable, 
     {
         EventLocationId = null;
         EventLocation = null;
+        LocationId = null;
+        Location = null;
+        RoomId = null;
+        Room = null;
     }
 }

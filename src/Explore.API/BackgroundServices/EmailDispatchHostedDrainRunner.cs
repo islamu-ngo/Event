@@ -1,6 +1,3 @@
-// ABOUTME: Runs one hosted-service EmailDispatch drain cycle through the shared drain boundary.
-// ABOUTME: Keeps timer orchestration testable without duplicating SMTP or outbox transition logic.
-
 using Explore.Application.Contracts.Services;
 
 namespace Explore.API.BackgroundServices;

@@ -1,6 +1,3 @@
-// ABOUTME: Issues opaque recovery capabilities and tenant/request/ticket/purpose-bound HMAC digests.
-// ABOUTME: Resolves dedicated active or retained key versions without reusing admission credential keys.
-
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;

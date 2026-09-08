@@ -1,6 +1,3 @@
-// ABOUTME: Authenticated API surface for the server-authoritative workspace-shell context.
-// ABOUTME: Returns private caller capabilities without HAL wrapping or shared caching.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Filters;

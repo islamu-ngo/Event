@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query request for fetching a single file type by ID.
-// ABOUTME: Returns FileTypeDto.
 using Explore.Application.DTOs.FileType;
 using MediatR;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for runtime moderation provider routing and local-only behavior.
-// ABOUTME: Verifies disabled/local modes avoid composite provider calls and preserve safe result contracts.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.EventReporting.Models;
 using Explore.Application.Settings.Groups;

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for FallbackAuthorizationService machine-caller path across all 5 owner types.
-// ABOUTME: Exercises scope gating, tenant isolation, owner-authority mapping, and InstanceAdmin cross-tenant shape.
-
 using Explore.Application.Authentication;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;

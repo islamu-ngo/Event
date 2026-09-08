@@ -1,6 +1,3 @@
-// ABOUTME: Readiness probe for configured OpenID Connect discovery metadata.
-// ABOUTME: Skips safely when no OIDC provider is configured and fails readiness when configured discovery is unreachable.
-
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Diagnostics.HealthChecks;

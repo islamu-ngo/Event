@@ -1,6 +1,3 @@
-// ABOUTME: Guards scheduler-wide host composition independently from EmailDispatch mode.
-// ABOUTME: Prevents a hosted email fallback from disabling unrelated Quartz jobs and operator surfaces.
-
 using Explore.API.Hosting;
 using Explore.API.Scheduling;
 using Explore.API.Extensions;
@@ -251,6 +248,45 @@ public sealed class QuartzSchedulerCompositionTests
                 await Assert.That(trigger!.JobDataMap.Count).IsEqualTo(0);
                 await Assert.That(trigger.JobKey).IsEqualTo(key);
             }
+        }
+        finally
+        {
+            await scheduler.Shutdown(false);
+        }
+    }
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task TransientCleanupRemainsScheduledWhenAtprotoLoginIsDisabled(bool atprotoEnabled)
+    {
+        await using ServiceProvider provider = BuildSchedulerProvider(new Dictionary<string, string?>
+        {
+            ["Authentication:AtprotoLoginEnabled"] = atprotoEnabled.ToString(),
+            ["Atproto:Enabled"] = atprotoEnabled.ToString(),
+            ["Atproto:PdsSync:Enabled"] = "false"
+        });
+        QuartzRecurringJobManifest manifest = provider.GetRequiredService<QuartzRecurringJobManifest>();
+        IScheduler scheduler = await provider.GetRequiredService<ISchedulerFactory>().GetScheduler();
+        var key = new JobKey("atproto-transient-cleanup", QuartzSchedulerKeys.RecurringGroup);
+
+        try
+        {
+            await Assert.That(manifest.Owned).Contains(key);
+            await Assert.That(manifest.Desired.Count(candidate => candidate.Equals(key))).IsEqualTo(1);
+            await Assert.That(ScheduledJobNames.All).Contains("atproto-transient-cleanup");
+            IJobDetail? job = await scheduler.GetJobDetail(key);
+            await Assert.That(job).IsNotNull();
+            await Assert.That(job!.ConcurrentExecutionDisallowed).IsTrue();
+            await Assert.That(job.JobDataMap.Count).IsEqualTo(0);
+            IReadOnlyCollection<ITrigger> triggers = await scheduler.GetTriggersOfJob(key);
+            await Assert.That(triggers.Count).IsEqualTo(1);
+            var trigger = triggers.Single() as ISimpleTrigger;
+            await Assert.That(trigger).IsNotNull();
+            await Assert.That(trigger!.RepeatInterval).IsEqualTo(TimeSpan.FromMinutes(1));
+            await Assert.That(trigger.RepeatCount).IsEqualTo(-1);
+            await Assert.That(trigger.Key).IsEqualTo(QuartzSchedulerKeys.RecurringTriggerFor(key));
+            await Assert.That(trigger.JobDataMap.Count).IsEqualTo(0);
         }
         finally
         {

@@ -1,6 +1,3 @@
-// ABOUTME: Maps normalized registration-form status, field-type, and organizer-visibility lookups.
-// ABOUTME: Reuses the shared provider-neutral lookup contract and runtime seeding model.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 

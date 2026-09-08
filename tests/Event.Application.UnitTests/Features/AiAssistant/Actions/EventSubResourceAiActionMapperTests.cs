@@ -1,6 +1,3 @@
-// ABOUTME: Tests generic Phase 5 event sub-resource proposal payload mapping.
-// ABOUTME: Ensures proposal mappers validate registry schemas without executing sub-resource commands.
-
 using Explore.Application.Features.AiAssistant.Actions;
 using Explore.Domain.Ai;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Authorized optimistic command that cancels a queued webhook bulk replay before execution.
-// ABOUTME: Requires the caller's observed operation version and a normalized audit reason.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

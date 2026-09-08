@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for Event aggregate identity, ownership, lookups, aspects, and listing indexes.
-// ABOUTME: Uses tenant-scoped alternate keys so child event-graph rows cannot reference cross-tenant parents.
-
 using System;
 using System.Collections.Generic;
 using System.Text;

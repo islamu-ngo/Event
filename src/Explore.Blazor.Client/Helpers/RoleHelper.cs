@@ -1,6 +1,3 @@
-// ABOUTME: Shared helper for organization role display (names, colors) using unified Role IDs.
-// ABOUTME: Replaces 3 duplicate GetRoleName and 2 duplicate GetRoleColor methods across the codebase.
-
 using Explore.Blazor.Client.Clients;
 using MudBlazor;
 

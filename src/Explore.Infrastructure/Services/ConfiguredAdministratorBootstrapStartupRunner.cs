@@ -1,6 +1,3 @@
-// ABOUTME: Converges configured administrator bootstrap generations under the persistence lock.
-// ABOUTME: Keeps startup preparation serializable, atomic, retry-safe, and free of network or background work.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

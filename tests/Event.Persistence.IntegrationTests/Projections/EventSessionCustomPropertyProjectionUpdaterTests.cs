@@ -1,6 +1,3 @@
-// ABOUTME: Testcontainers integration tests for EventSessionCustomPropertyProjectionUpdater.
-// ABOUTME: Mirrors event updater tests against a real PostgreSQL schema.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Exceptions;

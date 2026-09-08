@@ -1,6 +1,3 @@
-// ABOUTME: Validated retention and cleanup settings for webhook payload, evidence, logs, and audit data.
-// ABOUTME: Supplies distinct bounded horizons plus safe worker scheduling limits.
-
 using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure.Webhooks;

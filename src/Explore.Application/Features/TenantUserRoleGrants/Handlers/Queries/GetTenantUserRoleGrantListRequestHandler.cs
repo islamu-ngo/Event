@@ -1,6 +1,3 @@
-// ABOUTME: Handles query for listing tenant user role grants with eager-loaded navigation properties.
-// ABOUTME: Returns mapped list of TenantUserRoleGrantListDto.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.TenantUserRoleGrant;

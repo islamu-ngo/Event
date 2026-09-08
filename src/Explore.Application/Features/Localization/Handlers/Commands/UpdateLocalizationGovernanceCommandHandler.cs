@@ -1,6 +1,3 @@
-// ABOUTME: Handler for UpdateLocalizationGovernanceCommand — validates, upserts 9 governance keys, invalidates resolver cache.
-// ABOUTME: Validator is manually instantiated per repo convention (no DI for validators).
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.Localization;

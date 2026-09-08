@@ -1,6 +1,3 @@
-// ABOUTME: Exercises the generated-contract transformer against compact synthetic NSwag surfaces.
-// ABOUTME: Proves exact classification, privacy-safe printing, reversibility, and failure behavior.
-
 using Explore.GeneratedContracts;
 
 namespace Explore.GeneratedContracts.Tests;

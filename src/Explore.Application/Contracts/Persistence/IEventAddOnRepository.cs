@@ -1,6 +1,3 @@
-// ABOUTME: Defines transaction-bound persistence primitives for event add-on lifecycle authority.
-// ABOUTME: Returns domain entities and stable outcomes without exposing provider or DTO concerns.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

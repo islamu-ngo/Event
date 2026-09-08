@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for explicit browser Web Push consent and denied-permission behavior.
-// ABOUTME: Proves subscription starts only from the Enable action and denial exposes no repeat prompt.
-
 using Explore.Blazor.Client.Components.Notifications;
 using Explore.Blazor.Client.Contracts.Interop;
 using Explore.Blazor.Client.Contracts.Services.Notifications;

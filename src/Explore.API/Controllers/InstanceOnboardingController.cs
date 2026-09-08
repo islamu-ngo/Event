@@ -1,6 +1,3 @@
-// ABOUTME: API controller for first-run instance onboarding wizard (one-time setup flow).
-// ABOUTME: Provides status check, onboarding completion, secret validation, and setup-time auth provider config.
-
 using Explore.Application.Authentication;
 using Asp.Versioning;
 using Explore.API.Attributes;

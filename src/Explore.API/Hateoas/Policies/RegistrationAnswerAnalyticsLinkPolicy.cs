@@ -1,6 +1,3 @@
-// ABOUTME: HAL policy for organizer registration-answer analytics resources.
-// ABOUTME: Exposes only the self read relation after event-scoped registration authorization.
-
 using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;

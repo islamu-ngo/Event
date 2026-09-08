@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-bound aggregate for durable, provider-neutral refund reservation and truth.
-// ABOUTME: Pins original payment authority and keeps ambiguous outcomes capacity-reserving.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

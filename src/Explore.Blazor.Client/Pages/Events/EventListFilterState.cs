@@ -1,6 +1,3 @@
-// ABOUTME: Captures EventList filter-bar state for service query forwarding without owning UI or paging.
-// ABOUTME: Keeps filter-to-query mapping testable while EventList retains URL, pagination, and render behavior.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Models;
 using Explore.Blazor.Client.Pages.Events.Components;

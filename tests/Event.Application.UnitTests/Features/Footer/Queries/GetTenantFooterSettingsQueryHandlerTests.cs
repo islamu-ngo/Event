@@ -1,6 +1,3 @@
-// ABOUTME: Tests authoritative tenant footer admin settings query mapping.
-// ABOUTME: Proves scalar values and effective lock states are returned without link-group data.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Footer;

@@ -1,5 +1,3 @@
-// ABOUTME: Describes the isolated Local replacement bearer scheme in native and transitional OpenAPI documents.
-// ABOUTME: Applies challenge-only security exclusively to endpoints selecting the replacement authentication scheme.
 
 using Explore.Application.Constants;
 using Microsoft.AspNetCore.Authorization;

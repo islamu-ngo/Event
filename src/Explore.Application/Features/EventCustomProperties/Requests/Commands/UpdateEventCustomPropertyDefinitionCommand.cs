@@ -1,6 +1,3 @@
-// ABOUTME: Command request for updating an event-local custom-property definition.
-// ABOUTME: Route ID and If-Match carry identity/concurrency; the body carries the update payload.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventCustomProperty;
 using Explore.Application.Responses;

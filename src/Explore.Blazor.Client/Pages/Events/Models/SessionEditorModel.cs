@@ -1,6 +1,3 @@
-// ABOUTME: Lightweight session summary model used by event shell pages before dedicated session routes load full DTOs.
-// ABOUTME: Keeps Create/Edit Event summaries decoupled from drawer-era session editor components.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Pages.Events.Models;

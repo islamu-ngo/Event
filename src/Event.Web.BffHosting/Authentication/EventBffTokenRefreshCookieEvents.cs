@@ -1,6 +1,3 @@
-// ABOUTME: Validates current browser-session authority before cookie acceptance and OIDC token refresh.
-// ABOUTME: Delegates host validation, typed rejection cleanup, and refreshed claim enrichment through shared callbacks.
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text.Json;

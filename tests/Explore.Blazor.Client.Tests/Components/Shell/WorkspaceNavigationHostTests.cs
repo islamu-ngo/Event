@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for WorkspaceNavigationHost contextual navigation swapping.
-// ABOUTME: Verifies provider content swaps on workspace switch without dock panel re-registration.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.Shell;
 using Explore.Blazor.Client.Components.Shell.Workspaces;

@@ -1,6 +1,3 @@
-// ABOUTME: Contract tests for IAnalyticsInterop interface shape and method signatures.
-// ABOUTME: Verifies the analytics JS interop bridge contract has all required methods with correct signatures.
-
 using System.Reflection;
 
 namespace Explore.Blazor.Client.Tests.Services;

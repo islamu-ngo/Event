@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped layout for tenant effective settings, actions, and quota usage. */
-/* ABOUTME: Uses product tokens and logical properties for responsive LTR and RTL rendering. */
-
 .instance-tenant-config {
     display: grid;
     gap: var(--isl-space-5);

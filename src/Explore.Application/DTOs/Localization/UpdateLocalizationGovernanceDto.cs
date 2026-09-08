@@ -1,6 +1,3 @@
-// ABOUTME: Grouped PATCH contract for localization TMS, language, and runtime governance.
-// ABOUTME: TMS API keys remain isolated behind the dedicated secret-provider path.
-
 namespace Explore.Application.DTOs.Localization;
 
 public sealed record UpdateLocalizationGovernanceDto

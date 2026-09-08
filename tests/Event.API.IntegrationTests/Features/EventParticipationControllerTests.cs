@@ -1,6 +1,3 @@
-// ABOUTME: API contract tests for event participation configuration.
-// ABOUTME: Verifies the write route metadata and command forwarding without touching a database.
-
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Net;

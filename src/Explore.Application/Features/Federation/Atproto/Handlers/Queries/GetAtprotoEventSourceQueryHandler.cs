@@ -1,6 +1,3 @@
-// ABOUTME: Resolves a visible federated event source only after rechecking the current tenant capability.
-// ABOUTME: Revalidates the persisted redirect target through the shared HTTPS source policy.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Federation.Atproto.Requests.Queries;
 using Explore.Application.Services.Federation;

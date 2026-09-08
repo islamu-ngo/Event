@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for ordered AI assistant conversation messages.
-// ABOUTME: Preserves tenant-scoped message ordering with unique conversation sequence constraints.
-
 using Explore.Domain.Ai;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

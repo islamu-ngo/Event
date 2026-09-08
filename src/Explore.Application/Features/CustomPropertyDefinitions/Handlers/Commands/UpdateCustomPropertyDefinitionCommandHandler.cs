@@ -1,6 +1,3 @@
-// ABOUTME: Handles updates to shared Layer 3 custom-property definitions with governance and option replacement enforcement.
-// ABOUTME: Keeps shared-definition update semantics explicit before template/runtime flows are introduced.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

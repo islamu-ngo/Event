@@ -1,6 +1,3 @@
-// ABOUTME: Partial class containing named global query filter registrations (Tenant + SoftDelete).
-// ABOUTME: Entity filter registrations are grouped by domain area. Filter logic uses TenantContext closure.
-
 using Explore.Domain;
 using Explore.Domain.Ai;
 using Explore.Domain.Federation;

@@ -1,6 +1,3 @@
-// ABOUTME: Authorized query for bounded audit events attached to a support-access session.
-// ABOUTME: Carries target tenant context so authorization can enforce tenant-audit visibility.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.SupportAccess;
 using Explore.Application.Responses;

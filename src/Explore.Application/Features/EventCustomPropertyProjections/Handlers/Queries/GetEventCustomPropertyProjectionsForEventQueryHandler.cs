@@ -1,6 +1,3 @@
-// ABOUTME: Handles query for all projection rows of a specific event, optionally filtered by exposure ceiling.
-// ABOUTME: Maps projection entities to EventCustomPropertyProjectionDto for admin inspection.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.CustomPropertyProjection;

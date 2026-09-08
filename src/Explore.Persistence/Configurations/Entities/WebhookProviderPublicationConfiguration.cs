@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for provider publication authority and append-only attempt evidence.
-// ABOUTME: Enforces plan and binding ownership, normalized provider state, unique identities, and fenced concurrency.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

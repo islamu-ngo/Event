@@ -1,6 +1,3 @@
-// ABOUTME: Management projection for report decisions before and after execution.
-// ABOUTME: Contains safe decision metadata only; unsafe notes and raw provider payloads remain excluded.
-
 namespace Explore.Application.DTOs.EventReporting;
 
 public sealed record ModerationReportDecisionDto

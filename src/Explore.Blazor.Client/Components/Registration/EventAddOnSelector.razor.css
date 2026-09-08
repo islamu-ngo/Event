@@ -1,6 +1,3 @@
-/* ABOUTME: Styles the optional add-on selector with logical spacing and clear grouped facts. */
-/* ABOUTME: Preserves RTL, zoom, narrow-layout, focus, and touch-target behavior. */
-
 .event-add-ons {
     display: grid;
     gap: 1rem;

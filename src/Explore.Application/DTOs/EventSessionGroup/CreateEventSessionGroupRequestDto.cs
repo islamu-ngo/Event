@@ -1,6 +1,3 @@
-// ABOUTME: Request contract for creating a program section, track, devroom, or stage within an event.
-// ABOUTME: TenantId is intentionally omitted; handlers derive it from the parent event under tenant filters.
-
 namespace Explore.Application.DTOs.EventSessionGroup;
 
 public sealed record CreateEventSessionGroupRequestDto

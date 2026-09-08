@@ -1,6 +1,3 @@
-// ABOUTME: Query request for a single AI provider run status in an owned conversation.
-// ABOUTME: Supports future polling endpoints without exposing raw provider responses.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Ai;
 using MediatR;

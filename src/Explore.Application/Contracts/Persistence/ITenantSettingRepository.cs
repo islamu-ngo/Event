@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for tenant-specific setting overrides.
-// ABOUTME: Supports normalized cross-tenant domain-host ownership checks.
-
 namespace Explore.Application.Contracts.Persistence;
 
 using Explore.Domain;

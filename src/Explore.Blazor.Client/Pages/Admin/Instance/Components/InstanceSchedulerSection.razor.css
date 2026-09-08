@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped layout styles for the instance scheduler administration section. */
-/* ABOUTME: Provides status tiles, a scrollable job table, and responsive action rows. */
-
 .scheduler-section {
     display: flex;
     flex-direction: column;

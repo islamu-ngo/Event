@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning metadata for a single storage object by ID.
-// ABOUTME: Maps StorageObject entity to StorageObjectDto.
 using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;

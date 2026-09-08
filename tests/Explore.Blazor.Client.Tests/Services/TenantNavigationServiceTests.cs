@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for TenantNavigationService generated-client delegation and failure handling.
-// ABOUTME: Verifies operation contracts, DTO forwarding, and resilient fallback responses.
-
 namespace Explore.Blazor.Client.Tests.Services;
 
 public class TenantNavigationServiceTests

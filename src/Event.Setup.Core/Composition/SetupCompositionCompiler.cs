@@ -1,6 +1,3 @@
-// ABOUTME: Owns the fail-closed pipeline from hostile composition sources to canonical v1alpha2 artifacts.
-// ABOUTME: Publishes only strict Wire reparses with canonical bytes, digest, and the exact returned typed reference.
-
 namespace ISLAMU.Event.Setup.Core.Composition;
 
 using ISLAMU.Wire.Contracts.ConfigurationPortability;

@@ -1,5 +1,3 @@
-// ABOUTME: Reads the counterfactual email-disable impact within the caller's transaction.
-// ABOUTME: Returns only scope revisions and lock state without mutating settings or delivery controls.
 
 using System.Collections.Immutable;
 using Explore.Application.Contracts.Persistence;

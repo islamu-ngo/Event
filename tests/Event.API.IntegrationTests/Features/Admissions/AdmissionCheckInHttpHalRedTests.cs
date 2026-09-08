@@ -1,6 +1,3 @@
-// ABOUTME: Phase 21 RED API and HAL specifications for online admission check-in and scanner capabilities.
-// ABOUTME: Pins least-privilege routes, one-time secrets, bounded door data, rate limits, authorization, and OpenAPI.
-
 using Explore.Application.Constants;
 using System.ComponentModel.DataAnnotations;
 using System.Net;

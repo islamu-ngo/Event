@@ -1,6 +1,3 @@
-// ABOUTME: Builds enriched event detail DTOs for public and authorized management read paths.
-// ABOUTME: Adds moderation eligibility, tags, categories, and safe image URLs after entity mapping.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

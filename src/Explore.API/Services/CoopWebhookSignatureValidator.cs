@@ -1,6 +1,3 @@
-// ABOUTME: Validates Coop webhook HMAC-SHA256 signatures over timestamped raw bodies.
-// ABOUTME: Rejects stale, oversized, unsigned, or mismatched callbacks before JSON parsing.
-
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;

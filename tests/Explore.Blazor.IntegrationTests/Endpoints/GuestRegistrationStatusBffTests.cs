@@ -1,5 +1,3 @@
-// ABOUTME: Exercises the native BFF proxy and initial host document for private guest status bookmarks.
-// ABOUTME: Guards first-head inline transport, PathBase, and privacy headers against downstream overwrite.
 
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;

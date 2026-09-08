@@ -1,6 +1,3 @@
-// ABOUTME: Creates PII-free durable triggers for refund campaign paging, dispatch, and reconciliation.
-// ABOUTME: Correlates only tenant-scoped UUIDs while provider and money evidence stay in persisted entities.
-
 using System.Text.Json;
 using Explore.Domain;
 

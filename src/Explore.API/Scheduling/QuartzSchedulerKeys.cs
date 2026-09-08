@@ -1,6 +1,3 @@
-// ABOUTME: Centralized Quartz job and trigger keys derived from the Application scheduled-job catalog.
-// ABOUTME: Keeps scheduler identity stable across restarts so the persistent store recognizes existing rows.
-
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Contracts.Scheduling;
@@ -52,6 +49,9 @@ public static class QuartzSchedulerKeys
 
     public static readonly JobKey AiRetentionCleanup =
         new(ScheduledJobNames.AiRetentionCleanup, RecurringGroup);
+
+    public static readonly JobKey AtprotoTransientCleanup =
+        new(ScheduledJobNames.AtprotoTransientCleanup, RecurringGroup);
 
     public static readonly JobKey EmailDispatchRetentionCleanup =
         new(ScheduledJobNames.EmailDispatchRetentionCleanup, RecurringGroup);
@@ -115,6 +115,7 @@ public static class QuartzSchedulerKeys
         EmailDispatchDrain,
         EmailDispatchRecoveryScan,
         IdempotencyCleanup,
+        AtprotoTransientCleanup,
         AiRetentionCleanup,
         EmailDispatchRetentionCleanup,
         WebhookRetentionCleanup,

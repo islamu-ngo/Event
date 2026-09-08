@@ -1,6 +1,3 @@
-// ABOUTME: Defines one immutable version of optional instance-directed platform contributions.
-// ABOUTME: Keeps enablement, copy, and percentage choices out of tenant and organizer authority.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies PostgreSQL serializes ATProto refresh leases for one exact tenant/user/DID scope.
-// ABOUTME: Proves a competing application instance cannot rotate the same provider session concurrently.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Persistence;
 

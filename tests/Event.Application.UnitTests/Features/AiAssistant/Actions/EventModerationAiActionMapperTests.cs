@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for converting untrusted AI moderation proposals into safe moderation context.
-// ABOUTME: Verifies HAL evidence, reason metadata, and irreversible heavy moderation acknowledgement.
-
 using Explore.Application.Features.AiAssistant.Actions;
 using Explore.Application.Features.AiAssistant.Prompting;
 using Explore.Domain.Ai;

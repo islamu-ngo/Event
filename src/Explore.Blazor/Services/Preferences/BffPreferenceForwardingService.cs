@@ -1,6 +1,3 @@
-// ABOUTME: Server-side BFF API forwarding helpers for authenticated preference and appearance endpoints.
-// ABOUTME: Keeps BffPreferenceEndpoints thin while preserving token-safe generated-client forwarding boundaries.
-
 namespace Explore.Blazor.Services.Preferences;
 
 using Api = Explore.Blazor.Client.Clients;

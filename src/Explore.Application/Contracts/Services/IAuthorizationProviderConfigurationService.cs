@@ -1,6 +1,3 @@
-// ABOUTME: Service contract for managing instance-level authorization provider configuration.
-// ABOUTME: Handles reading, applying, and verifying authorization provider settings (Cerbos or Local).
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.Onboarding;

@@ -1,6 +1,3 @@
-// ABOUTME: bUnit accessibility tests for shared components (ErrorState, ImageUpload, StorageImage).
-// ABOUTME: Validates WCAG role="alert", alt text defaults, and ARIA patterns in rendered markup.
-
 using Explore.Blazor.Client.Services;
 using Explore.Blazor.Client.Shared;
 using Explore.Blazor.Client.Tests.Common;

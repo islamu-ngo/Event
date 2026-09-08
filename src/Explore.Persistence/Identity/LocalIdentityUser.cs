@@ -1,6 +1,3 @@
-// ABOUTME: ASP.NET Core Identity credential entity for embedded Local authentication.
-// ABOUTME: Uses UUIDv7 keys while keeping credential storage separate from the Domain user aggregate.
-
 using Microsoft.AspNetCore.Identity;
 
 namespace Explore.Persistence.Identity;

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the RFC 5545 calendar export file builder used by event downloads.
-// ABOUTME: Verifies stable VEVENT fields, canonical URL metadata, and UTC timestamp serialization.
-
 using Explore.API.Services.Calendar;
 using Explore.Application.DTOs.Event;
 

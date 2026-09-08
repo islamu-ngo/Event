@@ -1,6 +1,3 @@
-// ABOUTME: EF implementation of IEventDayRepository - delegates CRUD to GenericRepository and adds tenant-aware validation queries.
-// ABOUTME: Reads are AsNoTracking so validator use does not accidentally attach entities.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.Database;

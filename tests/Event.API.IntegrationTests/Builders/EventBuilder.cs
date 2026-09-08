@@ -1,6 +1,3 @@
-// ABOUTME: Fluent builder for Event domain entities in integration tests.
-// ABOUTME: Produces EF-compatible Event instances while keeping optional lookup FKs opt-in.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

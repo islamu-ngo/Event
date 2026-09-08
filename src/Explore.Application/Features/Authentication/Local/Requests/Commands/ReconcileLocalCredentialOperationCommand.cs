@@ -1,5 +1,3 @@
-// ABOUTME: Defines explicit administrator reconciliation intent for one durable Local credential operation.
-// ABOUTME: Accepts only the operation identifier; actor authority and binding facts are resolved server-side.
 
 using Explore.Application.Responses;
 using MediatR;

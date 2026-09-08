@@ -1,6 +1,3 @@
-// ABOUTME: Immutable instance-to-consumer application binding for one outgoing webhook provider.
-// ABOUTME: Supports instance- or tenant-scoped consumers and governed typed capabilities before provider authority.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text;
 using Explore.Domain.Interfaces;

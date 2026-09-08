@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL-backed API flow tests for persisted AI assistant conversations.
-// ABOUTME: Verifies the real EF repositories behind authenticated create/send/detail endpoints.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;

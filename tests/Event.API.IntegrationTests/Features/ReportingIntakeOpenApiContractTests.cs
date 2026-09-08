@@ -1,6 +1,3 @@
-// ABOUTME: Runtime OpenAPI contract tests for current-tenant reporting-intake administration.
-// ABOUTME: Pins stable operation ids, authenticated security, HAL schemas, and string-valued setting-source metadata.
-
 using System.Net;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;

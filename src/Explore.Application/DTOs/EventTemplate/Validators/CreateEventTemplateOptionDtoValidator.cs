@@ -1,6 +1,3 @@
-// ABOUTME: Validates template option payload shape with standard field length constraints.
-// ABOUTME: Mirrors CreateCustomPropertyOptionDtoValidator for consistency across EAV system.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.EventTemplate.Validators;

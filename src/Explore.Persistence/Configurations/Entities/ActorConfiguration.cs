@@ -1,6 +1,3 @@
-// ABOUTME: Configures global Actor ownership, concrete-subject type alignment, and profile relationships.
-// ABOUTME: Enforces one concrete owner and binds external-unclassified Actors to ExternalActorSubject ownership.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Seed;

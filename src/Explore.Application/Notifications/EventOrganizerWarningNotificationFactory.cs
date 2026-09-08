@@ -1,6 +1,3 @@
-// ABOUTME: Builds the durable required organizer warning for a WarnOrganizer report decision.
-// ABOUTME: Uses event-owner authority, generic safe copy, and preference-gated verified SMTP delivery.
-
 using Explore.Application.Contracts.Notifications;
 using Explore.Domain;
 using Explore.Domain.Enums;

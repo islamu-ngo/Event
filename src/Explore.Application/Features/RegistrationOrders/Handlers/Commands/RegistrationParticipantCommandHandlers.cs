@@ -1,6 +1,3 @@
-// ABOUTME: Dispatches participant, assignment, bulk-assignment, and deferral commands to the order-locked service.
-// ABOUTME: Manually instantiates every FluentValidation validator and propagates cancellation end to end.
-
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.Features.RegistrationOrders.Validators;

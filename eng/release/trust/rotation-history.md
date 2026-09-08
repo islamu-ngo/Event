@@ -1,6 +1,3 @@
-<!-- ABOUTME: Records the append-only signer rotation and revocation contract for release operations. -->
-<!-- ABOUTME: States the current activation blockers without inventing production principals or custody. -->
-
 # Release Signer Rotation History
 
 ## Current state

@@ -1,6 +1,3 @@
-// ABOUTME: Validates manual provider publication reconciliation evidence before aggregate mutation.
-// ABOUTME: Bounds provider identity and restricts audit reasons to normalized safe characters.
-
 using Explore.Application.Features.Webhooks.Requests.Commands;
 using Explore.Domain;
 using FluentValidation;

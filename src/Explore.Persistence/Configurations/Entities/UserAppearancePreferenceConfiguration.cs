@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for UserAppearancePreference — the active profile selection per user/scope.
-// ABOUTME: Unique per (UserId, TenantId) so a user can have different active profiles per tenant.
-
 namespace Explore.Persistence.Configurations.Entities;
 
 using Explore.Domain;

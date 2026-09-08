@@ -1,6 +1,3 @@
-// ABOUTME: Appends and reads the application database's immutable erasure replay checkpoint chain.
-// ABOUTME: Rejects duplicate, skipped, or forked authority sequences before database constraints run.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

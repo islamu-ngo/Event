@@ -1,6 +1,3 @@
-/* ABOUTME: CSS grid host for generic dock panels around shell/workspace content.
-   ABOUTME: Uses logical sizing tokens so future shell migration remains RTL-safe. */
-
 .dock-layout-host {
     position: relative;
     display: grid;

@@ -1,6 +1,3 @@
-// ABOUTME: Service for event domain reference lookups (types, formats, statuses, session kinds, modes, visibility).
-// ABOUTME: Queries generated NSwag tag clients and returns empty collections on non-critical error.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Lookup;
 using Microsoft.Extensions.Logging;

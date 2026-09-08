@@ -1,5 +1,3 @@
-// ABOUTME: Native scope tests for lifecycle provider selection through production DI and persisted bindings.
-// ABOUTME: Covers mixed authorities, foreign links, SMTP independence and tenantless Local accounts without internal mocks.
 
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Authentication;

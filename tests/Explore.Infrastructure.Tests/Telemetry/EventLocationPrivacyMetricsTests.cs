@@ -1,6 +1,3 @@
-// ABOUTME: Invariant specification for the Explore.EventLocationPrivacy observability meter.
-// ABOUTME: Proves disclosure, correction, and review-queue instruments emit bounded PII-free dimensions.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.LocationPrivacy;
 using Explore.Application.Telemetry;

@@ -1,6 +1,3 @@
-// ABOUTME: Authorized command for redriving one dead-lettered incoming webhook processing generation.
-// ABOUTME: Carries tenant, inbox identity, expected generation, and a bounded operator reason.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

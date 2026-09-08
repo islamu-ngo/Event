@@ -1,6 +1,3 @@
-/* ABOUTME: Styles the accessible purchase-governance panel with logical, RTL-safe spacing. */
-/* ABOUTME: Uses existing theme tokens and preserves native focus and form-control semantics. */
-
 .ticket-purchase-governance {
     display: grid;
     gap: var(--isl-space-4);

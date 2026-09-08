@@ -1,6 +1,3 @@
-// ABOUTME: Defines stable public bounds for portable localized legal Markdown content.
-// ABOUTME: Keeps aggregate and codec callers aligned without Domain ownership duplication.
-
 namespace ISLAMU.Wire.Contracts.ConfigurationPortability;
 
 public static class LegalMarkdownContentLimits

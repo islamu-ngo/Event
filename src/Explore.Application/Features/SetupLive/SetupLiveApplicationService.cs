@@ -1,6 +1,3 @@
-// ABOUTME: Executes tenant-bound Setup live enrollment authority and value-free readiness reads.
-// ABOUTME: Keeps capabilities ephemeral, persists only digests, and reauthorizes every operation.
-
 namespace Explore.Application.Features.SetupLive;
 
 using System.Security.Cryptography;

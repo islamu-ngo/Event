@@ -1,5 +1,3 @@
-// ABOUTME: Exercises Local and external account separation through native MediatR synchronization over SQLite.
-// ABOUTME: Rejects implicit Local account adoption while preserving exact bindings and independent external creation.
 
 using System.Data.Common;
 using Event.Api.IntegrationTests.Fixtures;

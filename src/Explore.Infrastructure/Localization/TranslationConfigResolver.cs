@@ -1,6 +1,3 @@
-// ABOUTME: Resolves TMS configuration from the hierarchical settings engine with short-lived cache.
-// ABOUTME: Uses system defaults with tenant overrides through IHierarchicalSettingsResolver.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Settings;
 using Explore.Domain.Common.Localization;

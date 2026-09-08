@@ -1,6 +1,3 @@
-// ABOUTME: Implements optional bounded Photon forward geocoding over an injected HTTP boundary.
-// ABOUTME: Enforces total-budget retries and emits only low-cardinality PII-free observability.
-
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Net;

@@ -1,6 +1,3 @@
-// ABOUTME: Design-time factory for DataProtectionKeyContext migrations and schema updates.
-// ABOUTME: Reuses the same structured migrator resolution as the primary ExploreDbContext factory.
-
 using Explore.Persistence.Database;
 using Explore.Secrets.Configuration;
 using Explore.Secrets.Database;

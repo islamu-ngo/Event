@@ -1,6 +1,3 @@
-// ABOUTME: Immutable builder for composing event session query filters and sorting.
-// ABOUTME: Currently supports projection-backed custom property filters (Layer 3) and basic sorting.
-
 using System.Linq.Expressions;
 using Explore.Domain;
 

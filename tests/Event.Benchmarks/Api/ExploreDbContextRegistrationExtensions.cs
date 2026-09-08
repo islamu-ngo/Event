@@ -1,6 +1,3 @@
-// ABOUTME: Benchmark infrastructure helper for replacing production ExploreDbContext registrations.
-// ABOUTME: Removes pooled EF Core services before the benchmark host adds its deterministic provider.
-
 using Explore.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;

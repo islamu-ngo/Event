@@ -1,6 +1,3 @@
-// ABOUTME: Guards the MSBuild dependency chain that recreates the generated API client before compilation.
-// ABOUTME: Prevents output-existence conditions from bypassing NSwag when EventApiTagClients.g.cs is absent.
-
 using System.Xml.Linq;
 
 namespace Event.Architecture.Tests;

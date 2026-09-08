@@ -1,6 +1,3 @@
-// ABOUTME: Maps the SQLite authority's singleton monotonic sequence allocator.
-// ABOUTME: Uses the fixed ie_ namespace and enforces a non-negative sequence.
-
 using Explore.Domain;
 using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;

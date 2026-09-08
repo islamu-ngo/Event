@@ -1,6 +1,3 @@
-// ABOUTME: Lightweight service for cross-component consent banner communication.
-// ABOUTME: Footer triggers OnReopenRequested; AnalyticsInitializer subscribes to reopen the banner.
-
 namespace Explore.Blazor.Client.Services;
 
 public sealed class CookieConsentStateService

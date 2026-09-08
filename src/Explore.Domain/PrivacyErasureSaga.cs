@@ -1,6 +1,3 @@
-// ABOUTME: Models the fenced local state and hashed short-lived receipt for one privacy-erasure intent.
-// ABOUTME: Enforces receipt expiry, optimistic concurrency, local settlement, and provider completion.
-
 using System.Security.Cryptography;
 
 namespace Explore.Domain;

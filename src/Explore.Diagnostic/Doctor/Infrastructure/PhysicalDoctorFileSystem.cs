@@ -1,6 +1,3 @@
-// ABOUTME: Production file-system adapter for read-only doctor checks.
-// ABOUTME: Exposes only read operations so doctor checks cannot write through this abstraction.
-
 namespace Explore.Diagnostic.Doctor.Infrastructure;
 
 public sealed class PhysicalDoctorFileSystem : IDoctorFileSystem

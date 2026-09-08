@@ -1,6 +1,3 @@
-// ABOUTME: Builds governed on-demand registration-answer analytics aggregates from EF Core.
-// ABOUTME: Suppresses small cells and excludes raw answer, subject, order, participant, and sensitive values.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

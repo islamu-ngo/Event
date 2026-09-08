@@ -1,6 +1,3 @@
-// ABOUTME: Shared Polly resilience pipeline for TMS HTTP clients (Tolgee, Weblate).
-// ABOUTME: Eliminates duplication — each provider supplies only its retry-delay reader.
-
 using System.Net;
 using Microsoft.Extensions.Http.Resilience;
 using Polly;

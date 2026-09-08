@@ -1,6 +1,3 @@
-// ABOUTME: JS-module-backed implementation for browser actions used by event UI affordances.
-// ABOUTME: Fails closed during prerender/JS disconnects and avoids logging raw user content.
-
 using Explore.Blazor.Client.Contracts.Interop;
 using Microsoft.JSInterop;
 

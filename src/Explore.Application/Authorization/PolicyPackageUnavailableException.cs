@@ -1,6 +1,3 @@
-// ABOUTME: Safe Application-layer exception for unavailable authorization policy package assets.
-// ABOUTME: Lets API controllers return ProblemDetails without leaking deployment filesystem paths.
-
 namespace Explore.Application.Authorization;
 
 /// <summary>

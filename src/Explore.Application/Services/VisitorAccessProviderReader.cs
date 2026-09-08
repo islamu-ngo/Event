@@ -1,5 +1,3 @@
-// ABOUTME: Reads uncached provider authority within the caller-owned visitor policy snapshot.
-// ABOUTME: Shares the authentication configuration projection with complete proposed-state validation.
 
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

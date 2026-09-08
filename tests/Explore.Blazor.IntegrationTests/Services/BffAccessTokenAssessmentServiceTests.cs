@@ -1,6 +1,3 @@
-// ABOUTME: Focused tests for stable BFF access-token outcomes and purpose-bound refresh identity.
-// ABOUTME: Keeps refresh-session token decisions covered after extraction from auth endpoints.
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Explore.Blazor.Services.Auth;

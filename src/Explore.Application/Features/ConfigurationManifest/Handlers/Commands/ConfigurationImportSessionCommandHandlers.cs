@@ -1,6 +1,3 @@
-// ABOUTME: Handles scope-specific configuration import session commands through one target-safe service.
-// ABOUTME: Preserves authorization-pipeline facts while keeping controllers free of workflow logic.
-
 namespace Explore.Application.Features.ConfigurationManifest.Handlers.Commands;
 
 using Explore.Application.Features.ConfigurationManifest.Importing;

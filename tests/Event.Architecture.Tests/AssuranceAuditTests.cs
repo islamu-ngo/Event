@@ -1,6 +1,3 @@
-// ABOUTME: Exercises the Roslyn assurance audit with synthetic prohibited and permitted code fixtures.
-// ABOUTME: Verifies deterministic categories and bounded locations without a real-file debt allowlist.
-
 using Explore.AssuranceAudit;
 
 namespace Event.Architecture.Tests;

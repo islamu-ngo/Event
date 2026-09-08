@@ -1,6 +1,3 @@
-// ABOUTME: Exercises Local Identity BFF antiforgery and HttpOnly cookie session behavior.
-// ABOUTME: Proves access tokens stay server-side while successful login establishes browser authentication.
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Json;
 using System.Security.Claims;

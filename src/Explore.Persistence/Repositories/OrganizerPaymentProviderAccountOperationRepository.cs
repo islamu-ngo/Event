@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for organizer payment account-create operation fences.
-// ABOUTME: Uses tenant-scoped tracked reads for transaction-owned state transitions.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

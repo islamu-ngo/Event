@@ -1,6 +1,3 @@
-// ABOUTME: Current-baseline and persisted provider-authority tests for the webhook schema.
-// ABOUTME: Verifies deterministic schema SQL and that legacy-unverified bindings cannot grant portal capability.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -8,6 +5,7 @@ using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Event.Persistence.IntegrationTests.Repositories;
@@ -45,8 +43,8 @@ public sealed class WebhookMigrationAndPortalPersistenceTests(PostgreSqlContaine
     [Test]
     public async Task PersistedBinding_GrantsPortalCapabilityOnlyAfterExactOwnershipVerification()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase($"webhook-portal-binding-{Guid.NewGuid():N}")
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase($"webhook-portal-binding-{Guid.NewGuid():N}")
             .Options;
         await using var context = new ExploreDbContext(options);
         var tenantId = Guid.CreateVersion7();
@@ -104,8 +102,15 @@ public sealed class WebhookMigrationAndPortalPersistenceTests(PostgreSqlContaine
         await Assert.That(binding.FindProperty(nameof(WebhookConsumerProviderBinding.InstanceId))).IsNotNull();
         await Assert.That(binding.FindProperty(nameof(WebhookConsumerProviderBinding.ApplicationUid))).IsNotNull();
         await Assert.That(binding.FindProperty(nameof(WebhookConsumerProviderBinding.VerificationStateId))).IsNotNull();
-        await Assert.That(binding.GetIndexes().Select(index => index.GetDatabaseName()))
-            .Contains("ux_webhook_provider_bindings_provider_environment_application_uid");
+        IIndex normalizedIdentity = binding.GetIndexes().Single(index =>
+            index.Properties.Select(property => property.Name).SequenceEqual(
+            [
+                nameof(WebhookConsumerProviderBinding.ProviderKindId),
+                nameof(WebhookConsumerProviderBinding.NormalizedEnvironment),
+                nameof(WebhookConsumerProviderBinding.NormalizedApplicationUid)
+            ]));
+        await Assert.That(normalizedIdentity.IsUnique).IsTrue();
+        await Assert.That(normalizedIdentity.GetFilter()).IsNull();
     }
 
     [Test]
@@ -113,18 +118,20 @@ public sealed class WebhookMigrationAndPortalPersistenceTests(PostgreSqlContaine
     {
         await fixture.ResetAsync();
         await using var context = fixture.CreateDbContext();
+        string schema = context.Model.GetDefaultSchema()
+            ?? throw new InvalidOperationException("The event model must declare a default schema.");
         string[] tables = await context.Database.SqlQueryRaw<string>(
                 """
                 SELECT table_name AS "Value"
                 FROM information_schema.tables
-                WHERE table_schema = 'public'
+                WHERE table_schema = {0}
                   AND table_name IN (
                       'webhook_provider_links',
                       'webhook_provider_publications',
                       'webhook_provider_publication_attempts',
                       'webhook_delivery_plan_snapshots',
                       'webhook_local_target_snapshots')
-                """)
+                """, schema)
             .ToArrayAsync();
 
         await Assert.That(tables).DoesNotContain("webhook_provider_links");
@@ -136,7 +143,7 @@ public sealed class WebhookMigrationAndPortalPersistenceTests(PostgreSqlContaine
 
     private static ExploreDbContext CreateRelationalContext()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql("Host=localhost;Database=webhook_model;Username=unused;Password=unused")
             .UseSnakeCaseNamingConvention()
             .Options;

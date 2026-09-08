@@ -1,6 +1,3 @@
-// ABOUTME: Tests for HierarchicalSettingsResolver covering cascade, locks, batch loading, and scope validation.
-// ABOUTME: Uses relational SMTP writes and isolated repository substitutes for existing cascade tests.
-
 namespace Explore.Infrastructure.Tests.Settings;
 
 using System.Collections.Immutable;

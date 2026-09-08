@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for creating an event session group such as a track or stage.
-// ABOUTME: Secured through the canonical event_session_group resource kind.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventSessionGroup;
 using Explore.Application.Responses;

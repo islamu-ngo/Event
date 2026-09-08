@@ -1,6 +1,3 @@
-// ABOUTME: Canonical category codes for per-user notification opt-in and unsubscribe preferences.
-// ABOUTME: Shared by unsubscribe endpoints, dispatch-time consent checks, and future notification settings UI.
-
 namespace Explore.Domain.Constants;
 
 public static class NotificationPreferenceCategories

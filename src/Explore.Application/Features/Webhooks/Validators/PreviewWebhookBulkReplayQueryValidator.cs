@@ -1,6 +1,3 @@
-// ABOUTME: Validates explicit UTC filters and bounded selection for webhook bulk replay previews.
-// ABOUTME: Rejects empty tenant IDs, inverted windows, empty optional IDs, and oversized event types.
-
 using Explore.Application.Features.Webhooks.Requests.Queries;
 using Explore.Domain;
 using FluentValidation;

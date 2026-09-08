@@ -1,6 +1,3 @@
-// ABOUTME: Defines account- and capability-scoped registration payment start and safe retry commands.
-// ABOUTME: Commands carry only order lineage and never accept provider URLs, amounts, or provider identifiers.
-
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Authorization;
 using MediatR;

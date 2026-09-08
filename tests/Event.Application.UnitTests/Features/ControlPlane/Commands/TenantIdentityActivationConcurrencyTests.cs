@@ -1,6 +1,3 @@
-// ABOUTME: Event-controlled concurrency proof for tenant activation and identity PATCH.
-// ABOUTME: Verifies the shared tenant identity lease prevents Active plus Activation-unready state.
-
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;

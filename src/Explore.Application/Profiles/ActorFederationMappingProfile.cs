@@ -1,6 +1,3 @@
-// ABOUTME: AutoMapper profile for Actor and StorageObject entities.
-// ABOUTME: Split from monolithic MappingProfile.cs for domain-cohesion.
-
 using AutoMapper;
 using Explore.Application.DTOs.Actor;
 using Explore.Application.DTOs.StorageObject;

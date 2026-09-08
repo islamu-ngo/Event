@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for AI provider readiness reporting and safe health data.
-// ABOUTME: Ensures health output surfaces configuration state without leaking endpoints or secrets.
-
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Infrastructure.Ai;
 using Microsoft.Extensions.Hosting;

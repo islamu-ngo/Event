@@ -1,6 +1,3 @@
-// ABOUTME: Organizer-facing read contexts for event creation, program, and publish readiness screens.
-// ABOUTME: Read-only composition over management queries; all mutations live in sibling controllers.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

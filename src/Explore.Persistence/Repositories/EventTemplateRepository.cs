@@ -1,6 +1,3 @@
-// ABOUTME: Repository implementation for EventTemplate CRUD with nested definitions and options.
-// ABOUTME: Supports versioned template management, transactional definition persistence, and publishing queries.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;

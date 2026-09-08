@@ -1,6 +1,3 @@
-// ABOUTME: Exposes isolated staff and scanner admission check-in HTTP surfaces with bounded HAL results.
-// ABOUTME: Keeps scanner scope principal-owned and staff scope event-authorized without mixing credentials.
-
 using System.ComponentModel.DataAnnotations;
 using Asp.Versioning;
 using Explore.API.Attributes;

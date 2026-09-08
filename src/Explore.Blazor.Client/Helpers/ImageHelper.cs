@@ -1,6 +1,3 @@
-// ABOUTME: Shared helper for generating local fallback images when no actual image is available.
-// ABOUTME: Keeps production pages independent from external placeholder image services.
-
 using System.Net;
 
 namespace Explore.Blazor.Client.Helpers;

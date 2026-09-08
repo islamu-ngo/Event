@@ -1,6 +1,3 @@
-// ABOUTME: Architecture tests for the multi-theme appearance subsystem.
-// ABOUTME: Verifies enum completeness, BFF endpoint coverage, and resolution service contract integrity.
-
 namespace Event.Architecture.Tests;
 
 using Explore.API.Controllers;

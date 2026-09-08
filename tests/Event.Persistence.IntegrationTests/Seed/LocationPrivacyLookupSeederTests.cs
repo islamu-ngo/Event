@@ -1,6 +1,3 @@
-// ABOUTME: Verifies EF model and runtime-seeder parity for event-location privacy lookups.
-// ABOUTME: Covers exact IDs/codes, missing-row repair, idempotency, and the model HasData prohibition.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
@@ -30,8 +27,8 @@ public sealed class LocationPrivacyLookupSeederTests
     [Test]
     public async Task PublicRuntimeSeederSeedsExactLocationPrivacyRows()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase($"event-location-privacy-public-seeder-{Guid.NewGuid():N}")
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase($"event-location-privacy-public-seeder-{Guid.NewGuid():N}")
             .Options;
 
         await using var context = new ExploreDbContext(options);
@@ -43,8 +40,8 @@ public sealed class LocationPrivacyLookupSeederTests
     [Test]
     public async Task RuntimeSeederRepairsMissingRowsAndRemainsIdempotent()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase($"event-location-privacy-lookups-{Guid.NewGuid():N}")
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase($"event-location-privacy-lookups-{Guid.NewGuid():N}")
             .Options;
 
         await using var context = new ExploreDbContext(options);
@@ -75,7 +72,7 @@ public sealed class LocationPrivacyLookupSeederTests
 
     private static ExploreDbContext CreateModelContext()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql("Host=localhost;Database=location_privacy_model;Username=unused;Password=unused")
             .UseSnakeCaseNamingConvention()
             .Options;

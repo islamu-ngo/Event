@@ -1,6 +1,3 @@
-// ABOUTME: Refit interface for same-origin BFF authentication utility endpoints.
-// ABOUTME: Keeps login-provider discovery, auth-scheme refresh, session refresh, and setup-secret cleanup behind the BFF.
-
 using Refit;
 
 namespace Explore.Blazor.Client.Services;

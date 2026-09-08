@@ -1,6 +1,3 @@
-// ABOUTME: EF Core implementation of the custom-property projection rebuild status repository.
-// ABOUTME: Provides upsert, state transitions, and multi-tenant fan-out reads for operator dashboards.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

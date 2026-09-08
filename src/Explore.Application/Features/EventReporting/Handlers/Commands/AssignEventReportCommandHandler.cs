@@ -1,6 +1,3 @@
-// ABOUTME: Handles local moderator assignment for an event-report case.
-// ABOUTME: Requires active tenant users and stale-write protection before moving a case to Assigned.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventReporting.Requests.Commands;

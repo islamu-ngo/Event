@@ -1,6 +1,3 @@
-// ABOUTME: Provides source-generated JSON metadata for Setup live wire data.
-// ABOUTME: Preserves strict camel-case, case-sensitive, compact transport behavior.
-
 namespace ISLAMU.Wire.Contracts.SetupLive;
 
 using System.Text.Json;

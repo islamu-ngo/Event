@@ -1,6 +1,3 @@
-// ABOUTME: Bridges Explore.Blazor BFF state services to neutral Event.Web.BffHosting adapter contracts.
-// ABOUTME: Preserves circuit-aware token, tenant route, setup-secret, and support-access forwarding behavior.
-
 using System.Security.Claims;
 using Event.Web.BffHosting.Security;
 using Event.Web.BffHosting.Abstractions;

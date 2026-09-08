@@ -1,6 +1,3 @@
-// ABOUTME: Repository implementation for shared Layer 3 custom-property definitions used by organizations and groups.
-// ABOUTME: Supports namespaced machine-key lookups plus transactional option persistence for the first CQRS slice.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

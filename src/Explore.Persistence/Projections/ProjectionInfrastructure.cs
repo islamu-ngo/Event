@@ -1,6 +1,3 @@
-// ABOUTME: Shared infrastructure for custom-property projection locking, FNV hashing, and chunking.
-// ABOUTME: Delegates provider coordination while retaining deterministic provider-neutral helpers.
-
 using Explore.Persistence.Database.ProviderPrimitives;
 
 namespace Explore.Persistence.Projections;

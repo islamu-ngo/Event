@@ -1,6 +1,3 @@
-// ABOUTME: Repository interface for UserAppearanceProfile — user-owned theme snapshots with lineage tracking.
-// ABOUTME: Supports finding profiles by user/scope, finding existing clones, and managing defaults.
-
 namespace Explore.Application.Contracts.Persistence;
 
 using Explore.Domain;

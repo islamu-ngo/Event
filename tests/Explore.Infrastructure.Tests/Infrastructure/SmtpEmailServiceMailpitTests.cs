@@ -1,6 +1,3 @@
-// ABOUTME: Mailpit-backed integration tests for SmtpEmailService.
-// ABOUTME: Proves MailKit SMTP sends and connection checks work against local test infrastructure.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Models;
 using Explore.Infrastructure.Mail;

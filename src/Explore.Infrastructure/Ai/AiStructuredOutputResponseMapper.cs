@@ -1,6 +1,3 @@
-// ABOUTME: Validates and parses opt-in structured-output assistant responses for AI adapters.
-// ABOUTME: Keeps provider JSON response-format handling safe without leaking raw model output in errors.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure.Ai;
 

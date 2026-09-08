@@ -1,6 +1,3 @@
-// ABOUTME: Verifies purpose-separated server-private ATProto bootstrap and session assertions.
-// ABOUTME: Proves exact route, method, tenant, and authenticated-session identity binding.
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Cryptography;
 using System.Text.Json;

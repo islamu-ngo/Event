@@ -1,5 +1,3 @@
-// ABOUTME: Defines bound anonymous proof issuance and validated internal allocation/recovery authority.
-// ABOUTME: Separates original fresh-allocation expiry from exact committed recovery and durable intake quotas.
 
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;

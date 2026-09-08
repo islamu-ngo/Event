@@ -1,6 +1,3 @@
-// ABOUTME: Tests the ConsentState enum values and state machine completeness.
-// ABOUTME: Ensures the 7-state consent lifecycle is correctly defined for AnalyticsInitializer.
-
 using Explore.Blazor.Client.Models.Analytics;
 
 namespace Explore.Blazor.Client.Tests.Models.Analytics;

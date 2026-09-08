@@ -1,6 +1,3 @@
-// ABOUTME: Shared validation helpers for event-reporting domain entities.
-// ABOUTME: Centralizes bounded string, enum, Guid, and score checks without external dependencies.
-
 namespace Explore.Domain;
 
 internal static class EventReportGuards

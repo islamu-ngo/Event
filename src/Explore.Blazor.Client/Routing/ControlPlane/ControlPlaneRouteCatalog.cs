@@ -1,6 +1,3 @@
-// ABOUTME: Provides a route catalog for Event control-plane navigation and host registration.
-// ABOUTME: Centralizes shared route metadata so embedded and separate hosts do not duplicate route strings.
-
 namespace Explore.Blazor.Client.Routing.ControlPlane;
 
 public sealed class ControlPlaneRouteCatalog : IControlPlaneRouteCatalog

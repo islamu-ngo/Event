@@ -1,6 +1,3 @@
-// ABOUTME: Guards Application persistence contracts for User-owned local and provider erasure reads.
-// ABOUTME: Requires bounded concrete collections and forbids IQueryable leakage.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using TUnit.Core;

@@ -1,6 +1,3 @@
-// ABOUTME: Browser-to-BFF request model for Local Identity login.
-// ABOUTME: Redacts credential values from diagnostic text while carrying safe return navigation.
-
 using System.Text.Json.Serialization;
 
 namespace Explore.Blazor.Models;

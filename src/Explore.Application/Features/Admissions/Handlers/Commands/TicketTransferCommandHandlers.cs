@@ -1,6 +1,3 @@
-// ABOUTME: Orchestrates ticket-transfer acceptance, cancellation, correction, and reissue through CQRS.
-// ABOUTME: Derives tenant/user/time and bearer digests server-side, returning only bounded state and one-time secrets.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

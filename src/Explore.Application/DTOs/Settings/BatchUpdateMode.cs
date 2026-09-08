@@ -1,6 +1,3 @@
-// ABOUTME: Enum controlling batch update behavior when locked settings are encountered.
-// ABOUTME: BestEffort for autosave (skip locked, apply rest); Strict for admin (reject all if any locked).
-
 namespace Explore.Application.DTOs.Settings;
 
 /// <summary>

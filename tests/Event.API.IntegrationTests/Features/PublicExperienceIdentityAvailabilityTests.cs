@@ -1,6 +1,3 @@
-// ABOUTME: Specifies anonymous HTTP failure semantics when public legal identity is unavailable.
-// ABOUTME: Requires identical non-cacheable RFC 7807 responses for settings and shell endpoints.
-
 namespace Event.Api.IntegrationTests.Features;
 
 using Explore.API.Controllers;

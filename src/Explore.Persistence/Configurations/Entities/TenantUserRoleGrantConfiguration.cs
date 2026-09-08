@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for tenant-local user role grants.
-// ABOUTME: Enforces tenant-user ownership, tenant role scope, active-grant uniqueness, and revoke lifecycle.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Microsoft.EntityFrameworkCore;

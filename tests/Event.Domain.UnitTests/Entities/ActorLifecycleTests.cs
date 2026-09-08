@@ -1,6 +1,3 @@
-// ABOUTME: Proves Actor lifecycle transitions preserve identity and immutable moderation evidence.
-// ABOUTME: Covers owner XOR, audit/concurrency mutation, retirement, suspension, and rejected transitions.
-
 namespace Event.Domain.UnitTests.Entities;
 
 using Explore.Domain.Enums;

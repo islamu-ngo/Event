@@ -1,6 +1,3 @@
-// ABOUTME: Defines tenant-governed workspace-shell defaults and personal shell preferences.
-// ABOUTME: Separates lockable instance/tenant policy from non-lockable user-only layout state.
-
 namespace Explore.Domain.Settings.Definitions;
 
 using Explore.Domain.Constants;

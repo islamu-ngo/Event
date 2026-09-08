@@ -1,6 +1,3 @@
-// ABOUTME: JS-module adapter for explicit, low-accuracy browser geolocation on the discovery home page.
-// ABOUTME: Fails closed during prerender, denial, timeout, disconnection, or unsupported browser execution.
-
 using Explore.Blazor.Client.Contracts.Interop;
 using Microsoft.JSInterop;
 

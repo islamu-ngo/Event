@@ -1,6 +1,3 @@
-// ABOUTME: Optional organizer entity payload for provider-provisioned tenants.
-// ABOUTME: Creates either an approved Organization actor or an approved Group actor inside the tenant.
-
 namespace Explore.Application.DTOs.ManagedProviderProvisioning;
 
 public sealed record ManagedProviderOrganizerDto

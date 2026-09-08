@@ -1,6 +1,3 @@
-// ABOUTME: Owns deterministic search, cancellation, keyboard navigation, and selection state.
-// ABOUTME: Ensures only the latest private address request can update rendered results.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Services;

@@ -1,6 +1,3 @@
-// ABOUTME: Authenticates setup-secret authority only for canonical provider settings and Local first-run routes.
-// ABOUTME: Fails closed without placing setup secret material in principals, logs, responses, or exceptions.
-
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Explore.API.ExceptionHandling;

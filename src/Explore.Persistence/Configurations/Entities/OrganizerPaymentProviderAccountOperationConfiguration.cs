@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for durable organizer payment account-create operation fences.
-// ABOUTME: Enforces portable active-scope uniqueness and tenant-safe optional connection binding.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

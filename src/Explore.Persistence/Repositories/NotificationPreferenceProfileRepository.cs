@@ -1,6 +1,3 @@
-// ABOUTME: Persistence repository for scoped notification preference profile rows.
-// ABOUTME: Provides tenant-safe global mute hierarchy reads for notification preference resolution.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

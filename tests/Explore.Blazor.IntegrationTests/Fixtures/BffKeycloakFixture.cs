@@ -1,6 +1,3 @@
-// ABOUTME: Keycloak container fixture for BFF security integration tests.
-// ABOUTME: Imports the ISLAMU test realm with per-instance credentials injected in memory for OIDC tests.
-
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;

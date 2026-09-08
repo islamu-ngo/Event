@@ -1,6 +1,3 @@
-// ABOUTME: Maps durable fenced registration-finalization effects and their worker polling index.
-// ABOUTME: Enforces one effect per tenant order so duplicate completion evidence converges.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

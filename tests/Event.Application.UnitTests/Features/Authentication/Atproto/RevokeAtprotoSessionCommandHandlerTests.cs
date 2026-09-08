@@ -1,6 +1,3 @@
-// ABOUTME: Tests authenticated ATProto session revocation through the exact tenant/user/DID gateway scope.
-// ABOUTME: Proves validation precedes remote work and bounded outcomes preserve idempotent local sign-out.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Authentication.Atproto.Handlers.Commands;
 using Explore.Application.Features.Authentication.Atproto.Models;

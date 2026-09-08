@@ -1,6 +1,3 @@
-// ABOUTME: Query to retrieve all projection rows for a specific event session with optional exposure ceiling.
-// ABOUTME: Used for admin inspection and future aggregate view composition.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Application.Responses;

@@ -1,6 +1,3 @@
-// ABOUTME: Persists an AI-proposed action that must be confirmed before side effects occur.
-// ABOUTME: Encapsulates confirmation, rejection, execution, and failure transitions for auditability.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-scoped operational control row for Basic Dispatch Mode email sending.
-// ABOUTME: Stores tenant-isolated operator controls, delivery-policy revisions, and optional suppression history.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

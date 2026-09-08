@@ -1,6 +1,3 @@
-// ABOUTME: Maps stable public event action health lookup rows without model-owned seed data.
-// ABOUTME: Keeps integer IDs and durable business codes aligned with runtime lookup repair.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

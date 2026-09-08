@@ -1,6 +1,3 @@
-// ABOUTME: Record describing a supported culture — display metadata + RTL flag.
-// ABOUTME: Consumed by CultureRegistry; single source of truth for all culture display fields.
-
 namespace Explore.Domain.Common.Localization;
 
 /// <summary>

@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos policy for tenant/event-bound registration-form authoring.
-# ABOUTME: Restricts every authoring action to verified organizer controllers or explicitly assigned registration managers.
-
 apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   resource: "islamuevent_registration_form"

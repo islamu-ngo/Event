@@ -1,6 +1,3 @@
-// ABOUTME: S3-compatible implementation of the provider-neutral file storage contract.
-// ABOUTME: Streams uploads through the AWS SDK while preserving server-generated keys and storage status checks.
-
 using System.Globalization;
 using System.Security.Cryptography;
 using Amazon.S3;

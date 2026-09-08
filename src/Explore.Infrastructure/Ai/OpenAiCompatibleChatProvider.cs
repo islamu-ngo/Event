@@ -1,6 +1,3 @@
-// ABOUTME: Implements the OpenAI-compatible chat provider adapter using raw HTTP and platform contracts.
-// ABOUTME: Maps chat completions and tool calls into safe provider-neutral results without SDK leakage.
-
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;

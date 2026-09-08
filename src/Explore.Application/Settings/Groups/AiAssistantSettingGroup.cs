@@ -1,6 +1,3 @@
-// ABOUTME: Strongly-typed AI assistant setting group resolved via hierarchical settings cascade.
-// ABOUTME: Encapsulates enablement and integration credential presence checks.
-
 namespace Explore.Application.Settings.Groups;
 
 using Explore.Application.Contracts.Infrastructure;

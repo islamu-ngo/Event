@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning a single file type by ID.
-// ABOUTME: Maps FileType entity to FileTypeDto.
 using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;

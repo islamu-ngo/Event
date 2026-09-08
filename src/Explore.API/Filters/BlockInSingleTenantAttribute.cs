@@ -1,6 +1,3 @@
-// ABOUTME: Authorization filter that blocks endpoints in single-tenant deployment mode.
-// ABOUTME: Returns 404 to hide platform-admin endpoints from discovery in simplified deployments.
-
 using Explore.Application.Contracts.Services;
 using Explore.Infrastructure;
 using Microsoft.AspNetCore.Mvc;

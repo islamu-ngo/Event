@@ -1,6 +1,3 @@
-// ABOUTME: Verifies signed Stripe Connect account webhooks and maps them to tenant-owned connections.
-// ABOUTME: Uses Stripe.net signature validation while keeping SDK types inside Infrastructure.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Secrets;

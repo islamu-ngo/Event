@@ -1,6 +1,3 @@
-// ABOUTME: Observable state service for shell-level AI assistant rail open/close and effective availability.
-// ABOUTME: Combines tenant policy, viewer authentication state, and user navbar preference.
-
 namespace Explore.Blazor.Client.Services;
 
 public sealed class AiAssistantState

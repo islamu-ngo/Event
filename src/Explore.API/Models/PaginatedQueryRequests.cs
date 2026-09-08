@@ -1,6 +1,3 @@
-// ABOUTME: Query-bound request models for shared paginated API list validation.
-// ABOUTME: Converts abusive page/filter query parameters into early ApiController validation failures.
-
 using System.ComponentModel.DataAnnotations;
 using Explore.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;

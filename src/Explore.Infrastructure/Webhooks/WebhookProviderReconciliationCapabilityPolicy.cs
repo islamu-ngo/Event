@@ -1,6 +1,3 @@
-// ABOUTME: Provider/version capability boundary for automatic publication-acceptance reconciliation.
-// ABOUTME: Enables exact lookup only for a deployment profile with nonzero conformance evidence.
-
 using Explore.Domain;
 
 namespace Explore.Infrastructure.Webhooks;

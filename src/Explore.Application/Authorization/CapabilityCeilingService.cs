@@ -1,6 +1,3 @@
-// ABOUTME: Capability ceiling enforcement with 4 anti-escalation rules.
-// ABOUTME: Prevents privilege escalation in custom role creation and permission assignment.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

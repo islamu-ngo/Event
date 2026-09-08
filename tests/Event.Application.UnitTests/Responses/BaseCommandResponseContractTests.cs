@@ -1,19 +1,21 @@
-// ABOUTME: Specifies the immutable BaseCommandResponse result and named valid-state factory contract.
-// ABOUTME: Covers every concrete descendant, generated JSON metadata, valid states, and complete payload preservation.
-
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.DTOs.ControlPlane;
 using Explore.Application.DTOs.EmailDispatch;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.DTOs.StorageObject;
 using Explore.Application.DTOs.SupportAccess;
 using Explore.Application.DTOs.Webhooks;
+using Explore.Application.Features.Authentication.Atproto.Models;
+using Explore.Application.Features.Authentication.Local.Models;
+using Explore.Application.Features.RegistrationOrders.Commands;
 using Explore.Application.Features.Promotions;
+using Explore.Domain;
 using Explore.Application.Features.Promotions.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Serialization;
@@ -34,21 +36,21 @@ public sealed class BaseCommandResponseContractTests
     private static readonly DateTime FixtureUtc = new(2026, 8, 25, 12, 0, 0, DateTimeKind.Utc);
     private static readonly DateTimeOffset FixtureOffset = new(2026, 8, 25, 12, 0, 0, TimeSpan.Zero);
 
-    private static readonly Type[] ExpectedConcreteDescendantTypes =
-    [
-        typeof(CreateExternalApiKeyCommandResponse),
-        typeof(GuestRegistrationOrderLifecycleResponseDto),
-        typeof(GuestRegistrationOrderStartDto),
-        typeof(RegistrationMaterialChangeChoiceCommandResultDto),
-        typeof(RegistrationOrderLifecycleResponseDto),
-        typeof(RegistrationPaymentCommandResultDto),
-        typeof(RegistrationRefundCommandResultDto),
-        typeof(SupportAccessSessionCommandResponseDto),
-        typeof(PromotionCodeIssuedCommandResponseDto),
-        typeof(PromotionManagementCommandResponseDto),
-        typeof(PromotionRedemptionResponseDto),
-        typeof(WebhookProviderPortalAccessCommandResponse),
-    ];
+    private static readonly Type[] ConcreteDescendantTypes = typeof(BaseCommandResponse<>).Assembly.GetTypes()
+        .Where(type => type is { IsClass: true, IsAbstract: false, ContainsGenericParameters: false }
+            && DerivesFromBaseCommandResponse(type))
+        .OrderBy(type => type.FullName, StringComparer.Ordinal)
+        .ToArray();
+
+    // Internal factory-only CQRS results are not wire DTOs. A JSON constructor or source-generation
+    // registration opts a response into the complete wire-contract checks below; neither can silently drift.
+    private static readonly Type[] WireDescendantTypes = ConcreteDescendantTypes
+        .Where(type => type.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            .Any(constructor => constructor.GetCustomAttribute<JsonConstructorAttribute>() is not null)
+            || typeof(ExploreJsonContext).GetCustomAttributesData()
+                .Any(registration => registration.AttributeType == typeof(JsonSerializableAttribute)
+                    && registration.ConstructorArguments[0].Value as Type == type))
+        .ToArray();
 
     private static readonly Type[] RegisteredResponseTypes =
     [
@@ -56,7 +58,7 @@ public sealed class BaseCommandResponseContractTests
         typeof(BaseCommandResponse<ControlPlaneTenantLifecycleTransitionDto>),
         typeof(BaseCommandResponse<IReadOnlyList<EmailDispatchStatusDto>>),
         typeof(BaseCommandResponse<StorageUploadSessionDto>),
-        .. ExpectedConcreteDescendantTypes,
+        .. WireDescendantTypes,
     ];
 
     private static readonly string[] BaseJsonPropertyNames =
@@ -107,20 +109,14 @@ public sealed class BaseCommandResponseContractTests
     ];
 
     [Test]
-    public async Task ConcreteDescendantInventoryIsExactlyTheTwelveOwnedResponseTypes()
+    public async Task EveryDiscoveredDescendantHasExecutableFactoryAndApplicableWireScenarios()
     {
-        Type[] actual = typeof(BaseCommandResponse<>).Assembly.GetTypes()
-            .Where(type => type is { IsClass: true, IsAbstract: false, ContainsGenericParameters: false }
-                && type != typeof(BaseCommandResponse<>)
-                && DerivesFromBaseCommandResponse(type))
-            .OrderBy(type => type.FullName, StringComparer.Ordinal)
-            .ToArray();
-
-        await Assert.That(actual.Select(type => type.FullName).SequenceEqual(
-            ExpectedConcreteDescendantTypes
-                .OrderBy(type => type.FullName, StringComparer.Ordinal)
-                .Select(type => type.FullName),
-            StringComparer.Ordinal)).IsTrue();
+        await Assert.That(CreateDerivedFactoryScenarios().Select(scenario => scenario.ResponseType))
+            .IsEquivalentTo(ConcreteDescendantTypes)
+            .Because("Every concrete response needs executable success, failure, payload and invalid-state coverage.");
+        await Assert.That(CreateDerivedWireScenarios().Select(scenario => scenario.ResponseType))
+            .IsEquivalentTo(WireDescendantTypes)
+            .Because("Every response declaring JSON construction or generated metadata needs complete wire round-trip coverage.");
     }
 
     [Test]
@@ -164,7 +160,7 @@ public sealed class BaseCommandResponseContractTests
     }
 
     [Test]
-    public async Task EveryConcreteDescendantRoundTripsItsCompleteRelevantPayloadJson()
+    public async Task EveryWireDescendantRoundTripsItsCompleteRelevantPayloadJson()
     {
         DerivedWireScenario[] scenarios = CreateDerivedWireScenarios();
 
@@ -189,7 +185,7 @@ public sealed class BaseCommandResponseContractTests
     [Test]
     public async Task PublicResponseStateHasNoSetterOrConstructorEscapeHatch()
     {
-        Type[] responseTypes = [typeof(BaseCommandResponse<Guid>), .. ExpectedConcreteDescendantTypes];
+        Type[] responseTypes = [typeof(BaseCommandResponse<Guid>), .. ConcreteDescendantTypes];
         string[] publicSetters = responseTypes
             .SelectMany(type => type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
             .Where(property => property.SetMethod?.IsPublic == true)
@@ -211,7 +207,7 @@ public sealed class BaseCommandResponseContractTests
     [Test]
     public async Task JsonConstructorsAreInternalAndBindTheIsSuccessClrState()
     {
-        Type[] responseTypes = [typeof(BaseCommandResponse<Guid>), .. ExpectedConcreteDescendantTypes];
+        Type[] responseTypes = [typeof(BaseCommandResponse<Guid>), .. WireDescendantTypes];
 
         foreach (Type responseType in responseTypes)
         {
@@ -254,7 +250,7 @@ public sealed class BaseCommandResponseContractTests
     public async Task InstanceSuccessStateIsReadableAsIsSuccessWithoutHidingTheSuccessFactory()
     {
         Type responseType = typeof(BaseCommandResponse<Guid>);
-        Type[] responseTypes = [responseType, .. ExpectedConcreteDescendantTypes];
+        Type[] responseTypes = [responseType, .. ConcreteDescendantTypes];
 
         foreach (Type contractType in responseTypes)
         {
@@ -617,11 +613,18 @@ public sealed class BaseCommandResponseContractTests
                 .Where(method => method.ReturnType == scenario.ResponseType)
                 .OrderBy(method => method.Name, StringComparer.Ordinal)
                 .ToArray();
+            string[] expectedFactoryNames = scenario.ResponseType == typeof(LocalCredentialIssueCommandResponse)
+                ? ["Failure", "Issued", "Replayed"]
+                : scenario.ResponseType == typeof(AnonymousRegistrationChallengeIssueResult)
+                    ? ["Denied", "Issued"]
+                    : ConcreteFactoryNames;
             await Assert.That(declaredFactories.Select(method => method.Name).SequenceEqual(
-                ConcreteFactoryNames,
+                expectedFactoryNames,
                 StringComparer.Ordinal)).IsTrue();
 
-            MethodInfo successFactory = declaredFactories.Single(method => method.Name == "Success");
+            string successFactoryName = scenario.ResponseType == typeof(LocalCredentialIssueCommandResponse)
+                || scenario.ResponseType == typeof(AnonymousRegistrationChallengeIssueResult) ? "Issued" : "Success";
+            MethodInfo successFactory = declaredFactories.Single(method => method.Name == successFactoryName);
             string[] expectedParameterNames = scenario.Facts.Keys.Order(StringComparer.OrdinalIgnoreCase).ToArray();
             string[] actualParameterNames = successFactory.GetParameters()
                 .Select(parameter => parameter.Name!)
@@ -659,6 +662,12 @@ public sealed class BaseCommandResponseContractTests
             {
                 await Assert.That(scenario.ResponseType.GetProperty(propertyName)!.GetValue(success))
                     .IsEqualTo(expected);
+            }
+
+            if (scenario.ResponseType == typeof(AnonymousRegistrationChallengeIssueResult))
+            {
+                await AssertAnonymousChallengeDenials();
+                continue;
             }
 
             if (scenario.ResponseType == typeof(WebhookProviderPortalAccessCommandResponse))
@@ -792,7 +801,7 @@ public sealed class BaseCommandResponseContractTests
     }
 
     [Test]
-    public async Task EveryConcreteDescendantIsRegisteredAndPreservesPayloadThroughExploreJsonContext()
+    public async Task EveryWireDescendantIsRegisteredAndPreservesPayloadThroughExploreJsonContext()
     {
         var missing = new List<string>();
 
@@ -871,8 +880,16 @@ public sealed class BaseCommandResponseContractTests
         PromotionManagementDto promotion = CreatePromotion();
         WebhookProviderPortalAccessDto portal = CreatePortal();
 
+        AtprotoTransientValue transient = CreateTransientValue();
+        LocalCredentialIssueDto issue = LocalCredentialIssueDto.Issued(CreateCredentialOperation(), SyntheticReveal);
+        AnonymousRegistrationChallengeDto challenge = CreateAnonymousChallenge();
+
         return
         [
+            Factory(typeof(AnonymousRegistrationChallengeIssueResult),
+                Facts(("eventId", RelatedId), ("challenge", challenge)), ("Challenge", challenge)),
+            Factory(typeof(LocalCredentialIssueCommandResponse), Facts(("issue", issue)), ("Issue", issue)),
+            Factory(typeof(AtprotoTransientCommandResult), Facts(("value", transient)), ("Value", transient)),
             Factory(typeof(CreateExternalApiKeyCommandResponse),
                 Facts(("id", ResultId), ("message", "result.created"),
                     ("apiKey", SyntheticReveal), ("keyId", SyntheticKeyId)),
@@ -924,6 +941,175 @@ public sealed class BaseCommandResponseContractTests
                 ("IsRetryable", true)),
         ];
     }
+
+    [Test]
+    public async Task PrivateTransientFactoriesBindRowIdentityAndClearPayloadForEveryFailureState()
+    {
+        AtprotoTransientValue value = CreateTransientValue();
+        AtprotoTransientCommandResult success = AtprotoTransientCommandResult.Success(value);
+        await Assert.That(success.IsSuccess).IsTrue();
+        await Assert.That(success.Id).IsEqualTo(value.Id);
+        await Assert.That(success.Value).IsEqualTo(value);
+        await Assert.That(success).IsEqualTo(AtprotoTransientCommandResult.Success(value with { }));
+        await Assert.That(success).IsNotEqualTo(AtprotoTransientCommandResult.Success(value with { TenantId = RelatedId }));
+
+        BaseCommandResponse<Guid>[] failures =
+        [
+            BaseCommandResponse.Validation<Guid>(OneValidationError),
+            BaseCommandResponse.NotFound<Guid>(),
+            BaseCommandResponse.Conflict(ResultId),
+            BaseCommandResponse.Authentication<Guid>(),
+            BaseCommandResponse.Authorization<Guid>(),
+            BaseCommandResponse.Quota<Guid>("quota.blocked", CreateQuota()),
+            BaseCommandResponse.Failure<Guid>("transient_unavailable", errors: FeatureErrors),
+        ];
+        foreach (var failure in failures)
+        {
+            AtprotoTransientCommandResult result = AtprotoTransientCommandResult.Failure(failure);
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.Id).IsEqualTo(failure.Id);
+            await Assert.That(result.FailureCode).IsEqualTo(failure.FailureCode);
+            await Assert.That(result.Message).IsEqualTo(failure.Message);
+            await Assert.That(result.Errors ?? []).IsEquivalentTo(failure.Errors ?? []);
+            await Assert.That(result.QuotaExceeded).IsEqualTo(failure.QuotaExceeded);
+            await Assert.That(result.Value).IsNull();
+        }
+        await Assert.That(() => AtprotoTransientCommandResult.Failure(BaseCommandResponse.Success(ResultId)))
+            .Throws<ArgumentException>();
+    }
+
+    [Test]
+    public async Task LocalCredentialFactoriesBindOperationAndNeverRediscloseOnReplayOrFailure()
+    {
+        LocalCredentialOperationStatus operation = CreateCredentialOperation();
+        LocalCredentialIssueDto issued = LocalCredentialIssueDto.Issued(operation, SyntheticReveal);
+        LocalCredentialIssueDto replayed = LocalCredentialIssueDto.Replayed(operation);
+        LocalCredentialIssueCommandResponse success = LocalCredentialIssueCommandResponse.Issued(issued);
+        LocalCredentialIssueCommandResponse replay = LocalCredentialIssueCommandResponse.Replayed(replayed);
+
+        await AssertFactoryParameters(RequireFactory(typeof(LocalCredentialIssueCommandResponse), "Issued"),
+            [Required<LocalCredentialIssueDto>("issue")]);
+        await AssertFactoryParameters(RequireFactory(typeof(LocalCredentialIssueCommandResponse), "Replayed"),
+            [Required<LocalCredentialIssueDto>("issue")]);
+        await Assert.That(success.Id).IsEqualTo(ResultId);
+        await Assert.That(replay.Id).IsEqualTo(ResultId);
+        await Assert.That(replay.IsSuccess).IsTrue();
+        await Assert.That(replay.Issue).IsEqualTo(replayed);
+        await Assert.That(replay.FailureCode).IsNull();
+        await Assert.That(replay.Errors).IsNull();
+        await Assert.That(replay.QuotaExceeded).IsNull();
+        await Assert.That(replay.Issue!.TemporaryPassword).IsNull();
+        JsonObject issuedPayload = Serialize(success.Issue!);
+        JsonObject replayPayload = Serialize(replay.Issue);
+        await Assert.That(issuedPayload["temporaryPassword"]!.GetValue<string>()).IsEqualTo(SyntheticReveal);
+        await Assert.That(issuedPayload["outcome"]!.GetValue<int>()).IsEqualTo((int)LocalCredentialIssueOutcome.Issued);
+        await Assert.That(replayPayload["outcome"]!.GetValue<int>()).IsEqualTo((int)LocalCredentialIssueOutcome.Replayed);
+        await Assert.That(JsonNode.DeepEquals(issuedPayload["operation"], replayPayload["operation"])).IsTrue();
+        await Assert.That(replayPayload.ContainsKey("temporaryPassword")).IsFalse();
+        await Assert.That(Serialize(replay).ToJsonString()).DoesNotContain(SyntheticReveal);
+        await Assert.That(success.ToString()).DoesNotContain(SyntheticReveal);
+
+        BaseCommandResponse<Guid>[] failures =
+        [
+            BaseCommandResponse.Validation<Guid>(OneValidationError, id: ResultId),
+            BaseCommandResponse.NotFound<Guid>(id: ResultId),
+            BaseCommandResponse.Conflict(ResultId),
+            BaseCommandResponse.Authentication<Guid>(),
+            BaseCommandResponse.Authorization<Guid>(),
+            BaseCommandResponse.Quota("quota.blocked", CreateQuota(), id: ResultId),
+            BaseCommandResponse.Failure("local_credential_unavailable", errors: FeatureErrors, id: ResultId),
+        ];
+        foreach (BaseCommandResponse<Guid> failure in failures)
+        {
+            LocalCredentialIssueCommandResponse result = LocalCredentialIssueCommandResponse.Failure(failure);
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.Id).IsEqualTo(failure.Id);
+            await Assert.That(result.FailureCode).IsEqualTo(failure.FailureCode);
+            await Assert.That(result.Message).IsEqualTo(failure.Message);
+            await Assert.That(result.Errors ?? []).IsEquivalentTo(failure.Errors ?? []);
+            await Assert.That(result.QuotaExceeded).IsEqualTo(failure.QuotaExceeded);
+            await Assert.That(result.Issue).IsNull();
+            await Assert.That(Serialize(result).ToJsonString()).DoesNotContain(SyntheticReveal);
+        }
+
+        await Assert.That(() => LocalCredentialIssueCommandResponse.Issued(replayed)).Throws<ArgumentException>();
+        await Assert.That(() => LocalCredentialIssueCommandResponse.Replayed(issued)).Throws<ArgumentException>();
+        await Assert.That(() => LocalCredentialIssueCommandResponse.Issued(null!)).Throws<ArgumentNullException>();
+        await Assert.That(() => LocalCredentialIssueCommandResponse.Replayed(null!)).Throws<ArgumentNullException>();
+        await Assert.That(() => LocalCredentialIssueCommandResponse.Failure(null!)).Throws<ArgumentNullException>();
+        await Assert.That(() => LocalCredentialIssueCommandResponse.Failure(success)).Throws<ArgumentException>();
+    }
+
+    [Test]
+    public async Task AnonymousChallengeIssuanceBindsEventAndPreservesPublicPayloadJson()
+    {
+        AnonymousRegistrationChallengeDto challenge = CreateAnonymousChallenge();
+        AnonymousRegistrationChallengeIssueResult result = AnonymousRegistrationChallengeIssueResult.Issued(RelatedId, challenge);
+        await AssertFactoryParameters(RequireFactory(typeof(AnonymousRegistrationChallengeIssueResult), "Issued"),
+            [Required<Guid>("eventId"), Required<AnonymousRegistrationChallengeDto>("challenge")]);
+        await Assert.That(result.IsSuccess).IsTrue();
+        await Assert.That(result.Id).IsEqualTo(RelatedId);
+        await Assert.That(result.Challenge).IsEqualTo(challenge);
+        JsonObject payload = Serialize(result.Challenge!);
+        var expectedPayload = new JsonObject
+        {
+            ["protectedChallenge"] = SyntheticReveal,
+            ["expiresAt"] = JsonSerializer.SerializeToNode(FixtureOffset.AddMinutes(5), JsonOptions),
+            ["difficulty"] = 18,
+            ["version"] = 1,
+        };
+        await Assert.That(JsonNode.DeepEquals(payload, expectedPayload)).IsTrue();
+        await Assert.That(JsonSerializer.Deserialize<AnonymousRegistrationChallengeDto>(payload.ToJsonString(), JsonOptions))
+            .IsEqualTo(challenge);
+        await Assert.That(result.ToString()).DoesNotContain(SyntheticReveal);
+    }
+
+    private static async Task AssertAnonymousChallengeDenials()
+    {
+        await AssertFactoryParameters(RequireFactory(typeof(AnonymousRegistrationChallengeIssueResult), "Denied"),
+            [Required<Guid>("eventId"), Required<string>("failureCode")]);
+        string[] failureCodes =
+        [
+            "anonymous_registration_challenge_invalid",
+            "anonymous_registration_challenge_unavailable",
+            "anonymous_registration_challenge_configuration_invalid",
+            "anonymous_registration_challenge_quota_exceeded",
+        ];
+        foreach (string failureCode in failureCodes)
+        {
+            AnonymousRegistrationChallengeIssueResult denied = AnonymousRegistrationChallengeIssueResult.Denied(RelatedId, failureCode);
+            await Assert.That(denied.IsSuccess).IsFalse();
+            await Assert.That(denied.Id).IsEqualTo(RelatedId);
+            await Assert.That(denied.FailureCode).IsEqualTo(failureCode);
+            await Assert.That(denied.Errors).IsNull();
+            await Assert.That(denied.QuotaExceeded).IsNull();
+            await Assert.That(denied.Challenge).IsNull();
+            JsonObject json = Serialize(denied);
+            await Assert.That(json["success"]!.GetValue<bool>()).IsFalse();
+            await Assert.That(json["failureCode"]!.GetValue<string>()).IsEqualTo(failureCode);
+            await Assert.That(json["challenge"] is null).IsTrue();
+            await Assert.That(json.ToJsonString()).DoesNotContain(SyntheticReveal);
+        }
+        string?[] invalidCodes = [null, "", " ", FailureCodes.QuotaExceeded, .. CanonicalFactoryFailureCodes];
+        foreach (string? invalidCode in invalidCodes)
+        {
+            await Assert.That(() => AnonymousRegistrationChallengeIssueResult.Denied(RelatedId, invalidCode!))
+                .Throws<ArgumentException>();
+        }
+    }
+
+    private static LocalCredentialOperationStatus CreateCredentialOperation() => new(
+        receipt: new LocalCredentialOperationReceipt(ResultId, LocalCredentialOperationKind.Create,
+            LocalCredentialOperationStage.ChangeRequired, RelatedId, TenantId, ChoiceId, RefundId, FixtureUtc),
+        operationConcurrencyStamp: ChoiceId, verifiedByApplicationUserId: RelatedId,
+        verifiedAt: FixtureUtc, updatedAt: FixtureUtc, isCurrent: true,
+        credentialState: LocalCredentialState.ChangeRequired, resetAudit: null);
+
+    private static AnonymousRegistrationChallengeDto CreateAnonymousChallenge() =>
+        new(SyntheticReveal, FixtureOffset.AddMinutes(5), difficulty: 18, version: 1);
+
+    private static AtprotoTransientValue CreateTransientValue() => new(ResultId, AtprotoTransientPurpose.OAuthState,
+        new string('a', 64), TenantId, SyntheticReveal, FixtureOffset.AddMinutes(1).ToUnixTimeMilliseconds());
 
     private static RegistrationOrderDto CreateOrder() => new()
     {

@@ -1,5 +1,3 @@
-// ABOUTME: Recovers global Local lifecycle operation pointers and linearizes handoff with SMTP policy changes.
-// ABOUTME: Commits Unknown before minting transient tokens; crashes and uncertain SMTP acceptance cannot trigger resend.
 
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;

@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for NotificationItem — handles display logic for type icons, scope colors, relative time.
-// ABOUTME: Maps NotificationTypeName → Material icon and NotificationScopeName → MudBlazor Color. Supports archive/snooze actions.
-
 using Explore.Blazor.Client.Clients;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;

@@ -1,6 +1,3 @@
-// ABOUTME: Typed policy for domain configuration — base domain and tenant custom domain permissions.
-// ABOUTME: Each field is a PolicySlot allowing instance admins to lock tenant domain overrides.
-
 namespace Explore.Domain.Policies;
 
 public sealed class DomainPolicy

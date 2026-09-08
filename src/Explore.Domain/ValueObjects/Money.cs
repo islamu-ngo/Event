@@ -1,6 +1,3 @@
-// ABOUTME: Represents a validated nonnegative amount in normalized integer minor units.
-// ABOUTME: Keeps currency metadata, arithmetic, exchange, and payment lifecycle concerns separate.
-
 using System.Globalization;
 
 namespace Explore.Domain.ValueObjects;

@@ -1,6 +1,3 @@
-// ABOUTME: Registers the external Local Identity migration context when its topology is selected.
-// ABOUTME: Keeps provider and migrator-credential binding inside the Persistence composition boundary.
-
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;

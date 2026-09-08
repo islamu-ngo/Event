@@ -1,6 +1,3 @@
-// ABOUTME: Command request for creating an ad-hoc session-local custom property definition.
-// ABOUTME: Used when organizers add properties directly to a session without a template.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventSessionCustomProperty;
 using Explore.Application.Responses;

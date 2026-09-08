@@ -1,5 +1,3 @@
-// ABOUTME: Verifies committed SMTP policy changes are visible despite warmed process-local settings caches.
-// ABOUTME: Exercises real repositories without local invalidation, as with a write committed by another replica.
 
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;

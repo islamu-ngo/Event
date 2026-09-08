@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL integration tests for public ATProto projection de-duplication against imported Event rows.
-// ABOUTME: Keeps unpublished imports from hiding their still-public federated discovery representation.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

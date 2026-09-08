@@ -1,6 +1,3 @@
-// ABOUTME: Application-owned persistence seam for order-scoped participant assignment materialization.
-// ABOUTME: Returns domain entities and stages PII-free placeholder participants inside the lifecycle transaction.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

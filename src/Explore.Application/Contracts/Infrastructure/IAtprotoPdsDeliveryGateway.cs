@@ -1,6 +1,3 @@
-// ABOUTME: Defines the CarpaNet-free boundary for one idempotent authenticated PDS record operation.
-// ABOUTME: Exposes only bounded outcome codes and settled URI/CID, never provider bodies or credentials.
-
 using Explore.Domain.Federation;
 
 namespace Explore.Application.Contracts.Infrastructure;

@@ -1,6 +1,3 @@
-// ABOUTME: Guest registration checkout endpoints driven by a capability token rather than an account.
-// ABOUTME: The capability header is the only authority here, so every action re-checks it through the command.
-
 using Asp.Versioning;
 using System.Text.Json;
 using Explore.API.Attributes;

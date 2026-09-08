@@ -1,6 +1,3 @@
-// ABOUTME: Builds AWS SDK S3 clients from resolved S3-compatible storage settings.
-// ABOUTME: Normalizes internal and public endpoints for data access and presigned URLs.
-
 using Amazon.S3;
 using Explore.Application.Models;
 

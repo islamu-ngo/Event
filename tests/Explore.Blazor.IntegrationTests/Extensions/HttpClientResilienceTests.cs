@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for BFF-to-API HttpClient resilience behavior.
-// ABOUTME: Verifies interactive server-side API calls tolerate local AI provider latency without unsafe retries.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Extensions;
 using Explore.Blazor.Services;

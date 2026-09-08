@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for OrganizationPolicySet — organization-level governance policy overrides.
-// ABOUTME: Organizations can only override event policies where the tenant allows it.
-
 using Explore.Domain.Policies;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

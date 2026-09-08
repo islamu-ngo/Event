@@ -1,6 +1,3 @@
-// ABOUTME: Defines read-only managed-control-plane and tenant-provisioning queries.
-// ABOUTME: Keeps management reads in the canonical CQRS queries namespace.
-
 using Explore.Application.DTOs.Management;
 using MediatR;
 

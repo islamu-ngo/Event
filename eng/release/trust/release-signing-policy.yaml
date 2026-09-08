@@ -1,5 +1,3 @@
-# ABOUTME: Defines the inactive SSH signer roles, validity, rotation, revocation, and tag-integrity contract.
-# ABOUTME: Uses fixture-only principals and keys until operators provision reviewed production trust material.
 schemaVersion: release-signing-policy.v1
 status: inactive-fixture-only
 allowedAlgorithms:

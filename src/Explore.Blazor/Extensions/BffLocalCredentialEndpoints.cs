@@ -1,5 +1,3 @@
-// ABOUTME: Hosts the restricted first-use Local credential replacement browser boundary.
-// ABOUTME: Applies browser mutation protections without creating an ordinary authenticated session.
 
 using Explore.Blazor.Models;
 using Explore.Blazor.Client.Clients;

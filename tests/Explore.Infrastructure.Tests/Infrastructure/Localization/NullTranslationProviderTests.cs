@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for NullTranslationProvider — verifies all methods are safe no-ops.
-// ABOUTME: Ensures the null provider never throws and returns empty/default values.
-
 using Explore.Infrastructure.Localization;
 using Microsoft.Extensions.Logging;
 using NSubstitute;

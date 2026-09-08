@@ -1,6 +1,3 @@
-// ABOUTME: One Quartz job listener that records duration and outcome for every scheduled job uniformly.
-// ABOUTME: Every method is exception-contained because a listener fault can disrupt the scheduling cycle.
-
 using System.Diagnostics;
 using Explore.Application.Contracts.Scheduling;
 using Quartz;

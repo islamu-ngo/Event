@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for irreversible administrative redaction of unsafe event content.
-// ABOUTME: Uses a dedicated authorization action so heavy moderation does not imply edit authority.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

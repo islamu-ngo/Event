@@ -26,6 +26,11 @@ Event publication, ticket confirmations, and moderation alerts utilize the **Tra
 * Background workers process fanout with deterministic deduplication keys, ensuring idempotent processing even during network interruptions.
 * **Server-Sent Events (SSE)** and **Browser Web Push** deliver non-authoritative wake-up signals; the client always fetches the canonical message from the API.
 
+When a push service reports a retired endpoint (`404` or `410`), the dispatch
+failure and subscription deactivation are stored together. A database failure
+does not leave half-completed cleanup, and another tenant's subscription is
+unaffected. The durable inbox remains available independently of push delivery.
+
 ---
 
 ## 3. Multi-Channel Boundaries

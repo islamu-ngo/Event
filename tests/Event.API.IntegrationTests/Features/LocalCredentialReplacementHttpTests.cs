@@ -1,5 +1,3 @@
-// ABOUTME: Exercises private credential replacement through native HTTP authentication and SQLite Identity state.
-// ABOUTME: Rejects cross-purpose, expired, corrupted, and replayed bearer authority without credential mutation.
 
 using System.IdentityModel.Tokens.Jwt;
 using System.Globalization;

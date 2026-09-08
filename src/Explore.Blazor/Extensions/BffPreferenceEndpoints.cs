@@ -1,6 +1,3 @@
-// ABOUTME: Preference BFF endpoints: appearance, theme mode, language, direction, and current-user info.
-// ABOUTME: For authenticated users the API is authoritative; cookies mirror the server state for anonymous SSR.
-
 namespace Explore.Blazor.Extensions;
 
 using Explore.Blazor.Services.Preferences;

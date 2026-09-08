@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS link policies for event detail and collection resources.
-// ABOUTME: Emits event navigation, management, registration, and organizer subscription affordances.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Collections.Generic;

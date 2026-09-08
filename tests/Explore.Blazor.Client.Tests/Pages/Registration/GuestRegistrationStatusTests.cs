@@ -1,5 +1,3 @@
-// ABOUTME: Exercises private bookmark restoration through real generated clients and rendered status UI.
-// ABOUTME: Uses exact transport/render signals to guard scope, checkout independence, HAL, and explicit save outcomes.
 
 using System.Net;
 using System.Security.Cryptography;

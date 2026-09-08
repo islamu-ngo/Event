@@ -1,6 +1,3 @@
-// ABOUTME: Grouped PATCH contract for updating an existing UI theme with optimistic concurrency.
-// ABOUTME: Route identity is authoritative and omitted metadata, state, or palette groups preserve persisted values.
-
 namespace Explore.Application.DTOs.Appearance;
 
 using Explore.Application.Models.Common;

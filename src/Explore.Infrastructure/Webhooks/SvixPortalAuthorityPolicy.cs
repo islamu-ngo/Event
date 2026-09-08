@@ -1,6 +1,3 @@
-// ABOUTME: Fail-closed server authority policy shared by Svix portal issuance and HAL eligibility.
-// ABOUTME: Requires runtime governance plus an exact persisted provider and capability-policy profile.
-
 using Explore.Domain;
 using Explore.Infrastructure.Configuration;
 

@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS contract coverage for event program section collection item links.
-// ABOUTME: Protects HAL-gated Blazor section management affordances from route or permission drift.
-
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.Authorization;

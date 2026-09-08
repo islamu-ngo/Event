@@ -1,6 +1,3 @@
-// ABOUTME: Semantically validates generated community event records before outbox eligibility.
-// ABOUTME: Rejects unsupported tokens, unsafe URIs, invalid native locations, ordering errors, and encoded overflow.
-
 using System.Collections.Immutable;
 using System.Globalization;
 using CommunityLexicon.Calendar;

@@ -1,6 +1,3 @@
-// ABOUTME: Probes optional Photon availability through one bounded query-free status request.
-// ABOUTME: Returns only provider-state categories and never exposes endpoints or address data.
-
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 

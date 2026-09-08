@@ -1,6 +1,3 @@
-// ABOUTME: Maps target-bound import-session state and digest-only preview freshness evidence.
-// ABOUTME: Applies optimistic concurrency without persisting raw tokens, bytes, or source authority.
-
 namespace Explore.Persistence.Configurations.Entities;
 
 using Explore.Application.Features.ConfigurationManifest.Importing;

@@ -1,6 +1,3 @@
-// ABOUTME: MCP endpoint authorization tests for the API-hosted Streamable HTTP adapter.
-// ABOUTME: Verifies anonymous-safe discovery, optional API-key fallback, and direct-auth conflict handling.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;

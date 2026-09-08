@@ -1,6 +1,3 @@
-// ABOUTME: DTO for tenant resolver configuration used by instance admin APIs and future activation UI.
-// ABOUTME: Stores only system-level resolver state and avoids tenant-aware settings resolution.
-
 namespace Explore.Application.DTOs.Onboarding;
 
 public sealed record ResolverConfigurationDto

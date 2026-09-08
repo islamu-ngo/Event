@@ -1,6 +1,3 @@
-// ABOUTME: Setting definitions for domain configuration (base domain, custom domains, subdomains).
-// ABOUTME: Controls tenant domain routing and custom domain capabilities.
-
 namespace Explore.Domain.Settings.Definitions;
 
 public static class DomainSettingDefinitions

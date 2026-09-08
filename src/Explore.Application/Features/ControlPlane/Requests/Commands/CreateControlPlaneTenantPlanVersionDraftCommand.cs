@@ -1,6 +1,3 @@
-// ABOUTME: Secured command for drafting a new version of an existing tenant plan tier.
-// ABOUTME: Does not move assigned tenants; publishing decides whether existing tenants update.
-
 using Explore.Application.Authorization;
 using Explore.Application.Features.ControlPlane.Plans;
 using Explore.Application.Responses;

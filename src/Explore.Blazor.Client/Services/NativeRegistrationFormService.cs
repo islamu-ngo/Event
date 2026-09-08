@@ -1,6 +1,3 @@
-// ABOUTME: Adapts attendee-safe native registration HAL resources into renderer workflow state.
-// ABOUTME: Keeps order and attempt capabilities in memory and sends explicit idempotency keys for every write.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.Registration.FormRenderer;
 using Explore.Blazor.Client.Contracts.Services;

@@ -1,6 +1,3 @@
-// ABOUTME: Handler for soft-removing a session/group assignment.
-// ABOUTME: Deletes only the EventSessionGroupSession join row, never the underlying session.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventSessionGroups.Requests.Commands;
 using Explore.Application.Responses;

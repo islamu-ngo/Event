@@ -1,6 +1,3 @@
-// ABOUTME: Handler for the canonical single-submit CreateEventDto graph command.
-// ABOUTME: Validates, resolves publisher ownership, persists event graph atomically, and creates initial EventOwner role assignment.
-
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;

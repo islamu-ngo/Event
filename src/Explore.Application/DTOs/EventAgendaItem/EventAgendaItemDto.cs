@@ -1,6 +1,3 @@
-// ABOUTME: Detail read-model DTO for a single event-level agenda item.
-// ABOUTME: Includes UTC times, cached local projections, and optional room/kind metadata.
-
 using Explore.Application.DTOs.Location;
 
 namespace Explore.Application.DTOs.EventAgendaItem;

@@ -1,5 +1,3 @@
-// ABOUTME: Authorizes only PII-free post-confirmation guest status under current order and event row fences.
-// ABOUTME: Preserves a live monotonic promise without renewing expired or unpromised historical access.
 
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

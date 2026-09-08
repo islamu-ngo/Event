@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-owned provider connection metadata for external registration collection.
-// ABOUTME: References SecretBinding credentials only and owns SSRF-safe approved HTTPS origins.
-
 using System.Net;
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;

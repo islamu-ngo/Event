@@ -1,6 +1,3 @@
-// ABOUTME: Reads the selected provider's local health into a bounded control-plane snapshot.
-// ABOUTME: Suppresses provider errors, values, binding identifiers, and source coordinates.
-
 using Explore.Application.Contracts.Secrets;
 using Explore.Secrets.Abstractions;
 using Explore.Secrets.Configuration;

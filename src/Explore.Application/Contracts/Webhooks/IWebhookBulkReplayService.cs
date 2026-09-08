@@ -1,6 +1,3 @@
-// ABOUTME: Application boundaries for bulk replay safety limits and queued-operation processing.
-// ABOUTME: Keeps configuration and worker orchestration outside CQRS handlers and persistence details.
-
 namespace Explore.Application.Contracts.Webhooks;
 
 public sealed record WebhookBulkReplayLimits(

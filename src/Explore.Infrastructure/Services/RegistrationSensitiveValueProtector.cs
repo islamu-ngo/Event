@@ -1,6 +1,3 @@
-// ABOUTME: Protects sensitive registration values with the shared ASP.NET Core Data Protection key ring.
-// ABOUTME: Versions the purpose string so persisted ciphertext remains decryptable across key rotation and restarts.
-
 using System.Text;
 using Explore.Application.Contracts.Services;
 using Microsoft.AspNetCore.DataProtection;

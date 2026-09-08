@@ -1,6 +1,3 @@
-// ABOUTME: Admin API controller for the Rule 12 custom-property governance report.
-// ABOUTME: Surfaces promotion recommendations via Atlassian 4-question matrix for Layer 3 definitions.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Extensions;

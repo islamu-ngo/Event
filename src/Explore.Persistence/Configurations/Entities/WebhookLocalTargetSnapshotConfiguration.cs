@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for snapshotted Local webhook targets and mutable delivery claims.
-// ABOUTME: Enforces composite tenant ownership, normalized delivery state, unique targets, and fenced concurrency.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

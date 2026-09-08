@@ -1,6 +1,3 @@
-// ABOUTME: Specifies the digest-only scanner-capability aggregate and target-scope invariants.
-// ABOUTME: Proves bounded authority, expiry, immutable issuance audit, and idempotent revocation transitions.
-
 using Explore.Domain;
 using Explore.Domain.Interfaces;
 

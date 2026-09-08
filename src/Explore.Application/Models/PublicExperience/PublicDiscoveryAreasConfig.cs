@@ -1,6 +1,3 @@
-// ABOUTME: Application-owned versioned configuration for tenant-governed public discovery areas.
-// ABOUTME: Separates coarse public centroids from internal tenant location IDs and exact location PII.
-
 namespace Explore.Application.Models.PublicExperience;
 
 public sealed record PublicDiscoveryAreasConfig(

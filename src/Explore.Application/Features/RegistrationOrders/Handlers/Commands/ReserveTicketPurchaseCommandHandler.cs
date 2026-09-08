@@ -1,6 +1,3 @@
-// ABOUTME: Resolves server-owned purchase authority and applies durable ticket ceilings through CQRS.
-// ABOUTME: Hashes operation scope without PII and maps every Domain outcome to a stable failure code.
-
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Contracts.Infrastructure;

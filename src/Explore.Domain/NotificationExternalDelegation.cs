@@ -1,6 +1,3 @@
-// ABOUTME: External notification delegation audit for provider-owned workflow or account-authority email actions.
-// ABOUTME: Stores safe identifiers, template keys, and payload hashes while excluding raw report evidence and secrets.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

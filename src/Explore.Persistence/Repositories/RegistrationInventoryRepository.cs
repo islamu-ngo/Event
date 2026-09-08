@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for ordered capacity-pool locks and registration inventory hold persistence.
-// ABOUTME: Counts active and consumed reservations together so capacity cannot be reallocated after checkout.
-
 using System.Data;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

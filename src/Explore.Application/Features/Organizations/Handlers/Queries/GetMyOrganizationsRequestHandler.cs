@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning organizations the current user is a member of.
-// ABOUTME: Filters by user ID, maps to OrganizationListDto.
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

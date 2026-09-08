@@ -1,6 +1,3 @@
-// ABOUTME: Handles bounded provider publication list reads and maps entities in Application.
-// ABOUTME: Validates normalized state filters before issuing tenant-scoped repository queries.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Queries;

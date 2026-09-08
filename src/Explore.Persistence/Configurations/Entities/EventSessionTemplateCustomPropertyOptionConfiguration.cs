@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for session-template-owned custom-property options.
-// ABOUTME: Keeps namespaced option identity stable within each session template definition.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

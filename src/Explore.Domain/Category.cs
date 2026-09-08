@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-scoped event category aggregate with optional parent hierarchy.
-// ABOUTME: Carries optimistic concurrency metadata for PATCH-based partial updates.
-
 using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;

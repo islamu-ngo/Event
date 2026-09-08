@@ -1,6 +1,3 @@
-// ABOUTME: Smoke tests proving runtime API compatibility across all HTTP verbs.
-// ABOUTME: Uses ContractApiFixture (InMemory + auth) to call representative endpoints per verb and verify 2xx + JSON payloads.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;

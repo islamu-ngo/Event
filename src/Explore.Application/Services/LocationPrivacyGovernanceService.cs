@@ -1,6 +1,3 @@
-// ABOUTME: Resolves EventLocation disclosure settings from instance and tenant storage independently.
-// ABOUTME: Merges only toward greater restriction and returns bounded fail-closed outcomes for invalid data or repository failure.
-
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;

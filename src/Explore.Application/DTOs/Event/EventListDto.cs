@@ -1,6 +1,3 @@
-// ABOUTME: Lightweight event card DTO returned by event list APIs and HAL collections.
-// ABOUTME: Includes organizer ownership metadata needed by event-scoped authorization links.
-
 using System;
 using System.Collections.Generic;
 using System.Text;

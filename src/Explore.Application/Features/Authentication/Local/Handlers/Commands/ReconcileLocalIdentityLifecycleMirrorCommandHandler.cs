@@ -1,5 +1,3 @@
-// ABOUTME: Provides trusted worker-only repair of current consumed Local mirrors after transport-token expiry.
-// ABOUTME: Reuses native serialization and the existing SyncUser writer; no HTTP endpoint accepts this pointer-only command.
 
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Responses;

@@ -1,6 +1,3 @@
-// ABOUTME: Durable outbox row for native third-party integration synchronization work.
-// ABOUTME: Keeps Listmonk subscriber sync atomic with registration while workers perform external I/O later.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

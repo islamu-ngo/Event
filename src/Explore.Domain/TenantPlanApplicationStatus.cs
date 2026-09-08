@@ -1,6 +1,3 @@
-// ABOUTME: Lookup-table entity for tenant plan application audit outcomes.
-// ABOUTME: Normalizes successful and failed plan apply or rollback attempts.
-
 namespace Explore.Domain;
 
 public class TenantPlanApplicationStatus

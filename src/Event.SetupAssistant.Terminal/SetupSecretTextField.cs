@@ -1,6 +1,3 @@
-// ABOUTME: Hardens the Terminal.Gui secret field against clipboard, context-menu, and undo-history escape.
-// ABOUTME: Keeps masking enabled and erases edit history after every value transition.
-
 namespace ISLAMU.Event.SetupAssistant.Terminal;
 
 using global::Terminal.Gui.Input;

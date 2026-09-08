@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query for fetching all navigation links for a tenant.
-// ABOUTME: Returns IEnumerable<TenantNavLinkDto>.
 using System.Collections.Generic;
 using Explore.Application.DTOs.Tenant;
 using MediatR;

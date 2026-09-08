@@ -1,6 +1,3 @@
-// ABOUTME: Handles irreversible heavy moderation by redacting event-owned content and triggering image deletion.
-// ABOUTME: Writes safe moderation history transactionally and invalidates caches only after commit.
-
 using Explore.Application.Authorization;
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Infrastructure;

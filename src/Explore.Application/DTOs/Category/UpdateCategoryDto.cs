@@ -1,6 +1,3 @@
-// ABOUTME: Wrapper DTO for partial category updates using nullable property groups.
-// ABOUTME: Body IDs and tenant IDs are absent because PATCH routes use route/context authority.
-
 using Explore.Application.Models.Common;
 
 namespace Explore.Application.DTOs.Category;

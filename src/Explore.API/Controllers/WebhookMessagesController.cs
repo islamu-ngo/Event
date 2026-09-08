@@ -1,6 +1,3 @@
-// ABOUTME: Webhook message and delivery-attempt endpoints for inspection, retry, and incoming redrive.
-// ABOUTME: Payload reads are no-store because message bodies can carry tenant data.
-
 using Explore.Application.Authentication;
 using Asp.Versioning;
 using Explore.API.Attributes;

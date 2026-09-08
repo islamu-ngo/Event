@@ -1,6 +1,3 @@
-// ABOUTME: Interface for event session template operations wrapping API client.
-// ABOUTME: Keeps Blazor components behind a typed BFF-safe service abstraction.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.EventSessionTemplates;

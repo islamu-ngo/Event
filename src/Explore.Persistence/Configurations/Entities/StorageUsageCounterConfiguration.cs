@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for tenant/provider storage quota counters.
-// ABOUTME: Enforces one counter per tenant/provider and nonnegative byte/object counters.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

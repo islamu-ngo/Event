@@ -1,6 +1,3 @@
-// ABOUTME: Shapes the public event Open Graph image response as a binary PNG in native OpenAPI.
-// ABOUTME: Keeps NSwag from generating a JSON FileContentResult contract for raw image bytes.
-
 using Explore.API.Hateoas;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;

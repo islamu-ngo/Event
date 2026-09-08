@@ -1,6 +1,3 @@
-// ABOUTME: Behavioral specifications for tenant directory-operator identity and capability readiness.
-// ABOUTME: Proves normalization, closed codes, fail-closed reasons, and non-inferred draft defaults.
-
 namespace Event.Domain.UnitTests.Settings;
 
 using System.Text.Json;

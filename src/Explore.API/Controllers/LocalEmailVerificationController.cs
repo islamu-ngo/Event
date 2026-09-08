@@ -1,5 +1,3 @@
-// ABOUTME: Exposes native Local current-address verification and authenticated proposed-address requests.
-// ABOUTME: Consumes exact email operations without granting a session or accepting caller-selected account authority.
 
 using Asp.Versioning;
 using Explore.API.Attributes;

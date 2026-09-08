@@ -1,6 +1,3 @@
-// ABOUTME: Aggregates AI multi-step plan preview validation results.
-// ABOUTME: Makes confirmation readiness explicit while always denying direct execution authority.
-
 namespace Explore.Application.Features.AiAssistant.Plans;
 
 public sealed record AiPlanValidationResult(

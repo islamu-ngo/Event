@@ -1,6 +1,3 @@
-// ABOUTME: AutoMapper profile for registration lookup and schedule metadata.
-// ABOUTME: Split from monolithic MappingProfile.cs for domain-cohesion.
-
 using AutoMapper;
 using Explore.Application.DTOs.EventRegistrationPolicy;
 using Explore.Application.DTOs.EventSessionKind;

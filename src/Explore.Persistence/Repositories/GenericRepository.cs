@@ -1,6 +1,3 @@
-// ABOUTME: Generic EF Core repository with basic CRUD operations for aggregate and settings entities.
-// ABOUTME: Update logic reuses already-tracked entities to avoid duplicate-key tracking conflicts inside one DbContext.
-
 using System;
 using System.Collections.Generic;
 using System.Linq;

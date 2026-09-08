@@ -1,6 +1,3 @@
-// ABOUTME: Unified role DTO with scope. Replaces OrganizationRoleDto and UserRoleDto.
-// ABOUTME: Used for role detail views and role assignment dropdowns across all scopes.
-
 namespace Explore.Application.DTOs.Role;
 
 public sealed record RoleDto

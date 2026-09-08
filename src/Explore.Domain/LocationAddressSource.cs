@@ -1,6 +1,3 @@
-// ABOUTME: Normalized lookup row describing the provenance of a Location's current address.
-// ABOUTME: Carries stable machine metadata without granting address reuse or disclosure authority.
-
 namespace Explore.Domain;
 
 public sealed class LocationAddressSource

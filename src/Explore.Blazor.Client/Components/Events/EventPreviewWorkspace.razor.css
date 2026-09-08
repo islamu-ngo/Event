@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped styling for the reusable event preview workspace shell. */
-/* ABOUTME: Sidebar chrome is owned by EventDetailsSidebar so profile pages match EventList exactly. */
-
 .event-preview-workspace {
     min-width: 0;
 }

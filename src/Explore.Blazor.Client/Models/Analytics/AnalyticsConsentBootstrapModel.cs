@@ -1,6 +1,3 @@
-// ABOUTME: Client-side model for analytics consent bootstrap data received from the public experience API.
-// ABOUTME: Mirrors server AnalyticsConsentBootstrap DTO. Used by AnalyticsInitializer state machine.
-
 namespace Explore.Blazor.Client.Models.Analytics;
 
 public class AnalyticsConsentBootstrapModel

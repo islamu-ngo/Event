@@ -1,6 +1,3 @@
-// ABOUTME: E2E tests for AiContextGateway covering all sensitivity tiers, provider trust tiers, MaxSensitivity caps, and fail-closed behavior.
-// ABOUTME: Uses the real AiContextDisclosureRegistry.CreateDefault() — no mocks needed for the registry; only IAiProviderTrustResolver is stubbed.
-
 using Explore.Application.Features.AiAssistant.Disclosure;
 using Explore.Domain.Enums;
 using NSubstitute;

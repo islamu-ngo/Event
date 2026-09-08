@@ -1,6 +1,3 @@
-// ABOUTME: Client-side boundary for registration-provider management API calls.
-// ABOUTME: Preserves generated HAL resources and cancellation tokens without backend model mirrors.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services;

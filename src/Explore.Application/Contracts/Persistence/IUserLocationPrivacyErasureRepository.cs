@@ -1,6 +1,3 @@
-// ABOUTME: Purpose-specific entity repository for User-owned location PII erasure across tenant boundaries.
-// ABOUTME: Loads only owner-bounded Homes, their EventLocation associations, and the owner's actors.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Keeps the sensitive-collection inventory honest by discovering paged secure queries via reflection.
-// ABOUTME: A new paginated authorized query must be classified protected or public-by-design, or this fails.
-
 namespace Event.Architecture.Tests;
 
 using System.Reflection;

@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for writing an admin-supplied static localization bundle.
-// ABOUTME: Keeps direct bundle imports in Application while Infrastructure owns disk persistence.
-
 using Explore.Application.DTOs.Localization;
 using Explore.Application.Responses;
 using MediatR;

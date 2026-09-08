@@ -1,6 +1,3 @@
-// ABOUTME: Handler for soft-deleting a room by Id.
-// ABOUTME: Follows the pattern where delete returns BaseCommandResponse<Guid>.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.LocationRooms.Requests.Commands;
 using Explore.Application.Responses;

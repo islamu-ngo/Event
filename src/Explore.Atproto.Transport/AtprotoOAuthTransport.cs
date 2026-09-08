@@ -1,6 +1,3 @@
-// ABOUTME: Defines issuer-bound OAuth endpoint profiles and an atomic expiring endpoint registry.
-// ABOUTME: Rejects endpoint-kind aliasing and cross-issuer collisions before publishing any trust entry.
-
 namespace Explore.Atproto.Transport;
 
 public sealed class AtprotoOAuthSecurityException(string failureCode, Exception? innerException = null)

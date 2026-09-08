@@ -1,6 +1,3 @@
-// ABOUTME: Handles explicit audited hard purge for dependency-free shared custom-property definitions.
-// ABOUTME: Keeps irreversible purge separate from normal retire + soft-delete lifecycle.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.CustomPropertyDefinition;

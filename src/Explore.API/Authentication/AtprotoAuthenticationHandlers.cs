@@ -1,6 +1,3 @@
-// ABOUTME: Authenticates the one-route bootstrap assertion and first-party ATProto session bearer scheme.
-// ABOUTME: Fails closed on tenant mismatch, replay, malformed credentials, or scheme confusion.
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text.Encodings.Web;

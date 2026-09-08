@@ -1,6 +1,3 @@
-// ABOUTME: Defines EventLocation management HAL candidates from the active route context.
-// ABOUTME: Binds disclosure edits to the direct mutation's parent-event authorization metadata.
-
 using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;

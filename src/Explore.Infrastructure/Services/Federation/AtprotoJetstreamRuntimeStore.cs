@@ -1,6 +1,3 @@
-// ABOUTME: Bridges the singleton Jetstream subscriber to scoped governance and fenced persistence operations.
-// ABOUTME: Invalidates public discovery caches only after successful scoped ingestion or recovery mutations.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Federation.Atproto.Models;

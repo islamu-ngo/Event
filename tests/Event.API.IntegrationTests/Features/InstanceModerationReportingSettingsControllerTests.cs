@@ -1,6 +1,3 @@
-// ABOUTME: API integration tests for instance moderation reporting provider lock endpoints.
-// ABOUTME: Verifies authenticated access, command dispatch, and forbidden command responses.
-
 using System.Net;
 using System.Net.Http.Json;
 using Event.Api.IntegrationTests.Fixtures;

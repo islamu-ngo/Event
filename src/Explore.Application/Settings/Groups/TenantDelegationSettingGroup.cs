@@ -1,6 +1,3 @@
-// ABOUTME: Strongly-typed Tenant Delegation setting group resolved via batch loading.
-// ABOUTME: Keys align to GovernanceSettingKeys.TenantDelegation for SMTP/storage/reporting/analytics lock controls.
-
 namespace Explore.Application.Settings.Groups;
 
 using Explore.Application.Contracts.Infrastructure;

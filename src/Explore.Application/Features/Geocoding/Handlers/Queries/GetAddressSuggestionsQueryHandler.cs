@@ -1,6 +1,3 @@
-// ABOUTME: Executes bounded local address search using trusted tenant and user context.
-// ABOUTME: Maps the persistence projection to a private provider-neutral Application contract.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Infrastructure.Geocoding;
@@ -9,6 +6,7 @@ using Explore.Application.DTOs.Geocoding;
 using Explore.Application.Features.Geocoding.Requests.Queries;
 using Explore.Application.Features.Geocoding.Validators;
 using Explore.Domain.Enums;
+using Explore.Domain.ValueObjects;
 using FluentValidation;
 using MediatR;
 
@@ -33,6 +31,15 @@ public sealed class GetAddressSuggestionsQueryHandler(
         if (!validation.IsValid)
         {
             throw new ValidationException(validation.Errors);
+        }
+
+        try
+        {
+            _ = LocationTextNormalization.Normalize(request.Request.SearchText.Trim());
+        }
+        catch (ArgumentException)
+        {
+            throw new ValidationException("Address suggestion search text is invalid.");
         }
 
         Guid tenantId = tenantContext.TenantId;

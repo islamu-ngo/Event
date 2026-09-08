@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for attendee registration-provider iframe rendering.
-// ABOUTME: Verifies same-origin-only embeds and server polling authority after frame events.
-
 using Explore.Blazor.Client.Components.Registration.FormRenderer;
 using Explore.Blazor.Client.Components.Registration.ProviderLaunch;
 using Explore.Blazor.Client.Services.Http;

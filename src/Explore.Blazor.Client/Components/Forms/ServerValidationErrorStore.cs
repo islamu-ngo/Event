@@ -1,6 +1,3 @@
-// ABOUTME: Bridges API validation failures into Blazor EditContext validation messages.
-// ABOUTME: Keeps server-side ProblemDetails authoritative while clearing stale field errors on edit.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;
 using Microsoft.AspNetCore.Components.Forms;

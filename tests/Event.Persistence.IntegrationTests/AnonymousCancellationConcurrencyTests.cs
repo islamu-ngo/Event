@@ -1,5 +1,3 @@
-// ABOUTME: Exercises native anonymous cancellation, issuance and check-in against one real SQLite authority graph.
-// ABOUTME: Uses production repositories, readiness and UoW with deterministic database barriers, never timing sleeps.
 
 using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;

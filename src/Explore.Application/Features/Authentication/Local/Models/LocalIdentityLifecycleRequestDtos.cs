@@ -1,5 +1,3 @@
-// ABOUTME: Defines bounded immutable Local verification and recovery HTTP bodies without session authority.
-// ABOUTME: Rejects extra fields and redacts transient tokens, addresses, and passwords from diagnostic formatting.
 
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;

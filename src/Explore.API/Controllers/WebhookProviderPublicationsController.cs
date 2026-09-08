@@ -1,6 +1,3 @@
-// ABOUTME: Provider publication operations API with handler-authorized reads and authorized writes.
-// ABOUTME: Exposes safe HAL evidence plus audited reconcile and abandon transitions without credentials.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Extensions;

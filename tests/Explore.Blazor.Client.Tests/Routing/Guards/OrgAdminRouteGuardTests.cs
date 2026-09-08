@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the organization settings guard's persisted authority checks.
-// ABOUTME: Verifies targeted organization access through the tenant-scoped BFF authority API.
-
 using Blazouter.Models;
 using Explore.Blazor.Client.Routing.Guards;
 using Explore.Blazor.Client.Tests.Common.Authentication;

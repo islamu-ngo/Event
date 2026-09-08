@@ -1,6 +1,3 @@
-// ABOUTME: Maps scheduler administration transport failures onto operator-readable explanations.
-// ABOUTME: Keeps refusal wording consistent whether the API answered with a body or the transport threw.
-
 namespace Explore.Blazor.Client.Services.Scheduling;
 
 /// <summary>

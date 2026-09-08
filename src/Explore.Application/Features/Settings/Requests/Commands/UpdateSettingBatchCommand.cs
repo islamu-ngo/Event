@@ -1,6 +1,3 @@
-// ABOUTME: Command for batch-updating multiple settings within a category at a specific scope.
-// ABOUTME: Supports BestEffort (skip locked, apply rest) and Strict (reject all if any locked) modes.
-
 namespace Explore.Application.Features.Settings.Requests.Commands;
 
 using Explore.Application.DTOs.Settings;

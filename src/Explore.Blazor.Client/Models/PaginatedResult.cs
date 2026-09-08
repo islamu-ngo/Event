@@ -1,6 +1,3 @@
-// ABOUTME: Presentation-only pagination state composed from generated collection resources.
-// ABOUTME: Keeps UI paging calculations without duplicating an API payload contract.
-
 using Explore.Blazor.Client.Clients;
 using System.Collections.ObjectModel;
 

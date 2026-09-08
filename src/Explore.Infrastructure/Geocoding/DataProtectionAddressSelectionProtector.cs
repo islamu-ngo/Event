@@ -1,6 +1,3 @@
-// ABOUTME: Protects normalized provider selections as opaque target-bound versioned tokens.
-// ABOUTME: Uses Data Protection and an injected clock without emitting token or address telemetry.
-
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;

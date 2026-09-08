@@ -1,5 +1,3 @@
-<!-- ABOUTME: Preserves reflection-discovered NSwag per-tag clients in trimmed WebAssembly publishes. -->
-<!-- ABOUTME: Limits reflection roots to generated client-suffixed types in the client contracts namespace. -->
 <linker>
   <assembly fullname="Explore.Blazor.Client">
     <type fullname="Explore.Blazor.Client.Clients.*Client" preserve="all" />

@@ -1,6 +1,3 @@
-// ABOUTME: Scoped service wrapping the generated GetUiShellContextAsync endpoint with a 5-minute cache.
-// ABOUTME: Returns null safely on failure, never calls the endpoint for anonymous users, and invalidates on CurrentUserState changes.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Shell;
 using Microsoft.AspNetCore.Components.Authorization;

@@ -1,6 +1,3 @@
-// ABOUTME: Integration coverage for actor subscription endpoints and HAL affordances.
-// ABOUTME: Seeds tenant-local membership and verifies subscription links flow through the API surface.
-
 using System.Linq;
 using System.Net;
 using System.Net.Http.Json;

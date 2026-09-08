@@ -1,6 +1,3 @@
-// ABOUTME: Shared predicate helpers for storage object metadata validators.
-// ABOUTME: Centralizes safe file names, object keys, MIME hints, extensions, and checksums.
-
 using System.Net.Http.Headers;
 
 namespace Explore.Application.DTOs.StorageObject.Validators;

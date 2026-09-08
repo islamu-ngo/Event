@@ -1,6 +1,3 @@
-// ABOUTME: Records value-free Setup enrollment issuance identity for exact replay decisions.
-// ABOUTME: Binds tenant, actor, operation, enrollment generation, and request fingerprint.
-
 namespace Explore.Domain.SetupLive;
 
 using Explore.Domain.Interfaces;

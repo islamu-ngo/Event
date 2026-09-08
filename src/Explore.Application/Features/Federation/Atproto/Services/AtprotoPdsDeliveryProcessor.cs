@@ -1,6 +1,3 @@
-// ABOUTME: Processes one fenced PDS outbox claim with repeated governance checks and bounded retries.
-// ABOUTME: Calls the authenticated delivery gateway only while the claim, consent, source version, and payload remain current.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 

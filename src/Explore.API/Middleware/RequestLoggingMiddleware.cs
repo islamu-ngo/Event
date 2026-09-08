@@ -1,6 +1,3 @@
-// ABOUTME: Logs structured metadata for every HTTP request (method, path, status, duration, user, tenant).
-// ABOUTME: Designed for observability; never logs sensitive data such as headers or bodies.
-
 using System.Diagnostics;
 using Explore.API.Hateoas;
 using Explore.Application.Authentication;

@@ -1,6 +1,3 @@
-// ABOUTME: Contract tests for anonymous email unsubscribe endpoint behavior.
-// ABOUTME: Verifies token handling, public responses, persistence side effects, and endpoint metadata.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;

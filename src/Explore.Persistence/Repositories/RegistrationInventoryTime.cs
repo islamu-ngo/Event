@@ -1,6 +1,3 @@
-// ABOUTME: Validates UTC timestamps entering registration inventory mutations.
-// ABOUTME: Keeps one temporal boundary shared by hold and reservation operations.
-
 namespace Explore.Persistence.Repositories;
 
 internal static class RegistrationInventoryTime

@@ -1,6 +1,3 @@
-// ABOUTME: Maps globally canonical AT Protocol record identity, materialization, provenance, and tombstone state.
-// ABOUTME: Keeps tenant-specific visibility and outbound ownership in separate federation tables.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

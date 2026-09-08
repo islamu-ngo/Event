@@ -1,6 +1,3 @@
-// ABOUTME: Application contract for recording PII-free exact EventLocation read security evidence.
-// ABOUTME: Carries only stable identities, a closed purpose, the decision, and optional trace identifiers.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Contracts.Services;

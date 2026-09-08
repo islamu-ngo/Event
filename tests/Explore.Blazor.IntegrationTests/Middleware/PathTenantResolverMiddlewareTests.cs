@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for PathTenantResolverMiddleware using the real Explore.Blazor HTTP pipeline.
-// ABOUTME: Verifies tenant slug extraction, request path rewriting, and pass-through scenarios.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.IntegrationTests.Middleware;

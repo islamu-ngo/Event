@@ -1,6 +1,3 @@
-// ABOUTME: Handler for ExportFromTmsCommand — pulls translations from TMS, writes bundle to disk, invalidates cache.
-// ABOUTME: The persistence seam is IBundleFileWriter so a future DistributedBundleFileWriter can replace local-disk.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Features.Localization.Requests.Commands;

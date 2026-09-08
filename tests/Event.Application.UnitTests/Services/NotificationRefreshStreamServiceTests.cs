@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for notification refresh SSE stream hint generation.
-// ABOUTME: Verifies authenticated users receive minimal unread-count hints without notification payload data.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Services;

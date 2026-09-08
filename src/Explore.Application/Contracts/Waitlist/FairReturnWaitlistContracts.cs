@@ -1,6 +1,3 @@
-// ABOUTME: Defines entity-returning fair-return and waitlist persistence primitives.
-// ABOUTME: Keeps canonical fence inputs, immutable buyer lineage, and bounded outcomes explicit.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Waitlist;

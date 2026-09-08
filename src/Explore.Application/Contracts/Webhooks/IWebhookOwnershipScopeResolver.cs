@@ -1,6 +1,3 @@
-// ABOUTME: Application boundary for resolving caller-selected webhook owner kinds into canonical typed scopes.
-// ABOUTME: Prevents handlers from trusting tenant, instance, organization, group, or user references from transport input.
-
 using Explore.Application.Authorization;
 using Explore.Domain;
 

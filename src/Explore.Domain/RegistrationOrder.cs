@@ -1,6 +1,3 @@
-// ABOUTME: Defines the tenant-scoped registration-order aggregate for buyer, ticket-line, and pre-payment workflow facts.
-// ABOUTME: Keeps purchaser PII and platform contributions separate while pinning participation, catalog, and totals snapshots.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 using Explore.Domain.Services.Registration;

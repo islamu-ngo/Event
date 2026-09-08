@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the closed fanout template set and immutable recipient rendering.
-// ABOUTME: Covers strict contract drift, occurrence linkage, and snapshot-only location disclosure.
-
 using System.Collections.Immutable;
 using System.Text.Json;
 using Explore.Application.Contracts.LocationPrivacy;

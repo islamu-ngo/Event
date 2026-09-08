@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for route/workflow-scoped AI tool catalog views.
-// ABOUTME: Proves catalog visibility remains separate from HAL/API execution authority.
-
 using Explore.Application.Features.AiAssistant.Tools;
 using Explore.Domain.Ai;
 

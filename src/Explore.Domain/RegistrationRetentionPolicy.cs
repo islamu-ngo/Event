@@ -1,6 +1,3 @@
-// ABOUTME: Normalized registration retention policy lookup with stable IDs and durations.
-// ABOUTME: Null DurationDays means legal hold/no automatic deletion until policy authority changes.
-
 namespace Explore.Domain;
 
 public sealed class RegistrationRetentionPolicy

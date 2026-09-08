@@ -1,5 +1,3 @@
-# ABOUTME: Advertises the GitHub release-adapter final check without activating releases.
-# ABOUTME: Uses workflow_dispatch, production approval, and default-branch trusted code only.
 name: Release Adapter Final Discovery
 
 on:

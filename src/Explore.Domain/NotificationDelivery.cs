@@ -1,6 +1,3 @@
-// ABOUTME: Local delivery audit row linking a notification intent to ISLAMU-owned email dispatch state.
-// ABOUTME: Captures safe provider-facing status metadata without storing raw transport errors or payload bodies.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

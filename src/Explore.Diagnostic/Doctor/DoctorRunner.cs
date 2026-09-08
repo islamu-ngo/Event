@@ -1,6 +1,3 @@
-// ABOUTME: Runs doctor checks with bounded execution and partial-result behavior.
-// ABOUTME: Converts unexpected check failures into WARN results instead of hiding them.
-
 namespace Explore.Diagnostic.Doctor;
 
 public sealed class DoctorRunner(IEnumerable<IDoctorCheck> checks)

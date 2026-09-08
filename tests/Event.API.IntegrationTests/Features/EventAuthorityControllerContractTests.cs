@@ -1,6 +1,3 @@
-// ABOUTME: Contract tests for public-action and organizer-claim API surfaces.
-// ABOUTME: Proves stored-ID redirects, endpoint classification, and private claim evidence reads.
-
 using System.Reflection;
 using Explore.API.Attributes;
 using Explore.API.Controllers;

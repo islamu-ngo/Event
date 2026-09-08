@@ -1,6 +1,3 @@
-// ABOUTME: Handler for retrieving a single event series by ID with its associated events.
-// ABOUTME: Uses GetEventSeriesWithEvents to eager-load events, returns null if not found.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSeries;

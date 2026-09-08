@@ -1,6 +1,3 @@
-// ABOUTME: Defines participant, concrete ticket-unit assignment, and deferred-assignment commands.
-// ABOUTME: Accepts collection payloads for company bookings while leaving CSV parsing to a later phase.
-
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Authorization;
 using Explore.Application.Responses;

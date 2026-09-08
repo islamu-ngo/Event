@@ -1,6 +1,3 @@
-// ABOUTME: ProblemDetails contract tests against the real ASP.NET Core pipeline with PostgreSQL.
-// ABOUTME: Verifies error shapes from actual handler exceptions, not ThrowingMediator stubs.
-
 using System.Net;
 using System.Text;
 using System.Text.Json;

@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped styling for the webhook management panel in instance settings. */
-/* ABOUTME: Uses dense operational layout, stable table dimensions, and responsive controls. */
-
 .webhook-management {
     --webhook-border: var(--isl-card-border);
 }

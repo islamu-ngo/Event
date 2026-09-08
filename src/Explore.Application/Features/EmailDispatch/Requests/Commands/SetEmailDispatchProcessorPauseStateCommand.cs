@@ -1,6 +1,3 @@
-// ABOUTME: Instance-admin command for pausing or resuming every SMTP dispatch admission path.
-// ABOUTME: Persists a bounded operator reason and audit actor in the singleton processor state.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

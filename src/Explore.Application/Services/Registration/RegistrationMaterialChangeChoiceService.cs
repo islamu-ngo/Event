@@ -1,6 +1,3 @@
-// ABOUTME: Records a buyer's accepted-new-terms or refund response to a material-change campaign.
-// ABOUTME: Couples refund choice and capacity reservation atomically without provider I/O.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Responses;

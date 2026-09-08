@@ -1,6 +1,3 @@
-// ABOUTME: Submits HAL-gated purchase-governance requests through same-origin BFF endpoints.
-// ABOUTME: Never accepts tenant, quantity, policy lineage, or browser-created idempotency authority.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Services.Http;

@@ -1,6 +1,3 @@
-// ABOUTME: Describes a session-template option that exists in the target template but not in the current runtime state.
-// ABOUTME: Used by session diff output and embedded in added-definition snapshots.
-
 namespace Explore.Application.DTOs.EventSessionTemplateSync;
 
 public sealed record AddedOptionDto(

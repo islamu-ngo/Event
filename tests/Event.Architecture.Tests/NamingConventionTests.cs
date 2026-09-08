@@ -1,6 +1,3 @@
-// ABOUTME: Tests naming and source-layout conventions across the platform assemblies.
-// ABOUTME: Includes the Phase 4 one-configuration-class-per-file persistence contract.
-
 namespace Event.Architecture.Tests;
 
 using System.Reflection;

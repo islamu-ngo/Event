@@ -1,5 +1,3 @@
-// ABOUTME: Protects five-minute email-disable previews with purpose-isolated ASP.NET Core Data Protection.
-// ABOUTME: Binds the actor and canonical impact digest without placing unbounded scope lists in tokens.
 
 using System.Security.Cryptography;
 using System.Text;

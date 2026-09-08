@@ -1,6 +1,3 @@
-// ABOUTME: Composes event-setup machine/text streams, filesystem access, and arguments at the executable edge.
-// ABOUTME: Keeps deterministic command handlers free of ambient access and contains no interactive terminal path.
-
 using ISLAMU.Event.SetupAssistant.Cli;
 
 return SetupCliProgram.Run(args);

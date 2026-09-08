@@ -1,6 +1,3 @@
-// ABOUTME: Owns one immutable-on-publication ticket catalog revision for an event.
-// ABOUTME: Provides draft-only ticket, entitlement, and pricing mutation plus independent draft cloning.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 using Explore.Domain.Services.Registration;

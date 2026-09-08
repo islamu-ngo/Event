@@ -1,6 +1,3 @@
-// ABOUTME: Applies the repository's EF-compatible write-once rule to tenant-scoped identity.
-// ABOUTME: Allows empty materialized backing fields to initialize once and rejects cross-tenant reassignment.
-
 namespace Explore.Domain;
 
 internal static class TenantIdentity

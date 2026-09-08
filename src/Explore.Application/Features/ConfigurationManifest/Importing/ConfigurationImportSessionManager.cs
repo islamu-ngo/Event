@@ -1,6 +1,3 @@
-// ABOUTME: Coordinates durable protected-byte creation, cancellation, and expiry transactions.
-// ABOUTME: Issues a bearer token once while persisting only its SHA-256 digest.
-
 namespace Explore.Application.Features.ConfigurationManifest.Importing;
 
 using System.Security.Cryptography;

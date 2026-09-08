@@ -1,6 +1,3 @@
-// ABOUTME: Authorized CQRS request for adding a reviewed public action to an event.
-// ABOUTME: Uses the event as the authorization resource and returns the new action identifier.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventPublicAction;
 using Explore.Application.Responses;

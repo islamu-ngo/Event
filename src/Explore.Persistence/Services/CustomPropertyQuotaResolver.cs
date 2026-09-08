@@ -1,6 +1,3 @@
-// ABOUTME: Resolves effective int/bool custom-property quotas by walking tenant override, system override, then registry default.
-// ABOUTME: Uses invariant JSON parsing so quota reads remain culture-stable and boring.
-
 using System.Globalization;
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;

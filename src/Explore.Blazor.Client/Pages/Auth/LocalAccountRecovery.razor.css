@@ -1,5 +1,3 @@
-/* ABOUTME: Keeps the Local account lifecycle form aligned with existing theme and focus conventions. */
-/* ABOUTME: Uses logical spacing and native controls without introducing a new visual design. */
 
 .local-account__form {
     display: grid;

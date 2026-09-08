@@ -1,6 +1,3 @@
-// ABOUTME: Maps Phase 5 event sub-resource AI proposals into validated proposal context.
-// ABOUTME: Keeps sub-resource MCP proposals side-effect-free while preserving event and target identifiers.
-
 using System.Text.Json;
 using Explore.Application.Features.AiAssistant.Prompting;
 using Explore.Application.Features.AiAssistant.Tools;

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for BootstrapSecretLoader covering discrete POSTGRESQL_* resolution.
-// ABOUTME: Verifies source precedence, structured projection, validation errors, and native connection composition.
-
 using Explore.Secrets.Bootstrap;
 using Explore.Secrets.Database;
 using Microsoft.Extensions.Configuration;

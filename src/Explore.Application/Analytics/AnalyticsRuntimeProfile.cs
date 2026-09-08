@@ -1,6 +1,3 @@
-// ABOUTME: Computed runtime profile — the single source of consent/analytics policy truth.
-// ABOUTME: Produced by IAnalyticsRuntimeProfileResolver; consumed by query handlers and admin UI.
-
 namespace Explore.Application.Analytics;
 
 using Explore.Domain.Enums.Analytics;

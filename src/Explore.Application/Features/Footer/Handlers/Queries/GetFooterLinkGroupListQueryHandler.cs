@@ -1,6 +1,3 @@
-// ABOUTME: Handles GetFooterLinkGroupListQuery — lists footer link groups for the current tenant.
-// ABOUTME: Returns lightweight list DTOs for the admin management table.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

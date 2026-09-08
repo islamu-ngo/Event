@@ -1,6 +1,3 @@
-// ABOUTME: Applies participant and concrete ticket-unit mutations under one order-locked transaction.
-// ABOUTME: Supports pre-confirm group booking and post-confirm optional or deferred admission amendments.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Persistence;

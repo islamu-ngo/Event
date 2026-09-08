@@ -1,6 +1,3 @@
-// ABOUTME: Validates event-local custom property definition payload shape with PropertyType-dependent rules.
-// ABOUTME: Used for ad-hoc definitions created without a template (task 6.3).
-
 using Explore.Domain.Enums;
 using FluentValidation;
 

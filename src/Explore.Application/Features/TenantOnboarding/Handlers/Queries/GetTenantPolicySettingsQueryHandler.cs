@@ -1,6 +1,3 @@
-// ABOUTME: Handles queries for effective tenant policy settings used in tenant onboarding questionnaires.
-// ABOUTME: Resolves tenant overrides against instance defaults and delegation constraints.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;

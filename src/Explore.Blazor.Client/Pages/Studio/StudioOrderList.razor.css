@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped order-list layout for actor and event Studio registration surfaces. */
-/* ABOUTME: Uses design tokens, logical properties, and low-elevation bordered rows. */
-
 .studio-order-list,
 .studio-order-list__state {
     display: grid;

@@ -1,5 +1,3 @@
-// ABOUTME: Deletes a ticket type from an event ticket catalog draft.
-// ABOUTME: Authorizes against the parent event ticket-management action.
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

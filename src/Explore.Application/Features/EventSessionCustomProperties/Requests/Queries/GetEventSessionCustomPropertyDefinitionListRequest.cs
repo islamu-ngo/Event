@@ -1,6 +1,3 @@
-// ABOUTME: Query request for paginated session-local custom property definition lists.
-// ABOUTME: Scoped to a specific event session so organizers see only their session's configuration.
-
 using Explore.Application.DTOs.EventSessionCustomProperty;
 using Explore.Application.Responses;
 using MediatR;

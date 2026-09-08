@@ -1,6 +1,3 @@
-// ABOUTME: Tests the uniform scheduler telemetry listener's recording and its exception containment.
-// ABOUTME: A throwing telemetry sink must degrade to silence, never to a disrupted scheduling cycle.
-
 using Explore.API.Scheduling;
 using Explore.Application.Contracts.Scheduling;
 using Microsoft.Extensions.Logging.Abstractions;

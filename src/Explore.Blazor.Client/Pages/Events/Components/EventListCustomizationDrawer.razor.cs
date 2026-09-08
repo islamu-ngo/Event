@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for the event list customization sidebar component.
-// ABOUTME: Manages user settings for browse mode, layout, and card field visibility.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Models;
 using Microsoft.AspNetCore.Components;

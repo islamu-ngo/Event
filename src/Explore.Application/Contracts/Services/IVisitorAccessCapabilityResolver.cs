@@ -1,5 +1,3 @@
-// ABOUTME: Shared authority port for current and complete proposed visitor-access policy states.
-// ABOUTME: Callers own the ordered settings lease and transaction before any authoritative read.
 
 using Explore.Application.Models;
 

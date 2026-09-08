@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the Stripe secret definitions that should live in the registry.
-// ABOUTME: Proves the registry keeps Stripe instance-scoped, non-bootstrap, and bindable via the public SecretBinding factories.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 

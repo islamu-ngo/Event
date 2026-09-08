@@ -1,6 +1,3 @@
-// ABOUTME: Repository implementation for unified Role entity with scope-based and permission queries.
-// ABOUTME: Provides permission lookups via RolePermission join table for dynamic RBAC.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

@@ -1,6 +1,3 @@
-// ABOUTME: Lookup-table entity for tenant plan assignment lifecycle statuses.
-// ABOUTME: Supports normalized constraints around one active SaaS tier assignment per tenant.
-
 namespace Explore.Domain;
 
 public class TenantPlanAssignmentStatus

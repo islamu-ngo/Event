@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for moderator-facing event-report queue workflows.
-// ABOUTME: Keeps HTTP transport thin while CQRS handlers enforce authorization and concurrency.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

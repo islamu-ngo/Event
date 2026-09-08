@@ -1,6 +1,3 @@
-// ABOUTME: Defines non-executable signed extension-pack descriptors outside the frozen manifest wire contract.
-// ABOUTME: Validates compatibility, provenance, licenses, declarative JSON, and issuer trust without granting authority.
-
 namespace Explore.Application.Features.ConfigurationManifest.Managed;
 
 using System.Security.Cryptography;

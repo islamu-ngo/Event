@@ -1,6 +1,3 @@
-// ABOUTME: Stable lookup row for the five explicit ticket pricing modes.
-// ABOUTME: Normalizes pricing semantics while TicketPricingRules enforces each mode's fields.
-
 namespace Explore.Domain;
 
 public sealed class TicketPricingMode

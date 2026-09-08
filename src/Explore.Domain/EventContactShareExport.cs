@@ -1,6 +1,3 @@
-// ABOUTME: Auditable export aggregate for contact-share data extraction requests.
-// ABOUTME: Captures immutable purpose, field snapshot, policy version, hash, and safe failure state.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

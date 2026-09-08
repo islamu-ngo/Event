@@ -1,6 +1,3 @@
-// ABOUTME: Reports bounded readiness for scheduler-owned IntegrationSync, webhook, and PDS queues.
-// ABOUTME: Emits tenant-free aggregate counts and bounded job-name metrics without row or provider identity.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Services.Webhooks;

@@ -1,6 +1,3 @@
-// ABOUTME: Adds the isolated Infisical authority source to IConfigurationBuilder.
-// ABOUTME: Contains no database-backed or lower-authority fallback source.
-
 namespace Explore.Secrets.Extensions;
 
 using Explore.Secrets.Configuration;

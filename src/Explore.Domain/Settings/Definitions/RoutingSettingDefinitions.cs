@@ -1,6 +1,3 @@
-// ABOUTME: Setting definitions for routing behavior and render policy configuration.
-// ABOUTME: Controls public home page, render modes, and prerendering across page categories.
-
 namespace Explore.Domain.Settings.Definitions;
 
 public static class RoutingSettingDefinitions

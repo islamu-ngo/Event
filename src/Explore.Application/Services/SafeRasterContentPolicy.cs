@@ -1,6 +1,3 @@
-// ABOUTME: Dependency-free policy for exact safe-raster metadata and bounded structural container validation.
-// ABOUTME: Validates JPEG, PNG, GIF, WebP, and AVIF framing through exact EOF without decoding pixels.
-
 using System.Buffers.Binary;
 using System.Diagnostics.CodeAnalysis;
 using Explore.Domain;

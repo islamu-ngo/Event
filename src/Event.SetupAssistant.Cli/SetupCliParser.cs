@@ -1,6 +1,3 @@
-// ABOUTME: Parses the exact repository-native event-setup grammar without aliases or dynamic dispatch.
-// ABOUTME: Validates option ownership, repeatability, safe identifiers, and explicit artifact intent.
-
 namespace ISLAMU.Event.SetupAssistant.Cli;
 
 internal static class SetupCliParser

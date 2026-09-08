@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for standalone event-session creation payloads.
-// ABOUTME: Validates timing, lookup references, room conflicts, and Islamic aspect scheduling state.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

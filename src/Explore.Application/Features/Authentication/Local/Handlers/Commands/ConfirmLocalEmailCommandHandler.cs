@@ -1,5 +1,3 @@
-// ABOUTME: Validates purpose-bound Local email consumption before entering native operation authority.
-// ABOUTME: Reuses serialized SyncUser mirror orchestration without fabricating a login response.
 
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Features.Authentication.Local.Requests.Commands;

@@ -1,6 +1,3 @@
-// ABOUTME: Handles explicit Keycloak client-secret rotation while respecting secret ownership boundaries.
-// ABOUTME: Persists only application-managed replacement secrets and refreshes JWT authority options after success.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;

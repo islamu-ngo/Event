@@ -1,6 +1,3 @@
-// ABOUTME: Read-only detail DTO for event templates, includes full definition list with nested options.
-// ABOUTME: Used by GetEventTemplateDetails query handler and HATEOAS detail resource.
-
 namespace Explore.Application.DTOs.EventTemplate;
 
 public sealed record EventTemplateDto

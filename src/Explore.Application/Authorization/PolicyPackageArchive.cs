@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral downloadable archive for authorization policy package fallback distribution.
-// ABOUTME: Carries ZIP bytes and manifest metadata while keeping provider-specific archive construction in Infrastructure.
-
 namespace Explore.Application.Authorization;
 
 /// <summary>

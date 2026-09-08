@@ -1,6 +1,3 @@
-// ABOUTME: Query request for paginated shared Layer 3 custom-property definition lists.
-// ABOUTME: Requires an entity-type scope so organization and group catalogs stay distinct.
-
 using Explore.Application.DTOs.CustomPropertyDefinition;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;

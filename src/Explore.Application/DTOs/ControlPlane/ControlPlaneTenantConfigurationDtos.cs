@@ -1,6 +1,3 @@
-// ABOUTME: Control-plane DTOs for per-tenant effective configuration governance.
-// ABOUTME: Combines resolved settings, plan assignment, and quota usage without leaking secrets.
-
 namespace Explore.Application.DTOs.ControlPlane;
 
 using System.Collections.ObjectModel;

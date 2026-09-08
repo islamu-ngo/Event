@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for processing signed Coop review-decision callbacks.
-// ABOUTME: Keeps provider decision capture and local execution orchestration inside Application.
-
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Responses;
 using MediatR;

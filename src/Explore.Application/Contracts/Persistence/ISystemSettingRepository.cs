@@ -1,4 +1,3 @@
-// ABOUTME: Repository interface for SystemSetting entity providing data access
 // for system-wide configuration settings with optional locking.
 
 namespace Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Contract for persisting exported TMS translations to disk as offline bundles.
-// ABOUTME: Abstracted so a future DistributedBundleFileWriter (S3/blob/shared volume) can replace local-disk.
-
 namespace Explore.Application.Contracts.Infrastructure;
 
 /// <summary>

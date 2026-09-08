@@ -1,6 +1,3 @@
-// ABOUTME: Resolves a storage object by ID and streams its content for public image proxy.
-// ABOUTME: Returns null if the storage object does not exist, enabling 404 at the controller level.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.StorageObjects.Requests.Queries;
 using Explore.Application.Models.Storage;

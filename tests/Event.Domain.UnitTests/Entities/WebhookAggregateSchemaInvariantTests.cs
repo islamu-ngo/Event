@@ -1,6 +1,3 @@
-// ABOUTME: Domain schema invariants for the webhook delivery redesign aggregate boundaries.
-// ABOUTME: Guards identifier types, normalized state ownership, UUIDv7 factories, and invalid transitions.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain;
 using TUnit.Core;

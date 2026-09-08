@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for AdminContext instance/tenant admin resolution behavior.
-// ABOUTME: Validates database-backed instance and tenant-role authorization.
-
 using System.Security.Claims;
 using Explore.Application.Authentication;
 using Explore.Application.Constants;

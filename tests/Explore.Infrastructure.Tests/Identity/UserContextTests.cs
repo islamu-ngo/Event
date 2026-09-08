@@ -1,6 +1,3 @@
-// ABOUTME: Unit coverage for infrastructure user claim extraction.
-// ABOUTME: Guards the documented user-id fallback chain used by authenticated API requests.
-
 using System.Security.Claims;
 using Explore.Application.Constants;
 using Explore.Infrastructure.Identity;

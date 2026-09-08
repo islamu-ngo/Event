@@ -1,6 +1,3 @@
-// ABOUTME: No-op setup secret provider for benchmark API hosts.
-// ABOUTME: Prevents startup bootstrap-state queries from polluting request performance benchmarks.
-
 using Explore.Application.Contracts.Services;
 
 namespace Event.Benchmarks.Api;

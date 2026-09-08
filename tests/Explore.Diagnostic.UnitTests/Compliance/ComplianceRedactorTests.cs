@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for StarRedactor, HmacRedactor, and DataTaxonomy compliance attributes.
-// ABOUTME: Verifies zero-leak PII masking, cryptographic HMAC determinism, and classification integrity.
-
 using System.Text;
 using Explore.ServiceDefaults.Compliance;
 using Microsoft.Extensions.Compliance.Classification;

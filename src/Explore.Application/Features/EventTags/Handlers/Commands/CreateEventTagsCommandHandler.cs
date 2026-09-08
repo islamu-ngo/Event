@@ -1,5 +1,3 @@
-// ABOUTME: Handler for adding a tag to an event with validation.
-// ABOUTME: Validates input, creates the event-tag junction entity.
 using System;
 using System.Linq;
 using System.Threading;

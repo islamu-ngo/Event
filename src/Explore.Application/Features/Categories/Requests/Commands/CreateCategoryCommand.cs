@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for creating a new category.
-// ABOUTME: Carries the CreateCategoryDto payload.
 using System;
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Category;

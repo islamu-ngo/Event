@@ -1,6 +1,3 @@
-// ABOUTME: Defines deterministic section-level artifact diff and coverage models.
-// ABOUTME: Compares only portable section keys and digests, never artifact bodies or runtime authority.
-
 namespace ISLAMU.Event.Setup.Core;
 
 using System.Collections.ObjectModel;

@@ -1,6 +1,3 @@
-// ABOUTME: Tests durable location-privacy correction dispatch across cache and PDS publication surfaces.
-// ABOUTME: Covers PII-free validation, current-projection requests, replay, retry, and cancellation.
-
 using System.Text.Json;
 using Explore.Application.Caching;
 using Explore.Application.Features.Federation.Atproto.Services;

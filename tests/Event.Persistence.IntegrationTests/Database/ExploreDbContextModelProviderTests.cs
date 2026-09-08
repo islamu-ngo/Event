@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the shared Explore EF Core model builds for every supported primary provider.
-// ABOUTME: Asserts configurable schema or fixed-prefix naming and PostgreSQL-only model defenses.
-
 using System.Text.RegularExpressions;
 using System.Security.Cryptography;
 using Explore.Persistence;
@@ -24,10 +21,6 @@ namespace Event.Persistence.IntegrationTests.Database;
 
 public sealed class ExploreDbContextModelProviderTests
 {
-    private static readonly Regex LiteralTableMappingPattern = new(
-        @"ToTable\(\s*""",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
-
     [Test]
     [Arguments("PostgreSql")]
     [Arguments("Sqlite")]
@@ -66,25 +59,34 @@ public sealed class ExploreDbContextModelProviderTests
         IProperty addressVersion = model.FindEntityType(typeof(Explore.Domain.LocationPii))!
             .FindProperty(nameof(Explore.Domain.LocationPii.AddressSubstringKeyVersion))!;
 
-        await Assert.That(displayKey.GetMaxLength()).IsEqualTo(14_000);
-        await Assert.That(addressKey.GetMaxLength()).IsEqualTo(14_000);
-        await Assert.That(displayKey.GetDefaultValue()).IsEqualTo(string.Empty);
-        await Assert.That(addressKey.GetDefaultValue()).IsEqualTo(string.Empty);
-        await Assert.That(displayVersion.GetDefaultValue()).IsEqualTo((short)0);
-        await Assert.That(addressVersion.GetDefaultValue()).IsEqualTo((short)0);
+        await Assert.That(displayKey.GetMaxLength()).IsEqualTo(2_000);
+        await Assert.That(addressKey.GetMaxLength()).IsEqualTo(2_000);
+        await Assert.That(displayKey.IsUnicode()).IsTrue();
+        await Assert.That(addressKey.IsUnicode()).IsTrue();
+        await Assert.That(displayKey.FindAnnotation(RelationalAnnotationNames.DefaultValue)).IsNull();
+        await Assert.That(addressKey.FindAnnotation(RelationalAnnotationNames.DefaultValue)).IsNull();
+        await Assert.That(displayVersion.FindAnnotation(RelationalAnnotationNames.DefaultValue)).IsNull();
+        await Assert.That(addressVersion.FindAnnotation(RelationalAnnotationNames.DefaultValue)).IsNull();
 
         string expectedCollation = provider switch
         {
             "PostgreSql" => "C",
             "Sqlite" => "BINARY",
             "SqlServer" => "Latin1_General_100_BIN2",
-            "MariaDb" or "MySql" => "ascii_bin",
+            "MariaDb" or "MySql" => "utf8mb4_bin",
             _ => throw new ArgumentOutOfRangeException(nameof(provider))
         };
         await Assert.That(displayKey.GetCollation()).IsEqualTo(expectedCollation);
         await Assert.That(addressKey.GetCollation()).IsEqualTo(expectedCollation);
-        await Assert.That(displayKey.GetCharSet()).IsEqualTo(provider is "MariaDb" or "MySql" ? "ascii" : null);
-        await Assert.That(addressKey.GetCharSet()).IsEqualTo(provider is "MariaDb" or "MySql" ? "ascii" : null);
+        await Assert.That(displayKey.GetCharSet()).IsEqualTo(provider is "MariaDb" or "MySql" ? "utf8mb4" : null);
+        await Assert.That(addressKey.GetCharSet()).IsEqualTo(provider is "MariaDb" or "MySql" ? "utf8mb4" : null);
+
+        foreach (IProperty asciiKey in model.GetEntityTypes().SelectMany(type => type.GetProperties())
+                     .Where(property => property.FindAnnotation(PortableOrdinalAsciiPropertyExtensions.AnnotationName)?.Value is true))
+        {
+            await Assert.That(asciiKey.GetCollation()).IsEqualTo(provider is "MariaDb" or "MySql" ? "ascii_bin" : expectedCollation);
+            await Assert.That(asciiKey.GetCharSet()).IsEqualTo(provider is "MariaDb" or "MySql" ? "ascii" : null);
+        }
 
         string checks = string.Join(' ', model.GetEntityTypes()
             .Where(type => type.ClrType == typeof(Explore.Domain.Location) || type.ClrType == typeof(Explore.Domain.LocationPii))
@@ -413,7 +415,7 @@ public sealed class ExploreDbContextModelProviderTests
         };
         if (!external)
         {
-            var options = new DbContextOptionsBuilder<ExploreDbContext>();
+            var options = TestDbContextOptions.Create<ExploreDbContext>();
             PrimaryDatabaseProviderComposition.ConfigureApplication(options, database);
             return new ExploreDbContext(options.Options);
         }
@@ -425,34 +427,38 @@ public sealed class ExploreDbContextModelProviderTests
             ["IdentityDatabase:Schema"] = database.Schema,
             ["IdentityDatabase:ServerVersion"] = database.ServerVersion?.ToString()
         }).Build();
-        var identityOptions = new DbContextOptionsBuilder<ExternalIdentityDbContext>();
+        var identityOptions = TestDbContextOptions.Create<ExternalIdentityDbContext>();
         IdentityDatabaseProviderComposition.Configure(identityOptions, configuration, PrimaryDatabaseRole.Runtime);
         return new ExternalIdentityDbContext(identityOptions.Options);
     }
 
     [Test]
-    public async Task FinalizedMappingSourceContainsNoLiteralTableNames()
+    [Arguments("PostgreSql")]
+    [Arguments("Sqlite")]
+    [Arguments("SqlServer")]
+    [Arguments("MariaDb")]
+    [Arguments("MySql")]
+    public async Task ConfiguredNamespacePreservesFinalizedTableAndColumnIdentity(string provider)
     {
-        string persistenceRoot = Path.Combine(GetRepositoryRoot(), "src", "Explore.Persistence");
-        var violations = new List<string>();
-        foreach (string path in Directory.GetFiles(persistenceRoot, "*.cs", SearchOption.AllDirectories))
+        using var defaultContext = CreateContext(provider);
+        using var configuredContext = CreateContext(provider, "operator_mapping");
+        ITable[] defaultTables = defaultContext.GetService<IDesignTimeModel>().Model
+            .GetRelationalModel().Tables.ToArray();
+        ITable[] configuredTables = configuredContext.GetService<IDesignTimeModel>().Model
+            .GetRelationalModel().Tables.ToArray();
+
+        await Assert.That(configuredTables.Select(table => table.Name))
+            .IsEquivalentTo(defaultTables.Select(table => table.Name));
+        foreach (ITable table in configuredTables)
         {
-            string relativePath = Path.GetRelativePath(GetRepositoryRoot(), path)
-                .Replace(Path.DirectorySeparatorChar, '/');
-            if (relativePath.Contains("/Migrations/", StringComparison.Ordinal) ||
-                relativePath.Contains("/bin/", StringComparison.Ordinal) ||
-                relativePath.Contains("/obj/", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            string source = await File.ReadAllTextAsync(path);
-            violations.AddRange(LiteralTableMappingPattern.Matches(source).Select(match =>
-                $"{relativePath}:{source[..match.Index].Count(character => character == '\n') + 1}"));
+            ITable original = defaultTables.Single(candidate => candidate.Name == table.Name);
+            await Assert.That(table.Schema)
+                .IsEqualTo(provider is "PostgreSql" or "SqlServer" ? "operator_mapping" : null);
+            await Assert.That(table.Columns.Select(column => (column.Name, column.StoreType, column.IsNullable)))
+                .IsEquivalentTo(original.Columns.Select(column => (column.Name, column.StoreType, column.IsNullable)));
+            await Assert.That(table.EntityTypeMappings.Select(mapping => mapping.TypeBase.Name))
+                .IsEquivalentTo(original.EntityTypeMappings.Select(mapping => mapping.TypeBase.Name));
         }
-
-        await Assert.That(violations).IsEmpty()
-            .Because("snake-case conventions and the provider namespace own every table name");
     }
 
     [Test]
@@ -593,19 +599,28 @@ public sealed class ExploreDbContextModelProviderTests
                 .Any(token => constraint.Sql.Contains(token, StringComparison.OrdinalIgnoreCase)))).IsFalse();
 
         var properties = model.GetEntityTypes().SelectMany(entityType => entityType.GetProperties()).ToArray();
-        if (provider is "MariaDb" or "MySql")
+        foreach (IProperty property in properties)
         {
-            await Assert.That(properties.Where(property => !IsMySqlAsciiIdentityProperty(property)
-                    && !IsLocationDerivedKey(property))
-                .All(property => property.GetCollation() == null)).IsTrue();
-            await Assert.That(model.FindEntityType(typeof(Explore.Domain.AtprotoIdentity))!
-                .FindProperty(nameof(Explore.Domain.AtprotoIdentity.Did))!
-                .GetCollation()).IsEqualTo("ascii_bin");
-        }
-        else
-        {
-            await Assert.That(properties.Where(property => !IsLocationDerivedKey(property))
-                .All(property => property.GetCollation() == null)).IsTrue();
+            bool ordinalAscii = property.FindAnnotation(PortableOrdinalAsciiPropertyExtensions.AnnotationName)?.Value is true;
+            bool locationUnicode = property.FindAnnotation(LocationUnicodePropertyExtensions.AnnotationName)?.Value is true;
+            string? expectedCollation = provider switch
+            {
+                "MariaDb" or "MySql" when locationUnicode => "utf8mb4_bin",
+                "MariaDb" or "MySql" when ordinalAscii || IsMySqlAsciiIdentityProperty(property) => "ascii_bin",
+                "Sqlite" when ordinalAscii || locationUnicode => "BINARY",
+                "SqlServer" when ordinalAscii || locationUnicode => "Latin1_General_100_BIN2",
+                _ => null
+            };
+            await Assert.That(property.GetCollation()).IsEqualTo(expectedCollation)
+                .Because($"{property.DeclaringType.Name}.{property.Name} must use provider-appropriate ordinal semantics");
+            if (expectedCollation == "ascii_bin")
+            {
+                await Assert.That(property.GetCharSet()).IsEqualTo("ascii");
+            }
+            else if (expectedCollation == "utf8mb4_bin")
+            {
+                await Assert.That(property.GetCharSet()).IsEqualTo("utf8mb4");
+            }
         }
         await Assert.That(properties.Any(property =>
         {
@@ -829,12 +844,6 @@ public sealed class ExploreDbContextModelProviderTests
         }
     }
 
-    private static bool IsLocationDerivedKey(IReadOnlyProperty property) =>
-        property.DeclaringType.ClrType == typeof(Explore.Domain.Location)
-            && property.Name == nameof(Explore.Domain.Location.DisplaySortKey)
-        || property.DeclaringType.ClrType == typeof(Explore.Domain.LocationPii)
-            && property.Name == nameof(Explore.Domain.LocationPii.AddressSubstringKey);
-
     private static bool IsMySqlAsciiIdentityProperty(IReadOnlyProperty property) =>
         (property.DeclaringType.ClrType == typeof(Explore.Domain.AtprotoIdentity) &&
          property.Name == nameof(Explore.Domain.AtprotoIdentity.Did)) ||
@@ -848,7 +857,7 @@ public sealed class ExploreDbContextModelProviderTests
         var databasePath = Path.Combine(Path.GetTempPath(), $"islamu-event-model-{Guid.NewGuid():N}.db");
         try
         {
-            var builder = new DbContextOptionsBuilder<ExploreDbContext>()
+            var builder = TestDbContextOptions.Create<ExploreDbContext>()
                 .UseSqlite($"Data Source={databasePath}")
                 .UseSnakeCaseNamingConvention();
             await using var context = new ExploreDbContext(builder.Options);
@@ -865,7 +874,7 @@ public sealed class ExploreDbContextModelProviderTests
 
     internal static ExploreDbContext CreateContext(string provider, string? modelSchema = null)
     {
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>();
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
         switch (provider)
         {
             case "PostgreSql":

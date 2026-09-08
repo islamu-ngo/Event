@@ -1,6 +1,3 @@
-// ABOUTME: Unit coverage for structural and tenant-bound discovery-area configuration validation.
-// ABOUTME: Protects stable IDs, one default, coarse centroids, and internal location ownership.
-
 using Explore.Application.Models.PublicExperience;
 
 namespace Event.Application.UnitTests.Features.PublicExperience;

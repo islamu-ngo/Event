@@ -1,6 +1,3 @@
-// ABOUTME: Produces deterministic canonical JSON, Markdown, and plain-text release artifact bytes.
-// ABOUTME: Rejects ambiguous or sensitive untrusted text before it can alter public release structure.
-
 using System.Globalization;
 using System.Text;
 using System.Text.Encodings.Web;

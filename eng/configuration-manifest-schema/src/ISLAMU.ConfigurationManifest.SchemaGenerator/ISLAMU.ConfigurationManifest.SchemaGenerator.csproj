@@ -1,5 +1,3 @@
-<!-- ABOUTME: Defines the deterministic ConfigurationManifest JSON Schema generator executable. -->
-<!-- ABOUTME: References Wire contracts directly and adds no third-party runtime dependency. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>

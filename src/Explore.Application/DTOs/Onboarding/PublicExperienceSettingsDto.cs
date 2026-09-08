@@ -1,6 +1,3 @@
-// ABOUTME: DTO for anonymous/authenticated public experience settings resolved via instance->tenant cascade.
-// ABOUTME: Powers home-page routing and white-label branding without requiring admin permissions.
-
 using Explore.Application.DTOs.Footer;
 using Explore.Application.DTOs.PublicExperience;
 

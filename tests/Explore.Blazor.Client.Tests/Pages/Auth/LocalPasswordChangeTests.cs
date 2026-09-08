@@ -1,5 +1,3 @@
-// ABOUTME: Verifies accessible first-use Local password replacement through the browser-to-BFF boundary.
-// ABOUTME: Guards credential clearing, fixed login navigation, and value-free request diagnostics.
 
 using System.Security.Cryptography;
 using System.Text.Json;

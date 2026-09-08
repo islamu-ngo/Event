@@ -1,6 +1,3 @@
-// ABOUTME: HAL resource assemblers for instance and tenant storage administration DTOs.
-// ABOUTME: Reuses the shared capability-planning pipeline for admin storage affordance links.
-
 namespace Explore.API.Hateoas.Assemblers;
 
 using Explore.Application.Contracts.Hateoas;

@@ -1,6 +1,3 @@
-<!-- ABOUTME: Records the clean-room, license, provenance, security, and SSO decision for ISLAMU.Terminal.Gui. -->
-<!-- ABOUTME: Separates the approved temporary packaging delta from the ISLAMU product implementation. -->
-
 # ISLAMU.Terminal.Gui Dependency Review
 
 Date: 2026-09-01 Europe/Brussels  

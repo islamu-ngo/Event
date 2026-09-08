@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation validator for CreateUpdateTechAspectDto.
-// ABOUTME: Validates tech-specific fields and business rules.
-
 namespace Explore.Application.DTOs.EventAspects.Validators;
 
 using System;

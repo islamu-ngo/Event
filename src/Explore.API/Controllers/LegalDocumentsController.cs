@@ -1,6 +1,3 @@
-// ABOUTME: Exposes anonymous role-labeled legal pages from immutable publication evidence.
-// ABOUTME: Returns RFC 7807 failures without leaking drafts, identities, source origins, or diagnostics.
-
 namespace Explore.API.Controllers;
 
 using System.Globalization;

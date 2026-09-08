@@ -1,5 +1,3 @@
-// ABOUTME: Exercises Local account UI through its real scoped service and generated HTTP clients.
-// ABOUTME: Guards HAL authority, exact reset intent, safe recovery, and ephemeral credential handover.
 
 using System.Net;
 using System.Security.Cryptography;

@@ -1,6 +1,3 @@
-// ABOUTME: Loads exact-commit Change-Id corrections without mutating immutable Git history.
-// ABOUTME: Applies a replacement only when the bound commit still carries the recorded old footer.
-
 using System.Text;
 
 namespace ISLAMU.ReleaseEngineering;
@@ -25,7 +22,7 @@ public static class ChangeIdRenamePolicy
 
     public static ChangeIdRenameLoadResult Load(string repositoryRoot)
     {
-        string directory = Path.Combine(repositoryRoot, "docs", "releases", "change-id-renames");
+        string directory = Path.Join(Path.GetFullPath(repositoryRoot), "docs", "internal", "releases", "change-id-renames");
         if (!Directory.Exists(directory))
         {
             return new ChangeIdRenameLoadResult(true, [], [], []);

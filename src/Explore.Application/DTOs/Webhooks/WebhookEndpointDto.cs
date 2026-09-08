@@ -1,6 +1,3 @@
-// ABOUTME: API DTO for typed owner-scoped outgoing webhook endpoints.
-// ABOUTME: Returns inherited owner identity, delivery controls, and subscriptions while omitting all secret material.
-
 namespace Explore.Application.DTOs.Webhooks;
 
 public sealed record WebhookEndpointDto

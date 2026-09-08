@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for the shell AI assistant rail UI.
-// ABOUTME: Verifies generated-client service usage and HAL-gated proposed action affordances.
-
 using Explore.Blazor.Client.Components.Shell;
 using Explore.Blazor.Client.Contracts.Services.Ai;
 using Explore.Blazor.Client.Services.Ai;

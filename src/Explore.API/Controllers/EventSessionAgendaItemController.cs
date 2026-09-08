@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for event session agenda item CRUD operations.
-// ABOUTME: Manages agenda items within event sessions including timing, speakers, and descriptions.
-
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;

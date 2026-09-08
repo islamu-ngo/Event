@@ -1,6 +1,3 @@
-// ABOUTME: Configuration extensions for the Aspire Migration Service worker.
-// ABOUTME: Resolves structured migrator database settings and publishes process-local connection strings.
-
 using Explore.Secrets.Configuration;
 using Explore.Secrets.Database;
 

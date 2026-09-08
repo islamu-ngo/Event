@@ -1,6 +1,3 @@
-// ABOUTME: Reflection bridge for deterministic RED geocoding readiness probe tests.
-// ABOUTME: Injects in-memory HTTP and manual time while production Task 4.3 contracts remain absent.
-
 using System.Collections;
 using System.Reflection;
 using System.Runtime.ExceptionServices;

@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for the webhook management panel's HAL-gated UI actions.
-// ABOUTME: Verifies Phase 7 webhook controls stay accessible and service-backed without client role checks.
-
 using Explore.Blazor.Client.Components.Common;
 using Explore.Blazor.Client.Components.Webhooks;
 using Explore.Blazor.Client.Contracts.Services.Webhooks;

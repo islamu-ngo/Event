@@ -1,6 +1,3 @@
-// ABOUTME: Enforces canonical Setup client challenges and unique scope arrays in JSON.
-// ABOUTME: Rejects null, numeric, duplicate, empty, unknown, and compatibility forms.
-
 namespace ISLAMU.Wire.Contracts.SetupLive;
 
 using System.Text.Json;

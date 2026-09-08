@@ -1,6 +1,3 @@
-// ABOUTME: CQRS command for updating the current user's actor subscription notification level.
-// ABOUTME: Requires the observed concurrency stamp to fail closed on stale writes.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.ActorSubscription;
 using Explore.Application.Responses;

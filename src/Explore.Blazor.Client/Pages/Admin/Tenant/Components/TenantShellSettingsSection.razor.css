@@ -1,6 +1,3 @@
-/* ABOUTME: Styles the tenant workspace-shell governance section with project tokens. */
-/* ABOUTME: Keeps field spacing and grouping logical-direction safe. */
-
 .tenant-shell-settings,
 .tenant-shell-settings__fields {
     display: grid;

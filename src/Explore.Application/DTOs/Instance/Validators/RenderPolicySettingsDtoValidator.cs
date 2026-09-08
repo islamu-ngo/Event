@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation validator for render policy settings sub-resource.
-// ABOUTME: Enforces allowed render modes, preset values, and CustomAdvanced override consistency.
-
 using Explore.Domain.Enums;
 using FluentValidation;
 

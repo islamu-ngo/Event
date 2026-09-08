@@ -1,6 +1,3 @@
-// ABOUTME: Guards canonical metadata on public SEO entry points.
-// ABOUTME: Keeps sitemap-facing Blazor routes aligned with centralized canonical URL generation.
-
 using Explore.Blazor.Client.Helpers;
 
 namespace Explore.Blazor.Client.Tests.Seo;

@@ -1,6 +1,3 @@
-// ABOUTME: Public bounded transport contracts for admission check-in and scanner-capability APIs.
-// ABOUTME: Excludes credential digests, ticket identities, persistence descriptors, and attendee PII.
-
 using System.ComponentModel.DataAnnotations;
 using Explore.Application.Contracts.Admissions;
 using Explore.Domain.Enums;

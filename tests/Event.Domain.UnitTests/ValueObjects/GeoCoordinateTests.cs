@@ -1,6 +1,3 @@
-// ABOUTME: Specifies finite, bounded exact-coordinate values with fail-closed construction.
-// ABOUTME: Ensures formatting never leaks precise latitude or longitude values.
-
 using System.Globalization;
 using System.Reflection;
 using Explore.Domain.ValueObjects;

@@ -1,5 +1,3 @@
-// ABOUTME: Classifies SMTP handoff evidence for durable delivery settlement.
-// ABOUTME: Unknown acceptance is never safe to retry automatically.
 
 namespace Explore.Application.Models;
 

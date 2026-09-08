@@ -1,4 +1,3 @@
-// ABOUTME: EF Core configuration for UserPreference entity with UUID v7 generation
 // and composite unique constraint on (TenantId, UserId, SettingKey).
 
 namespace Explore.Persistence.Configurations.Entities;

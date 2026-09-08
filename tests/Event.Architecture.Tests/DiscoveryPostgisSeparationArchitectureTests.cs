@@ -1,6 +1,3 @@
-// ABOUTME: Architecture pins for the current area-only discovery and private-location boundary.
-// ABOUTME: Prevents exact venue coordinates or Private Home PII from becoming public discovery defaults.
-
 using System.Reflection;
 using System.Text.Json;
 using System.Text.RegularExpressions;

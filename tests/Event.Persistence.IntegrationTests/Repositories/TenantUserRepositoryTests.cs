@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL-backed tests for tenant-local user participation state.
-// ABOUTME: Verifies tenant isolation and authority gating independently from global User records.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;

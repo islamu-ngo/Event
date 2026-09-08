@@ -85,8 +85,7 @@ dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.cs
 - [ ] No `as any`, `@ts-ignore`, `@ts-expect-error`, or equivalent C# type-suppression hack.
 - [ ] No new `rm`, `mv`, or `>` shell redirection in scripts.
 - [ ] No `.env`, credentials, or secrets staged.
-- [ ] No backward-compatibility shims or feature flags (active development, break-and-fix).
-- [ ] Every new / modified file starts with a two-line `ABOUTME:` comment header.
+- [ ] Self-documenting code: no synthetic `ABOUTME:` headers on code (`.cs`, `.razor`, `.css`, project files); standard C# XML doc comments (`/// <summary>`) where non-inferable.
 - [ ] No duplicated content across docs, skills, or agents (point — don't copy).
 
 ## Step 6 — Documentation Sanity

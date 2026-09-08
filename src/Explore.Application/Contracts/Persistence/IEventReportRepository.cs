@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for tenant-scoped event-report intake and moderation queue queries.
-// ABOUTME: Returns domain entities only so handlers own mapping, authorization, and HAL shaping.
-
 using Explore.Application.Specifications.EventReports;
 using Explore.Domain;
 using Explore.Domain.Enums;

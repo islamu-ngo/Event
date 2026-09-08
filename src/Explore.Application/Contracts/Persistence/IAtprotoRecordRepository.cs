@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for tenant-visible AT Protocol discovery and exact outbound ownership lookup.
-// ABOUTME: Keeps globally canonical records hidden unless a tenant presentation or ownership row authorizes access.
-
 using Explore.Domain;
 using Explore.Domain.Federation;
 

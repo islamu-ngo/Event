@@ -1,6 +1,3 @@
-// ABOUTME: Lookup entity describing the lifecycle state of an actor subscription.
-// ABOUTME: Used by ActorSubscription to preserve unsubscribe history as durable state transitions.
-
 namespace Explore.Domain;
 
 public class ActorSubscriptionStatus

@@ -1,6 +1,3 @@
-// ABOUTME: Drains durable WebPushDispatchOutbox rows through the Web Push provider.
-// ABOUTME: Applies preference gating, lease-token transitions, stale cleanup, and retry classification.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

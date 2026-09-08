@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped styling for compact path-based Personal Settings navigation. */
-/* ABOUTME: Uses logical properties and design tokens for responsive LTR and RTL layouts. */
-
 .settings-layout {
     background: var(--mud-palette-background);
 }

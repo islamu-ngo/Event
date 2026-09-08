@@ -1,6 +1,3 @@
-// ABOUTME: Defines canonical HTTP size, capability-token, rate, timeout, and ProblemDetails contracts.
-// ABOUTME: Keeps import failures bounded to status, stable code, and optional retry metadata.
-
 namespace Explore.API.ConfigurationImport;
 
 using ISLAMU.Wire.Contracts.ConfigurationPortability;

@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped BEM styling for the authenticated reporter report-status page. */
-/* ABOUTME: Keeps dense operational report rows readable across desktop and mobile breakpoints. */
-
 .my-reports-page__header {
     align-items: flex-start;
     display: flex;

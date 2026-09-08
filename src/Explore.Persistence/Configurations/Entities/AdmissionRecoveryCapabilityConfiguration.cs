@@ -1,6 +1,3 @@
-// ABOUTME: Maps tenant-qualified admission recovery lineage and digest-only lifecycle state.
-// ABOUTME: Uses provider-portable generation and active-slot uniqueness without filtered indexes.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

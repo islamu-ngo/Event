@@ -1,6 +1,3 @@
-// ABOUTME: Minimal Stripe payment evidence retained after exact raw-body signature verification.
-// ABOUTME: Excludes Checkout customer, card, billing, shipping, and other buyer payload fields.
-
 using System.Text.Json;
 
 namespace Explore.Infrastructure.Payments.Stripe;

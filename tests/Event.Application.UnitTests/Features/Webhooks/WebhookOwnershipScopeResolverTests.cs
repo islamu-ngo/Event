@@ -1,6 +1,3 @@
-// ABOUTME: Unit coverage for trusted typed webhook owner resolution.
-// ABOUTME: Guards local user identity and active tenant-membership boundaries for user-owned webhooks.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Services.Webhooks;

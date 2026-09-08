@@ -1,6 +1,3 @@
-// ABOUTME: Lookup entity describing why a support-access session ended.
-// ABOUTME: Keeps lifecycle reporting deterministic while allowing optional explanatory text.
-
 namespace Explore.Domain;
 
 public class SupportAccessEndReason

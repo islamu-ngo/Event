@@ -1,6 +1,3 @@
-// ABOUTME: Startup validator for Basic Dispatch Mode email dispatch settings.
-// ABOUTME: Fails fast on invalid polling, batch, retry, or consumer identity configuration.
-
 using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure;

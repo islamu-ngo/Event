@@ -1,6 +1,3 @@
-// ABOUTME: Canonicalizes, hashes, serializes, and maps managed tenant provisioning request snapshots.
-// ABOUTME: Makes idempotency comparisons deterministic while keeping terminal operation projections data-minimized.
-
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;

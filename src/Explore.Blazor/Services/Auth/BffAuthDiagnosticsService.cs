@@ -1,6 +1,3 @@
-// ABOUTME: Builds development-only auth diagnostics for BFF auth endpoints.
-// ABOUTME: Keeps diagnostic discovery probing out of endpoint mapping without changing the dev-only contract.
-
 using System.Text.Json;
 
 using Microsoft.Extensions.Options;

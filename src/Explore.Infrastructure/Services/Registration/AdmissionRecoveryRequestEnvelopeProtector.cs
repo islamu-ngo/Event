@@ -1,6 +1,3 @@
-// ABOUTME: Protects normalized recovery-request identity before durable asynchronous processing.
-// ABOUTME: Uses a request-specific Data Protection purpose and exposes only redacted failures.
-
 using System.Security.Cryptography;
 using System.Text.Json;
 using Explore.Application.Contracts.Admissions;

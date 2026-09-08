@@ -1,6 +1,3 @@
-// ABOUTME: Verifies registration authoring repository graph loading, isolation, tracking, and concurrency translation.
-// ABOUTME: Covers exact event ownership, default tenant filters, and persistence DI composition without filter bypasses.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
@@ -161,8 +158,8 @@ public sealed class RegistrationFormRepositoryTests
         InMemoryDatabaseRoot root,
         Guid tenantId)
     {
-        var context = new ExploreDbContext(new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase(database, root).Options)
+        var context = new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase(database, root).Options)
         {
             TenantContext = new TestTenantContext(tenantId)
         };

@@ -1,6 +1,3 @@
-// ABOUTME: Proves PostgreSQL capacity locking prevents two ticket types from taking one shared last seat.
-// ABOUTME: Uses independent DbContexts and serializable transactions against the real registration-hold repository.
-
 using System.Diagnostics;
 using System.Text.Json;
 using Event.Persistence.IntegrationTests.Fixtures;
@@ -1294,7 +1291,7 @@ public sealed class RegistrationInventoryHoldConcurrencyTests(PostgreSqlContaine
 
     private ExploreDbContext CreateRetryingTenantContext(Guid tenantId)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString, npgsql => npgsql.EnableRetryOnFailure(
                 maxRetryCount: 3,
                 maxRetryDelay: TimeSpan.FromSeconds(5),

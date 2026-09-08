@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for session-local typed values with explicit ordinal semantics.
-// ABOUTME: Indexes support session-scoped reads and deterministic multi-value ordering.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

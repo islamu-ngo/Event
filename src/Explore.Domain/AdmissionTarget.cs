@@ -1,6 +1,3 @@
-// ABOUTME: Defines one tenant-owned admission target at an exact event, day, or session scope.
-// ABOUTME: Enforces UUIDv7 identities and prevents ambiguous combinations of schedule references.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

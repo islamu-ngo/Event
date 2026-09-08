@@ -1,5 +1,3 @@
--- ABOUTME: Official Cerbos PostgreSQL schema for the policy storage backend.
--- ABOUTME: Creates tables for policy storage, dependency tracking, and audit logging.
 -- Source: https://docs.cerbos.dev/cerbos/latest/configuration/storage#postgres
 --
 -- IMPORTANT: This schema MUST match what Cerbos expects. Cerbos stores policies as

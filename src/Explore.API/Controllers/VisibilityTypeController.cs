@@ -1,6 +1,3 @@
-// ABOUTME: API controller for visibility type lookup table (read-only enumeration).
-// ABOUTME: Provides visibility options (public, private, etc.) for events and organizations.
-
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Asp.Versioning;

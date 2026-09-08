@@ -1,6 +1,3 @@
-// ABOUTME: Implements entity-returning recovery repository and identity resolver test ports.
-// ABOUTME: Preserves digest-only state while exercising atomic consume and rotation semantics.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Domain;
 

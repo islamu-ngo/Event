@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS link policies for organization membership resources.
-// ABOUTME: Emits organization, membership edit, and removal affordances backed by registered routes.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Collections.Generic;

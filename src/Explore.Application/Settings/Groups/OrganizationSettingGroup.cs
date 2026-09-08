@@ -1,6 +1,3 @@
-// ABOUTME: Strongly-typed Organization policy setting group resolved via batch loading.
-// ABOUTME: Keys align to OrganizationSettingDefinitions via GovernanceSettingKeys.Organizations.
-
 namespace Explore.Application.Settings.Groups;
 
 using Explore.Application.Contracts.Infrastructure;

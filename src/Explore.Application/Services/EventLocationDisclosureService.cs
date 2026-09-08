@@ -1,6 +1,3 @@
-// ABOUTME: Orchestrates bounded EventLocation, room, entitlement, governance, and management authorization reads.
-// ABOUTME: Feeds immutable facts to the pure evaluator without per-row database or policy calls.
-
 using System.Collections.Immutable;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;

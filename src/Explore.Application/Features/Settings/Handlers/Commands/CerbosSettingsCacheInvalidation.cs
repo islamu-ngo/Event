@@ -1,6 +1,3 @@
-// ABOUTME: Helper for invalidating Cerbos runtime caches after Cerbos governance settings change.
-// ABOUTME: Keeps generic settings handlers aligned with BYO Cerbos resolver/client cache semantics.
-
 namespace Explore.Application.Features.Settings.Handlers.Commands;
 
 using Explore.Application.Contracts.Infrastructure;

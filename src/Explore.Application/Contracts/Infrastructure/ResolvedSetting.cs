@@ -1,6 +1,3 @@
-// ABOUTME: Resolved setting value with metadata about resolution source and lock state.
-// ABOUTME: Shared type used by IHierarchicalSettingsResolver, ISettingGroup, and all setting group implementations.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Infrastructure;

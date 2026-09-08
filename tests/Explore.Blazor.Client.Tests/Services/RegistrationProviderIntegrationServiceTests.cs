@@ -1,6 +1,3 @@
-// ABOUTME: Service tests for registration-provider generated-client wrappers.
-// ABOUTME: Verifies HAL resources and cancellation tokens pass through without client-side remapping.
-
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Services;
 

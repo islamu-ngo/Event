@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for durable native integration synchronization outbox rows.
-// ABOUTME: Supports cancellation-aware worker polling, optimistic processing claims, completion, and retry/dead-letter transitions.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

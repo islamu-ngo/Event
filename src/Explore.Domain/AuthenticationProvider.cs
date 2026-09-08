@@ -1,6 +1,3 @@
-// ABOUTME: Normalized lookup row for authentication provider kinds persisted by user identity links.
-// ABOUTME: Pairs stable enum IDs with machine codes and operator-facing names.
-
 namespace Explore.Domain;
 
 public sealed class AuthenticationProvider

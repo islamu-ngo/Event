@@ -1,6 +1,3 @@
-// ABOUTME: Central mapping helpers between UI theme entities and appearance DTOs.
-// ABOUTME: Keeps normalization and palette conversion consistent across create, update, and query handlers.
-
 namespace Explore.Application.Features.Appearance.Common;
 
 using Explore.Application.DTOs.Appearance;

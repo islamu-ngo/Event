@@ -1,6 +1,3 @@
-// ABOUTME: API controller for actor type lookup table (read-only enumeration).
-// ABOUTME: Provides actor type options (speaker, performer, organizer, etc.) for actor classification.
-
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Asp.Versioning;

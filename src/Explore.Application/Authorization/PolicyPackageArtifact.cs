@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral artifact metadata for authorization policy package manifests.
-// ABOUTME: Records canonical identity, size, and content hash without exposing provider transport details.
-
 namespace Explore.Application.Authorization;
 
 /// <summary>

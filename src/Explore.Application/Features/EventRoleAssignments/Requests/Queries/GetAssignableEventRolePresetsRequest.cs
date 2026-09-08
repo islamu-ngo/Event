@@ -1,6 +1,3 @@
-// ABOUTME: Query for event-role presets assignable by the current actor for one event.
-// ABOUTME: Applies the deterministic same-event authority ceiling before returning UI choices.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventRoleAssignment;
 using Explore.Domain.Constants;

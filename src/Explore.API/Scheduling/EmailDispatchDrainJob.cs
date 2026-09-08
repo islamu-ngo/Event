@@ -1,6 +1,3 @@
-// ABOUTME: Quartz job that drains due EmailDispatchOutbox rows on the platform dispatch cadence.
-// ABOUTME: Delegates execution to Application contracts so the scheduler never owns email delivery state.
-
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Contracts.Services;
 using Quartz;

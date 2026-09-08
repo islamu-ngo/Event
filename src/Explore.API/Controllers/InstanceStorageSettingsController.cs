@@ -1,6 +1,3 @@
-// ABOUTME: Instance storage settings endpoints for provider configuration, connection tests, and usage recalculation.
-// ABOUTME: Storage credentials are written through the settings service and never echoed back in responses.
-
 using Explore.Application.Authentication;
 using Asp.Versioning;
 using Explore.API.Attributes;

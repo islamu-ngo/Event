@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral organizer payment readiness mapping shared by polling and webhooks.
-// ABOUTME: Combines payment capabilities and requirements into the domain's fail-closed observation shape.
-
 using Explore.Application.Contracts.Services;
 using Explore.Domain;
 

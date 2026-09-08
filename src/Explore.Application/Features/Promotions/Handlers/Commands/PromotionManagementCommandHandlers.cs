@@ -1,6 +1,3 @@
-// ABOUTME: Handles organizer promotion management mutation flows in the Application layer.
-// ABOUTME: Computes promotion code digests transiently and returns only safe management projections.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services.Registration;

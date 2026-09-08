@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL-backed tests for DB-enforced group hierarchy invariants.
-// ABOUTME: Verifies same-tenant parent FKs, parent exclusivity, self-parent checks, and bounded ancestry helpers.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -283,7 +280,7 @@ public class GroupHierarchyConstraintTests(PostgreSqlContainerFixture fixture)
 
     private ExploreDbContext CreateRetryingDbContext()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString, npgsql => npgsql.EnableRetryOnFailure())
             .UseSnakeCaseNamingConvention()
             .Options;

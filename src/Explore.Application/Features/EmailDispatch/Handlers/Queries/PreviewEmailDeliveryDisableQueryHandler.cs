@@ -1,5 +1,3 @@
-// ABOUTME: Previews email-disable impact under the same ordered SMTP lease and transaction used by setting writes.
-// ABOUTME: Resolves current administrator authority and issues confirmation only for an actionable non-secret snapshot.
 
 using System.Collections.Immutable;
 using Explore.Application.Contracts.Identity;

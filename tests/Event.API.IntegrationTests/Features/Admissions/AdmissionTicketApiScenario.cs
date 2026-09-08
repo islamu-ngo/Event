@@ -1,6 +1,3 @@
-// ABOUTME: Fixed outcomes for exact Phase 20 request contracts used by the API RED TestServer.
-// ABOUTME: Recovery records and one-time capabilities remain child state separate from admission tickets.
-
 using System.Security.Cryptography;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;

@@ -1,5 +1,3 @@
-// ABOUTME: Exposes private post-confirmation guest status and cancellation through the existing capability header.
-// ABOUTME: Uses a separate HAL family and private generic errors without granting checkout or attendee calendar access.
 
 using Asp.Versioning;
 using Explore.API.Attributes;

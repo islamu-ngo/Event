@@ -1,6 +1,3 @@
-// ABOUTME: Handles marking a single notification as read for the authenticated user.
-// ABOUTME: Idempotent — succeeds silently if the notification is already read.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Notifications.Requests.Commands;

@@ -1,6 +1,3 @@
-// ABOUTME: Resolves trusted storage upload authorization facts before session creation.
-// ABOUTME: Loads owning resources server-side so request-provided owner fields cannot grant authority.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

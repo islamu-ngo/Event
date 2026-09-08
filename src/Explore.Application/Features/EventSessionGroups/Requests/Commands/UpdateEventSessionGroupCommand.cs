@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for updating an event session group.
-// ABOUTME: Carries route identity, concurrency, and server-bound authorization context for grouped PATCH.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventSessionGroup;
 using Explore.Application.Responses;

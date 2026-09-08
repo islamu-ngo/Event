@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for event day CRUD operations scoped to events.
-// ABOUTME: Manages event days (multi-day event schedule structure) with HATEOAS.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

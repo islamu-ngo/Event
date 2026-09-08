@@ -1,6 +1,3 @@
-// ABOUTME: SQLite round-trip tests for semantic money, coordinate, and schedule values over scalar EF columns.
-// ABOUTME: Keeps existing UTC/payment checks green while specifying four new named database invariants in RED.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Scheduling;
@@ -168,7 +165,7 @@ public sealed class SemanticValueSqlitePersistenceTests
 
     private static async Task<ExploreDbContext> CreateContextAsync()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite("Data Source=:memory:")
             .UseSnakeCaseNamingConvention()
             .Options;

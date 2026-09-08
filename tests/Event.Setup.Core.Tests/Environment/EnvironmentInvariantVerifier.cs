@@ -1,6 +1,3 @@
-// ABOUTME: Implements independent source-free catalogue, activation, dotenv, and leakage breakers.
-// ABOUTME: Returns stable bounded failure codes so synthetic fixtures can prove each ratchet fails.
-
 namespace ISLAMU.Setup.Core.EnvironmentTests;
 
 using System.Text;

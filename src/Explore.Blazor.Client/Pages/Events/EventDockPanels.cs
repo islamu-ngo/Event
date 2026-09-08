@@ -1,6 +1,3 @@
-// ABOUTME: Event-list workspace dock panel descriptors for customization and preview chrome.
-// ABOUTME: Keeps event workspace panel IDs near the owning page without a central enum.
-
 using Explore.Blazor.Client.Services.Docking;
 
 namespace Explore.Blazor.Client.Pages.Events;

@@ -1,4 +1,3 @@
-// ABOUTME: Unit tests for EventAspectService Islamic and Tech aspect operations.
 // Verifies Get/Create/Update/Delete success and expected error-handling contracts.
 
 namespace Explore.Blazor.Client.Tests.Services;

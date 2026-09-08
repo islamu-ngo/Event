@@ -1,6 +1,3 @@
-// ABOUTME: Adversarial SQLite controls proving tenant isolation depends on both named filters and exact predicates.
-// ABOUTME: Demonstrates that bypassing the tenant filter or deleting its replacement predicate exposes another tenant.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -58,7 +55,7 @@ public sealed class TenantQueryFilterMutationTests
 
     private static ExploreDbContext CreateContext(SqliteConnection connection, Guid tenantId)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connection)
             .UseSnakeCaseNamingConvention()
             .Options;

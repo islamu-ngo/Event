@@ -1,6 +1,3 @@
-// ABOUTME: Application read-model vocabulary for public shell primary organization resolution states.
-// ABOUTME: Keeps organization-centric posture states out of Domain and outside DTO naming conventions.
-
 namespace Explore.Application.Models;
 
 public enum PublicExperiencePrimaryOrganizationState

@@ -1,6 +1,3 @@
-// ABOUTME: Application-layer contract for synchronizing canonical webhook event types to a provider.
-// ABOUTME: Lets infrastructure providers expose catalog sync without leaking provider SDK models upward.
-
 namespace Explore.Application.Contracts.Webhooks;
 
 public interface IWebhookProviderEventTypeSyncService

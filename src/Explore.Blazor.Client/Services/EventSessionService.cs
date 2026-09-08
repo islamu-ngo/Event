@@ -1,6 +1,3 @@
-// ABOUTME: Implements event session and session group management via generated tag clients.
-// ABOUTME: Decomposed from EventService to maintain SRP and clean DI boundaries.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Helpers;

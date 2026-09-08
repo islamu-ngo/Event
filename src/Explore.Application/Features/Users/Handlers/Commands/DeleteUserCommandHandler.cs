@@ -1,6 +1,3 @@
-// ABOUTME: Handles global user deletion through the retained-authority-first privacy-erasure workflow.
-// ABOUTME: Delegates atomic application mutation and replay to the purpose-specific erasure service.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.PrivacyErasure;
 using Explore.Application.Features.Users.Requests.Commands;

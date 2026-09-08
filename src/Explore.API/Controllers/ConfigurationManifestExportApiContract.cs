@@ -1,6 +1,3 @@
-// ABOUTME: Defines the canonical whole-instance configuration manifest download contract.
-// ABOUTME: Keeps media type, deterministic filenames, and overflow code shared by the API surface.
-
 namespace Explore.API.Controllers;
 
 using ISLAMU.Wire.Contracts.ConfigurationPortability;

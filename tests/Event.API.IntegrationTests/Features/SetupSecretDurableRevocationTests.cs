@@ -1,6 +1,3 @@
-// ABOUTME: Cross-replica regression tests for durable setup-secret revocation at API acceptance boundaries.
-// ABOUTME: Proves a provider with stale local state cannot validate, authenticate, or mutate after shared completion.
-
 using System.Net;
 using System.Net.Http.Json;
 using Event.Api.IntegrationTests.Fixtures;

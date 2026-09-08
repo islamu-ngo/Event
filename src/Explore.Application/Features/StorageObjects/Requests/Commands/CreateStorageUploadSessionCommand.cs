@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for reserving quota and opening a local-first upload session.
-// ABOUTME: Uses storage-object create authorization and dynamic tenant/resource attributes.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.StorageObject;
 using Explore.Application.Responses;

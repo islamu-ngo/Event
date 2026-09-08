@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for workspace-aware top-bar search and event creation actions.
-// ABOUTME: Verifies Events, Studio, and Settings render and navigate according to UiShellState.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.Shell;
 using Explore.Blazor.Client.Layout;

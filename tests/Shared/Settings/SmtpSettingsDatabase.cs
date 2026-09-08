@@ -1,5 +1,3 @@
-// ABOUTME: Shared relational SMTP settings fixture for transport, governance, and readiness tests.
-// ABOUTME: Uses real SQLite repositories and capability resolution with only the secret authority substituted.
 
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;

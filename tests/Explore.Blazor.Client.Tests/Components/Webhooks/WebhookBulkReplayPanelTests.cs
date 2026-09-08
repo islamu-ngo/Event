@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for bounded webhook replay preview, scheduling, and cancellation.
-// ABOUTME: Verifies collection and item HAL affordances govern every replay action rendered by the client.
-
 using Explore.Blazor.Client.Components.Common;
 using Explore.Blazor.Client.Components.Webhooks;
 using Explore.Blazor.Client.Contracts.Services.Webhooks;

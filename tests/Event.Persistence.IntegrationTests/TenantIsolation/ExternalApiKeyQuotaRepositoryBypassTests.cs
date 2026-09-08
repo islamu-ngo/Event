@@ -1,6 +1,3 @@
-// ABOUTME: Verifies ExternalApiKeyQuotaRepository platform usage reports bypass tenant filters safely.
-// ABOUTME: Proves platform-wide API-key quota reporting is bounded by period and API-key aggregation.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;

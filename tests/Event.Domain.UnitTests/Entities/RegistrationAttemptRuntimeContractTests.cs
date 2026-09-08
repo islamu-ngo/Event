@@ -1,6 +1,3 @@
-// ABOUTME: Covers Phase 8.1 registration-attempt runtime capability and lifecycle contracts.
-// ABOUTME: Proves token hashes, expiry, consumption, supersession, and late-evidence behavior stay domain-local.
-
 using System.Reflection;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;

@@ -1,5 +1,3 @@
-// ABOUTME: Verifies email-disable impact against real SQLite policy and control rows.
-// ABOUTME: Covers transport ownership, inherited enablement, locks, revisions, and read-only previews.
 
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

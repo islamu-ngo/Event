@@ -1,6 +1,3 @@
-// ABOUTME: Curator-authorized query for organizer claims attached to one event.
-// ABOUTME: Returns claim evidence and normalized status only through organizer-claim authorization.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventOrganizerClaim;
 using MediatR;

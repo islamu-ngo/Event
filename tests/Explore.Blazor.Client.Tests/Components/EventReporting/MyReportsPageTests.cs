@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for reporter-owned communication consent controls on My Reports.
-// ABOUTME: Verifies HAL gating, authoritative state replacement, isolated row state, and accessibility paths.
-
 using Explore.Blazor.Client.Components.EventReporting;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Contracts.Services.EventReporting;

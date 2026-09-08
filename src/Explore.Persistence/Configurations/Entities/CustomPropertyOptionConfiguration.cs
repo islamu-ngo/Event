@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for shared tenant-scoped Layer 3 option rows.
-// ABOUTME: Enforces namespaced machine-key uniqueness within each definition.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

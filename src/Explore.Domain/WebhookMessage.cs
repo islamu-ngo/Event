@@ -1,6 +1,3 @@
-// ABOUTME: Canonical tenant-scoped webhook message envelope emitted after domain/application events.
-// ABOUTME: Stores immutable provider-neutral payload metadata and retention evidence without delivery state.
-
 using System.Security.Cryptography;
 using Explore.Domain.Interfaces;
 

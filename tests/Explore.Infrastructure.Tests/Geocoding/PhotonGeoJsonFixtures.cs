@@ -1,6 +1,3 @@
-// ABOUTME: Independent GeoJSON fixtures for Photon adapter boundary tests.
-// ABOUTME: Uses bounded protocol fields and canaries without retaining third-party implementation expression.
-
 using System.Globalization;
 
 namespace Explore.Infrastructure.Tests.Geocoding;

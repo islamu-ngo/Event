@@ -1,6 +1,3 @@
-// ABOUTME: Creates the co-located PostgreSQL authority context from primary migrator settings.
-// ABOUTME: Keeps generated migrations aligned with the configurable primary database schema.
-
 using Explore.Persistence.Database;
 using Explore.Secrets.Configuration;
 using Explore.Secrets.Database;

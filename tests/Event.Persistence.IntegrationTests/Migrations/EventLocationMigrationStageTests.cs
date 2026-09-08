@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL acceptance tests for ordinary Explore database migration behavior after the clean reset.
-// ABOUTME: Converts the obsolete staged gate coverage into current-set, retry, and legacy-config invariants.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Persistence;
 using Explore.Persistence.Schema;
@@ -118,15 +115,13 @@ public sealed class EventLocationMigrationStageTests(RecipientDeliveryMigrationC
 
     private static ExploreDbContext CreateContext(string connectionString)
     {
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>()
+        var builder = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(connectionString)
             .UseSnakeCaseNamingConvention()
             .ConfigureWarnings(warnings =>
             {
                 warnings.Ignore(RelationalEventId.PendingModelChangesWarning);
-                warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning);
             });
-        builder.EnableServiceProviderCaching(false);
         return new ExploreDbContext(builder.Options);
     }
 }

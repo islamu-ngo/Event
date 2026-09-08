@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral request, response, and error records for AI chat provider adapters.
-// ABOUTME: Keeps prompts, proposed actions, usage metadata, and provider errors typed without provider SDK dependencies.
-
 namespace Explore.Application.Contracts.Infrastructure.Ai;
 
 using Explore.Domain.Ai;

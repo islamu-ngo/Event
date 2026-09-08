@@ -1,6 +1,3 @@
-// ABOUTME: Handler for creating a new organization with actor, default admin membership, and profile picture linking.
-// ABOUTME: Validates input, creates the org + actor pair, adds creator as OrgAdmin, and tracks metrics.
-
 using System.Linq;
 using AutoMapper;
 using Explore.Application.Contracts.Identity;

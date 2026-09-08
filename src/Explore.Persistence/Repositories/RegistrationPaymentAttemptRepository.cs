@@ -1,6 +1,3 @@
-// ABOUTME: Provides shared transaction and change-tracker plumbing for payment-attempt persistence.
-// ABOUTME: The cohesive claim, dispatch, and reconciliation operations live in adjacent partial files.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

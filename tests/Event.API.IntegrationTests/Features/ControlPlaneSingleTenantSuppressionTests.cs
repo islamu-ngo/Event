@@ -1,6 +1,3 @@
-// ABOUTME: Integration regression tests for control-plane API suppression in single-tenant mode.
-// ABOUTME: Verifies instance-admin credentials cannot bypass the multi-tenant-only controller filter.
-
 using System.Net;
 using Event.Api.IntegrationTests.Fixtures;
 using TUnit.Core;

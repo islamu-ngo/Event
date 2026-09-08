@@ -1,6 +1,3 @@
-// ABOUTME: Repository implementation for UiThemePreset — theme catalog templates with tenant-scoped queries.
-// ABOUTME: Keeps preset retrieval explicit for the resolution engine and admin catalog views.
-
 namespace Explore.Persistence.Repositories;
 
 using Explore.Application.Contracts.Persistence;

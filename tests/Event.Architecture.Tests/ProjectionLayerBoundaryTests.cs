@@ -1,6 +1,3 @@
-// ABOUTME: Architecture tests enforcing Layer 2/3 boundary separation for custom property projections.
-// ABOUTME: Ensures projection filter types stay in Application layer and do not leak into Domain.
-
 namespace Event.Architecture.Tests;
 
 using System.Reflection;

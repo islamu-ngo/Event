@@ -1,6 +1,3 @@
-// ABOUTME: Tests the server relay transport for browser analytics events.
-// ABOUTME: Verifies pageview relay honors shared analytics governance and sanitization rules.
-
 using System.Text.Json;
 using Explore.Application.Analytics;
 using Explore.Application.Contracts.Infrastructure;

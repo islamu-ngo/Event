@@ -1,6 +1,3 @@
-// ABOUTME: Parses the generated OpenAPI artifact to pin scalar AT Protocol DID wire semantics.
-// ABOUTME: Rejects route, operation, parameter, DTO, and compatibility-shape drift deterministically.
-
 using System.Text.Json;
 
 namespace Explore.GeneratedContracts.Tests;

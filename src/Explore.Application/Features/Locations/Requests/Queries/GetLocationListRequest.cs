@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query request for fetching a paginated location list.
-// ABOUTME: Returns IEnumerable<LocationListDto>.
 using System.Collections.Generic;
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Location;

@@ -1,5 +1,3 @@
-// ABOUTME: Exercises optional-email readiness through real settings and the shared HTTP health endpoint.
-// ABOUTME: Keeps SMTP degradation independent of core readiness and excludes provider-controlled diagnostics.
 
 using System.Net;
 using System.Text.Json.Nodes;

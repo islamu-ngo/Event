@@ -1,6 +1,3 @@
-// ABOUTME: Owns value-free Setup secret-binding operation replay and terminal lifecycle.
-// ABOUTME: Fences dispatch to the exact active enrollment generation without storing secrets.
-
 namespace Explore.Domain.SetupLive;
 
 using Explore.Domain.Interfaces;

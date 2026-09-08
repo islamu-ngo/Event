@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped operational layout for the public tenant plan catalog and draft editor. */
-/* ABOUTME: Keeps plan actions and dense facts responsive with logical sizing and clear contrast. */
-
 .instance-plans {
     display: grid;
     gap: var(--isl-space-8);

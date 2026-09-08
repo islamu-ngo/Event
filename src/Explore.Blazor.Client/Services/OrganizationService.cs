@@ -1,6 +1,3 @@
-// ABOUTME: Service for managing organization-related operations.
-// ABOUTME: Converts HAL API responses to DTOs and forwards If-Match headers for guarded profile updates.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Constants;
 using Explore.Blazor.Client.Extensions;

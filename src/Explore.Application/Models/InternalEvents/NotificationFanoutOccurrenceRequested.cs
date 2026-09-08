@@ -1,6 +1,3 @@
-// ABOUTME: PII-free general-outbox pointer for deferred notification fanout occurrence processing.
-// ABOUTME: Carries only tenant, occurrence, and schema-version identifiers.
-
 using System.Text.Json.Serialization;
 
 namespace Explore.Application.Models.InternalEvents;

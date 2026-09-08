@@ -1,6 +1,3 @@
-// ABOUTME: Records one tenant-bound buyer choice for an immutable material-change campaign.
-// ABOUTME: Pins the paid acceptance revision and prevents a decided choice from being contradicted.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

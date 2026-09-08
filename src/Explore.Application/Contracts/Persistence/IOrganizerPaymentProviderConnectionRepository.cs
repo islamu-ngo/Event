@@ -1,6 +1,3 @@
-// ABOUTME: Entity-first persistence contract for actor-bound organizer payment connections.
-// ABOUTME: Defines scoped active and historical external-account lookups without DTO or IQueryable leakage.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

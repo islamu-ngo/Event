@@ -1,6 +1,3 @@
-// ABOUTME: Validates the documented Docker Compose service topology without starting containers.
-// ABOUTME: Detects self-hosting drift such as service-name mismatches and missing dependencies.
-
 using Explore.Diagnostic.Doctor.Infrastructure;
 
 namespace Explore.Diagnostic.Doctor.Checks;

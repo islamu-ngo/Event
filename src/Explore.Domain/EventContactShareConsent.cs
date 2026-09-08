@@ -1,6 +1,3 @@
-// ABOUTME: Records explicit contact-sharing consent for typed registration/contact subjects.
-// ABOUTME: Current consent is uniquely scoped by tenant, subject, recipient actor, and purpose code.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

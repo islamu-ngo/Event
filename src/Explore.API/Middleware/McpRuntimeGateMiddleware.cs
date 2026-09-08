@@ -1,6 +1,3 @@
-// ABOUTME: Runtime gate for the API-hosted MCP adapter endpoint.
-// ABOUTME: Applies DB governance after tenant/auth resolution without making endpoint path or stateless mode runtime-editable.
-
 using Explore.API.Configuration;
 using Explore.API.Mcp;
 using Microsoft.Extensions.Options;

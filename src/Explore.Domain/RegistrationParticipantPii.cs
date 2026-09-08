@@ -1,6 +1,3 @@
-// ABOUTME: Defines the removable PII extension of a registration participant.
-// ABOUTME: Keeps participant contact data outside durable order and assignment facts.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

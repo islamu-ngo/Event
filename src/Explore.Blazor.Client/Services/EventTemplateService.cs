@@ -1,6 +1,3 @@
-// ABOUTME: Implementation of IEventTemplateService wrapping the event-template client.
-// ABOUTME: Handles HAL unwrap, error catching, and logging for event templates.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.EventTemplates;
 using Microsoft.Extensions.Logging;

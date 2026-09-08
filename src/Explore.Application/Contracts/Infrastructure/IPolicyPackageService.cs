@@ -1,6 +1,3 @@
-// ABOUTME: Application-layer seam for describing and publishing authorization policy packages.
-// ABOUTME: Keeps provider-specific file discovery, transport, ZIP, and Admin API details in Infrastructure.
-
 using Explore.Application.Authorization;
 
 namespace Explore.Application.Contracts.Infrastructure;

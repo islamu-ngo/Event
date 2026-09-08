@@ -1,6 +1,3 @@
-// ABOUTME: Unit coverage for frontend home-discovery context resolution and coarse-area selection.
-// ABOUTME: Proves URL and saved preference precedence, single composite calls, persistence, and origin reduction.
-
 using System.Net;
 using System.Text;
 using Explore.Blazor.Client.Clients;

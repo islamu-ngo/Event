@@ -1,6 +1,3 @@
-// ABOUTME: Reads exact retained webhook payload bytes through an audited persisted-owner boundary.
-// ABOUTME: Returns payload only after scope-aware audit and maps expired or cleared bytes to gone.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;

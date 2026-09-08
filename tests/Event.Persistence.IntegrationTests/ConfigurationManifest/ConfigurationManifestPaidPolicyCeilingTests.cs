@@ -1,6 +1,3 @@
-// ABOUTME: Proves PostgreSQL rejects instance policy revisions that would strand active tenant policies.
-// ABOUTME: Locks the paid-policy ceiling invariant to one atomic mutation boundary with unchanged revisions.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.PaidEventPolicies;

@@ -1,6 +1,3 @@
-// ABOUTME: Tests for the SettingRegistry ensuring all definitions are valid, unique, and properly categorized.
-// ABOUTME: Validates that every GovernanceSettingKey has a corresponding registry definition.
-
 namespace Event.Domain.UnitTests.Settings;
 
 using System.Reflection;
@@ -396,6 +393,7 @@ public class SettingRegistryTests
         await Assert.That(keys).IsEquivalentTo(new[]
         {
             GovernanceSettingKeys.PublicExperience.Mode,
+            GovernanceSettingKeys.PublicExperience.VisitorAccessMode,
             GovernanceSettingKeys.PublicExperience.EventCatalogLabel,
             GovernanceSettingKeys.PublicExperience.PrimaryOrganizationId,
             GovernanceSettingKeys.PublicExperience.HomeBlocks,

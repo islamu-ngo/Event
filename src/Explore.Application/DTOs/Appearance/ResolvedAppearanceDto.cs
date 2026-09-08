@@ -1,6 +1,3 @@
-// ABOUTME: DTO for the fully resolved appearance state returned to the client.
-// ABOUTME: Carries the active profile, source provenance, effective theme data, and capabilities so the UI never guesses.
-
 namespace Explore.Application.DTOs.Appearance;
 
 public sealed record ResolvedAppearanceDto

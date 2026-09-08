@@ -1,6 +1,3 @@
-// ABOUTME: Enum defining the data types supported by custom property definitions.
-// ABOUTME: Determines which typed value column is used in CustomPropertyValue.
-
 namespace Explore.Domain.Enums;
 
 public enum PropertyType

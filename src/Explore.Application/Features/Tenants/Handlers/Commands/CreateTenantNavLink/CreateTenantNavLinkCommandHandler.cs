@@ -1,5 +1,3 @@
-// ABOUTME: Handler for creating a new tenant navigation link.
-// ABOUTME: Validates input, normalizes values, and persists the nav link record.
 using System;
 using System.Linq;
 using System.Threading;

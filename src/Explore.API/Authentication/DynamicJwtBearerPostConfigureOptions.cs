@@ -1,6 +1,3 @@
-// ABOUTME: Wires the singleton DynamicJwtConfigurationService into JwtBearerOptions at resolve-time.
-// ABOUTME: Lets handlers hot-swap OIDC metadata without rebuilding the auth pipeline or restarting the API.
-
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 

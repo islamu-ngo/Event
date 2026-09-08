@@ -1,6 +1,3 @@
-// ABOUTME: Validates event-local custom property option payload shape.
-// ABOUTME: Mirrors CreateCustomPropertyOptionDtoValidator for consistency across EAV system.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.EventCustomProperty.Validators;

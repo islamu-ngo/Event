@@ -1,6 +1,3 @@
-// ABOUTME: Defines prospective PostgreSQL contracts for optional event-bound add-on commerce.
-// ABOUTME: Pins checked money, inventory, fulfillment, refund, tenancy, replay, and admission isolation.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;

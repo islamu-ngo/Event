@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for granting AI context disclosure consent for a PII field.
-// ABOUTME: Creates an AiConsentGrant record in Granted status, keyed by subject/entity/field/tier.
-
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
 using MediatR;

@@ -1,6 +1,3 @@
-// ABOUTME: Strongly-typed Branding setting group resolved via batch loading.
-// ABOUTME: Keys align to BrandingSettingDefinitions via GovernanceSettingKeys.Branding.
-
 namespace Explore.Application.Settings.Groups;
 
 using Explore.Application.Contracts.Infrastructure;

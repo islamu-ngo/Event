@@ -1,6 +1,3 @@
-// ABOUTME: Handles current-user notification level changes for actor subscriptions.
-// ABOUTME: Enforces active ownership and expected concurrency stamp before mutating the row.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ActorSubscription.Validators;

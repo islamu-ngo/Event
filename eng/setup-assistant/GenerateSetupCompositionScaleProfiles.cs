@@ -1,5 +1,3 @@
-// ABOUTME: Measures and verifies deterministic Setup composition scale-profile evidence.
-// ABOUTME: Emits only synthetic aggregate facts while keeping canonical parser limits unchanged.
 #:project ../../src/Event.Setup.Core/Event.Setup.Core.csproj
 #:property RestorePackagesWithLockFile=false
 

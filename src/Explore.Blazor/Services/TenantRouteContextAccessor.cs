@@ -1,6 +1,3 @@
-// ABOUTME: Stores the current tenant slug in HttpContext.Items with a scoped fallback for Blazor circuits.
-// ABOUTME: Supports trusted slug forwarding from the BFF without resolving tenant identity in the UI host.
-
 using Microsoft.AspNetCore.Http;
 
 namespace Explore.Blazor.Services;

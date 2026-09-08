@@ -1,6 +1,3 @@
-// ABOUTME: Orchestrates instance and tenant configuration portability through generated BFF clients.
-// ABOUTME: Keeps import tokens in InteractiveServer circuit state and normalizes generated wire shapes for UI use.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.ControlPlane;
 using Explore.Blazor.Client.Contracts.Interop;

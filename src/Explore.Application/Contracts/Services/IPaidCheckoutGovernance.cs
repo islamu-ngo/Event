@@ -1,6 +1,3 @@
-// ABOUTME: Startup-owned payment operations and activation governance for paid Checkout.
-// ABOUTME: Keeps refund, dispute, reconciliation, and provider handoff facts separate from instance legal identity.
-
 namespace Explore.Application.Contracts.Services;
 
 public interface IPaidCheckoutGovernance

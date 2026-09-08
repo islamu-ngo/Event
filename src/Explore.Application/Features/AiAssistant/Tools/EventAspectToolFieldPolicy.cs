@@ -1,6 +1,3 @@
-// ABOUTME: Shares field policy and scope metadata for event aspect AI proposal contracts.
-// ABOUTME: Keeps Islamic and Tech aspect proposal definitions aligned without widening schemas.
-
 namespace Explore.Application.Features.AiAssistant.Tools;
 
 internal static class EventAspectToolFieldPolicy

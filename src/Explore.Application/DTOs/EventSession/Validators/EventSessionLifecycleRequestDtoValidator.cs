@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for explicit event-session lifecycle transitions.
-// ABOUTME: Enforces optimistic concurrency before archive, cancel, or complete mutates session status.
-
 using Explore.Application.DTOs.EventSession;
 using FluentValidation;
 

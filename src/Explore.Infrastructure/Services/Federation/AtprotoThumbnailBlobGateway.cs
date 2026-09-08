@@ -1,6 +1,3 @@
-// ABOUTME: Acquires bounded ATProto thumbnail blobs from each DID's freshly resolved public PDS.
-// ABOUTME: Validates content binding before staging exact bytes through provider-neutral file storage.
-
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using CarpaNet;

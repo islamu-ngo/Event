@@ -1,5 +1,3 @@
-// ABOUTME: Recovers durable native lifecycle pointers independently of the accepting HTTP request.
-// ABOUTME: Never stores transport payloads or replays admitted Unknown operations after process failure.
 
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Features.Authentication.Local.Handlers.Commands;

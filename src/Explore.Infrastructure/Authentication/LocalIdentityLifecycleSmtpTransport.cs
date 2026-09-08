@@ -1,5 +1,3 @@
-// ABOUTME: Hands transient Local Identity link material to the existing MailKit SMTP implementation.
-// ABOUTME: Uses an admitted instance transport snapshot and stable delivery identifiers without tenant resolution.
 
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Models;

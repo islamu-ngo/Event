@@ -1,6 +1,3 @@
-// ABOUTME: Handler for publishing an event session through the lifecycle policy path.
-// ABOUTME: Publishes the session and parent schedule summary atomically with retry-safe concurrency checks.
-
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSession.Validators;

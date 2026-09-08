@@ -1,6 +1,3 @@
-// ABOUTME: Dynamic robots.txt endpoint for host-aware sitemap discovery.
-// ABOUTME: Disallows indexing outside production while advertising the tenant sitemap in production.
-
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

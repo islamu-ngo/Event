@@ -1,6 +1,3 @@
-// ABOUTME: Event creation context returned by the API before users start composing a draft.
-// ABOUTME: Centralizes tenant publishing policy and publisher affordances for the Blazor create flow.
-
 namespace Explore.Application.DTOs.Event;
 
 using System.Collections.Immutable;

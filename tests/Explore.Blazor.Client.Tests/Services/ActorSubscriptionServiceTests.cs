@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the Blazor actor subscription service wrapper.
-// ABOUTME: Verifies generated API calls are adapted into safe BFF-side results.
-
 using Explore.Blazor.Client.Helpers;
 
 namespace Explore.Blazor.Client.Tests.Services;

@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos policy test suite for instance_setting resources.
-# ABOUTME: Validates instance-admin authority across storage, tenant plans, assignments, and tenant lifecycle settings.
-
 name: InstanceSettingPolicyTests
 description: "Validates that instance settings remain exclusive to instance administrators"
 

@@ -1,6 +1,3 @@
-// ABOUTME: Immutable model representing the current language state for the Blazor application.
-// ABOUTME: Provided as a CascadingValue by LanguageProvider; all display metadata comes from CultureRegistry.
-
 using Explore.Blazor.Client.Localization;
 
 namespace Explore.Blazor.Client.Models;

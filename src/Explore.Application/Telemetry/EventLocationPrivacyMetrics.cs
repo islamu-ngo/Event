@@ -1,6 +1,3 @@
-// ABOUTME: OpenTelemetry meter for EventLocation disclosure, correction, and privacy-review observability.
-// ABOUTME: Emits only bounded low-cardinality dimensions so no tenant, subject, or address data reaches metrics.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.LocationPrivacy;
 

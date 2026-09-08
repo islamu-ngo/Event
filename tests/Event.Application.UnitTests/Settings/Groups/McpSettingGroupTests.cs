@@ -1,6 +1,3 @@
-// ABOUTME: Tests MCP setting group defaults and typed Boolean deserialization.
-// ABOUTME: Protects MCP runtime governance defaults while startup configuration remains the adapter ceiling.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Settings.Groups;
 using Explore.Domain.Constants;

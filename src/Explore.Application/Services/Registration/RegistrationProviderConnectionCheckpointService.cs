@@ -1,6 +1,3 @@
-// ABOUTME: Application-owned save checkpoints for registration provider connection credential/access metadata.
-// ABOUTME: Keeps external adapters from mutating tracked OAuth connection state directly.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Domain;

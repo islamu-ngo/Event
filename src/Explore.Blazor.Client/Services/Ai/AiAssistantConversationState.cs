@@ -1,6 +1,3 @@
-// ABOUTME: UI state model for AI assistant conversations, references, and command status.
-// ABOUTME: Exposes proposed-action affordances exclusively from API-provided HAL links.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Services.Shell;
 

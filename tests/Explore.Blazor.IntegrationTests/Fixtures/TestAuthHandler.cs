@@ -1,4 +1,3 @@
-// ABOUTME: Per-request authentication handler for integration tests.
 // Reads auth state from a custom request header (X-Test-Auth) to avoid shared mutable static state.
 // No header = anonymous (NoResult). Header present = authenticated with encoded claims.
 

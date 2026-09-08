@@ -1,6 +1,3 @@
-// ABOUTME: Atomically applies one incoming webhook handler result with receipt and inbox settlement evidence.
-// ABOUTME: Recovers matching receipts without replaying effects and converts bounded outcomes into domain transitions.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.Exceptions;

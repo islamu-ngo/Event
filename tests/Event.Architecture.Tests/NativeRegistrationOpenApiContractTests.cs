@@ -1,6 +1,3 @@
-// ABOUTME: Locks the attendee native-registration OpenAPI and generated-client contract.
-// ABOUTME: Guards typed progress, explicit transport headers, and the attendee-safe pinned form surface.
-
 using System.Text.Json;
 
 namespace Event.Architecture.Tests;

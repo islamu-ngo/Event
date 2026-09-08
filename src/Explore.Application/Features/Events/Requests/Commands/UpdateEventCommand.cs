@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for PATCH-based Event property updates.
-// ABOUTME: Carries route authority, If-Match concurrency, and a grouped update payload.
-
 using System;
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Event;

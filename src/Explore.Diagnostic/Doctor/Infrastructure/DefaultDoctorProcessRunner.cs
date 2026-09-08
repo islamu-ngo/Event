@@ -1,6 +1,3 @@
-// ABOUTME: Executes bounded read-only process checks for the doctor CLI.
-// ABOUTME: Captures output without shell expansion to avoid accidental mutation or secret leakage.
-
 using System.Diagnostics;
 
 namespace Explore.Diagnostic.Doctor.Infrastructure;

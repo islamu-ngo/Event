@@ -1,6 +1,3 @@
-// ABOUTME: Carries the bounded community-calendar fields accepted for one inbound federated event import.
-// ABOUTME: Keeps lexicon content validation separate from tenant and canonical record identity.
-
 namespace Explore.Application.Features.Federation.Atproto.Models;
 
 public sealed record AtprotoFederatedEventImportInput(

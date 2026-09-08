@@ -1,6 +1,3 @@
-// ABOUTME: Processor settings for the LocalProvider webhook HTTP delivery worker.
-// ABOUTME: Controls polling cadence, batch size, stale lease recovery, and worker logging.
-
 using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure.Webhooks;

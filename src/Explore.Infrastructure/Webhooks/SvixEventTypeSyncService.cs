@@ -1,6 +1,3 @@
-// ABOUTME: Synchronizes canonical ISLAMU webhook event types into the configured Svix backend.
-// ABOUTME: Uses the Application event catalog and schema provider while keeping Svix SDK calls in Infrastructure.
-
 using Explore.Application.Contracts.Webhooks;
 using Explore.Infrastructure.Configuration;
 using Microsoft.Extensions.Options;

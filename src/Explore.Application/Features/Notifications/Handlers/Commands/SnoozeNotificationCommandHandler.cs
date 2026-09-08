@@ -1,6 +1,3 @@
-// ABOUTME: Handles snoozing or unsnoozing a single notification for the authenticated user.
-// ABOUTME: Pass null SnoozedUntil to clear the snooze.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Notifications.Requests.Commands;

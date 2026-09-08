@@ -1,6 +1,3 @@
-// ABOUTME: Anonymous email unsubscribe endpoints for manual and RFC 8058 one-click flows.
-// ABOUTME: Validates opaque unsubscribe tokens and records category opt-outs without requiring authentication.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Extensions;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines immutable value-free messages, outcomes, lifecycle signals, and operation ports.
-// ABOUTME: Carries typed identities and exact Core result bytes without target or secret authority.
-
 namespace ISLAMU.Event.SetupAssistant.Presentation;
 
 public enum SetupOperationStatus

@@ -1,6 +1,3 @@
-// ABOUTME: Extends generated NSwag tag clients and centralizes hooks shared by all generated clients.
-// ABOUTME: Preserves idempotency, capability capture, and consistent System.Text.Json enum behavior.
-
 using System.Text.Json;
 using System.Text.Json.Serialization;
 

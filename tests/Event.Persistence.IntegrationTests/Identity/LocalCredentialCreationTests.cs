@@ -1,5 +1,3 @@
-// ABOUTME: Exercises atomic administrative credential creation, safe replay, and native Identity-store races.
-// ABOUTME: Uses independent SQLite contexts and EF fault boundaries without persisting or logging temporary passwords.
 
 using System.Data.Common;
 using System.Security.Cryptography;
@@ -418,7 +416,7 @@ public sealed class LocalCredentialCreationTests
             {
                 identity.AddEntityFrameworkStores<ExploreDbContext>();
             }
-            _provider = services.BuildServiceProvider();
+            _provider = services.BuildIsolatedServiceProvider();
             await using AsyncServiceScope scope = Provider.CreateAsyncScope();
             var application = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             await application.Database.EnsureCreatedAsync(CancellationToken);

@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped layout for attendee ticket selection. */
-/* ABOUTME: Uses design tokens while leaving control styling to MudBlazor. */
-
 .ticket-selection__choices {
     border: 0;
     padding: 0;

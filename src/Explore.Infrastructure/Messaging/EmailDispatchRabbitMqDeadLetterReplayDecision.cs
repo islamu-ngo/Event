@@ -1,6 +1,3 @@
-// ABOUTME: Pure decision helper for RabbitMQ EmailDispatch dead-letter replay safety checks.
-// ABOUTME: Validates broker pointer metadata against PostgreSQL truth before replaying or parking messages.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
 

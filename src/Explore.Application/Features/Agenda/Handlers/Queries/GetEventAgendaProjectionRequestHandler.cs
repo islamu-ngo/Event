@@ -1,6 +1,3 @@
-// ABOUTME: Handler that builds the full agenda projection for an event by merging sessions and agenda items into day groups.
-// ABOUTME: Groups by LocalStartDate, enriches with EventDay metadata, and sorts entries by start time within each day.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Agenda;

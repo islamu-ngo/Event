@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for event agenda item CRUD and agenda projection operations.
-// ABOUTME: Manages non-session schedule entries (breaks, meals, ceremonies) with HATEOAS.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

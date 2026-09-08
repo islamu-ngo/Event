@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for permanent workspace chrome, tenant links, and the mobile Links sheet.
-// ABOUTME: Loads observable tenant navigation state and filters workspaces through server-gated availability.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Contracts.Services.Shell;

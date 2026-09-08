@@ -1,6 +1,3 @@
-// ABOUTME: Conditional readiness probe for the instance Cerbos PDP.
-// ABOUTME: Keeps local-mode deployments healthy while failing readiness when configured Cerbos is unreachable.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.Utilities;
 using Explore.Infrastructure.Services;

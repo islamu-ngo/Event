@@ -1,6 +1,3 @@
-// ABOUTME: DelegatingHandler that forwards tenant context headers to outgoing API requests.
-// ABOUTME: Adds trusted tenant and normalized request-host context without reading browser forwarding headers.
-
 using Event.Web.BffHosting.Security;
 using Explore.Blazor.Client.Contracts.Services;
 

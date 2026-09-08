@@ -1,6 +1,3 @@
-// ABOUTME: RabbitMQ.Client adapter for optional EmailDispatch pointer publishing and topology checks.
-// ABOUTME: Uses mandatory publishes plus publisher confirms while PostgreSQL remains the delivery source of truth.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Telemetry;

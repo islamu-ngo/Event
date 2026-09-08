@@ -1,6 +1,3 @@
-// ABOUTME: Secured operator commands that control the instance scheduler and its individual jobs.
-// ABOUTME: Authorizes every action through instance-setting update metadata before any handler runs.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

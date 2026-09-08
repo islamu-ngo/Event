@@ -1,6 +1,3 @@
-// ABOUTME: Handles persisted-owner webhook endpoint detail queries.
-// ABOUTME: Uses the owner-operation boundary and maps found endpoints into secret-safe DTOs.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Queries;

@@ -1,6 +1,3 @@
-// ABOUTME: Live TestServer RED contracts for one-time admission ticket recovery consumption.
-// ABOUTME: Uses independent fixed-state cases for malformed, expired, replayed, purpose, and tenant denial.
-
 using System.Net;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

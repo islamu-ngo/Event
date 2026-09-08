@@ -1,6 +1,3 @@
-// ABOUTME: Mailpit-backed Basic EmailDispatch drain tests for durable outbox state transitions.
-// ABOUTME: Proves the scheduler-neutral drain sends through real SMTP and records sent ledger state.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

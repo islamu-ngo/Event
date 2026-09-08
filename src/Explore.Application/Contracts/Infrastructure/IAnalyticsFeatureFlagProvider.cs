@@ -1,6 +1,3 @@
-// ABOUTME: Optional capability interface for analytics providers that support feature flags.
-// ABOUTME: PostHog implements this; Plausible/Rybbit/RudderStack/Null providers return safe defaults.
-
 namespace Explore.Application.Contracts.Infrastructure;
 
 /// <summary>

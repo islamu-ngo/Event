@@ -1,6 +1,3 @@
-// ABOUTME: Handles tenant moderation reporting provider test actions without external network dispatch.
-// ABOUTME: Validates authorization, delegation locks, and tenant provider readiness while redacting secrets.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.EventReporting.Requests.Commands;

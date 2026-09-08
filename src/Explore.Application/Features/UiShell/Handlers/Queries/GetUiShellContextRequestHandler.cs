@@ -1,6 +1,3 @@
-// ABOUTME: Composes existing authority, actor, policy, deployment, and settings contracts for the UI shell.
-// ABOUTME: Keeps workspace eligibility server-authoritative without caching or duplicating membership rules.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;

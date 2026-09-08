@@ -1,6 +1,3 @@
-// ABOUTME: Folds per-policy Cerbos content hashes into one deterministic store revision token.
-// ABOUTME: Gives operators a single value that changes whenever any policy in the store changes.
-
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;

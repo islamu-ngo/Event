@@ -1,6 +1,3 @@
-// ABOUTME: Resolves one public action only when its parent event and review state are public.
-// ABOUTME: Fails closed for missing, pending, unsafe, disabled, private, or unpublished destinations.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Event;

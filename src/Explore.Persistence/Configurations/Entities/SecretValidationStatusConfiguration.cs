@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for secret validation status lookup values.
-// ABOUTME: Maps SecretValidationStatus to the secret_validation_statuses table.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

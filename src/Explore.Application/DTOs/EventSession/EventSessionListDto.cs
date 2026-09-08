@@ -1,6 +1,3 @@
-// ABOUTME: Lightweight event-session DTO returned by list APIs and HAL collection items.
-// ABOUTME: Carries lifecycle and schedule state needed for server-filtered collection affordances.
-
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;

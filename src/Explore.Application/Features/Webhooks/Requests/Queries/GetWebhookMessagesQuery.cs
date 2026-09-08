@@ -1,6 +1,3 @@
-// ABOUTME: Authorized query for webhook delivery messages belonging to one canonical typed owner.
-// ABOUTME: Preserves source-tenant evidence while authorization and reads use configuration ownership.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Webhooks;
 using MediatR;

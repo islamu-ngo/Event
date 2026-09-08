@@ -1,6 +1,3 @@
-// ABOUTME: Writes Setup secrets through the one selected target authority and creates value-free commitments.
-// ABOUTME: Rejects source mismatch, malformed UTF-8, weak HMAC keys, and provider failures without fallback or logs.
-
 namespace Explore.Secrets.Services;
 
 using System.Net;

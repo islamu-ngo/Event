@@ -1,6 +1,3 @@
-// ABOUTME: Verifies native registration transport mapping, capabilities, and idempotency at the client boundary.
-// ABOUTME: Ensures attendee answers use server subject identity without exposing generated DTOs to components.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.Registration.FormRenderer;
 using Explore.Blazor.Client.Services;

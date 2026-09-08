@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for submitting a review of an organization.
-// ABOUTME: Carries the CreateOrganizationReviewDto payload.
 using Explore.Application.DTOs.OrganizationReview;
 using Explore.Application.Authorization;
 using Explore.Application.Responses;

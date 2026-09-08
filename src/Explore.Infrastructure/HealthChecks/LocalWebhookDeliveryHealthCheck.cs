@@ -1,6 +1,3 @@
-// ABOUTME: Readiness health check for the LocalProvider webhook delivery queue.
-// ABOUTME: Reports queue backlog and stale sending leases without exposing endpoints, payloads, or secrets.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Telemetry;
 using Explore.Infrastructure.Configuration;

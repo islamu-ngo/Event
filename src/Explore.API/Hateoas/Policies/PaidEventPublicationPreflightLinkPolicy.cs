@@ -1,6 +1,3 @@
-// ABOUTME: HAL policy for event-scoped paid publication preflight resources.
-// ABOUTME: Emits publish only when readiness says the catalog can be safely published.
-
 using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;

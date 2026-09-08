@@ -1,6 +1,3 @@
-// ABOUTME: Pure classifier for provider schema snapshots against ISLAMU Event registration schema snapshots.
-// ABOUTME: Emits the exact fail-open/fail-closed drift classes used by binding publication policy.
-
 using Explore.Application.Contracts.Services.Registration;
 
 namespace Explore.Application.Services.Registration;

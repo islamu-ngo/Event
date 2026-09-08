@@ -1,6 +1,3 @@
-// ABOUTME: MCP tool methods for proposal-first AI assistant actions.
-// ABOUTME: Delegates through MediatR so external MCP clients never mutate repositories directly.
-
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text.Json;

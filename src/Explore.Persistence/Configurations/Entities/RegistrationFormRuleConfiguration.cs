@@ -1,6 +1,3 @@
-// ABOUTME: Maps ordered typed registration-form rules as authoritative tenant-scoped relational rows.
-// ABOUTME: Persists the closed condition AST as provider-neutral text with composite ownership constraints.
-
 using System.Text.Json;
 using Explore.Domain;
 using Explore.Domain.Services.Registration;

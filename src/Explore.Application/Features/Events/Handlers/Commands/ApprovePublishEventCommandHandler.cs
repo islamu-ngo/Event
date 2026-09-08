@@ -1,6 +1,3 @@
-// ABOUTME: Handles privileged event approval-publication after pipeline authorization succeeds.
-// ABOUTME: Delegates directly to the shared publication executor without nesting MediatR commands.
-
 using Explore.Application.Features.Events.Requests.Commands;
 using Explore.Application.Responses;
 using MediatR;

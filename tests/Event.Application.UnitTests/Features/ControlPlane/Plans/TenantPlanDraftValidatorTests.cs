@@ -1,6 +1,3 @@
-// ABOUTME: Regression tests for SaaS tenant-plan pricing-tier draft validation.
-// ABOUTME: Pins safe setting, quota, and diff semantics before persistence or UI work exists.
-
 using Explore.Application.Features.ControlPlane.Plans;
 using Explore.Domain.Constants;
 

@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL-backed tests for AI conversation repository persistence and tenant filtering.
-// ABOUTME: Verifies migrated AI tables, aggregate updates, message ordering, quota counts, and action lookup.
-
 using System.Text.Json;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;

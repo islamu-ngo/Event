@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the RabbitMQ EmailDispatch pointer publisher.
-// ABOUTME: Verifies producer metadata transitions without requiring a live broker.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

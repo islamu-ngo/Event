@@ -1,6 +1,3 @@
-// ABOUTME: Drains durable EmailDispatchOutbox rows into SMTP attempts for Basic Dispatch Mode.
-// ABOUTME: Preserves PostgreSQL-owned delivery state while exposing a scheduler-friendly execution boundary.
-
 using System.Collections.Concurrent;
 using System.Net;
 using Explore.Application.Contracts.Infrastructure;

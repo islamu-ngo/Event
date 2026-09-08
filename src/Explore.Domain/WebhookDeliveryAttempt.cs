@@ -1,6 +1,3 @@
-// ABOUTME: LocalProvider delivery attempt ledger for one webhook message and endpoint pair.
-// ABOUTME: Captures safe HTTP outcome metadata, retry scheduling, and worker claim state.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

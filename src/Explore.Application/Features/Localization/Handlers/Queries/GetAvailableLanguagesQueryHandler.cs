@@ -1,6 +1,3 @@
-// ABOUTME: Handler for GetAvailableLanguagesQuery that returns supported language codes.
-// ABOUTME: Delegates to ITranslationManagementProvider to discover available languages.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Localization.Requests.Queries;
 using MediatR;

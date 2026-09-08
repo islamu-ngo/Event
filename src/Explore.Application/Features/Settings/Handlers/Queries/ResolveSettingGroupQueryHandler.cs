@@ -1,6 +1,3 @@
-// ABOUTME: Generic query handler that resolves all settings for a category through hierarchical cascade.
-// ABOUTME: Computes per-setting CanEdit/Reason metadata based on lock state, scope range, and authorization.
-
 namespace Explore.Application.Features.Settings.Handlers.Queries;
 
 using Explore.Application.Contracts.Identity;

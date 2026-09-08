@@ -1,6 +1,3 @@
-// ABOUTME: Shared incoming webhook verifier for signed Coop moderation callbacks.
-// ABOUTME: Preserves timestamp tolerance, HMAC verification, and fixed-time comparison before JSON parsing.
-
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;

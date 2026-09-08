@@ -1,6 +1,3 @@
-// ABOUTME: Aggregate-view DTO describing one session-scoped custom-property facet aggregated at event scope.
-// ABOUTME: Mirrors the event facet shape while remaining explicit for session-derived extension data.
-
 using System.Collections.Immutable;
 using System.Text.Json;
 using Explore.Domain.Enums;

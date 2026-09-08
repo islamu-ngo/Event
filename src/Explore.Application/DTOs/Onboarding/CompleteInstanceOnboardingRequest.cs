@@ -1,6 +1,3 @@
-// ABOUTME: Minimal onboarding payload — captures only the decisions made during first-run wizard.
-// ABOUTME: All other settings are configurable post-onboarding via instance admin endpoints.
-
 using System.Text.Json.Serialization;
 using Explore.Application.DTOs.TenantSettings;
 using Explore.Domain.Enums;

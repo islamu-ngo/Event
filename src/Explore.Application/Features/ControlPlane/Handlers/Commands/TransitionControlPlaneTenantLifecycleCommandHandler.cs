@@ -1,6 +1,3 @@
-// ABOUTME: Applies audited tenant lifecycle status transitions for the control plane.
-// ABOUTME: Records destructive purge intent without deleting tenant data in the request path.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

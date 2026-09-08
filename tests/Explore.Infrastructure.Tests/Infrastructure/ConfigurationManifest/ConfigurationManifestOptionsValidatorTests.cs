@@ -1,6 +1,3 @@
-// ABOUTME: Pins exact configuration-manifest mode and configured-path option validation.
-// ABOUTME: Preserves Off semantics while rejecting unsupported modes and relative explicit paths.
-
 namespace Explore.Infrastructure.Tests.Infrastructure.ConfigurationManifest;
 
 using Explore.Application.Features.ConfigurationManifest.Ingestion;

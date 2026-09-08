@@ -1,6 +1,3 @@
-// ABOUTME: Tests for the Event Edit program sections management dialog.
-// ABOUTME: Verifies section create mapping stays routed through IEventService wrappers.
-
 using System.Reflection;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Events;

@@ -1742,7 +1742,7 @@ Final ownership is exact. C1 Red owns only the two new files
   under `src/Event.Setup.Core/Composition/`;
 - `tests/Event.Setup.Core.Tests/packages.lock.json`;
 - new `docs/SETUP_COMPOSITION.md`; and
-- new `docs/releases/changes/CHG-01M1C8MP8S1T10N8D3D5A7B9CX.yaml`.
+- new `docs/internal/releases/changes/CHG-01M1C8MP8S1T10N8D3D5A7B9CX.yaml`.
 
 C1 Red tests are verification inputs, never Green commit paths. The fragment's
 `Change-Id` matches the literal commit footer. C2 owns only these new files:

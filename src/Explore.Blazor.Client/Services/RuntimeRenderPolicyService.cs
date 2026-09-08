@@ -1,6 +1,3 @@
-// ABOUTME: Resolves runtime Blazor render policy for the current request path using governance settings.
-// ABOUTME: Applies route-group classification, global fallback, and onboarding InteractiveServer guardrail.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Providers;
 

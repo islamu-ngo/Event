@@ -1,8 +1,3 @@
-// ABOUTME: FluentValidation validator for UpdateTenantNavigationLinkDto.
-// ABOUTME: Same URL safety rules as Create, plus requires a valid Id.
-// ABOUTME: FluentValidation rules for grouped tenant navigation-link PATCH payloads.
-// ABOUTME: Retains the URL allowlist and rejects empty wrappers or no-op groups.
-
 using Explore.Application.Validation;
 using FluentValidation;
 

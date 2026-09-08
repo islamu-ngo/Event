@@ -1,6 +1,3 @@
-// ABOUTME: Contract tests for ICookieConsentInterop interface shape and method signatures.
-// ABOUTME: Verifies the consent cookie JS interop contract has exactly 3 methods with correct parameters.
-
 namespace Explore.Blazor.Client.Tests.Services;
 
 public class CookieConsentInteropContractTests

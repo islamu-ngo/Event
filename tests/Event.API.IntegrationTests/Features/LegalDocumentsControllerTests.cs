@@ -1,6 +1,3 @@
-// ABOUTME: Exercises the anonymous legal endpoint through its real handler and SQLite repository.
-// ABOUTME: Proves published role labels and value-safe unavailable responses without internal mocks.
-
 namespace Event.Api.IntegrationTests.Features;
 
 using Explore.API.Controllers;

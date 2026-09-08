@@ -1,6 +1,3 @@
-// ABOUTME: Verifies registration-form template source and deep instantiation domain invariants.
-// ABOUTME: Proves published source requirement, independent clone identity, provenance, and later source isolation.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;

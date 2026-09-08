@@ -1,6 +1,3 @@
-// ABOUTME: Verifies portable domain-host lookup and provider-specific projection lock coordination.
-// ABOUTME: Covers bounded JSON lookup, lock command contracts, and real SQLite lock contention.
-
 using System.Data.Common;
 using Explore.Application.Settings;
 using Explore.Domain;
@@ -194,7 +191,7 @@ public sealed class PrimaryPersistencePortabilityTests
     }
 
     private static ExploreDbContext CreateContext(SqliteConnection connection) =>
-        new(new DbContextOptionsBuilder<ExploreDbContext>()
+        new(TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connection)
             .UseSnakeCaseNamingConvention()
             .AddInterceptors(SqliteProjectionLockTransactionInterceptor.Instance)

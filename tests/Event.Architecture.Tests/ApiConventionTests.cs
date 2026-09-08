@@ -1,6 +1,3 @@
-// ABOUTME: Architecture tests enforcing API conventions for versioning, authorization, and boundaries.
-// ABOUTME: Ensures controllers stay HTTP-only and do not leak persistence or domain contracts.
-
 namespace Event.Architecture.Tests;
 
 using System.Reflection;

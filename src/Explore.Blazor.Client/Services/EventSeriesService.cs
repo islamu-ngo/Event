@@ -1,6 +1,3 @@
-// ABOUTME: Service for managing Event Series via the NSwag-generated API client.
-// ABOUTME: Provides list, detail, create, update, and search operations for series selection.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Events;
 using Explore.Blazor.Client.Helpers;

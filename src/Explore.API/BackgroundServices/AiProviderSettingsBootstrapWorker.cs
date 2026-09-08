@@ -1,6 +1,3 @@
-// ABOUTME: Seeds missing hierarchical AI assistant system settings from deployment provider configuration.
-// ABOUTME: Lets Infisical AiProvider secrets become instance defaults without overwriting admin-managed settings.
-
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Settings;

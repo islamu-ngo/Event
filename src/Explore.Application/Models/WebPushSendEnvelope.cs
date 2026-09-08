@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral Web Push send envelope with subscription keys and fixed payload JSON.
-// ABOUTME: Allows Infrastructure tests and drains to avoid referencing the official WebPush package directly.
-
 namespace Explore.Application.Models;
 
 public sealed record WebPushSendEnvelope(

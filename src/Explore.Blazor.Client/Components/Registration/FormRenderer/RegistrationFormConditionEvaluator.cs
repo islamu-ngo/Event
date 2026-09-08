@@ -1,6 +1,3 @@
-// ABOUTME: Evaluates the generated bounded form-condition contract against in-memory attendee answers.
-// ABOUTME: Supports the closed nine-operator language without referencing backend or Domain assemblies.
-
 using System.Globalization;
 using System.Text.Json;
 

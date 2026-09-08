@@ -1,6 +1,3 @@
-// ABOUTME: Authenticated webhook endpoint operations that change persisted delivery-control state.
-// ABOUTME: Exposes manual pause and resume while CQRS authorization and state enforce eligibility.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Extensions;

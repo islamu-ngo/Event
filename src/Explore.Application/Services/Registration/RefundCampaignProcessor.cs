@@ -1,6 +1,3 @@
-// ABOUTME: Processes one fenced refund-campaign page and durably schedules provider dispatch after commit.
-// ABOUTME: Uses stable accepted-payment authority, bounded batches, and idempotent campaign reservation keys.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 

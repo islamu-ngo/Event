@@ -1,6 +1,3 @@
-// ABOUTME: Builds the scheduler administration overview from live scheduler state and the platform job catalog.
-// ABOUTME: Projects lifecycle and summary counts only, so no job payload or tenant content reaches operators.
-
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.DTOs.Scheduling;
 using Explore.Application.Features.Scheduling.Requests.Queries;

@@ -1,6 +1,3 @@
-// ABOUTME: Authorization policy names for the API-hosted MCP adapter surface.
-// ABOUTME: Keeps API-key scope requirements explicit while allowing normal authenticated user sessions.
-
 namespace Explore.API.Mcp;
 
 public static class McpAuthorizationPolicies

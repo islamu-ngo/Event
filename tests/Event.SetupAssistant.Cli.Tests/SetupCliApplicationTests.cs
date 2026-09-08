@@ -1,6 +1,3 @@
-// ABOUTME: Exercises every Setup CLI operation through real Core artifacts and bounded in-memory I/O.
-// ABOUTME: Proves deterministic diff, catalogue, environment, write, framing, and no-secret behavior.
-
 using System.Globalization;
 using System.Text;
 using System.Text.Json;

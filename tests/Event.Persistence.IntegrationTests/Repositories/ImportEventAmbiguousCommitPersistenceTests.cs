@@ -1,6 +1,3 @@
-// ABOUTME: Persistence-backed regression coverage for import retries after an ambiguous committed attempt.
-// ABOUTME: Verifies the retry observes the deterministic Event row and does not issue a duplicate insert.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Persists group memberships and loads their user, role, group, and actor details.
-// ABOUTME: Keeps permission-scoped membership reads entity-based and tenant-filtered through ExploreDbContext.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

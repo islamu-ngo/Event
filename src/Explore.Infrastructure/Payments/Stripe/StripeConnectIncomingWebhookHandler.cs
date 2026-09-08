@@ -1,6 +1,3 @@
-// ABOUTME: Applies verified Stripe Connect account.updated webhooks to organizer payment readiness.
-// ABOUTME: Projects only persisted payload facts inside the existing incoming-webhook transaction.
-
 using System.Text;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

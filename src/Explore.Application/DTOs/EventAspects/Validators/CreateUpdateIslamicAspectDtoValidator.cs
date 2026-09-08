@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation validator for CreateUpdateIslamicAspectDto.
-// ABOUTME: Validates foreign keys against lookup repositories.
-
 namespace Explore.Application.DTOs.EventAspects.Validators;
 
 using Explore.Application.Contracts.Persistence;

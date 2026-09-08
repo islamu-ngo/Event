@@ -1,6 +1,3 @@
-// ABOUTME: Projects authorized admission tickets into human-readable holder and entitlement facts.
-// ABOUTME: Applies explicit tenant/ticket bounds and keeps PII outside durable ticket entities.
-
 using System.Collections.Immutable;
 using Explore.Application.Contracts.Admissions;
 using Explore.Domain;

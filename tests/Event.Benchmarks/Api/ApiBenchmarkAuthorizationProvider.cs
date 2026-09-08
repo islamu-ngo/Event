@@ -1,6 +1,3 @@
-// ABOUTME: Benchmark-only authorization provider that removes external Cerbos latency from API measurements.
-// ABOUTME: Allows benchmark scenarios to focus on API pipeline, serialization, caching, and data access costs.
-
 using Explore.Application.Contracts.Infrastructure;
 
 namespace Event.Benchmarks.Api;

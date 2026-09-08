@@ -1,6 +1,3 @@
-// ABOUTME: Verifies stable release-engine CLI diagnostics and every git-cliff trust rejection boundary.
-// ABOUTME: Uses temporary local fake executables so tests never download or execute provider-supplied tools.
-
 using System.Security.Cryptography;
 using ISLAMU.ReleaseEngineering;
 

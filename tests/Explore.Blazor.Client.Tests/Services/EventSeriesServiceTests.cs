@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for EventSeriesService update forwarding.
-// ABOUTME: Verifies grouped PATCH DTOs are sent with quoted If-Match concurrency stamps.
-
 namespace Explore.Blazor.Client.Tests.Services;
 
 public class EventSeriesServiceTests

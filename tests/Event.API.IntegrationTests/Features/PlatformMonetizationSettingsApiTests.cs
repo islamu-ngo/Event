@@ -1,6 +1,3 @@
-// ABOUTME: Tests the instance-admin platform monetization controller and HAL affordance contract.
-// ABOUTME: Covers protected routes, MediatR dispatch, RFC 7807 metadata, and permission-bound edit omission.
-
 using System.Net;
 using System.Reflection;
 using System.Text;

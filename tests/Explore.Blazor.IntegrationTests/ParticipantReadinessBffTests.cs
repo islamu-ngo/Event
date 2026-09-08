@@ -1,6 +1,3 @@
-// ABOUTME: Defines RED privacy and trust-boundary contracts for browser readiness operations.
-// ABOUTME: Covers antiforgery, cookie authority, capability secrecy, generated forwarding, and caching.
-
 using System.Net;
 using Explore.Blazor.Client.Clients;
 using Microsoft.AspNetCore.Hosting;

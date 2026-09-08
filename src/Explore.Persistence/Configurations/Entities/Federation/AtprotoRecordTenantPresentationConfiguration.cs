@@ -1,6 +1,3 @@
-// ABOUTME: Maps tenant-specific visibility decisions for globally canonical AT Protocol records.
-// ABOUTME: Enforces one presentation row per tenant and record with same-tenant query filtering.
-
 using Explore.Domain.Federation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

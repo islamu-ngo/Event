@@ -1,6 +1,3 @@
-// ABOUTME: Command response for external API key creation.
-// ABOUTME: Carries the one-time reveal secret alongside the normal command status envelope.
-
 namespace Explore.Application.Responses;
 
 public sealed record CreateExternalApiKeyCommandResponse : BaseCommandResponse<Guid>

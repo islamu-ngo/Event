@@ -1,6 +1,3 @@
-// ABOUTME: Normalized lookup entity for event-location disclosure audiences.
-// ABOUTME: Stable backend codes remain separate from localized user-interface labels.
-
 namespace Explore.Domain;
 
 public sealed class LocationDisclosureAudience

@@ -1,6 +1,3 @@
-// ABOUTME: Covers ticket pricing mode shape, buyer-price bounds, lookup identities, and integer minor units.
-// ABOUTME: Proves currency metadata, basis-point math, and overflow behavior remain deterministic.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;
 using Explore.Domain.ValueObjects;

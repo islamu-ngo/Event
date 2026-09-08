@@ -1,6 +1,3 @@
-// ABOUTME: Exercises the tenant directory-operator identity section through typed rendered behavior.
-// ABOUTME: Protects HAL-only editing, validation focus, conflicts, live regions, and readable field grouping.
-
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Pages.Admin.Tenant.Components;
 using Explore.Blazor.Client.Services;

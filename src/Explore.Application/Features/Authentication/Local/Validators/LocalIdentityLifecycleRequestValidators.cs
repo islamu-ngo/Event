@@ -1,5 +1,3 @@
-// ABOUTME: Validates native Local lifecycle inputs before trusted authority or token operations are constructed.
-// ABOUTME: Enforces purpose separation and bounded secrets for HTTP and non-HTTP command callers alike.
 
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Identity;

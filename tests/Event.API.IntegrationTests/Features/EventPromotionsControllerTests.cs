@@ -1,6 +1,3 @@
-// ABOUTME: Controller contract tests for event-scoped promotion management APIs.
-// ABOUTME: Verifies private reads, write safeguards, CQRS dispatch, and HAL authorization metadata.
-
 using System.Reflection;
 using System.Text.Json;
 using Explore.API.Attributes;

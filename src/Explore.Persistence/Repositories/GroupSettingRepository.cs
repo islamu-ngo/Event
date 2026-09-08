@@ -1,4 +1,3 @@
-// ABOUTME: Repository implementation for GroupSetting entity providing data access
 // for group-specific setting overrides.
 
 namespace Explore.Persistence.Repositories;

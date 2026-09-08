@@ -1,6 +1,3 @@
-// ABOUTME: Pins Setup live headers, media types, limits, HAL relations, and generic problems.
-// ABOUTME: Keeps transport identity value-free and independent from server framework ownership.
-
 namespace ISLAMU.Wire.Contracts.SetupLive;
 
 public static class SetupLiveContractMetadata

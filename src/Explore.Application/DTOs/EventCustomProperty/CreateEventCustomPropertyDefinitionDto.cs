@@ -1,6 +1,3 @@
-// ABOUTME: Write DTO for creating event-local custom property definitions without a template.
-// ABOUTME: Used when organizers add ad-hoc properties directly to an event (task 6.3).
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.DTOs.EventCustomProperty;

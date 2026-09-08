@@ -1,6 +1,3 @@
-// ABOUTME: Exercises tenant directory-operator identity administration through its public typed service.
-// ABOUTME: Protects exact HAL edit authority, grouped PATCH values, revision chaining, and conflict reload.
-
 using Explore.Blazor.Client.Services;
 
 namespace Explore.Blazor.Client.Tests.Services;

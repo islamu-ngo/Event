@@ -1,6 +1,3 @@
-// ABOUTME: Appends and replays co-located PostgreSQL privacy-erasure authority facts.
-// ABOUTME: Uses the primary database transaction boundary and a locked monotonic counter row.
-
 using System.Data;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.PrivacyErasure;

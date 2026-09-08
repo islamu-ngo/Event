@@ -1,6 +1,3 @@
-// ABOUTME: Sends CarpaNet OAuth session material only to the authenticated server-private API bootstrap bridge.
-// ABOUTME: Captures the bridge-authenticated user contract for cookie sign-in without decoding token claims.
-
 using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Text.Json;

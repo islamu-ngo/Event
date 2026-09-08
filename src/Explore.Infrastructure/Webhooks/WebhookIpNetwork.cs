@@ -1,6 +1,3 @@
-// ABOUTME: Minimal CIDR parser used by webhook SSRF protection and options validation.
-// ABOUTME: Avoids external dependencies while supporting IPv4, IPv6, and exact IP allow-list entries.
-
 using System.Net;
 using System.Net.Sockets;
 

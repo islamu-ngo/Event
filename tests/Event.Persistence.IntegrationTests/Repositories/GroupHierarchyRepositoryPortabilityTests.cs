@@ -1,6 +1,3 @@
-// ABOUTME: Verifies group hierarchy validation through provider-neutral EF Core queries.
-// ABOUTME: Exercises file-backed SQLite behavior and query translation for every supported provider.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
@@ -168,7 +165,7 @@ public sealed class GroupHierarchyRepositoryPortabilityTests
             ForeignKeys = true
         }.ToString();
         var context = new ExploreDbContext(
-            new DbContextOptionsBuilder<ExploreDbContext>()
+            TestDbContextOptions.Create<ExploreDbContext>()
                 .UseSqlite(connectionString)
                 .UseSnakeCaseNamingConvention()
                 .Options);

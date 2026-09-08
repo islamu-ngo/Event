@@ -1,6 +1,3 @@
-// ABOUTME: Handles webhook endpoint signing secret reference rotation with bounded previous-secret overlap.
-// ABOUTME: Keeps secret material external to the database and persists only secret references plus version metadata.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;

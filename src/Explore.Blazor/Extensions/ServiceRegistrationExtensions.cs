@@ -1,6 +1,3 @@
-// ABOUTME: Registers server-specific services on top of the shared application services.
-// ABOUTME: Shared services live in Explore.Blazor.Client.Extensions.ServiceCollectionExtensions.
-
 using CarpaNet.OAuth.Storage;
 using Explore.Blazor.Authentication;
 using Explore.Blazor.Client.Configuration;
@@ -115,11 +112,13 @@ public static class ServiceRegistrationExtensions
         services.AddSingleton<AtprotoClientKeyProvider>();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<AtprotoBootstrapAssertionService>();
-        services.AddSingleton<AtprotoAtomicCache>();
+        services.AddSingleton<AtprotoTransientAssertionService>();
+        services.AddSingleton<ApiBackedAtprotoTransientStore>();
+        services.AddSingleton<AtprotoBrowserProof>();
         services.AddSingleton<AtprotoTenantOriginResolver>();
         services.AddScoped<AtprotoOAuthFlowContext>();
-        services.AddScoped<CacheBackedOAuthStateStore>();
-        services.AddScoped<IOAuthStateStore>(provider => provider.GetRequiredService<CacheBackedOAuthStateStore>());
+        services.AddScoped<ApiBackedOAuthStateStore>();
+        services.AddScoped<IOAuthStateStore>(provider => provider.GetRequiredService<ApiBackedOAuthStateStore>());
         services.AddScoped<ApiBackedOAuthSessionStore>();
         services.AddScoped<IOAuthSessionStore>(provider => provider.GetRequiredService<ApiBackedOAuthSessionStore>());
         services.AddSingleton<AtprotoTenantSessionHandoffStore>();

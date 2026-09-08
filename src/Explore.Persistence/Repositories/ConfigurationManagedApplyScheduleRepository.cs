@@ -1,6 +1,3 @@
-// ABOUTME: Persists managed configuration apply schedules behind exact target authority.
-// ABOUTME: Uses tracked entities and optimistic revisions so review/apply races fail closed.
-
 namespace Explore.Persistence.Repositories;
 
 using Explore.Application.Features.ConfigurationManifest.Managed;

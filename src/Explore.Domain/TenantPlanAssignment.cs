@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-to-plan assignment row recording the active SaaS tier version for a tenant.
-// ABOUTME: Uses a normalized assignment status lookup to enforce a single active assignment.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

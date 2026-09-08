@@ -1,5 +1,3 @@
-// ABOUTME: Separates one-time administrative credential disclosure from safe operation replay.
-// ABOUTME: Makes secret-bearing issuance valid only for a current change-required operation and suppresses diagnostic values.
 
 using System.Text.Json.Serialization;
 using Explore.Application.Contracts.Identity;

@@ -1,5 +1,3 @@
-// ABOUTME: Requests a bounded immutable page of Local identity administration summaries.
-// ABOUTME: Leaves administrator resolution and metadata eligibility to the query handler and native reader.
 
 using Explore.Application.Contracts.Identity;
 using MediatR;

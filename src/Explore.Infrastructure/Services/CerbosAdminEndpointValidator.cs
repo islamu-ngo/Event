@@ -1,6 +1,3 @@
-// ABOUTME: Validates Cerbos Admin API endpoints before persistence or HTTP publishing.
-// ABOUTME: Centralizes SSRF-oriented safety rules so onboarding and package publishing cannot drift.
-
 using System.Net;
 using Microsoft.Extensions.Options;
 

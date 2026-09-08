@@ -1,6 +1,3 @@
-// ABOUTME: Verifies durable fanout pointer validation and idempotent run handoff behavior.
-// ABOUTME: Proves handoff never claims work and superseded occurrences complete as no-ops.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Models.InternalEvents;

@@ -1,6 +1,3 @@
-// ABOUTME: API controller for approval status lookup table (read-only enumeration).
-// ABOUTME: Provides approval status values for event and organization verification workflows.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Hateoas;

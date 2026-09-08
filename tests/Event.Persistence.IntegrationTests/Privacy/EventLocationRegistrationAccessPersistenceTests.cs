@@ -1,6 +1,3 @@
-// ABOUTME: Real-PostgreSQL acceptance for bounded EventLocation registration coverage reads.
-// ABOUTME: Proves exact scope mapping, tenant and soft-delete denial, no tracking, and one-query batching.
-
 using System.Data.Common;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
@@ -125,7 +122,7 @@ public sealed class EventLocationRegistrationAccessPersistenceTests(Registration
 
     private ExploreDbContext CreateTenantContext(Guid tenantId, DbCommandInterceptor? interceptor = null)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString)
             .UseSnakeCaseNamingConvention()
             .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning));
@@ -453,7 +450,7 @@ public sealed class RegistrationCoveragePostgreSqlFixture : IAsyncInitializer, I
 
     public ExploreDbContext CreateDbContext()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(ConnectionString)
             .UseSnakeCaseNamingConvention()
             .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning))

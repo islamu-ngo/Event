@@ -1,6 +1,3 @@
-// ABOUTME: Declares instance-operator authorized CQRS requests for durable sale controls and risk reviews.
-// ABOUTME: Keeps official/activation startup facts absent from every browser-writable request.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Payments;
 using Explore.Application.Responses;

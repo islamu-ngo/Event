@@ -1,6 +1,3 @@
-// ABOUTME: Implements the exact recovery capability and delivery ports plus exact public request construction.
-// ABOUTME: CSPRNG plaintext crosses only capability-to-delivery test edges and is never logged.
-
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Contracts.Admissions;

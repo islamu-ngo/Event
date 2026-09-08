@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query request for fetching all session-language links.
-// ABOUTME: Returns IEnumerable<EventSessionLanguageDto>.
 using System.Collections.Generic;
 using Explore.Application.DTOs.EventSessionLanguage;
 using Explore.Application.Responses;

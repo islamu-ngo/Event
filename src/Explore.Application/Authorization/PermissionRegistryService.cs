@@ -1,6 +1,3 @@
-// ABOUTME: Cached permission vocabulary service that provides all known permissions.
-// ABOUTME: Used for validation, UI dropdowns, and capability ceiling filtering.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

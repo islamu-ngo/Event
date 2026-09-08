@@ -1,6 +1,3 @@
-// ABOUTME: Governs polymorphic reference targets used by bindings, notifications, and custom properties.
-// ABOUTME: Centralizes ID shape, ownership, tenant-scope, cleanup, and validation contracts for stringly typed references.
-
 using System.Collections.Frozen;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;

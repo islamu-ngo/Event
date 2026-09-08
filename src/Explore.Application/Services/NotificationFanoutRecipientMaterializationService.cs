@@ -1,6 +1,3 @@
-// ABOUTME: Materializes one immutable fanout occurrence for one explicit recipient.
-// ABOUTME: Resolves current persisted email, preference, and location authority before atomic graph creation.
-
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

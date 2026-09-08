@@ -1,6 +1,3 @@
-// ABOUTME: Setting definitions for the tenant-customizable footer system.
-// ABOUTME: Governs templates, link groups, social links, description, and copyright with instance-level lock flags.
-
 namespace Explore.Domain.Settings.Definitions;
 
 public static class FooterSettingDefinitions

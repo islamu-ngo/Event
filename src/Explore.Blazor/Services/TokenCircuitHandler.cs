@@ -1,6 +1,3 @@
-// ABOUTME: Captures original browser-session authority and validates it before dispatching circuit activity.
-// ABOUTME: Revokes stale circuits with anonymous-state notification and exact-session token cleanup.
-
 using Event.Web.BffHosting.Security;
 using Microsoft.Net.Http.Headers;
 using Microsoft.AspNetCore.Authentication;

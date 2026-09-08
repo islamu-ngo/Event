@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning all supported file types.
-// ABOUTME: Maps FileType entities to FileTypeDto list.
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;

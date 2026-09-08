@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning all members of a specific group.
-// ABOUTME: Maps GroupMember entities to GroupMemberDto list.
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;

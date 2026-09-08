@@ -1,0 +1,42 @@
+# ABOUTME: Public change fragment for paid-registration refunds and buyer protection.
+# ABOUTME: Records migration, API, security, and operator impacts for Phase 19.
+Change-Id: CHG-01M1VJ164PAQ0PSFW2E6CTDCJY
+Title: Paid registrations gain durable refund and event-change protection
+Type: feat
+Scope: registration
+Summary: >-
+  Buyers and organizers can follow provider-proven refunds, event cancellation,
+  material changes, disputes, and explicit recovery through tenant-safe durable workflows.
+Group: registration-refund-protection
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/DOMAIN.md
+    Disposition: documented
+    Detail: >-
+      Refund authority remains tenant-qualified, provider identities stay server-only,
+      and HAL relations are the sole browser action authority.
+  Migration:
+    Reference: docs/OPERATIONS.md
+    Disposition: documented
+    Detail: >-
+      Adds generated refund, dispute, campaign, material-change, allocation, cursor,
+      constraint, and recovery persistence for every supported database provider.
+  Configuration:
+    Reference: docs/OPERATIONS.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: documented
+    Detail: >-
+      Adds buyer and Studio refund projections, campaign operations, material-change
+      responses, dispute truth, and HAL-gated same-attempt settlement recovery.
+  Operator:
+    Reference: docs/OPERATIONS.md
+    Disposition: documented
+    Detail: >-
+      Operators monitor bounded refund reconciliation health, dispute deadlines,
+      campaign progress, and explicit provider-block recovery without exposing PII.

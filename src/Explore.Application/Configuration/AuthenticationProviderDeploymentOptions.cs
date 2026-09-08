@@ -1,6 +1,3 @@
-// ABOUTME: Validated deployment selector for the primary authentication provider and ATProto login axis.
-// ABOUTME: Distinguishes an operator-locked provider from application-managed onboarding configuration.
-
 namespace Explore.Application.Configuration;
 
 public sealed class AuthenticationProviderDeploymentOptions

@@ -1,6 +1,3 @@
-// ABOUTME: Resolves setup secrets from BFF-owned sources before forwarding privileged setup headers.
-// ABOUTME: Protects setup-secret cookies and prevents client-controlled X-Setup-Secret header trust.
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;

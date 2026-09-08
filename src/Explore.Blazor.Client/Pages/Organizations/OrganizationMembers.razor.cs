@@ -1,6 +1,3 @@
-// ABOUTME: Loads organization members and renders mutations solely from server HAL affordances.
-// ABOUTME: Preserves accessible dialog focus while leaving self and creator policy to the API.
-
 using Blazouter.Services;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;

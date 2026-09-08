@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for tenant/instance administrators to update Group approval state.
-// ABOUTME: Keeps approval management separate from ordinary group metadata editing.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Group;
 using Explore.Application.Responses;

@@ -1,6 +1,3 @@
-// ABOUTME: Regression tests for cache-safe static assets at the Blazor BFF boundary.
-// ABOUTME: Proves XSRF token issuance does not force Home Discovery images into no-store responses.
-
 using System.Net;
 using Explore.Blazor.IntegrationTests.Fixtures;
 using Microsoft.AspNetCore.Mvc.Testing;

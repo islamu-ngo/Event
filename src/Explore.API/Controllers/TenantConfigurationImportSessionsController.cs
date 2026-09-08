@@ -1,6 +1,3 @@
-// ABOUTME: Exposes tenant-authorized package upload, preview, refresh, and cancellation.
-// ABOUTME: Binds every session operation to the independently authorized tenant route.
-
 namespace Explore.API.Controllers;
 
 using System.ComponentModel.DataAnnotations;

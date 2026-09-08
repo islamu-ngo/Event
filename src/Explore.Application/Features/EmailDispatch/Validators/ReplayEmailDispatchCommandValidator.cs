@@ -1,6 +1,3 @@
-// ABOUTME: Validator for operator EmailDispatch replay commands.
-// ABOUTME: Requires explicit tenant and outbox scope before requeueing durable dispatch state.
-
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using FluentValidation;
 

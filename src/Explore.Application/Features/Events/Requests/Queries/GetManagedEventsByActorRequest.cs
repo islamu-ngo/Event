@@ -1,6 +1,3 @@
-// ABOUTME: MediatR query request for authenticated actor-profile management event lists.
-// ABOUTME: Returns only events the current principal can manage/view through event view-management authorization.
-
 using Explore.Application.DTOs.Event;
 using Explore.Application.Responses;
 using MediatR;

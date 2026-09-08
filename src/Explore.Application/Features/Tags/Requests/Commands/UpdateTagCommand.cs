@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for updating an existing tag.
-// ABOUTME: Carries the UpdateTagDto payload.
 using System;
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Tag;

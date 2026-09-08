@@ -1,6 +1,3 @@
-// ABOUTME: Batch update handler supporting BestEffort (skip locked, apply rest) and Strict (reject all) modes.
-// ABOUTME: Validates each key independently and commits SMTP batches under one ordered policy lock and transaction.
-
 namespace Explore.Application.Features.Settings.Handlers.Commands;
 
 using System.Collections.Immutable;

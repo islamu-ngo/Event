@@ -1,5 +1,3 @@
-// ABOUTME: Verifies the native Blazor-to-worker bridge forwards generated work and numeric progress.
-// ABOUTME: Uses exact invocation signals to prove worker cleanup finishes before success or failure escapes.
 
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Services.Interop;

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies registration-form template HAL authorization metadata.
-// ABOUTME: Keeps create and instantiate affordances discoverable but gated by the right authority.
-
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.Authorization;

@@ -1,6 +1,3 @@
-// ABOUTME: Validates value-setting payload shape for event session custom properties.
-// ABOUTME: Ensures required references are present and ordinal is non-negative.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.EventSessionCustomProperty.Validators;

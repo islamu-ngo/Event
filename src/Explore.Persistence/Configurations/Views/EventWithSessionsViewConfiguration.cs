@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for the keyless event-with-sessions aggregate read view.
-// ABOUTME: Maps the read-only PostgreSQL view shape without generating a backing table.
-
 using Explore.Domain.Views;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

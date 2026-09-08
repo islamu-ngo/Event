@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL tests for normalized append-only webhook administrative audit evidence.
-// ABOUTME: Proves database timestamps, immutable persistence, foreign keys, and transactional rollback.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;

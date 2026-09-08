@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the configuration-manifest reader's real filesystem trust boundary.
-// ABOUTME: Covers convention discovery, regular files, permissions, directories, and symbolic links.
-
 namespace Explore.Infrastructure.Tests.Infrastructure.ConfigurationManifest;
 
 using Explore.Application.Features.ConfigurationManifest.Ingestion;

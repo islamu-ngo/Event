@@ -1,6 +1,3 @@
-// ABOUTME: Enriches authenticated principals with database-resolved administrative authority claims.
-// ABOUTME: Projects instance, tenant, organization, and group scopes for trusted server-side decisions.
-
 using System.Security.Claims;
 using Explore.Application.Authentication;
 using Explore.Application.Authorization;

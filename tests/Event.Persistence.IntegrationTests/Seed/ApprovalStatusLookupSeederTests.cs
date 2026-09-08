@@ -1,6 +1,3 @@
-// ABOUTME: Verifies runtime-seeder parity for the complete registration approval lifecycle vocabulary.
-// ABOUTME: Locks stable IDs and codes while proving missing terminal rows are repaired idempotently.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
@@ -15,8 +12,8 @@ public sealed class ApprovalStatusLookupSeederTests
     [Test]
     public async Task RuntimeSeederMaintainsExactApprovalStatusIdsAndCodes()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase($"approval-status-lookups-{Guid.NewGuid():N}")
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase($"approval-status-lookups-{Guid.NewGuid():N}")
             .Options;
 
         await using var context = new ExploreDbContext(options);

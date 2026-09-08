@@ -1,6 +1,3 @@
-// ABOUTME: Verifies provider-specific registration unique-race classification stays narrowly scoped.
-// ABOUTME: Uses SQLite's real file-backed unique messages because its errors omit index names.
-
 using Explore.Domain;
 using Explore.Persistence;
 using Explore.Persistence.Database;

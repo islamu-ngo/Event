@@ -16,6 +16,7 @@ priority: medium
 - Give a recommended answer with a concise rationale before each question.
 - Resolve upstream decisions before asking about choices that depend on them.
 - When repository evidence can answer a question, inspect the codebase and treat the finding as resolved instead of asking the user.
+- **Self-Contained Questions**: Questions must be fully understandable on their own. Never reference bare task IDs, phase numbers, or internal doc sections without explaining their functional context inline. The user must not need to open any implementation plan or task file to answer.
 - Continue until every relevant branch is resolved and both sides share the same understanding.
 
 ## High-Criticality Intake Decision Trees

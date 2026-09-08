@@ -1,6 +1,3 @@
-// ABOUTME: Defines closed failure codes and value-minimized import observability/support evidence.
-// ABOUTME: Produces the same bounded fields for logs, metrics, and traces without payload values.
-
 namespace Explore.Application.Features.ConfigurationManifest.Importing;
 
 using System.Collections.Frozen;

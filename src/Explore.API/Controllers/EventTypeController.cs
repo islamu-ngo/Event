@@ -1,6 +1,3 @@
-// ABOUTME: API controller for event type lookup table (read-only enumeration).
-// ABOUTME: Provides available event types for event creation and filtering.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Hateoas;

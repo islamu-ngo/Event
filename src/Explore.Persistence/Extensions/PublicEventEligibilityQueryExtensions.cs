@@ -1,6 +1,3 @@
-// ABOUTME: Shared EF query predicates for anonymous event program and agenda eligibility.
-// ABOUTME: Keeps public child reads subordinate to published public parent events and published scheduled sessions.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

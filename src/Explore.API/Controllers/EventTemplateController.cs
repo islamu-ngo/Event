@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for event template CRUD operations.
-// ABOUTME: Manages reusable templates that define sets of custom property definitions for event creation.
-
 using System.ComponentModel.DataAnnotations;
 using Asp.Versioning;
 using Explore.API.Attributes;

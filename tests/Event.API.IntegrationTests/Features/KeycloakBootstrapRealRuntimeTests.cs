@@ -1,6 +1,3 @@
-// ABOUTME: Real-runtime tests for setup-time Keycloak bootstrap against a disposable Keycloak container.
-// ABOUTME: Verifies the setup endpoint, Infrastructure adapter, and Keycloak token endpoint agree on rotated secrets.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
@@ -47,6 +44,7 @@ public sealed class KeycloakBootstrapRealRuntimeTests
         await factory.InitializeDatabaseAsync();
         using var client = factory.CreateClient();
         string rotatedClientSecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        await Assert.That(string.Equals(rotatedClientSecret, _keycloak.ClientSecret, StringComparison.Ordinal)).IsFalse();
         var payload = CreateBootstrapRequest(rotatedClientSecret);
 
         try
@@ -76,7 +74,7 @@ public sealed class KeycloakBootstrapRealRuntimeTests
             var internalConfigResponse = await client.SendAsync(internalConfigRequest);
 
             await Assert.That(internalConfigResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
-            var config = await internalConfigResponse.Content.ReadFromJsonAsync<AuthProviderConfigurationDto>();
+            var config = await internalConfigResponse.Content.ReadFromJsonAsync<AuthProviderConfigurationDto>(TestJsonOptions.Default);
             await Assert.That(config).IsNotNull();
             await Assert.That(config!.PrimaryProviderId)
                 .IsEqualTo((int)AuthenticationProviderKind.Keycloak);
@@ -87,7 +85,9 @@ public sealed class KeycloakBootstrapRealRuntimeTests
         }
         finally
         {
-            await SendBootstrapRequestAsync(client, CreateBootstrapRequest(_keycloak.ClientSecret));
+            using var restoreResponse = await SendBootstrapRequestAsync(
+                client, CreateBootstrapRequest(_keycloak.ClientSecret));
+            await Assert.That(restoreResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         }
     }
 
@@ -131,6 +131,7 @@ public sealed class KeycloakBootstrapRealRuntimeTests
         {
             _keycloakBaseUrl = keycloakBaseUrl;
             _setupSecret = setupSecret;
+            ClientOptions.BaseAddress = new Uri("https://localhost");
         }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)

@@ -1,6 +1,3 @@
-// ABOUTME: Claims and settles outbound provider-submission write effects with database fencing.
-// ABOUTME: Loads the post-claim delivery graph without persisting provider payloads or raw answers in the effect row.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

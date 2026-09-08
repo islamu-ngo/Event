@@ -1,6 +1,3 @@
-// ABOUTME: Aggregate-view DTO describing one event-scoped custom-property facet and its values.
-// ABOUTME: Uses JsonElement values so typed projection data survives without reflection-based unions.
-
 using System.Collections.Immutable;
 using System.Text.Json;
 using Explore.Domain.Enums;

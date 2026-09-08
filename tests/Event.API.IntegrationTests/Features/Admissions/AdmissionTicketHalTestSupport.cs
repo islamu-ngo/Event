@@ -1,6 +1,3 @@
-// ABOUTME: HAL and route-path helpers shared by Phase 20 admission ticket HTTP tests.
-// ABOUTME: Reads only machine-consumed relation href and method values.
-
 using System.Text.Json;
 
 namespace Event.Api.IntegrationTests.Features;

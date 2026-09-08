@@ -1,6 +1,3 @@
-// ABOUTME: Defines RED PostgreSQL contracts for ticket transfer, holder authority, and credential rotation.
-// ABOUTME: Pins tenant isolation, shared-fence races, immutable commerce/check-in truth, replay, and PII minimization.
-
 using System.Security.Cryptography;
 using System.Text;
 using Event.Persistence.IntegrationTests.Fixtures;

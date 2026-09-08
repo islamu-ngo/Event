@@ -120,6 +120,12 @@ Flood prevention is layered:
 
 `Topic` and `tag` are deliberately separate: `Topic` controls queued transport delivery; `tag` controls displayed OS notification replacement. The service worker validates navigation as a same-origin relative path and focuses an existing app window before opening a new one.
 
+Stale-endpoint cleanup in `WebPushDispatchOutboxRepository` owns one transaction
+inside the provider execution strategy. The tenant/lease-qualified terminal
+dispatch update and same-tenant subscription deactivation commit together.
+Failure between the updates rolls back the terminal dispatch change; a stale
+lease or wrong tenant cannot deactivate a subscription.
+
 ## Email Boundary
 
 In-app notifications are separate from SMTP email delivery:

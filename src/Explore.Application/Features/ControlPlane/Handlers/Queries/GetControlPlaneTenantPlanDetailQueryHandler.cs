@@ -1,6 +1,3 @@
-// ABOUTME: Query handler for control-plane tenant plan detail and version history.
-// ABOUTME: Returns normalized settings and quota rows for instance-admin review.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ControlPlane;
 using Explore.Application.Features.ControlPlane;

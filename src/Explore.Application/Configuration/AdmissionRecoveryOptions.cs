@@ -1,6 +1,3 @@
-// ABOUTME: Configures admission recovery capability key rotation and bounded lifetime.
-// ABOUTME: Keeps the active key version explicit while persisted versions remain resolvable.
-
 namespace Explore.Application.Configuration;
 
 public sealed class AdmissionRecoveryOptions

@@ -1,6 +1,3 @@
-// ABOUTME: Dedicated sensitive response contract for retained outgoing webhook payload bytes.
-// ABOUTME: Encodes exact bytes as base64 and remains separate from default message list/detail DTOs.
-
 namespace Explore.Application.DTOs.Webhooks;
 
 public sealed record WebhookMessagePayloadDto

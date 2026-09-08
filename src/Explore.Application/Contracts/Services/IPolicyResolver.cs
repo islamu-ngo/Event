@@ -1,6 +1,3 @@
-// ABOUTME: Contract for deterministic policy resolution across the Instance→Tenant→Organization hierarchy.
-// ABOUTME: Returns both the effective value and whether the requesting scope can override it.
-
 using System.Linq.Expressions;
 using Explore.Domain.Policies;
 using Explore.Domain.Settings;

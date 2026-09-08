@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for the shared EventList-compatible event details sidebar.
-// ABOUTME: Provides formatting and HAL/tag/category helpers while parent pages own loading and mutation callbacks.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Helpers;

@@ -1,6 +1,3 @@
-// ABOUTME: EF implementation of IEventAgendaItemRepository - delegates CRUD to GenericRepository and adds event-scoped queries.
-// ABOUTME: Reads are AsNoTracking so query handler use does not accidentally attach entities.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.Extensions;

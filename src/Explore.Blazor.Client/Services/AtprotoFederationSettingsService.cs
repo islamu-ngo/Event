@@ -1,6 +1,3 @@
-// ABOUTME: Adapts generated AT Protocol federation setting operations for Blazor governance components.
-// ABOUTME: Preserves server HAL/edit authority while centralizing exact setting payload construction.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Federation;
 

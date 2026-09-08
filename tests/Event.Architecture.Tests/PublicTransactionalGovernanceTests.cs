@@ -1,6 +1,3 @@
-// ABOUTME: Architecture tests for the anonymous, idempotent PublicTransactional endpoint contract.
-// ABOUTME: Establishes the Phase 3 classification and required-key governance baseline before runtime enforcement.
-
 namespace Event.Architecture.Tests;
 
 using System.Reflection;

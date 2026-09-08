@@ -1,6 +1,3 @@
-// ABOUTME: Validates tenant directory-operator identity input at capability boundaries.
-// ABOUTME: Reuses Domain readiness rules so HTTP, onboarding, and provider automation cannot drift.
-
 namespace Explore.Application.DTOs.TenantSettings.Validators;
 
 using Explore.Domain.ValueObjects;

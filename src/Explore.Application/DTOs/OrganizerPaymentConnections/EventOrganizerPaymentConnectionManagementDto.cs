@@ -1,6 +1,3 @@
-// ABOUTME: Private HAL management envelope for an event organizer payment connection.
-// ABOUTME: Carries trusted event/organizer authorization attributes while exposing only bounded connection state.
-
 using System.Text.Json.Serialization;
 
 namespace Explore.Application.DTOs.OrganizerPaymentConnections;

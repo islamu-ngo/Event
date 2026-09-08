@@ -1,6 +1,3 @@
-// ABOUTME: Converts verified normalized Stripe payment callbacks into durable reconciliation triggers.
-// ABOUTME: Performs no provider I/O and never mutates payment or order state in the callback transaction.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 

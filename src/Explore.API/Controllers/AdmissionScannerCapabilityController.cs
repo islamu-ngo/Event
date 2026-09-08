@@ -1,6 +1,3 @@
-// ABOUTME: Exposes organizer-owned scanner capability issue, masked list, and immediate revoke routes.
-// ABOUTME: Maps only bounded Application descriptors and reveals plaintext on a newly issued response once.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Extensions;

@@ -1,6 +1,3 @@
-// ABOUTME: Resolves registered file storage providers by canonical provider key.
-// ABOUTME: Fails closed when an unknown or unavailable provider is requested.
-
 using Explore.Application.Contracts.Infrastructure;
 
 namespace Explore.Infrastructure.Storage;

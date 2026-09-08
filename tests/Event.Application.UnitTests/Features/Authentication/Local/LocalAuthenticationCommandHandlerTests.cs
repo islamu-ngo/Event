@@ -1,6 +1,3 @@
-// ABOUTME: Verifies local login rejects bad input and synchronizes normalized identities only after authorization.
-// ABOUTME: Proves credentials never reach the service after validation failure and tokens remain hidden after sync failure.
-
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Authentication.Local.Models;

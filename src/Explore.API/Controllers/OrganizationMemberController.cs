@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for organization member CRUD operations with role-based access control.
-// ABOUTME: Manages user-role assignments within organizations via CQRS/MediatR.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

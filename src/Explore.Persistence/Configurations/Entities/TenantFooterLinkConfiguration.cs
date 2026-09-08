@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for TenantFooterLink.
-// ABOUTME: Tenant isolation is inherited from the parent group — no direct TenantId needed.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

@@ -1,6 +1,3 @@
-// ABOUTME: Sanitized API response for tenant Listmonk integration settings.
-// ABOUTME: Exposes non-secret configuration and credential presence flags only.
-
 namespace Explore.Application.DTOs.Integrations;
 
 public sealed record ListmonkIntegrationSettingsDto

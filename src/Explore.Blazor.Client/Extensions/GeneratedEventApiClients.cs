@@ -1,6 +1,3 @@
-// ABOUTME: Discovers and registers NSwag per-tag client interface and implementation pairs.
-// ABOUTME: Keeps multi-client composition scalable while linker metadata preserves reflected WASM types.
-
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using Explore.Blazor.Client.Clients;

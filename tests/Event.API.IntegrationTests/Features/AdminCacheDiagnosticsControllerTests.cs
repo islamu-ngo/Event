@@ -1,6 +1,3 @@
-// ABOUTME: Direct API contracts for the Development-only admin-cache identity diagnostics endpoint.
-// ABOUTME: Proves canonical resolution stays separate from explicitly requested diagnostic claim values.
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Explore.API.Controllers;

@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for AI provider run audit rows.
-// ABOUTME: Indexes pending runs by tenant/provider while bounding provider failure metadata.
-
 using Explore.Domain.Ai;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

@@ -1,4 +1,3 @@
-# ABOUTME: Cerbos policy test suite for event-scoped operational role derived roles.
 # Tests same-event access, cross-event isolation, missing event context denial, and event-family resource coverage.
 
 name: EventRolePolicyTests

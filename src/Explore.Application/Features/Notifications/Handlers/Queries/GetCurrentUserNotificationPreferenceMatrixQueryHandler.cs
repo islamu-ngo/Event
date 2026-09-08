@@ -1,6 +1,3 @@
-// ABOUTME: Handles authenticated-user notification preference matrix projection.
-// ABOUTME: Maps entity metadata plus resolver decisions into UI-ready DTOs.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

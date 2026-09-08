@@ -1,5 +1,3 @@
-// ABOUTME: Retains real issuance exclusion while discovering all order ticket lineage and attendance history.
-// ABOUTME: Uses native assignment-before-ticket-before-target fences and exact conditional consumed releases.
 
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Persistence;

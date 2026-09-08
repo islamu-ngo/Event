@@ -1,6 +1,3 @@
-// ABOUTME: Defines immutable received registration evidence tied to a pinned runtime attempt lineage.
-// ABOUTME: Keeps business deduplication separate from HTTP idempotency and blocks finalization of late evidence.
-
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Domain.Enums;

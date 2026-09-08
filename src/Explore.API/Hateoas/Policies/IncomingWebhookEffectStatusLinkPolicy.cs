@@ -1,6 +1,3 @@
-// ABOUTME: HAL link policy for incoming Coop effect operator status rows.
-// ABOUTME: Emits redrive only when durable pointer state says the action is eligible.
-
 using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;

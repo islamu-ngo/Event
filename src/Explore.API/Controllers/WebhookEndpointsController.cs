@@ -1,6 +1,3 @@
-// ABOUTME: Webhook endpoint endpoints for registration, update, deletion, secret rotation, and test delivery.
-// ABOUTME: Endpoint secrets are write-only; rotation returns a handle rather than the secret material.
-
 using Explore.Application.Authentication;
 using Asp.Versioning;
 using Explore.API.Attributes;

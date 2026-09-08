@@ -1,6 +1,3 @@
-// ABOUTME: Append-only PII-free evidence for one EventLocation disclosure-policy mutation.
-// ABOUTME: Captures old/new field, audience, reveal, and policy-version facts without location values.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the current-user administrative authority query projection.
-// ABOUTME: Covers normalized instance, tenant, organization, and group scope identifiers.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Features.Users.Handlers.Queries;
 using Explore.Application.Features.Users.Requests.Queries;

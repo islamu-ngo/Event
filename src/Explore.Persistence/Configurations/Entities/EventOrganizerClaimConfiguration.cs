@@ -1,6 +1,3 @@
-// ABOUTME: Maps tenant-owned organizer claims and their auditable review relationships.
-// ABOUTME: Uses tenant-safe composite event and actor foreign keys to prevent cross-tenant claims.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

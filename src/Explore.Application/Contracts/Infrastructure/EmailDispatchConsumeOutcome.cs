@@ -1,5 +1,3 @@
-// ABOUTME: Enumerates outcomes for consuming and replaying durable email-dispatch broker pointers.
-// ABOUTME: Keeps consumer telemetry typed without leaking RabbitMQ.Client types into Application.
 
 namespace Explore.Application.Contracts.Infrastructure;
 

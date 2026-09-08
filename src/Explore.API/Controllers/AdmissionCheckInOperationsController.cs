@@ -1,6 +1,3 @@
-// ABOUTME: Exposes authenticated exact-target admission health and incident-operation controls.
-// ABOUTME: Returns HAL-gated stop, restore, and reconcile actions with private bounded responses.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Extensions;

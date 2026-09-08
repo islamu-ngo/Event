@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for normalized physical location kinds.
-// ABOUTME: Maps stable integer IDs and unique machine codes without model seed data.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

@@ -1,6 +1,3 @@
-// ABOUTME: Creates the SQLite authority context for dedicated or primary-database storage.
-// ABOUTME: Keeps one generated SQLite migration model aligned across both topologies.
-
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;

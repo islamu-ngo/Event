@@ -1,6 +1,3 @@
-// ABOUTME: Binds Keycloak OIDC and cookie settings for reusable browser-BFF host profiles.
-// ABOUTME: Requires private host identity values explicitly while keeping all secrets server-side.
-
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 

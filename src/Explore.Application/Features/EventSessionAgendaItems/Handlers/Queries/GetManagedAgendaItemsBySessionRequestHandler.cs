@@ -1,6 +1,3 @@
-// ABOUTME: Handles exact organizer-facing session agenda reads without public location redaction.
-// ABOUTME: Verifies the selected session belongs to the event used for resource authorization.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionAgendaItem;

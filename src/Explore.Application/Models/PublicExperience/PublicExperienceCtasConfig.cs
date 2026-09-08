@@ -1,6 +1,3 @@
-// ABOUTME: Application-owned versioned configuration records for public call-to-action links.
-// ABOUTME: Keeps CTA persistence bounded and independent from UI component DTOs.
-
 namespace Explore.Application.Models.PublicExperience;
 
 public sealed record PublicExperienceCtasConfig(

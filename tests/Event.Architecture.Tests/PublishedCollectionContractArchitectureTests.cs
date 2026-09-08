@@ -1,6 +1,3 @@
-// ABOUTME: Ratchets every published collection-bearing record to an explicit ownership disposition.
-// ABOUTME: Rejects mutable collection exposure and stale, missing, malformed, or unexplained inventory entries.
-
 using System.Collections;
 using System.CodeDom.Compiler;
 using System.Reflection;

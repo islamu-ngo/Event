@@ -1,6 +1,3 @@
-// ABOUTME: Persistence contract for Organization aggregate reads, paged lists, and PII erasure.
-// ABOUTME: Keeps organization data access entity-based so handlers own DTO mapping and cancellation flow.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

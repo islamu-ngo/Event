@@ -1,6 +1,3 @@
-// ABOUTME: Repository implementation for Permission entity with dynamic RBAC queries.
-// ABOUTME: Provides capability ceiling, role-based permission checks, and scope filtering.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

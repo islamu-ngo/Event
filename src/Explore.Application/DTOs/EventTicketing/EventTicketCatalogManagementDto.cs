@@ -1,5 +1,3 @@
-// ABOUTME: Management read model for an event ticket catalog.
-// ABOUTME: Contains catalog, ticket type, and capacity pool read projections.
 using System.Text.Json.Serialization;
 
 namespace Explore.Application.DTOs.EventTicketing;

@@ -1,6 +1,3 @@
-// ABOUTME: Blazor service wrapper around generated AI assistant API client methods.
-// ABOUTME: Provides safe defaults and preserves HAL resources for UI affordance gating.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Ai;

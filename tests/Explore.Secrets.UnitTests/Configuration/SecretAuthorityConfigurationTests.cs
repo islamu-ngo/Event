@@ -1,6 +1,3 @@
-// ABOUTME: Adversarial tests for the explicit Development/Testing User Secrets authority.
-// ABOUTME: Proves production rejection and isolation from lower Environment values.
-
 using Explore.Secrets.Abstractions;
 using Explore.Secrets.Configuration;
 using Microsoft.Extensions.Configuration;

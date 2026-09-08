@@ -1,6 +1,3 @@
-// ABOUTME: Handler for revoking event-role assignments without deleting audit evidence.
-// ABOUTME: Protects the last effective direct EventOwner assignment.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventRoleAssignments.Requests.Commands;

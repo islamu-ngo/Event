@@ -1,6 +1,3 @@
-// ABOUTME: Tracks per-period credit usage for external API keys with atomic race-safe updates.
-// ABOUTME: Each row represents one billing period; lazy-provisioned on first use; unique per (ApiKeyId, PeriodStart).
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

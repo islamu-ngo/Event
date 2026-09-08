@@ -1,5 +1,3 @@
-// ABOUTME: Verifies anonymous challenge issue eligibility through real event and shared visitor policy facts.
-// ABOUTME: Rejects wrong tenant, nonpublic lifecycle, deleted participation and account-required modes without mocks.
 
 using Explore.Application.Features.RegistrationOrders.Commands;
 using Explore.Application.Models;

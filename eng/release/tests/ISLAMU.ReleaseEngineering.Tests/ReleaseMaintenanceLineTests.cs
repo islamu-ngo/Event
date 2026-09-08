@@ -1,6 +1,3 @@
-// ABOUTME: Proves maintenance lines may be opened only from a verified signed stable release tag.
-// ABOUTME: Exercises idempotent planning, reserved-namespace refusal, and non-mutating behavior.
-
 using ISLAMU.ReleaseEngineering;
 
 namespace ISLAMU.ReleaseEngineering.Tests;

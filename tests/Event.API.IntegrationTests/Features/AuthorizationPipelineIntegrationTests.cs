@@ -1,6 +1,3 @@
-// ABOUTME: Authorization pipeline integration tests using real Keycloak JWTs and real Cerbos PDP decisions.
-// ABOUTME: Validates that different user roles get different authorization results from the Cerbos container.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;

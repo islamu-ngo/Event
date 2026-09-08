@@ -1,6 +1,3 @@
-// ABOUTME: Repository implementation for EventIslamicAspect entity.
-// ABOUTME: Provides CRUD and specialized queries for Islamic event aspects.
-
 namespace Explore.Persistence.Repositories;
 
 using System;

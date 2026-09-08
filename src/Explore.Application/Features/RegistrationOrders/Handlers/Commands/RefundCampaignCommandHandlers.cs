@@ -1,6 +1,3 @@
-// ABOUTME: Resumes non-completed refund campaign generation by writing one durable process trigger.
-// ABOUTME: Keeps operator HTTP actions provider-free and preserves the existing campaign cursor and counters.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.RegistrationOrders;

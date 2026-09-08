@@ -1,6 +1,3 @@
-// ABOUTME: Builds linkless reporter outcome notifications from one completed report decision.
-// ABOUTME: Keeps action/no-action copy generic and gates SMTP by current consent and authority.
-
 using Explore.Application.Contracts.Notifications;
 using Explore.Domain;
 using Explore.Domain.Enums;

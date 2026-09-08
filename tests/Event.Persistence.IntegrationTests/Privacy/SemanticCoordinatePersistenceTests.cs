@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL privacy proofs for semantic GeoCoordinate persistence through removable LocationPii scalars.
-// ABOUTME: Verifies tenant isolation, Private Home erasure, schema shape, database invariants, and zero-PII diagnostics.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
@@ -190,8 +187,9 @@ public sealed class SemanticCoordinatePersistenceTests(RecipientDeliveryMigratio
             await connection.OpenAsync();
             await using var command = new NpgsqlCommand(
                 """
-                INSERT INTO location_pii (location_id, address, postcode, latitude, longitude)
-                VALUES (@location_id, @address, @postcode, @latitude, @longitude)
+                INSERT INTO location_pii (location_id, address, postcode, latitude, longitude,
+                                         address_substring_key, address_substring_key_version)
+                VALUES (@location_id, @address, @postcode, @latitude, @longitude, 'INVARIANT-BREAKER', 2)
                 """, connection);
             command.Parameters.AddWithValue("location_id", NpgsqlDbType.Uuid, locations[index].Id);
             command.Parameters.AddWithValue("address", NpgsqlDbType.Text, "invariant-breaker");
@@ -231,9 +229,12 @@ public sealed class SemanticCoordinatePersistenceTests(RecipientDeliveryMigratio
         };
         Location loaded = await context.Locations.SingleAsync(x => x.Id == locationId);
         loaded.SetProviderAddress(
-            $"{sentinelAddress}{new string('x', 500)}",
+            sentinelAddress,
             sentinelPostcode,
             GeoCoordinate.Create(50.123456789, 4));
+        // Bypass the aggregate only to exercise the database's malformed-write diagnostic boundary.
+        context.Entry(loaded.Pii!).Property(pii => pii.Address).CurrentValue =
+            $"{sentinelAddress}{new string('x', 500)}";
         DbUpdateException? exception = await Assert.That(async () => await context.SaveChangesAsync())
             .Throws<DbUpdateException>();
         string[] forbidden =
@@ -281,16 +282,14 @@ public sealed class SemanticCoordinatePersistenceTests(RecipientDeliveryMigratio
 
     private DbContextOptionsBuilder<ExploreDbContext> CreateContextOptions(PrimaryDatabaseRole role)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>();
+        var options = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(options, CreateDatabaseOptions(role));
-        options.ConfigureWarnings(warnings =>
-            warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning));
         return options;
     }
 
     private string CreateComposedConnectionString(PrimaryDatabaseRole role)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>();
+        var options = TestDbContextOptions.Create<ExploreDbContext>();
         return PrimaryDatabaseProviderComposition.ConfigureApplication(options, CreateDatabaseOptions(role))
             .ConnectionString;
     }

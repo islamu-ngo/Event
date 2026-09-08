@@ -1,6 +1,3 @@
-// ABOUTME: Management API contracts for webhook bulk replay filters, previews, and durable operations.
-// ABOUTME: Exposes bounded counts and normalized lifecycle metadata without payload or endpoint secrets.
-
 namespace Explore.Application.DTOs.Webhooks;
 
 public sealed record WebhookBulkReplayFilterDto

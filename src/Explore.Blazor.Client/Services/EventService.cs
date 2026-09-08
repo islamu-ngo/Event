@@ -1,6 +1,3 @@
-// ABOUTME: Service for managing Events via generated API client calls.
-// ABOUTME: Keeps Blazor event pages behind HAL-aware service methods and the BFF typed-client boundary.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Helpers;
 using Explore.Blazor.Client.Models;

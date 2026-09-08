@@ -1,5 +1,3 @@
-// ABOUTME: Maps preview and confirmation failures to the existing typed API problem contract.
-// ABOUTME: Keeps stale evidence a conflict and current administrator failures forbidden.
 
 using Explore.Application.Responses;
 using Microsoft.AspNetCore.Mvc;

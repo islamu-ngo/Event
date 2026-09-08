@@ -1,6 +1,3 @@
-// ABOUTME: Deterministic TimeProvider used by Photon resilience contract tests.
-// ABOUTME: Advances registered timers explicitly without sleeps, polling, real time, or network access.
-
 namespace Explore.Infrastructure.Tests.Geocoding;
 
 internal sealed class PhotonManualTimeProvider(DateTimeOffset initialUtcNow) : TimeProvider

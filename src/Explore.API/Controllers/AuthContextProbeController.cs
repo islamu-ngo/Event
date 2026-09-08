@@ -1,6 +1,3 @@
-// ABOUTME: Internal Phase 0 probe endpoint for validating authentication plus tenant-resolution flow.
-// ABOUTME: Returns the resolved runtime context for integration tests without exposing the endpoint in API docs.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

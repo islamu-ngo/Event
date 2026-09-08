@@ -1,6 +1,3 @@
-// ABOUTME: Proves checkout issuance runs through browser JavaScript rather than server-side HttpClient.
-// ABOUTME: Pins the capability to the fetch header argument for InteractiveServer and WebAssembly.
-
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Services.Http;
 using Microsoft.JSInterop;

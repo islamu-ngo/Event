@@ -1,5 +1,3 @@
-// ABOUTME: Registers native ASP.NET Identity Data Protection token providers with fixed lifecycle lifetimes.
-// ABOUTME: Provider and per-operation purposes isolate verification/email change from password recovery.
 
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;

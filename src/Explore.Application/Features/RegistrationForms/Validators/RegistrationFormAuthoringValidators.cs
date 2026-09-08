@@ -1,6 +1,3 @@
-// ABOUTME: Validates every explicit registration workflow and form-authoring request at the CQRS boundary.
-// ABOUTME: Rejects missing route identities, concurrency stamps, purpose values, and condition payloads.
-
 using Explore.Application.Authorization;
 using Explore.Application.Features.RegistrationForms.Requests.Commands;
 using Explore.Application.Features.RegistrationForms.Requests.Queries;

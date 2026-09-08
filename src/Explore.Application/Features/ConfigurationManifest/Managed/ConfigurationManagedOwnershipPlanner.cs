@@ -1,6 +1,3 @@
-// ABOUTME: Produces value-free managed-field drift and ownership decisions before any mutation.
-// ABOUTME: Preserves unmanaged fields and requires explicit takeover, relinquishment, and owned deletion intent.
-
 namespace Explore.Application.Features.ConfigurationManifest.Managed;
 
 public enum ConfigurationManagedPlanMode

@@ -1,6 +1,3 @@
-// ABOUTME: Resolves the current user's persisted administrative authority through IAdminContext.
-// ABOUTME: Returns normalized instance, tenant, organization, and group scope identifiers.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.DTOs.User;
 using Explore.Application.Features.Users.Requests.Queries;

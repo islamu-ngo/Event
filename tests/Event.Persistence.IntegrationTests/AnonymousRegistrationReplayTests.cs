@@ -1,5 +1,3 @@
-// ABOUTME: Exercises authenticated anonymous allocation and exact committed recovery through native SQLite commands.
-// ABOUTME: Uses explicit commit and lease barriers to preserve original holds and reject unbound or expired allocation.
 
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Application-owned first-run profile for convention-first self-hosted onboarding.
-// ABOUTME: Captures public site identity without introducing domain workspace or tenant-scope concepts.
-
 namespace Explore.Application.DTOs.Onboarding;
 
 public sealed record SelfHostOnboardingProfileDto

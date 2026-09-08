@@ -1,4 +1,3 @@
-# ABOUTME: Cerbos resource policy for event_day resources.
 # Event days are event-scoped child resources governed by event operational roles.
 
 apiVersion: api.cerbos.dev/v1

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies paid Checkout operator APIs are authorized, no-store, HAL-driven, and exclude startup-owned mutations.
-// ABOUTME: Guards official status, credentials, and operator identity from admin/browser request contracts.
-
 using System.Reflection;
 using Explore.API.Controllers;
 using Explore.API.Filters;

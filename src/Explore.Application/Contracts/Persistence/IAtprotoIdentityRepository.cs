@@ -1,6 +1,3 @@
-// ABOUTME: Defines global exact-DID identity persistence for Actor federation ownership.
-// ABOUTME: Keeps mutable handle and PDS metadata on the credential rather than on Actor.
-
 using Explore.Domain;
 using Explore.Domain.ValueObjects;
 

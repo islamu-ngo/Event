@@ -1,5 +1,3 @@
-// ABOUTME: Public read projection of the shared backend visitor capability.
-// ABOUTME: Separates trusted public signup destinations from existing-account and operator login.
 
 using Explore.Application.Models;
 using Explore.Domain.Enums;

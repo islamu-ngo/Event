@@ -1,6 +1,3 @@
-// ABOUTME: Event filter specification factories used by repository query composition.
-// ABOUTME: Keeps searchable event fields aligned with card descriptions and long content.
-
 using System.Linq.Expressions;
 using Explore.Domain;
 using Explore.Domain.Enums;

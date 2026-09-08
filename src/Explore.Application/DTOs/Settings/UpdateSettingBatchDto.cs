@@ -1,6 +1,3 @@
-// ABOUTME: Request body DTO for batch setting updates via API.
-// ABOUTME: Contains key-value pairs and optional batch update mode selection.
-
 using System.Collections.ObjectModel;
 
 namespace Explore.Application.DTOs.Settings;

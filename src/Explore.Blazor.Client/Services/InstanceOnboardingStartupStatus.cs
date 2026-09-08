@@ -1,6 +1,3 @@
-// ABOUTME: Classifies the value-free instance bootstrap fields into exhaustive client startup states.
-// ABOUTME: Consumes only canonical generated properties and fails closed for inconsistent combinations.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Services;

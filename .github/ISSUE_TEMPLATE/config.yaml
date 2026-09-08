@@ -1,6 +1,3 @@
-# ABOUTME: GitHub issue template configuration for ISLAMU Event.
-# ABOUTME: Disables blank issues and routes questions, feature requests, and improvements to Discussions and Discord.
-
 blank_issues_enabled: false
 
 contact_links:

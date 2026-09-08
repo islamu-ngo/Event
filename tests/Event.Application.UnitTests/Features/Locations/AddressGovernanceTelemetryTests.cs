@@ -1,6 +1,3 @@
-// ABOUTME: Captures reachable address-authorization diagnostics and rejects location or address PII.
-// ABOUTME: Keeps authorization enforcement inputs intact while proving emitted logs contain only bounded codes.
-
 using Explore.Application.Authorization;
 using Explore.Application.Behaviors;
 using Explore.Application.Contracts.Infrastructure;

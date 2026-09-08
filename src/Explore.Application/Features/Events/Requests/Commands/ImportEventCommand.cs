@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for importing an event from an external source or backfill.
-// ABOUTME: Supplies tenant-scoped resource context for authorization before the import handler runs.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Responses;

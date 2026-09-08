@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for append-only support-access audit evidence.
-// ABOUTME: Optimizes audit lookup by session, tenant, actor, and occurrence time.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

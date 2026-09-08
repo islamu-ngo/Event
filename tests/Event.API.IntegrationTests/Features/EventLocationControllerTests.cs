@@ -1,6 +1,3 @@
-// ABOUTME: Failing-first API contracts for the final EventLocation purpose-specific routes.
-// ABOUTME: Pins anonymous/public and authenticated/private cache and authorization boundaries.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;

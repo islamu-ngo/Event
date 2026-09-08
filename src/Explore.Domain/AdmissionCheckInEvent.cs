@@ -1,6 +1,3 @@
-// ABOUTME: Captures one immutable append-only admission check-in or compensating undo fact.
-// ABOUTME: Records exact ticket, target, tenant, authority, reason code, action, and UTC occurrence data.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

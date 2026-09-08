@@ -1,6 +1,3 @@
-// ABOUTME: Event-report sort specification factories for queue and reporter-facing report lists.
-// ABOUTME: Provides stable database-level ordering expressions for repository queries.
-
 using System.Linq.Expressions;
 using Explore.Domain;
 

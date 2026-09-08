@@ -1,6 +1,3 @@
-// ABOUTME: Explicit client-side result type for HTTP calls that may fail with ProblemDetails.
-// ABOUTME: Keeps UI-facing services from exposing raw HttpResponseMessage or transport exceptions.
-
 using System.Net;
 using Explore.Blazor.Client.Exceptions;
 

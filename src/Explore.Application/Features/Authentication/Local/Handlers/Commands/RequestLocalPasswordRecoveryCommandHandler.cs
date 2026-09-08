@@ -1,5 +1,3 @@
-// ABOUTME: Admits anonymous Local recovery against native identifiers and persisted Local authority only.
-// ABOUTME: Hides all account-specific eligibility and delivery outcomes behind the same accepted result.
 
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Features.Authentication.Local.Requests.Commands;

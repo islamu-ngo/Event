@@ -1,6 +1,3 @@
-// ABOUTME: Exercises provider-neutral Git object validation against disposable synthetic repositories.
-// ABOUTME: Covers descriptor-selected tags, immutable ancestry, promisor objects, and graph failures.
-
 using System.Diagnostics;
 using ISLAMU.ReleaseEngineering;
 

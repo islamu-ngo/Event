@@ -1,6 +1,3 @@
-// ABOUTME: Handles explicit Cerbos endpoint verification requests from onboarding UI.
-// ABOUTME: Validates endpoint format, normalizes bare host:port input, and performs a gRPC health check.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Responses;

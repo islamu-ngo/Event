@@ -1,6 +1,3 @@
-// ABOUTME: Defines the closed parsed command model, result model, and value-safe projection helpers.
-// ABOUTME: Centralizes bounds, diagnostic path normalization, readiness, and artifact metadata construction.
-
 using ISLAMU.Event.Setup.Core;
 using ISLAMU.Event.Setup.Core.Environment;
 

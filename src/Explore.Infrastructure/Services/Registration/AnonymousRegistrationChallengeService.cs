@@ -1,5 +1,3 @@
-// ABOUTME: Protects anonymous registration intent using the host's existing native Data Protection authority.
-// ABOUTME: Verifies bounded SHA-256 work before reconstructing stable internal order and capability authority.
 
 using System.Security.Cryptography;
 using System.Text;

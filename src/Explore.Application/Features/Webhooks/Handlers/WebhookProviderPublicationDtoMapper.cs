@@ -1,6 +1,3 @@
-// ABOUTME: Maps authoritative provider publication entities into credential-free operations DTOs.
-// ABOUTME: Resolves every lifecycle and attempt value through normalized lookup metadata.
-
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Lookups;
 using Explore.Domain;

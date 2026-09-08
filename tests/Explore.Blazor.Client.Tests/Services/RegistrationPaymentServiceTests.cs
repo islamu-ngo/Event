@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for RegistrationPaymentService verifying capability boundaries and UUIDv7 idempotency.
-// ABOUTME: Verifies exact HAL relation gating for payment, refund, and campaign actions.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Services;

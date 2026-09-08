@@ -1,6 +1,3 @@
-// ABOUTME: MediatR query request for fetching all event registration policies.
-// ABOUTME: Returns list of EventRegistrationPolicyListDto (Open, ApprovalRequired, InvitationOnly).
-
 using Explore.Application.DTOs.EventRegistrationPolicy;
 using MediatR;
 

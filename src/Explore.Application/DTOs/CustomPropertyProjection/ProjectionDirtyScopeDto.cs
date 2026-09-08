@@ -1,6 +1,3 @@
-// ABOUTME: Read-only DTO for pending dirty-scope backlog rows surfaced to operators.
-// ABOUTME: Enables inspection of which scopes are awaiting drain after rebuild contention.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.DTOs.CustomPropertyProjection;

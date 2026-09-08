@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for PATCH-based EventSession property updates.
-// ABOUTME: Carries route ID, If-Match concurrency stamp, and grouped update payload.
 using System;
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventSession;

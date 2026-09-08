@@ -1,6 +1,3 @@
-// ABOUTME: Implements custom-property definition operations through definition, event, and session tag clients.
-// ABOUTME: Handles HAL unwrap, error catching, and logging for CRUD of layer 3 definitions.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.CustomProperties;
 using Explore.Blazor.Client.Helpers;

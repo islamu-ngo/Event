@@ -1,6 +1,3 @@
-// ABOUTME: Domain tests for AI conversation aggregate lifecycle behavior.
-// ABOUTME: Verifies ordered messages, run lifecycle, references, and action proposal rules.
-
 namespace Event.Domain.UnitTests.Ai;
 
 using Explore.Domain.Ai;

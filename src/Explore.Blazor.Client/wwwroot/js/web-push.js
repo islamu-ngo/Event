@@ -1,6 +1,3 @@
-// ABOUTME: Browser Push API bridge for explicit consent, service-worker subscription, and unsubscribe.
-// ABOUTME: Creates a random per-browser identifier and never handles bearer tokens or VAPID private keys.
-
 const deviceIdentifierKey = 'islamu.web-push.device-id';
 const serviceWorkerPath = '/push-service-worker.js';
 

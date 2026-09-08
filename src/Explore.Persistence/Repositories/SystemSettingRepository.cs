@@ -1,6 +1,3 @@
-// ABOUTME: Persists system settings with canonical per-key mutation coordination.
-// ABOUTME: SMTP writes require policy ownership before caller-owned transactions, including explicit transaction writes.
-
 namespace Explore.Persistence.Repositories;
 
 using Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Tests encrypted repository-backed persistence of complete CarpaNet OAuth sessions.
-// ABOUTME: Verifies binding, rotation, corruption handling, ciphertext privacy, and scoped deletion.
-
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Security.Cryptography;

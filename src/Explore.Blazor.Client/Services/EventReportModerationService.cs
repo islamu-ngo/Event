@@ -1,6 +1,3 @@
-// ABOUTME: Moderator-facing Blazor service that wraps generated moderation report API calls.
-// ABOUTME: Normalizes HAL pagination and prevents privileged evidence from leaking into logs.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.EventReporting;
 using Explore.Blazor.Client.Helpers;

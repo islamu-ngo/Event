@@ -1,6 +1,3 @@
-// ABOUTME: Resolves opaque BFF principal values only for explicitly named browser-host purposes.
-// ABOUTME: Enforces one trusted authenticated identity without claiming platform-user GUID authority.
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;

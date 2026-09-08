@@ -1,6 +1,3 @@
-// ABOUTME: Converts verified registration-provider callbacks into one durable pending effect pointer.
-// ABOUTME: Reuses the incoming-webhook effect outbox instead of adding a provider callback bus.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.Features.RegistrationSubmissions.Commands;

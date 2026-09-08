@@ -1,6 +1,3 @@
-// ABOUTME: Extension methods for safely reading HttpResponseMessage as typed results or ProblemDetails.
-// ABOUTME: Central place that checks status codes and throws ApiProblemException on non-success responses.
-
 using System.Net.Http.Json;
 using System.Text.Json;
 using Explore.Blazor.Client.Exceptions;

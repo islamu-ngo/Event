@@ -1,6 +1,3 @@
-// ABOUTME: Verifies signed Svix operational callbacks using the configured webhook signing secret.
-// ABOUTME: Reuses the Svix-compatible signature service and secret resolver without depending on outgoing mode.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Secrets;

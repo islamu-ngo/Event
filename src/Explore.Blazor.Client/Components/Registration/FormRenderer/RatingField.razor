@@ -1,6 +1,3 @@
-@* ABOUTME: Renders a bounded rating as a native select with an explicit unanswered option. *@
-@* ABOUTME: Avoids an inaccessible visual-only star widget while preserving numeric submission semantics. *@
-
 <FormFieldShell @ref="_shell" ControlId="@ControlId" FieldKey="@FieldKey" FieldTypeCode="RATING"
                 Label="@Label" Required="@Required" Issues="@Issues">
     <select id="@ControlId" name="@FieldKey" required="@Required" value="@Value"

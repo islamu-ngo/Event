@@ -1,6 +1,3 @@
-// ABOUTME: Produces activated SSH trust roots from two reviewed public keys and enforces separation of duty.
-// ABOUTME: Accepts public key material only, never signs, never tags, and never writes a private key.
-
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;

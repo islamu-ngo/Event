@@ -1,6 +1,3 @@
-// ABOUTME: Tests order-backed EventLocation access resolution for concrete session admissions.
-// ABOUTME: Proves confirmed orders grant only their admitted locations and terminal orders fail closed.
-
 using System.Collections.Immutable;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Services;

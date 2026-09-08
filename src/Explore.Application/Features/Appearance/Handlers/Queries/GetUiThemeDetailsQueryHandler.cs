@@ -1,6 +1,3 @@
-// ABOUTME: Handles administrative detail queries for a single UI theme.
-// ABOUTME: Resolves authorization from the stored theme scope so tenant and platform catalogs stay isolated.
-
 namespace Explore.Application.Features.Appearance.Handlers.Queries;
 
 using Explore.Application.Contracts.Identity;

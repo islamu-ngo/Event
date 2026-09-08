@@ -1,6 +1,3 @@
-// ABOUTME: Coordinates one scoped event-detail load for Studio route content and sibling shell navigation.
-// ABOUTME: Reuses the same in-flight request for every consumer of the current event ID.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Services;
 

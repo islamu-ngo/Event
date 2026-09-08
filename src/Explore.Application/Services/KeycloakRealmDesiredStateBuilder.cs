@@ -1,6 +1,3 @@
-// ABOUTME: Composes Keycloak realm desired state from registered identity contract contributors.
-// ABOUTME: Centralizes additive-only realm ownership rules for preview, apply, and drift detection.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 

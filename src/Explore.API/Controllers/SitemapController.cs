@@ -1,6 +1,3 @@
-// ABOUTME: Root-level XML sitemap endpoint for public SEO discovery.
-// ABOUTME: Combines static public routes with tenant-scoped published public events.
-
 using System.Globalization;
 using System.Xml.Linq;
 using Asp.Versioning;

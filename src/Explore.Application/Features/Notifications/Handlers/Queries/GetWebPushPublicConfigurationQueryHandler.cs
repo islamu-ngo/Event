@@ -1,6 +1,3 @@
-// ABOUTME: Handles browser-safe Web Push configuration reads.
-// ABOUTME: Keeps VAPID private-key access behind Infrastructure-owned configuration providers.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Notifications.Requests.Queries;
 using Explore.Application.Models;

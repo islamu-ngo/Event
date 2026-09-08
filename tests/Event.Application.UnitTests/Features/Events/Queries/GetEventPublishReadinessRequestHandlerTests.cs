@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the event publish-readiness query handler.
-// ABOUTME: Verifies policy-aware readiness mapping and missing-event behavior.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Events.Handlers.Queries;
 using Explore.Application.Features.Events.Requests.Queries;

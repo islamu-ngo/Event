@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for lookup tables section location-related loading/error/success states.
-// ABOUTME: Verifies location data appears in consolidated tenant lookup management UI.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Contracts.Services.Lookup;

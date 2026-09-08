@@ -1,6 +1,3 @@
-// ABOUTME: Blazor AI assistant command result model returned by the client service wrapper.
-// ABOUTME: Keeps generated API command response mapping out of the pure service interface file.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.Ai;

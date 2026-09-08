@@ -1,6 +1,3 @@
-// ABOUTME: Repository implementation for TenantFooterLinkGroup with tenant-aware query logic.
-// ABOUTME: Handles fallback to instance-default groups when the tenant has none configured.
-
 namespace Explore.Persistence.Repositories;
 
 using Explore.Application.Contracts.Persistence;

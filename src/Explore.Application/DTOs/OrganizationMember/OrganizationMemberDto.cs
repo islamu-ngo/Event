@@ -1,6 +1,3 @@
-// ABOUTME: DTO for organization member read responses with tenant, organization, user, role, and position details.
-// ABOUTME: Supplies resource metadata used by HAL and authorization descriptors for membership affordances.
-
 using System;
 
 namespace Explore.Application.DTOs.OrganizationMember;

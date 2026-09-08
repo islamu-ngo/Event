@@ -1,6 +1,3 @@
-// ABOUTME: API integration tests for exact configured-administrator provider claims and bounded status.
-// ABOUTME: Proves indirect identity claims cannot take over bootstrap authority or produce partial writes.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
@@ -36,7 +33,9 @@ public sealed class ConfiguredAdministratorBootstrapTests
     private const string Fingerprint = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
     [Test]
-    public async Task SyncUser_ExactNormalizedIssuerAndSubject_CompletesConfiguredClaim()
+    [Arguments("keycloak")]
+    [Arguments("google")]
+    public async Task SyncUser_ExactNormalizedIssuerAndSubject_CompletesConfiguredClaim(string providerHint)
     {
         ProviderAccountKey expected = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
             ExpectedIssuer,
@@ -48,7 +47,7 @@ public sealed class ConfiguredAdministratorBootstrapTests
         using var request = CreateSyncRequest(
             ("sub", ExpectedSubject),
             ("iss", "HTTPS://AUTH.EXAMPLE.TEST/realms/ISLAMU/"),
-            ("idp", "keycloak"),
+            ("idp", providerHint),
             ("email", "configured-admin@example.test"),
             ("given_name", "Configured"),
             ("family_name", "Administrator"));
@@ -222,6 +221,7 @@ public sealed class ConfiguredAdministratorBootstrapTests
             ("sub", attack is "wrong-issuer" or "nonmatching-provider" ? ExpectedSubject : "attacker-subject"),
             ("iss", attack == "wrong-issuer"
                 ? "https://other.example.test/realms/ISLAMU"
+                : attack == "nonmatching-provider" ? "https://accounts.google.com"
                 : attack == "realm-only-issuer" ? "ISLAMU" : ExpectedIssuer),
             ("idp", attack == "nonmatching-provider" ? "google" : "keycloak"),
             ("email", "configured-admin@example.test"),

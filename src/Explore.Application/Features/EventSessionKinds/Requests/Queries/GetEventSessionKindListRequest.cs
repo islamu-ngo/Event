@@ -1,6 +1,3 @@
-// ABOUTME: MediatR query request for fetching all event session kinds.
-// ABOUTME: Returns list of EventSessionKindListDto values for program item classification.
-
 using Explore.Application.DTOs.EventSessionKind;
 using MediatR;
 

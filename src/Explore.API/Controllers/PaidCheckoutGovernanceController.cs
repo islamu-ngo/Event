@@ -1,6 +1,3 @@
-// ABOUTME: Exposes authorized operator APIs and HAL for durable paid-sale controls and independent reviews.
-// ABOUTME: Browser DTOs cannot mutate startup-owned official status, provider credentials, or operator identity.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

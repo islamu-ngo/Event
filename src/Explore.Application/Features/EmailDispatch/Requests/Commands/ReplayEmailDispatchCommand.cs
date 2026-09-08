@@ -1,6 +1,3 @@
-// ABOUTME: Command contract for operator replay of a deferred EmailDispatch outbox row.
-// ABOUTME: Requeues eligible rows by resetting durable PostgreSQL state without touching SMTP or RabbitMQ directly.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

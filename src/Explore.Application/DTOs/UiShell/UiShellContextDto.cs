@@ -1,6 +1,3 @@
-// ABOUTME: Authenticated workspace-shell context projected from server-authoritative capabilities.
-// ABOUTME: Carries workspace availability, managed actors, settings scopes, and navigation defaults.
-
 namespace Explore.Application.DTOs.UiShell;
 
 public sealed record UiShellContextDto

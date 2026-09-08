@@ -1,6 +1,3 @@
-// ABOUTME: MCP read tools for public event discovery and details.
-// ABOUTME: Delegates through MediatR queries so MCP does not bypass API/Application visibility rules.
-
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;

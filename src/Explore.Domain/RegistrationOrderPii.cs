@@ -1,6 +1,3 @@
-// ABOUTME: Defines the purchaser PII extension of a registration order.
-// ABOUTME: Keeps contact details removable without placing PII on the durable commercial aggregate.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for Web Push subscriptions and durable dispatch rows.
-// ABOUTME: Enforces active endpoint/device uniqueness, tenant-safe ownership, and worker poll indexes.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

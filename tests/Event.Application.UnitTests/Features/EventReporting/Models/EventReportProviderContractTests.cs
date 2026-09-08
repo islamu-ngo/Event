@@ -1,6 +1,3 @@
-// ABOUTME: Contract tests for event-report provider envelopes and result helpers.
-// ABOUTME: Guards data-minimized sync payloads before external provider adapters are added.
-
 using System.Text.Json;
 using Explore.Application.Features.EventReporting.Models;
 using Explore.Domain.Enums;

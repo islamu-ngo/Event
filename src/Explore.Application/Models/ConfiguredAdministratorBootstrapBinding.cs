@@ -1,6 +1,3 @@
-// ABOUTME: Carries the immutable server-derived binding for one configured administrator generation.
-// ABOUTME: Contains a keyed fingerprint and canonical account key, never a raw bootstrap selector.
-
 using Explore.Application.Authentication;
 using Explore.Application.DTOs.Onboarding;
 

@@ -1,6 +1,3 @@
-<!-- ABOUTME: Licenses the listed draft ISLAMU logo assets under CC BY 4.0. -->
-<!-- ABOUTME: Keeps future assets and ISLAMU trademark rights outside this license. -->
-
 # Draft ISLAMU Logo License
 
 Copyright © 2026 Amir Akrari.

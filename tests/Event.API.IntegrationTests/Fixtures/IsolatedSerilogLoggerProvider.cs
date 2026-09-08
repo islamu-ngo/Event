@@ -1,6 +1,3 @@
-// ABOUTME: Bridges one host's Microsoft log events into an isolated Serilog logger without global state.
-// ABOUTME: Preserves structured properties so concurrent hosts can capture independent Serilog surfaces.
-
 using Microsoft.Extensions.Logging;
 using Serilog.Core;
 using Serilog.Events;

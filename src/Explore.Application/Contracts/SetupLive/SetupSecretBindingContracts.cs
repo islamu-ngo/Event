@@ -1,6 +1,3 @@
-// ABOUTME: Defines fixed-shape Setup live secret write and commitment contracts.
-// ABOUTME: Validates UUIDv7 lineage, borrowed bytes, and digest-only evidence.
-
 namespace Explore.Application.Contracts.SetupLive;
 
 public sealed class SetupSecretBindingWriteRequest

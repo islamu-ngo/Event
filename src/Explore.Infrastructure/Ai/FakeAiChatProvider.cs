@@ -1,6 +1,3 @@
-// ABOUTME: Deterministic AI provider used for local development and automated tests.
-// ABOUTME: Produces bounded assistant responses and optional proposed-action payloads without network calls.
-
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Domain.Ai;
 using Explore.Domain.Enums;

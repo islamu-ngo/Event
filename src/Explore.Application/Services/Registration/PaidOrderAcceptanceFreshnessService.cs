@@ -1,6 +1,3 @@
-// ABOUTME: Rebuilds authoritative payment disclosures before provider handoff and compares immutable acceptance evidence.
-// ABOUTME: Detects schedule, operator, policy, provider, order, and typed-line changes without rewriting accepted history.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 

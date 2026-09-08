@@ -1,0 +1,34 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records private operational probing, bounded readiness caching and optional-provider isolation.
+Change-Id: CHG-01M1V2M8AEJC1RVVRZQSYP9900
+Title: "Report usable ATProto login storage"
+Type: feat
+Scope: access
+Summary: "Verify login storage with a private bounded synthetic probe while keeping optional ATProto failures isolated from other identity providers."
+Group: database-backed-atproto-auth
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/adr/ADR-014-atproto-session-trust-bridge.md
+    Disposition: not-applicable
+    Detail: Completes operational readiness on the existing database-backed transient transport.
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: The signed replay-protected probe admits only a fixed health purpose, generates tenantless synthetic data and exposes status only; browser routing stays denied and metric dimensions are closed.
+  Migration:
+    Reference: docs/internal/adr/ADR-014-atproto-session-trust-bridge.md
+    Disposition: not-applicable
+    Detail: Uses existing health-probe rows and bounded lifecycle cleanup without adding schema.
+  Configuration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: Readiness uses a fixed two-second budget and ten-second cache; size the existing instance admission limit for aggregate replica probe and login traffic.
+  OpenAPI:
+    Reference: docs/internal/adr/ADR-014-atproto-session-trust-bridge.md
+    Disposition: not-applicable
+    Detail: The private probe stays excluded from public OpenAPI, generated browser clients and HAL discovery.
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Store failure marks ATProto primary unhealthy but only degrades optional ATProto with Local Identity or Keycloak primary; liveness stays independent and cache misses are coalesced per BFF.

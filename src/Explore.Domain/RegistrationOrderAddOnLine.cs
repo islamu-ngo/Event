@@ -1,6 +1,3 @@
-// ABOUTME: Captures one immutable buyer-selected add-on line inside a registration order.
-// ABOUTME: Snapshots price and disclosures with checked totals and no admission authority.
-
 using Explore.Domain.Interfaces;
 using Explore.Domain.ValueObjects;
 

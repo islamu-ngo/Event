@@ -1,6 +1,3 @@
-// ABOUTME: Blazor client service contract for AI assistant API operations.
-// ABOUTME: Keeps Razor components behind a generated-client wrapper and HAL-preserving DTO surface.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Services.Ai;
 

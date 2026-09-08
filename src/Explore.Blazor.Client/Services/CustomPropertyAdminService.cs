@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-scoped custom-property governance service using definition, governance, and projection clients.
-// ABOUTME: Single source of truth for admin pages interacting with Layer 3 definitions and projection runtime.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.CustomProperties;

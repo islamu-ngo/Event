@@ -1,6 +1,3 @@
-// ABOUTME: Maps stable ordered options owned by one tenant-scoped registration field version.
-// ABOUTME: Enforces composite lineage, unique active keys and ordinals, retirement, and concurrency.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

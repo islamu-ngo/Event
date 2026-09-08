@@ -1,6 +1,3 @@
-// ABOUTME: Binds a global AT Protocol record to the tenant, user, and local aggregate that authorized publication.
-// ABOUTME: Prevents nullable tenant state from weakening the canonical record's global identity.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain.Federation;

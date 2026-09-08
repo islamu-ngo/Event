@@ -1,6 +1,3 @@
-// ABOUTME: Proves publication drift is reported against canonical release identity and never repaired.
-// ABOUTME: Exercises the repository-owned file-based drift reporter with synthetic projection documents.
-
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
@@ -88,7 +85,7 @@ public sealed class ReleasePublicationDriftScriptTests
     public async Task ProviderWithoutAReleaseApiDegradesToARecordedNoOpBackedByOperatorEvidence()
     {
         using var evidenced = DriftFixture.Create();
-        evidenced.WriteProjections(evidenced.NoOpProjection("tangled", "unsupported", "docs/releases/evidence/tangled-2026-08-23.json"));
+        evidenced.WriteProjections(evidenced.NoOpProjection("tangled", "unsupported", "docs/internal/releases/evidence/tangled-2026-08-23.json"));
 
         using var unevidenced = DriftFixture.Create();
         unevidenced.WriteProjections(unevidenced.NoOpProjection("forgejo-codeberg", "unavailable", operatorEvidence: null));
@@ -149,7 +146,7 @@ public sealed class ReleasePublicationDriftScriptTests
         private DriftFixture(string root)
         {
             Root = root;
-            ReleaseDirectory = Path.Combine(root, "docs", "releases", "1.1.0");
+            ReleaseDirectory = Path.Combine(root, "docs", "internal", "releases", "1.1.0");
             OutputDirectory = Path.Combine(root, "out");
             ProjectionsPath = Path.Combine(root, "publication-projection.v1.json");
             NotesPath = Path.Combine(ReleaseDirectory, "release-notes.md");

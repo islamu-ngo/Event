@@ -1,6 +1,3 @@
-// ABOUTME: Idempotency guard and progress record for asynchronous notification fanout work.
-// ABOUTME: Tracks fanout status and cursor counts without storing recipient PII in worker metadata.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

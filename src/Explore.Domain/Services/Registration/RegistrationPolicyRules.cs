@@ -1,6 +1,3 @@
-// ABOUTME: Pure domain rules mapping EventRegistrationPolicy (organizer choice) to the set of allowed RegistrationScope values.
-// ABOUTME: Single source of truth consumed by validators and handlers so policy enforcement never drifts.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Domain.Services.Registration;

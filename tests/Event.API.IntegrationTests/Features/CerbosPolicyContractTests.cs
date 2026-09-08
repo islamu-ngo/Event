@@ -1,6 +1,3 @@
-// ABOUTME: Data-driven Cerbos policy contract tests exercising all resource policies via the HTTP API.
-// ABOUTME: Validates the 3-level admin hierarchy (instance > tenant > org) for every resource kind.
-
 using Event.Api.IntegrationTests.Fixtures;
 using TUnit.Core;
 

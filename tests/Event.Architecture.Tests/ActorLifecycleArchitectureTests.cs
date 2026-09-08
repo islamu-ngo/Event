@@ -1,6 +1,3 @@
-// ABOUTME: Architecture guardrails for global Actor ownership and AT Protocol identity boundaries.
-// ABOUTME: Prevents tenant scope, duplicate owner foreign keys, and DID authority from returning to global subjects.
-
 using Explore.Domain;
 using Explore.Domain.Interfaces;
 

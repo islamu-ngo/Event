@@ -1,6 +1,3 @@
-// ABOUTME: Proves the catalogued sensitive collections disclose no rows, counts, or existence out of scope.
-// ABOUTME: Constraints must land before Count/Skip/Take, so an unauthorized caller cannot even read a total.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
@@ -408,8 +405,8 @@ public sealed class SensitiveCollectionDisclosureTests
         InMemoryDatabaseRoot root,
         Guid tenantId)
     {
-        var context = new ExploreDbContext(new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase(database, root).Options)
+        var context = new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase(database, root).Options)
         {
             TenantContext = new TestTenantContext(tenantId)
         };

@@ -1,6 +1,3 @@
-// ABOUTME: Read models for the instance scheduler administration surface.
-// ABOUTME: Exposes scheduling metadata and fire timelines only, never job payloads or tenant content.
-
 namespace Explore.Application.DTOs.Scheduling;
 
 /// <summary>

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies EmailDispatchOutboxRepository tenant-filter bypasses stay bounded to dispatch predicates.
-// ABOUTME: Proves worker queues, tenant operations, and receipt idempotency do not leak ambient tenant rows.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

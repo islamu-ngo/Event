@@ -1,6 +1,3 @@
-// ABOUTME: Persistence-backed batch authority snapshot service for event-scoped authorization checks.
-// ABOUTME: Hydrates only effective assignments for the requested tenant/user/event batch to avoid N+1 lookups.
-
 using Explore.Application.Contracts.Services;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;

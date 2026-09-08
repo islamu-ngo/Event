@@ -1,6 +1,3 @@
-// ABOUTME: Deterministically allocates refund minor units across paid-event money components.
-// ABOUTME: Preserves exact totals with checked Int128 arithmetic and largest remainders.
-
 using Explore.Domain.ValueObjects;
 
 namespace Explore.Domain;

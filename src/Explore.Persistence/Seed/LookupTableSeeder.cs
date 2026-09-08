@@ -1,6 +1,3 @@
-// ABOUTME: Seeds all lookup/enum tables at runtime in ALL environments.
-// ABOUTME: Replaces HasData() in entity configurations to avoid EF Core circular FK migration bug (#36682).
-
 using Explore.Domain;
 using Explore.Domain.Ai;
 using Explore.Domain.Constants;

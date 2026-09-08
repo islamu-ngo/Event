@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL container fixture for projection and event-location repository tests.
-// ABOUTME: Uses the current EF model plus canonical lookup seeding without migration-history coupling.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Persistence;
 using Explore.Persistence.Database;
@@ -80,11 +77,8 @@ public class ProjectionTestContainerFixture : IAsyncInitializer, IAsyncDisposabl
             Password = connection.Password,
             TlsMode = PrimaryDatabaseTlsMode.Disabled,
         };
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>();
-        builder.EnableServiceProviderCaching(false);
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(builder, database);
-        builder.ConfigureWarnings(warnings =>
-            warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning));
         return new ExploreDbContext(builder.Options);
     }
 }

@@ -1,6 +1,3 @@
-// ABOUTME: Removes production background services from benchmark API hosts.
-// ABOUTME: Keeps benchmark runs focused on request handling instead of unrelated startup workers.
-
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 

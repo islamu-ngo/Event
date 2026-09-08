@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for canonical outgoing webhook messages and provider publish state.
-// ABOUTME: Supports tenant status reads, provider queue transitions, and privacy retention cleanup.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;

@@ -1,6 +1,3 @@
-// ABOUTME: Exposes event-authorized refund campaign progress and explicit durable resume actions.
-// ABOUTME: Emits HAL action links from server authority while keeping provider I/O in outbox workers.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

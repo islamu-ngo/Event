@@ -1,6 +1,3 @@
-// ABOUTME: Command to update a footer link's label, URL, and display options.
-// ABOUTME: Validates the link's parent group belongs to the current tenant.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using Explore.Application.Validation;

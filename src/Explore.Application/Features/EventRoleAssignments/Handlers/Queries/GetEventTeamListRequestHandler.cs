@@ -1,6 +1,3 @@
-// ABOUTME: Handler for listing event team members with role and lifecycle details.
-// ABOUTME: Maps entities to DTOs with computed IsEffective flag for UI display.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventRoleAssignment;
 using Explore.Application.Features.EventRoleAssignments.Requests.Queries;

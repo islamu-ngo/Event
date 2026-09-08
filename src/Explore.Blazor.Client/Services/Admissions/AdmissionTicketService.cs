@@ -1,6 +1,3 @@
-// ABOUTME: Wraps generated ticket APIs and the anonymous recovery BFF bridge for Blazor pages.
-// ABOUTME: Executes QR/print writes only from matching HAL POST links and logs no bearer material.
-
 using System.Net;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Admissions;

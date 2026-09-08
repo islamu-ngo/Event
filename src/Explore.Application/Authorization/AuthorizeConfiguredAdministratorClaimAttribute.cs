@@ -1,6 +1,3 @@
-// ABOUTME: Classifies the configured-administrator claim as a purpose-bound bootstrap mutation.
-// ABOUTME: Documents authority enforced by the verified deployment binding at the completion seam.
-
 namespace Explore.Application.Authorization;
 
 /// <summary>

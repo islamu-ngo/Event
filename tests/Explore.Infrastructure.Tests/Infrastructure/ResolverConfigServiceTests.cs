@@ -1,6 +1,3 @@
-// ABOUTME: Tests selective persistence for instance resolver configuration.
-// ABOUTME: Proves one supplied leaf is normalized, written alone, and invalidates cache after success.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Instance;
 using Explore.Application.DTOs.Onboarding;

@@ -1,6 +1,3 @@
-// ABOUTME: Builds Infrastructure-owned CarpaNet OAuth sessions over the shared hardened transport.
-// ABOUTME: Resolves the instance private key ring safely and requires the persisted session kid explicitly.
-
 using CarpaNet.OAuth;
 using CarpaNet.OAuth.Storage;
 using Explore.Application.Contracts.Secrets;

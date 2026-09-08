@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for location entity reads and PII erasure.
-// ABOUTME: Keeps location query mapping in handlers and supports caller cancellation.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

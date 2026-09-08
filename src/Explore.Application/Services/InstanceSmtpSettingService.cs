@@ -1,6 +1,3 @@
-// ABOUTME: Service implementation for non-secret instance SMTP governance.
-// ABOUTME: Credentials never enter SystemSetting records or application write contracts.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

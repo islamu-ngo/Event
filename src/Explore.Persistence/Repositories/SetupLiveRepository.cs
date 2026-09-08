@@ -1,6 +1,3 @@
-// ABOUTME: Persists tenant-qualified Setup live enrollment, replay claim, and operation entities.
-// ABOUTME: Keeps writes unit-of-work compatible and every replay read explicitly tenant scoped.
-
 namespace Explore.Persistence.Repositories;
 
 using Explore.Application.Contracts.Persistence;

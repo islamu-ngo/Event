@@ -1,6 +1,3 @@
-// ABOUTME: Svix-compatible webhook signature implementation for outgoing and incoming webhook payloads.
-// ABOUTME: Uses raw-body HMAC verification, timestamp tolerance, and fixed-time comparisons.
-
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;

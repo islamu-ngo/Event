@@ -1,6 +1,3 @@
-// ABOUTME: Defines the host-facing contract for configuration-manifest discovery, validation, and exact-byte identity.
-// ABOUTME: Keeps Infrastructure file I/O behind an Application-owned boundary with closed safe failures.
-
 namespace Explore.Application.Features.ConfigurationManifest.Ingestion;
 
 using ISLAMU.Wire.Contracts.ConfigurationPortability;

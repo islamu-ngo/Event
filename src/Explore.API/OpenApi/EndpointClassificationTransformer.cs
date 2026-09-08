@@ -1,6 +1,3 @@
-// ABOUTME: OpenAPI operation transformer that emits endpoint posture vendor extensions.
-// ABOUTME: Projects classification, rate-limit, cache, and tenant-mode metadata from endpoint attributes.
-
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;

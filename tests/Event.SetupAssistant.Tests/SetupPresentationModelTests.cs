@@ -1,6 +1,3 @@
-// ABOUTME: Specifies deterministic B1 lifecycle races, generated MVVM behavior, typed fencing, and direct Core projection.
-// ABOUTME: Exercises independent public owners with bounded signals, dynamic canaries, and no target-composition responsibility.
-
 namespace Event.SetupAssistant.Tests;
 
 using System.ComponentModel;

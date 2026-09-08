@@ -1,5 +1,3 @@
-// ABOUTME: Exercises real global Local lifecycle authority and durable SMTP delivery across both native store topologies.
-// ABOUTME: Covers crash recovery, exact binding, disabled admission, fixed budgets and transient token-only transport.
 
 using System.Text.Json;
 using Event.Persistence.IntegrationTests.Fixtures;

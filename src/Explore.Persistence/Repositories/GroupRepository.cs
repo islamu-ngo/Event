@@ -1,6 +1,3 @@
-// ABOUTME: Persists tenant-scoped groups and provides hierarchy validation queries.
-// ABOUTME: Serializes hierarchy mutations with a retry-safe PostgreSQL advisory transaction lock.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.Database;

@@ -1,6 +1,3 @@
-// ABOUTME: Resolves non-secret S3 policy from governance and credentials from the selected secret authority.
-// ABOUTME: Contains no database/configuration credential fallback and fails the storage capability closed.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Models;

@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning events created or managed by the current user.
-// ABOUTME: Filters by actor ID and maps to EventListDto.
 using System;
 using System.Collections.Generic;
 using System.Threading;

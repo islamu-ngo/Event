@@ -1,6 +1,3 @@
-// ABOUTME: Normalized lookup entities and stable enums for webhook administrative audit events.
-// ABOUTME: Keeps action, outcome, principal, scope, and target classifications relationally governed.
-
 namespace Explore.Domain;
 
 public sealed class WebhookAuditActionLookup

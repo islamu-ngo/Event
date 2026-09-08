@@ -1,6 +1,3 @@
-// ABOUTME: WebAssembly host bootstrap for the Blazor client application.
-// ABOUTME: Registers client-side DI, BFF HTTP clients, MudBlazor, routing, localization, and auth state.
-
 using System.Globalization;
 using Blazouter.Extensions;
 using Explore.Blazor.Client.Clients;

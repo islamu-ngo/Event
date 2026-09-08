@@ -1,6 +1,3 @@
-// ABOUTME: Handler implementations for provider-neutral registration reconciliation health and queue operations.
-// ABOUTME: Reuses existing provider bindings, incoming effect outbox, and submission issues instead of new tables.
-
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;

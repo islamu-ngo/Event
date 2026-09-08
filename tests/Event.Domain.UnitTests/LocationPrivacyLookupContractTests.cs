@@ -1,6 +1,3 @@
-// ABOUTME: Locks the stable integer vocabulary for event-location privacy lookups.
-// ABOUTME: Proves location kind remains classification data and carries no disclosure authority.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using TUnit.Core;

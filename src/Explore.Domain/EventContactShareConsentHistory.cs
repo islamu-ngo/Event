@@ -1,6 +1,3 @@
-// ABOUTME: Append-only audit row for every contact-share consent grant, withdrawal, and regrant.
-// ABOUTME: Stores immutable status/snapshot/provenance evidence without update or delete transitions.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

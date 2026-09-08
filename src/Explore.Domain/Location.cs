@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-scoped physical place with optional PII and an irreversible privacy lifecycle.
-// ABOUTME: Owns consent-backed Private Home identity, erasure tombstones, rooms, audit, and concurrency.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
@@ -449,10 +446,10 @@ public class Location : ITenantEntity, IAuditableEntity, IConcurrencyAware
 
     private void SetFullName(string value)
     {
-        string displaySortKey = LocationDisplaySortKeyV1.Create(value);
+        string displaySortKey = LocationTextNormalization.Normalize(value);
         _fullName = value;
         DisplaySortKey = displaySortKey;
-        DisplaySortKeyVersion = LocationDisplaySortKeyV1.Version;
+        DisplaySortKeyVersion = LocationTextNormalization.CurrentRevision;
     }
 
     internal bool HasCurrentDerivedKeys()
@@ -462,9 +459,9 @@ public class Location : ITenantEntity, IAuditableEntity, IConcurrencyAware
             return false;
         }
 
-        string currentDisplaySortKey = LocationDisplaySortKeyV1.Create(FullName);
-        string currentAddressSubstringKey = LocationAddressSubstringKeyV1.Create(Pii.Address);
-        return DisplaySortKeyVersion == LocationDisplaySortKeyV1.Version
+        string currentDisplaySortKey = LocationTextNormalization.Normalize(FullName);
+        string currentAddressSubstringKey = LocationTextNormalization.Normalize(Pii.Address);
+        return DisplaySortKeyVersion == LocationTextNormalization.CurrentRevision
             && string.Equals(DisplaySortKey, currentDisplaySortKey, StringComparison.Ordinal)
             && Pii.HasCurrentAddressSubstringKey(currentAddressSubstringKey);
     }
@@ -476,16 +473,16 @@ public class Location : ITenantEntity, IAuditableEntity, IConcurrencyAware
             throw new InvalidOperationException("Current derived keys require active address PII.");
         }
 
-        string currentDisplaySortKey = LocationDisplaySortKeyV1.Create(FullName);
-        string currentAddressSubstringKey = LocationAddressSubstringKeyV1.Create(Pii.Address);
-        bool displayChanged = DisplaySortKeyVersion != LocationDisplaySortKeyV1.Version
+        string currentDisplaySortKey = LocationTextNormalization.Normalize(FullName);
+        string currentAddressSubstringKey = LocationTextNormalization.Normalize(Pii.Address);
+        bool displayChanged = DisplaySortKeyVersion != LocationTextNormalization.CurrentRevision
             || !string.Equals(DisplaySortKey, currentDisplaySortKey, StringComparison.Ordinal);
         bool addressChanged = !Pii.HasCurrentAddressSubstringKey(currentAddressSubstringKey);
 
         if (displayChanged)
         {
             DisplaySortKey = currentDisplaySortKey;
-            DisplaySortKeyVersion = LocationDisplaySortKeyV1.Version;
+            DisplaySortKeyVersion = LocationTextNormalization.CurrentRevision;
         }
         if (addressChanged)
         {

@@ -1,6 +1,3 @@
-// ABOUTME: Contract for dispatching outbox messages to their final consumer (email, webhook, integration).
-// ABOUTME: Called by OutboxProcessor after claiming a message; implementations route by EventType.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Infrastructure;

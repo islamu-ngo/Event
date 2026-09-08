@@ -1,6 +1,3 @@
-// ABOUTME: White-label manifest endpoint that projects public branding into install metadata.
-// ABOUTME: Keeps browser manifest values DB-backed when branding settings are available.
-
 namespace Explore.Blazor.Extensions;
 
 using Explore.Blazor.Client.Clients;

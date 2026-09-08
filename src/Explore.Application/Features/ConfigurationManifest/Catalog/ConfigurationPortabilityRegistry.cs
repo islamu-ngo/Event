@@ -1,6 +1,3 @@
-// ABOUTME: Defines the closed machine-readable registry for configuration portability.
-// ABOUTME: Classifies every supported and excluded section without granting authority by discovery.
-
 namespace Explore.Application.Features.ConfigurationManifest.Catalog;
 
 using System.Collections.Frozen;

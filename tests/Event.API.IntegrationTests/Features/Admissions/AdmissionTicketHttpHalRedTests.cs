@@ -1,6 +1,3 @@
-// ABOUTME: Live TestServer RED contracts for account ticket visibility, delivery, HAL, and headers.
-// ABOUTME: Exercises active-to-revoked state changes through actual HTTP responses.
-
 using System.Net;
 using Microsoft.AspNetCore.Http;
 

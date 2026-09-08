@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query request for fetching a single agenda item by ID.
-// ABOUTME: Returns EventSessionAgendaItemDto.
 using System;
 using Explore.Application.DTOs.EventSessionAgendaItem;
 using MediatR;

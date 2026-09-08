@@ -1,6 +1,3 @@
-// ABOUTME: Result of checking whether the current user has authority to create an API key for a given owner type.
-// ABOUTME: Helper value type used by CreateExternalApiKeyCommandHandler for validation flow.
-
 namespace Explore.Application.Features.ExternalApiKeys;
 
 /// <summary>

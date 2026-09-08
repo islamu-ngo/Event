@@ -1,6 +1,3 @@
-// ABOUTME: Handles Osprey callbacks by recording idempotent provider signals on local reports.
-// ABOUTME: Promotes urgent recommendations for human review without executing moderation actions.
-
 using System.Text;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

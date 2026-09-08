@@ -1,6 +1,3 @@
-// ABOUTME: Formats server-computed integer-minor registration-order amounts for display.
-// ABOUTME: Uses decimal arithmetic only for presentation and never derives or submits checkout totals.
-
 namespace Explore.Blazor.Client.Helpers;
 
 public static class RegistrationOrderMoneyFormatter

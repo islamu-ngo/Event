@@ -1,6 +1,3 @@
-// ABOUTME: Stable closed vocabularies for EventLocation privacy audit and erasure-authority facts.
-// ABOUTME: Prevents free-form text or encoded physical-location values from entering durable evidence.
-
 namespace Explore.Domain.Enums;
 
 public enum EventLocationDisclosureAuditReasonEnum

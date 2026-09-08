@@ -1,6 +1,3 @@
-// ABOUTME: Command to reorder footer link groups for the current tenant.
-// ABOUTME: Accepts an ordered list of group IDs and updates their Order properties.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

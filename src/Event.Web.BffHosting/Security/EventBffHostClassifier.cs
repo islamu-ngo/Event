@@ -1,6 +1,3 @@
-// ABOUTME: Implements configured browser-BFF admin-host classification after forwarded-header processing.
-// ABOUTME: Keeps dedicated admin hosts exact-match and independent from tenant resolution internals.
-
 using Event.Web.BffHosting.Abstractions;
 using Event.Web.BffHosting.Options;
 using Microsoft.Extensions.Options;

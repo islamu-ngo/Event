@@ -1,6 +1,3 @@
-// ABOUTME: DTO for creating a new room under a location.
-// ABOUTME: LocationId scopes the room to a parent location; Name is required.
-
 namespace Explore.Application.DTOs.LocationRoom;
 
 public sealed record CreateLocationRoomDto

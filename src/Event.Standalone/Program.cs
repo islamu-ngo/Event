@@ -1,6 +1,3 @@
-// ABOUTME: Composes the API and Blazor owning host modules into one optional web process.
-// ABOUTME: Owns one Combined profile, shutdown state, and ordered startup sequence.
-
 using Explore.API.Hosting;
 using Explore.Blazor.Extensions;
 using Explore.Blazor.Hosting;
@@ -35,7 +32,7 @@ builder.AddBlazorHostServices(hostProfile, shutdownState);
 builder.Services.AddCombinedApiBridge();
 builder.AddStandaloneSchedulerDashboard();
 
-var app = builder.Build();
+await using var app = builder.Build();
 var primaryDatabase = PrimaryDatabaseConfiguration.BindRuntime(app.Configuration);
 if (primaryDatabase.Provider == PrimaryDatabaseProvider.Sqlite &&
     app.Configuration.GetValue("Hosting:ReplicaCount", 1) != 1)

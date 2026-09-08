@@ -1,6 +1,3 @@
-// ABOUTME: Shared EF predicate for tenant-contextual Actor discovery and subscriptions.
-// ABOUTME: Requires active global state plus public participation or federated Event evidence.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

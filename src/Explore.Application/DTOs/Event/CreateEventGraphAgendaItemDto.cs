@@ -1,6 +1,3 @@
-// ABOUTME: Sub-DTO for creating agenda items within the event creation graph.
-// ABOUTME: Defines time-bound agenda entries with location and room references.
-
 using System;
 
 namespace Explore.Application.DTOs.Event;

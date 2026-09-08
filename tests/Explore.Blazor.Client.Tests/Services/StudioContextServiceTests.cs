@@ -1,6 +1,3 @@
-// ABOUTME: Characterizes production Studio attendee filtering at the generated-client adapter seam.
-// ABOUTME: Proves orders without view-participants never become attendee rows or participant requests.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Services;
 

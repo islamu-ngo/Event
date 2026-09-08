@@ -1,0 +1,13 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Repository documentation, mock tokens, and planning notes"
+paths = [
+    '''(?i)^\.agents/skills/.*/resources/''',
+    '''(?i)^dev/(active|completed|next|_journal)/''',
+    '''(?i)^docs/''',
+    '''(?i)^islamic-value-sensitive-design/''',
+    '''\.env\.example''',
+    '''(?i)tests/.*/TestData/'''
+]

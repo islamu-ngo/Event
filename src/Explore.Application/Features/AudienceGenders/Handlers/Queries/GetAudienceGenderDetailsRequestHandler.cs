@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning a single audience gender option by ID.
-// ABOUTME: Maps AudienceGender entity to AudienceGenderDto.
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.AudienceGender;

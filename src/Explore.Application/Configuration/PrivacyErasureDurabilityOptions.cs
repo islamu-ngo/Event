@@ -1,5 +1,3 @@
-// ABOUTME: Defines the startup-only topology for the platform privacy-erasure authority.
-
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 

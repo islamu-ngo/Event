@@ -1,6 +1,3 @@
-// ABOUTME: Response DTO for upload session reservation state.
-// ABOUTME: Exposes only application identifiers and policy metadata, not provider filesystem paths.
-
 namespace Explore.Application.DTOs.StorageObject;
 
 public sealed record StorageUploadSessionDto

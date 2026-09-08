@@ -1,6 +1,3 @@
-/* ABOUTME: Generic dock panel surface for descriptor-driven dock content.
-   ABOUTME: Uses logical borders and tokenized widths while content owns panel chrome. */
-
 .dock-panel-host {
     position: relative;
     display: flex;

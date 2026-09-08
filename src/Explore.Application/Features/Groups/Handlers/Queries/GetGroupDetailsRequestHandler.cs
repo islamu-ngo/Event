@@ -1,6 +1,3 @@
-// ABOUTME: Handles retrieval of a single Group with full details, cached with HybridCache.
-// ABOUTME: Resolves profile picture storage object keys to presigned URLs.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

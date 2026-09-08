@@ -1,6 +1,3 @@
-// ABOUTME: Compatibility facade for the shared Event.Web.BffHosting proxy header sanitizer.
-// ABOUTME: Keeps existing Explore.Blazor call sites while centralizing privileged header stripping.
-
 using SharedBffProxyHeaderSanitizer = Event.Web.BffHosting.Security.BffProxyHeaderSanitizer;
 
 namespace Explore.Blazor.Services;

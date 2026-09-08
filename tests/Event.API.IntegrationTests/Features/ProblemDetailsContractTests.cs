@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests verifying ProblemDetails contract consistency.
-// ABOUTME: Ensures GlobalExceptionHandler and ValidationExceptionHandler return RFC 7807 compliant responses.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;

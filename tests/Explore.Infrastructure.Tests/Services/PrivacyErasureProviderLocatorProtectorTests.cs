@@ -1,6 +1,3 @@
-// ABOUTME: Verifies purpose-bound protection for short-lived privacy-erasure provider locators.
-// ABOUTME: Proves plaintext round-trip and rejects blank locator material.
-
 using Explore.Infrastructure.Services;
 using Microsoft.AspNetCore.DataProtection;
 using TUnit.Core;

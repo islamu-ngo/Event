@@ -1,6 +1,3 @@
-// ABOUTME: Domain tests for canonical webhook consumer ownership across every supported scope.
-// ABOUTME: Proves owner-kind/reference consistency and rejects ambiguous or cross-scope combinations.
-
 using Explore.Domain;
 using TUnit.Core;
 

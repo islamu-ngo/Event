@@ -1,6 +1,3 @@
-// ABOUTME: Authenticated integration tests for persisted external API key management endpoints.
-// ABOUTME: Verifies policy updates stay owner-scoped and only mutate safe editable metadata.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;

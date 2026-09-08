@@ -1,6 +1,3 @@
-// ABOUTME: Validates explicit operator reconciliation of an Unknown SMTP outcome.
-// ABOUTME: Requires exact scope, a delivered/not-delivered decision, and bounded evidence fields.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using FluentValidation;

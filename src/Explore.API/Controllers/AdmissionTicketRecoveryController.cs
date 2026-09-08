@@ -1,6 +1,3 @@
-// ABOUTME: Exposes uniform admission recovery request and one-time capability consume endpoints.
-// ABOUTME: Applies dedicated abuse limits, private caching, and one canonical invalid-capability fingerprint.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

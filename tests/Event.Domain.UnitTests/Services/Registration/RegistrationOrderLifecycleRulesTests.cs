@@ -1,6 +1,3 @@
-// ABOUTME: Specifies lifecycle transitions needed after approval and before payment settlement.
-// ABOUTME: Keeps cancellation available until the future payment workflow takes ownership.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;
 

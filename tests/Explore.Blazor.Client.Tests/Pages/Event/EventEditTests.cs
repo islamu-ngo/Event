@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for EventEdit program-management and image preview behavior.
-// ABOUTME: Verifies draft edit affordances preserve existing metadata and storage-backed images.
-
 using System.Reflection;
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;

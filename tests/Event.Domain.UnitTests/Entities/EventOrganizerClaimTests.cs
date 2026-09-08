@@ -1,6 +1,3 @@
-// ABOUTME: Verifies organizer claims follow explicit terminal state transitions.
-// ABOUTME: Ensures approval assigns only future organizer authority and preserves event provenance.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

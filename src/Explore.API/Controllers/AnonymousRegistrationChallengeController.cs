@@ -1,5 +1,3 @@
-// ABOUTME: Issues anonymous proof work bound to the exact intended guest-start business request and key.
-// ABOUTME: Delegates tenant/event eligibility and durable issuance budgets without allocating orders or inventory.
 
 using Asp.Versioning;
 using Explore.API.Attributes;

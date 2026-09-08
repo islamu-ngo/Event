@@ -1,6 +1,3 @@
-// ABOUTME: Unit coverage for dedicated program item form mapping and normalization.
-// ABOUTME: Protects create/edit session composer transformations during Phase 4 UI decomposition.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Helpers;
 using Explore.Blazor.Client.Pages.Events.Sessions;

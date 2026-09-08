@@ -1,6 +1,3 @@
-// ABOUTME: Command handler for importing external events with provenance metadata.
-// ABOUTME: Uses EventImportCreate readiness profile, stores Draft status, emits no outbox messages.
-
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

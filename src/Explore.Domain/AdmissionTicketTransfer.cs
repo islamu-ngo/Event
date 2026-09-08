@@ -1,6 +1,3 @@
-// ABOUTME: Defines catalog-versioned ticket-transfer policy and append-only holder-transfer attempts.
-// ABOUTME: Rotates digest-only bearer authority without changing commerce or append-only check-in truth.
-
 using System.Security.Cryptography;
 using Explore.Domain.Interfaces;
 

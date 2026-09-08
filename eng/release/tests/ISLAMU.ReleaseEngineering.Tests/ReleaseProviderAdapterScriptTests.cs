@@ -1,6 +1,3 @@
-// ABOUTME: Proves provider release-adapter manifests fail closed and plan only transport actions.
-// ABOUTME: Exercises the repository-owned file-based adapter validator with synthetic release bytes.
-
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;

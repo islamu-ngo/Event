@@ -1,6 +1,3 @@
-// ABOUTME: Sub-DTO for creating an individual event session within the event creation graph.
-// ABOUTME: Carries session timing, room/location references via temp keys, and speaker associations.
-
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;

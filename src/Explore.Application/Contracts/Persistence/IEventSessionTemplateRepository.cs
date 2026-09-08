@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for EventSessionTemplate CRUD with nested definitions and options.
-// ABOUTME: Supports versioned session-template management owned by EventTemplate, publishing, and transactional definition persistence.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

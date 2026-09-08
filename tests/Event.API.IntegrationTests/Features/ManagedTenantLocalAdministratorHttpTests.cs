@@ -1,5 +1,3 @@
-// ABOUTME: Verifies direct managed Local administrator linkage through real authenticated API requests and SQLite.
-// ABOUTME: Uses native Local JWTs, credential enrollment, MediatR handlers, and public credential/persistence read contracts.
 
 using System.Net;
 using System.Net.Http.Headers;

@@ -1,6 +1,3 @@
-// ABOUTME: Control-plane command for applying an assigned tenant plan version to tenant settings.
-// ABOUTME: Keeps plan application explicit, audited by caller identity, and separate from assignment switching.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

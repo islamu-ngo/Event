@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for provider operational webhooks that authenticate by signature.
-// ABOUTME: Keeps incoming callbacks independent from outgoing Local/Svix provider selection.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

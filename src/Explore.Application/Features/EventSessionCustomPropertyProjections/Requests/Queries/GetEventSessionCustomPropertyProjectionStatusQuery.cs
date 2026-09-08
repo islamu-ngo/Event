@@ -1,6 +1,3 @@
-// ABOUTME: Query to retrieve current projection status for event session custom-property projections.
-// ABOUTME: Mirrors event projection status query for session scope.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.CustomPropertyProjection;

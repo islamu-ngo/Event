@@ -1,6 +1,3 @@
-// ABOUTME: Secured command for replacing a draft tenant plan version's template content.
-// ABOUTME: Keeps plan updates versioned while validating pricing, settings, and quotas first.
-
 using Explore.Application.Authorization;
 using Explore.Application.Features.ControlPlane.Plans;
 using Explore.Application.Responses;

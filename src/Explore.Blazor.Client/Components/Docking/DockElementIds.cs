@@ -1,6 +1,3 @@
-// ABOUTME: Builds stable DOM ids shared by dock panel chrome and tab controls.
-// ABOUTME: Keeps aria-controls relationships deterministic across host components.
-
 using Explore.Blazor.Client.Services.Docking;
 
 namespace Explore.Blazor.Client.Components.Docking;

@@ -1,6 +1,3 @@
-// ABOUTME: Stable relational lookup rows for webhook consumer lifecycle states.
-// ABOUTME: Mirrors WebhookConsumerStatus identifiers used by consumer aggregates and public contracts.
-
 namespace Explore.Domain;
 
 public sealed class WebhookConsumerStatusLookup

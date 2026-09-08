@@ -1,6 +1,3 @@
-// ABOUTME: Typed storage route policy documents used by storage administration and upload routing.
-// ABOUTME: Keeps route-matrix JSON parsed into safe provider, route, and upload-ceiling models.
-
 using Explore.Application.Contracts.Infrastructure;
 
 namespace Explore.Application.Models.Storage;

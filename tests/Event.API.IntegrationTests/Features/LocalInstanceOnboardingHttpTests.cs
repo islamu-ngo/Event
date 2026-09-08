@@ -1,5 +1,3 @@
-// ABOUTME: Exercises Local first-run enrollment through native setup authentication and SQLite persistence.
-// ABOUTME: Proves no-email first-use replacement, setup finality, provider isolation, and private responses.
 
 using System.Data.Common;
 using System.IdentityModel.Tokens.Jwt;

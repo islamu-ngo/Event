@@ -1,6 +1,3 @@
-// ABOUTME: Distinguishes first-time private home classification from an ownership handover.
-// ABOUTME: Both paths require the incoming owner's own consent; only the wording and endpoint differ.
-
 namespace Explore.Blazor.Client.Contracts.Services.Events;
 
 public enum HomeOwnerConsentMode

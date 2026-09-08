@@ -1,6 +1,3 @@
-// ABOUTME: Benchmark-only authentication handler for exercising authenticated API paths deterministically.
-// ABOUTME: Reads base64-encoded claims from X-Benchmark-Auth and leaves requests anonymous when absent.
-
 using System.Security.Claims;
 using System.Text;
 using System.Text.Encodings.Web;

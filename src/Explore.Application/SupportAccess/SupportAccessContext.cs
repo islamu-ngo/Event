@@ -1,6 +1,3 @@
-// ABOUTME: Immutable request support-access context used after trusted session validation.
-// ABOUTME: Separates support metadata from the real authenticated actor identity.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Domain.Enums;
 

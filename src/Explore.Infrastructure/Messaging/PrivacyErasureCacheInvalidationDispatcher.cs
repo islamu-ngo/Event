@@ -1,6 +1,3 @@
-// ABOUTME: Converges User and shared event caches after a committed privacy erasure.
-// ABOUTME: Validates the payload-free outbox envelope before retryable HybridCache invalidation.
-
 using Explore.Application.Caching;
 using Explore.Application.Services;
 using Explore.Domain;

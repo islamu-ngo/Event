@@ -1,6 +1,3 @@
-// ABOUTME: Reads and writes tenant resolver configuration directly from system settings with in-memory caching.
-// ABOUTME: Keeps resolver bootstrapping independent from tenant-aware settings resolution and invalidates cache on updates.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

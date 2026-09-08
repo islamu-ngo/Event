@@ -6,6 +6,21 @@ description: Deploy and operate an external Cerbos Policy Decision Point (PDP) b
 
 This runbook guides operators through deploying and operating an external **Cerbos Policy Decision Point (PDP)** as a standalone application on **Coolify** behind Traefik, providing fine-grained authorization for ISLAMU Event.
 
+> [!TIP]
+> **⚙️ ISLAMU's Production Deployment on Coolify Cloud:**
+> In our own production environment, we connect our Hetzner CPX32 server to a **Coolify Cloud** subscription and deploy the following services directly through Coolify:
+> - **`islamu-event-api`**: Core ASP.NET Core REST API & Background Workers Docker image
+> - **`islamu-event-ui`**: Blazor WebAssembly BFF Docker image
+> - **`postgres` (ISLAMU Event)**: Primary application relational database
+> - **`postgres` (Cerbos)**: Dedicated policy and schema storage database for Cerbos PDP
+> - **`cerbos`**: Policy Decision Point Docker image for fine-grained authorization (configured below)
+> - **Phase Two Keycloak (`phasetwo/phasetwo-keycloak`)**: Identity Provider Docker image supporting multi-tenancy and OIDC
+> - **CockroachDB**: Dedicated database backend powering Phase Two Keycloak
+> - **Infisical**: Secrets management engine providing dynamic runtime configuration
+> - **Hetzner Object Storage**: S3-compatible media storage located in Falkenstein, Germany (`eu-central`)
+>
+> For server sizing benchmarks, see the **[Deployment Tiers & Sizing Guide](deployment-tiers.md)**.
+
 ---
 
 ## 1. Architecture Overview
@@ -287,6 +302,7 @@ Verify that the `cerbos` health check reports `Healthy` (see [Health Check Endpo
 
 ## Related Guides & Next Steps
 
+* **[Deployment Tiers & Sizing](deployment-tiers.md)** — Review hardware requirements, sizing matrices, and ISLAMU's real-world reference setup.
 * **[Authorization Architecture & Policies](../security-and-identity/authorization.md)** — Understand how MediatR requests evaluate policies and generate HAL affordances.
 * **[Docker Compose Runbook](docker-compose.md)** — Deploy the core application stack behind Traefik or Caddy.
 * **[Troubleshooting Recipe: Cerbos 403 Forbidden](../configuration-and-operations/troubleshooting-and-health.md#recipe-5-all-authenticated-actions-return-403-forbidden-cerbos-fail-closed)** — Diagnose missing policies or network timeouts.

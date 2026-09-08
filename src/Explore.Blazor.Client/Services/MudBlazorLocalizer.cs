@@ -1,6 +1,3 @@
-// ABOUTME: Bridges MudBlazor's MudLocalizer to our ITranslationService using "mudblazor.{key}" prefix.
-// ABOUTME: Enables MudBlazor component strings (data grid, pagination, dialogs) to follow user language.
-
 using Explore.Blazor.Client.Contracts.Services;
 using Microsoft.Extensions.Localization;
 using MudBlazor;

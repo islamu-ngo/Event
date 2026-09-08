@@ -1,6 +1,3 @@
-// ABOUTME: Runs the CarpaNet AT Protocol OAuth challenge and callback inside the Blazor BFF.
-// ABOUTME: Enforces bounded handles, protected flow bindings, HTTPS redirects, and verified bridge results.
-
 using System.Text.Encodings.Web;
 using CarpaNet.OAuth.Storage;
 using Explore.Blazor.Services.Auth;
@@ -22,7 +19,8 @@ public sealed class AtprotoAuthenticationHandler(
     IOAuthStateStore stateStore,
     IOAuthSessionStore sessionStore,
     AtprotoOAuthFlowContext flowContext,
-    AtprotoTenantOriginResolver originResolver)
+    AtprotoTenantOriginResolver originResolver,
+    AtprotoBrowserProof browserProof)
     : AuthenticationHandler<AtprotoAuthenticationOptions>(options, logger, encoder)
 {
     public const string HandleProperty = "atproto_handle";
@@ -76,6 +74,7 @@ public sealed class AtprotoAuthenticationHandler(
         }
 
         var tenantOrigin = originResolver.Resolve(Request);
+        var browserBinding = browserProof.CreateBinding(Context);
         using var lease = clientFactory.CreateForNewFlow(stateStore, sessionStore);
         var resolved = await lease.ResolveIdentityAsync(handle, cancellationToken).ConfigureAwait(false);
         var seed = new AtprotoOAuthFlowSeed(
@@ -88,17 +87,20 @@ public sealed class AtprotoAuthenticationHandler(
             lease.PinnedKeyId,
             classification,
             canonicalActorId,
-            expectedCanonicalActorConcurrencyStamp);
+            expectedCanonicalActorConcurrencyStamp)
+        {
+            BrowserBinding = browserBinding
+        };
         var authorizationUrl = await lease.Session.AuthorizeAsync(
             resolved.Did,
-            CacheBackedOAuthStateStore.EncodeAppState(seed),
+            ApiBackedOAuthStateStore.EncodeAppState(seed),
             cancellationToken).ConfigureAwait(false);
         return ValidateAuthorizationUrl(authorizationUrl);
     }
 
     public async Task<AtprotoCallbackCompletion> CompleteCallbackAsync(CancellationToken cancellationToken)
     {
-        if (stateStore is not CacheBackedOAuthStateStore cacheStateStore)
+        if (stateStore is not ApiBackedOAuthStateStore protectedStateStore)
         {
             throw new InvalidOperationException("ATProto callback requires the protected state store.");
         }
@@ -123,7 +125,7 @@ public sealed class AtprotoAuthenticationHandler(
             throw new InvalidOperationException("ATProto callback parameters are invalid.");
         }
 
-        var pinnedKeyId = await cacheStateStore
+        var pinnedKeyId = await protectedStateStore
             .GetPinnedKeyIdAsync(state[0]!, cancellationToken)
             .ConfigureAwait(false)
             ?? throw new InvalidOperationException("ATProto OAuth state is unavailable.");

@@ -1,6 +1,3 @@
-// ABOUTME: Covers the terminal policy-version boundary before the aggregate increments its version.
-// ABOUTME: Prevents a syntactically valid command from overflowing the contiguous audit sequence.
-
 using Explore.Application.DTOs.Location;
 using Explore.Application.Features.EventLocations.Requests.Commands;
 using Explore.Application.Features.EventLocations.Validators;

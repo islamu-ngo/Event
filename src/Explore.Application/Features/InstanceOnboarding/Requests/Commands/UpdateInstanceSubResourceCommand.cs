@@ -1,6 +1,3 @@
-// ABOUTME: Per-domain instance settings partial-update commands for sub-resource endpoints.
-// ABOUTME: Each command carries a dedicated presence-aware write contract rather than a read DTO.
-
 using Explore.Application.DTOs.Instance;
 using Explore.Application.Responses;
 using MediatR;

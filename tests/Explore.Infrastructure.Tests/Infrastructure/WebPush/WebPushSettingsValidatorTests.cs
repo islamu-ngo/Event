@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for WebPushSettingsValidator startup validation.
-// ABOUTME: Verifies VAPID, retry, lease, health, and public payload settings fail safely.
-
 using Explore.Infrastructure.WebPush;
 using WebPush;
 

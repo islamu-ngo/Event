@@ -1,6 +1,3 @@
-// ABOUTME: Specifies strict ordered UTC instant ranges with half-open interval behavior.
-// ABOUTME: Protects offset normalization, instant equality, deterministic formatting, and a narrow API.
-
 using System.Reflection;
 using Explore.Domain.ValueObjects;
 

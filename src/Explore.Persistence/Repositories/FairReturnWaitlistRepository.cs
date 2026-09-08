@@ -1,6 +1,3 @@
-// ABOUTME: Serializes fair-return allocation, withdrawal, substitution, expiry, and finalization.
-// ABOUTME: Uses one canonical PostgreSQL fence while preserving immutable buyer commercial snapshots.
-
 using System.Linq.Expressions;
 using Explore.Application.Contracts.Waitlist;
 using Explore.Domain;

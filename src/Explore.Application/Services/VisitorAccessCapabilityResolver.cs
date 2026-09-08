@@ -1,5 +1,3 @@
-// ABOUTME: Resolves immutable visitor capabilities using uncached native settings and provider facts.
-// ABOUTME: Shares one pure proposed-state evaluator with coordinated setting/provider mutations.
 
 using System.Collections.Immutable;
 using System.Text.Json;

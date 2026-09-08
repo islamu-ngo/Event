@@ -1,6 +1,3 @@
-// ABOUTME: Configuration settings for the generic outbox background processor.
-// ABOUTME: Controls polling interval, retry logic, and batch processing; mirrors PdsSyncSettings structure.
-
 namespace Explore.Infrastructure;
 
 /// <summary>

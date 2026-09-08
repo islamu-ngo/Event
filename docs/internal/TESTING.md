@@ -43,6 +43,28 @@ Key TUnit features used:
 | `Assert.That(x).IsEqualTo(y)` | Fluent async assertions |
 | `Assert.Multiple()` | Group multiple assertions |
 
+## The 3-Ring Progressive Verification Model
+
+To eliminate the 50% test diagnosis and 15% container troubleshooting bottleneck during agentic and contributor workflows, the repository strictly enforces a **3-Ring Progressive Verification** hierarchy:
+
+| Ring | Scope & Cadence | Budget | Permitted Suites & Infrastructure | Purpose |
+|---|---|---|---|---|
+| **Ring 1: Inner Loop** | Subtask level (during active coding) | **< 2s** | In-memory TUnit slicing (`--treenode-filter`) in `Event.Domain.UnitTests` or `Event.Application.UnitTests`. **0 containers, 0 network, 0 DB lag**. | Instant Red/Green validation of business logic, state machines, and invariants. |
+| **Ring 2: Phase Exit Gate** | Phase boundary (before phase commit) | **< 15s** | Release build (`dotnet build -c Release -v q`) + at most **one** selected project test against **one canonical provider** (e.g. SQLite in-memory or single PostgreSQL container). | Ensure project-level integrity without matrix delays. |
+| **Ring 3: Plan Exit Gate** | Workstream boundary (before PR) | Minutes | Full 5-database matrix (PostgreSQL, SQLite, SQL Server, MySQL), EF Core migrations, and `Event.Architecture.Tests`. | Catch multi-dialect edge cases and architecture drift once before PR submission. |
+
+### Fast-Loop In-Memory Slicing vs Containerized Persistence Testing
+
+- **In-Memory Domain Invariants (Ring 1)**: Pure algorithmic, normalization, validation, and state-machine tests (e.g., Unicode FormC normalization, string trimming, case-folding, regex matching, entity status transitions) MUST run in `Event.Domain.UnitTests` in **< 50ms**. Never write database integration tests to verify pure in-memory business logic.
+- **Containerized Integration Tests (Ring 2/3)**: `Event.Persistence.IntegrationTests` and `Event.API.IntegrationTests` are reserved strictly for EF Core mapping annotations, SQL dialect translation, transactions, RLS filters, and HTTP middleware pipelines.
+
+### The Yak-Shaving Quarantine Rule
+
+When working on a feature or bug fix:
+1. Agents and contributors are **strictly forbidden** from fixing pre-existing test suite rot or unrelated fixture failures encountered during execution.
+2. If an existing test fails outside the task's path, verify whether it reproduces on a clean worktree of `develop`.
+3. If pre-existing, document it in `*-context.md` under `Validation Baseline / Pre-Existing Technical Debt` (and optionally `dev/backlog/<slug>.md`), quarantine it, and proceed with the assigned scope.
+
 ## Test Projects
 
 Each project has a specific role. Run individually — never use solution-level `dotnet test`. The primary projects are listed below.
@@ -68,6 +90,17 @@ Each project has a specific role. Run individually — never use solution-level 
 | `Event.Benchmarks` | Benchmarks | Advisory BenchmarkDotNet performance scenarios; build-only in PRs and executed by `performance-smoke.yml` | Optional PostgreSQL only for the dedicated provider benchmark |
 
 ### Run Commands
+
+Host-lifetime regressions in `ApiHostLifetimeTests` and
+`GracefulShutdownLifetimeTests` distinguish stopped/never-started host disposal
+from process-global callback retention using non-inlined helpers and weak
+references. `HostProcessSignalSubscriptions` is DI-created through
+`AddServiceDefaults`; disposal removes each exact Console/ProcessExit delegate.
+Minimal hosts calling the public startup extensions must include those service
+defaults. All executable roots lexically dispose their application if startup
+fails before `Run`. Callback behavior is unchanged, and detaching an event does
+not wait for a callback already dispatched. These focused checks do not replace
+full-project acceptance or prove the cause of an entire process-memory failure.
 
 ```bash
 # Unit tests (no infrastructure needed)
@@ -277,6 +310,56 @@ Every lane must:
 Architecture tests also prove each non-PostgreSQL application/Data Protection
 migration project owns generated migrations and the expected provider package.
 Generated files are never patched to make a matrix lane pass.
+
+### Unicode Location Search Provider Corpus
+
+After the production migration service has completed twice on a disposable target,
+run the structured-provider entrypoint with that target's authorized `Database:Runtime`
+environment. Repeat for PostgreSQL, SQLite, SQL Server, MariaDB, and MySQL:
+
+```bash
+dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj \
+  --configuration Release \
+  --treenode-filter '/*/*/PrimaryDatabaseProviderBehaviorContractTests/MigratedProviderExecutesUnicodeAddressSuggestionContract'
+```
+
+The corpus checks complete 500-unit text and normalization expansion, canonical/script
+semantics, literal wildcard characters, SQL membership and limit, provider-local ordering,
+unsupported revisions, tenant/membership/governance canaries, a two-context stale write
+after committed erasure, and four rejected handler PATCH scenarios using real repositories,
+settings, and protected provider selections. Only the external Cerbos authorization boundary
+is substituted. Invalid-input diagnostics reveal neither original nor derived address text.
+
+Unsupported-revision probes temporarily remove only the two derived-key checks on the
+disposable database (SQLite uses its connection-scoped check setting), write an unsupported
+revision, assert no suggestion, repair through authorized promotion, and restore the checks.
+This is test-only deliberate corruption, never a production fallback or reset procedure.
+Seed identities are run-scoped so the structured corpus can repeat without resetting data.
+
+Initial verification on 2026-09-06 used PostgreSQL 18, SQLite, SQL Server 2022 CU26,
+MariaDB 11.4.7, and MySQL 8.4.6. All five completed the corpus with zero skips; elapsed
+whole-corpus times were approximately 23–25 seconds, including seeding and concurrency
+checks. These are local functional observations, not query latency benchmarks or claims
+about the distinct CI engine versions above. Query-plan observations must report the
+candidate-row scale and distinguish bounded output from substring scan work.
+
+The exact first suggestion command and its typed parameters are replayed by the
+existing test interceptor for one warm measurement and a native query plan. Plan
+output keeps only operator names, provider, elapsed time, and matching-row count;
+SQL text, parameter values, and raw XML/JSON plans are never printed. On the initial
+small synthetic corpus (20 location rows before privacy/write canaries, four matches):
+
+| Engine | Warm query, milliseconds | Observed operators |
+| --- | ---: | --- |
+| SQLite | 0.346 | SEARCH, USE temporary ordering |
+| PostgreSQL | 2.826 | Limit, Sort, Hash Join, Seq Scan |
+| SQL Server | 4.939 | Top, Sort, Nested Loops, Index Scan, Clustered Index Seek |
+| MySQL | 0.926 | ref, eq_ref |
+| MariaDB | 0.878 | ref, eq_ref |
+
+These single local observations establish translated execution shape, not production
+capacity. SQL Server collects its actual plan through `STATISTICS XML`; the other
+engines use EXPLAIN. The substring predicate is not a promised B-tree seek.
 
 ### Privacy-erasure authority and restore lane
 
@@ -584,9 +667,24 @@ tests restore the originating fixture's secret, not a repository constant.
 The external-API mock JWT authority shares one generated key between signing and
 validation. PostgreSQL fixtures pass runtime container connection material through
 `TestDatabaseConfiguration`; in-memory hosts do not need DB or S3 credential defaults.
-Setup-secret tests retain a shared generated value only for their class/replica
-scenario. Tests that mutate process environment serialize globally and capture
-and restore prior values in native per-test lifecycle hooks, including failures.
+Fixtures that need a shared generated setup value retain it only for their
+class/replica scenario. Any test that mutates process environment must serialize
+globally and restore prior values in lifecycle hooks, including failures.
+
+Onboarding HTTP tests use `OnboardingWebApplicationFactory` with a unique SQLite
+file under the test process's temporary directory. It reuses production provider
+composition, including transaction-completion interceptors that release named
+locks, and deletes its own file after disposing its unpooled connection. An
+in-memory replacement cannot prove this transaction lifecycle. Fixtures seed
+UUIDv7 user identities and issuer-bound external-login keys; a session ID or
+unlinked internal-user claim is not account authority.
+
+Inject disposable `SETUP_SECRET` for the onboarding HTTP factory through the
+environment key documented in `.env.example`; that factory does not mutate
+process-wide secret values. Container-owned Keycloak rotation tests use their
+fixture's generated client secret consistently and verify successful restoration.
+CI-generated secret values must be masked. Keep real operator credentials out
+of test runs and logs; no repository or operator secret access is required.
 
 ```
 Event.API.IntegrationTests/

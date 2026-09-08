@@ -1,6 +1,3 @@
-// ABOUTME: Single-source resolver with tenant/instance overrides and registry-owned defaults.
-// ABOUTME: Dispatches to exactly one source selected by deployment authority, with no fallback.
-
 namespace Explore.Secrets.Services;
 
 using System.Collections.Frozen;

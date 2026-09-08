@@ -1,6 +1,3 @@
-// ABOUTME: API controller for management of event-session speaker assignments.
-// ABOUTME: Exposes session-scoped HAL routes backed by Application CQRS commands.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

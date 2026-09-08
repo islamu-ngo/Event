@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for public event-level agenda item detail queries.
-// ABOUTME: Verifies public eligibility repository routing and missing-item behavior.
-
 using AutoMapper;
 using Event.Application.UnitTests.Common;
 using Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Tests AnalyticsSettingGroup's Populate method and snake_case enum parsing.
-// ABOUTME: Covers deserialization of consent governance keys and PostHog privacy controls.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Settings.Groups;
 using Explore.Domain.Enums.Analytics;

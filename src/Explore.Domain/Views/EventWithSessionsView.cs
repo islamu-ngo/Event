@@ -1,6 +1,3 @@
-// ABOUTME: Keyless aggregate read view for event-with-sessions discovery and publication-facing composition.
-// ABOUTME: Combines Layer 1 core fields, Layer 2 aspect summaries, and Layer 3 projection facets into one read-only shape.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain.Views;

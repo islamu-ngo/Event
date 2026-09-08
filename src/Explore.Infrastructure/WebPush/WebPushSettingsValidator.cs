@@ -1,6 +1,3 @@
-// ABOUTME: Startup validator for browser Web Push VAPID and dispatch worker settings.
-// ABOUTME: Fails fast on missing keys, unsafe paths, invalid retry windows, and health thresholds.
-
 using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure.WebPush;

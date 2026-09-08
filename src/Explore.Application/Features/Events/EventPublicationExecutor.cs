@@ -1,6 +1,3 @@
-// ABOUTME: Executes ordinary and privileged event publication through one transactional lifecycle path.
-// ABOUTME: Privileged approval bypasses only the approval-required gate after authorization has succeeded.
-
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;

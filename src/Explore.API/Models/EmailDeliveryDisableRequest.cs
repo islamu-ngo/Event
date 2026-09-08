@@ -1,5 +1,3 @@
-// ABOUTME: Binds only preview evidence and deliberate acknowledgement for an email-disable confirmation.
-// ABOUTME: Scope and actor authority are never accepted from the HTTP body.
 
 using System.Text.Json.Serialization;
 

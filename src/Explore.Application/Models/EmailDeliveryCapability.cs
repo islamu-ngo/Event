@@ -1,5 +1,3 @@
-// ABOUTME: Safe computed email capability without SMTP coordinates or credential material.
-// ABOUTME: Reports transport ownership and explicit intent separately from authentication authority.
 
 using Explore.Domain.Enums;
 

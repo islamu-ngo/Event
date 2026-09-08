@@ -1,6 +1,3 @@
-// ABOUTME: Records one safe validation issue against a registration submission and optional form field.
-// ABOUTME: Retains tenant, event, attempt, submission, and pinned-form lineage without storing rejected values.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

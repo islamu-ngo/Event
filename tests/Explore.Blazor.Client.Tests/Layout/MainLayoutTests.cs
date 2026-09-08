@@ -1,6 +1,3 @@
-// ABOUTME: Tests for MainLayout covering chrome visibility, user sync, accessibility landmarks, and settings-driven UI.
-// ABOUTME: Validates WCAG 2.4.1 skip link, ARIA live regions, sidebar brand name, and community guidelines conditional.
-
 using Explore.Blazor.Client.Components.Shell;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Contracts.Services.Ai;

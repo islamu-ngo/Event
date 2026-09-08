@@ -1,6 +1,3 @@
-// ABOUTME: Live conformance matrix for pinned self-hosted Svix publication semantics.
-// ABOUTME: Proves the exact idempotency, ambiguity, credential, lookup, and readiness facts used by runtime policy.
-
 using Explore.Domain;
 using Explore.Infrastructure.Configuration;
 using Explore.Infrastructure.HealthChecks;

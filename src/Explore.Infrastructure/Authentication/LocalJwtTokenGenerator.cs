@@ -1,6 +1,3 @@
-// ABOUTME: Issues Local access tokens and isolated first-use challenges with a secrets-backed HMAC-SHA256 key.
-// ABOUTME: Fails closed when signing material is absent, malformed, or below the 256-bit security floor.
-
 using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;

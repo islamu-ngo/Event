@@ -1,6 +1,3 @@
-// ABOUTME: Runtime settings for bounded, cross-replica notification fanout processing.
-// ABOUTME: Defines claim, paging, lease, backpressure, and readiness limits without recipient data.
-
 namespace Explore.Infrastructure.NotificationFanout;
 
 public sealed class NotificationFanoutProcessorSettings

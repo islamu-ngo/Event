@@ -1,6 +1,3 @@
-// ABOUTME: bUnit tests for tenant render-policy and domain autosave controls.
-// ABOUTME: Verifies exact-key writes, lock gating, pending suppression, and authoritative recovery.
-
 using Explore.Blazor.Client.Pages.Admin.Tenant.Components;
 using MudBlazor;
 

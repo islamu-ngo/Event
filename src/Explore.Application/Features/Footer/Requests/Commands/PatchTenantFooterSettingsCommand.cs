@@ -1,6 +1,3 @@
-// ABOUTME: Command to apply a presence-aware grouped patch to tenant footer scalar settings.
-// ABOUTME: Uses trusted tenant authorization metadata and silently skips instance-locked leaves.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Footer;
 using Explore.Application.Responses;

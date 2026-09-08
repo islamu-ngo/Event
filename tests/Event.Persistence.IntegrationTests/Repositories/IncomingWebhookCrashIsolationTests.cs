@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL crash-recovery QA for concurrent incoming webhook workers and tenants.
-// ABOUTME: Proves cancellation rollback, expired-lease recovery, persisted tenant authority, and exactly-once effects.
-
 using System.Security.Cryptography;
 using System.Text;
 using Event.Persistence.IntegrationTests.Fixtures;

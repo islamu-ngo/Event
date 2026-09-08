@@ -1,6 +1,3 @@
-// ABOUTME: Main layout code-behind handling theme initialization, user sync, and accessibility.
-// ABOUTME: Uses the new IAppearanceThemeService with AppearanceState for reactive theme management.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.Shell;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;

@@ -1,4 +1,3 @@
-# ABOUTME: Cerbos resource policy for indexed_did resources.
 # Indexed DIDs are system/admin resources: instance admins write, users read.
 
 apiVersion: api.cerbos.dev/v1

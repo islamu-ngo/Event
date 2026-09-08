@@ -1,6 +1,3 @@
-// ABOUTME: Verifies refund-reconciliation readiness reports only bounded operational aggregates.
-// ABOUTME: Covers healthy and stale/operator-action states without exposing commerce identifiers.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Infrastructure.HealthChecks;
 using Microsoft.Extensions.DependencyInjection;

@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for the moderation report action dialog.
-// ABOUTME: Validates bounded command inputs before returning typed action metadata.
-
 using Explore.Blazor.Client.Clients;
 using Microsoft.AspNetCore.Components;
 using MudBlazor;

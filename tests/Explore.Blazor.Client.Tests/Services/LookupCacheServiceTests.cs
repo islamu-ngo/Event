@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for LookupCacheService cache behavior and synchronization.
-// ABOUTME: Verifies cache hit/miss, invalidation, concurrent access, and safe teardown.
-
 namespace Explore.Blazor.Client.Tests.Services;
 
 public class LookupCacheServiceTests

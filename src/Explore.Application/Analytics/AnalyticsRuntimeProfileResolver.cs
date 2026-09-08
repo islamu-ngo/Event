@@ -1,6 +1,3 @@
-// ABOUTME: Core consent policy engine — computes effective analytics runtime behavior.
-// ABOUTME: Checks global kill switch, provider capabilities, storage profile, and PostHog options.
-
 namespace Explore.Application.Analytics;
 
 using Explore.Application.Contracts.Services;

@@ -1,6 +1,3 @@
-// ABOUTME: Persistence repository for querying the EventWithSessions keyless view and its supporting facet metadata.
-// ABOUTME: Keeps aggregate filtering, pagination, and definition enrichment close to the DbContext while returning entities only.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Views;

@@ -1,6 +1,3 @@
-// ABOUTME: Request body for the instance-wide scheduler pause action.
-// ABOUTME: Carries the typed confirmation that guards stopping all background work at once.
-
 namespace Explore.Application.DTOs.Scheduling;
 
 /// <summary>

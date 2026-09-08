@@ -1,6 +1,3 @@
-// ABOUTME: Persistence boundary for tenant-scoped webhook bulk replay previews and operations.
-// ABOUTME: Supports serialized scheduling, bounded queued capacity, and atomic Local-target reopening.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

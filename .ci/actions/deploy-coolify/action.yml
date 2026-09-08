@@ -1,6 +1,3 @@
-# ABOUTME: Local composite action for Coolify webhook deployment and smoke-check evidence.
-# ABOUTME: Centralizes deploy shell behavior for staging and production workflows.
-
 name: Deploy to Coolify
 description: Trigger a Coolify deployment, run optional smoke checks, and retain deployment evidence.
 

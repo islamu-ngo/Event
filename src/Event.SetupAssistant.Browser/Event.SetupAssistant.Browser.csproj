@@ -1,5 +1,3 @@
-<!-- ABOUTME: Defines the disabled package-free browser target contract shell. -->
-<!-- ABOUTME: Successor B owns browser runtime selection, implementation, and activation. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>

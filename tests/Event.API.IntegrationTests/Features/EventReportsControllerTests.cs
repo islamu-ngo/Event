@@ -1,6 +1,3 @@
-// ABOUTME: API contract tests for reporter-facing event-report endpoints.
-// ABOUTME: Verifies route metadata, ProblemDetails mapping, and API-boundary fingerprint hashing.
-
 using System.Net;
 using System.Reflection;
 using System.Security.Cryptography;

@@ -1,5 +1,3 @@
-// ABOUTME: Coordinates setup-authorized Local creation with durable linkage, grants, and onboarding finality.
-// ABOUTME: Reconciles only the bootstrap-owned credential receipt without replaying passwords or issuing session authority.
 
 using System.Security.Claims;
 using Explore.Application.Authentication;

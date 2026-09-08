@@ -1,6 +1,3 @@
-// ABOUTME: Tests the read-only MCP registry discovery tool output.
-// ABOUTME: Ensures exposed tool contracts stay registry-backed and avoid prompt/provider secrets.
-
 using System.Text.Json;
 using Explore.API.Mcp;
 using Explore.Application.Authorization;

@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral payment-dispute lifecycle used by refund reservation rules.
-// ABOUTME: Treats any unresolved inquiry or formal dispute as open financial exposure.
-
 namespace Explore.Domain.Enums;
 
 public enum PaymentDisputeStatus

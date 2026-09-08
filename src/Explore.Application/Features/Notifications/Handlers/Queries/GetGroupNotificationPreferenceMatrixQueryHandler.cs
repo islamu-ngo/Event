@@ -1,6 +1,3 @@
-// ABOUTME: Handles group-scoped notification preference matrix projection.
-// ABOUTME: Includes the group's organization context so inherited organization rules resolve correctly.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

@@ -1,6 +1,3 @@
-// ABOUTME: Proves the durable CI release bundle consumes the final canonical manifest as identity.
-// ABOUTME: Characterizes retained evidence categories and checksum coverage for .ci bundle scripts.
-
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -63,8 +60,8 @@ public sealed class ReleaseEvidenceBundleScriptTests
             "test-results",
             "trusted-tooling",
             "workflow-security"]);
-        await Assert.That(checksumText).Contains("docs/releases/1.1.0/release.yaml");
-        await Assert.That(checksumText).Contains("docs/releases/1.1.0/release-evidence.v1.json");
+        await Assert.That(checksumText).Contains("docs/internal/releases/1.1.0/release.yaml");
+        await Assert.That(checksumText).Contains("docs/internal/releases/1.1.0/release-evidence.v1.json");
         await Assert.That(checksumText).Contains("trusted-bundle/trusted-bundle.manifest.json");
         await Assert.That(checksumText).Contains("trust/allowed-signers");
         await Assert.That(checksumText).Contains("signer/tag-verification.json");
@@ -248,7 +245,7 @@ public sealed class ReleaseEvidenceBundleScriptTests
     public async Task BundleScriptRejectsPathAliasesUnicodeAndOversizedArtifactsWithoutPartialOutput()
     {
         using var caseAlias = BundleFixture.Create();
-        string alias = Path.Combine(caseAlias.ArtifactRoot, "Docs", "releases", "1.1.0");
+        string alias = Path.Combine(caseAlias.ArtifactRoot, "Docs", "internal", "releases", "1.1.0");
         Directory.CreateDirectory(alias);
         File.Copy(caseAlias.FinalManifestPath, Path.Combine(alias, "release-evidence.v1.json"));
         ScriptResult caseResult = caseAlias.GenerateBundle();
@@ -356,7 +353,7 @@ public sealed class ReleaseEvidenceBundleScriptTests
             Root = Path.Combine(Path.GetTempPath(), $"islamu-bundle-{Guid.NewGuid():N}");
             ArtifactRoot = Path.Combine(Root, "artifacts");
             OutputRoot = Path.Combine(Root, "bundle");
-            ReleaseDirectory = Path.Combine(ArtifactRoot, "docs", "releases", "1.1.0");
+            ReleaseDirectory = Path.Combine(ArtifactRoot, "docs", "internal", "releases", "1.1.0");
             FinalManifestPath = Path.Combine(ReleaseDirectory, "release-evidence.v1.json");
             NotesPath = Path.Combine(ReleaseDirectory, "release-notes.md");
             BundleJsonPath = Path.Combine(OutputRoot, "release-evidence.json");
@@ -376,7 +373,7 @@ public sealed class ReleaseEvidenceBundleScriptTests
         public string BundleJsonPath { get; }
         public string ChecksumPath { get; }
         public string B { get; }
-        public string CandidateDigest => ArtifactDigest("docs/releases/1.1.0/release-candidate.v1.json");
+        public string CandidateDigest => ArtifactDigest("docs/internal/releases/1.1.0/release-candidate.v1.json");
         public string TagObjectId { get; }
         public string DescriptorDigest => Sha256(File.ReadAllBytes(Path.Combine(ReleaseDirectory, "release.yaml")));
         public string SummaryDigest => Sha256(File.ReadAllBytes(Path.Combine(ReleaseDirectory, "summary.md")));
@@ -462,11 +459,11 @@ public sealed class ReleaseEvidenceBundleScriptTests
 
         private void WriteAllArtifacts()
         {
-            Write("docs/releases/1.1.0/release.yaml", "version: 1.1.0\nline: v1.1\n");
-            Write("docs/releases/1.1.0/summary.md", "# Summary\n\nRelease summary.\n");
-            Write("docs/releases/1.1.0/release-context.v1.json", "{\"schemaVersion\":1,\"changes\":[]}\n");
-            Write("docs/releases/1.1.0/release-notes.md", "# v1.1.0\n\nRelease notes.\n");
-            Write("docs/releases/1.1.0/release-candidate.v1.json", "{\"schemaVersion\":\"release-candidate.v1\"}\n");
+            Write("docs/internal/releases/1.1.0/release.yaml", "version: 1.1.0\nline: v1.1\n");
+            Write("docs/internal/releases/1.1.0/summary.md", "# Summary\n\nRelease summary.\n");
+            Write("docs/internal/releases/1.1.0/release-context.v1.json", "{\"schemaVersion\":1,\"changes\":[]}\n");
+            Write("docs/internal/releases/1.1.0/release-notes.md", "# v1.1.0\n\nRelease notes.\n");
+            Write("docs/internal/releases/1.1.0/release-candidate.v1.json", "{\"schemaVersion\":\"release-candidate.v1\"}\n");
             Write("container/oci-digest.txt", "sha256:container\n");
             Write("container/checksums.sha256", "sha256  image\n");
             Write("deployment/production-deploy-summary.md", "deployment ok\n");

@@ -1,6 +1,3 @@
-// ABOUTME: API and HAL contract tests for allowlisted ATProto instance-governance administration.
-// ABOUTME: Proves its controls use centralized CQRS authorization, validation, and locking without widening scope.
-
 using Explore.API.Controllers;
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;

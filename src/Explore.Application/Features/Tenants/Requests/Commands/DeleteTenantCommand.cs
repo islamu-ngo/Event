@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for deleting a tenant by ID.
-// ABOUTME: Carries the target tenant ID.
 using System;
 using Explore.Application.Authorization;
 using MediatR;

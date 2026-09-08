@@ -1,6 +1,3 @@
-// ABOUTME: Handles authenticated-user notification preference global mute updates.
-// ABOUTME: Writes the user profile row transactionally without changing saved channel choices.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Notifications.Requests.Commands;

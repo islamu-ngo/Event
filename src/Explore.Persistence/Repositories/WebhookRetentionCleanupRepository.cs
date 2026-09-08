@@ -1,6 +1,3 @@
-// ABOUTME: Performs bounded tenant-scoped webhook payload redaction and terminal evidence pruning.
-// ABOUTME: Excludes active work, replay windows, ambiguous publications, and durable retention holds.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;

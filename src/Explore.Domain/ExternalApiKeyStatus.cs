@@ -1,6 +1,3 @@
-// ABOUTME: Lookup-table entity for external API key lifecycle statuses used by authentication and management flows.
-// ABOUTME: Stores metadata for each status including whether it represents a usable state for API key authentication.
-
 namespace Explore.Domain;
 
 public class ExternalApiKeyStatus

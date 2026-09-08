@@ -1,6 +1,3 @@
-// ABOUTME: Model for editing a single custom property value in the Blazor UI.
-// ABOUTME: Unified shape covering both Event and EventSession values.
-
 using System.ComponentModel.DataAnnotations;
 using Explore.Blazor.Client.Clients;
 

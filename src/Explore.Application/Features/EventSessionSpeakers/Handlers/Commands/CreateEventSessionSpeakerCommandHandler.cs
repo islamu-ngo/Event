@@ -1,5 +1,3 @@
-// ABOUTME: Handler for adding a speaker to an event session with validation.
-// ABOUTME: Validates input, creates the session-speaker junction entity.
 using System;
 using System.Collections.Generic;
 using System.Linq;

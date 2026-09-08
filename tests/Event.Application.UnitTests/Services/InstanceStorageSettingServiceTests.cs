@@ -1,6 +1,3 @@
-// ABOUTME: Tests presence-aware persistence for specialized instance storage settings.
-// ABOUTME: Proves policy and S3 groups do not rewrite omitted sibling groups or redacted credentials.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

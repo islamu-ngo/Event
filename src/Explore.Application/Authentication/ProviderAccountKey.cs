@@ -1,6 +1,3 @@
-// ABOUTME: Represents one canonical, authority-qualified external provider account identifier.
-// ABOUTME: Preserves exact identity equality without email, username, role, or handle fallback.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Authentication;

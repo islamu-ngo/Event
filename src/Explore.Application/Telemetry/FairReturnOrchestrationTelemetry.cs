@@ -1,6 +1,3 @@
-// ABOUTME: Emits fixed-cardinality fair-return drain counters including explicit zero sentinels.
-// ABOUTME: Excludes tenant, participant, provider object, payment instrument, and other PII dimensions.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.Waitlist;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Emits exact-resource readiness links only from server-computed authority and Domain state.
-// ABOUTME: Keeps subject and organizer actions absent unless the Application query explicitly allows them.
-
 using System.Security.Claims;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.DTOs.Admissions;

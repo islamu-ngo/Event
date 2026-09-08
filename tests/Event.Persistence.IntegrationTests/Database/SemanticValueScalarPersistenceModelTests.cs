@@ -1,6 +1,3 @@
-// ABOUTME: Locks semantic Money, GeoCoordinate, and range owners to their existing scalar EF leaves.
-// ABOUTME: Requires four portable value checks without changing provider storage, indexes, tenancy, or privacy metadata.
-
 using Explore.Domain;
 using Explore.Domain.ValueObjects;
 using Explore.Persistence;
@@ -242,11 +239,8 @@ public sealed class SemanticValueScalarPersistenceModelTests
 
     private static ExploreDbContext CreateContext(PrimaryDatabaseProvider provider)
     {
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>();
-        builder.EnableServiceProviderCaching(false);
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(builder, CreateOptions(provider));
-        builder.ConfigureWarnings(warnings =>
-            warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning));
         return new ExploreDbContext(builder.Options);
     }
 

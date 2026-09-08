@@ -1,6 +1,3 @@
-// ABOUTME: DTO for a footer link group column containing ordered links.
-// ABOUTME: Maps from TenantFooterLinkGroup entity; includes child links for rendering.
-
 namespace Explore.Application.DTOs.Footer;
 
 public sealed record FooterLinkGroupDto

@@ -1,6 +1,3 @@
-// ABOUTME: RED API and HAL contract tests for current-tenant reporting-intake policy administration.
-// ABOUTME: Pins route security, server-owned identity, immutable failures, lock affordances, and OpenAPI enum shape.
-
 using System.Reflection;
 using System.Security.Claims;
 using Explore.API.Attributes;

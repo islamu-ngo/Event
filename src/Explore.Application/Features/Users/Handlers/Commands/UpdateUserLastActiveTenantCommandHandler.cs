@@ -1,6 +1,3 @@
-// ABOUTME: Handler to update the user's LastActiveTenantId setting.
-// ABOUTME: Evicts cached user profile to ensure immediate consistency.
-
 using System.Threading;
 using System.Threading.Tasks;
 using Explore.Application.Contracts.Persistence;

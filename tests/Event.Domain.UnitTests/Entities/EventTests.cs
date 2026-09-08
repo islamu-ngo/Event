@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the Event aggregate's required contracts, relationships, and default state.
-// ABOUTME: Guards the breaking removal of obsolete participation fields from the Domain model.
-
 namespace Event.Domain.UnitTests.Entities;
 
 using Explore.Domain;

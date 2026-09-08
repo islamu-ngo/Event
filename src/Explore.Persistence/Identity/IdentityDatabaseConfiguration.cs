@@ -1,6 +1,3 @@
-// ABOUTME: Binds and validates the optional external Identity database connection boundary.
-// ABOUTME: Supports direct secret connection strings or discrete provider credentials without logging values.
-
 using Explore.Secrets.Database;
 using Microsoft.Extensions.Configuration;
 

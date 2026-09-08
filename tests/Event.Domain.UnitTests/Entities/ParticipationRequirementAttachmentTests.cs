@@ -1,6 +1,3 @@
-// ABOUTME: Specifies participation-owned requirement attachment invariants across all four handling modes.
-// ABOUTME: Covers tenant/event lineage, channel compatibility, standalone uniqueness, and idempotent detach.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

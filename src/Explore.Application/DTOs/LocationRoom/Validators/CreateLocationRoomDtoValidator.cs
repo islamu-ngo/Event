@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for CreateLocationRoomDto enforcing location ownership and field constraints.
-// ABOUTME: Manually instantiated in handlers — accepts ILocationRepository for async location existence check.
-
 using Explore.Application.Contracts.Persistence;
 using FluentValidation;
 

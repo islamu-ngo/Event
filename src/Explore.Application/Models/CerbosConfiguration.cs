@@ -1,4 +1,3 @@
-// ABOUTME: Cerbos configuration POCO resolved from the cascading settings engine.
 // Supports instance PDP (default) and Bring Your Own Cerbos PDP per tenant.
 
 namespace Explore.Application.Models;

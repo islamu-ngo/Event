@@ -1,6 +1,3 @@
-// ABOUTME: Readiness health check for the Svix outgoing webhook provider.
-// ABOUTME: Verifies provider selection and server-side secret resolution without exposing tokens or endpoint URLs.
-
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Lookups;
 using Explore.Application.Telemetry;

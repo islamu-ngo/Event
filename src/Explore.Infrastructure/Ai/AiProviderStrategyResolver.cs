@@ -1,6 +1,3 @@
-// ABOUTME: Resolves AI provider strategies by provider name from DI-registered strategy collection.
-// ABOUTME: Follows the StrategyResolver convention established by event strategies.
-
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Microsoft.Extensions.Logging;
 

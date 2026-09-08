@@ -1,6 +1,3 @@
-// ABOUTME: Reports dev-only readiness for registry-governed AI tools and agent artifacts.
-// ABOUTME: Produces review-first PASS/WARN evidence without scaffolding or mutating runtime state.
-
 using Explore.Application.Features.AiAssistant.Tools;
 using Explore.Diagnostic.Doctor.Infrastructure;
 

@@ -1,5 +1,3 @@
-// ABOUTME: Persists global Local lifecycle pointer delivery state in the selected native Identity ledger.
-// ABOUTME: Shares the instance SMTP rate authority without tenant queues, payload persistence or cross-database atomicity claims.
 
 using System.Data;
 using Explore.Application.Contracts.Identity;

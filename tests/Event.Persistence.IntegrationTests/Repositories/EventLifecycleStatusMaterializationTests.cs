@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL and file-backed SQLite round-trip coverage for private event and session lifecycle setters.
-// ABOUTME: Proves explicit statuses and schedule projections materialize under tenant filtering.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
@@ -25,18 +22,8 @@ public sealed class EventLifecycleStatusMaterializationTests(ProjectionTestConta
         Guid sessionId;
         await using (var seedContext = fixture.CreateDbContext())
         {
-            seedContext.EventStatuses.Add(new EventStatus
-            {
-                Id = (int)EventStatusEnum.Published,
-                MasterCode = "PUBLISHED",
-                FullName = "Published"
-            });
-            seedContext.EventSessionStatuses.Add(new EventSessionStatus
-            {
-                Id = (int)EventSessionStatusEnum.Published,
-                MasterCode = "PUBLISHED",
-                FullName = "Published"
-            });
+            await Assert.That(await seedContext.EventStatuses.FindAsync((int)EventStatusEnum.Published)).IsNotNull();
+            await Assert.That(await seedContext.EventSessionStatuses.FindAsync((int)EventSessionStatusEnum.Published)).IsNotNull();
             var tenant = new Tenant
             {
                 FullName = "Lifecycle materialization tenant",
@@ -304,7 +291,7 @@ public sealed class EventLifecycleStatusSqliteMaterializationTests
     }
 
     private static ExploreDbContext CreateDbContext(string databasePath) => new(
-        new DbContextOptionsBuilder<ExploreDbContext>()
+        TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite($"Data Source={databasePath}")
             .UseSnakeCaseNamingConvention()
             .Options);

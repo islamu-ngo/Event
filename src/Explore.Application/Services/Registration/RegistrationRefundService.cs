@@ -1,6 +1,3 @@
-// ABOUTME: Creates one accepted-authority refund reservation and dispatch trigger without provider I/O.
-// ABOUTME: Hashes caller idempotency input and persists actor, authority, and reason audit facts atomically.
-
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Contracts.Persistence;

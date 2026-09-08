@@ -1,6 +1,3 @@
-// ABOUTME: Reports fixed-cardinality fair-return orchestration backlog and dead-letter health.
-// ABOUTME: Exposes aggregate counts and age only, never tenant, participant, or provider identifiers.
-
 using Explore.Application.Contracts.Waitlist;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;

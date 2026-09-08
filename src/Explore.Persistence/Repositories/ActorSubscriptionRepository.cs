@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for actor subscriptions and fanout subscriber scans.
-// ABOUTME: Keeps subscription queries tenant-scoped while returning domain entities only.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

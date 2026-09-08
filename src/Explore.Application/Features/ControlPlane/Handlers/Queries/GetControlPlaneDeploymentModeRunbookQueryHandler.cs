@@ -1,6 +1,3 @@
-// ABOUTME: Builds the Control Plane deployment-mode migration runbook and target preconditions.
-// ABOUTME: Centralizes single-to-multi and multi-to-single active-tenant safety rules for operators.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.ControlPlane;

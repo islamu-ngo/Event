@@ -1,6 +1,3 @@
-// ABOUTME: EF Core connection interceptor that binds the current tenant into PostgreSQL session state.
-// ABOUTME: Supports PostgreSQL RLS prototypes by setting app.current_tenant_id whenever EF opens a connection.
-
 using System.Data.Common;
 using Explore.Application.Contracts.Infrastructure;
 using Microsoft.EntityFrameworkCore;

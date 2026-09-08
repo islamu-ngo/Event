@@ -1,6 +1,3 @@
-// ABOUTME: Server-backed event program summary read model for progressive-disclosure shells.
-// ABOUTME: Groups EventSession program items by section, local day, and readiness guidance.
-
 using System.Collections.Immutable;
 using Explore.Application.DTOs.Location;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Runs one modern instance-based Terminal.Gui lifetime over a scoped CommunityToolkit presentation session.
-// ABOUTME: Orders cancellation, secret clearing, binding disposal, workspace deactivation, and terminal restoration.
-
 namespace ISLAMU.Event.SetupAssistant.Terminal;
 
 using ISLAMU.Event.SetupAssistant.Presentation;

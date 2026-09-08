@@ -1,6 +1,3 @@
-// ABOUTME: Strongly-typed appearance setting group resolving profile, preset, direction, and language from hierarchical settings.
-// ABOUTME: Distinguishes user scope (active_profile_id) from tenant/instance scope (default_preset_id).
-
 namespace Explore.Application.Settings.Groups;
 
 using Explore.Application.Contracts.Infrastructure;

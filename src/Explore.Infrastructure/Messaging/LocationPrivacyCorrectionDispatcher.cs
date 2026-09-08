@@ -1,6 +1,3 @@
-// ABOUTME: Applies durable location-privacy correction messages to cached and remote read surfaces.
-// ABOUTME: Validates PII-free payloads, invalidates cache tags, and requests replay-safe PDS replanning.
-
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Explore.Application.Caching;

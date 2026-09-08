@@ -1,6 +1,3 @@
-// ABOUTME: Persistence contract for verified webhook consumer-to-provider bindings.
-// ABOUTME: Returns domain entities and exposes fenced verification-state transitions.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

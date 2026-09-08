@@ -1,6 +1,3 @@
-// ABOUTME: Command to delete a footer link group and all its child links.
-// ABOUTME: Validates group ownership before deletion.
-
 using Explore.Application.Authorization;
 using MediatR;
 

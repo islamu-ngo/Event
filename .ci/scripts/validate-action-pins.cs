@@ -1,5 +1,3 @@
-// ABOUTME: Validates that external GitHub Actions references are immutable full SHA pins.
-// ABOUTME: Allows local reusable workflows while requiring same-line version comments for external actions.
 #:property RestorePackagesWithLockFile=false
 
 using System.Text.RegularExpressions;

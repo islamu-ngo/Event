@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for ordered tenant-scoped event public actions.
-// ABOUTME: Keeps public-action lookup loading and one-primary checks inside Persistence.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

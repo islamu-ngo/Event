@@ -1,4 +1,3 @@
-// ABOUTME: Repository interface for AppSetting entity providing data access
 // for encrypted operational configuration with key versioning support.
 
 namespace Explore.Application.Contracts.Persistence;

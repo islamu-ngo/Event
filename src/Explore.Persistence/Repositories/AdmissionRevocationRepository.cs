@@ -1,6 +1,3 @@
-// ABOUTME: Locks tenant/order admission tickets and persists idempotent credential revocation.
-// ABOUTME: Keeps refund and cancellation transitions atomic without provider-specific state.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Services.Registration;
 using Explore.Domain;

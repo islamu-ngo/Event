@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral decision execution envelope for report enforcement integrations.
-// ABOUTME: Carries safe decision metadata and idempotency data without raw provider response payloads.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Features.EventReporting.Models;

@@ -1,6 +1,3 @@
-// ABOUTME: Command handler for replacing a draft tenant plan version's template rows.
-// ABOUTME: Validates draft content before replacing normalized setting and quota rows.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ControlPlane.Plans;
 using Explore.Application.Features.ControlPlane.Requests.Commands;

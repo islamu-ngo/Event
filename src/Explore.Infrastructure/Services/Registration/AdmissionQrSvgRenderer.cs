@@ -1,6 +1,3 @@
-// ABOUTME: Renders canonical admission payloads as deterministic bounded black-on-white QR SVG geometry.
-// ABOUTME: Uses quartile correction and a fixed four-module quiet zone without embedding credential text or metadata.
-
 using System.Globalization;
 using System.Text;
 using ISLAMU.Wire.Contracts.Admissions;

@@ -1,6 +1,3 @@
-// ABOUTME: Tooltip copy and semantic color map for custom-property governance flags.
-// ABOUTME: Centralizes operator-facing explanations referenced by the exposure governance UI (Task 9.9).
-
 using Explore.Blazor.Client.Clients;
 using MudBlazor;
 

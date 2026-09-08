@@ -1,6 +1,3 @@
-// ABOUTME: Handles queries for effective instance governance settings used in onboarding/admin UI.
-// ABOUTME: Reads settings from SystemSetting records through service layer.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Instance;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;

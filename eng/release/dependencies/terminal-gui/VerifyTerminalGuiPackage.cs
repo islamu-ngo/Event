@@ -1,5 +1,3 @@
-// ABOUTME: Generates and verifies the exact evidence packet for the ISLAMU Terminal.Gui package.
-// ABOUTME: Fails closed on package identity, patch drift, TextMate re-entry, or lock/SBOM divergence.
 #:property RestorePackagesWithLockFile=false
 #:property NoWarn=IL2026;IL3050
 #:property JsonSerializerIsReflectionEnabledByDefault=true

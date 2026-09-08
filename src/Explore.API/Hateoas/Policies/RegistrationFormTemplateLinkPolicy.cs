@@ -1,6 +1,3 @@
-// ABOUTME: Defines HAL affordances for registration-form template catalog resources.
-// ABOUTME: Keeps template instantiation and creation discoverable through authorization-filtered links.
-
 using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;

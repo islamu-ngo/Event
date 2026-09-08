@@ -1,6 +1,3 @@
-// ABOUTME: Persistence contract for event-owned ticket catalog graphs and capacity child lookups.
-// ABOUTME: Returns Domain entities with exact tenant and event predicates for handler-owned validation.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

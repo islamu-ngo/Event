@@ -1,6 +1,3 @@
-// ABOUTME: Unit-style tests for Quartz scheduler startup configuration validation.
-// ABOUTME: Proves status-endpoint and clustering settings fail fast before unsafe operational exposure.
-
 using Explore.API.Configuration;
 using TUnit.Core;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Handles catalogue metadata and relevant-only no-secret dotenv commands through Setup Core.
-// ABOUTME: Emits explicit bounded artifacts without defaults, help prose, environment values, or secret generation.
-
 using System.Text.Json;
 using ISLAMU.Event.Setup.Core.Environment;
 

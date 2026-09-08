@@ -1,6 +1,3 @@
-// ABOUTME: Strongly typed governed limits for Local webhook claiming, retry, timeout, and circuit behavior.
-// ABOUTME: Hierarchical resolution supplies instance defaults and lock-aware tenant overrides.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain.Constants;
 

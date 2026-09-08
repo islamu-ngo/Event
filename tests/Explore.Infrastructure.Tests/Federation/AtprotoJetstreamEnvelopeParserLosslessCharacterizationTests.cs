@@ -1,6 +1,3 @@
-// ABOUTME: Characterizes lossless retention of complete producer-shaped calendar event records at Jetstream ingress.
-// ABOUTME: Proves unknown nested extension data stays semantically identical in canonical raw JSON.
-
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using CarpaNet;

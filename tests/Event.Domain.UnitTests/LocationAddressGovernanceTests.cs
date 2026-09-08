@@ -1,6 +1,3 @@
-// ABOUTME: Verifies Location address provenance and reuse scope as independent aggregate state.
-// ABOUTME: Covers conservative defaults, invalid scope combinations, private homes, and erasure quarantine.
-
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 

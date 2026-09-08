@@ -1,6 +1,3 @@
-// ABOUTME: Detailed event-session DTO returned by detail APIs and HAL resources.
-// ABOUTME: Exposes lifecycle status, schedule state, and concurrency metadata for management affordances.
-
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;

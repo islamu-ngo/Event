@@ -1,6 +1,3 @@
-// ABOUTME: Locks configuration-manifest audit entities to immutable, bounded, value-free outcome facts.
-// ABOUTME: Exercises UUIDv7 identity, lifecycle counts, UTC timestamps, and changed-key normalization.
-
 namespace Event.Domain.UnitTests.ConfigurationManifest;
 
 public sealed class ConfigurationManifestAuditTests

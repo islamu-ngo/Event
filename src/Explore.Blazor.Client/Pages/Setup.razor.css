@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped split-screen layout for the setup-secret entry gateway. */
-/* ABOUTME: Uses design-system tokens and logical properties across desktop and narrow viewports. */
-
 .setup-page {
     --setup-brand-panel-size: 58%;
     --setup-form-panel-size: 50%;

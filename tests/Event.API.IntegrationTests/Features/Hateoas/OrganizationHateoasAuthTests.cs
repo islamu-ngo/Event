@@ -1,6 +1,3 @@
-// ABOUTME: Authenticated HATEOAS tests for organization collection: verifies per-item edit/delete links
-// ABOUTME: surface only for authorized callers and stay absent for anonymous requests.
-
 using System.Net;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;

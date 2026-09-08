@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for RegistrationPolicyHelper verifying scope resolution logic.
-// ABOUTME: Ensures client-side policy rules mirror Domain RegistrationPolicyRules behavior.
-
 using Explore.Blazor.Client.Helpers;
 
 namespace Explore.Blazor.Client.Tests.Helpers;

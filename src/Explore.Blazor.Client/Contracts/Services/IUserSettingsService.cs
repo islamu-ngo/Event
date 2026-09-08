@@ -1,6 +1,3 @@
-// ABOUTME: Contract for user-scoped settings (event list customization).
-// ABOUTME: Supports authenticated (BFF API) and anonymous (localStorage) storage with SSR safety.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services;

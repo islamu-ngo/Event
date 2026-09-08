@@ -1,6 +1,3 @@
-// ABOUTME: Reconciles stale organizer payment provider connection readiness from the onboarding provider.
-// ABOUTME: Keeps provider I/O outside serializable transactions and applies monotonic observations inside them.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Domain;

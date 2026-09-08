@@ -1,6 +1,3 @@
-// ABOUTME: Defines fair-return supply, deterministic waitlist, replacement binding, and refund facts.
-// ABOUTME: Preserves immutable buyer commerce while allowing only equivalent pre-handoff source substitution.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

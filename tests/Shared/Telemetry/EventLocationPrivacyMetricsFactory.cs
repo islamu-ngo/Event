@@ -1,6 +1,3 @@
-// ABOUTME: Shared test factory building an isolated Explore.EventLocationPrivacy meter instance.
-// ABOUTME: Keeps every suite that constructs privacy-instrumented services on one disposable meter root.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Telemetry;
 

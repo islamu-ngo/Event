@@ -1,4 +1,3 @@
-// ABOUTME: Default ISecretAuditLogger implementation using structured logging.
 // Outputs audit entries as structured JSON for OpenTelemetry/Loki ingestion.
 // Designed for Serilog but works with any ILogger implementation.
 

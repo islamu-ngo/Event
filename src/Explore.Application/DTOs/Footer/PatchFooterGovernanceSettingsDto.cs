@@ -1,6 +1,3 @@
-// ABOUTME: Presence-aware write DTO for instance footer-governance lock settings.
-// ABOUTME: Distinguishes omitted flags from explicit lock changes without using the read DTO as a command body.
-
 using Explore.Application.Models.Common;
 
 namespace Explore.Application.DTOs.Footer;

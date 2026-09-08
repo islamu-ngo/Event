@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos policy tests for sensitive physical location and room resources.
-# ABOUTME: Verifies generic reads are administrator-scoped and tenant-isolated.
-
 name: EventLocationPrivacyPolicyTests
 description: "Validates private physical location read authority"
 

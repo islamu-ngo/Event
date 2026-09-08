@@ -1,6 +1,3 @@
-// ABOUTME: Keeps generated MySQL and MariaDB constraint names within their identifier limit.
-// ABOUTME: Uses stable hashes so long names remain distinct after deterministic table prefixing.
-
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;

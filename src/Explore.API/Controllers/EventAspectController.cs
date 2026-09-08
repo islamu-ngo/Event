@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for event Islamic and tech aspect subresources.
-// ABOUTME: Keeps aspect-specific routes separate from core event CRUD while preserving route contracts.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

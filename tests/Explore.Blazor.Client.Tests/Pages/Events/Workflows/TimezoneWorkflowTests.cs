@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the shared timezone workflow used by event create and edit pages.
-// ABOUTME: Verifies initialization, selection, searching, and display formatting behavior.
-
 using Explore.Blazor.Client.Pages.Events.Workflows;
 
 namespace Explore.Blazor.Client.Tests.Pages.Events.Workflows;

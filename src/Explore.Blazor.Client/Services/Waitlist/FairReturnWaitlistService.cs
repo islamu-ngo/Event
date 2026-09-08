@@ -1,6 +1,3 @@
-// ABOUTME: Calls private fair-return waitlist BFF endpoints through the browser credential pipeline.
-// ABOUTME: Uses generated HAL contracts and stable per-action idempotency without exposing bearer authority.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Waitlist;
 using Explore.Blazor.Client.Services.Http;

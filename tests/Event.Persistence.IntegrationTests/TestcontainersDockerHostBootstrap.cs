@@ -1,6 +1,3 @@
-// ABOUTME: Sets a deterministic Docker host for Testcontainers-based persistence tests when Docker Desktop is used.
-// ABOUTME: Avoids suite-wide DockerUnavailableException failures when DOCKER_HOST is unset but the user-scoped socket exists.
-
 using System.Runtime.CompilerServices;
 
 namespace Event.Persistence.IntegrationTests;

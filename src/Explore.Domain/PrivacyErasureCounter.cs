@@ -1,6 +1,3 @@
-// ABOUTME: Models the singleton monotonic sequence allocator for the platform privacy-erasure ledger.
-// ABOUTME: Keeps allocation state PII-free and exposes only validated forward movement.
-
 namespace Explore.Domain;
 
 public sealed class PrivacyErasureCounter

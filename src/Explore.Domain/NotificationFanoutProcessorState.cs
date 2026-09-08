@@ -1,6 +1,3 @@
-// ABOUTME: Persists cross-replica notification fanout processor coordination state.
-// ABOUTME: Keeps optional-reminder backlog hysteresis durable across hosts and restarts.
-
 namespace Explore.Domain;
 
 public sealed class NotificationFanoutProcessorState

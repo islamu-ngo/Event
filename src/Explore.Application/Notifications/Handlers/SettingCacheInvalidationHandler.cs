@@ -1,6 +1,3 @@
-// ABOUTME: MediatR notification handler that invalidates the hierarchical settings cache after writes.
-// ABOUTME: Ensures read-after-write consistency by evicting stale system settings from IMemoryCache.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings;

@@ -1,6 +1,3 @@
-// ABOUTME: Batches event-management authorization for exact EventLocation reads.
-// ABOUTME: Returns one fail-closed decision per association only after PII-free audit persistence succeeds.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

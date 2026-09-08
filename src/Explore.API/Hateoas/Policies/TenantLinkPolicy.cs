@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS link policies for tenant detail and collection resources.
-// ABOUTME: Adds tenant-scoped affordances such as role grants through named API routes.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Collections.Generic;

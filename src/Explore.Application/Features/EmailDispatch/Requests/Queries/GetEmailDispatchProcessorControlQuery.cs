@@ -1,6 +1,3 @@
-// ABOUTME: Secured query for sanitized instance-wide SMTP processor control state.
-// ABOUTME: Uses the instance-setting resource so tenant administrators cannot inspect global controls.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EmailDispatch;
 using MediatR;

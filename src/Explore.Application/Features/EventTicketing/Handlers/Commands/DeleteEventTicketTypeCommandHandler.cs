@@ -1,6 +1,3 @@
-// ABOUTME: Handles removal of a ticket type from an event ticket catalog draft.
-// ABOUTME: Applies the aggregate deletion transition with audited actor and time data.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventTicketing.Requests.Commands;

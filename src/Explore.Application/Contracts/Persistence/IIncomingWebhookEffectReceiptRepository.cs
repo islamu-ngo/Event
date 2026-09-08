@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for durable incoming webhook effect receipts.
-// ABOUTME: Resolves and creates tenant-scoped idempotency proof without exposing persistence DTOs.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

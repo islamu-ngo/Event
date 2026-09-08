@@ -1,6 +1,3 @@
-// ABOUTME: Strictly parses current and historical heavy-moderation outbox payloads into one safe pointer.
-// ABOUTME: Rejects unknown fields and emits only canonical operational identifiers and schema version.
-
 using System.Text.Json;
 using System.Text.Json.Serialization;
 

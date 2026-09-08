@@ -1,6 +1,3 @@
-// ABOUTME: Defines ticket-line eligibility for a promotion definition version.
-// ABOUTME: Supports all-ticket and explicit ticket-type scopes without application or persistence dependencies.
-
 namespace Explore.Domain;
 
 public sealed class PromotionEligibility

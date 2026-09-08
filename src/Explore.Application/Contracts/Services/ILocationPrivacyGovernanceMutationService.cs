@@ -1,6 +1,3 @@
-// ABOUTME: Coordinates authorized location-governance writes with projection correction and cache eviction.
-// ABOUTME: Keeps setting persistence, EventLocation policy versioning, audit, and outbox writes transactional.
-
 using Explore.Domain.Settings;
 
 namespace Explore.Application.Contracts.Services;

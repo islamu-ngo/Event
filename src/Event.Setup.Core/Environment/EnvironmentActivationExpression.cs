@@ -1,6 +1,3 @@
-// ABOUTME: Implements the closed identifier-based activation AST used by the environment catalogue.
-// ABOUTME: Evaluates only declared topology, capability, provider, and acyclic feature identifiers.
-
 namespace ISLAMU.Event.Setup.Core.Environment;
 
 public abstract record EnvironmentActivationExpression

@@ -1,5 +1,3 @@
-// ABOUTME: API controller for event session status lookup table (read-only enumeration).
-// ABOUTME: Provides session lifecycle status values (draft, submitted, published, etc.) for session lifecycle management.
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Asp.Versioning;

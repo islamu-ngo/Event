@@ -1,6 +1,3 @@
-// ABOUTME: Specifies signed Stripe refund and dispute callback normalization and processing.
-// ABOUTME: Proves PII-free envelopes, duplicate safety, multiple disputes, and late provider evidence.
-
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;

@@ -1,6 +1,3 @@
-// ABOUTME: Handles updating an event-scoped capacity pool for ticket authoring.
-// ABOUTME: Resolves the pool within the platform-managed event before its domain transition.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventTicketing.Validators;

@@ -1,6 +1,3 @@
-// ABOUTME: Packs selected AI references into bounded prompt context blocks.
-// ABOUTME: Uses explicit XML-like boundaries so model-visible reference text remains quoted context.
-
 using Explore.Application.DTOs.Ai;
 
 namespace Explore.Application.Features.AiAssistant.Prompting;

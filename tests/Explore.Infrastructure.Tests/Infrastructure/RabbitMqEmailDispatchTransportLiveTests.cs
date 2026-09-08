@@ -1,6 +1,3 @@
-// ABOUTME: Runtime RabbitMQ tests for the EmailDispatch transport topology and health path.
-// ABOUTME: Proves enabled RabbitMQ Dispatch Mode can declare broker resources against Testcontainers.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Telemetry;

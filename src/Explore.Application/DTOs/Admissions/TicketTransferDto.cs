@@ -1,6 +1,3 @@
-// ABOUTME: Publishes bounded ticket-transfer state without holder, participant, commerce, or bearer data.
-// ABOUTME: Keeps server-computed HAL action authority and route lineage out of the serialized contract.
-
 using System.Text.Json.Serialization;
 
 namespace Explore.Application.DTOs.Admissions;

@@ -1,6 +1,3 @@
-// ABOUTME: Computes interim lock metadata for tenant branding typed settings documents.
-// ABOUTME: Reuses instance governance scalar locks without reading scalar tenant values or dual-writing them.
-
 namespace Explore.Application.Services;
 
 using System.Text.Json;

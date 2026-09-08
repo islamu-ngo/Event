@@ -1,6 +1,3 @@
-// ABOUTME: Readiness health check for scheduled email dispatch content retention.
-// ABOUTME: Exposes bounded cleanup posture without tenant, recipient, or message data.
-
 using Explore.Infrastructure;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;

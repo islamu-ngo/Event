@@ -1,6 +1,3 @@
-// ABOUTME: Events workspace navigation provider rendered through the WorkspaceNavigationHost.
-// ABOUTME: Preserves legacy MainLayout drawer links: catalog, discovery, policies, branding, tenant links.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Shell;
 using Explore.Blazor.Client.Services;

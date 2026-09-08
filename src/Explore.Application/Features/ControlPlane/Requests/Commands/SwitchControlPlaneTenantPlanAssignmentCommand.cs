@@ -1,6 +1,3 @@
-// ABOUTME: Secured command for switching one tenant to a selected tenant plan version.
-// ABOUTME: Supersedes the previous active assignment and creates one new active assignment.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

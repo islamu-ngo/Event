@@ -1,6 +1,3 @@
-// ABOUTME: Command handler for cloning an existing plan version into a new draft tier.
-// ABOUTME: Copies template pricing, settings, and quotas without assigning tenants.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ControlPlane.Plans;
 using Explore.Application.Features.ControlPlane.Requests.Commands;

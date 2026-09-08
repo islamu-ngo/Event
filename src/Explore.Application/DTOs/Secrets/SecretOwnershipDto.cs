@@ -1,6 +1,3 @@
-// ABOUTME: Describes who owns a secret or sensitive configuration value without exposing the value.
-// ABOUTME: Lets UI distinguish application-managed editable secrets from deployment-managed read-only bindings.
-
 namespace Explore.Application.DTOs.Secrets;
 
 public sealed record SecretOwnershipDto

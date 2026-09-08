@@ -1,6 +1,3 @@
-// ABOUTME: Verifies generated composition scale evidence and fail-closed profile admission.
-// ABOUTME: Keeps canonical defaults unchanged while testing only machine-consumed profile facts.
-
 namespace Event.Setup.Core.Tests;
 
 using System.Reflection;

@@ -1,6 +1,3 @@
-// ABOUTME: Resolves effective public experience settings through system->tenant cascade for current tenant context.
-// ABOUTME: Supports anonymous-safe home page routing and white-label branding consumption.
-
 using System.Text.Json;
 using AutoMapper;
 using Explore.Application.Analytics;

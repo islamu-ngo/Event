@@ -1,6 +1,3 @@
-// ABOUTME: Lightweight list DTO for event program sections/tracks/devrooms.
-// ABOUTME: Used by program summary and event-scoped group picker surfaces.
-
 using Explore.Application.DTOs.Location;
 
 namespace Explore.Application.DTOs.EventSessionGroup;

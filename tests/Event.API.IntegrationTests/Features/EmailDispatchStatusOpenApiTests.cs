@@ -1,5 +1,3 @@
-// ABOUTME: Verifies Release-generated email-dispatch enums and SMTP administration contracts.
-// ABOUTME: Protects typed HAL fields, confirmation evidence and optional park-reason metadata.
 
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;

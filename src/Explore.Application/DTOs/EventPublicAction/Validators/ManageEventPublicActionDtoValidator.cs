@@ -1,6 +1,3 @@
-// ABOUTME: Validates event public-action input before domain URL normalization.
-// ABOUTME: Rejects unknown kinds and unsafe external destinations at the Application boundary.
-
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 using FluentValidation;

@@ -1,6 +1,3 @@
-// ABOUTME: Preserves the current tenant slug across the Blazor Server circuit lifetime.
-// ABOUTME: Keeps route context available for trusted API forwarding without making Blazor tenant-authoritative.
-
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.AspNetCore.Components.Server.Circuits;

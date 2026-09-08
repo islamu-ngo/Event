@@ -1,6 +1,3 @@
-// ABOUTME: Handles transactional event-template sync applies using the explicit sync service and manual validator instantiation.
-// ABOUTME: Returns structured outcome data instead of throwing for stale-base or concurrent-update conflict results.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventTemplateSync;
 using Explore.Application.DTOs.EventTemplateSync.Validators;

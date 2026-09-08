@@ -1,6 +1,3 @@
-// ABOUTME: Command to delete the Islamic aspect from an event.
-// ABOUTME: Permanently removes the aspect data.
-
 namespace Explore.Application.Features.EventAspects.Requests.Commands;
 
 using System;

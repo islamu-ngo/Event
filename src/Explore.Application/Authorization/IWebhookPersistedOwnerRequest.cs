@@ -1,6 +1,3 @@
-// ABOUTME: Marks webhook requests whose authoritative owner must be loaded from a persisted resource.
-// ABOUTME: Prevents existing-resource authorization from trusting caller-provided tenant or owner attributes.
-
 namespace Explore.Application.Authorization;
 
 public interface IWebhookPersistedOwnerRequest

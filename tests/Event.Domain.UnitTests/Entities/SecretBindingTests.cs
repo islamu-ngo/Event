@@ -1,6 +1,3 @@
-// ABOUTME: Tests SecretBinding factories, source switches, validation, and scope invariants.
-// ABOUTME: Guards the metadata-only control-plane model and rejects all inline secret representation.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 

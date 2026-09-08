@@ -1,6 +1,3 @@
-// ABOUTME: Defines a versioned catalog ticket type with pricing, eligibility, limits, and entitlements.
-// ABOUTME: Keeps all mutable commercial configuration inside its draft catalog version.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 using Explore.Domain.Services.Registration;

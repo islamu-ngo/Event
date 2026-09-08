@@ -1,6 +1,3 @@
-// ABOUTME: State machine enum for cookie consent lifecycle in the AnalyticsInitializer component.
-// ABOUTME: Drives transitions: Uninitialized → banner/no-banner path → accepted/declined terminal states.
-
 namespace Explore.Blazor.Client.Models.Analytics;
 
 public enum ConsentState

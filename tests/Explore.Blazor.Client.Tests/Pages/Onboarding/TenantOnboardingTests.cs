@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for the server-authoritative tenant onboarding task-list workflow.
-// ABOUTME: Covers fail-closed tenant authority, governed settings, completion confirmation, and refresh safety.
-
 using System.Reflection;
 using System.Text.Json;
 using AngleSharp.Dom;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines the governed DeleteEvent AI tool contract for MCP proposal workflows.
-// ABOUTME: Requires destructive confirmation metadata while keeping deletion proposal-first.
-
 using Explore.Application.Authorization;
 using Explore.Application.Features.AiAssistant.Actions;
 using Explore.Domain.Ai;

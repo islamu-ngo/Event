@@ -1,6 +1,3 @@
-// ABOUTME: Contract tests for typed secret-resolution outcomes and value-free diagnostics.
-// ABOUTME: Proves resolved material exists only on successful results and never prints accidentally.
-
 using Explore.Application.Contracts.Secrets;
 using Explore.Domain.Enums;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Covers exact organizer-earnings calculation from minor-unit line totals and platform policy snapshots.
-// ABOUTME: Proves basis-point rounding and fixed charges never use floating-point or include contributions.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.Services.Registration;
 using Explore.Domain;

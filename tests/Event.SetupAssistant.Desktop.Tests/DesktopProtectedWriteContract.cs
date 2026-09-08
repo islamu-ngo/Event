@@ -1,6 +1,3 @@
-// ABOUTME: Drives the public desktop protected-write transaction without compile-time production owners.
-// ABOUTME: Supports deterministic prepare, filesystem mutation, commit, disposal, and value-free result checks.
-
 namespace Event.SetupAssistant.Desktop.Tests;
 
 using System.Reflection;

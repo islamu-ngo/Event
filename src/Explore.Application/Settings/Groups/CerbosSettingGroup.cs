@@ -1,6 +1,3 @@
-// ABOUTME: Strongly-typed Cerbos authorization setting group resolved via batch loading.
-// ABOUTME: Contains governance-only Cerbos settings; Admin credentials use ISecretResolver.
-
 namespace Explore.Application.Settings.Groups;
 
 using Explore.Application.Contracts.Infrastructure;

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for bounded AI reference prompt packing.
-// ABOUTME: Verifies selected references are quoted safely and constrained by per-item and total budgets.
-
 using Explore.Application.DTOs.Ai;
 using Explore.Application.Features.AiAssistant.Prompting;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Reads one regular configuration-manifest file into a bounded buffer and validates exact bytes.
-// ABOUTME: Computes a stable digest and returns a strict Application contract without retaining raw content.
-
 namespace Explore.Infrastructure.ConfigurationManifest;
 
 using System.Security.Cryptography;

@@ -1,6 +1,3 @@
-// ABOUTME: Owns only the independently retained platform privacy-erasure authority EF model.
-// ABOUTME: Excludes the application model while preserving the shared authority schema lifecycle.
-
 using Explore.Domain;
 using Explore.Persistence.Privacy.ErasureAuthority.Configurations;
 using Microsoft.EntityFrameworkCore;

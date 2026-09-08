@@ -1,6 +1,3 @@
-// ABOUTME: Islamic extension entity for event sessions using strict 1:1 vertical partitioning.
-// ABOUTME: Owns prayer-relative session scheduling state and ritual requirements outside event_sessions.
-
 namespace Explore.Domain;
 
 using System.ComponentModel.DataAnnotations.Schema;

@@ -1,6 +1,3 @@
-// ABOUTME: Carries one fully verified PDS repository snapshot across the Infrastructure/Application boundary.
-// ABOUTME: Keeps CarpaNet types out of Application while retaining canonical records and event projections.
-
 using Explore.Domain;
 using Explore.Domain.Federation;
 

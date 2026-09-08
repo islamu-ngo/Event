@@ -1,6 +1,3 @@
-// ABOUTME: Shared mapper for notification preference matrix handler projections.
-// ABOUTME: Keeps user, organization, and group matrix DTOs consistent across scopes.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Notification;
 using Explore.Domain;

@@ -1,5 +1,3 @@
-// ABOUTME: Exercises guest status through native challenged allocation, confirmation and SQLite transactions.
-// ABOUTME: Guards finite promises, post-hold purpose isolation, scope privacy and deadline waits without internal mocks.
 
 using System.Data.Common;
 using System.Text.Json;

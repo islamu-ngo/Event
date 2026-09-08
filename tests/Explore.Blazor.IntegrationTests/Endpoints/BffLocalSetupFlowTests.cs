@@ -1,5 +1,3 @@
-// ABOUTME: Runs native BFF setup cookies, antiforgery, and YARP enrichment against an HTTP contract upstream.
-// ABOUTME: Proves browser headers cannot impersonate setup authority and Local completion creates no session.
 
 using System.Net;
 using System.Net.Http.Json;

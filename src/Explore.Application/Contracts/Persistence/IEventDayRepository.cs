@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for EventDay - first-class event-local day aggregate used for day-scope registration and admin landing sections.
-// ABOUTME: Provides tenant-aware event-day reads for registration-order and event-management validation.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

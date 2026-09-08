@@ -1,5 +1,3 @@
-<!-- ABOUTME: Runs focused behavioral tests for the generated NSwag record transformer. -->
-<!-- ABOUTME: Keeps syntax policy, reversibility, privacy, and determinism independently verified. -->
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>

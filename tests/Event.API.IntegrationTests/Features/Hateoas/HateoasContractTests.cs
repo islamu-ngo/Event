@@ -1,6 +1,3 @@
-// ABOUTME: HAL contract tests using ContractApiFixture (InMemory) for fast API surface validation.
-// ABOUTME: Validates HAL+JSON structure, pagination metadata, Prefer header, content-type, and link format.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;

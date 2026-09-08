@@ -1,6 +1,3 @@
-// ABOUTME: Mutable form models for Studio ticket-type, entitlement, and capacity-pool authoring.
-// ABOUTME: Converts validated form state into generated API write DTOs without leaking UI state.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Pages.Studio;

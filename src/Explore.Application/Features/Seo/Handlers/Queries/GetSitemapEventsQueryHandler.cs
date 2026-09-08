@@ -1,6 +1,3 @@
-// ABOUTME: Handles sitemap event projection with a dedicated published/public repository query.
-// ABOUTME: Avoids reusing general event listing filters that can include non-published states.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Seo;
 using Explore.Application.Features.Seo.Requests.Queries;

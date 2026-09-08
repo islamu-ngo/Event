@@ -1,6 +1,3 @@
-// ABOUTME: Authenticates Control Plane calls only against the active Event managed-registration credential hash.
-// ABOUTME: Uses fixed-time secret comparison and never exposes the dedicated machine principal to default auth.
-
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Explore.Application.Constants;

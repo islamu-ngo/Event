@@ -1,6 +1,3 @@
-// ABOUTME: Defines route-owned request bodies for registration-order checkout selections.
-// ABOUTME: Keeps event identity authoritative in the API route rather than caller-controlled JSON.
-
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Domain.Enums;
 

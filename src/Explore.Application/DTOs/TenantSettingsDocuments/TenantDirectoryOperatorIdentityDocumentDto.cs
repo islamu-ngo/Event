@@ -1,6 +1,3 @@
-// ABOUTME: API-safe tenant directory-operator identity document and grouped patch contracts.
-// ABOUTME: Exposes public legal facts, readiness booleans, and optimistic concurrency without persistence JSON.
-
 namespace Explore.Application.DTOs.TenantSettingsDocuments;
 
 using System.Collections.Immutable;

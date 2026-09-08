@@ -1,6 +1,3 @@
-# ABOUTME: Production CI/CD — builds Docker images and deploys to Coolify on push to main or version tags.
-# ABOUTME: Uses change detection to only build/test/deploy API or UI when their source code changes.
-
 name: Build and Deploy to Coolify (Production)
 
 permissions:

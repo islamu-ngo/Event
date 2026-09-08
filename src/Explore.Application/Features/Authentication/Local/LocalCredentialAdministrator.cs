@@ -1,5 +1,3 @@
-// ABOUTME: Resolves current persisted instance authority for Local credential administration.
-// ABOUTME: Reuses canonical actor resolution and uncached platform-role checks without introducing another service.
 
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;

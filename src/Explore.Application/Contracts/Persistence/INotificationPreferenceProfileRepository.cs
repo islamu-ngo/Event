@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for notification profile-level preferences such as global mute.
-// ABOUTME: Returns entities so resolver and handlers preserve persistence boundaries.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

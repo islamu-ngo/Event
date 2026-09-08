@@ -1,6 +1,3 @@
-// ABOUTME: Stores and reads configuration import receipts through exact trusted target authority.
-// ABOUTME: Keeps history bounded, ordered, entity-first, and snapshot-content free.
-
 namespace Explore.Persistence.Repositories;
 
 using Explore.Application.Contracts.Persistence;

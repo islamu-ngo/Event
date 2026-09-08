@@ -1,6 +1,3 @@
-// ABOUTME: MCP Streamable HTTP protocol contract tests over the authenticated API test host.
-// ABOUTME: Verifies discovery, proposal-only calls, and redacted failure behavior without live MCP clients.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;

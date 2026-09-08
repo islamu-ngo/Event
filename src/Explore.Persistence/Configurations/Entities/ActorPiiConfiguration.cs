@@ -1,6 +1,3 @@
-// ABOUTME: Configures the actor_pii extension table with strict 1:1 PK/FK to actors.
-// ABOUTME: Stores removable actor-identifying fields separately from the core actor record.
-
 namespace Explore.Persistence.Configurations.Entities;
 
 using Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: Applies route-authorized tenant display-name changes inside a caller-owned transaction.
-// ABOUTME: Keeps source package identity from changing the trusted target tenant or slug.
-
 namespace Explore.Application.Features.ConfigurationManifest.Application;
 
 using Explore.Application.Contracts.Persistence;

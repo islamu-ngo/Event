@@ -1,6 +1,3 @@
-// ABOUTME: Centralized serialization/deserialization for setting values stored as JSON strings.
-// ABOUTME: Replaces copy-pasted DeserializeString/Int/Bool helpers across 3+ services.
-
 namespace Explore.Application.Settings;
 
 using System.Globalization;

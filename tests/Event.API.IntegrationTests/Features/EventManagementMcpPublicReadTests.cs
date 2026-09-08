@@ -1,6 +1,3 @@
-// ABOUTME: MCP protocol tests for public event-management read tools.
-// ABOUTME: Verifies anonymous event reads stay within published-public visibility.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;

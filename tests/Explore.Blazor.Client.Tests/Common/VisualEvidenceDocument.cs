@@ -1,6 +1,3 @@
-// ABOUTME: Writes sanitized rendered Blazor markup with the production CSS stack for visual QA.
-// ABOUTME: Keeps evidence local, deterministic, theme-complete, and free of aggregate identifiers.
-
 using System.Text.RegularExpressions;
 using MudBlazor;
 

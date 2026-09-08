@@ -1,6 +1,3 @@
-// ABOUTME: Enforces mutually exclusive staff-bearer and scanner-capability authority on admission check-in proxy routes.
-// ABOUTME: Applies fail-closed upstream outage translation without inspecting or retaining admission bearer material.
-
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;

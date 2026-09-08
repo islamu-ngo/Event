@@ -1,5 +1,5 @@
-/* ABOUTME: CSS layer declaration and import order for the ISLAMU Event application.
-   ABOUTME: Layer priority (lowest to highest): reset, base, tokens, mudblazor-overrides, components, utilities.
+/* CSS layer declaration and import order for the ISLAMU Event application.
+   Layer priority (lowest to highest): reset, base, tokens, mudblazor-overrides, components, utilities.
 
    Unlayered styles (Blazor CSS isolation .razor.css, MudThemeProvider :root injection)
    naturally beat all layered styles — this is by design.

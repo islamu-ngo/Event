@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the embedded authority's local-file, single-writer, and bounded-contention contract.
-// ABOUTME: Prevents URI, network, replica, and unsafe timeout configurations from reaching SQLite.
-
 using Explore.Secrets.Database;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;

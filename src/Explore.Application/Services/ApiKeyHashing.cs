@@ -1,6 +1,3 @@
-// ABOUTME: Provides deterministic hashing helpers for external API-key authentication and issuance.
-// ABOUTME: Keeps raw API keys out of storage while allowing constant-time verification across layers.
-
 using System.Security.Cryptography;
 using System.Text;
 

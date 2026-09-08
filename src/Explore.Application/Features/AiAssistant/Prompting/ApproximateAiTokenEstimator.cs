@@ -1,6 +1,3 @@
-// ABOUTME: Provides a conservative fallback token estimator for AI prompt budgeting.
-// ABOUTME: Preserves deterministic prompt packing when no provider tokenizer is configured.
-
 namespace Explore.Application.Features.AiAssistant.Prompting;
 
 public sealed class ApproximateAiTokenEstimator : IAiTokenEstimator

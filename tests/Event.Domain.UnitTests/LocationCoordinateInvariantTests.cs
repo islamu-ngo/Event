@@ -1,6 +1,3 @@
-// ABOUTME: Specifies GeoCoordinate ownership at Location PII mutation boundaries.
-// ABOUTME: Covers atomic absence, exact values, manual replacement, redaction, and erasure.
-
 using System.Reflection;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;

@@ -1,6 +1,3 @@
-// ABOUTME: Validates bounded provider-neutral refund amounts and reason codes at the application boundary.
-// ABOUTME: Is manually instantiated by handlers and never accepts provider identifiers or free-form PII.
-
 using Explore.Application.DTOs.RegistrationOrders;
 using FluentValidation;
 

@@ -1,6 +1,3 @@
-/* ABOUTME: Styles the organizer add-on editor with logical spacing and responsive form grouping. */
-/* ABOUTME: Preserves RTL, narrow-layout, zoom, focus, and touch-target behavior. */
-
 .add-on-editor {
     display: grid;
     gap: 1.5rem;

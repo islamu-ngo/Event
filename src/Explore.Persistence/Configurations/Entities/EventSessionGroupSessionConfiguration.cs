@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for EventSessionGroupSession many-to-many join payload.
-// ABOUTME: Indexes group membership and primary assignment per event/session for program summaries.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

@@ -1,6 +1,3 @@
-// ABOUTME: Lookup classifying a program item/session (talk, workshop, panel, activity, etc.).
-// ABOUTME: Used by event session composer flows to present event-appropriate labels and options.
-
 namespace Explore.Domain;
 
 public class EventSessionKind

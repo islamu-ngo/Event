@@ -1,6 +1,3 @@
-// ABOUTME: Anchors admission orchestration through direct public Application types before reflection removal.
-// ABOUTME: Covers issuance, check-in, revocation, recovery, and provider-neutral compiled signatures.
-
 using ApplicationUnitTests.Contracts.Admissions.Support;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Services.Registration;

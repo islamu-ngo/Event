@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests covering all five external API key owner types across JWT and API-key paths.
-// ABOUTME: Verifies tenant resolution, null-tenant InstanceAdmin behavior, forwarded-host, and cross-owner isolation.
-
 using System.Net;
 using System.Net.Http.Json;
 using Event.Api.IntegrationTests.Fixtures;

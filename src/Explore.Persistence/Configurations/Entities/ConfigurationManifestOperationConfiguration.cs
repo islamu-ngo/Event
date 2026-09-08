@@ -1,6 +1,3 @@
-// ABOUTME: Maps immutable deployment-wide configuration-manifest operation evidence.
-// ABOUTME: Enforces bounded identity, lifecycle consistency, and provenance indexes portably.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

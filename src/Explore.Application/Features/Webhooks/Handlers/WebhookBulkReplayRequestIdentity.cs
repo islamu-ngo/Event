@@ -1,6 +1,3 @@
-// ABOUTME: Computes a stable normalized SHA-256 identity for webhook bulk replay schedule requests.
-// ABOUTME: Prevents one operation key from being reused with different tenant, filter, limit, or reason data.
-
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;

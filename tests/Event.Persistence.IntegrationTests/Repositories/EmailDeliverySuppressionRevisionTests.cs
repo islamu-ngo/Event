@@ -1,5 +1,3 @@
-// ABOUTME: Verifies optional email suppression at final admission using exact-tenant source revisions.
-// ABOUTME: Uses misleading timestamps to prove clock-independent ordering, tenant isolation, and untouched handoff evidence.
 
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;

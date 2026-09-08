@@ -1,6 +1,3 @@
-// ABOUTME: Links modules to tenants, controlling which aspects are available.
-// ABOUTME: Implements ITenantEntity for automatic tenant filtering.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain.Modules;

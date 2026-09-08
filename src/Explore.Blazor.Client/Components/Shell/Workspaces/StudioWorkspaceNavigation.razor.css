@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped layout for actor-level Studio workspace navigation. */
-/* ABOUTME: Reuses the shell token scale and compact navigation hierarchy. */
-
 .studio-workspace-navigation {
     display: block;
 }

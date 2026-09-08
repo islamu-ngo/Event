@@ -1,6 +1,3 @@
-// ABOUTME: Appearance state model for the Blazor client using generated API contracts.
-// ABOUTME: Keeps only reactive presentation state while transport models come from generated clients.
-
 using Explore.Blazor.Client.Clients;
 using MudBlazor;
 

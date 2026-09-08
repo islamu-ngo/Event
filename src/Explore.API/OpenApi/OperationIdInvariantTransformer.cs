@@ -1,6 +1,3 @@
-// ABOUTME: OpenAPI document transformer enforcing operationId invariants at startup in Development.
-// ABOUTME: Throws if any operation has null/empty/placeholder/banned-pattern operationIds.
-
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.Extensions.Hosting;

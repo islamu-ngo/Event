@@ -1,6 +1,3 @@
-// ABOUTME: Persistence contract for outbound provider submission write effects.
-// ABOUTME: Keeps identifiers-only queue claims and delivery graph loading behind Application boundary.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

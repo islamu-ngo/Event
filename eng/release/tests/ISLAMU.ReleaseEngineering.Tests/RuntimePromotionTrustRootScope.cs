@@ -1,6 +1,3 @@
-// ABOUTME: Serializes tests that mutate the release-engine runtime promotion trust-root singleton.
-// ABOUTME: Snapshots exact prior bytes or absence, atomically writes fixture bytes, and restores on dispose.
-
 namespace ISLAMU.ReleaseEngineering.Tests;
 
 internal sealed class RuntimePromotionTrustRootScope : IDisposable

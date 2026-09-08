@@ -1,6 +1,3 @@
-// ABOUTME: Verifies every supported primary provider owns the generated configuration-manifest audit migration.
-// ABOUTME: Compares each provider snapshot with the current model without connecting to an external database.
-
 using Explore.Domain;
 using Explore.Persistence;
 using Explore.Persistence.Database;
@@ -23,7 +20,7 @@ public sealed class ConfigurationManifestAuditProviderMigrationTests
     public async Task ProviderHeadContainsAuditTablesAndMatchesCurrentModel(
         PrimaryDatabaseProvider provider)
     {
-        var optionsBuilder = new DbContextOptionsBuilder<ExploreDbContext>();
+        var optionsBuilder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(
             optionsBuilder,
             CreateOptions(provider));

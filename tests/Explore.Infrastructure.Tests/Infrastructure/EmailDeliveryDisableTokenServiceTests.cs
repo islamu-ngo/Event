@@ -1,5 +1,3 @@
-// ABOUTME: Exercises disable-preview tokens with real Data Protection and immutable impact snapshots.
-// ABOUTME: Rejects stale scope bindings, malformed input, tampering, purpose confusion, and expired previews.
 
 using System.Collections.Immutable;
 using Explore.Application.Contracts.Persistence;

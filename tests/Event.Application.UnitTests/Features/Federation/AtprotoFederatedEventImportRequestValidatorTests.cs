@@ -1,6 +1,3 @@
-// ABOUTME: Failing-first contract tests for validating inbound ATProto event import content.
-// ABOUTME: Proves only name and createdAt are required while optional source, schedule, and tokens fail closed.
-
 using Explore.Application.Features.Federation.Atproto.Models;
 using Explore.Application.Features.Federation.Atproto.Validators;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Command request for partially updating an event session template by route-owned identity.
-// ABOUTME: Authorization binds persisted tenant context before the handler checks concurrency.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventSessionTemplate;
 using Explore.Application.Responses;

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for AppearanceThemeService covering theme composition, mode resolution, HC modes, and persistence.
-// ABOUTME: Verifies the IAppearanceThemeService API surface with AppearanceState, profile management, and preset operations.
-
 using System.Net;
 using System.Net.Http.Json;
 using MudBlazor;

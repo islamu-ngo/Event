@@ -1,6 +1,3 @@
-// ABOUTME: Offline translation provider — merges embedded bundle defaults with writable App_Data overrides.
-// ABOUTME: Default provider when no TMS is configured; also the fallback when a live TMS throws or force_offline_mode is on.
-
 using System.Collections.Concurrent;
 using System.Reflection;
 using System.Text.Json;

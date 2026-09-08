@@ -1,4 +1,3 @@
-// ABOUTME: Stores actor-identifying fields in a dedicated extension table.
 // Uses a 1:1 shared primary-key relationship with Actor for hard-deleteable PII.
 
 namespace Explore.Domain;

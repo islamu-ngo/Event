@@ -1,6 +1,3 @@
-// ABOUTME: Specifies the authenticated Blazor BFF boundary for online admission check-in and scanner capabilities.
-// ABOUTME: Covers trusted forwarding, mutation safety, PathBase routing, outage failure, and transient capability lifetime.
-
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;

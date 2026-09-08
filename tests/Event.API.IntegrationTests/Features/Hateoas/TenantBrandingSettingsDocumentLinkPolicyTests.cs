@@ -1,6 +1,3 @@
-// ABOUTME: Tests HAL link policy metadata for tenant branding typed settings documents.
-// ABOUTME: Ensures edit is capability-aware, server-authorized, and routed to the PATCH endpoint.
-
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.Authorization;

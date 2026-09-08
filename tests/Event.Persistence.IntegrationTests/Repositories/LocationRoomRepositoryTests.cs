@@ -1,6 +1,3 @@
-// ABOUTME: Persistence integration tests for LocationRoomRepository verifying CRUD and location-scoped queries.
-// ABOUTME: Uses Testcontainers PostgreSQL with real schema via MigrateAsync and Respawn reset.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Persistence;
@@ -11,6 +8,7 @@ using TUnit.Core;
 namespace Event.Persistence.IntegrationTests.Repositories;
 
 [ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
+[NotInParallel("PersistenceDb")]
 public class LocationRoomRepositoryTests
 {
     private readonly PostgreSqlContainerFixture _fixture;

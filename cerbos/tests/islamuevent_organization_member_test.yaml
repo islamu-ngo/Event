@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos policy test suite for organization_member resources.
-# ABOUTME: Tests admin-only organization member reads, writes, and member-management actions.
-
 name: OrganizationMemberPolicyTests
 description: "Validates organization_member resource policies across admin hierarchy levels"
 

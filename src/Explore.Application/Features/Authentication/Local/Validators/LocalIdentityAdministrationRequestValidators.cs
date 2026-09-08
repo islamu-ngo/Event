@@ -1,5 +1,3 @@
-// ABOUTME: Validates bounded administrative Local creation and supervised reset request intent.
-// ABOUTME: Uses manually constructed FluentValidation validators without treating request metadata as authority.
 
 using Explore.Application.Contracts.Identity;
 using System.Net.Mail;

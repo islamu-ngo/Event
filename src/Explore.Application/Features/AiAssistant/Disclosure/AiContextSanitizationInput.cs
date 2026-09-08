@@ -1,6 +1,3 @@
-// ABOUTME: Input record for AI context sanitization requests through the disclosure gateway.
-// ABOUTME: Carries entity fields, provider trust tier, viewer scope, consent grants, and PII gate.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Features.AiAssistant.Disclosure;

@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL contract tests for authoritative coordinated publication-policy setting persistence.
-// ABOUTME: Covers guarded snapshots, atomic batches, transaction ownership, rollback, validation, and seeding.
-
 namespace Event.Persistence.IntegrationTests.Settings;
 
 using System.Collections.Immutable;

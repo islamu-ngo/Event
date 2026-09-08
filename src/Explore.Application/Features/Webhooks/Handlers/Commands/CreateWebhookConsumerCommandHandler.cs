@@ -1,6 +1,3 @@
-// ABOUTME: Handles webhook consumer creation with Application-owned validation and mapping.
-// ABOUTME: Persists canonical consumer rows without exposing provider internals to controllers.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;

@@ -1,6 +1,3 @@
-// ABOUTME: Response models for BFF operations invoked via JS interop (bff.js fetch calls).
-// ABOUTME: Used by pages that call BFF endpoints through browser fetch for cookie compatibility.
-
 namespace Explore.Blazor.Client.Models.Responses;
 
 /// <summary>

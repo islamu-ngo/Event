@@ -1,6 +1,3 @@
-// ABOUTME: Builds the authenticated purchase-authority HAL affordance for payable orders.
-// ABOUTME: Keeps payment eligibility and authorization facts outside the primary order policy seam.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Hateoas;

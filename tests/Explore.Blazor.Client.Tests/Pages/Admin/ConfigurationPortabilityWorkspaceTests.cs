@@ -1,6 +1,3 @@
-// ABOUTME: Exercises HAL-gated instance and tenant configuration portability administration.
-// ABOUTME: Proves capability loss, trusted tenant labels, and accessible upload/recovery semantics.
-
 namespace Explore.Blazor.Client.Tests.Pages.Admin;
 
 using Explore.Blazor.Client.Clients;

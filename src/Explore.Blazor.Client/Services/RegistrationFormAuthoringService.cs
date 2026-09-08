@@ -1,6 +1,3 @@
-// ABOUTME: Delegates Studio form-authoring reads and mutations to the generated BFF client.
-// ABOUTME: Validates every server-advertised HAL mutation target immediately before dispatch.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Events;
 using Explore.Blazor.Client.Pages.Studio.RegistrationForms;

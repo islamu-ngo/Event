@@ -1,6 +1,3 @@
-// ABOUTME: Tests AnalyticsSettingGroup against the canonical analytics governance keys.
-// ABOUTME: Prevents regressions back to legacy endpoint/site-id key names.
-
 namespace Event.Application.UnitTests.Settings;
 
 using Explore.Application.Contracts.Infrastructure;

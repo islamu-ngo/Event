@@ -1,6 +1,3 @@
-// ABOUTME: Represents a named group of footer links for a tenant or instance-level default.
-// ABOUTME: TenantId = null means instance-default group, visible to all tenants when they have no own groups.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

@@ -1,6 +1,3 @@
-// ABOUTME: Content-signature validation policy for storage upload finalization.
-// ABOUTME: Compares trusted session MIME/extension metadata with inspected upload bytes before provider writes.
-
 using System.Buffers.Binary;
 
 namespace Explore.Application.Services;

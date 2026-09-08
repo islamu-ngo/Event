@@ -1,6 +1,3 @@
-// ABOUTME: Query handler for organization member detail resources.
-// ABOUTME: Uses repository abstraction and maps entities to DTOs inside Application.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.OrganizationMember;

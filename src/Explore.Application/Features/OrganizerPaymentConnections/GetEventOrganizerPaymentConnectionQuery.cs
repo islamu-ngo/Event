@@ -1,6 +1,3 @@
-// ABOUTME: Resolves the event organizer payment management envelope for a persisted event organizer.
-// ABOUTME: Uses server-owned tenant, organizer, provider, and platform facts for the private read model.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.OrganizerPaymentConnections;
 using MediatR;

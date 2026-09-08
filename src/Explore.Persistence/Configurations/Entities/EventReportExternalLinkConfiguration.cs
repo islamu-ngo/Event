@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for external report provider synchronization state.
-// ABOUTME: Applies idempotency indexes, retry bounds, and tenant/report/case graph constraints.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

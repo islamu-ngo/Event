@@ -1,6 +1,3 @@
-// ABOUTME: Test-side projection of provider-neutral Photon suggestions returned through reflection.
-// ABOUTME: Asserts only machine-consumed result fields and never depends on provider implementation internals.
-
 using System.Reflection;
 
 namespace Explore.Infrastructure.Tests.Geocoding;

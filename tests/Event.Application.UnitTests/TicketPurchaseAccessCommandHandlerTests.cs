@@ -1,6 +1,3 @@
-// ABOUTME: Verifies server-owned purchase-policy selection after account or guest access checks.
-// ABOUTME: Prevents public callers from choosing policy lineage or probing policy existence.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

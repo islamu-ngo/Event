@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for the reusable AI conversation composer surface.
-// ABOUTME: Verifies hosts can provide actor, prompt, and command state without rail dependencies.
-
 using Explore.Blazor.Client.Components.Shell.AiAssistant;
 using Explore.Blazor.Client.Tests;
 

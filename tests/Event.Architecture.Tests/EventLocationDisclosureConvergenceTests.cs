@@ -1,6 +1,3 @@
-// ABOUTME: Proves every EventLocation read path converges on the single batched disclosure authority.
-// ABOUTME: Blocks handlers, projections, and outbound builders from evaluating venue visibility themselves.
-
 using System.Reflection;
 using Explore.Application.Contracts.LocationPrivacy;
 using Explore.Application.Contracts.Services;

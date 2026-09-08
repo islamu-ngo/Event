@@ -1,5 +1,3 @@
-// ABOUTME: Instance-owned provider configuration and explicit public account onboarding declarations.
-// ABOUTME: Conservative stored defaults preserve provider-service deployment ownership and onboarding authority.
 
 using Explore.Domain.Constants;
 

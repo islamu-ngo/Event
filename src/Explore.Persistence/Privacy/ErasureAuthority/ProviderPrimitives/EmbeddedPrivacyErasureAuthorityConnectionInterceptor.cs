@@ -1,6 +1,3 @@
-// ABOUTME: Applies connection-scoped SQLite durability and contention settings to every authority session.
-// ABOUTME: Prevents pooled or newly opened connections from weakening synchronous writes or foreign keys.
-
 using System.Collections.Concurrent;
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore.Diagnostics;

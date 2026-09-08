@@ -1,6 +1,3 @@
-// ABOUTME: Maps direct-transfer session evidence and encrypted chunks with replay-resistant uniqueness.
-// ABOUTME: Enforces bounded metadata while leaving portable values only in protected payload columns.
-
 namespace Explore.Persistence.Configurations.Entities;
 
 using Explore.Domain;

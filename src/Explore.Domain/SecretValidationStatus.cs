@@ -1,6 +1,3 @@
-// ABOUTME: Lookup-table entity for secret validation lifecycle statuses.
-// ABOUTME: IDs mirror SecretValidationResult values and are referenced by SecretBinding.
-
 namespace Explore.Domain;
 
 public class SecretValidationStatus

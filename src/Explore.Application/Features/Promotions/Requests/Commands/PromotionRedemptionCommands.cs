@@ -1,6 +1,3 @@
-// ABOUTME: Defines promotion redemption command inputs and safe response DTOs for registration orders.
-// ABOUTME: Keeps plaintext codes write-only and returns only bounded public pricing state.
-
 using Explore.Application.Responses;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using MediatR;

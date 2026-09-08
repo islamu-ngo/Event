@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for schema-only AI data context allow-list validation.
-// ABOUTME: Proves model-selected fields cannot expose arbitrary EF, SQL/LINQ, or private content.
-
 using Explore.Application.Features.AiAssistant.Context;
 
 namespace Event.Application.UnitTests.Features.AiAssistant.Context;

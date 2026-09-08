@@ -1,6 +1,3 @@
-// ABOUTME: Characterization tests for atomic idempotency claims in the HTTP middleware.
-// ABOUTME: Proves concurrent identical keys execute once and persistence failures fail closed.
-
 using System.Security.Claims;
 using System.Text;
 using Event.Api.IntegrationTests.Features;

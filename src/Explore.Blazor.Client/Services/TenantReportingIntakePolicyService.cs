@@ -1,6 +1,3 @@
-// ABOUTME: Adapts generated reporting-intake policy operations for tenant administration.
-// ABOUTME: Preserves server HAL authority while centralizing the exact update payload.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Reporting;
 

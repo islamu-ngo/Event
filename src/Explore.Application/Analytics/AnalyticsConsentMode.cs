@@ -1,6 +1,3 @@
-// ABOUTME: Enumerates the privacy posture for analytics identity handling.
-// ABOUTME: Used to gate raw identifiers and identify/group calls across providers.
-
 namespace Explore.Application.Analytics;
 
 public enum AnalyticsConsentMode

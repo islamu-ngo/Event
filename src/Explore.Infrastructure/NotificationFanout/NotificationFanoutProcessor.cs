@@ -1,6 +1,3 @@
-// ABOUTME: Hosts bounded, fair notification fanout processing over durable PostgreSQL claims.
-// ABOUTME: Executes every claim in a fresh scope and reports aggregate PII-free outcomes.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Services;
 using Explore.Application.Telemetry;

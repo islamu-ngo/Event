@@ -1,6 +1,3 @@
-// ABOUTME: Shared bUnit test context for Blazor client tests with MudBlazor, auth, and common DI defaults.
-// ABOUTME: Centralizes JS interop stubs and test-only service registrations so component tests stay deterministic.
-
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Contracts.Services.Federation;
 using Explore.Blazor.Client.Contracts.Services.Notifications;

@@ -1,4 +1,3 @@
-// ABOUTME: Interface for resolving applicable event strategies based on tenant and DTO.
 // Orchestrates strategy selection and validation across modules.
 
 using Explore.Application.DTOs.Event;

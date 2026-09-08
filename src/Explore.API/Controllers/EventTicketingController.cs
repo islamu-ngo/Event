@@ -1,6 +1,3 @@
-// ABOUTME: Authenticated event-scoped ticket catalog, ticket type, and capacity-pool authoring endpoints.
-// ABOUTME: Delegates all platform-managed and event-authority enforcement to MediatR requests.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

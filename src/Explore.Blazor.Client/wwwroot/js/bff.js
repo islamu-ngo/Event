@@ -1,6 +1,3 @@
-// ABOUTME: Browser-side BFF utilities for cookie-aware auth, setup, and antiforgery requests.
-// ABOUTME: Keeps credential submissions in the browser so HttpOnly session cookies are applied correctly.
-
 /**
  * Read a cookie value by name from document.cookie.
  * Used by BffClient to read the XSRF-TOKEN cookie for CSRF protection on mutations.

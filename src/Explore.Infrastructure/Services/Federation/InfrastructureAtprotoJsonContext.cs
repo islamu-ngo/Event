@@ -1,6 +1,3 @@
-// ABOUTME: Supplies source-generated JSON metadata for Infrastructure-owned ATProto XRPC responses.
-// ABOUTME: Extends CarpaNet client options without reflection fallback or leaking transport models outward.
-
 using System.Text.Json.Serialization;
 
 namespace Explore.Infrastructure.Services.Federation;

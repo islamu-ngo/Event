@@ -1,6 +1,3 @@
-// ABOUTME: Detail read-model DTO for an event program section, track, devroom, or stage.
-// ABOUTME: Exposes grouping metadata without leaking internal EventSessionGroup naming into UI copy.
-
 using Explore.Application.DTOs.Location;
 
 namespace Explore.Application.DTOs.EventSessionGroup;

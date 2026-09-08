@@ -1,6 +1,3 @@
-// ABOUTME: Resolves trusted server-owned BFF request credentials independently of proxy transport.
-// ABOUTME: Applies one sanitized enrichment result to either YARP or an in-process API request.
-
 using System.Net.Http.Headers;
 using Event.Web.BffHosting.Abstractions;
 using Microsoft.AspNetCore.Authentication;

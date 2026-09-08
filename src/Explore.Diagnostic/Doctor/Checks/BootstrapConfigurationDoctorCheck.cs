@@ -1,6 +1,3 @@
-// ABOUTME: Verifies Compose projects the structured database runtime and migrator contract.
-// ABOUTME: Flags raw default connection strings because runtime composition owns derived values.
-
 using Explore.Diagnostic.Doctor.Infrastructure;
 
 namespace Explore.Diagnostic.Doctor.Checks;

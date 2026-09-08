@@ -1,6 +1,3 @@
-// ABOUTME: CQRS command for unsubscribing the current tenant user from an actor.
-// ABOUTME: Preserves the subscription row as status history instead of soft deleting it.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.ActorSubscription;
 using Explore.Application.Responses;

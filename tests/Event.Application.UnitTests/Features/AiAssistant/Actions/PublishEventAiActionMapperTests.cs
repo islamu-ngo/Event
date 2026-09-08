@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for converting untrusted AI PublishEvent proposals into safe publish DTOs.
-// ABOUTME: Verifies required concurrency, readiness context, hidden fields, and mapping output.
-
 using Explore.Application.Features.AiAssistant.Actions;
 using Explore.Application.Features.AiAssistant.Prompting;
 using Explore.Domain.Ai;

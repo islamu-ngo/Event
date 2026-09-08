@@ -1,6 +1,3 @@
-// ABOUTME: Applies context-owned Local Identity migrations with dedicated migrator credentials.
-// ABOUTME: Supports hosts that migrate in-process without replacing runtime Identity DI options.
-
 using Explore.Secrets.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;

@@ -1,6 +1,3 @@
-// ABOUTME: Redacts sensitive values before they can be printed by doctor checks.
-// ABOUTME: Protects connection strings, tokens, passwords, setup secrets, cookies, and auth headers.
-
 using System.Text.RegularExpressions;
 
 namespace Explore.Diagnostic.Doctor;

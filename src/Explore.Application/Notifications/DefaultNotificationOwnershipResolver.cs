@@ -1,6 +1,3 @@
-// ABOUTME: Default category-based notification ownership resolver.
-// ABOUTME: Applies account-authority, ISLAMU product, and external workflow ownership rules.
-
 using Explore.Application.Contracts.Notifications;
 using Microsoft.Extensions.Options;
 

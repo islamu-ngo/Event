@@ -1,6 +1,3 @@
-// ABOUTME: Tests effective Local webhook delivery governance and startup safety ceilings.
-// ABOUTME: Verifies tenant context, immutable policy values, and stable resolution identity.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;

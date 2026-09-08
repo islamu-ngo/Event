@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for domain references attached to AI assistant conversations.
-// ABOUTME: Enforces typed reference identity and prevents duplicate references per conversation.
-
 using Explore.Domain.Ai;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

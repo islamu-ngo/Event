@@ -1,6 +1,3 @@
-// ABOUTME: Options controlling deployment-selected authorization reconciliation during API startup.
-// ABOUTME: Bounds initial delay, retry cadence, attempt count, and per-attempt timeout without exposing secrets.
-
 namespace Explore.API.BackgroundServices;
 
 /// <summary>

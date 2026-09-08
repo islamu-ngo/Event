@@ -1,6 +1,3 @@
-// ABOUTME: SSRF protection policy for LocalProvider user-supplied webhook endpoint URLs.
-// ABOUTME: Blocks private, loopback, link-local, and metadata destinations unless explicitly allow-listed.
-
 using System.Net;
 using System.Net.Sockets;
 using Explore.Infrastructure.Configuration;

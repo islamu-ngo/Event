@@ -1,6 +1,3 @@
-// ABOUTME: BFF preference cookie helper for anonymous SSR appearance, language, and direction state.
-// ABOUTME: Centralizes cookie defaults so preference endpoints stay focused on routing and API forwarding.
-
 namespace Explore.Blazor.Services.Preferences;
 
 using System.Globalization;

@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for processing authenticated Osprey signal callbacks.
-// ABOUTME: Keeps provider callback persistence inside Application while API owns transport authentication.
-
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Responses;
 using MediatR;

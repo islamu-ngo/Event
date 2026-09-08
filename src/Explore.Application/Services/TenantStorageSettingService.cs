@@ -1,6 +1,3 @@
-// ABOUTME: Service implementation for provider-neutral tenant storage administration.
-// ABOUTME: Reads effective settings, redacts secrets, and writes tenant overrides through the settings resolver.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

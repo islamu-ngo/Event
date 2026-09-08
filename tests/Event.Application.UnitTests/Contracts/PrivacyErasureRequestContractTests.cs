@@ -1,6 +1,3 @@
-// ABOUTME: Specifies the platform-wide Application request contract for typed User privacy erasure.
-// ABOUTME: Rejects invalid identities, kinds, reasons, policy versions, and arbitrary executable instruction fields.
-
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Explore.Application.Contracts.PrivacyErasure;

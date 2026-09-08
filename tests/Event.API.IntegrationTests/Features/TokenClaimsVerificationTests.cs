@@ -1,6 +1,3 @@
-// ABOUTME: Token claims verification tests validating JWT structure from containerized Keycloak.
-// ABOUTME: Decodes tokens and asserts claims (sub, aud, iss, iat, exp, preferred_username, email).
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Headers;
 using System.Security.Claims;

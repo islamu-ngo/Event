@@ -1,5 +1,3 @@
-// ABOUTME: Exposes private instance-authorized Local identity issuance and operation status through MediatR.
-// ABOUTME: Keeps one-time credential disclosure outside generic replay storage and projects native results into HAL.
 
 using Asp.Versioning;
 using Explore.API.Attributes;

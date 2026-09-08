@@ -38,6 +38,7 @@ Orchestrates business use cases. Owns CQRS commands and queries, MediatR handler
 
 * **Identifiers**: Aggregates use UUIDv7 `Guid`; lookup tables use `int`; pagination cursors use `long`.
 * **Endpoints**: GET requests default to `[AllowAnonymous]`; state-mutating commands require `[Authorize]`.
+* **Concurrent edits**: When an endpoint requires `If-Match`, send the observed non-empty concurrency GUID in double quotes, for example `If-Match: "0194d714-6800-7000-8000-000000000001"`. Bare GUIDs, weak tags, wildcard/list values, and malformed quotes are rejected. If the version is stale, reload the resource before deciding whether to retry the edit.
 * **Multi-Tenancy**: Tenant context resolves strictly from ambient session headers, never from untrusted request body parameters (see [Multi-Tenancy Architecture](../security-and-identity/multi-tenancy.md)).
 * **Outbox Reliability**: Side effects (email dispatch, webhooks, search indexing) commit to transactional outboxes within the same database transaction (see [Architecture & Request Flows](../getting-started/architecture-and-request-flows.md#2-write-command-flow)).
 

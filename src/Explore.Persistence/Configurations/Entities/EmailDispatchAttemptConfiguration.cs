@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for immutable-ish email dispatch attempt ledger rows.
-// ABOUTME: Enforces one attempt number per outbox row and tenant-scoped operational indexes.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

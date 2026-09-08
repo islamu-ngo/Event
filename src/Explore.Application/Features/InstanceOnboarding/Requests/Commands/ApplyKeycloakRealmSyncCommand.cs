@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for applying backup-confirmed additive Keycloak realm repairs.
-// ABOUTME: Keeps mutation intent explicit for post-onboarding instance-admin operations.
-
 using Explore.Application.DTOs.Onboarding;
 using MediatR;
 

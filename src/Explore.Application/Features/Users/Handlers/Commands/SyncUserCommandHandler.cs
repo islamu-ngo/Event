@@ -1,6 +1,3 @@
-// ABOUTME: Synchronizes provider profiles while requiring pre-established canonical Local account bindings.
-// ABOUTME: Rechecks ownership inside the write transaction and prevents implicit Local/external account adoption.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;

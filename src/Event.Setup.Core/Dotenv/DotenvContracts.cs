@@ -1,6 +1,3 @@
-// ABOUTME: Defines immutable dotenv entries, documents, provenance, and bounded value-safe results.
-// ABOUTME: Defensively snapshots collections while redacting values from all public string projections.
-
 namespace ISLAMU.Event.Setup.Core.Environment;
 
 public enum DotenvEntryKind

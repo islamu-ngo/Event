@@ -1,6 +1,3 @@
-// ABOUTME: Handles admin approval-state changes for tenant-scoped Group records.
-// ABOUTME: Validates approval lookup rows and updates only approval audit fields, not ordinary group metadata.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Group.Validators;

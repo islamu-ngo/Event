@@ -1,6 +1,3 @@
-// ABOUTME: Enforces canonical public ATProto OAuth destinations and production-safe resolved addresses.
-// ABOUTME: Allows only explicit exact loopback in Development and rejects mixed DNS rebinding answers.
-
 using System.Net;
 using System.Net.Sockets;
 

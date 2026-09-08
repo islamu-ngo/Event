@@ -1,6 +1,3 @@
-// ABOUTME: Wrapper DTO for PATCH-based Group profile and hierarchy updates using nullable logical groups.
-// ABOUTME: Route ID owns identity; nullable fields and relationships use OptionalUpdate for explicit clear semantics.
-
 using System;
 using Explore.Application.Models.Common;
 

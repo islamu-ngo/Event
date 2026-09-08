@@ -1,6 +1,3 @@
-// ABOUTME: Semantic parity tests between native ASP.NET Core OpenAPI and Swashbuckle output.
-// ABOUTME: Phase 4 guardrail that keeps both generators aligned before runtime export cleanup.
-
 using System.Net;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;

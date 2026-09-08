@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for confirmed AI tool execution audit rows.
-// ABOUTME: Keeps execution result metadata bounded and linked to its proposed action.
-
 using Explore.Domain.Ai;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

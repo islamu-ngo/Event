@@ -1,6 +1,3 @@
-// ABOUTME: Evaluates HATEOAS link visibility by batching authorization checks with deduplication.
-// ABOUTME: Static checks (auth, roles, conditions) run first; permission-bound links are batch-evaluated via IAuthorizationProvider.
-
 namespace Explore.API.Hateoas;
 
 using System.Diagnostics;

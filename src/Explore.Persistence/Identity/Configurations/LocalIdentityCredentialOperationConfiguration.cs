@@ -1,5 +1,3 @@
-// ABOUTME: Maps Identity-owned Local credential receipts in both supported store topologies.
-// ABOUTME: Enforces operation identity, closed lifecycle values, provenance, and optimistic concurrency.
 
 using Explore.Application.Contracts.Identity;
 using Microsoft.EntityFrameworkCore;

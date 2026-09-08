@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning all tag types that contain a given tag.
-// ABOUTME: Inverse of GetTagsByTagType — used for breadcrumb resolution.
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.TagType;

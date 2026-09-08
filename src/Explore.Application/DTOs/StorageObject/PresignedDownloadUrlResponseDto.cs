@@ -1,6 +1,3 @@
-// ABOUTME: Response contract for metadata-authorized presigned storage downloads.
-// ABOUTME: Carries the short-lived URL plus safe presentation metadata without exposing provider keys.
-
 namespace Explore.Application.DTOs.StorageObject;
 
 /// <summary>

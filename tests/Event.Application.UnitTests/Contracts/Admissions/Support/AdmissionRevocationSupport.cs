@@ -1,6 +1,3 @@
-// ABOUTME: Defines the exact revocation repository port fake and immutable refund/cancellation matrix.
-// ABOUTME: The fake applies only service-computed revoked and preserved ticket identities.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Services.Registration;
 

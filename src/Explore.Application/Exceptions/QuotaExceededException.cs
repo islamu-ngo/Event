@@ -1,6 +1,3 @@
-// ABOUTME: Application exception for business quota violations that must map to stable quota_exceeded ProblemDetails.
-// ABOUTME: Carries machine-readable quota metadata without depending on HTTP or API-layer types.
-
 using Explore.Application.Responses;
 
 namespace Explore.Application.Exceptions;

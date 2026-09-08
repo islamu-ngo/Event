@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS link policies for LocationRoom detail and collection views.
-// ABOUTME: Provides self, parent location, edit, and delete links with Cerbos authorization.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Collections.Generic;

@@ -1,6 +1,3 @@
-// ABOUTME: Creates gRPC channel options for Cerbos connectivity with IPv4-safe transport settings.
-// ABOUTME: Avoids dual-stack DNS stalls on self-hosted domains that publish unreachable AAAA records.
-
 using System.Net;
 using System.Net.Sockets;
 using Grpc.Net.Client;

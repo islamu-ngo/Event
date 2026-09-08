@@ -1,6 +1,3 @@
-// ABOUTME: Validates session runtime custom property option payload with standard field length constraints.
-// ABOUTME: Mirrors CreateEventCustomPropertyOptionDtoValidator for consistency across EAV system.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.EventSessionCustomProperty.Validators;

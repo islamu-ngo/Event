@@ -1,6 +1,3 @@
-// ABOUTME: Maps tenant-bound refund campaigns with fenced leases, stable cursors, and operator-safe counters.
-// ABOUTME: Enforces one immutable campaign decision and indexed bounded worker queries across providers.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

@@ -1,6 +1,3 @@
-// ABOUTME: Shared helper for turning stored image references into browser-safe presentation URLs.
-// ABOUTME: Allows only external URLs or stable API-owned public-image paths.
-
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Services;

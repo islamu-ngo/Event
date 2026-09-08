@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the S3-compatible provider-neutral storage adapter.
-// ABOUTME: Verifies generated keys, streaming writes, reads, deletes, and provider health without external S3 access.
-
 using System.Text;
 using Amazon.S3;
 using Amazon.S3.Model;

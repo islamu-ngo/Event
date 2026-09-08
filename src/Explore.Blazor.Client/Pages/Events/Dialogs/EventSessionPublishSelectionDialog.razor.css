@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped layout styles for the event-session publish selection dialog. */
-/* ABOUTME: Keeps selectable rows stable and readable across compact and desktop dialog widths. */
-
 .event-session-publish-dialog__select-all,
 .event-session-publish-dialog__session {
     border: 1px solid var(--mud-palette-lines-default);

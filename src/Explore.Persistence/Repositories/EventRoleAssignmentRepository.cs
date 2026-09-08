@@ -1,6 +1,3 @@
-// ABOUTME: Repository for persisted event-role assignment grants and effective authority lookups.
-// ABOUTME: Applies the canonical lifecycle/time predicate so fallback authorization is not weaker than Cerbos.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

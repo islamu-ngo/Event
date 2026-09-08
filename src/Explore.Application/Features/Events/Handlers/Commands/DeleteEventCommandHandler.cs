@@ -1,5 +1,3 @@
-// ABOUTME: Handler for deleting (soft-deleting) an event.
-// ABOUTME: Fetches event by ID and delegates deletion to the repository.
 using System;
 using System.Linq;
 using System.Threading;

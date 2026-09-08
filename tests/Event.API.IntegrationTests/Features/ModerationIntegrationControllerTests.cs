@@ -1,6 +1,3 @@
-// ABOUTME: API contract tests for moderation-provider integration callback endpoints.
-// ABOUTME: Verifies Osprey callback route metadata, API-key policy use, and MediatR mapping.
-
 using System.Diagnostics.Metrics;
 using System.Globalization;
 using System.Reflection;

@@ -1,6 +1,3 @@
-// ABOUTME: Command contract for completing tenant onboarding policy questionnaire.
-// ABOUTME: Persists tenant policy overrides and marks tenant onboarding as completed.
-
 using Explore.Application.DTOs.TenantPolicy;
 using Explore.Application.DTOs.TenantSettings;
 using Explore.Application.Responses;

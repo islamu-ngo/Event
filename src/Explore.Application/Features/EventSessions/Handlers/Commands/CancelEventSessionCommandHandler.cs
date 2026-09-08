@@ -1,6 +1,3 @@
-// ABOUTME: Handler that transitions an event session to the Cancelled lifecycle state.
-// ABOUTME: Adds an immutable attendee occurrence only when a published session is cancelled.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.EventSessions.Requests.Commands;

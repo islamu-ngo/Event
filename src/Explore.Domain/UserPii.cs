@@ -1,4 +1,3 @@
-// ABOUTME: Stores user-identifying fields in a dedicated extension table.
 // Uses a 1:1 shared primary-key relationship with User for hard-deleteable PII.
 
 namespace Explore.Domain;

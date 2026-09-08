@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for event-scoped Studio participation and ticketing route boundaries.
-// ABOUTME: Proves direct navigation fails closed without each route's exact event HAL relation.
-
 using System.Text.Json;
 using Blazouter.Services;
 using Explore.Blazor.Client.Clients;

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for custom property admin service projection HAL mapping.
-// ABOUTME: Ensures projection action links survive generated client HAL resources into UI models.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Models;
 using Explore.Blazor.Client.Services;

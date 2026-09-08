@@ -1,6 +1,3 @@
-// ABOUTME: API controller for managing storage objects (files, media, attachments) with upload/download support.
-// ABOUTME: Handles file metadata, access control, and integration with object storage backends.
-
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;

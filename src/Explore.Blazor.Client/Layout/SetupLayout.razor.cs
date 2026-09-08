@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for SetupLayout providing theme toggle with same palettes as MainLayout.
-// ABOUTME: Uses the new IAppearanceThemeService for theme mode persistence.
-
 using Explore.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
 using MudBlazor;

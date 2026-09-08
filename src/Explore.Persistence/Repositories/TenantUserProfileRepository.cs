@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for tenant-local user profile records.
-// ABOUTME: Looks up profile metadata by tenant-local participation identity.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

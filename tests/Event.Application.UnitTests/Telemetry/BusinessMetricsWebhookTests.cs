@@ -1,6 +1,3 @@
-// ABOUTME: Verifies webhook business metrics use bounded, safe OpenTelemetry tags.
-// ABOUTME: Guards against exposing endpoint URLs, payloads, secrets, message ids, or response bodies in dimensions.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Telemetry;
 using NSubstitute;

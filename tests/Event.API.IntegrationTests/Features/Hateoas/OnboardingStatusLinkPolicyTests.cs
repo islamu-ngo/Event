@@ -1,6 +1,3 @@
-// ABOUTME: Verifies HAL affordances for instance and tenant onboarding status resources.
-// ABOUTME: Covers setup-secret, administrator, tenant-scope, and fail-closed authority boundaries.
-
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.Authorization;

@@ -1,6 +1,3 @@
-// ABOUTME: Unit coverage for generated-client webhook operations normalization.
-// ABOUTME: Verifies typed HAL collection affordances and sensitive payload results cross the client service boundary intact.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Webhooks;
 using Explore.Blazor.Client.Services.Webhooks;

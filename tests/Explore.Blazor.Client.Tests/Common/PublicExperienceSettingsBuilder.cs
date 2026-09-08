@@ -1,6 +1,3 @@
-// ABOUTME: Fluent builder for PublicExperienceSettingsDto used in bUnit tests.
-// ABOUTME: Makes tenant branding, module flags, analytics, and render policy configuration explicit and readable.
-
 using Explore.Blazor.Client.Services;
 
 namespace Explore.Blazor.Client.Tests.Common;

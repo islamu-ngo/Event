@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS contract coverage for organization member collection and detail affordances.
-// ABOUTME: Protects HAL-gated Blazor organization member actions from route, scope, or permission drift.
-
 using System.Security.Claims;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Hateoas;

@@ -1,4 +1,3 @@
-// ABOUTME: EF Core configuration for AppSetting entity with primary key on Key column,
 // check constraint preventing high-value secrets, and concurrency control via RowVersion.
 
 namespace Explore.Persistence.Configurations.Entities;

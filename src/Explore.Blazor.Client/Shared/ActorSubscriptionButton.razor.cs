@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for HAL-gated actor subscription button behavior.
-// ABOUTME: Coordinates subscription state, idempotent subscribe/unsubscribe calls, and accessible announcements.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Contracts.Services.Notifications;

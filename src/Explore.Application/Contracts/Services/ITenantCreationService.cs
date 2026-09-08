@@ -1,6 +1,3 @@
-// ABOUTME: Transaction-neutral boundary for creating one tenant and both mandatory typed documents.
-// ABOUTME: Rejects Active creation unless the explicit directory-operator seed is capability-ready.
-
 using Explore.Domain;
 using Explore.Domain.Settings.Documents;
 

@@ -1,5 +1,3 @@
-// ABOUTME: Exercises rendered SMTP administration against real generated clients and controlled HTTP responses.
-// ABOUTME: Verifies confirmation authority, lock preservation, expiry and failures without timing-based waits.
 
 using System.Globalization;
 using System.Net;

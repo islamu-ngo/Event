@@ -1,6 +1,3 @@
-// ABOUTME: Handles paginated retrieval of notifications for the authenticated user.
-// ABOUTME: Supports optional filtering by read status and notification type.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for EventLookupService verifying generated-client delegation and fault isolation.
-// ABOUTME: Ensures empty collections are returned gracefully on API errors.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Services.Lookup;
 using Microsoft.Extensions.Logging.Abstractions;

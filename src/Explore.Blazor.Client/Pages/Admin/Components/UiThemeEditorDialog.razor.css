@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped grid layout for the UI theme palette editor dialog. */
-/* ABOUTME: Produces a responsive 2-3 column grid for the 17 color token fields per palette. */
-
 .ui-theme-editor__grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

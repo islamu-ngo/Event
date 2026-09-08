@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for webhook payload envelope creation and minimization.
-// ABOUTME: Guards stable hashes, retention calculation, strict data allow-lists, and heavy-redaction privacy.
-
 using System.Text;
 using System.Text.Json;
 using Explore.Application.Contracts.Webhooks;

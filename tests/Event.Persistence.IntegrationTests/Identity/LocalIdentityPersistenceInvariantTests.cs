@@ -1,6 +1,3 @@
-// ABOUTME: Guards normalized Local Identity persistence and convention-derived relational names.
-// ABOUTME: Verifies provider lookup FKs and namespace rules across every supported EF Core provider.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
@@ -58,8 +55,8 @@ public sealed class LocalIdentityPersistenceInvariantTests
     [Test]
     public async Task ProviderLookupSeederRepairsStableEnumRowsIdempotently()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase($"authentication-providers-{Guid.NewGuid():N}")
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase($"authentication-providers-{Guid.NewGuid():N}")
             .Options;
         await using var context = new ExploreDbContext(options);
 
@@ -105,7 +102,8 @@ public sealed class LocalIdentityPersistenceInvariantTests
                     : null,
             })
             .Build();
-        var options = new DbContextOptionsBuilder<ExternalIdentityDbContext>();
+        // External topology probes require independent provider-specific migration services.
+        var options = TestDbContextOptions.Create<ExternalIdentityDbContext>().EnableServiceProviderCaching(false);
         IdentityDatabaseProviderComposition.Configure(
             options,
             configuration,
@@ -178,7 +176,7 @@ public sealed class LocalIdentityPersistenceInvariantTests
 
     private static ExploreDbContext CreatePostgreSqlContext()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql("Host=localhost;Database=identity_model;Username=test;Password=test")
             .UseSnakeCaseNamingConvention()
             .Options;
@@ -187,7 +185,7 @@ public sealed class LocalIdentityPersistenceInvariantTests
 
     private static ExploreDbContext CreateSqlServerContext()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlServer("Server=localhost;Database=identity_model;User Id=test;Password=test;TrustServerCertificate=true")
             .UseSnakeCaseNamingConvention()
             .Options;
@@ -196,7 +194,7 @@ public sealed class LocalIdentityPersistenceInvariantTests
 
     private static ExploreDbContext CreateSqliteContext()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite("Data Source=:memory:")
             .UseSnakeCaseNamingConvention()
             .Options;
@@ -205,7 +203,7 @@ public sealed class LocalIdentityPersistenceInvariantTests
 
     private static ExploreDbContext CreateMySqlContext()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseMySql(
                 "Server=localhost;Database=identity_model;User=test;Password=test",
                 new MySqlServerVersion(new Version(8, 4)))

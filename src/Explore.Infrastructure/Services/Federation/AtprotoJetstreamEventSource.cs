@@ -1,6 +1,3 @@
-// ABOUTME: Owns one CarpaNet Jetstream v2 client per active session behind a bounded session contract.
-// ABOUTME: Sends the exact community filters in the subscribe request; v2 filters are immutable per connection.
-
 using System.Runtime.CompilerServices;
 using CarpaNet.Jetstream;
 using Explore.Domain.ValueObjects;

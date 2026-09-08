@@ -1,6 +1,3 @@
-// ABOUTME: Defines the fixed first-party ATProto JWT trust domains and bounded token lifetimes.
-// ABOUTME: Keeps bootstrap and platform-session issuers, audiences, and key purposes distinct.
-
 namespace Explore.API.Authentication;
 
 public sealed class AtprotoJwtOptions

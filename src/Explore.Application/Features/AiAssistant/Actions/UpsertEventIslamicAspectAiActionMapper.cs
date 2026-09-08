@@ -1,6 +1,3 @@
-// ABOUTME: Maps untrusted AI Islamic aspect proposals into explicit grouped update commands.
-// ABOUTME: Validates aspect module context, event concurrency, and bounded Islamic aspect fields.
-
 using System.Text.Json;
 using Explore.Application.DTOs.EventAspects;
 using Explore.Application.Features.AiAssistant.Prompting;

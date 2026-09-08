@@ -1,6 +1,3 @@
-// ABOUTME: Reports bounded privacy-erasure replay and provider-work readiness diagnostics.
-// ABOUTME: Excludes identifiers, endpoints, payloads, connection details, and exception text.
-
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.PrivacyErasure;

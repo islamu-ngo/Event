@@ -1,6 +1,3 @@
-// ABOUTME: Specifies the exact admission QR payload grammar and redacted bearer value semantics.
-// ABOUTME: Proves one canonical codec round-trips v1 material and rejects malformed input without echoing it.
-
 using System.Diagnostics;
 using ISLAMU.Wire.Contracts.Admissions;
 

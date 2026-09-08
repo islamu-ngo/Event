@@ -1,6 +1,3 @@
-// ABOUTME: Structured public accountability DTOs for tenant-directory and instance-operator roles.
-// ABOUTME: Keeps role labels and source revisions explicit without merging or deduplicating authorities.
-
 namespace Explore.Application.DTOs.PublicExperience;
 
 public sealed record TenantDirectoryOperatorPublicDto

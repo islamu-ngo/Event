@@ -1,6 +1,3 @@
-// ABOUTME: No-op translation provider used as fallback when no TMS and no offline bundles available.
-// ABOUTME: Returns empty results for all operations — translations resolve to key fallback in TranslationResolver.
-
 using Explore.Application.Contracts.Infrastructure;
 using Microsoft.Extensions.Logging;
 

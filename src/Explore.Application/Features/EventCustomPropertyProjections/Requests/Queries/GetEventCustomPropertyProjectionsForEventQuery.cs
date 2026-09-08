@@ -1,6 +1,3 @@
-// ABOUTME: Query to retrieve all projection rows for a specific event, optionally filtered by exposure ceiling.
-// ABOUTME: Used for admin inspection and as a dependency for Milestone F aggregate view composition.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Application.Responses;

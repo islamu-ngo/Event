@@ -1,6 +1,3 @@
--- ABOUTME: Idempotent PostgreSQL DDL for the co-located Quartz.NET scheduler tables in the primary application database.
--- ABOUTME: {prefix} is substituted with the validated Scheduler:Quartz:TablePrefix; GO on its own line separates batches.
-
 CREATE TABLE IF NOT EXISTS {prefix}job_details (
     sched_name TEXT NOT NULL,
     job_name TEXT NOT NULL,

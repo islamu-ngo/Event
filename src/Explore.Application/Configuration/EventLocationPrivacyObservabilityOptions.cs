@@ -1,6 +1,3 @@
-// ABOUTME: Operator-tunable thresholds for EventLocation privacy remediation observability.
-// ABOUTME: Owns the review-queue backlog level at which readiness reports a degraded privacy posture.
-
 namespace Explore.Application.Configuration;
 
 public sealed class EventLocationPrivacyObservabilityOptions

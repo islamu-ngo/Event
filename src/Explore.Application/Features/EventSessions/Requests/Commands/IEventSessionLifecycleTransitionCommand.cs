@@ -1,6 +1,3 @@
-// ABOUTME: Shared command contract for terminal event-session lifecycle transitions.
-// ABOUTME: Lets handlers share concurrency, authorization, cache, and parent-event invariant behavior.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventSession;
 using Explore.Application.Responses;

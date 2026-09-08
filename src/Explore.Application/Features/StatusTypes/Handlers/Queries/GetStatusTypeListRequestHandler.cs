@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning all available status types.
-// ABOUTME: Maps StatusType entities to StatusTypeDto list.
 using System;
 using System.Collections.Generic;
 using System.Text;

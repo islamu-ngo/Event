@@ -1,6 +1,3 @@
-// ABOUTME: API route contract tests for EventAspectController endpoints.
-// ABOUTME: Verifies the aspect-controller split preserves existing event aspect route, auth, cache, and response contracts.
-
 using System.Reflection;
 using Explore.API.Attributes;
 using Explore.API.Controllers;

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the Open Graph image operation is generated as a binary PNG contract.
-// ABOUTME: Guards the NSwag client from accepting JSON or deserializing FileContentResult.
-
 using System.Text.Json;
 
 using Explore.API.Hateoas;

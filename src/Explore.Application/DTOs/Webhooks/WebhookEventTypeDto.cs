@@ -1,6 +1,3 @@
-// ABOUTME: API DTO for canonical outgoing webhook event type metadata.
-// ABOUTME: Exposes schema, example, retention, and field catalog data for management clients.
-
 namespace Explore.Application.DTOs.Webhooks;
 
 public sealed record WebhookEventTypeDto

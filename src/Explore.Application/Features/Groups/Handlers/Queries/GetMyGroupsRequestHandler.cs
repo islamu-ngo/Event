@@ -1,6 +1,3 @@
-// ABOUTME: Handles retrieval of Groups the current user belongs to, with pagination.
-// ABOUTME: Enriches each GroupListDto with the user's normalized CurrentUserRoleId from membership data.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

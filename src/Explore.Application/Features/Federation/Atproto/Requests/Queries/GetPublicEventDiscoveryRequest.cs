@@ -1,6 +1,3 @@
-// ABOUTME: Requests a bounded source-aware public event page merged from local and governed ATProto projections.
-// ABOUTME: Keeps the existing local event query contract unchanged for management, MCP, and internal consumers.
-
 using Explore.Application.DTOs.PublicExperience;
 using Explore.Application.Features.Events.Requests.Queries;
 using Explore.Application.Responses;

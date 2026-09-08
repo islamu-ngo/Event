@@ -1,6 +1,3 @@
-// ABOUTME: Authenticates narrow admission-scanner capabilities through the Application boundary.
-// ABOUTME: Projects only bounded scope claims and never logs or persists plaintext capability material.
-
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Explore.Application.Contracts.Admissions;

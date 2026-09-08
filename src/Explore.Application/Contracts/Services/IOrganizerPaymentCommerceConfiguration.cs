@@ -1,6 +1,3 @@
-// ABOUTME: Provides the configured organizer payment provider identity for publication readiness checks.
-// ABOUTME: Keeps paid-publication CQRS from hard-coding deployment-specific Connect platform identifiers.
-
 namespace Explore.Application.Contracts.Services;
 
 public interface IOrganizerPaymentCommerceConfiguration

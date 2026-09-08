@@ -1,6 +1,3 @@
-// ABOUTME: Minimal retention deadline authority for registration answers and PII snapshots.
-// ABOUTME: Keeps immutable deadlines on rows instead of inferring cleanup policy at sweep time.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Domain;

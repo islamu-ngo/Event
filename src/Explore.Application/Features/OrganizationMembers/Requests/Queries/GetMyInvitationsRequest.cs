@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query for fetching the current user's pending organization invitations.
-// ABOUTME: Returns IEnumerable<OrganizationMemberDto>.
 using System.Collections.Generic;
 using Explore.Application.DTOs.OrganizationMember;
 using MediatR;

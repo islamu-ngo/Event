@@ -1,6 +1,3 @@
-// ABOUTME: Covers provider-neutral capability resolution, schema drift classes, and mapping publication commands.
-// ABOUTME: Keeps Phase 9 Wave B policy tests in Application without EF, API, or provider adapters.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Application.DTOs.RegistrationProviders;

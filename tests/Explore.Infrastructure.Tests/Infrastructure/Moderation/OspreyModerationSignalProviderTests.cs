@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the Osprey moderation signal HTTP adapter.
-// ABOUTME: Verifies safe request serialization, response mapping, and retry classification.
-
 using System.Net;
 using System.Text;
 using System.Text.Json;

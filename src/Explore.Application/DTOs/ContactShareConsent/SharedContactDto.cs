@@ -1,6 +1,3 @@
-// ABOUTME: DTO for the organiser contacts page showing granted email consents.
-// ABOUTME: Returns email snapshot data for authorised organisation members to view/export.
-
 namespace Explore.Application.DTOs.ContactShareConsent;
 
 public sealed record SharedContactDto

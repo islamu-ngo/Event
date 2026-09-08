@@ -1,6 +1,3 @@
-// ABOUTME: Creates payload-free outbox messages for committed configuration import effects.
-// ABOUTME: Binds post-commit cache invalidation to the value-minimized import operation receipt.
-
 namespace Explore.Application.Features.ConfigurationManifest.Importing;
 
 using Explore.Application.Contracts.Persistence;

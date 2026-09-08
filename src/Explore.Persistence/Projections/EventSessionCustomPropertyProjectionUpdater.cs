@@ -1,6 +1,3 @@
-// ABOUTME: Transactional projection writer for the event-session custom-property read model with advisory-lock coordination.
-// ABOUTME: Entity-specific logic hand-coded; shared infrastructure (locks, hashing, chunking) in ProjectionInfrastructure.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Exceptions;

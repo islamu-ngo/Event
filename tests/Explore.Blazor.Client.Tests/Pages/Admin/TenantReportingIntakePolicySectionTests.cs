@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for tenant reporting-intake administration.
-// ABOUTME: Verifies HAL-only editability, publication-safety gating, and authoritative reloads.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;

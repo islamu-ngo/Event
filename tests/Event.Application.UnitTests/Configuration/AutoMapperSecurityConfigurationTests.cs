@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the application composition root bounds every AutoMapper traversal.
-// ABOUTME: Prevents regression of the CVE-2026-32933 uncontrolled-recursion mitigation.
-
 using AutoMapper;
 using AutoMapper.Internal;
 using Explore.Application;

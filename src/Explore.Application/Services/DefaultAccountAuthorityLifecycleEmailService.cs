@@ -1,6 +1,3 @@
-// ABOUTME: Routes lifecycle email using the exact persisted provider-account binding of the target user.
-// ABOUTME: Keeps Local delivery and external authorities independent of deployment-wide SMTP defaults.
-
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;

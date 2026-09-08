@@ -1,6 +1,3 @@
-// ABOUTME: Processes encrypted recovery identity only after the uniform public request commits.
-// ABOUTME: Clears protected identity after successful present-or-absent processing and retries failures.
-
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Explore.Application.Contracts.Admissions;

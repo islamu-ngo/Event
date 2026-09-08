@@ -1,6 +1,3 @@
--- ABOUTME: Idempotent SQL Server DDL for the co-located Quartz.NET scheduler tables in the primary application database.
--- ABOUTME: {prefix} is substituted with the validated Scheduler:Quartz:TablePrefix; GO on its own line separates batches.
-
 IF OBJECT_ID(N'{prefix}JOB_DETAILS', N'U') IS NULL
 CREATE TABLE {prefix}JOB_DETAILS (
     SCHED_NAME NVARCHAR(120) NOT NULL,

@@ -1,5 +1,3 @@
-// ABOUTME: Exercises Local bootstrap convergence and crash recovery through real SQLite Identity and application stores.
-// ABOUTME: Substitutes only deployment secrets and runtime notification boundaries, never credential or onboarding services.
 
 using System.Data.Common;
 using System.Security.Cryptography;
@@ -467,7 +465,7 @@ public sealed class LocalBootstrapConvergenceTests
                 identity.AddEntityFrameworkStores<ExternalIdentityDbContext>();
             }
             else identity.AddEntityFrameworkStores<ExploreDbContext>();
-            Provider = services.BuildServiceProvider();
+            Provider = services.BuildIsolatedServiceProvider();
             await using var scope = Provider.CreateAsyncScope();
             await Application(scope).Database.EnsureCreatedAsync(Token);
             if (_topology == IdentityDatabaseTopology.External)

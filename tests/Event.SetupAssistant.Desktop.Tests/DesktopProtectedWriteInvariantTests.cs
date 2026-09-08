@@ -1,6 +1,3 @@
-// ABOUTME: Specifies real Unix protected-write invariants and Windows fail-closed disposition.
-// ABOUTME: Exercises owner-only creation, atomic replacement, target swaps, cleanup, and value-free failures.
-
 namespace Event.SetupAssistant.Desktop.Tests;
 
 using System.Reflection;

@@ -1,6 +1,3 @@
-// ABOUTME: Handles presence-aware updates to instance-level footer governance lock flags.
-// ABOUTME: Authorizes and validates before writing only supplied settings at Instance scope.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Footer.Requests.Commands;

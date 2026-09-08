@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for HAL-driven Studio form authoring and published immutability.
-// ABOUTME: Proves keyboard reorder boundaries, announcements, and exact mutation target checks.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;

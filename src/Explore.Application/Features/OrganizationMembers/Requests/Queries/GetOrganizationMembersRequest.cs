@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query for fetching all members of an organization.
-// ABOUTME: Returns List<OrganizationMemberDto> after organization-member view authorization.
 using System;
 using System.Collections.Generic;
 using Explore.Application.Authorization;

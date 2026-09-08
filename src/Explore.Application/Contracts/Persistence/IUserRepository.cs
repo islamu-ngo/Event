@@ -1,6 +1,3 @@
-// ABOUTME: Persistence contract for global user identity and normalized-email entity lookups.
-// ABOUTME: Keeps PII erasure and entity-first user resolution behind the Application boundary.
-
 using System;
 using System.Collections.Generic;
 using System.Text;

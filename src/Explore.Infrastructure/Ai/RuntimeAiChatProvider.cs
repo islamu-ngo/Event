@@ -1,6 +1,3 @@
-// ABOUTME: Runtime AI provider selector that delegates to strategy-resolved providers.
-// ABOUTME: Eliminates if/else dispatch by using IAiProviderStrategyResolver for provider selection.
-
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Microsoft.Extensions.Options;
 

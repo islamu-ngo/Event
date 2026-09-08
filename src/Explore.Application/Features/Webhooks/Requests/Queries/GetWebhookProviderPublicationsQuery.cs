@@ -1,6 +1,3 @@
-// ABOUTME: Authorized query for bounded tenant-scoped provider publication operations rows.
-// ABOUTME: Supports normalized state, message, and consumer filters without exposing persistence types.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Webhooks;
 using MediatR;

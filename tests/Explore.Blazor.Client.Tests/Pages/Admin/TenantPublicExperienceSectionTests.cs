@@ -1,5 +1,3 @@
-// ABOUTME: Rendered coverage for separate tenant public-display and visitor-access controls.
-// ABOUTME: Verifies canonical visitor modes and platform lock presentation without conflating display mode.
 
 using Explore.Blazor.Client.Pages.Admin.Tenant.Components;
 using Explore.Blazor.Client.Tests.Common;

@@ -1,6 +1,3 @@
-// ABOUTME: Interface for EventTemplate operations wrapping API client.
-// ABOUTME: Follows the same pattern as ICustomPropertyDefinitionService.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.EventTemplates;

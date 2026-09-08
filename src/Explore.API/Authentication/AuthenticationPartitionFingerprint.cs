@@ -1,6 +1,3 @@
-// ABOUTME: Creates bounded non-reversible partitions for opaque authenticated provider identities.
-// ABOUTME: Length-prefixes scheme and subject so equal subjects remain isolated across authentication schemes.
-
 using System.Security.Cryptography;
 using System.Text;
 

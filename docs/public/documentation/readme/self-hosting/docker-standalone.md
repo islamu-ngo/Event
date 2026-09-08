@@ -1,8 +1,6 @@
 ---
 description: Deploy and operate the single-container standalone distribution with durable SQLite storage.
 ---
-<!-- ABOUTME: Operator runbook for the single-process ISLAMU Event distribution. -->
-<!-- ABOUTME: Covers persistent storage, Local Identity defaults, first-run setup, proxying, and backup. -->
 
 # Docker Standalone Self-Hosting
 
@@ -22,6 +20,11 @@ administrator-controlled capability.
 | **Zero External Infrastructure**: Runs on built-in SQLite persistence; no PostgreSQL server or Redis required. | **Single Replica**: SQLite requires exactly one running container instance (no horizontal multi-container scaling). |
 | **Single-Process Footprint**: Runs API, BFF/UI, and SQLite in one container without auxiliary database servers. | **Local-First Storage**: Media and database files live in a mounted Docker volume. |
 | **Instant Onboarding**: In-process migrations apply automatically before the HTTP port opens. | **Initial Platform Target**: Built for `linux/amd64`. |
+
+SQLite coordinates transaction-owned work inside the application process.
+Failed operations release that coordination when their transaction and connection
+are cleaned up, so later checkout or configuration requests are not left waiting
+on an abandoned lock. This does not change the one-replica requirement.
 
 ---
 
@@ -291,6 +294,11 @@ docker start islamu-event-standalone
 Store the capture encrypted outside the container host and rehearse recovery in
 isolation. A persistent volume is not a backup, and key persistence alone does not
 prove crash recovery, a consistent live snapshot or survival of every session.
+
+{% hint style="info" %}
+**Operating a community deployment?**
+ISLAMU Event is 100% free and open source. If this standalone deployment powers events for your organization, please consider [supporting our work via Stripe](https://donate.stripe.com/14A6oIesc0Oc2KYg35aR200) or [becoming an official sponsor](../contributing/sponsorship.md).
+{% endhint %}
 
 ---
 

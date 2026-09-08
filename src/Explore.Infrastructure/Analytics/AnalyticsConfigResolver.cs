@@ -1,6 +1,3 @@
-// ABOUTME: Resolves public analytics settings from governance and private admin keys from secret authority.
-// ABOUTME: Keeps private analytics credentials out of hierarchical database settings.
-
 using Explore.Application.Analytics;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Secrets;

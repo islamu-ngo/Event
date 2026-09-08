@@ -1,6 +1,3 @@
-// ABOUTME: Exposes private exact-resource ticket-transfer reads and authenticated lifecycle writes.
-// ABOUTME: Keeps capabilities in headers, delegates authority to CQRS, and returns server-owned HAL affordances.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

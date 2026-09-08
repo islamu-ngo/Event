@@ -1,4 +1,3 @@
-// ABOUTME: Repository implementation for TenantCapability entity providing
 // data access for tenant module capabilities and governance.
 
 using Explore.Application.Contracts.Persistence;

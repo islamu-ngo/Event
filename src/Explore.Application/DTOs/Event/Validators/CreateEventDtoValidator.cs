@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for the canonical CreateEventDto graph contract.
-// ABOUTME: Validates create-page visible fields and temp-key references before transactional persistence.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSession.Validators;
 using Explore.Domain.Enums;

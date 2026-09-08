@@ -20,7 +20,7 @@ Backport-Of: 0123456789abcdef0123456789abcdef01234567
 Supersedes: []
 Impacts:
   Breaking:
-    Reference: docs/releases/README.md
+    Reference: docs/internal/releases/README.md
     Disposition: documented
     Detail: Check-in integrations must send credential after upgrading.
   Security:
@@ -52,7 +52,7 @@ Rules:
   ID already reachable from the target fails before conflict resolution.
 - A correction for an immutable colliding footer is an exact-commit
   `change-id-rename.v1` record under
-  `docs/releases/change-id-renames/`, never a loose alias or history rewrite.
+  `docs/internal/releases/change-id-renames/`, never a loose alias or history rewrite.
 - `Backport-Of`, when present, is the full original Git object ID, not a short display ID.
 - `Type` and `Scope` follow the release commit policy registries.
 - `Group` is optional and deterministic; fragments in one group must share a compatible public scope.

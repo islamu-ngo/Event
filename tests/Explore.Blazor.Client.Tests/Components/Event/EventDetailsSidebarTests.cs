@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for shared event-sidebar affordances and its event-image lightbox integration.
-// ABOUTME: Verifies HAL-gated actions, external-platform links, accessible image triggers, and lightbox dismissal.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Components.Events;
 using Explore.Blazor.Client.Services;

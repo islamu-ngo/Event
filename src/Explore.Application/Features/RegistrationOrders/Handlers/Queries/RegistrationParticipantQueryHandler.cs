@@ -1,6 +1,3 @@
-// ABOUTME: Maps tenant-filtered participant and ticket-assignment entities to order-scoped application DTOs.
-// ABOUTME: Keeps repository entities and participant lookup navigation objects out of presentation contracts.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.RegistrationOrders;

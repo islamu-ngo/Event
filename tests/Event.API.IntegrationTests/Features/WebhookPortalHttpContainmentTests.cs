@@ -1,6 +1,3 @@
-// ABOUTME: Real HTTP containment tests for verified Svix portal access issuance.
-// ABOUTME: Covers persisted success, HAL parity, safe ProblemDetails, no-store, and audit failure.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;

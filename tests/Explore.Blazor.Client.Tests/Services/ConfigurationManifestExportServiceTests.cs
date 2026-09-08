@@ -1,6 +1,3 @@
-// ABOUTME: Verifies immediate HAL revalidation and fixed same-origin manifest download routing.
-// ABOUTME: Proves generated API hrefs, browser claims, and deployment topology never select the export target.
-
 using Explore.Blazor.Client.Contracts.ControlPlane;
 using Explore.Blazor.Client.Contracts.Services.ControlPlane;
 using Explore.Blazor.Client.Routing.ControlPlane;

@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for append-only Local webhook HTTP attempt evidence.
-// ABOUTME: Provides tenant-scoped history reads and durable terminal evidence inserts.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;

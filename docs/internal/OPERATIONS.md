@@ -45,8 +45,9 @@ Changing, deleting or unverifying that current account contact cannot revive an
 earlier queued recipient. Work whose external send already began retains its
 existing accepted/uncertain handling.
 
-Apply the generated `AnonymousRegistrationRetention` primary-context migrations
-before this behavior. They add nullable order and storage-content deadlines, with
+Apply the complete primary-context catalog, including the generated
+`EmailOptionalSelfHostingIntegration` tail, before this behavior. Its retention
+delta adds nullable order and storage-content deadlines, with
 no inferred historical backfill or Identity changes. Historical guest PII without
 an original bound is unavailable; changing the current event schedule cannot
 restore it. Prefer a verified forward correction over removing privacy metadata
@@ -540,33 +541,29 @@ See [WEBHOOKS.md](WEBHOOKS.md) and [INTEGRATIONS.md](INTEGRATIONS.md) for provid
 
 ## Location Address Governance Migration Topology
 
-PostgreSQL retains its incremental application history. Its address-governance migration adds the
-source and visibility lookups and conservatively classifies retained pre-governance rows as
-`UnknownLegacy` / `Quarantined` with empty version-0 derived keys and no organization scope. Those rows
-remain excluded from local suggestions until an authorized operator reviews and promotes an exact row.
-Promotion never infers provider/manual provenance, creator, organization, address, or coordinates.
+Address governance belongs to the current application initial, not an incremental
+legacy backfill. Four application migration assemblies cover five engines, with
+MySQL and MariaDB sharing their catalog. Each initial owns that baseline;
+the complete application catalog also includes the email-optional integration
+tail described below. Neither stage reinterprets older rows or supplies a version-0 search
+compatibility path. Promotion never infers provider/manual provenance, creator,
+organization, address, or coordinates.
 
-All five application providers are development-only rebaselines with no
-historical upgrade compatibility. Each single initial migration represents the
-complete current model; it does not backfill or reinterpret older rows.
-
-| Provider | Migration head | History contract |
-|---|---|---|
-| PostgreSQL | `20260828035010_InitialApplication` | Development rebaseline; database recreation required |
-| SQLite | `20260828040252_InitialApplication` | Development rebaseline; database recreation required |
-| SQL Server | `20260828040310_InitialApplication` | Development rebaseline; database recreation required |
-| MariaDB | `20260828040320_InitialApplication` | Development rebaseline; database recreation required |
-| MySQL | `20260828040329_InitialApplication` | Development rebaseline; database recreation required |
+The exact generated heads and lifecycle checks are maintained once in
+[Development Application Migration Rebaseline](#development-application-migration-rebaseline).
 
 A deployment applies only its selected provider assembly through `Event.MigrationService`; never apply
 multiple provider chains to one database or hand-edit a migration, designer, or snapshot.
 
 ### Mandatory development reset
 
-Every existing application development database must be discarded and
-recreated from its new `InitialApplication` migration. Do not point a rebaselined assembly at an old
-database or synthesize migration-history rows. Run `Event.MigrationService` twice against the recreated
-database and require both runs to exit zero; the second run is the idempotency check.
+Select an explicitly disposable application catalog, or preserve a matching backup,
+before recreating it from the selected regenerated initial. Identify and preserve
+independent Identity, Data Protection and privacy-authority histories first; sharing
+a server, schema topology or file does not authorize deleting those authorities.
+Do not point a rebaselined assembly at an old database or synthesize migration-history
+rows. Run `Event.MigrationService` twice against the recreated application target and
+require both runs to exit zero; the second run is the idempotency check.
 
 Do not delete an entire shared server volume when only the application
 database requires recreation. If an unapplied development migration is wrong,
@@ -695,6 +692,13 @@ seed convenience; production/staging do not. The API owns only the Quartz
 scheduler schema, which is applied as idempotent DDL rather than an EF Core
 migration and works on every supported primary provider, including SQLite.
 
+SQLite transaction-owned named locks retain their owning connection separately
+from the transaction object. Commit, rollback, closed/disposed-connection cleanup,
+and reaping completed owners before connection reuse release the process semaphore.
+This prevents implicit rollback from stranding later payment or configuration work
+without releasing a lock while its owning transaction is still active. SQLite
+remains a single-instance deployment; server-provider locking is unchanged.
+
 | Provider | Application migrations | Data Protection migrations | Namespace/history |
 |---|---|---|---|
 | PostgreSQL | `Explore.Persistence` | `Explore.Persistence` | Configured schema (default `islamu_event`) with separate histories |
@@ -816,8 +820,9 @@ SQLITE_DESIGN_TIME_ENV=(
 
 #### Remove the current generated histories
 
-`dotnet ef migrations remove --force` removes only the latest migration and
-updates its snapshot. The clean development baseline has one `Init` migration
+`dotnet ef migrations remove --force` can roll back an applied migration and
+therefore is not an artifact-only deletion command. Use plain `migrations remove`
+against a verified empty disposable target for an unapplied initial. The clean development baseline has one `Init` migration
 per catalog, so run each command once. A dedicated provider project must be its
 own startup project while its existing snapshot is removed; otherwise EF can
 load the context but fail to discover that provider's snapshot. Stop
@@ -828,26 +833,26 @@ Application catalogs:
 
 ```bash
 env Database__Provider=PostgreSql \
-  dotnet ef migrations remove --force \
+  dotnet ef migrations remove \
   --context ExploreDbContext \
   --project "$PERSISTENCE" \
   --startup-project "$PERSISTENCE"
 
 env "${SQLITE_DESIGN_TIME_ENV[@]}" \
-  dotnet ef migrations remove --force \
+  dotnet ef migrations remove \
   --context ExploreDbContext \
   --project "$APP_SQLITE" \
   --startup-project "$APP_SQLITE"
 
 env Database__Provider=SqlServer Database__Port=1433 \
-  dotnet ef migrations remove --force \
+  dotnet ef migrations remove \
   --context ExploreDbContext \
   --project "$APP_SQLSERVER" \
   --startup-project "$APP_SQLSERVER"
 
 env Database__Provider=MySql Database__Port=3306 \
   Database__ServerFlavor=MySql Database__ServerVersion=8.4 \
-  dotnet ef migrations remove --force \
+  dotnet ef migrations remove \
   --context ExploreDbContext \
   --project "$APP_MYSQL" \
   --startup-project "$APP_MYSQL"
@@ -1117,7 +1122,7 @@ Readiness interpretation:
 | `data-protection-keys` | Blazor, Standalone | Redis probe succeeds (inspect `keyRingPresent` separately), or the active non-Redis provider completes protect/unprotect | Not used | Active key-store probe or protect/unprotect fails; this check does not prove prior-key recovery |
 | `distributed-cache` | API, Blazor, Control Plane BFF | Effective cache round-trip works | Configured Redis fell back to in-memory cache | Effective cache round-trip failed |
 | `oidc-discovery` | API, Blazor, Control Plane BFF | OIDC metadata valid, or OIDC is not configured | Not used | Configured OIDC metadata endpoint is unreachable or invalid |
-| `atproto-authentication` | Blazor | AT Protocol login is disabled, or its canonical public URL/callback, key ring, and state/session stores are ready | Not used | Login is enabled but a bounded prerequisite is unavailable |
+| `atproto-authentication` | Blazor | AT Protocol login is disabled, or local prerequisites and the signed transient-store create/read/consume probe pass | ATProto is unavailable but explicit Local Identity or Keycloak is primary | ATProto is primary (or primary authority is unknown) and a prerequisite/probe fails |
 | `smtp` | API | Instance delivery is disabled without a transport probe, or its configured SMTP connection/authentication succeeds | Instance delivery is enabled but its capability is unavailable, or SMTP connection/authentication fails or times out | Required capability/diagnostic resolution throws, or health-check composition fails; the registration retains an `Unhealthy` fallback |
 | `email-dispatch` | API | Worker is intentionally disabled (`Enabled=false` or `Mode=Disabled`), or the selected trigger is enabled and outbox counts are below warning thresholds | `Quartz` mode selected while the scheduler is disabled; operator pause or backlog, stale-processing, unknown, dead-letter, or age thresholds require attention | Outbox/database status cannot be read or health-check composition fails; invalid dispatch/scheduler options still fail startup |
 | `email-dispatch-retention-cleanup` | API | Retention cleanup is enabled in redaction or dry-run mode | Cleanup is intentionally disabled | Invalid retention options fail startup |
@@ -1521,23 +1526,57 @@ Operator sequence:
 ### Development Application Migration Rebaseline
 
 All development application-provider chains are rebaselined at PostgreSQL
-`20260828035010_InitialApplication`, SQLite
-`20260828040252_InitialApplication`, SQL Server
-`20260828040310_InitialApplication`, MariaDB
-`20260828040320_InitialApplication`, and MySQL
-`20260828040329_InitialApplication`. Existing development application
+`20260906223112_Init`, SQLite `20260906223113_Init`, SQL Server
+`20260906223115_Init`, and the shared MySQL/MariaDB catalog
+`20260906223116_Init`. These generated initials contain both complete Unicode
+location search fields and relational ATProto transient authentication storage.
+Existing development application
 databases must be recreated; incremental upgrade from the former development
 chains is intentionally unsupported. Data Protection and retained
 privacy-erasure authority keep their independent histories and must not be
 reset with the application catalog. All migration and snapshot files are
 generated artifacts and must never be patched by hand.
 
+The email-optional integration retains these initials and adds one natively
+generated `EmailOptionalSelfHostingIntegration` tail to each application catalog.
+It replaces the seven unapplied feature stages for credential operations,
+administrator bootstrap, email controls, Local lifecycle operations, challenge
+quotas, guest status, and anonymous retention. The final model retains all of
+those effects alongside the upstream Unicode and relational ATProto baseline.
+The separate external Identity Init and three feature migrations are unchanged;
+Data Protection and privacy-authority catalogs are not consolidated.
+
+The generated integration heads are PostgreSQL
+`20260908213348_EmailOptionalSelfHostingIntegration`, SQLite
+`20260908213357_EmailOptionalSelfHostingIntegration`, SQL Server
+`20260908213409_EmailOptionalSelfHostingIntegration`, and shared MySQL/MariaDB
+`20260908213419_EmailOptionalSelfHostingIntegration`.
+
+This approved development consolidation removes six intermediate rollback
+destinations. The generated Down boundary is the entire application feature back
+to its retained upstream Init, not selective credential/email/retention rollback.
+It is not a retained-data recovery strategy: it drops receipts, control metadata
+and deadlines, and restoring the old bootstrap provider constraint can fail when
+a Local bootstrap row remains. Use forward correction or a tested matching
+backup/binary recovery while preserving newer independent erasure facts.
+
+Do not rewrite history-table rows to make a database with retired Init or feature
+IDs appear current. Such development stores require an explicitly disposable
+rebuild or the matching recovery procedure. When applying the new tail to a
+retained database already at the supported Init, check for duplicate nonnull
+normalized Local emails before the unique-index transition; the migration does
+not select a winner or deduplicate identities. Existing policy revisions start
+at zero; absent guest/privacy deadlines remain null, with no capability or
+historical PII-window backfill.
+
 Verify a provider change through the generated lifecycle before starting an
 application host:
 
-1. Apply the provider's application initial to an empty database.
-2. Roll back to zero only in the generated development lifecycle lane.
-3. Reapply the initial and run `has-pending-model-changes`.
+1. Apply the provider's complete application catalog to an empty database and
+   require exact ordered equality between available and applied migration IDs.
+2. Run the idempotent application again. Roll back to zero only in the
+   explicitly disposable generated development lifecycle lane.
+3. Reapply the complete catalog and run `has-pending-model-changes`.
 4. Repeat the independent Data Protection lifecycle.
 5. For PostgreSQL retained authority, verify the standalone and co-located
    generated histories independently; SQLite embedded authority has its own
@@ -1548,10 +1587,45 @@ application host:
 If apply, rollback, or pending-model verification fails, preserve the generated
 SQL and provider logs without credentials or parameter values. Fix the entity,
 configuration, provider primitive, or migration generator; then regenerate the
-unapplied development initial. Never repair a generated migration or model
+affected unapplied development migration. Never repair a generated migration or model
 snapshot manually. Recreate only the disposable application database selected
 for the development lane—do not delete Data Protection or retained-authority
 catalogs as collateral recovery.
+
+### Location Unicode Runtime Compatibility
+
+Location search now stores complete Unicode NFC → invariant uppercase → NFC values
+(revision 2), replacing scalar-token text. SQL Server uses `nvarchar(2000)`;
+MySQL/MariaDB use `utf8mb4` binary collation. The original name/address limit is
+500 UTF-16 code units; derived output is bounded separately at 2,000. Invalid
+input fails before mutation, including SQLite writes. See [DOMAIN.md](DOMAIN.md#location-unicode-search-text)
+for matching and privacy semantics.
+
+For this pre-release migration rebaseline, stop application writers and select a
+disposable application catalog or take a matching backup before recreating it.
+Never delete a shared database volume. Preserve the independent Identity,
+Data Protection, and retained privacy-authority histories; identify their topology
+before resetting an application schema/file. Run `Event.MigrationService` twice
+against the new application target, require exit 0 both times, verify the selected
+application migration ID and no pending model changes, and complete the five-engine
+Unicode/authority/erasure corpus before allowing readers or writers to resume.
+
+For later SDK/runtime, ICU, NLS, operating-system, or globalization-profile upgrades:
+
+1. Pin the candidate runtime and deployment globalization profile. Compare focused
+   Unicode semantics and authorized match membership against the currently deployed
+   profile; a passing build or unchanged revision number is insufficient.
+2. Stop all old-profile readers and writers. Run an explicitly authorized current-key
+   rebuild through the aggregate lifecycle, or recreate a disposable development
+   application catalog. There is no automatic rebuild endpoint or rolling mixed-profile
+   writer support. Never repair erased PII, bypass authority, or export raw derived keys.
+3. Re-run the focused corpus and provider-local repeat/limited ordering checks before
+   reopening traffic. Record profile, generated migration IDs, result counts, and
+   query-plan/timing observations without text parameters or connection strings.
+
+Recovery requires the matching binary/profile plus its matching backup, or recreation
+of the selected disposable application catalog. Reverting a commit alone cannot
+restore deleted data or a previous normalization profile.
 
 ### Promotion Code Operations
 
@@ -1778,6 +1852,7 @@ The scheduler job catalog is Application-owned through `IScheduledJobRegistry`. 
 | `email-dispatch-recovery-scan` | Cron `0 */1 * * * ?` (every minute) | None | Stale `EmailDispatchOutbox` processing leases |
 | `event-reminder-dispatch` | One-off time trigger | Pointer-only IDs | Pre-persisted `EmailDispatchOutbox` row |
 | `idempotency-cleanup` | Interval, `IdempotencyCleanup:PollingIntervalMinutes` | None | Expired `idempotency_records` |
+| `atproto-transient-cleanup` | Interval, fixed 1 minute | None | Expired ATProto transient records and assertion-replay claims; remains enabled when ATProto login is disabled |
 | `ai-retention-cleanup` | Interval, `AiRetentionCleanup:PollingIntervalMinutes` | None | Per-tenant `ai_assistant.retention_days` |
 | `email-dispatch-retention-cleanup` | Interval, `EmailDispatchRetention:PollingIntervalMinutes` | None | Email dispatch content retention horizon |
 | `webhook-retention-cleanup` | Interval, `WebhookRetention:PollingIntervalMinutes` | None | Webhook message/attempt retention horizon |
@@ -2293,9 +2368,77 @@ Operational signals are intentionally bounded:
 | `atproto.authentication.operations` | Count of readiness/challenge/callback/bridge/refresh/revoke outcomes with bounded `operation` and `outcome` tags. |
 | `atproto.authentication.duration` | Matching authentication duration histogram in seconds. |
 | `atproto.jetstream.envelopes` | Jetstream connection, replay, fencing, materialization, quarantine, and lease outcomes; the optional `collection` tag is normalized to `event`, `rsvp`, or `unsupported`. |
-| `atproto-authentication` health check | BFF readiness for canonical public URL/callback, signing material, state/session stores, and provider configuration; failure detail is reduced to a stable code. |
+| `atproto-authentication` health check | Local prerequisites plus a signed synthetic transient-store create/read/consume probe; two-second deadline, no retry/hedging, ten-second completed-result cache, stable failure codes only. |
+| `explore.atproto.transient.operations` | Private operation count; only fixed `operation`, verified `purpose`, and `outcome` labels described below. |
+| `explore.atproto.transient.cleanup_runs` | Completed/failed cleanup passes; `outcome=succeeded` or `failed`. |
+| `explore.atproto.transient.cleanup_rows` | Rows deleted by completed passes; `store=transients` or `assertions`. Failed partial-pass work is not reported as a completed row total. |
 | `atproto-jetstream` health check | API readiness for capability resolution and public or DID-curated exact-collection subscription; dormant disabled capability is also healthy. |
 | `pds-sync-drain` structured logs | Aggregate claimed/delivered/failed/claim-lost counts only; provider response bodies, OAuth material, DIDs, record keys, and payloads must not be logged. |
+
+Transient instruments use the existing `Explore.Business` meter. Operation
+labels are closed to `create`, `read`, `consume`, `probe`, or `unknown`;
+purpose labels are `oauth_state`, `tenant_handoff`, `health_probe`, or
+`unknown`, taken only from successfully verified authentication context.
+Outcomes are `succeeded`, `not_found`, `conflict`, `rate_limited`, `rejected`,
+`unavailable`, or `cancelled`. Never label or log tenant/user identifiers,
+locators or their digests, assertions, proof cookies, ciphertext, or keys.
+
+`BffProviderReadinessService` checks local configuration/key/adapter prerequisites
+before its cached result. Concurrent cache misses share one probe per BFF
+singleton through a cancellation-aware gate; the two-second budget includes
+gate waiting. A cancelled waiter neither cancels the active probe nor replaces
+its result. Coalescing is per instance, not distributed; account for aggregate
+replica probes and login operations when sizing the existing instance-wide
+transient admission limit. Its `ApiBackedAtprotoTransientStore` posts the sole
+body `{"purpose":"health_probe"}` to the signed private
+`/api/auth/atproto/transient/probe` endpoint. The Application command generates
+tenantless random non-secret data with a thirty-second expiry, proves creation,
+read-back, and conditional consumption, then returns an empty `204`. No caller
+tenant, locator, or payload is accepted, and the browser proxy denies this
+route. Probe failures reduce to `state_store_unavailable`; they do not disclose
+database errors. This does not certify PDS/discovery availability or durable
+session operations. Disabled ATProto is Healthy; an unavailable ATProto primary
+is Unhealthy (`503`), while optional ATProto with explicit Local Identity or
+Keycloak primary is Degraded (`200`). Other checks can still fail readiness;
+`/alive` is independent of the probe.
+
+`AtprotoTransientCleanupJob` calls one `AtprotoTransientCleanupService` pass
+every minute, starting after sixty seconds, with
+`DisallowConcurrentExecution` and no job payload. Each pass captures one
+Unix-millisecond time and deletes at most five 500-row batches per table,
+stopping on a short batch: at most ten delete calls and 5,000 rows in total.
+Repositories select fixed expired identities before a parameterized,
+non-retrying deletion. A lost delete acknowledgement fails the pass instead
+of letting a provider retry select another batch; the next scheduled pass
+resumes cleanup. Failed passes can have committed partial work.
+There is no 24-hour idempotency grace. The owned job remains registered when
+ATProto is disabled, but `Scheduler:Quartz:Enabled=false` stops it along with
+other scheduler work. Successful passes use the canonical log event
+`Scheduled job {JobName} completed.` with `JobName=atproto-transient-cleanup`.
+
+Keep every BFF/API host within five seconds of trusted UTC and monitor clock
+synchronization. This permits at most ten seconds of pairwise clock difference.
+The transient cutoff is the captured time; the replay cutoff is that time minus
+10,000 milliseconds. Replay claims retain their original acceptance expiry
+(assertion expiry plus five seconds), so the extra retention never widens
+assertion admission. An ahead cleanup host therefore cannot delete a claim
+while a supported behind verifier still accepts it. If a host exceeds the
+clock bound, restore synchronization before returning it to authentication
+traffic; the fixed margin does not protect arbitrary clock drift.
+
+For a store outage, restore API/database access, migrations, and the shared
+OAuth signing authority; wait beyond the ten-second readiness cache, then
+start a fresh login. Never replay an uncertain consume. For cleanup failures,
+restore scheduler/database access and watch failed-run counts and subsequent
+completed-pass row counts. Backlogs above the per-pass cap drain over later
+passes; do not extend expiry or manually recycle locators. Reads and consumes
+reject expired rows independently of deletion, including synthetic leftovers
+from failed probes. Replay claims are retained through their acceptance expiry,
+including five seconds of skew. Active-row cleanup does not erase backup
+copies; apply operator backup retention separately. Preserve and share the
+existing BFF Data Protection keys across restarts/replicas as described in
+[ADR-014](adr/ADR-014-atproto-session-trust-bridge.md); loss of required keys
+fails closed and requires new login flows, not a memory fallback.
 
 For delayed or failed publication, keep the local event authoritative. Inspect the newest non-superseded `PdsSyncOutbox` row for the tenant/event, verify capability, consent, linked session, and public-location eligibility, then follow the stable recovery guidance in [TROUBLESHOOTING.md](TROUBLESHOOTING.md). Do not create a PDS record manually and do not replay by changing the stable record key.
 
@@ -2395,6 +2538,7 @@ Lifecycle classes:
 | `email_dispatch_attempts`, `email_dispatch_receipts` | Durable side-effect ledger | Email dispatch drain/consumer idempotency | Implemented: free-text errors and provider IDs redact transactionally with the selected parent; typed outcomes and timestamps remain | Attempts/receipts follow parent retention; failed/unknown evidence stays while parent is unresolved | Partition only with parent strategy; independent partitioning risks expensive parent/child maintenance | Keep parent-aware regression coverage in the persistence gate |
 | `ai_conversations`, `ai_messages`, `ai_runs`, `ai_conversation_references`, `ai_proposed_actions`, `ai_tool_executions` | User-facing operational state with provider/prompt sensitivity | AI assistant conversation, proposal, and confirmed-tool audit flows | Implemented: the `ai-retention-cleanup` Quartz job (`AiRetentionCleanupJob`) iterates active tenants, binds tenant context, resolves each tenant's `ai_assistant.retention_days`, supports `AiRetentionCleanup:DryRun`, redacts message content/action payload/reference summaries/failure messages/tool failure messages, and soft-deletes expired conversation shells through tenant-filtered repository cleanup. | 30 days by default via `ai_assistant.retention_days`, tenant-configurable through governance settings | Do not partition initially; cleanup predicates use tenant plus conversation age and should stay index-backed until AI history volume proves otherwise | Monitor `ai-retention-cleanup` readiness and `explore.ai.retention.*` metrics before broad history enablement; never log prompt content, action payloads, provider responses, or model secrets |
 | `idempotency_records` | Ephemeral safety cache | `IdempotencyMiddleware` / `IIdempotencyRepository` | Implemented: reads ignore expired rows, and the `idempotency-cleanup` Quartz job (`IdempotencyCleanupJob`) deletes rows older than `ExpiresAt + IdempotencyCleanup:ExpirationGraceHours` in bounded batches; dry-run is available | Delete after `ExpiresAt + 24h` safety buffer by default | Do not partition initially; TTL delete by `ExpiresAt` should be enough unless write volume is extreme | Monitor `idempotency-cleanup` readiness and cleanup metrics; revisit only if delete volume or index bloat threatens SLOs |
+| `atproto_transient_records`, `atproto_transient_assertion_replays` | Ephemeral authentication state and replay protection | Private signed ATProto transient bridge | Implemented: `atproto-transient-cleanup` deletes at most five 500-row batches per table each minute; reads/consumes enforce expiry independently | State at most 10 minutes, handoff at most 2 minutes, synthetic probe 30 seconds; replay claims through assertion acceptance expiry including 5-second skew, then 10-second cleanup retention without extending validity; no 24-hour grace | No partitioning initially; indexed Unix-millisecond expiry supports bounded deletion | Keep cleanup running after disabling login; monitor fixed operation/cleanup counters; active-row deletion does not erase retained backups |
 | `custom_property_projection_dirty_scope` | Rebuildable projection/cache backlog | Projection rebuild/drain coordination | Drained rows remain; pending rows are quota-bounded | Pending rows stay until drained; drained rows retained 7 days for diagnostics | No partitioning initially; the table is quota-bounded per tenant | Add drained-row cleanup and metrics for deleted/drained/pending counts |
 | `event_custom_property_projections`, `event_session_custom_property_projections` | Rebuildable projection/cache | Projection updaters from Layer 3 values | Rebuild and source deletes replace/remove rows; no age cleanup | No independent age retention; rows live while source values and exposure rules require them | Consider tenant/hash or event-date-adjacent strategy only after projection query SLOs require it; range partitioning by `UpdatedAt` is not useful for most lookup predicates | Keep rebuild-first recovery; add periodic consistency checks before partitioning |
 | `external_api_key_quotas` | Operational accounting ledger | External API key quota service | Cascade delete when key is physically deleted; no age cleanup | 24 monthly periods by default for usage reporting | Do not partition initially; one row per key per period should stay small | Add retention by `PeriodEnd` with tenant/admin reporting guardrails |

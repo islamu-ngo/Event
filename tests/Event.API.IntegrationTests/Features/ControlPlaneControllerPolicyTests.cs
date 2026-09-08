@@ -1,6 +1,3 @@
-// ABOUTME: API contract tests for control-plane saturation policy metadata.
-// ABOUTME: Verifies admin control-plane routes use the dedicated rate-limit and timeout policies.
-
 using System.Reflection;
 using Explore.API.Controllers;
 using Explore.API.Extensions;

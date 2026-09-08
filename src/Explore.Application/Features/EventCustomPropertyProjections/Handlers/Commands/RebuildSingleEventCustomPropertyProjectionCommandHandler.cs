@@ -1,6 +1,3 @@
-// ABOUTME: Handles rebuilding projection rows for a single event.
-// ABOUTME: Delegates to RefreshForEventAsync which recomputes all projection rows for the event.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.EventCustomPropertyProjections.Requests.Commands;

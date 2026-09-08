@@ -1,6 +1,3 @@
-// ABOUTME: Orchestrates authorized upload, current-state preview, refresh, and cancellation.
-// ABOUTME: Derives target snapshots server-side so request bodies cannot forge authority or freshness.
-
 namespace Explore.Application.Features.ConfigurationManifest.Importing;
 
 using System.Collections.Immutable;

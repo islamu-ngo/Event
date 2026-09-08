@@ -1,6 +1,3 @@
-// ABOUTME: Adapts paid-event policy CQRS commands to the canonical mutation boundary.
-// ABOUTME: Keeps authorization requests separate from serializable policy mutation mechanics.
-
 using Explore.Application.DTOs.PaidEventPolicies;
 using Explore.Application.Features.PaidEventPolicies.Requests.Commands;
 using Explore.Application.Responses;

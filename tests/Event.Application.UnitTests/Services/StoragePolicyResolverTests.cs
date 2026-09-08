@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for effective storage policy resolution.
-// ABOUTME: Verifies provider normalization, tenant delegation locks, quota values, and upload ceilings.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Models.Storage;
 using Explore.Application.Services;

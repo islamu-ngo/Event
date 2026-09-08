@@ -1,5 +1,3 @@
-// ABOUTME: Exercises cancellation HAL and safe conflicts against native payment and admission evidence.
-// ABOUTME: Builds real confirmed guest lineage, keyed issuance and SQLite check-in without internal success mocks.
 
 using System.Net;
 using System.Security.Cryptography;

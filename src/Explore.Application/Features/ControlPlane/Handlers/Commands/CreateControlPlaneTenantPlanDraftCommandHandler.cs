@@ -1,6 +1,3 @@
-// ABOUTME: Command handler for creating draft control-plane SaaS tenant plans.
-// ABOUTME: Validates pricing, settings, and quotas before persisting normalized plan entities.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ControlPlane;
 using Explore.Application.Features.ControlPlane.Plans;

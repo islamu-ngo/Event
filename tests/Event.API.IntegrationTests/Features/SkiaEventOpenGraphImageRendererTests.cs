@@ -1,6 +1,3 @@
-// ABOUTME: Focused rendering tests for the API-local SkiaSharp event Open Graph image implementation.
-// ABOUTME: Covers deterministic PNG output, embedded shaping font, fallback gradients, dates, and artwork cropping.
-
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using Event.Api.IntegrationTests.Fixtures;

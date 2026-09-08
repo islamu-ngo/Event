@@ -1,6 +1,3 @@
-// ABOUTME: Management detail projection for one event report case file.
-// ABOUTME: Includes explicit evidence, case, decision, signal, target, and provider-link sections.
-
 namespace Explore.Application.DTOs.EventReporting;
 
 public sealed record ModerationReportDetailDto

@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for CreateEventDayDto enforcing event ownership and date uniqueness.
-// ABOUTME: Manually instantiated in handlers — accepts IEventRepository and IEventDayRepository for async checks.
-
 using Explore.Application.Contracts.Persistence;
 using FluentValidation;
 

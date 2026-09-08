@@ -1,6 +1,3 @@
-// ABOUTME: bUnit tests for generic dock host rendering and scope isolation.
-// ABOUTME: Verifies the dormant Phase 4 host components before MainLayout migration.
-
 using Explore.Blazor.Client.Components.Docking;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Services.Docking;

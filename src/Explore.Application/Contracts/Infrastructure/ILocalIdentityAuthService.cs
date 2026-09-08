@@ -1,6 +1,3 @@
-// ABOUTME: Application boundary for local Identity credential operations and platform token issuance.
-// ABOUTME: Keeps ASP.NET Core Identity and signing implementation details outside the application layer.
-
 using Explore.Application.Features.Authentication.Local.Models;
 
 namespace Explore.Application.Contracts.Infrastructure;

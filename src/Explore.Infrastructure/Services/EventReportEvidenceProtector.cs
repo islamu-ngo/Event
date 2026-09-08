@@ -1,6 +1,3 @@
-// ABOUTME: DataProtection-backed implementation for protecting event-report evidence text.
-// ABOUTME: Keeps sensitive reporter text encrypted before it reaches persistence.
-
 using Explore.Application.Contracts.Services;
 using Microsoft.AspNetCore.DataProtection;
 

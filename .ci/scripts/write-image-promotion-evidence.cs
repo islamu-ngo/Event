@@ -1,5 +1,3 @@
-// ABOUTME: Writes immutable deployment-tag promotion evidence for container images built in CI.
-// ABOUTME: Keeps digest-promotion metadata generation in C# while shell only performs registry inspection.
 #:property RestorePackagesWithLockFile=false
 
 using System.Text.Json;

@@ -1,6 +1,3 @@
-// ABOUTME: Proves external authority replay failure blocks API startup before hosted workers run.
-// ABOUTME: Verifies the startup gate preserves caller cancellation and sanitizes failures.
-
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.BackgroundServices;
 using Explore.Application.Configuration;

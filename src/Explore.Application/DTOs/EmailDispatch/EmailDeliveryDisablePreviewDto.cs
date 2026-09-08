@@ -1,5 +1,3 @@
-// ABOUTME: Publishes the non-secret impact and expiring confirmation for an email-delivery disable operation.
-// ABOUTME: Includes actual scope revisions while keeping SMTP configuration and actor authority server-side.
 
 using System.Collections.Immutable;
 

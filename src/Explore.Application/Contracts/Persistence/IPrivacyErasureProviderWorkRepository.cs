@@ -1,6 +1,3 @@
-// ABOUTME: Defines durable typed provider-work claiming, settlement, reconciliation, and retention.
-// ABOUTME: Requires exact lease fences so stale workers cannot settle a successor's claim.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

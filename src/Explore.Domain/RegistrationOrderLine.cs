@@ -1,6 +1,3 @@
-// ABOUTME: Defines one immutable ticket purchase line with pinned pricing and policy snapshots.
-// ABOUTME: Validates buyer-selected minor-unit prices against the published catalog revision that the line references.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 using Explore.Domain.Services.Registration;

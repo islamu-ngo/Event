@@ -1,4 +1,3 @@
-// ABOUTME: Repository interface for GroupSetting entity providing data access
 // for group-specific setting overrides.
 
 namespace Explore.Application.Contracts.Persistence;

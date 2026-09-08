@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL-backed tests for generic outbox claim fencing and per-message retry policy.
-// ABOUTME: Proves replacement leases reject stale terminal writes and terminal rows cannot be resurrected.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

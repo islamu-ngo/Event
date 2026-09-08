@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for location detail, listing, and PII erasure operations.
-// ABOUTME: Preserves entity-returning persistence boundaries and forwards cancellation into custom queries.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
 using Explore.Domain;

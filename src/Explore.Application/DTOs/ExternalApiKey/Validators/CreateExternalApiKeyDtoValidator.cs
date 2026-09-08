@@ -1,6 +1,3 @@
-// ABOUTME: Validates external API key creation requests before handlers persist credentials.
-// ABOUTME: Enforces safe names, entity existence for Organization/Group types, and owner-scoped uniqueness.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ExternalApiKey;
 using Explore.Application.Features.ExternalApiKeys;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines actor-context authorization for AI assistant conversations and messages.
-// ABOUTME: Keeps rail and MCP-facing AI entry points on the same server-side acting-actor contract.
-
 using Explore.Application.DTOs.Ai;
 
 namespace Explore.Application.Features.AiAssistant.Actors;

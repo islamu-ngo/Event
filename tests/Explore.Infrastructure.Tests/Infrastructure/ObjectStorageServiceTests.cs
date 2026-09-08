@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for legacy S3-compatible object-storage service diagnostics.
-// ABOUTME: Verifies connection probes fail closed without leaking endpoints or provider exception payloads.
-
 using Amazon.S3;
 using Amazon.S3.Model;
 using Explore.Application.Contracts.Infrastructure;

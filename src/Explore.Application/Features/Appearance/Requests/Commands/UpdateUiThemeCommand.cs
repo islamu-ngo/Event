@@ -1,6 +1,3 @@
-// ABOUTME: Route-identified command for patching an existing UI theme with optimistic concurrency.
-// ABOUTME: Carries nullable logical groups so omitted theme properties remain unchanged.
-
 namespace Explore.Application.Features.Appearance.Requests.Commands;
 
 using Explore.Application.DTOs.Appearance;

@@ -1,6 +1,3 @@
-// ABOUTME: Persistence regression tests for EventSessionGroupSession soft-delete uniqueness behavior.
-// ABOUTME: Verifies reassignment after soft-delete uses active-row indexes, not stale deleted memberships.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -13,6 +10,7 @@ using TUnit.Core;
 namespace Event.Persistence.IntegrationTests.Repositories;
 
 [ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
+[NotInParallel("PersistenceDb")]
 public sealed class EventSessionGroupSessionRepositoryTests
 {
     private readonly PostgreSqlContainerFixture _fixture;

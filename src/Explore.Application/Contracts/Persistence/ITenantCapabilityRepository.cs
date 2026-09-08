@@ -1,4 +1,3 @@
-// ABOUTME: Repository interface for TenantCapability entity providing
 // data access for tenant module capabilities and governance.
 
 using Explore.Domain.Modules;

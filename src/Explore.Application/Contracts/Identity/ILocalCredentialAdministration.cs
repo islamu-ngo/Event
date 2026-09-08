@@ -1,5 +1,3 @@
-// ABOUTME: Defines Local credential lifecycle mutations and immutable administrative identity and operation reads.
-// ABOUTME: Separates validated nonsecret intent and durable audit from plaintext returned only to an issuance winner.
 
 using System.Net.Mail;
 using System.Collections.ObjectModel;

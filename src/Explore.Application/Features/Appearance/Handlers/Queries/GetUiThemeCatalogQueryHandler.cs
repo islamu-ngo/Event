@@ -1,6 +1,3 @@
-// ABOUTME: Handles administrative catalog queries for platform themes or the current tenant-owned themes.
-// ABOUTME: Applies scope-aware authorization so platform and tenant catalogs stay separated.
-
 namespace Explore.Application.Features.Appearance.Handlers.Queries;
 
 using Explore.Application.Contracts.Identity;

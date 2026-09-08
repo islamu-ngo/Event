@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for provider-neutral policy package manifest contracts.
-// ABOUTME: Guards Application-layer contracts against Cerbos/Admin API/transport leakage.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 

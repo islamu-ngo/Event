@@ -1,6 +1,3 @@
-// ABOUTME: Persistent room under a Location with stable scheduling identity and irreversible privacy tombstones.
-// ABOUTME: Protects erased Home labels while retaining the room key used by overlap and containment constraints.
-
 using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;

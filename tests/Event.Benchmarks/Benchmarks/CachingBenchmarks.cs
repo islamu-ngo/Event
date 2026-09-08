@@ -1,6 +1,3 @@
-// ABOUTME: Collection cache benchmark suite for lookup-heavy in-memory data structures.
-// ABOUTME: Compares frozen, mutable, and concurrent dictionary behavior at representative sizes.
-
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using BenchmarkDotNet.Attributes;

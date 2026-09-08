@@ -1,5 +1,3 @@
-// ABOUTME: Orchestrates one-use native lifecycle consumption and token-authorized retry of the existing SyncUser mirror boundary.
-// ABOUTME: Runs mirror writes under core-owned credential serialization, then invalidates cached profiles after commit.
 
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;

@@ -1,6 +1,3 @@
-// ABOUTME: Specifies clustered EmailDispatch recovery when transport accepts before local settlement is lost.
-// ABOUTME: Uses PostgreSQL Quartz nodes and event barriers to prove ambiguity, fencing, privacy, and no resend.
-
 using System.Collections.Concurrent;
 using System.Diagnostics.Metrics;
 using Event.Api.IntegrationTests.Fixtures;

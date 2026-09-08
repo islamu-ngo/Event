@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral DTOs for instance-level storage administration.
-// ABOUTME: Redacts secrets while exposing provider policy, quotas, usage, and health for admin UI.
-
 using Explore.Application.DTOs.Storage;
 using Explore.Application.Models.Storage;
 using Explore.Domain;

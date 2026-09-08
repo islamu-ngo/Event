@@ -1,6 +1,3 @@
-// ABOUTME: EF repository for tenant-filtered EventLocation mutation and bounded disclosure reads.
-// ABOUTME: Returns entities only and makes tracking behavior explicit at each persistence boundary.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.Database;

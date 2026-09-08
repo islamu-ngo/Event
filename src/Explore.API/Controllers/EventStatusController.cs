@@ -1,6 +1,3 @@
-// ABOUTME: API controller for event status lookup table (read-only enumeration).
-// ABOUTME: Provides event status values (draft, published, cancelled, etc.) for event lifecycle management.
-
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Asp.Versioning;

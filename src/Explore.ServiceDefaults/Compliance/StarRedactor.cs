@@ -1,6 +1,3 @@
-// ABOUTME: High-performance zero-allocation star-masking redactor for sensitive and PII fields.
-// ABOUTME: Implements Microsoft.Extensions.Compliance.Redaction.Redactor using Span<char> operations.
-
 using Microsoft.Extensions.Compliance.Redaction;
 
 namespace Explore.ServiceDefaults.Compliance;

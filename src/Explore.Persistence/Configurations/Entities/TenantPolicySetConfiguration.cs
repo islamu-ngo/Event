@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for TenantPolicySet — tenant-level governance policy overrides.
-// ABOUTME: Each sub-policy section uses table-splitting (flattened columns); only fields with Allow override mode apply.
-
 using Explore.Domain.Policies;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

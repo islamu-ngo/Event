@@ -1,6 +1,3 @@
-// ABOUTME: Defines a workflow-owned registration requirement with typed completion and applicability policy.
-// ABOUTME: Evaluates alternative channels purely, including non-blocking and registrant-skipped outcomes.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

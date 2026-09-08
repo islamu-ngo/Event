@@ -1,5 +1,3 @@
-// ABOUTME: Canonical bounded operator choices for anonymous challenge difficulty and durable issuance budgets.
-// ABOUTME: Conservative proof and per-minute defaults are intake controls, not capacity or mobile performance guarantees.
 
 using Explore.Domain.Constants;
 

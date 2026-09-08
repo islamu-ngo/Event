@@ -1,6 +1,3 @@
-// ABOUTME: Handles creating an event-scoped capacity pool for ticket authoring.
-// ABOUTME: Validates platform ownership before persisting and invalidating the event cache.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventTicketing.Validators;

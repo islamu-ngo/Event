@@ -1,5 +1,3 @@
-// ABOUTME: Verifies public Local admission policy through production HTTP, Identity, and account synchronization.
-// ABOUTME: Guards closed registration and email-verification enforcement without substituting authentication services.
 
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;

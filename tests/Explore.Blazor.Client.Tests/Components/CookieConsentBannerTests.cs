@@ -1,6 +1,3 @@
-// ABOUTME: bUnit tests for CookieConsentBanner rendering, visibility, and callback behavior.
-// ABOUTME: Verifies equal-prominence Accept/Decline buttons, BEM markup, and parameter-driven visibility.
-
 using Explore.Blazor.Client.Shared;
 
 namespace Explore.Blazor.Client.Tests.Components;

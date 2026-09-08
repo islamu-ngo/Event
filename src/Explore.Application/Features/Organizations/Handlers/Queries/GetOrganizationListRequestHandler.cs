@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning a paginated list of organizations.
-// ABOUTME: Maps entities to OrganizationListDto via AutoMapper.
 using System;
 using System.Collections.Generic;
 using System.Text;

@@ -1,6 +1,3 @@
-// ABOUTME: Atomically revalidates current recipient authority immediately before SMTP provider handoff.
-// ABOUTME: Refreshes verified addresses or settles linked outbox, attempt, receipt, and delivery rows as skipped.
-
 using System.Data;
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;

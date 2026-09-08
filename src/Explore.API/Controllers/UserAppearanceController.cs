@@ -1,6 +1,3 @@
-// ABOUTME: API controller for authenticated user appearance preferences and profiles.
-// ABOUTME: Exposes resolved appearance state, available presets, user profiles, clone/activate/update/archive actions, and mode selection.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

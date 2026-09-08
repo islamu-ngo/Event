@@ -1,6 +1,3 @@
-// ABOUTME: Options for enabling account-authority-owned identity lifecycle email delegation.
-// ABOUTME: Keeps provider readiness explicit before Application records local delegation audit rows.
-
 namespace Explore.Application.Services;
 
 public sealed class AccountAuthorityLifecycleEmailOptions

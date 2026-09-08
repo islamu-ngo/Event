@@ -1,6 +1,3 @@
-// ABOUTME: Resolves Cerbos endpoints from governance and custom Admin credentials from secret authority.
-// ABOUTME: Keeps tenant authority server-derived and fails credentialed admin operations closed.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Models;

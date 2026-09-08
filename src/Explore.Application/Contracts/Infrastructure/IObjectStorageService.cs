@@ -1,6 +1,3 @@
-// ABOUTME: Contract for S3-compatible object storage operations.
-// ABOUTME: Supports ID-bound presigned downloads and server-side file retrieval.
-
 using System;
 using System.Collections.Generic;
 using System.Text;

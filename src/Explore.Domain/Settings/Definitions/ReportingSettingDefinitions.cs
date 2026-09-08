@@ -1,6 +1,3 @@
-// ABOUTME: Setting definitions for tenant-scoped moderation reporting provider configuration.
-// ABOUTME: Registers tenant Osprey and Coop routing settings plus secret-bearing provider credentials.
-
 namespace Explore.Domain.Settings.Definitions;
 
 using Explore.Domain.Constants;

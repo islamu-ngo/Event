@@ -1,6 +1,3 @@
-// ABOUTME: Parses Local session, credential-replacement, and API-key authorities from API principals.
-// ABOUTME: Centralizes bounded claim extraction and canonical platform identity delegation for API consumers.
-
 using System.Security.Claims;
 using System.Globalization;
 using Explore.Application.Configuration;

@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for instance and tenant paid-event policy versions.
-// ABOUTME: Uses tenant-safe filters and entity tracking for active policy revision writes.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;

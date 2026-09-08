@@ -1,5 +1,3 @@
-// ABOUTME: Exercises exact Local application binding and cross-store activation recovery with native persistence.
-// ABOUTME: Verifies fresh database administrator authority and preserves Pending credentials across interrupted reconciliation.
 
 using System.Data.Common;
 using System.Security.Claims;
@@ -686,7 +684,7 @@ public sealed class LocalCredentialBindingTests
                 identity.AddEntityFrameworkStores<ExternalIdentityDbContext>();
             }
             else identity.AddEntityFrameworkStores<ExploreDbContext>();
-            _provider = services.BuildServiceProvider();
+            _provider = services.BuildIsolatedServiceProvider();
             await using (AsyncServiceScope seed = Provider.CreateAsyncScope())
             {
                 ExploreDbContext application = Application(seed);

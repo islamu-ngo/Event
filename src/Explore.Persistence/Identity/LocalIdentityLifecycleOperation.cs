@@ -1,5 +1,3 @@
-// ABOUTME: Stores one-use Local lifecycle authority separately from credential/session admission.
-// ABOUTME: Retains fixed deadlines and stamp-bound mirror receipts, never transport or password material.
 
 using Explore.Application.Contracts.Identity;
 

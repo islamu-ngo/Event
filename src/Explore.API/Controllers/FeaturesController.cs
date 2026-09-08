@@ -1,6 +1,3 @@
-// ABOUTME: Exposes evaluated feature flags for the authenticated user as a boolean dictionary.
-// ABOUTME: Blazor UI calls this endpoint to hydrate its local FeatureStateContainer — no SDK in UI.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Hateoas;

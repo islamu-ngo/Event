@@ -1,6 +1,3 @@
-// ABOUTME: Handler for current user's effective event permissions using authority snapshot.
-// ABOUTME: Used by API/HAL layer for affordance gating without exposing internal authorization logic.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.EventRoleAssignments.Requests.Queries;
 using MediatR;

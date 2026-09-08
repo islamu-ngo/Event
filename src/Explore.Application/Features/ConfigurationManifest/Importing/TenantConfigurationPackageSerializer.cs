@@ -1,6 +1,3 @@
-// ABOUTME: Projects one tenant from a whole-instance export into a deterministic portable package.
-// ABOUTME: Removes instance and other-tenant authority while preserving only canonical tenant content.
-
 namespace Explore.Application.Features.ConfigurationManifest.Importing;
 
 using System.Text.Json;

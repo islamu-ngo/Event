@@ -1,6 +1,3 @@
-// ABOUTME: Command handler for switching a tenant to a chosen SaaS plan version.
-// ABOUTME: Keeps one active assignment by superseding the previous row before creating the new one.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ControlPlane.Requests.Commands;
 using Explore.Application.Responses;

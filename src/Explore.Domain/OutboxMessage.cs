@@ -1,6 +1,3 @@
-// ABOUTME: Generic outbox entity for reliable delivery of cross-process side effects (emails, webhooks, integrations).
-// ABOUTME: Written atomically inside UnitOfWork transactions; processed asynchronously by OutboxProcessor.
-
 namespace Explore.Domain;
 
 /// <summary>

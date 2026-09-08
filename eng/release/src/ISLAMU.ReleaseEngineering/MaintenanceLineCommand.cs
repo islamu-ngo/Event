@@ -1,6 +1,3 @@
-// ABOUTME: Plans an idempotent maintenance-line branch sourced only from a verified signed stable release tag.
-// ABOUTME: Emits the exact operator command and compare-and-swap IDs without creating, moving, or deleting any ref.
-
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -36,7 +33,7 @@ public static class MaintenanceLineCommand
         {
             string root = ResolveDirectory(repositoryRoot);
             string releaseDirectory = ResolveChild(root, args[1]);
-            if (!string.Equals(Path.GetDirectoryName(releaseDirectory), Path.Combine(root, "docs", "releases"), PathComparison))
+            if (!string.Equals(Path.GetDirectoryName(releaseDirectory), Path.Join(Path.GetFullPath(root), "docs", "internal", "releases"), PathComparison))
             {
                 return Reject(output, "maintenance_line_path_invalid");
             }

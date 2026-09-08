@@ -1,6 +1,3 @@
-// ABOUTME: Covers Phase 17 promotion reservation and order snapshot contracts.
-// ABOUTME: Proves exact-once transitions, discount repricing, and verified purchaser precedence stay Domain-only.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;
 using Explore.Domain.ValueObjects;

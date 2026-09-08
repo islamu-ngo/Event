@@ -1,5 +1,3 @@
-// ABOUTME: Shared real SQLite setup for email eligibility, rate admission, and delivery policy fences.
-// ABOUTME: Seeds an optional verified-recipient dispatch with production lookup rows and transaction interceptors.
 
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Notifications;
@@ -107,7 +105,7 @@ internal static class EmailDispatchSqliteFixture
             DefaultTimeout = 30,
             Pooling = true
         }.ToString();
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connectionString)
             .UseSnakeCaseNamingConvention()
             .AddInterceptors(

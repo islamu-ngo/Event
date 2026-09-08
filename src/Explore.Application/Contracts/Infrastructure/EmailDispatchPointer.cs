@@ -1,6 +1,3 @@
-// ABOUTME: Pointer-only RabbitMQ payload contract for durable EmailDispatchOutbox records.
-// ABOUTME: Excludes recipient, subject, body, provider secrets, and other email content by design.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Infrastructure;

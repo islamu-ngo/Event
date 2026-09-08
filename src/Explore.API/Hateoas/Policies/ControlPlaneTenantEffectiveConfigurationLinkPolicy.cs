@@ -1,6 +1,3 @@
-// ABOUTME: HAL link policy for a tenant's effective configuration read model.
-// ABOUTME: Emits plan-assignment action metadata so clients keep using server HAL affordances.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Security.Claims;

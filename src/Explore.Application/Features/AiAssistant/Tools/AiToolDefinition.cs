@@ -1,6 +1,3 @@
-// ABOUTME: Describes an AI tool contract shared by provider schemas and future adapters.
-// ABOUTME: Carries allowed payload fields, schema text, and confirmation metadata for validation.
-
 using System;
 using Explore.Domain.Ai;
 

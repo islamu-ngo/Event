@@ -1,6 +1,3 @@
-// ABOUTME: Characterizes the reusable Explore.Blazor host composition and its transport profiles.
-// ABOUTME: Proves the real BFF HTTP surface and Split-versus-Combined registration boundary.
-
 using System.Net;
 using Explore.Blazor.Extensions;
 using Explore.Blazor.HealthChecks;

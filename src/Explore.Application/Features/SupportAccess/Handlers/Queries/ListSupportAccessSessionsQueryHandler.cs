@@ -1,6 +1,3 @@
-// ABOUTME: Handles bounded support-access session history queries by target tenant.
-// ABOUTME: Maps persisted sessions to HAL-ready DTOs while preserving explicit tenant scoping.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.SupportAccess;
 using Explore.Application.Features.SupportAccess.Requests.Queries;

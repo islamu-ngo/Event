@@ -1,6 +1,3 @@
-// ABOUTME: Validates current Local cookie authority and bridges shared refresh events into Explore session state.
-// ABOUTME: Coordinates admin enrichment, setup-aware redirects, and session-scoped rejection cleanup.
-
 using System.Security.Claims;
 using System.Diagnostics.CodeAnalysis;
 using Event.Web.BffHosting.Authentication;

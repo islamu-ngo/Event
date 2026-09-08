@@ -1,6 +1,3 @@
-// ABOUTME: Shared timezone selection workflow for CreateEvent and EventEdit pages.
-// ABOUTME: Centralizes search, selection, display formatting, and initialization from stored timezone ids.
-
 namespace Explore.Blazor.Client.Pages.Events.Workflows;
 
 public sealed class TimezoneWorkflow

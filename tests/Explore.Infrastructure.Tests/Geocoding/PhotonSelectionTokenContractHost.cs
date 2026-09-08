@@ -1,6 +1,3 @@
-// ABOUTME: Exercises the production Application-owned selection-protection port.
-// ABOUTME: Adapts synchronous test assertions to target-bound asynchronous token operations.
-
 using System.Security.Cryptography;
 using Explore.Application.Contracts.Infrastructure.Geocoding;
 using Explore.Infrastructure.Geocoding;

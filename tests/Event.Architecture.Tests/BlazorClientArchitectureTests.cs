@@ -1,4 +1,3 @@
-// ABOUTME: Architecture fitness functions for Blazor (Explore.Blazor host + Explore.Blazor.Client WASM).
 // Component injection uses compiled metadata; placement rules inspect handwritten source.
 
 using System.Reflection;

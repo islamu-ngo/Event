@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped layout for the configuration-manifest administration section. */
-/* ABOUTME: Uses logical spacing, project tokens, and responsive actions for RTL-safe administration. */
-
 .configuration-manifest-export {
     display: grid;
     gap: var(--isl-space-4);

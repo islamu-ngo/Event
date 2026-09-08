@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-scoped metadata record for stored files addressed by application IDs, not raw provider keys.
-// ABOUTME: Models provider, visibility, lifecycle, safe display name, and quarantine/delete state for local-first storage.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

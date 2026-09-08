@@ -1,5 +1,3 @@
-// ABOUTME: Private durable issuance budgets containing only real tenant/event scope and the current database minute.
-// ABOUTME: One row per scope is reused forever; these counters never reserve tickets or identify requesters.
 
 namespace Explore.Persistence.Models;
 

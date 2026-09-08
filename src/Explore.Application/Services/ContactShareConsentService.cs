@@ -1,6 +1,3 @@
-// ABOUTME: Service handling contact-sharing consent lifecycle during registration and user management.
-// ABOUTME: Resolves event→actor→organisation chain, validates approval, creates/reactivates consent records.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

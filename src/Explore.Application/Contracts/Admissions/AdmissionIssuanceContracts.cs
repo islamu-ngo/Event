@@ -1,6 +1,3 @@
-// ABOUTME: Defines typed provider-neutral admission issuance, credential, persistence, and delivery contracts.
-// ABOUTME: One-time bearers survive committed-response ambiguity only as recoverable protected envelopes.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Admissions;

@@ -1,6 +1,3 @@
-// ABOUTME: Maps safe registration submission issue codes with exact tenant and submission containment.
-// ABOUTME: Persists no rejected value, free-form message, HTML, or other attendee-provided content.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

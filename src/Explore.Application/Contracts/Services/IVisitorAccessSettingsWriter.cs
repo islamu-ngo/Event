@@ -1,5 +1,3 @@
-// ABOUTME: Defines complete visitor-policy mutation batches and their deferred setting effects.
-// ABOUTME: Keeps mutation transport separate from the canonical capability policy and resolver.
 
 using System.Collections.Immutable;
 using Explore.Application.Notifications;

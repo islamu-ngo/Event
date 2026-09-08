@@ -1,6 +1,3 @@
-// ABOUTME: Query to get permissions the current user can assign (capability ceiling).
-// ABOUTME: Filters by caller's own permissions and target scope boundary.
-
 using Explore.Application.DTOs.Permission;
 using Explore.Domain.Enums;
 using MediatR;

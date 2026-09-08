@@ -1,6 +1,3 @@
-// ABOUTME: Shared input normalization helpers for external API key create/update validators.
-// ABOUTME: Keeps API-key name and description limits aligned with persistence constraints.
-
 namespace Explore.Application.DTOs.ExternalApiKey.Validators;
 
 internal static class ExternalApiKeyInputValidation

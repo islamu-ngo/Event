@@ -1,6 +1,3 @@
-// ABOUTME: Compact management projection for one event-report queue row.
-// ABOUTME: Includes safe report metadata, current case state, and counts without evidence text.
-
 namespace Explore.Application.DTOs.EventReporting;
 
 public sealed record ModerationReportQueueItemDto

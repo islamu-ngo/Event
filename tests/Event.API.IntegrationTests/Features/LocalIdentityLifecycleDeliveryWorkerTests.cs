@@ -1,5 +1,3 @@
-// ABOUTME: Exercises the existing lifecycle worker's trusted mirror repair through production DI and native stores.
-// ABOUTME: Repairs consumed receipts after token expiry with SMTP disabled, without another handoff or public replay.
 
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Identity;

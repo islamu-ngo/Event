@@ -1,6 +1,3 @@
-// ABOUTME: Resolves manual provider publication uncertainty from exact operator-supplied evidence.
-// ABOUTME: Commits the aggregate transition and mandatory safe audit under optimistic concurrency.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;

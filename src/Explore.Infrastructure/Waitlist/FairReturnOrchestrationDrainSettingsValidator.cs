@@ -1,6 +1,3 @@
-// ABOUTME: Rejects unsafe fair-return drain batch, fairness, and lease configuration.
-// ABOUTME: Keeps scheduler wake-ups bounded and prevents one tenant from monopolizing a pass.
-
 using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure.Waitlist;

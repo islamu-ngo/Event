@@ -1,6 +1,3 @@
-// ABOUTME: Maps immutable consent evidence with tenant-contained submission and typed-subject lineage.
-// ABOUTME: Enforces one subject shape plus restrictive composite foreign keys to every referenced principal.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Microsoft.EntityFrameworkCore;

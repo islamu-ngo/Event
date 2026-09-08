@@ -1,6 +1,3 @@
-// ABOUTME: Validates optimistic cancellation of a queued webhook bulk replay operation.
-// ABOUTME: Requires tenant, actor, operation, observed version, and normalized audit reason evidence.
-
 using Explore.Application.Features.Webhooks.Requests.Commands;
 using Explore.Domain;
 using FluentValidation;

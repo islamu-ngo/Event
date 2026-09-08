@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL-backed tests for tenant-owned typed settings document persistence.
-// ABOUTME: Verifies JSONB storage, tenant isolation, uniqueness, and concurrency-stamp behavior.
-
 using System.Text.Json;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;

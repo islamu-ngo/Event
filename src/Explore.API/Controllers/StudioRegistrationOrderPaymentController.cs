@@ -1,6 +1,3 @@
-// ABOUTME: Exposes bounded Studio payment status under exact event commercial authority.
-// ABOUTME: The response shares the privacy-safe payment projection and offers no purchaser action links.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

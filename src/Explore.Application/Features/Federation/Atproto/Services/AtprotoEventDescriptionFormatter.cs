@@ -1,6 +1,3 @@
-// ABOUTME: Deterministically renders every non-native public event snapshot value into one readable description.
-// ABOUTME: Uses fixed section order, invariant formatting, and stable item ordering without truncation.
-
 using System.Globalization;
 using System.Text;
 using Explore.Application.Features.Federation.Atproto.Models;

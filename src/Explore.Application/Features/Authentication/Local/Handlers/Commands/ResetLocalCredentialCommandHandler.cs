@@ -1,5 +1,3 @@
-// ABOUTME: Issues supervised Local resets through the selected-store lifecycle and one-time handover boundary.
-// ABOUTME: Preserves safe replay and rechecks current instance authority before mutation and plaintext disclosure.
 
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;

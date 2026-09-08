@@ -1,6 +1,3 @@
-// ABOUTME: Pointer capture helpers for dock resize handles.
-// ABOUTME: Keeps DOM pointer capture logic isolated from Blazor resize state.
-
 export function setPointerCapture(element, pointerId) {
     if (!element || typeof element.setPointerCapture !== 'function') {
         return;

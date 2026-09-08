@@ -1,6 +1,3 @@
-// ABOUTME: Verifies split reporter-consent columns in the rebased PostgreSQL baseline.
-// ABOUTME: Proves case-update and follow-up consent remain independent and legacy storage is absent.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -45,15 +42,13 @@ public sealed class SplitEventReportConsentMigrationTests(
 
     private ExploreDbContext CreateDbContext()
     {
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>()
+        var builder = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString)
             .UseSnakeCaseNamingConvention()
             .ConfigureWarnings(warnings =>
             {
                 warnings.Ignore(RelationalEventId.PendingModelChangesWarning);
-                warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning);
             });
-        builder.EnableServiceProviderCaching(false);
         return new ExploreDbContext(builder.Options);
     }
 

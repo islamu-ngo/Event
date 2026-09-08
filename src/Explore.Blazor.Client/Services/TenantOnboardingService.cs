@@ -1,6 +1,3 @@
-// ABOUTME: Client service for tenant onboarding status and tenant policy settings workflows.
-// ABOUTME: Supports startup gating and tenant policy questionnaire submission through BFF endpoints.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Helpers;
 

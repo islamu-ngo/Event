@@ -1,6 +1,3 @@
-// ABOUTME: Handles persisted-owner webhook delivery attempt detail reads.
-// ABOUTME: Maps LocalProvider delivery ledger entities to safe operations DTOs.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Queries;

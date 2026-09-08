@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for the dedicated EditSession page and Blazouter route-id handling.
-// ABOUTME: Verifies program-item edits preserve event and session ids through navigation and save flows.
-
 using System.Reflection;
 using System.Text.Json;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;

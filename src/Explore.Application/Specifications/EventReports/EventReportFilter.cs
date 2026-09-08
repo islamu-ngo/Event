@@ -1,6 +1,3 @@
-// ABOUTME: Event-report filter specification factories for moderator queue and reporter status queries.
-// ABOUTME: Keeps report filtering composable without leaking EF Core or DTO concerns into handlers.
-
 using System.Linq.Expressions;
 using Explore.Domain;
 using Explore.Domain.Enums;

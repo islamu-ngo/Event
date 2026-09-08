@@ -1,6 +1,3 @@
-// ABOUTME: Command request for applying an operator-selected subset of an event-template diff transactionally.
-// ABOUTME: Authorized as a custom-property template sync-apply operation and validated manually inside the handler.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventTemplateSync;
 using Explore.Application.Responses;

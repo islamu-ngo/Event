@@ -1,6 +1,3 @@
-// ABOUTME: Read path for tenant policy settings — resolves effective values by merging tenant overrides with instance defaults.
-// ABOUTME: Partial class containing ReadEffectiveTenantSettingsAsync and its governance flag computations.
-
 using Explore.Application.DTOs.Onboarding;
 using Explore.Domain;
 using Explore.Domain.Constants;

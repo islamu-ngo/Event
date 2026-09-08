@@ -1,6 +1,3 @@
-// ABOUTME: Refit interface for maps BFF endpoints.
-// ABOUTME: Covers map embed URL resolution.
-
 using Refit;
 
 namespace Explore.Blazor.Client.Services;

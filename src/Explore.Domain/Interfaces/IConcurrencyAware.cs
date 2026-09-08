@@ -1,6 +1,3 @@
-// ABOUTME: Interface for entities that support optimistic concurrency control.
-// ABOUTME: Uses a Guid ConcurrencyStamp that is auto-updated by SaveChangesAsync in DbContext.
-
 namespace Explore.Domain.Interfaces;
 
 /// <summary>

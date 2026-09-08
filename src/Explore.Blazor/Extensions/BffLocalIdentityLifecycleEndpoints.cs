@@ -1,5 +1,3 @@
-// ABOUTME: Forwards Local lifecycle requests through generated clients with native browser antiforgery.
-// ABOUTME: Discards downstream bodies, forbids mutation retries, and clears ordinary sessions after consumption.
 
 using Explore.Blazor.Client.Clients;
 using Microsoft.AspNetCore.Authentication;

@@ -1,6 +1,3 @@
-// ABOUTME: Emits ticket-transfer links only from server-computed holder, source, and recipient authority.
-// ABOUTME: Keeps capabilities out of URLs while preserving exact action routes for HAL clients.
-
 using System.Security.Claims;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.DTOs.Admissions;

@@ -1,5 +1,3 @@
-// ABOUTME: Handler for deleting an agenda item from an event session.
-// ABOUTME: Fetches agenda item by ID and delegates deletion.
 using System.Threading;
 using System.Threading.Tasks;
 using Explore.Application.Contracts.Persistence;

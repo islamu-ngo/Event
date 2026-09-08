@@ -1,6 +1,3 @@
-// ABOUTME: Shared OpenAPI 2.x schema mutation helpers for HAL wrapper schemas.
-// ABOUTME: Used by native OpenAPI and Swashbuckle adapters without owning discovery or schema resolution.
-
 using Microsoft.OpenApi;
 
 namespace Explore.API.OpenApi;

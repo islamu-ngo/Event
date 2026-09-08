@@ -1,6 +1,3 @@
-// ABOUTME: Characterizes the HAL service graph so registration refactors cannot change what gets resolved.
-// ABOUTME: Asserts lifetime uniformity, contract pairing, and duplicate-free registration across all HAL types.
-
 namespace Event.Architecture.Tests;
 
 using Explore.API.Extensions;

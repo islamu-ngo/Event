@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL integration tests for fenced notification fanout run leases and checkpoints.
-// ABOUTME: Proves contention, expiry recovery, tenant bounds, stale cursor rejection, and crash replay.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

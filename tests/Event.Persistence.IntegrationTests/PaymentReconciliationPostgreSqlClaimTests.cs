@@ -1,6 +1,3 @@
-// ABOUTME: Proves PostgreSQL claims at most fifty due reconciliation rows in one command round trip.
-// ABOUTME: Asserts stable due ordering and leaves provider I/O outside the persistence claim operation.
-
 using System.Data.Common;
 using System.Diagnostics;
 using Event.Persistence.IntegrationTests.Fixtures;

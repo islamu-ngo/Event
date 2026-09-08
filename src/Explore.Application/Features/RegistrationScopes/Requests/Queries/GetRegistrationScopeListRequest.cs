@@ -1,6 +1,3 @@
-// ABOUTME: MediatR query request for fetching all registration scopes.
-// ABOUTME: Returns list of RegistrationScopeListDto (Event, Day, SessionSelection).
-
 using Explore.Application.DTOs.RegistrationScope;
 using MediatR;
 

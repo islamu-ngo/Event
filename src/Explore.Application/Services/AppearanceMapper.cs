@@ -1,6 +1,3 @@
-// ABOUTME: Static mapping helpers between domain palette value objects and DTOs for the appearance subsystem.
-// ABOUTME: Keeps normalization consistent across the resolution service and API handlers.
-
 namespace Explore.Application.Services;
 
 using Explore.Application.DTOs.Appearance;

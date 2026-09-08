@@ -1,6 +1,3 @@
-// ABOUTME: Executes audited Control Plane deployment-mode transitions with tenant-count safeguards.
-// ABOUTME: Persists operator-selected mode through bootstrap state and invalidates runtime mode cache after commit.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

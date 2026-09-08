@@ -1,5 +1,3 @@
-// ABOUTME: Verifies immutable fanout source revisions across real SQLite email-policy changes.
-// ABOUTME: Protects coalescing boundaries, historical replay, and pretransaction lock ownership.
 
 using Explore.Application.Models.InternalEvents;
 using Explore.Application.Notifications;

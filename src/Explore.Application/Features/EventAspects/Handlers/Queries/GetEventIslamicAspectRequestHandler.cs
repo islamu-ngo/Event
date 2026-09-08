@@ -1,6 +1,3 @@
-// ABOUTME: Query handler to retrieve the Islamic aspect for an event.
-// ABOUTME: Returns the aspect with navigation properties (Madhab, PrimaryLanguage) or null.
-
 namespace Explore.Application.Features.EventAspects.Handlers.Queries;
 
 using System.Threading;

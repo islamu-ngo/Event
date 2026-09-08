@@ -1,6 +1,3 @@
-// ABOUTME: Repository interface for TenantFooterLinkGroup with domain-specific query operations.
-// ABOUTME: Handles both tenant-owned groups (TenantId set) and instance-default groups (TenantId null).
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

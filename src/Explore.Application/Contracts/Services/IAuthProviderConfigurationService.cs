@@ -1,6 +1,3 @@
-// ABOUTME: Service contract for managing instance-level authentication provider configuration.
-// ABOUTME: Handles reading and applying auth provider settings (Keycloak, ATProto, Google SSO).
-
 using Explore.Application.DTOs.Onboarding;
 
 namespace Explore.Application.Contracts.Services;

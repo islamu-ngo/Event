@@ -1,4 +1,3 @@
-// ABOUTME: Stub IAuthorizationProvider for integration tests.
 // Configurable to allow-all or deny-all for testing endpoint authorization behavior.
 
 using Explore.Application.Contracts.Infrastructure;

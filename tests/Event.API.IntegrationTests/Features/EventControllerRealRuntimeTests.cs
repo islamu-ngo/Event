@@ -1,6 +1,3 @@
-// ABOUTME: Production-faithful integration tests for EventController against real PostgreSQL.
-// ABOUTME: Uses RealRuntimeApiFixture with Respawn reset and scenario seeds for deterministic testing.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;

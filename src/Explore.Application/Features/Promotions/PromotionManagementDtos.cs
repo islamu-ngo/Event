@@ -1,6 +1,3 @@
-// ABOUTME: Browser-safe promotion management DTOs for organizer authoring screens.
-// ABOUTME: Hides commercial authority metadata and never exposes digests, key versions, or stored secrets.
-
 using System.Text.Json.Serialization;
 using Explore.Application.Responses;
 

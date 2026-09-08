@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for instance platform contribution percentage options.
-// ABOUTME: Preserves integer basis-point storage and per-setting uniqueness constraints.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

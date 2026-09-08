@@ -1,5 +1,3 @@
-// ABOUTME: Writes SHA-256 checksum manifests for retained CI/CD evidence artifacts.
-// ABOUTME: Keeps release evidence integrity checks in repository-owned C# instead of workflow shell logic.
 #:property RestorePackagesWithLockFile=false
 
 using System.Security.Cryptography;

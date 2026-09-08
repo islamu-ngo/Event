@@ -1,5 +1,3 @@
-// ABOUTME: Verifies Control Plane SMTP lock and unlock handlers reuse their outer policy lease inside a transaction.
-// ABOUTME: Exercises real writer persistence and post-commit notifications without provider I/O or timing sleeps.
 
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;

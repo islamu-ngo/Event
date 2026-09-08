@@ -1,6 +1,3 @@
-// ABOUTME: Builds the Control Plane operations snapshot from existing operational services.
-// ABOUTME: Uses bounded counts and redacted provider status so instance operators see health without tenant payloads.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

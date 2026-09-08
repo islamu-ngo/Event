@@ -1,6 +1,3 @@
-// ABOUTME: Event-scoped organizer query for exact session agenda items.
-// ABOUTME: Authorizes against the parent event and carries the session ID only as a bounded child selector.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventSessionAgendaItem;
 using MediatR;

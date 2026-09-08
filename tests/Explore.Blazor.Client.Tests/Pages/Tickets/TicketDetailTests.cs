@@ -1,6 +1,3 @@
-// ABOUTME: Verifies admission ticket actions are rendered exclusively from HAL link relations.
-// ABOUTME: Covers revoked presentation and exact QR versus print affordance separation.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Interop;
 using Explore.Blazor.Client.Contracts.Services.Admissions;

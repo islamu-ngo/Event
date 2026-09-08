@@ -1,6 +1,3 @@
-// ABOUTME: Behavioral tests for AI assistant shell availability state.
-// ABOUTME: Verifies tenant enabled/available flags, authentication audience, and user navbar preference composition.
-
 using Explore.Blazor.Client.Services;
 
 namespace Explore.Blazor.Client.Tests.Services;

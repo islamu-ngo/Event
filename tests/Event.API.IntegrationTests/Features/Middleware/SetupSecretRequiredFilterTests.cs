@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for SetupSecretRequiredAttribute filter behavior using a resolved private inner TypeFilter.
-// ABOUTME: Verifies setup-mode checks, header secret validation, and action execution gating outcomes.
-
 using Explore.API.Filters;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Onboarding;

@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS link policies for event session detail and collection resources.
-// ABOUTME: Emits only event session affordances backed by registered API route names.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Collections.Generic;

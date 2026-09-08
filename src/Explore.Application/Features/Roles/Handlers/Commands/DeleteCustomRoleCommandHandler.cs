@@ -1,6 +1,3 @@
-// ABOUTME: Handler for deleting custom (non-system) roles with active member validation.
-// ABOUTME: Prevents deletion of roles with active members, removes permissions, triggers PolicySync.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

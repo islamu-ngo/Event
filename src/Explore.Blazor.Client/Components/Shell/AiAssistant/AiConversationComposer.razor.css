@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped styles for the reusable AI conversation composer. */
-/* ABOUTME: Preserves the existing dock composer appearance across alternate hosts. */
-
 .ai-rail__composer {
     --ai-rail-reference-token-background: #BFFF00;
     --ai-rail-reference-token-text: #111827;

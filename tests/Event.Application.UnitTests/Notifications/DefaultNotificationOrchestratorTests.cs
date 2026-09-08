@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for notification orchestration over ownership resolution and durable intent persistence.
-// ABOUTME: Locks local, delegated, disabled, and validation paths without invoking delivery providers.
-
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Notifications;

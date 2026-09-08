@@ -1,6 +1,3 @@
-// ABOUTME: Luma-inspired group profile page with banner, avatar, events timeline.
-// ABOUTME: Loads group details and public events split into upcoming vs past.
-
 using Blazouter.Services;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;

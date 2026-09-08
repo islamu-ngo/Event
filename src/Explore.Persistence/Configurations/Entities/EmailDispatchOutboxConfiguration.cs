@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for specialized email dispatch outbox, attempts, and receipts.
-// ABOUTME: Adds worker-poll, uniqueness, and operator-status indexes for Basic Dispatch Mode.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

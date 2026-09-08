@@ -1,4 +1,3 @@
-// ABOUTME: Repository implementation for UserPreference entity providing data access
 // for user-specific setting overrides.
 
 namespace Explore.Persistence.Repositories;

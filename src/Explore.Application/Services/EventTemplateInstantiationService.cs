@@ -1,6 +1,3 @@
-// ABOUTME: Creates in-memory runtime definitions/options from a published template for event creation.
-// ABOUTME: Handles provenance tracking, default option mapping, and source-id-first provenance matching.
-
 using Explore.Application.Contracts.Services;
 using Explore.Domain;
 using Explore.Domain.Constants;

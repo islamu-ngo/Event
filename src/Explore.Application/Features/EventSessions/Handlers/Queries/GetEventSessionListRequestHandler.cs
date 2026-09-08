@@ -1,6 +1,3 @@
-// ABOUTME: Query handler returning a paginated list of event sessions with optional projection-backed filtering.
-// ABOUTME: Custom property filters are gated behind tenant feature flag via ICustomPropertyQuotaResolver.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

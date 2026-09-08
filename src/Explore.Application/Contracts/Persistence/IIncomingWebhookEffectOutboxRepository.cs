@@ -1,6 +1,3 @@
-// ABOUTME: Persistence contract for tenant-scoped pending incoming-webhook effect pointers.
-// ABOUTME: Supports exact provider identity lookup and tracked insertion inside the inbox transaction.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

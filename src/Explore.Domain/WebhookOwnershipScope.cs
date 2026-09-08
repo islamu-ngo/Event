@@ -1,6 +1,3 @@
-// ABOUTME: Immutable typed ownership value for webhook configuration aggregates.
-// ABOUTME: Normalizes Instance, Tenant, Organization, Group, and User references into one validated scope.
-
 namespace Explore.Domain;
 
 public sealed record WebhookOwnershipScope

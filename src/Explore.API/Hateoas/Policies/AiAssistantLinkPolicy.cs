@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS link policies for authenticated AI assistant conversation resources.
-// ABOUTME: Emits conversation navigation and send affordances through the standard fail-closed HAL pipeline.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Collections.Generic;

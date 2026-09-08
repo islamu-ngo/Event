@@ -1,6 +1,3 @@
-// ABOUTME: Secured query for the multi-tenant control-plane domain and DNS checklist.
-// ABOUTME: Authorizes domain guidance through instance-setting metadata before the handler runs.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.ControlPlane;
 using MediatR;

@@ -1,6 +1,3 @@
-// ABOUTME: Unit coverage for the explicit browser geolocation module boundary used by home discovery.
-// ABOUTME: Verifies typed transient results, exact module/function calls, and safe interop failure behavior.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Contracts.Interop;
 using Explore.Blazor.Client.Services.Interop;

@@ -1,6 +1,3 @@
-// ABOUTME: Validates notification-level update payload shape before ownership checks.
-// ABOUTME: Keeps allowed lookup IDs in application code so invalid writes fail closed.
-
 using Explore.Domain.Enums;
 using FluentValidation;
 

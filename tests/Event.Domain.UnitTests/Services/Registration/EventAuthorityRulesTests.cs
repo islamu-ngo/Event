@@ -1,6 +1,3 @@
-// ABOUTME: Verifies provenance-derived event authority remains separate and fail closed.
-// ABOUTME: Protects community contributors from receiving organizer, data, or commercial powers.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Registration;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Maps workflow-owned registration requirements and normalized policy lookup relationships.
-// ABOUTME: Enforces tenant-safe lineage, deterministic ordinals, bounded metadata, and concurrency.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;

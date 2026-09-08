@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL proofs for tenant-scoped membership removal isolation and atomicity.
-// ABOUTME: Verifies profiles and grants change only in one tenant while global identity and Homes remain intact.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.TenantUsers.Handlers.Commands;
 using Explore.Application.Features.TenantUsers.Requests.Commands;
@@ -373,11 +370,8 @@ public sealed class TenantMembershipRemovalPostgreSqlFixture : IAsyncInitializer
             Password = connection.Password,
             TlsMode = PrimaryDatabaseTlsMode.Disabled,
         };
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>();
-        builder.EnableServiceProviderCaching(false);
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(builder, database);
-        builder.ConfigureWarnings(warnings =>
-            warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning));
         return new ExploreDbContext(builder.Options);
     }
 

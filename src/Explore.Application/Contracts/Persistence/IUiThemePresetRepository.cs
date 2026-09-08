@@ -1,6 +1,3 @@
-// ABOUTME: Repository interface for UiThemePreset — theme catalog templates spanning platform and tenant scopes.
-// ABOUTME: Presets are selectable templates; user snapshots live in UserAppearanceProfile.
-
 namespace Explore.Application.Contracts.Persistence;
 
 using Explore.Domain;

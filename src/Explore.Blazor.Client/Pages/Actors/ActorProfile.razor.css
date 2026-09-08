@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped styling for canonical and tenant-contextual Actor profiles. */
-/* ABOUTME: Provides responsive identity, metadata, and action layout with logical properties. */
-
 .actor-profile {
     padding-block: var(--space-8, 2rem);
 }

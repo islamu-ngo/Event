@@ -1,6 +1,3 @@
-// ABOUTME: Concrete per-session admission row derived from a registration order.
-// ABOUTME: Requires participant lineage while retaining an optional denormalized linked-user identity.
-
 using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;

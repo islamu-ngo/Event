@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for removing a language from an event session.
-// ABOUTME: Carries the junction record ID.
 using Explore.Application.Authorization;
 using MediatR;
 

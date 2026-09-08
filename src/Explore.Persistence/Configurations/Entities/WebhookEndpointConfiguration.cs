@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for owner-scoped webhook endpoints managed locally or mirrored from Svix.
-// ABOUTME: Enforces one instance-or-tenant query scope and a typed consumer relationship.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;

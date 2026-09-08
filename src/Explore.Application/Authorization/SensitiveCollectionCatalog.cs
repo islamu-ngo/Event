@@ -1,6 +1,3 @@
-// ABOUTME: Names the exact paged collections whose rows, counts, or existence are authorization-sensitive.
-// ABOUTME: Every secure paged query must be classified here as protected or explicitly public.
-
 namespace Explore.Application.Authorization;
 
 /// <summary>

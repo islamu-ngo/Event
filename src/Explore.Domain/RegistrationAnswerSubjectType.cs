@@ -1,6 +1,3 @@
-// ABOUTME: Defines normalized lookup rows for registration-answer subject identity.
-// ABOUTME: Keeps stable persisted IDs and codes separate from the enum convenience mirror.
-
 namespace Explore.Domain;
 
 public sealed class RegistrationAnswerSubjectType

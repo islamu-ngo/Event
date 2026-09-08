@@ -1,5 +1,3 @@
-// ABOUTME: Exercises native ATProto visitor JIT through the signed private HTTP bridge and real SQLite transactions.
-// ABOUTME: Keeps visitor signup policy separate from exact linked login and configured administrator authority.
 
 using System.Net;
 using System.Net.Http.Json;
@@ -79,6 +77,7 @@ public sealed class AtprotoVisitorAdmissionTests
     [Arguments(AuthenticationProviderKind.Atproto, VisitorAccessMode.DirectoryListingOnly, true, true)]
     [Arguments(AuthenticationProviderKind.Local, VisitorAccessMode.FullRegistrationAndAuth, false, true)]
     [Arguments(AuthenticationProviderKind.Local, VisitorAccessMode.FullRegistrationAndAuth, true, false)]
+    [Arguments(AuthenticationProviderKind.Atproto, VisitorAccessMode.FullRegistrationAndAuth, true, false)]
     public async Task DirectBridgeCannotCreateVisitorsWithoutUsableSignup(
         AuthenticationProviderKind primary, VisitorAccessMode mode, bool enabled, bool usable)
     {

@@ -1,6 +1,3 @@
-// ABOUTME: DTOs for the authenticated user's notification preference matrix.
-// ABOUTME: Carries category, channel, cell, and global mute state for HAL-backed clients.
-
 namespace Explore.Application.DTOs.Notification;
 
 public sealed record NotificationPreferenceMatrixDto

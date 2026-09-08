@@ -1,6 +1,3 @@
-// ABOUTME: Validates provider-neutral hosted Checkout requests at the Application trust boundary.
-// ABOUTME: Prevents malformed identities, money, and cross-origin return URLs from reaching providers.
-
 using Explore.Application.Contracts.Payments;
 
 namespace Event.Application.UnitTests.Contracts.Payments;

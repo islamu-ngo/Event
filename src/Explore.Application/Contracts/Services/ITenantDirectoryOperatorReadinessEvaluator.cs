@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-scoped readiness contract for activation, public disclosure, and paid commerce.
-// ABOUTME: Returns normalized identity plus bounded failure codes without leaking submitted legal facts.
-
 namespace Explore.Application.Contracts.Services;
 
 using System.Collections.Immutable;

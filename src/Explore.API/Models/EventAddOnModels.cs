@@ -1,6 +1,3 @@
-// ABOUTME: Defines body-safe organizer and buyer intent contracts for event add-ons.
-// ABOUTME: Excludes tenant, event, identity, currency, and server-computed total authority.
-
 namespace Explore.API.Models;
 
 public sealed record EventAddOnSelectionRequest

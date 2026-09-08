@@ -1,4 +1,3 @@
-// ABOUTME: Stress test fixture backed by real PostgreSQL with rate limiting explicitly enabled.
 // Used for timing-sensitive scenarios: rate limiting enforcement, timeout handling, auth conflicts.
 
 using Explore.Application.Features.Events.OpenGraph;

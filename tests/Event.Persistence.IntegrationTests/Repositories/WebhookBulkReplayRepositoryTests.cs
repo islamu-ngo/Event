@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL tests for webhook bulk replay classification, locking, and Local target scheduling.
-// ABOUTME: Proves disjoint exclusions, tenant scoping, retention rechecks, and terminal-only reopening.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

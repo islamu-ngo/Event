@@ -1,5 +1,3 @@
-// ABOUTME: Centralizes root/startup routing decisions using instance onboarding and public experience settings.
-
 using Explore.Blazor.Client.Contracts.Providers;
 
 namespace Explore.Blazor.Client.Services;

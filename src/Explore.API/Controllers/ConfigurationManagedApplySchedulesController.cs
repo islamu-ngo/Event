@@ -1,6 +1,3 @@
-// ABOUTME: Exposes target-authorized creation, independent review, and cancellation of managed apply windows.
-// ABOUTME: Keeps import capabilities header-only and leaves actual mutation inside the ordinary atomic apply endpoint.
-
 namespace Explore.API.Controllers;
 
 using System.ComponentModel.DataAnnotations;

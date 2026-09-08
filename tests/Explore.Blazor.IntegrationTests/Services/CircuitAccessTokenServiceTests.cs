@@ -1,6 +1,3 @@
-// ABOUTME: Tests for CircuitAccessTokenService and AccessTokenForwardingHandler using the bounded ICircuitTokenStore.
-// ABOUTME: Verifies cross-user isolation, session scoping, token refresh propagation, and deterministic cleanup.
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using Explore.Blazor.Services;

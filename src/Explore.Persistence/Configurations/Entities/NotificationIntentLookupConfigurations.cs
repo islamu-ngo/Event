@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mappings for normalized notification ownership and routing lookup tables.
-// ABOUTME: Keeps persistent email-responsibility classifiers stable with integer foreign keys.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

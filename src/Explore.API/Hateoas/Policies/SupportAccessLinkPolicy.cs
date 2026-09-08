@@ -1,6 +1,3 @@
-// ABOUTME: HAL link policies for support-access session and audit resources.
-// ABOUTME: Emits start, stop, force-stop, and audit affordances through authorization-backed links.
-
 using System.Security.Claims;
 using Explore.Application.Authentication;
 using Explore.Application.Authorization;

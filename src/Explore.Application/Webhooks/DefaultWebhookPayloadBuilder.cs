@@ -1,6 +1,3 @@
-// ABOUTME: Default application-layer builder for stable webhook envelopes.
-// ABOUTME: Enforces event-catalog allow lists, payload retention, and SHA-256 payload hashes.
-
 using System.Security.Cryptography;
 using System.Text.Json;
 using Explore.Application.Contracts.Webhooks;

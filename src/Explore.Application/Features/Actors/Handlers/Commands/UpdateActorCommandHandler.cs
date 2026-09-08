@@ -1,6 +1,3 @@
-// ABOUTME: Handler for grouped actor PATCH updates using the sub-DTO pattern.
-// ABOUTME: Validates groups, enforces concurrency, applies explicit mappings, and invalidates detail cache.
-
 using System.Linq;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;

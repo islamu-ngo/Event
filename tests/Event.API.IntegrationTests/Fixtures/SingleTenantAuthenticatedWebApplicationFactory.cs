@@ -1,6 +1,3 @@
-// ABOUTME: Authenticated test factory pinned to single-tenant mode for tenant-scoped endpoint integration tests.
-// ABOUTME: Avoids tenant-resolution 404s so tests can focus on authenticated controller behavior.
-
 using Explore.Domain.Constants;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;

@@ -1,6 +1,3 @@
-// ABOUTME: Enforces final record-contract and HTTP body-authority ratchets after records adoption.
-// ABOUTME: Uses compiled metadata and exact reasoned JSON baselines so new, stale, or hidden debt fails deterministically.
-
 namespace Event.Architecture.Tests
 {
 
@@ -41,6 +38,7 @@ public sealed class RecordContractArchitectureTests
         "Explore.Application.DTOs.RegistrationOrders.RegistrationPaymentCommandResultDto",
         "Explore.Application.DTOs.RegistrationOrders.RegistrationRefundCommandResultDto",
         "Explore.Application.DTOs.SupportAccess.SupportAccessSessionCommandResponseDto",
+        "Explore.Application.Features.Authentication.Atproto.Models.AtprotoTransientCommandResult",
         "Explore.Application.Features.Promotions.PromotionCodeIssuedCommandResponseDto",
         "Explore.Application.Features.Promotions.PromotionManagementCommandResponseDto",
         "Explore.Application.Features.Promotions.Requests.Commands.PromotionRedemptionResponseDto",
@@ -286,7 +284,7 @@ public sealed class RecordContractArchitectureTests
         await Assert.That(classBaseline.Failures).IsEmpty();
         await Assert.That(bodyBaseline.Failures).IsEmpty();
         await Assert.That(classBaseline.Entries).IsEmpty();
-        await Assert.That(bodyBaseline.Entries).Count().IsEqualTo(7);
+        await Assert.That(bodyBaseline.Entries).Count().IsEqualTo(10);
         await Assert.That(bodyBaseline.Entries.All(entry => entry.Category == "legitimate-target")).IsTrue();
         await Assert.That(DiscoverConcreteMediatRClassRequests()).IsEmpty();
     }

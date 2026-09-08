@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the instance SMTP connection diagnostic query handler.
-// ABOUTME: Verifies safe result propagation and cancellation forwarding through the Application boundary.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.InstanceOnboarding.Handlers.Queries;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;

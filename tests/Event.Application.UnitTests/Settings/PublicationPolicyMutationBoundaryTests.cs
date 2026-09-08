@@ -1,6 +1,3 @@
-// ABOUTME: Defines the RED Application contract for coordinated publication-policy mutation.
-// ABOUTME: Covers one lock-scoped workflow, transactional rollback, fail-closed safety, and deferred effects.
-
 namespace Event.Application.UnitTests.Settings;
 
 using System.Collections.Immutable;

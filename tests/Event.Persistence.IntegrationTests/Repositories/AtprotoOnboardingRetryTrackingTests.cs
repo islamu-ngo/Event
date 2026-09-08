@@ -1,6 +1,3 @@
-// ABOUTME: Verifies EF tracking recovery for retryable ATProto tenant onboarding.
-// ABOUTME: Ensures reloaded User and Actor owners are not inserted again after tracking is cleared.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
@@ -16,8 +13,8 @@ public class AtprotoOnboardingRetryTrackingTests
     [Test]
     public async Task RetryReloadsTrackedOwnersBeforeCreatingMissingTenantUser()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase($"atproto-onboarding-retry-{Guid.NewGuid():N}")
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase($"atproto-onboarding-retry-{Guid.NewGuid():N}")
             .Options;
         await using var context = new ExploreDbContext(options);
         context.EnableTenantFilterBypass("ATProto onboarding retry tracking test.");

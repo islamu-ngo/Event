@@ -1,6 +1,3 @@
-// ABOUTME: Organization detail read DTO including profile, actor, status, tenant, and concurrency metadata.
-// ABOUTME: The concurrency stamp is returned so clients can issue PATCH requests with If-Match.
-
 using System;
 
 namespace Explore.Application.DTOs.Organization;

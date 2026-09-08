@@ -1,6 +1,3 @@
-// ABOUTME: Routes durable outbox messages to local application side-effect dispatchers.
-// ABOUTME: Handles notification fanout and provider synchronization after durable transaction commits.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;

@@ -1,5 +1,3 @@
-// ABOUTME: Verifies tenant-plan SMTP application through real version loading and relational mutation fences.
-// ABOUTME: Preserves tenant matching, instance locks, mixed setting atomicity, and post-commit notifications.
 
 using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;

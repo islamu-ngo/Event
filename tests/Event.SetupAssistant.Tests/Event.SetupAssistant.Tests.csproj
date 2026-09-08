@@ -1,5 +1,3 @@
-<!-- ABOUTME: Defines the focused executable TUnit boundary for Event.SetupAssistant. -->
-<!-- ABOUTME: References the shared presentation and separately compiled live-adapter owners. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>

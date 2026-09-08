@@ -1,6 +1,3 @@
-// ABOUTME: Applies bounded operator signals to custom-property projection status DTOs.
-// ABOUTME: Keeps projection admin responses actionable without exposing raw custom-property keys.
-
 using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Domain.Enums;
 

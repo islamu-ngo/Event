@@ -1,6 +1,3 @@
-// ABOUTME: Defines stable value-safe setup diagnostics with bounded codes, paths, and severity.
-// ABOUTME: Excludes arbitrary messages, supplied values, credentials, and deployment details.
-
 namespace ISLAMU.Event.Setup.Core;
 
 public enum SetupDiagnosticSeverity

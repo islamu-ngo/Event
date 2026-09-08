@@ -1,6 +1,3 @@
-// ABOUTME: Explicit, versioned household-consent payload for private home classification and ownership.
-// ABOUTME: Both fields are required so an omitted body can never read as silent agreement.
-
 namespace Explore.Application.DTOs.Location;
 
 /// <summary>

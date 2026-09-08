@@ -1,6 +1,3 @@
-// ABOUTME: Client service for instance onboarding and governance through the generated API client.
-// ABOUTME: Exposes generated request and response DTOs for all onboarding settings.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Helpers;

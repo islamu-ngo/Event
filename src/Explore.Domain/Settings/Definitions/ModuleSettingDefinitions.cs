@@ -1,6 +1,3 @@
-// ABOUTME: Setting definitions for feature module toggles (Islamic, Tech).
-// ABOUTME: Controls which event modules are available per tenant.
-
 namespace Explore.Domain.Settings.Definitions;
 
 public static class ModuleSettingDefinitions

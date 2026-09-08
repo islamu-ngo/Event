@@ -1,6 +1,3 @@
-// ABOUTME: Query handler to retrieve the Tech aspect for an event.
-// ABOUTME: Returns the aspect or null if the event doesn't have one.
-
 namespace Explore.Application.Features.EventAspects.Handlers.Queries;
 
 using System.Threading;

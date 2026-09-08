@@ -1,6 +1,3 @@
-// ABOUTME: Configures the embedded Identity user-claim table and bounded claim columns.
-// ABOUTME: Preserves Identity's generated integer claim key and user ownership relationship.
-
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

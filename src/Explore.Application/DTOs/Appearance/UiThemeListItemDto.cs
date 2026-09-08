@@ -1,6 +1,3 @@
-// ABOUTME: Summary DTO for admin theme catalog lists.
-// ABOUTME: Surfaces ownership, active/default state, and concurrency token without the full palette payload.
-
 namespace Explore.Application.DTOs.Appearance;
 
 public sealed record UiThemeListItemDto

@@ -1,6 +1,3 @@
-// ABOUTME: Command to update tenant-scoped non-secret Listmonk integration settings.
-// ABOUTME: Credentials are intentionally excluded and rotated through encrypted secret bindings.
-
 using Explore.Application.DTOs.Integrations;
 using Explore.Application.Responses;
 using MediatR;

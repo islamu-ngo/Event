@@ -1,6 +1,3 @@
-// ABOUTME: Exposes capability-scoped guest and current-account registration-order lifecycle endpoints.
-// ABOUTME: Transports guest capabilities only in headers and delegates all order access decisions to MediatR.
-
 using Asp.Versioning;
 using System.Text.Json;
 using Explore.API.Attributes;

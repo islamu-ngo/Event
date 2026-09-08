@@ -1,6 +1,3 @@
-// ABOUTME: Registers bounded multi-scheme authentication and authorization for the API.
-// ABOUTME: Dispatches exact setup, API-key, ATProto, privacy-receipt, and Keycloak bearer credentials.
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Net.Security;
@@ -70,6 +67,7 @@ public static class AuthenticationExtensions
                 LocalIdentityOptions.IsValid,
                 "Local Identity lockout and token lifetime settings are outside their supported ranges.")
             .ValidateOnStart();
+        services.AddScoped<AtprotoTransientAssertionValidator>();
         services.AddScoped<AtprotoJwtService>();
         services.AddScoped<IAtprotoSessionTokenIssuer>(provider => provider.GetRequiredService<AtprotoJwtService>());
         if (!skipAuthorityWarmup)
@@ -294,6 +292,9 @@ public static class AuthenticationExtensions
             .AddScheme<AuthenticationSchemeOptions, SetupSecretAuthenticationHandler>(
                 ApiAuthenticationSchemeNames.SetupSecret,
                 _ => { })
+            .AddScheme<AuthenticationSchemeOptions, AtprotoTransientAuthenticationHandler>(
+                AtprotoTransientAuthenticationDefaults.Scheme,
+                _ => { })
             .AddScheme<AuthenticationSchemeOptions, AtprotoBootstrapAuthenticationHandler>(
                 ApiAuthenticationSchemeNames.AtprotoBootstrap,
                 _ => { })
@@ -368,6 +369,11 @@ public static class AuthenticationExtensions
 
     internal static string SelectDefaultAuthenticationScheme(HttpContext context)
     {
+        if (AtprotoTransientAuthenticationDefaults.IsPrivatePath(context.Request.Path))
+        {
+            return AtprotoTransientAuthenticationDefaults.Scheme;
+        }
+
         if (SetupSecretAuthenticationHandler.SupportsRequest(context.Request)
             && context.Request.Headers.ContainsKey(SetupSecretAuthenticationHandler.HeaderName))
         {

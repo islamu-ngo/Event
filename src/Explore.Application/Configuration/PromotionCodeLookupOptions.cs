@@ -1,6 +1,3 @@
-// ABOUTME: Non-secret promotion-code digest configuration bound from application settings.
-// ABOUTME: Carries only the active HMAC key version; secret bytes resolve through SecretBinding.
-
 namespace Explore.Application.Configuration;
 
 public sealed class PromotionCodeLookupOptions

@@ -1,6 +1,3 @@
-// ABOUTME: Marks sensitive read responses as browser-private and forbidden from storage.
-// ABOUTME: Prevents sensitive payload caching and cross-navigation referrer disclosure.
-
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Net.Http.Headers;
 

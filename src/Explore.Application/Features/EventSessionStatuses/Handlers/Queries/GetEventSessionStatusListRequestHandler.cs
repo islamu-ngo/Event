@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning all EventSessionStatus lookup rows.
-// ABOUTME: Maps EventSessionStatus entities to EventSessionStatusListDto via AutoMapper.
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionStatus;

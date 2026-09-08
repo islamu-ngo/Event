@@ -1,6 +1,3 @@
-// ABOUTME: Validates Osprey provider endpoint, timeout, and credential header configuration.
-// ABOUTME: Prevents unsafe endpoint targets unless explicitly allowed for self-hosted deployments.
-
 using System.Net;
 using System.Net.Sockets;
 using Microsoft.Extensions.Options;

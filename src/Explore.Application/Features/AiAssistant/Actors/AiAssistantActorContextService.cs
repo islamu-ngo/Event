@@ -1,6 +1,3 @@
-// ABOUTME: Resolves authorized acting actors for AI assistant use across rail, API, and MCP adapters.
-// ABOUTME: Centralizes user, organization-member, and group-member actor eligibility before AI writes persist.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Ai;
 using Explore.Domain;

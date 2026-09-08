@@ -1,6 +1,3 @@
-// ABOUTME: Strongly-typed Deployment setting group resolved via batch loading.
-// ABOUTME: Single key from DeploymentSettingDefinitions via GovernanceSettingKeys.Deployment.
-
 namespace Explore.Application.Settings.Groups;
 
 using Explore.Application.Contracts.Infrastructure;

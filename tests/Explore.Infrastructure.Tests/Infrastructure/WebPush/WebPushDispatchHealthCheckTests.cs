@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for Web Push dispatch readiness health data.
-// ABOUTME: Verifies backlog, stale-processing, and terminal state reporting avoids sensitive payloads.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Infrastructure.HealthChecks;
 using Explore.Infrastructure.WebPush;

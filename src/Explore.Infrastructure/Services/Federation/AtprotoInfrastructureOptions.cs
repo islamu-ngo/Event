@@ -1,6 +1,3 @@
-// ABOUTME: Defines typed server-only configuration and bounded readiness for Infrastructure ATProto clients.
-// ABOUTME: Keeps public client identity and development loopback policy explicit at the composition boundary.
-
 namespace Explore.Infrastructure.Services.Federation;
 
 public sealed class AtprotoInfrastructureOptions

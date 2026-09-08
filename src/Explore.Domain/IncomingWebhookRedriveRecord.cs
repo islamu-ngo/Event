@@ -1,6 +1,3 @@
-// ABOUTME: Append-only provenance for an operator redrive of a dead-lettered incoming webhook.
-// ABOUTME: Records actor, reason, time, source generation, target generation, and scheduling result.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

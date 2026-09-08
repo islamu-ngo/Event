@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for GroupService membership HAL collection adaptation.
-// ABOUTME: Ensures group member action affordances survive service compatibility mapping.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Helpers;
 

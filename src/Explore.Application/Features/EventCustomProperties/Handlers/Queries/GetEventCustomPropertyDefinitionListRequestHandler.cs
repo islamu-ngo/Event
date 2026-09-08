@@ -1,6 +1,3 @@
-// ABOUTME: Handles paginated retrieval of event-local custom property definitions for a given event.
-// ABOUTME: Uses HybridCache keyed by eventId to keep repeated organizer list reads efficient.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventCustomProperty;

@@ -1,6 +1,3 @@
-// ABOUTME: CQRS query for listing event team members with role and lifecycle details.
-// ABOUTME: Returns all assignments for an event; handler filters by effective status for non-admin views.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventRoleAssignment;
 using Explore.Domain.Constants;

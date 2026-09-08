@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for PATCH-based Organization profile updates.
-// ABOUTME: Carries route authority, current user authorization context, If-Match concurrency, and grouped payload.
 using System;
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Organization;

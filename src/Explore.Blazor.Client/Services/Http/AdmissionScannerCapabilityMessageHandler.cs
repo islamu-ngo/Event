@@ -1,6 +1,3 @@
-// ABOUTME: Adds transient scanner authority only to the exact same-origin scanner check-in endpoint.
-// ABOUTME: Forces browser credentials off so staff cookies and bearer authorization cannot accompany it.
-
 using Explore.Blazor.Client.Services.Admissions;
 using Microsoft.AspNetCore.Components.WebAssembly.Http;
 

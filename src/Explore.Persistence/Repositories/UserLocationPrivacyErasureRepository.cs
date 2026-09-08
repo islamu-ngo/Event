@@ -1,6 +1,3 @@
-// ABOUTME: EF Core adapter for owner-bounded global Private Home erasure across every tenant.
-// ABOUTME: Preserves scheduling references while tracking Homes, rooms, associations, and user actors.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

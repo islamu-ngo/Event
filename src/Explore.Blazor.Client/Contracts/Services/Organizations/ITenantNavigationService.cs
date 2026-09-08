@@ -1,6 +1,3 @@
-// ABOUTME: Service contract for managing tenant navigation links through the generated API client.
-// ABOUTME: Exposes only NSwag-generated request, response, and resource models.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.Organizations;

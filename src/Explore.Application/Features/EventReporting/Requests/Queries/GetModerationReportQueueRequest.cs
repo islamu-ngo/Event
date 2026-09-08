@@ -1,6 +1,3 @@
-// ABOUTME: Secured MediatR query for event-scoped report moderation queue rows.
-// ABOUTME: Supports management filters while authorizing against the concrete event resource.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventReporting;
 using Explore.Application.Responses;

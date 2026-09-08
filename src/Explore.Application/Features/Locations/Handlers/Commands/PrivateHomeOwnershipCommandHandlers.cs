@@ -1,6 +1,3 @@
-// ABOUTME: Handlers that bind Private Home classification and ownership to explicit, versioned consent.
-// ABOUTME: Never infer ownership from CreatedBy; the acting user must acknowledge the household statement.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;

@@ -1,6 +1,3 @@
-// ABOUTME: Refit contract for Cerbos Admin API policy, schema, and reload operations.
-// ABOUTME: Keeps mutable policy-store calls centralized behind the infrastructure package publisher.
-
 using System.Threading;
 using System.Threading.Tasks;
 using Refit;

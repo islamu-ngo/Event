@@ -1,6 +1,3 @@
-// ABOUTME: Refit interface for the Anthropic Messages API with multi-turn tool calling support.
-// ABOUTME: Supports dynamic endpoint resolution for multi-tenant governance per-request routing.
-
 using Refit;
 
 namespace Explore.Infrastructure.Ai;

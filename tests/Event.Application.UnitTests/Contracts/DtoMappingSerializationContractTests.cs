@@ -1,6 +1,3 @@
-// ABOUTME: Characterizes representative DTO value, mapping, HAL, pagination, JSON, and PATCH behavior before record conversion.
-// ABOUTME: Keeps the RED lane behavioral: equality consumption and post-construction mutation fail while mapping/wire contracts stay green.
-
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;

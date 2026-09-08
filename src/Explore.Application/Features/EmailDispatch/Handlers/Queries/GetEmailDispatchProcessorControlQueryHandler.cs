@@ -1,6 +1,3 @@
-// ABOUTME: Maps durable singleton SMTP processor state to a sanitized operator control DTO.
-// ABOUTME: Returns safe defaults when no worker has created the processor state row yet.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EmailDispatch;
 using Explore.Application.Features.EmailDispatch.Requests.Queries;

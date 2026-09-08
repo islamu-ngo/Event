@@ -1,6 +1,3 @@
-// ABOUTME: RED bUnit contracts for typed optional-provider outcomes and HAL-gated autocomplete.
-// ABOUTME: Preserves typed input, local rows, attribution, and browser-safe protected selections.
-
 using System.Reflection;
 using AngleSharp.Dom;
 using Explore.Blazor.Client.Components.Locations;

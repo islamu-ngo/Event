@@ -1,6 +1,3 @@
-// ABOUTME: Validates the machine ticketing deployment matrix and disabled protected-payout boundary.
-// ABOUTME: Proves closed statuses, external-gate honesty, OpenAPI convergence, and absence of payout surfaces.
-
 using System.Text.Json;
 
 namespace Event.Architecture.Tests;

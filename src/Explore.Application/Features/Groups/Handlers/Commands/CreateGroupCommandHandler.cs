@@ -1,6 +1,3 @@
-// ABOUTME: Handles Group creation: validates DTO, creates Group, Actor, storage object link, and creator membership.
-// ABOUTME: Follows the same pattern as CreateOrganizationCommandHandler with Group-specific entities and roles.
-
 using AutoMapper;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;

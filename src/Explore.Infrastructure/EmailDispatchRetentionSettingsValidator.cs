@@ -1,6 +1,3 @@
-// ABOUTME: Startup validator for email dispatch content retention and redaction settings.
-// ABOUTME: Fails fast on unsafe scheduling, retention, or batch configuration.
-
 using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure;

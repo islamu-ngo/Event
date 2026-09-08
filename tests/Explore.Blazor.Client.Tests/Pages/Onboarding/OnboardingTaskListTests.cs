@@ -1,6 +1,3 @@
-// ABOUTME: Focused bUnit coverage for the display-only onboarding task list primitive.
-// ABOUTME: Verifies semantic ordering, localized metadata, native actions, and polite status updates.
-
 using Explore.Blazor.Client.Pages.Onboarding.Components;
 
 namespace Explore.Blazor.Client.Tests.Pages.Onboarding;

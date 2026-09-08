@@ -1,6 +1,3 @@
-// ABOUTME: Kills mutations in manifest validation, recovery states, fences, and credential reissue intent.
-// ABOUTME: Uses literal floors and timestamps so every reopen decision remains independently observable.
-
 using Explore.Domain;
 
 namespace Explore.Domain.Recovery.MutationTests;

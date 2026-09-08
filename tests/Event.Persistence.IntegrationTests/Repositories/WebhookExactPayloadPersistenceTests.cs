@@ -1,6 +1,3 @@
-// ABOUTME: Persistence-contract tests for authoritative inbound and outbound webhook payload bytes.
-// ABOUTME: Verifies bytea mapping, byte/hash identity, immutable evidence metadata, and honest legacy provenance.
-
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Domain;
@@ -100,7 +97,7 @@ public sealed class WebhookExactPayloadPersistenceTests
 
     private static ExploreDbContext CreateModelContext()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql("Host=localhost;Database=webhook_model;Username=unused;Password=unused")
             .UseSnakeCaseNamingConvention()
             .Options;

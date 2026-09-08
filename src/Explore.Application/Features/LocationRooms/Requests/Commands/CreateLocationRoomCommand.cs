@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for creating a new room under a location.
-// ABOUTME: Secured via AuthorizeResource for the location_room resource kind.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.LocationRoom;
 using Explore.Application.Responses;

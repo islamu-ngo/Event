@@ -1,5 +1,3 @@
-// ABOUTME: Exercises visitor capability bypasses through native event and registration commands on SQLite.
-// ABOUTME: Verifies rejected requests leave event configuration, publication outbox and inventory unchanged.
 
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Services;

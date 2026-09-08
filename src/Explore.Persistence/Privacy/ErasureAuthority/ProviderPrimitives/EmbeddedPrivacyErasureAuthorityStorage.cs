@@ -1,6 +1,3 @@
-// ABOUTME: Prepares and validates the dedicated embedded authority SQLite file before use.
-// ABOUTME: Enforces local storage, WAL, integrity, private permissions, and bounded contention.
-
 using Explore.Secrets.Database;
 using Microsoft.Data.Sqlite;
 

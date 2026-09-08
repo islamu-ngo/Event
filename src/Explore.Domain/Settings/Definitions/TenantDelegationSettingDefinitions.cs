@@ -1,6 +1,3 @@
-// ABOUTME: Setting definitions for tenant delegation lock controls.
-// ABOUTME: Controls whether tenant admins can override platform-governed SMTP, storage, reporting, analytics, AI, and MCP settings.
-
 namespace Explore.Domain.Settings.Definitions;
 
 using Explore.Domain.Constants;

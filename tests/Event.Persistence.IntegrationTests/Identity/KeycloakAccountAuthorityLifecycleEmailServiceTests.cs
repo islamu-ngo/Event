@@ -1,5 +1,3 @@
-// ABOUTME: Exercises Keycloak lifecycle email through real linked-account selection and native SQLite audit persistence.
-// ABOUTME: Verifies exact issuer/subject, tenant scope, required actions and safe HTTP failure outcomes.
 
 using System.Net;
 using System.Text.Json;

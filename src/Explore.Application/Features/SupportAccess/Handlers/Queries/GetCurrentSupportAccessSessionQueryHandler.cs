@@ -1,6 +1,3 @@
-// ABOUTME: Handles current actor support-access status queries for BFF and UI banners.
-// ABOUTME: Uses the same validation service as authorization instead of reading client claims.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

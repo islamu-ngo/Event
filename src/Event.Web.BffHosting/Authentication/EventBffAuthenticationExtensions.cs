@@ -1,6 +1,3 @@
-// ABOUTME: Registers Keycloak OIDC, secure cookies, and coarse BFF authorization policies.
-// ABOUTME: Keeps confidential browser-host authentication setup reusable for Event web hosts.
-
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;

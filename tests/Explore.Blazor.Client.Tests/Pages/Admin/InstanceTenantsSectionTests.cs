@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for the public instance tenant lifecycle surface.
-// ABOUTME: Proves lifecycle controls follow item HAL links and purge confirmation stays fail-closed.
-
 using Explore.Blazor.Client.Contracts.ControlPlane;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Contracts.Services.ControlPlane;

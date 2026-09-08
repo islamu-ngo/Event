@@ -1,6 +1,3 @@
-// ABOUTME: Canonical authentication scheme names used across BFF and multi-provider auth registration.
-// ABOUTME: Referenced by DynamicAuthSchemeManager, BFF endpoints, and login UI to identify providers.
-
 namespace Explore.Domain.Constants;
 
 public static class AuthSchemeNames

@@ -1,6 +1,3 @@
-// ABOUTME: Explicit join assigning EventSession program items to tracks/devrooms/sections with payload.
-// ABOUTME: Stores event and tenant denormalization so Application validators can enforce same-event membership.
-
 using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;

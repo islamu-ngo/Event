@@ -1,6 +1,3 @@
-// ABOUTME: Stages one encrypted recovery request and identifier-only outbox pointer per public call.
-// ABOUTME: Performs identical durable work before identity existence is evaluated asynchronously.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Admissions;
 using Explore.Domain;

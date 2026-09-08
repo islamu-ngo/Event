@@ -1,5 +1,3 @@
-// ABOUTME: Requests ticketing management data for one event.
-// ABOUTME: Authorizes against the parent event ticket-management action.
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventTicketing;
 using MediatR;

@@ -1,6 +1,3 @@
-// ABOUTME: Builds absolute registration-provider callback URLs from the API-owned named route.
-// ABOUTME: Keeps routing and request-origin concerns out of Application provider orchestration.
-
 using System.Net;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Services.Registration;

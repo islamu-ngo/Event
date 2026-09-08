@@ -1,5 +1,3 @@
-// ABOUTME: Validates and unlocks a tenant-scoped setting override via the Control Plane write surface.
-// ABOUTME: Rejects ineligible targets and illegal state transitions before applying the unlock.
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

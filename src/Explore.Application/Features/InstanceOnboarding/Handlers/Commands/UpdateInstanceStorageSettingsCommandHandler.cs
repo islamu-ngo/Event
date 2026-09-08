@@ -1,6 +1,3 @@
-// ABOUTME: Handles updates to provider-neutral instance storage settings by instance administrators.
-// ABOUTME: Validates storage policy, persists settings, and invalidates S3 resolver cache when relevant.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

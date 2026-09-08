@@ -1,6 +1,3 @@
-// ABOUTME: Client-side service for managing contact share consents via the API.
-// ABOUTME: Wraps the contact-share consent client with view-model mapping.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Microsoft.Extensions.Logging;

@@ -1,6 +1,3 @@
-// ABOUTME: Handles creation of ad-hoc session-local custom property definitions with governance and option persistence.
-// ABOUTME: Used when organizers add properties directly without a template; mirrors event runtime create flow scoped to EventSessionId.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

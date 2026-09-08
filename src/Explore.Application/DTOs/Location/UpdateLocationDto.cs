@@ -1,6 +1,3 @@
-// ABOUTME: Wrapper DTO for PATCH-based Location updates using nullable per-property groups.
-// ABOUTME: Body tenancy and raw coordinates are absent because trusted boundaries own that authority.
-
 using Explore.Application.Models.Common;
 
 namespace Explore.Application.DTOs.Location;

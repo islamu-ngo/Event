@@ -1,6 +1,3 @@
-// ABOUTME: Bounded configuration for organizer payment readiness reconciliation batches.
-// ABOUTME: Validates cadence and batch inputs without touching provider secrets or account identifiers.
-
 using Microsoft.Extensions.Options;
 
 namespace Explore.Application.Features.OrganizerPaymentConnections;

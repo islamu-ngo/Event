@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for EventAgendaItemService covering CRUD operations.
-// ABOUTME: Tests GetAgendaItemsByEvent, GetAgendaItemById, Create, Update, Delete with success and error paths.
-
 using System.Globalization;
 
 namespace Explore.Blazor.Client.Tests.Services;

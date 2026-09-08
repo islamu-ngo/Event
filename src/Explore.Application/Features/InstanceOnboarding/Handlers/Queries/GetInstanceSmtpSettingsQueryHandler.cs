@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning the current instance SMTP configuration.
-// ABOUTME: Reads SMTP settings from the infrastructure config store.
 using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;

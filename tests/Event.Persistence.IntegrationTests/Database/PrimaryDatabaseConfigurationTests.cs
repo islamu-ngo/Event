@@ -1,6 +1,3 @@
-// ABOUTME: Contract tests for structured primary database options and native builders.
-// ABOUTME: Exercise runtime/migrator roles, validation matrices, redaction, and provider-specific connection-string output.
-
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Secrets.Bootstrap;
@@ -578,11 +575,8 @@ public sealed class PrimaryDatabaseConfigurationTests
 
         try
         {
-            var options = new DbContextOptionsBuilder();
-            options.EnableServiceProviderCaching(false);
+            var options = TestDbContextOptions.Create();
             options.UseSqlite(result.ConnectionString);
-            options.ConfigureWarnings(warnings =>
-                warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning));
             await using (var context = new DbContext(options.Options))
             {
                 await SqliteDatabaseInitializer.InitializeAsync(context, CancellationToken.None);
@@ -606,8 +600,8 @@ public sealed class PrimaryDatabaseConfigurationTests
     [Test]
     public async Task SqliteInitializer_WithNonSqliteProvider_DoesNotExecuteSqliteSql()
     {
-        await using var context = new DbContext(new DbContextOptionsBuilder()
-            .UseInMemoryDatabase($"sqlite-initializer-{Guid.NewGuid():N}")
+        await using var context = new DbContext(TestDbContextOptions.Create()
+            .UseTestInMemoryDatabase($"sqlite-initializer-{Guid.NewGuid():N}")
             .Options);
 
         var act = () => SqliteDatabaseInitializer.InitializeAsync(context, CancellationToken.None);

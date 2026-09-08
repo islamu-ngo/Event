@@ -1,6 +1,3 @@
-// ABOUTME: Implements tenant-owned PDS outbox enqueue, reclaimable fenced claims, supersession, and settlement.
-// ABOUTME: Settles canonical URI/CID, ownership, presentation, and terminal outbox state in one transaction.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

@@ -1,4 +1,3 @@
-// ABOUTME: System-wide configuration setting with optional locking to prevent tenant overrides.
 // Part of the 3-tier cascading settings engine (System → Tenant → Event).
 
 using Explore.Domain.Interfaces;

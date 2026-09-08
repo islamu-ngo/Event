@@ -1,6 +1,3 @@
-// ABOUTME: Sub-resource DTO for instance-level organization policies.
-// ABOUTME: Controls organization verification requirements and self-registration.
-
 namespace Explore.Application.DTOs.Instance;
 
 public sealed record OrganizationPolicyDto

@@ -1,6 +1,3 @@
-// ABOUTME: Authenticated API controller for support-access session lifecycle and audit review.
-// ABOUTME: Exposes actor-bound start/stop/status flows plus tenant-scoped history through HAL.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

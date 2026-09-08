@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning all available visibility types.
-// ABOUTME: Maps entities to VisibilityTypeDto list.
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;

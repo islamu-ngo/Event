@@ -1,6 +1,3 @@
-// ABOUTME: Verifies registration consent evidence snapshots its pinned form metadata and permits one withdrawal.
-// ABOUTME: Rejects construction from fields that are not declared consent fields with complete evidence metadata.
-
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Domain;

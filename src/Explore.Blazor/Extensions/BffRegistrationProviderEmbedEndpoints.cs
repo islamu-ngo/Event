@@ -1,6 +1,3 @@
-// ABOUTME: BFF-only registration provider embed host for approved external registration descriptors.
-// ABOUTME: Keeps provider URLs server-derived while the browser loads external content only inside a sandboxed iframe.
-
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;

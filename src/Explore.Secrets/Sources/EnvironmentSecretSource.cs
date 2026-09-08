@@ -1,6 +1,3 @@
-// ABOUTME: Resolves local secrets from the explicitly selected Environment or User Secrets authority.
-// ABOUTME: Returns bounded typed outcomes without crossing between the two local sources.
-
 using Explore.Application.Contracts.Secrets;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;

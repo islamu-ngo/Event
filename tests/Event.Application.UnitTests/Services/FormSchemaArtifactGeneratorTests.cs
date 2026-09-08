@@ -1,6 +1,3 @@
-// ABOUTME: Locks deterministic registration-form schema artifacts and their published hash contract.
-// ABOUTME: Covers all four artifacts, canonical ordering, culture invariance, and mutation sensitivity.
-
 using System.Globalization;
 using System.Reflection;
 using System.Text.Json;

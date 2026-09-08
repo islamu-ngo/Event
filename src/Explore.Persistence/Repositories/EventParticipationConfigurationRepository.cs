@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for exact tenant-scoped event participation configuration updates.
-// ABOUTME: Loads normalized lookups for entity consumers and saves the tracked concurrency boundary.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

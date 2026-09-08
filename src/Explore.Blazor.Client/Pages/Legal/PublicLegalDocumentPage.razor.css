@@ -1,6 +1,3 @@
-/* ABOUTME: Responsive logical layout for role-labeled public legal documents. */
-/* ABOUTME: Preserves readable measure, visible links, forced colors, and RTL reflow. */
-
 .public-legal-document-shell__title,
 .public-legal-document__title {
     font-weight: 800;

@@ -1,6 +1,3 @@
-// ABOUTME: Maps bounded payload-free Jetstream quarantine evidence to its global consumer cursor.
-// ABOUTME: Enforces one quarantine outcome per consumer cursor and hash-only record identity evidence.
-
 using Explore.Domain.Federation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

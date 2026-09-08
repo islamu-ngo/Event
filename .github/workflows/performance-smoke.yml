@@ -1,6 +1,3 @@
-# ABOUTME: Advisory scheduled BenchmarkDotNet smoke lane for representative API endpoint performance.
-# ABOUTME: Retains benchmark logs/results without slowing required PR checks.
-
 name: Performance Smoke
 
 permissions:

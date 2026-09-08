@@ -1,5 +1,3 @@
-// ABOUTME: Validates complete visitor/provider mutations before atomic persistence under a pretransaction lease.
-// ABOUTME: Preserves usable public signup for every affected AccountRequired configuration without rewriting events.
 
 using System.Collections.Immutable;
 using System.Data;

@@ -1,6 +1,3 @@
-// ABOUTME: Sub-resource DTO for tenant delegation policies.
-// ABOUTME: Controls what tenants can self-manage (SMTP, storage, analytics, white-labeling).
-
 namespace Explore.Application.DTOs.Instance;
 
 public sealed record TenantDelegationSettingsDto

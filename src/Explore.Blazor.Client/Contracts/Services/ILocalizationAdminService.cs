@@ -1,6 +1,3 @@
-// ABOUTME: Client contract for localization admin operations — config read/write, test connection, export.
-// ABOUTME: Used by InstanceLocalizationSection; wraps the LocalizationAdminController endpoints.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services;

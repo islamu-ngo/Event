@@ -1,6 +1,3 @@
-// ABOUTME: Canonical single-submit DTO for creating an event with its initial scheduling graph.
-// ABOUTME: Models only Create Event page inputs that must be persisted atomically by the API.
-
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;

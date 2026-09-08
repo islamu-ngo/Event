@@ -1,6 +1,3 @@
-// ABOUTME: Default implementation of IAiContextRedactor using AiContextDisclosureRegistry + regex patterns.
-// ABOUTME: Provides field-level redaction via registry lookup and pattern-based embedded-PII scrubbing.
-
 using System.Text.RegularExpressions;
 using Explore.Domain.Enums;
 

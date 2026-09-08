@@ -1,6 +1,3 @@
-// ABOUTME: Command request for irreversible audited purge of dependency-free event custom-property definitions.
-// ABOUTME: Blocks purge when values, projections, audit, or template provenance would lose history.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.CustomPropertyDefinition;
 using Explore.Application.Responses;

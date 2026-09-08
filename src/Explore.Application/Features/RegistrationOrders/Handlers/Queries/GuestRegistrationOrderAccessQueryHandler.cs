@@ -1,6 +1,3 @@
-// ABOUTME: Resolves a guest order only after validating its full tenant/event/order/capability scope.
-// ABOUTME: Maps all malformed, missing, expired, and mismatched access attempts to generic absence.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

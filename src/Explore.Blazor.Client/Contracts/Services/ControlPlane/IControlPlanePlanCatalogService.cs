@@ -1,6 +1,3 @@
-// ABOUTME: Defines tenant-plan catalog and version-governance operations for control-plane pages.
-// ABOUTME: Returns generated API HAL resources and command responses without local plan mirrors.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.ControlPlane;

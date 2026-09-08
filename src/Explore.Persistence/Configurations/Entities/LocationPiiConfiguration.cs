@@ -1,6 +1,3 @@
-// ABOUTME: Configures the location_pii extension table with strict 1:1 PK/FK to locations.
-// ABOUTME: Stores removable precise address and coordinates outside the core location table.
-
 namespace Explore.Persistence.Configurations.Entities;
 
 using Explore.Domain;
@@ -25,7 +22,7 @@ public class LocationPiiConfiguration : IEntityTypeConfiguration<LocationPii>
         builder.HasKey(e => e.LocationId);
 
         builder.Property(e => e.Address)
-            .HasMaxLength(500)
+            .HasMaxLength(LocationTextNormalization.MaximumSourceLength)
             .IsRequired();
 
         builder.Property(e => e.Postcode)
@@ -33,18 +30,16 @@ public class LocationPiiConfiguration : IEntityTypeConfiguration<LocationPii>
             .IsRequired();
 
         builder.Property(e => e.AddressSubstringKey)
-            .HasMaxLength(LocationAddressSubstringKeyV1.MaximumLength)
-            .HasDefaultValue(string.Empty)
+            .HasMaxLength(LocationTextNormalization.MaximumKeyLength)
+            .IsUnicode()
             .IsRequired()
-            .UsePortableOrdinalAscii();
+            .UseLocationUnicodeCollation();
 
         builder.Property(e => e.AddressSubstringKeyVersion)
-            .HasDefaultValue((short)0)
             .IsRequired();
 
         builder.ToTable(table => table.HasCheckConstraint(
             "ck_location_pii_address_substring_key_version",
-            "(address_substring_key_version = 0 AND address_substring_key = '') OR " +
-            "(address_substring_key_version = 1 AND address_substring_key <> '' AND length(address_substring_key) % 7 = 0)"));
+            $"address_substring_key_version = {LocationTextNormalization.CurrentRevision} AND address_substring_key <> ''"));
     }
 }

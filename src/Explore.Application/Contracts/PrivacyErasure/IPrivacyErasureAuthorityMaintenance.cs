@@ -1,6 +1,3 @@
-// ABOUTME: Defines dry-run and apply boundaries for bounded erasure-authority retention maintenance.
-// ABOUTME: Accepts only PII-free held sequence numbers and returns aggregate state and counts.
-
 using System.Collections.Immutable;
 using Explore.Domain;
 

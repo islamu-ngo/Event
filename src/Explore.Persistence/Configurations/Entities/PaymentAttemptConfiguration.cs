@@ -1,6 +1,3 @@
-// ABOUTME: Maps payment attempts and their post-commit Checkout dispatch effects.
-// ABOUTME: Enforces portable one-active-attempt slots plus identifiers-only worker leases.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Microsoft.EntityFrameworkCore;

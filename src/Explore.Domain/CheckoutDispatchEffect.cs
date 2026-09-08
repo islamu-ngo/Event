@@ -1,6 +1,3 @@
-// ABOUTME: Durable identifiers-only Checkout dispatch effect for one committed payment attempt.
-// ABOUTME: Provides lease-token and generation fencing so provider I/O happens only after local commit.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

@@ -1,6 +1,4 @@
-// ABOUTME: PostgreSQL-backed tests for Web Push preference metadata, subscription persistence, and dispatch outbox transitions.
-// ABOUTME: Proves tenant isolation, active uniqueness, idempotent claims, retry/dead-letter, lease recovery, and stale cleanup.
-
+using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
@@ -434,6 +432,74 @@ public sealed class WebPushFoundationPersistenceTests(PostgreSqlContainerFixture
     }
 
     [Test]
+    public async Task DispatchRepository_SubscriptionFailureRollsBackTheTerminalDispatch()
+    {
+        await fixture.ResetAsync();
+        var tenant = CreateTenant("push-cleanup-rollback");
+        var user = CreateUser("push-cleanup-rollback");
+        DateTime failedAt = DateTime.UtcNow;
+        WebPushSubscription subscription;
+        WebPushDispatchOutbox dispatch;
+        Guid leaseToken = Guid.CreateVersion7();
+        await using (ExploreDbContext setup = fixture.CreateDbContext())
+        {
+            setup.AddRange(tenant, user);
+            await setup.SaveChangesAsync();
+            subscription = WebPushSubscription.Create(
+                tenant.Id, user.Id, "device-rollback", "https://push.example/rollback",
+                "key", "auth", null, failedAt);
+            setup.WebPushSubscriptions.Add(subscription);
+            dispatch = CreateDispatch(tenant.Id, subscription.Id, user.Id);
+            dispatch.Status = WebPushDispatchStatus.Processing;
+            dispatch.ProcessingStartedAt = failedAt.AddSeconds(-5);
+            dispatch.ProcessingLeaseToken = leaseToken;
+            setup.WebPushDispatchOutbox.Add(dispatch);
+            await setup.SaveChangesAsync();
+        }
+
+        await using (ExploreDbContext failing = fixture.CreateDbContext(new RejectSubscriptionUpdate()))
+        {
+            await Assert.That(failing.Database.CreateExecutionStrategy().RetriesOnFailure).IsTrue();
+            var repository = new WebPushDispatchOutboxRepository(failing);
+            await Assert.That(async () => await repository.MarkPermanentFailureAndDeactivateSubscription(
+                    tenant.Id, dispatch.Id, leaseToken, subscription.Id,
+                    "gone_410", "Push endpoint retired.", failedAt))
+                .Throws<SubscriptionUpdateFailure>();
+        }
+
+        await using ExploreDbContext verification = fixture.CreateDbContext();
+        var persistedDispatch = await verification.WebPushDispatchOutbox.AsNoTracking()
+            .SingleAsync(row => row.Id == dispatch.Id);
+        var persistedSubscription = await verification.WebPushSubscriptions.AsNoTracking()
+            .SingleAsync(row => row.Id == subscription.Id);
+        await Assert.That(persistedDispatch.Status).IsEqualTo(WebPushDispatchStatus.Processing);
+        await Assert.That(persistedDispatch.ProcessingLeaseToken).IsEqualTo(leaseToken);
+        await Assert.That(persistedDispatch.PermanentFailedAt).IsNull();
+        await Assert.That(persistedSubscription.IsActive).IsTrue();
+        await Assert.That(persistedSubscription.DeactivatedAt).IsNull();
+    }
+
+    private sealed class SubscriptionUpdateFailure : Exception;
+
+    private sealed class RejectSubscriptionUpdate : DbCommandInterceptor
+    {
+        public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (command.CommandText.Contains("UPDATE", StringComparison.OrdinalIgnoreCase)
+                && command.CommandText.Contains("web_push_subscriptions", StringComparison.Ordinal))
+            {
+                throw new SubscriptionUpdateFailure();
+            }
+
+            return ValueTask.FromResult(result);
+        }
+    }
+
+    [Test]
     public async Task CurrentBaseline_PersistsIntendedPushDefaults()
     {
         await fixture.ResetAsync();
@@ -445,6 +511,114 @@ public sealed class WebPushFoundationPersistenceTests(PostgreSqlContainerFixture
             .All(category => category.DefaultPushEnabled == category.DefaultInAppEnabled)).IsTrue();
         await Assert.That(categories.Single(category =>
             category.MasterCode == NotificationPreferenceCategoryCodes.Marketing).DefaultPushEnabled).IsFalse();
+    }
+
+    [Test]
+    [Arguments(0)]
+    [Arguments(1)]
+    [Arguments(2)]
+    public async Task DispatchRepository_PartialCleanupFailurePreservesAtomicityAndAllowsRecovery(int failureMode)
+    {
+        await fixture.ResetAsync();
+        await using var setup = fixture.CreateDbContext();
+        var tenant = CreateTenant("push-recovery");
+        var user = CreateUser("push-recovery");
+        setup.Tenants.Add(tenant);
+        setup.Users.Add(user);
+        await setup.SaveChangesAsync();
+        var subscription = WebPushSubscription.Create(tenant.Id, user.Id, "device-1",
+            "https://push.example/recovery", "key", "auth", null, DateTime.UtcNow);
+        setup.WebPushSubscriptions.Add(subscription);
+        var dispatch = CreateDispatch(tenant.Id, subscription.Id, user.Id);
+        var leaseToken = Guid.CreateVersion7();
+        dispatch.Status = WebPushDispatchStatus.Processing;
+        dispatch.ProcessingStartedAt = DateTime.UtcNow.AddSeconds(-5);
+        dispatch.ProcessingLeaseToken = leaseToken;
+        setup.WebPushDispatchOutbox.Add(dispatch);
+        await setup.SaveChangesAsync();
+
+        using var request = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var failure = new FailAfterFirstCleanupWrite(failureMode, request);
+        await using var context = fixture.CreateDbContext(failure);
+        var repository = new WebPushDispatchOutboxRepository(context);
+        var failedAt = DateTime.UtcNow;
+        Task<bool> Attempt(CancellationToken token) => repository.MarkPermanentFailureAndDeactivateSubscription(
+            tenant.Id, dispatch.Id, leaseToken, subscription.Id, "gone_410", "Synthetic cleanup failure.", failedAt, token);
+
+        if (failureMode == 0)
+        {
+            await Assert.That(await Attempt(request.Token)).IsTrue();
+        }
+        else
+        {
+            if (failureMode == 1)
+            {
+                await Assert.That(() => Attempt(request.Token)).Throws<InvalidOperationException>();
+            }
+            else
+            {
+                await Assert.That(() => Attempt(request.Token)).Throws<OperationCanceledException>();
+            }
+
+            await using var durable = fixture.CreateDbContext();
+            var unchangedDispatch = await durable.WebPushDispatchOutbox.IgnoreQueryFilters().AsNoTracking()
+                .SingleAsync(row => row.Id == dispatch.Id);
+            var unchangedSubscription = await durable.WebPushSubscriptions.IgnoreQueryFilters().AsNoTracking()
+                .SingleAsync(row => row.Id == subscription.Id);
+            await Assert.That(unchangedDispatch.Status).IsEqualTo(WebPushDispatchStatus.Processing);
+            await Assert.That(unchangedDispatch.ProcessingLeaseToken).IsEqualTo(leaseToken);
+            await Assert.That(unchangedDispatch.PermanentFailedAt).IsNull();
+            await Assert.That(unchangedSubscription.IsActive).IsTrue();
+            await Assert.That(unchangedSubscription.DeactivationReason).IsNull();
+
+            using var recovery = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            await Assert.That(await Attempt(recovery.Token)).IsTrue();
+        }
+
+        await Assert.That(failure.WasInjected).IsTrue();
+        await using var verify = fixture.CreateDbContext();
+        var dispatchRow = await verify.WebPushDispatchOutbox.IgnoreQueryFilters().AsNoTracking()
+            .SingleAsync(row => row.Id == dispatch.Id);
+        var subscriptionRow = await verify.WebPushSubscriptions.IgnoreQueryFilters().AsNoTracking()
+            .SingleAsync(row => row.Id == subscription.Id);
+        await Assert.That(dispatchRow.Status).IsEqualTo(WebPushDispatchStatus.PermanentFailed);
+        await Assert.That(dispatchRow.ProcessingLeaseToken).IsNull();
+        await Assert.That(dispatchRow.LastFailureCategory).IsEqualTo("gone_410");
+        await Assert.That(subscriptionRow.IsActive).IsFalse();
+        await Assert.That(subscriptionRow.DeactivationReason).IsEqualTo("gone_410");
+        await Assert.That(await Attempt(CancellationToken.None)).IsFalse();
+        await Assert.That(await verify.WebPushDispatchOutbox.IgnoreQueryFilters()
+            .CountAsync(row => row.Id == dispatch.Id)).IsEqualTo(1);
+    }
+
+    private sealed class FailAfterFirstCleanupWrite(int failureMode, CancellationTokenSource request)
+        : DbCommandInterceptor
+    {
+        private bool _failed;
+        public bool WasInjected => _failed;
+
+        public override ValueTask<int> NonQueryExecutedAsync(
+            DbCommand command,
+            CommandExecutedEventData eventData,
+            int result,
+            CancellationToken cancellationToken = default)
+        {
+            if (!_failed && eventData.CommandSource == CommandSource.ExecuteUpdate)
+            {
+                _failed = true;
+                if (failureMode == 0)
+                {
+                    throw new TimeoutException("Synthetic transient cleanup failure after the dispatch write.");
+                }
+                if (failureMode == 1)
+                {
+                    throw new InvalidOperationException("Synthetic permanent cleanup failure after the dispatch write.");
+                }
+                request.Cancel();
+                request.Token.ThrowIfCancellationRequested();
+            }
+            return ValueTask.FromResult(result);
+        }
     }
 
     private static Tenant CreateTenant(string slugPrefix)
@@ -491,7 +665,7 @@ public sealed class WebPushFoundationPersistenceTests(PostgreSqlContainerFixture
 
     private static ExploreDbContext CreateDbContext(string connectionString, SaveChangesInterceptor interceptor)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(connectionString)
             .UseSnakeCaseNamingConvention()
             .AddInterceptors(interceptor)

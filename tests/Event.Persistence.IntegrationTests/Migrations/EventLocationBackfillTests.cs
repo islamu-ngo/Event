@@ -1,6 +1,3 @@
-// ABOUTME: Converts obsolete Event Location Privacy backfill tests into ordinary EF migration behavior checks.
-// ABOUTME: Proves legacy Backfill configuration is inert while current migration history applies and retries safely.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Persistence;
 using Explore.Persistence.Schema;
@@ -130,7 +127,7 @@ public sealed class EventLocationBackfillTests(RecipientDeliveryMigrationContain
 
     private static ExploreDbContext CreateContext(string connectionString)
     {
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>()
+        var builder = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(
                 connectionString,
                 postgres => postgres.MigrationsAssembly(typeof(Task4MigrationProbe).Assembly.FullName))
@@ -138,9 +135,7 @@ public sealed class EventLocationBackfillTests(RecipientDeliveryMigrationContain
             .ConfigureWarnings(warnings =>
             {
                 warnings.Ignore(RelationalEventId.PendingModelChangesWarning);
-                warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning);
             });
-        builder.EnableServiceProviderCaching(false);
         return new Task4MigrationProbeContext(builder.Options);
     }
 

@@ -1,6 +1,3 @@
-// ABOUTME: Delegating handler that adds the server-held BFF bearer credential to typed API clients.
-// ABOUTME: Keeps generated clients aligned with the BFF proxy token-forwarding boundary.
-
 using System.Net.Http.Headers;
 using Event.Web.BffHosting.Abstractions;
 

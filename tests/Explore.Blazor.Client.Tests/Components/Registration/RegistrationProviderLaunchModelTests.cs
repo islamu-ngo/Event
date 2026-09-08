@@ -1,6 +1,3 @@
-// ABOUTME: Contract tests for attendee registration-provider launch state.
-// ABOUTME: Proves same-origin BFF launch URLs and server-polled completion authority.
-
 using Explore.Blazor.Client.Components.Registration.FormRenderer;
 using Explore.Blazor.Client.Components.Registration.ProviderLaunch;
 using Explore.Blazor.Client.Services.Http;

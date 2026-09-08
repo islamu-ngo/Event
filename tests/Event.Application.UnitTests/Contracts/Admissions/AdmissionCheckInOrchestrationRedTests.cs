@@ -1,6 +1,3 @@
-// ABOUTME: Specifies the Phase 21 online check-in, undo, batch, and scanner-capability Application contracts.
-// ABOUTME: Uses strict reflection ports so absent production contracts compile as intentional RED failures.
-
 using ApplicationUnitTests.Contracts.Admissions.Support;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Exceptions;

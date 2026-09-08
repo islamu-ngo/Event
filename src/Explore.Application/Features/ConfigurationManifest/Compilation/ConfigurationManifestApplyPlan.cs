@@ -1,6 +1,3 @@
-// ABOUTME: Immutable compiled work plan for one validated whole-instance configuration-manifest invocation.
-// ABOUTME: Keeps instance and tenant mutations strongly separated before atomic orchestration.
-
 namespace Explore.Application.Features.ConfigurationManifest.Compilation;
 
 using System.Collections.Immutable;

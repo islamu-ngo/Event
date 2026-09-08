@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for the event moderation reason dialog.
-// ABOUTME: Verifies heavy redaction requires explicit irreversible-action confirmation before submit.
-
 using System.Reflection;
 using Explore.Blazor.Client.Pages.Events.Dialogs;
 using MudBlazor;

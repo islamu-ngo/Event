@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the standalone host exposes one explicitly owned API, BFF, UI, and health graph.
-// ABOUTME: Exercises referenced static assets and guards against duplicate controllers or YARP self-routing.
-
 using System.CodeDom.Compiler;
 using System.Net;
 using System.Net.Http.Headers;
@@ -258,7 +255,8 @@ public sealed class StandaloneHostGraphTests
 
         await Assert.That(expectedInterfaces).IsNotEmpty();
         await Assert.That(registrations.Select(pair => pair.InterfaceType)).IsEquivalentTo(expectedInterfaces);
-        await Assert.That(resolvedClients).Count().IsEqualTo(expectedInterfaces.Length);
+        await Assert.That(registrations).IsNotEmpty();
+        await Assert.That(resolvedClients).Count().IsEqualTo(registrations.Count);
         await Assert.That(resolvedClients.Zip(registrations)
             .All(pair => pair.Second.ImplementationType.IsInstanceOfType(pair.First))).IsTrue();
         await Assert.That(configuredHttpClient.BaseAddress).IsEqualTo(InProcessEventApiDispatcher.InternalBaseAddress);

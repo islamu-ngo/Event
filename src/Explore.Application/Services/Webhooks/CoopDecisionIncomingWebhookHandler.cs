@@ -1,6 +1,3 @@
-// ABOUTME: Converts one verified Coop decision callback into a durable pending effect pointer.
-// ABOUTME: Defers moderation command execution and records no applied-effect receipt during inbox processing.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Domain;

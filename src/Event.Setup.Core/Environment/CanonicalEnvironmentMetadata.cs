@@ -1,6 +1,3 @@
-// ABOUTME: Declares explicit auditable semantic policy for every canonical environment key.
-// ABOUTME: Separates startup metadata from explicitly surface-scoped external Compose interpolation.
-
 namespace ISLAMU.Event.Setup.Core.Environment;
 
 public static partial class CanonicalEnvironmentCatalogue

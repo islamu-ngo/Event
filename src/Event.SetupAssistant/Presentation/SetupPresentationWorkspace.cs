@@ -1,6 +1,3 @@
-// ABOUTME: Implements generated observable state and commands over exact immutable Setup Core outcomes.
-// ABOUTME: Linearizes cancellation, stale completion, recipient lifecycle, and single settlement per generation.
-
 namespace ISLAMU.Event.SetupAssistant.Presentation;
 
 using CommunityToolkit.Mvvm.ComponentModel;

@@ -1,6 +1,3 @@
-// ABOUTME: Validates session template definition update payload, extends create with Id check.
-// ABOUTME: Manually instantiated in handlers (no DI), following project convention.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.EventSessionTemplate.Validators;

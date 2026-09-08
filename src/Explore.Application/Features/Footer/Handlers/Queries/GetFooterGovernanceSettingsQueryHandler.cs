@@ -1,6 +1,3 @@
-// ABOUTME: Handles GetFooterGovernanceSettingsQuery — reads instance-level footer lock flags.
-// ABOUTME: Uses IHierarchicalSettingsResolver to resolve at Instance scope only.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.Footer;
 using Explore.Application.Features.Footer.Requests.Queries;

@@ -1,6 +1,3 @@
-// ABOUTME: Handler for adding a new member to an organization.
-// ABOUTME: Validates authorization, creates the membership record.
-
 using System;
 using System.Linq;
 using System.Threading;

@@ -1,6 +1,3 @@
-// ABOUTME: Shared helper for registering NavMenu component dependencies in bUnit tests.
-// ABOUTME: Consolidates duplicated service setup from NavMenuAdminTests and AuthenticationFlowTests.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Contracts.Services.Organizations;

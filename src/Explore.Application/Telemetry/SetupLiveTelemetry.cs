@@ -1,6 +1,3 @@
-// ABOUTME: Emits bounded Setup live activities and aggregate operation metrics.
-// ABOUTME: Restricts telemetry to closed operation/outcome names, counts, bytes, and duration.
-
 namespace Explore.Application.Telemetry;
 
 using System.Diagnostics;

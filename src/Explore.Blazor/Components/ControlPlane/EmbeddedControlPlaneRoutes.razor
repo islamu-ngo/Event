@@ -1,6 +1,3 @@
-@* ABOUTME: Routes configured admin-host requests through the host-owned control-plane page.
-   ABOUTME: Uses a control-plane layout instead of the public tenant shell on dedicated admin hosts. *@
-
 <Router AppAssembly="@typeof(App).Assembly">
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(EmbeddedControlPlaneLayout)">

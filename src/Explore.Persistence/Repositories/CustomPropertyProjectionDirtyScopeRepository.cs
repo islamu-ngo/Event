@@ -1,6 +1,3 @@
-// ABOUTME: EF Core implementation of the custom-property projection dirty-scope backlog repository.
-// ABOUTME: Idempotent upsert + pending scan + drain marking coordinate inline writers with rebuild workers.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

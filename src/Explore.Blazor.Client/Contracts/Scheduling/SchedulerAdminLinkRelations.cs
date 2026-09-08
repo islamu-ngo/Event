@@ -1,6 +1,3 @@
-// ABOUTME: Stable HAL link relation and state names used by the scheduler administration UI.
-// ABOUTME: Mirrors the server contract locally because the Blazor client never references the Application assembly.
-
 namespace Explore.Blazor.Client.Contracts.Scheduling;
 
 /// <summary>

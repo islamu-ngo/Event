@@ -1,5 +1,3 @@
-// ABOUTME: Discovers email enablement and preview-confirmed disable through the owning settings resources.
-// ABOUTME: Uses server authorization facts and actionable preview state instead of client role checks.
 
 using System.Security.Claims;
 using Explore.Application.Authorization;

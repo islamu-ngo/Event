@@ -1,6 +1,3 @@
-// ABOUTME: Verifies admission telemetry is collected by the production OpenTelemetry meter pipeline with bounded labels.
-// ABOUTME: Parses Prometheus alert-rule expressions to keep machine-consumed thresholds aligned with emitted series.
-
 using System.Diagnostics.Metrics;
 using System.Text.RegularExpressions;
 using Explore.Application.Contracts.Admissions;

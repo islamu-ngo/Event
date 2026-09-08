@@ -1,6 +1,3 @@
-// ABOUTME: Handles paid publication preflight reads through the existing readiness service.
-// ABOUTME: Keeps controller logic thin and centralizes paid ticketing blockers in Application.
-
 using Explore.Application.DTOs.EventTicketing;
 using Explore.Application.Features.EventTicketing.Requests.Queries;
 using Explore.Application.Features.EventTicketing.Services;

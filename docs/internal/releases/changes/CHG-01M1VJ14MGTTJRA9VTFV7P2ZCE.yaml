@@ -1,0 +1,47 @@
+# ABOUTME: Public change fragment for clustered durable queue-drain scheduling and recovery.
+# ABOUTME: Records the breaking cadence cutover, operator controls, and API recovery impact.
+Change-Id: CHG-01M1VJ14MGTTJRA9VTFV7P2ZCE
+Title: Durable queue drains survive clustered restarts safely
+Type: feat
+Scope: self-hosting
+Summary: >-
+  Self-hosted and clustered deployments use Quartz as the sole cadence authority
+  for bounded registration, integration, webhook, replay, publication, and PDS
+  queue drains while durable tenant and lease fences remain authoritative.
+Group: quartz-queue-drains
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/OPERATIONS.md
+    Disposition: documented
+    Detail: >-
+      Replaced timer-loop workers are removed, mixed old/new application versions
+      are unsupported, and upgrades require coordinated stop, lease settlement,
+      owned-key reconciliation, and restart.
+  Security:
+    Reference: docs/OUTBOX_PATTERN.md
+    Disposition: documented
+    Detail: >-
+      Tenant-qualified claim tokens, observed-start fences, and explicit ambiguous
+      provider outcomes prevent stale settlement and blind replay across replicas.
+  Migration:
+    Reference: docs/OPERATIONS.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: documented
+    Detail: >-
+      Existing queue cadence sections now register Quartz jobs, and bounded health
+      thresholds control aggregate queue-drain readiness without exposing identity.
+  OpenAPI:
+    Reference: schemas/openapi_islamu-event.json
+    Disposition: documented
+    Detail: >-
+      Adds tenant-authenticated evidence-based resolution for ambiguous Listmonk
+      synchronization outcomes.
+  Operator:
+    Reference: docs/OPERATIONS.md
+    Disposition: documented
+    Detail: >-
+      Operators monitor queue-drains readiness and bounded queue metrics, preserve
+      Quartz storage, and use coordinated deployment and rollback procedures.

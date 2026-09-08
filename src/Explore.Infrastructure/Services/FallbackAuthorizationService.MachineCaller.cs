@@ -1,6 +1,3 @@
-// ABOUTME: Machine caller (API-key) authorization evaluation partial for FallbackAuthorizationService.
-// ABOUTME: Applies scope ceiling first, then maps owner-type authority to resource-specific access rules.
-
 using Explore.Application.Authorization;
 using Explore.Domain.Enums;
 

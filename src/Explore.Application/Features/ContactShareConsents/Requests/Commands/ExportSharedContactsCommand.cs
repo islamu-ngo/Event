@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for exporting shared contacts as CSV or TSV.
-// ABOUTME: Authorised via Cerbos — requires ExportSharedContacts permission on the resource.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.ContactShareConsent;
 using Explore.Application.Responses;

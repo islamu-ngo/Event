@@ -1,6 +1,3 @@
-// ABOUTME: Architecture guardrails for the shared Event.Web.BffHosting browser-BFF library.
-// ABOUTME: Prevents UI, business, generated-client, and persistence dependencies from entering the BFF hosting boundary.
-
 namespace Event.Architecture.Tests;
 
 public sealed class EventWebBffHostingArchitectureTests

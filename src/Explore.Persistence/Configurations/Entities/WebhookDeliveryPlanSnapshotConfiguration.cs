@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for immutable tenant-scoped webhook delivery-plan snapshots.
-// ABOUTME: Enforces normalized provider mode, composite tenant ownership, retention, and one plan per message.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

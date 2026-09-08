@@ -1,6 +1,3 @@
-// ABOUTME: Delegates event promotion management operations to the generated Event API client.
-// ABOUTME: Parses HAL collection resources into safe Studio presentation state with cancellation.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Events;
 using Explore.Blazor.Client.Pages.Studio;

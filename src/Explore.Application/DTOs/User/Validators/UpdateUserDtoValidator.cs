@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation validator for UpdateUserDto.
-// ABOUTME: Manually instantiated in UpdateUserCommandHandler (not DI-injected).
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.User.Validators;

@@ -1,5 +1,3 @@
-// ABOUTME: Composes real native Identity lifecycle, relational SMTP policy and global admission for delivery tests.
-// ABOUTME: Reuses supervised native provisioning; controls only SMTP, time and explicit concurrency signals.
 
 using Event.Persistence.IntegrationTests.Identity;
 using Explore.Application.Contracts.Identity;

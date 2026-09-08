@@ -1,6 +1,3 @@
-// ABOUTME: Command request for creating a private AI assistant conversation shell.
-// ABOUTME: Creation is gated by tenant AI settings and does not call a provider.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Ai;
 using Explore.Application.Responses;

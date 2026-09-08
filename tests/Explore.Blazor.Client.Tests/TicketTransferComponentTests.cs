@@ -1,6 +1,3 @@
-// ABOUTME: Defines RED HAL, secret-handling, bounded-state, and accessibility contracts for transfer UI.
-// ABOUTME: Pins semantic live regions, deterministic pending actions, localization, focus, and RTL-safe CSS.
-
 using AngleSharp.Dom;
 using Bunit;
 using Explore.Blazor.Client.Clients;

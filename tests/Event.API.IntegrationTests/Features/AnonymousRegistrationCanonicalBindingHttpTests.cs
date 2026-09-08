@@ -1,5 +1,3 @@
-// ABOUTME: Proves anonymous proof binds native case-insensitive last-member-wins JSON semantics.
-// ABOUTME: Exercises issuance, allocation and cached disclosure through real HTTP, SQLite and shared native keys.
 
 using System.Net;
 using System.Text.Json;

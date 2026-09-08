@@ -1,6 +1,3 @@
-// ABOUTME: API contract tests for event-session speaker management routes.
-// ABOUTME: Verifies canonical update identity plus session-scoped create/delete context forwarding.
-
 using System.Net.Http.Json;
 using System.Reflection;
 using Event.Api.IntegrationTests.Fixtures;

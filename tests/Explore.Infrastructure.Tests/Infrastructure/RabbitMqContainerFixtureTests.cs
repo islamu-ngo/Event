@@ -1,6 +1,3 @@
-// ABOUTME: Runtime tests for the RabbitMQ Testcontainers fixture used by dispatch integration tests.
-// ABOUTME: Verifies AMQP and management endpoints are reachable before live transport tests depend on them.
-
 using Explore.Infrastructure.Tests.Fixtures;
 
 namespace Explore.Infrastructure.Tests.Infrastructure;

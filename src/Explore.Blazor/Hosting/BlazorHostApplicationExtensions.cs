@@ -1,6 +1,3 @@
-// ABOUTME: Applies the reusable ordered Explore.Blazor middleware pipeline and endpoint graph.
-// ABOUTME: Maps YARP and proxy antiforgery only for the registered Split transport profile.
-
 using Blazouter.Extensions;
 using Blazouter.Server.Extensions;
 using Event.Web.BffHosting.Proxy;

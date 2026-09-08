@@ -1,6 +1,3 @@
-// ABOUTME: Handles public system onboarding status reads for API/BFF startup decisions.
-// ABOUTME: Uses configured onboarding mode before setup and persisted runtime mode after setup.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;

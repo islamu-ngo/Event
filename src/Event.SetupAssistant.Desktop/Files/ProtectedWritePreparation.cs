@@ -1,6 +1,3 @@
-// ABOUTME: Owns a protected temporary artifact and commits it after target revalidation.
-// ABOUTME: Cleans uncommitted state deterministically and returns only closed value-free failures.
-
 namespace ISLAMU.Event.SetupAssistant.Desktop.Files;
 
 public sealed class ProtectedWritePreparation : IDisposable

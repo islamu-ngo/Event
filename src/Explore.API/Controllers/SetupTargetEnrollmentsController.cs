@@ -1,6 +1,3 @@
-// ABOUTME: Exposes the authenticated Setup enrollment and write-only secret-binding HTTP boundary.
-// ABOUTME: Emits private HAL or bounded RFC 7807 responses without exposing authority or coordinates.
-
 namespace Explore.API.Controllers;
 
 using System.Security.Cryptography;

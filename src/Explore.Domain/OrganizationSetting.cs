@@ -1,4 +1,3 @@
-// ABOUTME: Organization-specific setting override for the hierarchical settings engine.
 // Allows organizations to customize settings unless locked at Instance or Tenant scope.
 
 namespace Explore.Domain;

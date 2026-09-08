@@ -1,6 +1,3 @@
-// ABOUTME: Handles paginated retrieval of event template lists with optional event-type filtering.
-// ABOUTME: Uses HybridCache to keep repeated tenant-admin list reads efficient.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

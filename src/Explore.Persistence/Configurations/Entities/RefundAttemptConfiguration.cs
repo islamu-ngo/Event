@@ -1,6 +1,3 @@
-// ABOUTME: Maps refund attempts and their exact minor-unit allocations to tenant-qualified payment authority.
-// ABOUTME: Enforces idempotency, money, status, relationship, and optimistic-concurrency invariants.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

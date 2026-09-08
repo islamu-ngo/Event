@@ -1,6 +1,3 @@
-// ABOUTME: API DTO for webhook endpoint event type subscription metadata.
-// ABOUTME: Exposes event catalog ids/names without leaking endpoint secret material.
-
 namespace Explore.Application.DTOs.Webhooks;
 
 public sealed record WebhookEndpointSubscriptionDto

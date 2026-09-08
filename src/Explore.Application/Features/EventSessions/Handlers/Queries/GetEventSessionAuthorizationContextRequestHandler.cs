@@ -1,6 +1,3 @@
-// ABOUTME: Resolves minimal EventSession parent context for API management command composition.
-// ABOUTME: Reads entities through the repository and maps only IDs needed for authorization.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSession;
 using Explore.Application.Features.EventSessions.Requests.Queries;

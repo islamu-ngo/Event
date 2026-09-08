@@ -1,6 +1,3 @@
-// ABOUTME: Handles the production composite-outbox route by unprotecting and directly handing off admission credentials.
-// ABOUTME: Retains ciphertext on ambiguous acceptance and erases it only after a receipt-bearing channel success.
-
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Explore.Application.Contracts.Admissions;

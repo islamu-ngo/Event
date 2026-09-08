@@ -1,6 +1,3 @@
-// ABOUTME: Records one bounded public-action engagement metric and nothing else.
-// ABOUTME: No persistence, no identity, and no user-derived data flow through this handler.
-
 using Explore.Application.Features.EventPublicActions.Requests.Commands;
 using Explore.Application.Telemetry;
 using MediatR;

@@ -1,6 +1,3 @@
-// ABOUTME: Enforces AI disclosure ceilings on every location value an Event MCP tool is about to reveal.
-// ABOUTME: Fails closed so a sanitization gap blocks the response instead of leaking coordinates or rooms.
-
 using Explore.Application.DTOs.EventSession;
 using Explore.Application.DTOs.EventSessionGroup;
 using Explore.Application.DTOs.EventProgram;

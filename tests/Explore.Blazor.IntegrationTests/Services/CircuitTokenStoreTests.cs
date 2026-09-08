@@ -1,6 +1,3 @@
-// ABOUTME: Comprehensive unit tests for the bounded CircuitTokenStore (Phase 1F).
-// ABOUTME: Verifies cross-user isolation, session scoping, expiry rejection, capacity eviction, deterministic cleanup, and multi-circuit behavior.
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Explore.Blazor.Services;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines native registration attempt launch and answer submission HTTP contracts.
-// ABOUTME: Keeps bearer capabilities in headers and validation responses limited to safe issue metadata.
-
 using Explore.Domain.Enums;
 using Explore.Application.DTOs.RegistrationSubmissions;
 

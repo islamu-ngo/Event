@@ -1,6 +1,3 @@
-// ABOUTME: Security integration tests verifying real JWT Bearer validation against containerized Keycloak.
-// ABOUTME: Tests happy path with real tokens, negative cases (no token, malformed, wrong issuer), and role-based access.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;

@@ -1,6 +1,3 @@
-// ABOUTME: Implementation of IEventSessionTemplateService wrapping the event-session-template client.
-// ABOUTME: Handles HAL unwrap, error catching, and logging for session templates.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.EventSessionTemplates;
 using Microsoft.Extensions.Logging;

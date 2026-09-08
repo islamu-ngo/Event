@@ -1,6 +1,3 @@
-/* ABOUTME: Styles for Event Template list page.
-   ABOUTME: Implements BEM naming conventions. */
-
 .event-template-list {
     display: flex;
     flex-direction: column;

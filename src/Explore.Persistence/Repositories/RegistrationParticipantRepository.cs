@@ -1,6 +1,3 @@
-// ABOUTME: Loads order-owned ticket assignments with participant entities for final admission materialization.
-// ABOUTME: Stages only tenant-safe PII-free participant entities for the shared transactional unit of work.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

@@ -1,6 +1,3 @@
-// ABOUTME: Supplies status-specific recovery copy and hold countdown formatting for order pages.
-// ABOUTME: Keeps recovery UI descriptive while lifecycle authority remains server-authored.
-
 namespace Explore.Blazor.Client.Helpers;
 
 public static class RegistrationOrderRecovery

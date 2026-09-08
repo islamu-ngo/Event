@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for executing captured report decisions.
-// ABOUTME: Ensures route identifiers, case concurrency, and optional correlation metadata are bounded.
-
 using Explore.Application.Features.EventReporting.Policies;
 using Explore.Application.Features.EventReporting.Requests.Commands;
 using FluentValidation;

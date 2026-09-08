@@ -1,6 +1,3 @@
-// ABOUTME: Validates grouped user appearance profile PATCH requests.
-// ABOUTME: Rejects empty metadata or palette groups before profile mutation.
-
 namespace Explore.Application.DTOs.Appearance.Validators;
 
 using Explore.Domain.Enums;

@@ -1,6 +1,3 @@
-// ABOUTME: Resolves webhook ownership from trusted tenant, instance, membership, and aggregate persistence state.
-// ABOUTME: Canonicalizes all five owner kinds before authorization attributes or configuration rows are created.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;

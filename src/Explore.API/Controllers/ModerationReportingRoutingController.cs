@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-scoped API controller for redacted moderation reporting provider routing state.
-// ABOUTME: Exposes effective routing through CQRS and HAL without leaking provider secrets.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

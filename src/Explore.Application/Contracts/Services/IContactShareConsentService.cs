@@ -1,6 +1,3 @@
-// ABOUTME: Service interface for contact-sharing consent operations.
-// ABOUTME: Called by registration handler and user consent management endpoints.
-
 using Explore.Application.DTOs.ContactShareConsent;
 
 namespace Explore.Application.Contracts.Services;

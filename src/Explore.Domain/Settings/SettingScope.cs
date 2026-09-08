@@ -1,6 +1,3 @@
-// ABOUTME: Defines the scope levels in the hierarchical settings cascade.
-// ABOUTME: Instance → Tenant → Organization → Group → User, ordered from broadest to narrowest.
-
 namespace Explore.Domain.Settings;
 
 /// <summary>

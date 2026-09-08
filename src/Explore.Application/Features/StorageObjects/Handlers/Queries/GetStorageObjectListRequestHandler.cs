@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning a paginated list of storage objects.
-// ABOUTME: Maps entities to StorageObjectListDto.
 using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;

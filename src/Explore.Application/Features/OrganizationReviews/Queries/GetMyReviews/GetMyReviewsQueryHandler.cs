@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning organization reviews submitted by the current user.
-// ABOUTME: Filters by actor ID, maps to OrganizationReviewDto.
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.OrganizationReview;

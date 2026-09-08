@@ -1,6 +1,3 @@
-// ABOUTME: Parses only repository machine configuration formats needed for environment parity assertions.
-// ABOUTME: Redacts values at ingestion and exposes names, order, placeholder, and classification facts only.
-
 namespace ISLAMU.Setup.Core.EnvironmentTests;
 
 using System.Text.Json;

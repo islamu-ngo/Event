@@ -1,6 +1,3 @@
-// ABOUTME: Background service that refreshes one replica's provider cache with bounded backoff.
-// ABOUTME: Emits value-free local acknowledgements and never claims deployment convergence.
-
 using Explore.Secrets.Abstractions;
 using Explore.Secrets.Configuration;
 using Explore.Secrets.Observability;

@@ -1,6 +1,3 @@
-// ABOUTME: Stores one encrypted, bounded direct-transfer chunk until target promotion or expiry.
-// ABOUTME: Keeps plaintext portable configuration out of relational rows and diagnostic metadata.
-
 namespace Explore.Persistence.Entities;
 
 public sealed class ConfigurationDirectTransferChunk

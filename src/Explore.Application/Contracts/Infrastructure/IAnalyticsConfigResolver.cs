@@ -1,6 +1,3 @@
-// ABOUTME: Contract for resolving analytics configuration from the cascading settings engine.
-// ABOUTME: Supports the SaaS multi-tenant hierarchy: Instance admin -> Tenant admin.
-
 using Explore.Application.Models;
 
 namespace Explore.Application.Contracts.Infrastructure;

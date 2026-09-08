@@ -1,6 +1,3 @@
-// ABOUTME: Handles retrieval of one event session template with all nested definitions and options.
-// ABOUTME: Maps entity returned from repository to the detail DTO for session template configuration views.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionTemplate;

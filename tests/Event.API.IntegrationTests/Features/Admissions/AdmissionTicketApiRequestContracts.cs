@@ -1,6 +1,3 @@
-// ABOUTME: Exact planned request/response identities and machine-consumed properties for the admission API test mediator.
-// ABOUTME: Includes decoy contracts used to prove fail-closed dispatch against ambiguous request graphs.
-
 using System.Reflection;
 using Explore.Application.DTOs.RegistrationOrders;
 using MediatR;

@@ -1,6 +1,3 @@
-// ABOUTME: Redaction regression tests for event-management MCP error paths.
-// ABOUTME: Verifies MCP failures do not echo credentials, tenant/user hints, or raw internals.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;

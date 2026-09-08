@@ -1,6 +1,3 @@
-// ABOUTME: Lookup entity describing support-access permission modes.
-// ABOUTME: Distinguishes read-only support access from separately governed write access.
-
 namespace Explore.Domain;
 
 public class SupportAccessMode

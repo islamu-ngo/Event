@@ -1,6 +1,3 @@
-// ABOUTME: Identifiers-only durable evidence that authoritative provider retrieval proved payment success.
-// ABOUTME: Supplies duplicate-safe downstream input without finalizing an order or retaining buyer data.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

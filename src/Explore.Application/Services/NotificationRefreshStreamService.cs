@@ -1,6 +1,3 @@
-// ABOUTME: Produces minimal notification refresh hints for authenticated users.
-// ABOUTME: Uses unread-count polling server-side while preserving browser polling fallback.
-
 using System.Runtime.CompilerServices;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Behaviour for the instance scheduler administration section.
-// ABOUTME: Re-reads server state after every action so affordances and status never drift from the scheduler.
-
 using System.Globalization;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Scheduling;

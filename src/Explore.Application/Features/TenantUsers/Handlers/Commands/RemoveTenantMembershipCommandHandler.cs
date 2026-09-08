@@ -1,6 +1,3 @@
-// ABOUTME: Removes one tenant-local membership, profile, and active role authority atomically.
-// ABOUTME: Revalidates self or tenant-admin authority without invoking global account or Home erasure.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

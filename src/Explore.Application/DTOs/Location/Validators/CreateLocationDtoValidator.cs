@@ -1,6 +1,3 @@
-// ABOUTME: Validates untrusted manual Location creation fields.
-// ABOUTME: Coordinates and tenancy remain absent because trusted boundaries own them.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.Location.Validators;

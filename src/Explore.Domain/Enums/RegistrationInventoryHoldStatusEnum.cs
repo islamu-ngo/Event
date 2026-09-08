@@ -1,6 +1,3 @@
-// ABOUTME: Enum mirror for stable inventory-hold lifecycle lookup identities.
-// ABOUTME: Separates active, consumed, released, expired, and cancelled reservations.
-
 namespace Explore.Domain.Enums;
 
 public enum RegistrationInventoryHoldStatusEnum

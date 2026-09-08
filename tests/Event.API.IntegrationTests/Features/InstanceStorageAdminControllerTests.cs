@@ -1,6 +1,3 @@
-// ABOUTME: API controller tests for instance storage admin operations.
-// ABOUTME: Verifies provider test and usage recalculation routes remain instance-admin gated.
-
 using Explore.API.Controllers;
 using Explore.API.Hateoas;
 using Explore.Application.Authorization;

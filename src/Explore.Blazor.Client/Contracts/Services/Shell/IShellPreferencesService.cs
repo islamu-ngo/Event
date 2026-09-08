@@ -1,6 +1,3 @@
-// ABOUTME: Contract for durable, authority-revalidated shell workspace, actor, and Settings-scope preferences.
-// ABOUTME: Keeps persistence orchestration out of MainLayout and Settings components.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.Shell;

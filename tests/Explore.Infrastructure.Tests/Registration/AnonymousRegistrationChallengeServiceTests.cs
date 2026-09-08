@@ -1,5 +1,3 @@
-// ABOUTME: Exercises native protected anonymous authority, proof binding, and recovery expiry across service instances.
-// ABOUTME: Uses real Data Protection and cryptographic work with an injected clock, without repository mocks or sleeps.
 
 using System.Globalization;
 using System.Security.Cryptography;

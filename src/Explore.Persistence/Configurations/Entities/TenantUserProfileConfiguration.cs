@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for tenant-local user profile and moderation metadata.
-// ABOUTME: Keeps tenant profile data scoped to TenantUser instead of global User.Pii.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

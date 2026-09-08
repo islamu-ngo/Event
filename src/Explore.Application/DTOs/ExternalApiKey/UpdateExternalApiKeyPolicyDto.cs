@@ -1,6 +1,3 @@
-// ABOUTME: Route-owned grouped PATCH contract for editable external API key policy.
-// ABOUTME: Excludes key material, owner binding, tenant binding, status, and usage state.
-
 namespace Explore.Application.DTOs.ExternalApiKey;
 
 public sealed record UpdateExternalApiKeyPolicyDto

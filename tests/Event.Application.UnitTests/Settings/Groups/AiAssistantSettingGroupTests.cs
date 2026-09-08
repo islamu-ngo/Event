@@ -1,6 +1,3 @@
-// ABOUTME: Tests AiAssistantSettingGroup's safe provider defaults and typed setting deserialization.
-// ABOUTME: Protects AI provider bootstrap settings from becoming available without model/provider configuration.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Settings.Groups;
 using Explore.Domain.Constants;

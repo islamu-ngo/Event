@@ -1,6 +1,3 @@
-// ABOUTME: Runtime API tests for fail-closed public eligibility across event program and agenda sibling routes.
-// ABOUTME: Proves hidden parents and unpublished groups/sessions cannot be enumerated or fetched anonymously.
-
 using System.Net;
 using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;

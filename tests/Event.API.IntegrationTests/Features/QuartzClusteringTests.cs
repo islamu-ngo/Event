@@ -1,6 +1,3 @@
-// ABOUTME: Proves two clustered Quartz schedulers over one PostgreSQL store fire a single trigger exactly once.
-// ABOUTME: PostgreSQL is the store under test because the clustered lock handler needs row locks SQLite lacks.
-
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Configuration;
 using Microsoft.Extensions.DependencyInjection;

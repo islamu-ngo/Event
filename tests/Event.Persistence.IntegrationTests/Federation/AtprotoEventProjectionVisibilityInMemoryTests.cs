@@ -1,6 +1,3 @@
-// ABOUTME: In-memory fallback tests for ATProto projection visibility when PostgreSQL containers are unavailable.
-// ABOUTME: Exercises inbound Actor/DID presentation checks and owned local-echo eligibility without bypassing tenant filters.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
@@ -288,8 +285,8 @@ public sealed class AtprotoEventProjectionVisibilityInMemoryTests
         };
 
     private static ExploreDbContext CreateContext(Guid tenantId) => new(
-        new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase($"atproto-projection-visibility-{Guid.NewGuid():N}")
+        TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase($"atproto-projection-visibility-{Guid.NewGuid():N}")
             .Options)
     {
         TenantContext = new TestTenantContext(tenantId)

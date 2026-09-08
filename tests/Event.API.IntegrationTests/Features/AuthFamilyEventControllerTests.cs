@@ -1,6 +1,3 @@
-// ABOUTME: Authorization family tests verifying the auth matrix for EventController endpoints.
-// ABOUTME: Covers anonymous, authenticated user, instance admin, and tenant admin access patterns.
-
 using System.Net;
 using System.Text;
 using Event.Api.IntegrationTests.Fixtures;

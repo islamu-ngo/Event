@@ -1,6 +1,3 @@
-// ABOUTME: Persists organization settings by tenant participation and global organization identity.
-// ABOUTME: Applies both identifiers explicitly so ambient filters are defense in depth, not authority.
-
 namespace Explore.Persistence.Repositories;
 
 using Explore.Application.Contracts.Persistence;

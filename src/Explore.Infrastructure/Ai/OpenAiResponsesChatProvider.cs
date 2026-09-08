@@ -1,6 +1,3 @@
-// ABOUTME: Implements the first-class OpenAI Responses API provider adapter using raw HTTP.
-// ABOUTME: Maps /v1/responses output text and function calls into safe provider-neutral results.
-
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;

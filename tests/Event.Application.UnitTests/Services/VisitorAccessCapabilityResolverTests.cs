@@ -1,5 +1,3 @@
-// ABOUTME: Behavioral visitor policy invariants evaluated through the real shared pure authority.
-// ABOUTME: Covers provider aggregation, explicit onboarding, tenant usability, immutable facts and visitor modes.
 
 using System.Text.Json;
 using Explore.Application.Models;

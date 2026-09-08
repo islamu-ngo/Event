@@ -1,6 +1,3 @@
-// ABOUTME: Verifies bounded HMAC-bucket recovery rate limiting over normalized identities.
-// ABOUTME: Proves fixed memory, exact retry windows, reset behavior, and fail-closed normalization.
-
 using System.Reflection;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Admissions;

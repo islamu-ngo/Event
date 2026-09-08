@@ -1,6 +1,3 @@
-// ABOUTME: Generated-client service for fetching and applying Event template synchronization.
-// ABOUTME: Routes every backend call through the event-template-sync client and preserves generated payload types.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Services.EventTemplateSync;

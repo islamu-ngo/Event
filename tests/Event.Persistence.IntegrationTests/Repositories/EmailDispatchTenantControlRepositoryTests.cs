@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL-backed tests for Basic Dispatch Mode tenant pause/resume persistence.
-// ABOUTME: Verifies one durable control row per tenant and idempotent state transitions.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;

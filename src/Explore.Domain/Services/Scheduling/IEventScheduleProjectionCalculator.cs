@@ -1,6 +1,3 @@
-// ABOUTME: Single authorized contract for converting a UTC start/end pair plus an IANA timezone id into the six local projection fields.
-// ABOUTME: Implementations must be pure, stateless, DST-aware, and free of any persistence or ambient-state access.
-
 using System;
 
 namespace Explore.Domain.Services.Scheduling;

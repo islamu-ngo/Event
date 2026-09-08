@@ -1,6 +1,3 @@
-// ABOUTME: Persists registration evidence with transactional attempt claiming and database-backed deduplication.
-// ABOUTME: Converts expected unique and concurrency races into typed no-op outcomes without exposing hash values.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

@@ -1,6 +1,3 @@
-// ABOUTME: Requests authorized promotion of one governed Location address to tenant-wide reuse.
-// ABOUTME: Carries only the target identity and caller-observed optimistic concurrency stamp.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

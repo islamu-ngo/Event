@@ -1,6 +1,3 @@
-// ABOUTME: Public global and tenant-contextual Actor reads plus protected global moderation operations.
-// ABOUTME: Omits generic Actor mutations and returns HATEOAS affordances from server-side policy.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

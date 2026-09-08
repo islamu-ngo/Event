@@ -1,6 +1,3 @@
-// ABOUTME: Versioned event blueprint that defines reusable Layer 3 custom-property definitions.
-// ABOUTME: Templates are tenant-scoped and instantiate event-local runtime definitions explicitly.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

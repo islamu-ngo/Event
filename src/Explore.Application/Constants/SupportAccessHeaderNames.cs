@@ -1,6 +1,3 @@
-// ABOUTME: Trusted support-access header names used across API and BFF boundaries.
-// ABOUTME: Centralizes browser-stripped, server-injected header constants for support context forwarding.
-
 namespace Explore.Application.Constants;
 
 public static class SupportAccessHeaderNames

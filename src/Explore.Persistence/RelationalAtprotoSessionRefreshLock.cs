@@ -1,6 +1,3 @@
-// ABOUTME: Serializes each ATProto OAuth refresh across instances on every supported relational provider.
-// ABOUTME: Holds a provider session lock while remote credential rotation runs and releases it through an async lease.
-
 using System.Globalization;
 using Explore.Application.Contracts.Persistence;
 using Explore.Persistence.Database;

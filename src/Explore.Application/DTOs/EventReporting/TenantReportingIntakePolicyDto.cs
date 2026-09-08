@@ -1,6 +1,3 @@
-// ABOUTME: Public contracts for reading and updating the current tenant's event-reporting intake policy.
-// ABOUTME: Keeps tenant identity and disablement authority server-authored while exposing effective policy metadata.
-
 using System.Text.Json.Serialization;
 using Explore.Application.Contracts.Infrastructure;
 

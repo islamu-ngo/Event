@@ -1,4 +1,3 @@
-// ABOUTME: Repository interface for ConfigurationChangeLog audit entity.
 // Provides query methods for retrieving audit trail entries by scope, user, or setting key.
 
 using Explore.Domain;

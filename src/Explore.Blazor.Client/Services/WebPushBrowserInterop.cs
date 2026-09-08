@@ -1,6 +1,3 @@
-// ABOUTME: JS-module-backed Web Push browser enrollment and unsubscribe implementation.
-// ABOUTME: Treats unsupported, denied, prerender, and disconnected browser states as safe non-success outcomes.
-
 using Explore.Blazor.Client.Contracts.Interop;
 using Microsoft.JSInterop;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Query handler for authenticated actor-profile event management lists.
-// ABOUTME: Filters actor-owned event DTOs through event view-management authorization before returning HAL-ready results.
-
 using AutoMapper;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;

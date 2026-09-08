@@ -1,6 +1,3 @@
-// ABOUTME: Validates complete replacement platform monetization settings before a write transaction begins.
-// ABOUTME: Enforces request-level bounds and uniqueness while Domain factories retain aggregate invariants.
-
 using Explore.Application.DTOs.PlatformMonetization;
 using Explore.Application.Features.PlatformMonetization.Requests.Commands;
 using Explore.Domain.ValueObjects;

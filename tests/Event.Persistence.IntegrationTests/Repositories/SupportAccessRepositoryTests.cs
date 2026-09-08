@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL-backed tests for support-access session and audit repositories.
-// ABOUTME: Verifies scoped lookups, audit queries, and active-session uniqueness constraints.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;

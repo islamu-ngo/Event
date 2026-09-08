@@ -1,6 +1,3 @@
-// ABOUTME: Observable state service that caches tenant navigation links for the current session.
-// ABOUTME: Uses SemaphoreSlim double-check locking (like LookupCacheService) to avoid redundant API calls.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Services;

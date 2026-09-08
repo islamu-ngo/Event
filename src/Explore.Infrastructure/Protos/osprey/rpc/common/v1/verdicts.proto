@@ -1,5 +1,3 @@
-// ABOUTME: Local copy of the upstream Osprey verdicts protobuf contract used by the coordinator gRPC client.
-// ABOUTME: Keeps the generated client bounded to the minimal ProcessAction response types needed by moderation.
 syntax = "proto3";
 
 package osprey.rpc.common.v1;

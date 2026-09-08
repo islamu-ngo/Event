@@ -1,6 +1,3 @@
-// ABOUTME: Serializes fanout occurrence precedence, coalescing, replay, and supersession decisions.
-// ABOUTME: Runs inside the caller's transaction and emits one stable outbox pointer only for a new winner.
-
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Nodes;

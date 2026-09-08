@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for session-template-owned Layer 3 custom-property definitions.
-// ABOUTME: Enforces namespaced keys and typed metadata needed before session instantiation.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

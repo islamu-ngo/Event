@@ -1,6 +1,3 @@
-// ABOUTME: Represents the fail-closed Windows protected-write disposition until ACL evidence exists.
-// ABOUTME: Never inherits ambient permissions or falls back to an unprotected plaintext write.
-
 namespace ISLAMU.Event.SetupAssistant.Desktop.Files;
 
 public sealed class WindowsProtectedFileWriter : IProtectedFileWriter

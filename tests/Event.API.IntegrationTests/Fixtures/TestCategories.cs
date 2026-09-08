@@ -1,6 +1,3 @@
-// ABOUTME: Defines test category constants for the hybrid test taxonomy.
-// ABOUTME: Used with TUnit [Category] attribute to selectively run fast, runtime, security, and messaging tests.
-
 namespace Event.Api.IntegrationTests.Fixtures;
 
 /// <summary>

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies fail-closed transfer capability reads and one-time offer claim disclosure.
-// ABOUTME: Prevents expired claims and duplicate-offer losers from receiving usable-looking authority.
-
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;

@@ -1,6 +1,3 @@
-// ABOUTME: Characterizes registration provider binding watch storage and subscription-state transitions.
-// ABOUTME: Guards durable claims, checkpoint settlement, renewal, failure bounds, and stale fences.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

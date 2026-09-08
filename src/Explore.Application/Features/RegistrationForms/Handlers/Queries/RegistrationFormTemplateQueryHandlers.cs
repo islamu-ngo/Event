@@ -1,6 +1,3 @@
-// ABOUTME: Handles registration-form template catalog list and detail reads.
-// ABOUTME: Maps repository entities to bounded DTOs while preserving tenant/platform visibility rules.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.RegistrationForms;
 using Explore.Application.Features.RegistrationForms.Requests.Queries;

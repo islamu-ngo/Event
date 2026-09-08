@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the Web Push provider wrapper around the official WebPush client.
-// ABOUTME: Verifies encrypted HTTP requests are sent and provider HTTP outcomes are classified safely.
-
 using System.Net;
 using Explore.Application.Models;
 using Explore.Infrastructure.WebPush;

@@ -1,6 +1,3 @@
-// ABOUTME: Shared webhook ownership-scope resolution for the webhook controller family.
-// ABOUTME: Ensures every webhook collection link is built from server-resolved ownership, never caller input.
-
 using Explore.API.Hateoas;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;

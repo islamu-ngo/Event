@@ -1,6 +1,3 @@
-// ABOUTME: Admin API controller for managing the UI theme catalog (platform and tenant-owned themes).
-// ABOUTME: Authorization is enforced per-theme inside handlers using IAdminContext to gate platform vs. tenant scope.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

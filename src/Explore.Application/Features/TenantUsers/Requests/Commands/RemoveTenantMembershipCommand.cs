@@ -1,6 +1,3 @@
-// ABOUTME: CQRS command for removing one user's participation from one tenant.
-// ABOUTME: Uses user-update authorization because membership removal leaves the global account intact.
-
 using Explore.Application.Authorization;
 using MediatR;
 

@@ -1,6 +1,3 @@
-// ABOUTME: One-shot HTTP proxy that forwards a Svix request and drops the accepted response.
-// ABOUTME: Lets live conformance tests prove timeout-after-acceptance behavior without logging request data.
-
 using System.Net;
 using System.Net.Sockets;
 

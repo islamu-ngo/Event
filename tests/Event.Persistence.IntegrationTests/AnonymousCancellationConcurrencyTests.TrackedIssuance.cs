@@ -1,5 +1,3 @@
-// ABOUTME: Retains a tracked confirmed order across native cancellation before delayed issuance.
-// ABOUTME: Proves fenced authority freshness, capacity reuse and preservation of the tracked graph.
 
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Persistence;

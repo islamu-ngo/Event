@@ -1,6 +1,3 @@
-// ABOUTME: Reads database-authoritative UTC time for cross-worker persistence decisions.
-// ABOUTME: Keeps the one provider scalar seam outside repositories and normalizes provider date kinds.
-
 using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 

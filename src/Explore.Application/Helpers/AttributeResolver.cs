@@ -1,6 +1,3 @@
-// ABOUTME: Resolves authorization attribute values into supported primitive identifier types.
-// ABOUTME: Accepts existing typed and string representations without coercing mismatched values.
-
 namespace Explore.Application.Helpers;
 
 public static class AttributeResolver

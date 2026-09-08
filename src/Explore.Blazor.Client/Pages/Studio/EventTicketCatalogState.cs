@@ -1,6 +1,3 @@
-// ABOUTME: Typed presentation state parsed from the generated extension-data ticket catalog HAL resource.
-// ABOUTME: Fails closed on malformed data and binds embedded edit/delete affordances to exact item identifiers.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Clients;
 

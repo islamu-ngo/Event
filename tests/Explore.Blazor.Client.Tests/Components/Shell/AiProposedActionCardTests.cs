@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for HAL-gated AI proposed action cards.
-// ABOUTME: Verifies preview/result rendering and absence of local authorization decisions.
-
 using Explore.Blazor.Client.Components.Shell.AiAssistant;
 using Explore.Blazor.Client.Tests;
 

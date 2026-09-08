@@ -1,6 +1,3 @@
-// ABOUTME: Proves payment attempts pin immutable recipient, amount, provider, and idempotency facts.
-// ABOUTME: Covers provider-neutral monotonic payment status transitions without mutating registration orders.
-
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 

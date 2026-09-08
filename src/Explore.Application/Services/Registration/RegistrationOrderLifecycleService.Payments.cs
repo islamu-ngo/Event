@@ -1,6 +1,3 @@
-// ABOUTME: Handles Phase 18 paid registration finalization, payment-aware cancellation, and cutoff cleanup.
-// ABOUTME: Keeps payment evidence and provider-handoff guards inside the lifecycle transaction boundary.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.DTOs.RegistrationOrders;

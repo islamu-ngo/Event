@@ -1,6 +1,3 @@
-// ABOUTME: HAL resource assembler for actor subscription resources.
-// ABOUTME: Converts current-user actor subscription DTOs to HAL resources with action links.
-
 namespace Explore.API.Hateoas.Assemblers;
 
 using Explore.Application.Contracts.Hateoas;

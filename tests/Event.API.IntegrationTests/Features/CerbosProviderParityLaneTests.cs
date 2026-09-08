@@ -1,6 +1,3 @@
-// ABOUTME: Runs the shared provider-neutral corpus against a live Cerbos PDP and records bounded diagnostics.
-// ABOUTME: Pairs with LocalProviderParityLaneTests so a Local/Cerbos disagreement fails instead of hiding.
-
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Authorization.ParityCorpus;

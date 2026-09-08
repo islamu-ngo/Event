@@ -1,6 +1,3 @@
-// ABOUTME: Application-owned repository contract for tenant/user/device Web Push subscriptions.
-// ABOUTME: Keeps browser endpoint ownership and lifecycle persistence behind entity-returning methods.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

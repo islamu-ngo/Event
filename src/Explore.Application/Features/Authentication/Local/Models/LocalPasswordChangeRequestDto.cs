@@ -1,5 +1,3 @@
-// ABOUTME: Defines the password-only body for an ordinary authenticated Local password change.
-// ABOUTME: Keeps subject, credential stamp, and binding authority out of caller-controlled JSON.
 
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;

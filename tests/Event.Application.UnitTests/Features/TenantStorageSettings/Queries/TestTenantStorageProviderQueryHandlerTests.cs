@@ -1,6 +1,3 @@
-// ABOUTME: Authorization and delegation tests for tenant storage provider checks.
-// ABOUTME: Ensures only tenant or instance administrators can trigger write-capable preflight verification.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;

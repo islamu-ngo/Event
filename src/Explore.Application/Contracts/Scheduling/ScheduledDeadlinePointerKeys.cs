@@ -1,6 +1,3 @@
-// ABOUTME: Canonical key names for the string identifiers carried inside a ScheduledDeadline pointer.
-// ABOUTME: Shared by the Application callers that build pointers and the jobs that read them back.
-
 namespace Explore.Application.Contracts.Scheduling;
 
 /// <summary>

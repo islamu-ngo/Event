@@ -1,5 +1,3 @@
-// ABOUTME: Native SQLite and production DI fixture for exact linked-account lifecycle email routing.
-// ABOUTME: Fakes only Keycloak HTTP while retaining real binding, ownership, audit and settings persistence.
 
 using System.Net;
 using System.Net.Http.Headers;
@@ -90,7 +88,7 @@ internal sealed class AccountAuthorityLifecycleEmailFixture : IAsyncDisposable
         });
         services.AddHttpClient(KeycloakAccountAuthorityLifecycleEmailService.HttpClientName)
             .ConfigurePrimaryHttpMessageHandler(() => fixture.Http);
-        fixture._provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+        fixture._provider = services.BuildIsolatedServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         fixture._scope = fixture._provider.CreateAsyncScope();
         var tenantAccessor = new TenantContextAccessor(new Microsoft.AspNetCore.Http.HttpContextAccessor());
         tenantAccessor.SetTenant(fixture.TenantId);

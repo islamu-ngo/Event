@@ -1,6 +1,3 @@
-// ABOUTME: Specifies defensive snapshot contracts for every collection-bearing Application request.
-// ABOUTME: Reconciles the 18-request/37-property inventory and preserves JSON binding with explicit sequence comparisons.
-
 using System.Collections;
 using System.Reflection;
 using System.Runtime.CompilerServices;

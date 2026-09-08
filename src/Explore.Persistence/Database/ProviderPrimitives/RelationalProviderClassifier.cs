@@ -1,6 +1,3 @@
-// ABOUTME: Classifies EF relational providers once for capability-focused persistence primitives.
-// ABOUTME: Prevents repositories from inspecting package provider names or extension methods directly.
-
 using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace Explore.Persistence.Database.ProviderPrimitives;

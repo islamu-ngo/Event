@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning a single category-type/category link by ID.
-// ABOUTME: Maps junction entity to CategoryTypeCategoriesDto.
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.CategoryTypeCategories;

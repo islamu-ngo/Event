@@ -1,6 +1,3 @@
-// ABOUTME: Locks the public Event Keycloak exports to Event-owned realm resources.
-// ABOUTME: Rejects private Control Plane identifiers with bounded, secret-free diagnostics.
-
 using System.Text.Json;
 
 namespace Event.Architecture.Tests;

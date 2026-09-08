@@ -1,6 +1,3 @@
-// ABOUTME: Focused authentication routing and rate-partition tests for managed Control Plane credentials.
-// ABOUTME: Proves managed headers select isolated machine auth, reject mixed credentials, and avoid anonymous write buckets.
-
 using System.Security.Claims;
 using Explore.API.Authentication;
 using Explore.API.Extensions;

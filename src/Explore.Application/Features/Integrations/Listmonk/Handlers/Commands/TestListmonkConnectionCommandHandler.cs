@@ -1,6 +1,3 @@
-// ABOUTME: Handles Listmonk connection tests through an Application infrastructure contract.
-// ABOUTME: Returns only success or failure so generated-client details stay in Infrastructure.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Integrations.Listmonk.Requests.Commands;
 using Explore.Application.Responses;

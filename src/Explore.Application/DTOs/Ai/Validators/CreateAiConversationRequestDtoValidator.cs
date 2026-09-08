@@ -1,6 +1,3 @@
-// ABOUTME: Validator for creating a private AI assistant conversation shell.
-// ABOUTME: Enforces bounded user-supplied metadata before persistence handlers run.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.Ai.Validators;

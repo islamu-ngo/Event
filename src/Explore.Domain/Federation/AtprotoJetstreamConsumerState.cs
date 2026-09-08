@@ -1,6 +1,3 @@
-// ABOUTME: Owns the single global Jetstream cursor and its renewable multi-node processing lease.
-// ABOUTME: Uses a monotonically increasing fence so expired workers cannot advance canonical state.
-
 namespace Explore.Domain.Federation;
 
 public sealed class AtprotoJetstreamConsumerState

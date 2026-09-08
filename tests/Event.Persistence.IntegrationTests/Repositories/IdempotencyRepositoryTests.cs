@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL-backed tests for idempotency replay-cache persistence.
-// ABOUTME: Verifies bounded cleanup and deterministically coordinated competing key claims.
-
 using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
@@ -80,7 +77,7 @@ public sealed class IdempotencyRepositoryTests(PostgreSqlContainerFixture fixtur
 
     private ExploreDbContext CreateNonRetryingContext(params IInterceptor[] interceptors)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString)
             .UseSnakeCaseNamingConvention()
             .AddInterceptors(interceptors)

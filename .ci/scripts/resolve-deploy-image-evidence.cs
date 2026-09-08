@@ -1,5 +1,3 @@
-// ABOUTME: Resolves deploy-time image evidence from container promotion artifacts.
-// ABOUTME: Exposes expected immutable image tag and digest outputs for deploy workflows.
 #:property RestorePackagesWithLockFile=false
 
 using System.Text.Json.Nodes;

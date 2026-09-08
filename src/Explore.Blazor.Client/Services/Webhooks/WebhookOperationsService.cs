@@ -1,6 +1,3 @@
-// ABOUTME: Generated-client backed service for sensitive and stateful webhook operations.
-// ABOUTME: Normalizes HAL snapshots and converts API failures into bounded operator-safe results.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Webhooks;
 

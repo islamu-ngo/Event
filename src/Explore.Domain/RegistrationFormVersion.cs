@@ -1,6 +1,3 @@
-// ABOUTME: Owns one immutable-on-publication registration-form version and its complete field graph.
-// ABOUTME: Enforces draft-only mutations, publication retirement, provenance, and independent draft cloning.
-
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;

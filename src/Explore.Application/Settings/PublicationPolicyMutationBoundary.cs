@@ -1,6 +1,3 @@
-// ABOUTME: Coordinates publication-policy reads, validation, writes, and deferred effects under one setting lock.
-// ABOUTME: Rejects invalid or unsafe complete states before any atomic store write is attempted.
-
 namespace Explore.Application.Settings;
 
 using System.Collections.Immutable;

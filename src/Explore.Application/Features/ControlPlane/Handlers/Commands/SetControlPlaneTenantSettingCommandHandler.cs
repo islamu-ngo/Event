@@ -1,5 +1,3 @@
-// ABOUTME: Validates and writes a tenant-scoped setting override via the Control Plane write surface.
-// ABOUTME: Enforces registry, sensitivity, system-lock, and typed-value constraints before persistence.
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

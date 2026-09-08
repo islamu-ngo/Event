@@ -1,6 +1,3 @@
-// ABOUTME: Owns durable tenant-wide or event-specific paid Checkout stop and independently reviewed resume state.
-// ABOUTME: Appends immutable bounded audit facts for every activation decision without affecting handed-off payments.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

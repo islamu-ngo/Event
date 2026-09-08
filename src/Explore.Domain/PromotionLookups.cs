@@ -1,6 +1,3 @@
-// ABOUTME: Defines normalized lookup rows for promotion definition and reservation statuses.
-// ABOUTME: Keeps persisted status IDs tied to stable master codes without exposing enum columns.
-
 namespace Explore.Domain;
 
 public sealed class PromotionDefinitionStatus

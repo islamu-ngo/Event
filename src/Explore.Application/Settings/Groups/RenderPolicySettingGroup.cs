@@ -1,6 +1,3 @@
-// ABOUTME: Strongly-typed Render Policy setting group resolved via batch loading.
-// ABOUTME: Keys align to RoutingSettingDefinitions render policy keys via GovernanceSettingKeys.Routing.RenderPolicy.
-
 namespace Explore.Application.Settings.Groups;
 
 using Explore.Application.Contracts.Infrastructure;

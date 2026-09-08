@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-scoped program section grouping sessions and an event-mediated physical placement.
-// ABOUTME: Retains room scheduling keys only when a matching EventLocation proves the same physical place.
-
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -78,5 +75,9 @@ public class EventSessionGroup : ITenantEntity, IAuditableEntity, ISoftDeletable
     {
         EventLocationId = null;
         EventLocation = null;
+        LocationId = null;
+        Location = null;
+        RoomId = null;
+        Room = null;
     }
 }

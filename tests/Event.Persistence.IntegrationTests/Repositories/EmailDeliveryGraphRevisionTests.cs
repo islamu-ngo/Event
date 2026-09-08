@@ -1,5 +1,3 @@
-// ABOUTME: Verifies original email-policy revision ownership while creating and repairing real recipient graphs.
-// ABOUTME: Preserves in-app delivery and terminal optional suppression across re-enable, delayed fanout, and transaction boundaries.
 
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;

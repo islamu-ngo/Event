@@ -1,6 +1,3 @@
-// ABOUTME: Applies pure paid-event policy narrowing and currency confirmation rules.
-// ABOUTME: Keeps location suggestions non-authoritative and provider capability out of Domain policy.
-
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 

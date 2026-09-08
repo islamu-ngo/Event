@@ -1,6 +1,3 @@
-// ABOUTME: Drives each public B1 presentation owner independently without a compile-time Toolkit dependency.
-// ABOUTME: Supplies exact lifecycle signals, controlled completions, and bounded generation allocation for race tests.
-
 namespace Event.SetupAssistant.Tests;
 
 using System.ComponentModel;

@@ -1,6 +1,3 @@
-// ABOUTME: Bounded public event descriptors returned by MCP event-management tools.
-// ABOUTME: Keeps MCP read outputs small and excludes tenant, auth, and write-control data.
-
 using Explore.Domain.Enums;
 
 namespace Explore.API.Mcp;

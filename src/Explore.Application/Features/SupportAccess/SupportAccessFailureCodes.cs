@@ -1,6 +1,3 @@
-// ABOUTME: Machine-readable failure codes for support-access command responses.
-// ABOUTME: Keeps API ProblemDetails mapping stable for BFF and Blazor callers.
-
 namespace Explore.Application.Features.SupportAccess;
 
 public static class SupportAccessFailureCodes

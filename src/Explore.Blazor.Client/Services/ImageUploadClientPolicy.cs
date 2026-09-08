@@ -1,6 +1,3 @@
-// ABOUTME: Shared Blazor upload UX policy for image file hints, safe messages, and log-safe buckets.
-// ABOUTME: Sanitizes browser-provided filename metadata before image upload services send it to the BFF/API.
-
 using System.Buffers.Binary;
 using System.Text;
 

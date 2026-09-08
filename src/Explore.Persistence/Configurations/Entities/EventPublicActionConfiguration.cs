@@ -1,6 +1,3 @@
-// ABOUTME: Maps tenant-owned public event actions, validated destinations, and lookup relationships.
-// ABOUTME: Indexes event-scoped action reads used by the portable serializable primary-action guard.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

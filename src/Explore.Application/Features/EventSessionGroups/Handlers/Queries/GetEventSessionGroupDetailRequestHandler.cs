@@ -1,6 +1,3 @@
-// ABOUTME: Handler for public event session group detail retrieval.
-// ABOUTME: Maps published data while redacting exact physical location and room fields.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

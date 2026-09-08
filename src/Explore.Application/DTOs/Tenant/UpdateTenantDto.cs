@@ -1,8 +1,5 @@
 using System;
 
-// ABOUTME: Wrapper DTO for partial tenant metadata updates using nullable property groups.
-// ABOUTME: Lifecycle state is excluded because dedicated control-plane actions own status transitions.
-
 namespace Explore.Application.DTOs.Tenant;
 
 public sealed record UpdateTenantDto

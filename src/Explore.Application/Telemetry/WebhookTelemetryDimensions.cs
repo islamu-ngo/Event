@@ -1,6 +1,3 @@
-// ABOUTME: Defines the closed telemetry vocabulary for webhook provider operations and outcomes.
-// ABOUTME: Keeps OpenTelemetry dimensions compile-time bounded and independent from tenant or resource identity.
-
 namespace Explore.Application.Telemetry;
 
 public enum WebhookTelemetryProvider

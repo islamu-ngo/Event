@@ -1,6 +1,3 @@
-// ABOUTME: Emits fair-return waitlist links only from server-computed state and stop controls.
-// ABOUTME: Keeps tenant, participant, seller, payment, and capability facts out of URLs and labels.
-
 using System.Security.Claims;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.DTOs.Waitlist;

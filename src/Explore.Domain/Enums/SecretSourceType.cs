@@ -1,6 +1,3 @@
-// ABOUTME: Declares WHERE a secret value is fetched from for a given SecretBinding.
-// ABOUTME: DB stores only this marker + that source's metadata - never the value itself.
-
 namespace Explore.Domain.Enums;
 
 public enum SecretSourceType

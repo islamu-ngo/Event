@@ -1,6 +1,3 @@
-// ABOUTME: Registers HAL resource assemblers and link policies for API controllers.
-// ABOUTME: Keeps HATEOAS dependency injection wiring centralized by DTO resource family.
-
 namespace Explore.API.Extensions;
 
 using Explore.API.Hateoas;

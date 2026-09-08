@@ -1,6 +1,3 @@
-// ABOUTME: Adapts public carrier placements to one EventLocation disclosure batch.
-// ABOUTME: Returns only purpose-constrained public DTOs keyed by the stable EventLocation identity.
-
 using System.Collections.Immutable;
 using Explore.Application.Contracts.LocationPrivacy;
 using Explore.Application.Contracts.Services;

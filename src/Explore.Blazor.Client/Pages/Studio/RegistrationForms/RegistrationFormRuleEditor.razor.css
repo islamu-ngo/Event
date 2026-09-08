@@ -1,6 +1,3 @@
-/* ABOUTME: Tokenized rule-editor structure for Studio registration authoring. */
-/* ABOUTME: Uses logical flow and container adaptation without scoped focus overrides. */
-
 .registration-form-rule-editor,
 .registration-form-rule-editor__definition {
     display: grid;

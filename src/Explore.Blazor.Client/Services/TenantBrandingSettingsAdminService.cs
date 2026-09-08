@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-admin BFF service for typed tenant branding settings document reads and grouped PATCHes.
-// ABOUTME: Maps HAL and field capabilities while sending one display-name or asset leaf per request.
-
 using System.Net;
 using Explore.Blazor.Client.Clients;
 

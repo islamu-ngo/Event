@@ -1,6 +1,3 @@
-// ABOUTME: Requests paid-ticket publication readiness for one event catalog draft.
-// ABOUTME: Authorizes against ticket management so blockers can explain paid-commerce denials safely.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventTicketing;
 using MediatR;

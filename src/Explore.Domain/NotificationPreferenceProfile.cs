@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-scoped notification profile override for global mute state and locks.
-// ABOUTME: Keeps channel choices intact while allowing non-required notifications to be suppressed.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

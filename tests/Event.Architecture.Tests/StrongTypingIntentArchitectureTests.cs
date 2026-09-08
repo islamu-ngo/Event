@@ -1,6 +1,3 @@
-// ABOUTME: Enforces architecture rules, contract validity, and taxonomy for the strong-typing remediation intent.
-// ABOUTME: Proves benchmark parity, path integrity, and executable architecture testing standards.
-
 using System.Text.Json;
 using YamlDotNet.Serialization;
 

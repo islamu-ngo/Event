@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for deleting an event by ID.
-// ABOUTME: Carries the target event ID.
 using System;
 using Explore.Application.Authorization;
 using MediatR;

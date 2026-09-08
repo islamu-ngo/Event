@@ -1,6 +1,3 @@
-// ABOUTME: Secured command for publishing a draft tenant plan version.
-// ABOUTME: Encodes the instance-admin choice to pin or move existing tenant assignments.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

@@ -1,6 +1,3 @@
-// ABOUTME: Tests public authentication-session DTOs expose only the approved metadata contract.
-// ABOUTME: Guards generated API contracts from adding identity or credential material.
-
 using Explore.Application.DTOs.UserAuthenticationToken;
 using TUnit.Core;
 

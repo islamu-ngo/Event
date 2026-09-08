@@ -1,6 +1,3 @@
-// ABOUTME: Secret binding entity - the DB control-plane record describing WHERE a secret value lives.
-// ABOUTME: Stores only normalized opaque references; secret values never enter application persistence.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

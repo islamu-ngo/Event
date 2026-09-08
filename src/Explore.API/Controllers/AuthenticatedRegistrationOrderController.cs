@@ -1,6 +1,3 @@
-// ABOUTME: Authenticated registration checkout endpoints scoped to the signed-in caller's current order.
-// ABOUTME: Order ownership comes from the authenticated principal, never from a caller-supplied identifier.
-
 using Asp.Versioning;
 using System.Text.Json;
 using Explore.API.Attributes;

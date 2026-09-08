@@ -1,6 +1,3 @@
-// ABOUTME: Contract tests for authenticated event ticketing API routes and ProblemDetails metadata.
-// ABOUTME: Ensures all ticketing actions retain stable route names and documented failure responses.
-
 using System.Reflection;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Controllers;

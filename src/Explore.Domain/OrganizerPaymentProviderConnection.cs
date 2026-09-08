@@ -1,6 +1,3 @@
-// ABOUTME: Actor-bound organizer payment-provider connection aggregate for OrganizerDirect commerce.
-// ABOUTME: Stores bounded provider-neutral readiness and creates immutable recipient snapshots only when ready.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 using Explore.Domain.ValueObjects;

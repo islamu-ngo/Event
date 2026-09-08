@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for the admin-only organization approval status action.
-// ABOUTME: Keeps approval lifecycle changes separate from grouped profile property updates.
 using System;
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Organization;

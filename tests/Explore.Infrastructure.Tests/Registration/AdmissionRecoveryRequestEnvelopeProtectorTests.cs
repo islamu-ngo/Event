@@ -1,6 +1,3 @@
-// ABOUTME: Verifies normalized recovery identity is protected before durable request staging.
-// ABOUTME: Covers round-trip recovery purpose, plaintext absence, redaction, and fail-closed versions.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Infrastructure.Services.Registration;
 using Microsoft.AspNetCore.DataProtection;

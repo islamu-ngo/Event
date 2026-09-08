@@ -1,6 +1,3 @@
-# ABOUTME: Forgejo/Codeberg publication projection definition for the trusted self-hosted final lane.
-# ABOUTME: Publishes canonical notes as a noncanonical page and reports drift without repairing it.
-
 name: Release Publish Projection
 
 on:

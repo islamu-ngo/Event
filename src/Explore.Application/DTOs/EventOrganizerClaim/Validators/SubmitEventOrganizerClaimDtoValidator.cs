@@ -1,6 +1,3 @@
-// ABOUTME: Validates organizer-claim evidence and actor identity at the Application boundary.
-// ABOUTME: Keeps trust-boundary limits explicit before domain claim creation.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.EventOrganizerClaim.Validators;

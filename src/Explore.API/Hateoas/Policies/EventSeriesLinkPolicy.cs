@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS policies for event-series detail and collection resources.
-// ABOUTME: Authorizes edit affordances through each series' persisted parent actor.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Security.Claims;

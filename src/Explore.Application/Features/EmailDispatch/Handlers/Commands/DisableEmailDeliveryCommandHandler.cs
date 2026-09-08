@@ -1,5 +1,3 @@
-// ABOUTME: Commits a deliberately confirmed email disable against fresh authority, revision, and actual scope impact.
-// ABOUTME: Owns the SMTP lease before its transaction and publishes setting effects only after a successful commit.
 
 using System.Collections.Immutable;
 using Explore.Application.Contracts.Identity;

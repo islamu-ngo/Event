@@ -1,6 +1,3 @@
-// ABOUTME: File-backed SQLite regression for portable external API key quota mutations.
-// ABOUTME: Proves concurrent provisioners create one period row and credit use remains bounded.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -99,6 +96,13 @@ public sealed class ExternalApiKeyQuotaRepositorySqliteTests
         ExploreDbContext[] contexts = Enumerable.Range(0, 4).Select(_ => CreateContext(databasePath, tenantId)).ToArray();
         try
         {
+            foreach (ExploreDbContext context in contexts)
+            {
+                await context.Database.OpenConnectionAsync();
+                await Assert.That(await context.ExternalApiKeys.AnyAsync(key => key.Id == externalApiKeyId)).IsTrue();
+            }
+
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));
             var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             Task<ExternalApiKeyQuota>[] attempts = contexts.Select(async context =>
             {
@@ -109,11 +113,11 @@ public sealed class ExternalApiKeyQuotaRepositorySqliteTests
                     periodStart.AddMonths(1).AddDays(-1),
                     creditLimit: 3,
                     rolloverCredits: 0,
-                    CancellationToken.None);
+                    deadline.Token);
             }).ToArray();
 
             start.SetResult();
-            return await Task.WhenAll(attempts).WaitAsync(TimeSpan.FromSeconds(15));
+            return await Task.WhenAll(attempts);
         }
         finally
         {
@@ -129,15 +133,22 @@ public sealed class ExternalApiKeyQuotaRepositorySqliteTests
         ExploreDbContext[] contexts = Enumerable.Range(0, 8).Select(_ => CreateContext(databasePath, tenantId)).ToArray();
         try
         {
+            foreach (ExploreDbContext context in contexts)
+            {
+                await context.Database.OpenConnectionAsync();
+                await Assert.That(await context.Set<ExternalApiKeyQuota>().AnyAsync(quota => quota.Id == quotaId)).IsTrue();
+            }
+
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));
             var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             Task<bool>[] attempts = contexts.Select(async context =>
             {
                 await start.Task;
-                return await new ExternalApiKeyQuotaRepository(context).TryConsumeCredits(quotaId, 1, CancellationToken.None);
+                return await new ExternalApiKeyQuotaRepository(context).TryConsumeCredits(quotaId, 1, deadline.Token);
             }).ToArray();
 
             start.SetResult();
-            return await Task.WhenAll(attempts).WaitAsync(TimeSpan.FromSeconds(15));
+            return await Task.WhenAll(attempts);
         }
         finally
         {
@@ -157,7 +168,7 @@ public sealed class ExternalApiKeyQuotaRepositorySqliteTests
             Pooling = true,
         }.ToString();
 
-        var context = new ExploreDbContext(new DbContextOptionsBuilder<ExploreDbContext>()
+        var context = new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connectionString)
             .UseSnakeCaseNamingConvention()
             .Options);

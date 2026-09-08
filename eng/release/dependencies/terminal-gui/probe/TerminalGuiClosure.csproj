@@ -1,5 +1,3 @@
-<!-- ABOUTME: Resolves the exact non-shipping runtime closure of the internal Terminal.Gui package. -->
-<!-- ABOUTME: Produces the lock graph used by dependency, provenance, and CycloneDX evidence gates. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>

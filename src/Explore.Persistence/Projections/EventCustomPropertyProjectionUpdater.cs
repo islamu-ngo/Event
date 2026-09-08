@@ -1,6 +1,3 @@
-// ABOUTME: Transactional projection writer for the event custom-property read model with advisory-lock coordination.
-// ABOUTME: Inline writers skip-on-contention into the dirty-scope backlog; rebuild worker drains on completion.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Exceptions;

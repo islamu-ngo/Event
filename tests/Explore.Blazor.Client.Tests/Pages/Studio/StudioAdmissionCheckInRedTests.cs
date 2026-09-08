@@ -1,6 +1,3 @@
-// ABOUTME: RED bUnit specifications for the Phase 21 Studio admission check-in workflow.
-// ABOUTME: Defines HAL, scanner fallback, queue, accessibility, cancellation, and online-only contracts before UI exists.
-
 using System.Globalization;
 using System.Reflection;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;

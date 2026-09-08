@@ -1,6 +1,3 @@
-// ABOUTME: Domain exception carrying every typed event participation configuration validation error.
-// ABOUTME: Preserves machine-readable failure details for application-layer translation.
-
 namespace Explore.Domain;
 
 public sealed class EventParticipationConfigurationValidationException : Exception

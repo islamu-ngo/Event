@@ -1,6 +1,3 @@
-// ABOUTME: Background processor that polls and dispatches generic outbox messages for reliable side-effect delivery.
-// ABOUTME: Polls the general outbox, claims messages optimistically, dispatches them, and applies bounded retries.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

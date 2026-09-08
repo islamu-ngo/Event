@@ -1,6 +1,3 @@
-// ABOUTME: Tests the tenant typed settings document resolver path during settings cutover.
-// ABOUTME: Verifies tenant JSONB document resolution stays isolated from current scalar settings caches.
-
 namespace Explore.Infrastructure.Tests.Settings;
 
 using Explore.Application.Contracts.Infrastructure;

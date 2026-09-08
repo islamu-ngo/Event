@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for registration-provider connections and bindings.
-// ABOUTME: Returns tracked entities for write flows and keeps mapping/entity composition inside Persistence.
-
 using System.Linq.Expressions;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

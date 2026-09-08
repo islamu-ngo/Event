@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the LocalProvider webhook delivery readiness health check.
-// ABOUTME: Verifies provider selection, disabled processor state, queue backlog, and stale lease reporting.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Services.Webhooks;

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for catalog-derived ticket price summary rendering.
-// ABOUTME: Covers every summary code and exact integer formatting for zero- and three-digit currencies.
-
 using Explore.Blazor.Client.Helpers;
 
 namespace Explore.Blazor.Client.Tests.Helpers;

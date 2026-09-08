@@ -1,6 +1,3 @@
-// ABOUTME: Request DTO for read-only Keycloak realm sync preview generation.
-// ABOUTME: Temporary admin credentials are request-scoped and must never be persisted or returned.
-
 namespace Explore.Application.DTOs.Onboarding;
 
 public sealed record KeycloakRealmSyncPreviewRequestDto

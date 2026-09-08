@@ -1,5 +1,3 @@
-// ABOUTME: Immutable visitor authority facts and complete proposed-state inputs for shared policy evaluation.
-// ABOUTME: Snapshots provider collections and separates public onboarding from existing account login.
 
 using System.Collections.Immutable;
 using Explore.Domain.Enums;

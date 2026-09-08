@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for event-session runtime custom-property single-value writes.
-// ABOUTME: Proves service-level ordinal and duplicate checks mirror event-scope writes.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

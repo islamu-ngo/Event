@@ -1,6 +1,3 @@
-// ABOUTME: Prepares owner-only same-directory Unix files and atomically commits after revalidation.
-// ABOUTME: Rejects links, directories, devices, target swaps, overwrite without approval, and unsafe modes.
-
 namespace ISLAMU.Event.SetupAssistant.Desktop.Files;
 
 using System.Runtime.Versioning;

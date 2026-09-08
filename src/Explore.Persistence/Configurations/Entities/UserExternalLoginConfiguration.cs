@@ -1,6 +1,3 @@
-// ABOUTME: Configures internal external-login bindings used to resolve one global user per provider identity.
-// ABOUTME: Enforces exact provider-key uniqueness before tenant participation is evaluated.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

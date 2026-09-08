@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for EventOrganizerClaimService covering claims submission, withdrawal, and queries.
-// ABOUTME: Verifies organizer claims client delegation and error handling using TUnit and NSubstitute.
-
 using System.Diagnostics.CodeAnalysis;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Services;

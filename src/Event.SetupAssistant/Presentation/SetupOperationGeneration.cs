@@ -1,6 +1,3 @@
-// ABOUTME: Defines typed monotonic presentation-operation generations and their allocator contract.
-// ABOUTME: Prevents primitive generation identities, wraparound, reseeding, and ABA acceptance.
-
 namespace ISLAMU.Event.SetupAssistant.Presentation;
 
 using System.Globalization;

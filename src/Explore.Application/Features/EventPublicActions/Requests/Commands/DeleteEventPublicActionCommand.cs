@@ -1,6 +1,3 @@
-// ABOUTME: Authorized CQRS request for soft-deleting an event public action.
-// ABOUTME: Requires the action concurrency stamp while authorizing against its event.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

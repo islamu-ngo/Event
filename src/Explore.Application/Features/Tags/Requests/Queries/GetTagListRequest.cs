@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query request for fetching a paginated tag list.
-// ABOUTME: Returns IEnumerable<TagListDto>.
 using System.Collections.Generic;
 using Explore.Application.DTOs.Tag;
 using Explore.Application.Responses;

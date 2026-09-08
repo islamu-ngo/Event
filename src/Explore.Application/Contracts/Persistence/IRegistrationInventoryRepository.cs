@@ -1,6 +1,3 @@
-// ABOUTME: Persistence contract for registration order creation and capacity-hold reservation primitives.
-// ABOUTME: Exposes entity-first transaction-bound operations for application orchestration.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

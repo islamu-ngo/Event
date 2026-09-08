@@ -1,6 +1,3 @@
-// ABOUTME: Service tests for registration-order lifecycle transport and safe guest recovery failures.
-// ABOUTME: Proves missing capability transport metadata never escapes into the page flow.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Models;

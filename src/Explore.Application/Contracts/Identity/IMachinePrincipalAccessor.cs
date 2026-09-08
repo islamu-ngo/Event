@@ -1,6 +1,3 @@
-// ABOUTME: Contract for resolving the current request's machine principal when authenticated via an external API key.
-// ABOUTME: Surfaces the API-key context so authorization providers can build consistent machine principals across Cerbos and fallback paths.
-
 using Explore.Application.Authentication;
 
 namespace Explore.Application.Contracts.Identity;

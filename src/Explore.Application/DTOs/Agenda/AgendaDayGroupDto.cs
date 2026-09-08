@@ -1,6 +1,3 @@
-// ABOUTME: Groups schedule entries under a local date with optional EventDay metadata.
-// ABOUTME: When an EventDay row exists, Label/Description/IsPublished come from it; otherwise the group is derived from sessions.
-
 namespace Explore.Application.DTOs.Agenda;
 
 using System.Collections.Immutable;

@@ -1,6 +1,3 @@
-// ABOUTME: Protects recovery recipient and capability envelopes with the persistent Data Protection key ring.
-// ABOUTME: Uses a recovery-specific cryptographic purpose and exposes only redacted failures.
-
 using System.Security.Cryptography;
 using System.Text.Json;
 using Explore.Application.Contracts.Admissions;

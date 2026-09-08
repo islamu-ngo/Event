@@ -1,5 +1,3 @@
-// ABOUTME: Coordinates HAL-gated Local account forms, exact-operation recovery, and one-time credential handover.
-// ABOUTME: Cancels superseded work and discards stale or disposed responses before any sensitive UI assignment.
 
 using System.ComponentModel.DataAnnotations;
 using Explore.Blazor.Client.Clients;

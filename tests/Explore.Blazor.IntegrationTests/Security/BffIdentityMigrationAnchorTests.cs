@@ -1,6 +1,3 @@
-// ABOUTME: Anchors fail-closed BFF identity behavior that current duplicated readers do not satisfy.
-// ABOUTME: Keeps intentional Task 4.2 RED failures separate from the passing Task 4.1 characterization.
-
 using System.Text;
 using System.Text.Json;
 using System.Threading.RateLimiting;

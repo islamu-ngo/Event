@@ -1,6 +1,3 @@
-// ABOUTME: Application contract for transaction-safe registration-order lifecycle recovery.
-// ABOUTME: Lets background workers invoke lifecycle recovery without referencing persistence implementations.
-
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Contracts.Persistence;
 

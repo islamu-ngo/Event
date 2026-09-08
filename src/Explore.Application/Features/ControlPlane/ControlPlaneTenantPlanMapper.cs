@@ -1,6 +1,3 @@
-// ABOUTME: Mapping helpers for tenant plan control-plane query handlers.
-// ABOUTME: Converts normalized tenant plan entities into bounded SaaS tier DTOs.
-
 using Explore.Application.DTOs.ControlPlane;
 using Explore.Domain;
 using Explore.Domain.Enums;

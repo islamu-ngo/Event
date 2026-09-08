@@ -1,6 +1,3 @@
-// ABOUTME: Verifies persisted notification delivery policy codes and versions resolve to dispatch rules.
-// ABOUTME: Keeps optional preferences, reporter consent, and invitation authority policy-driven.
-
 using Explore.Application.Notifications;
 using Explore.Domain.Enums;
 

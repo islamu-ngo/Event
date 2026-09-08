@@ -1,5 +1,3 @@
-// ABOUTME: Exercises native Local lifecycle HTTP admission and one-use authority through real SQLite Identity.
-// ABOUTME: Verifies private responses and exact Domain mirror synchronization without issuing sessions on consume.
 
 using System.Net;
 using System.Net.Http.Headers;

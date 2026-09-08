@@ -1,6 +1,3 @@
-// ABOUTME: Handles retry-safe grouped Event PATCH updates and published timezone fanout occurrences.
-// ABOUTME: Persists event projections, immutable attendee notices, federation work, and cache sequencing atomically.
-
 using System;
 using System.Linq;
 using System.Threading;

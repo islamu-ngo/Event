@@ -1,6 +1,3 @@
-// ABOUTME: Pinned Svix, PostgreSQL, and Redis Testcontainers fixture for live provider conformance.
-// ABOUTME: Generates disposable JWTs and exposes cache expiry without persisting credentials.
-
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using DotNet.Testcontainers.Networks;

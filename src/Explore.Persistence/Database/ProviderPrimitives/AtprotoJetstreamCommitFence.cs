@@ -1,6 +1,3 @@
-// ABOUTME: Verifies Jetstream lease ownership atomically at PostgreSQL commit time.
-// ABOUTME: Resolves every identifier from EF metadata and keeps the database-clock fence out of repositories.
-
 using System.Linq.Expressions;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain.Federation;

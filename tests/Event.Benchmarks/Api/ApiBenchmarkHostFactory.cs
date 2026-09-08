@@ -1,6 +1,3 @@
-// ABOUTME: WebApplicationFactory used by benchmarks to host the real Explore API in-process.
-// ABOUTME: Mirrors integration-test startup overrides while keeping benchmark infrastructure standalone.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
 using Explore.Domain.Constants;

@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for webhook endpoints and subscription filtering.
-// ABOUTME: Supports LocalProvider endpoint resolution while allowing Svix endpoint mirrors.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

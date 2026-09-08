@@ -1,6 +1,3 @@
-// ABOUTME: bUnit tests for the server-backed Event Program Summary view.
-// ABOUTME: Verifies grouped section/day/item rendering and readiness warning display.
-
 using Explore.Blazor.Client.Clients;
 using EventProgramSummaryViewComponent = Explore.Blazor.Client.Pages.Events.Components.EventProgramSummaryView;
 

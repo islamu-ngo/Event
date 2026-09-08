@@ -1,6 +1,3 @@
-// ABOUTME: Represents an ordered inclusive range of local calendar dates.
-// ABOUTME: Contains no timezone, instant-conversion, arithmetic, or persistence behavior.
-
 using System.Globalization;
 
 namespace Explore.Domain.ValueObjects;

@@ -1,6 +1,3 @@
-// ABOUTME: Dedicated EF Core context for operators hosting Local Identity in an external database.
-// ABOUTME: Applies only Identity entity mappings and never exposes platform Domain aggregates.
-
 using Explore.Persistence.Schema;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;

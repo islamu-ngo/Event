@@ -1,6 +1,3 @@
-// ABOUTME: Setting definitions for local-first storage policy and optional S3-compatible configuration.
-// ABOUTME: Local provider defaults are non-secret; S3 credentials remain sensitive optional settings.
-
 using Explore.Domain;
 using Explore.Domain.Constants;
 

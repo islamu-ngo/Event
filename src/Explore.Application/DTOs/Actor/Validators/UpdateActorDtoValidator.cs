@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation validator for grouped Actor PATCH payloads.
-// ABOUTME: Manually instantiated by UpdateActorCommandHandler with repository dependencies.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Models.Common;
 using FluentValidation;

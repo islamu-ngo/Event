@@ -1,6 +1,3 @@
-// ABOUTME: Application boundary for resolving immutable webhook retention policy cutoffs.
-// ABOUTME: Keeps runtime configuration outside Domain while materialized work receives stable evidence horizons.
-
 namespace Explore.Application.Contracts.Webhooks;
 
 public sealed record WebhookRetentionPolicySnapshot(

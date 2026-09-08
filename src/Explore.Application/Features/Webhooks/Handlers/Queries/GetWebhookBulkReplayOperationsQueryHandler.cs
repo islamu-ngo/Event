@@ -1,6 +1,3 @@
-// ABOUTME: Lists recent webhook bulk replay operations through a bounded tenant-scoped read.
-// ABOUTME: Maps normalized operation state without exposing internal request hashes or sensitive data.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Features.Webhooks.Requests.Queries;

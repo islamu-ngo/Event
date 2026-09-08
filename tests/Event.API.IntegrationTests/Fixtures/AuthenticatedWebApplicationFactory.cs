@@ -1,6 +1,3 @@
-// ABOUTME: Configures authenticated API integration hosts with deterministic identity and isolated persistence.
-// ABOUTME: Replaces authentication/authorization while keeping runtime startup validation active.
-
 using System.Threading.Channels;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain.Constants;

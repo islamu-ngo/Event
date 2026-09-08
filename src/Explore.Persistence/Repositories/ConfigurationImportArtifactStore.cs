@@ -1,6 +1,3 @@
-// ABOUTME: Persists configuration import bytes only after purpose-bound Data Protection encryption.
-// ABOUTME: Revalidates digest and length after decrypting and returns no storage location.
-
 namespace Explore.Persistence.Repositories;
 
 using System.Security.Cryptography;

@@ -1,6 +1,3 @@
-// ABOUTME: Represents one scoped AI tool catalog item for assistant or MCP discovery.
-// ABOUTME: Makes proposal availability explicit while never granting execution authority.
-
 using Explore.Domain.Ai;
 
 namespace Explore.Application.Features.AiAssistant.Tools;

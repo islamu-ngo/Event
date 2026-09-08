@@ -1,6 +1,3 @@
-// ABOUTME: Strategy for the first-class Anthropic company provider using the Messages API.
-// ABOUTME: Delegates to AnthropicChatProvider and reports configured_no_probe status.
-
 using Explore.Application.Contracts.Infrastructure.Ai;
 
 namespace Explore.Infrastructure.Ai;

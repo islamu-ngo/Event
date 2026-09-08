@@ -1,6 +1,3 @@
-// ABOUTME: Verifies tenant module mutation commands require tenant update authorization metadata.
-// ABOUTME: Prevents module governance writes from regressing to controller-only authentication.
-
 using System.Reflection;
 using Explore.Application.Authorization;
 using Explore.Application.Features.Modules.Requests.Commands;

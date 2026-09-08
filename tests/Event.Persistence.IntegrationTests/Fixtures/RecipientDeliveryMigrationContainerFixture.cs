@@ -1,6 +1,3 @@
-// ABOUTME: Isolated PostgreSQL Testcontainer fixture for recipient-delivery migration verification.
-// ABOUTME: Owns guarded full-schema resets for migration tests sharing its isolated database.
-
 using Npgsql;
 using Testcontainers.PostgreSql;
 using TUnit.Core.Interfaces;

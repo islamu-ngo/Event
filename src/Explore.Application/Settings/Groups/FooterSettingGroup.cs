@@ -1,6 +1,3 @@
-// ABOUTME: Strongly-typed setting group for footer settings resolved via batch loading.
-// ABOUTME: Keys align to FooterSettingDefinitions via GovernanceSettingKeys.Footer.
-
 namespace Explore.Application.Settings.Groups;
 
 using Explore.Application.Contracts.Infrastructure;

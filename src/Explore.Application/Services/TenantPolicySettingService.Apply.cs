@@ -1,6 +1,3 @@
-// ABOUTME: Write path for tenant policy settings — applies overrides while enforcing instance-level delegation constraints.
-// ABOUTME: Partial class containing ApplyTenantSettingsAsync and its per-field override helpers.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.TenantPolicy;

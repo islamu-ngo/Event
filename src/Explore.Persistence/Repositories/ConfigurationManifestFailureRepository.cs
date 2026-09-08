@@ -1,6 +1,3 @@
-// ABOUTME: Persists one safe failed configuration-manifest operation through a fresh DbContext after rollback.
-// ABOUTME: Prevents failed configuration entries retained by another tracker from being saved with audit evidence.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

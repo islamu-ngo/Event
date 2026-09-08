@@ -1,6 +1,3 @@
-// ABOUTME: Creates JSON Schema and example envelopes for canonical webhook event descriptors.
-// ABOUTME: Keeps documentation-ready webhook schemas generated from the same catalog used by builders.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Webhooks;
 

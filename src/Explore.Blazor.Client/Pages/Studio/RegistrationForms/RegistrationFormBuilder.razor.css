@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped Studio registration-form builder layout and interaction states. */
-/* ABOUTME: Uses project tokens, logical properties, RTL-safe flow, and container adaptation. */
-
 .registration-form-builder {
     display: grid;
     gap: var(--isl-space-5);

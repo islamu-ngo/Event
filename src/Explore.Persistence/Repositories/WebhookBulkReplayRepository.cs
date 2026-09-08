@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL persistence for bounded tenant webhook replay previews and queued operations.
-// ABOUTME: Classifies exclusions set-wise and reopens only still-eligible terminal Local targets under tenant locks.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.Database;

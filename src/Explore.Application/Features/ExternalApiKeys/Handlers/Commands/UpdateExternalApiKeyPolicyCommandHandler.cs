@@ -1,6 +1,3 @@
-// ABOUTME: Updates editable policy fields for persisted external API keys visible to the current caller.
-// ABOUTME: Checks owner authority across all five owner types while hiding unauthorized keys.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ExternalApiKey.Validators;

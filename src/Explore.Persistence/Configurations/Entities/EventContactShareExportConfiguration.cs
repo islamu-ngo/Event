@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for EventContactShareExport entity — export audit headers.
-// ABOUTME: Tracks each time an organisation member downloads shared contact data.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

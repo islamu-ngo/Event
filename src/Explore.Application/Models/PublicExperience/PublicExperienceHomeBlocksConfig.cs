@@ -1,6 +1,3 @@
-// ABOUTME: Application-owned versioned configuration records for public home content blocks.
-// ABOUTME: Represents persisted configuration documents, not Blazor rendering DTOs.
-
 namespace Explore.Application.Models.PublicExperience;
 
 public sealed record PublicExperienceHomeBlocksConfig(

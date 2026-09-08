@@ -1,6 +1,3 @@
-// ABOUTME: Exact-tuple Microsoft Forms descriptor for link/embed and Power Automate callback delivery.
-// ABOUTME: Verifies delegated callback envelopes without claiming native Forms APIs or subscription management.
-
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;

@@ -1,6 +1,3 @@
-// ABOUTME: Command to create a new footer link group for the current tenant.
-// ABOUTME: Carries tenant context for resource authorization before auto-assigning order.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

@@ -1,6 +1,3 @@
-// ABOUTME: Builds canonical tenant-configuration manifest objects for focused Application tests.
-// ABOUTME: Keeps valid envelope and tenant defaults centralized so each test changes one concern.
-
 namespace Event.Application.UnitTests.Features.ConfigurationManifest;
 
 using System.Text.Json;

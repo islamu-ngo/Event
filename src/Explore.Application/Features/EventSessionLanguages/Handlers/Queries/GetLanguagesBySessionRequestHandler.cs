@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning all languages spoken in a specific event session.
-// ABOUTME: Used for session language indicator display.
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;

@@ -1,6 +1,3 @@
-// ABOUTME: Readiness health check for Basic Dispatch Mode email dispatch scheduler and outbox state.
-// ABOUTME: Reports backlog, retry, stale-processing, and dead-letter signals without exposing message content.
-
 using Explore.API.Configuration;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Telemetry;

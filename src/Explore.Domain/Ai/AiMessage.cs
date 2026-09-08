@@ -1,6 +1,3 @@
-// ABOUTME: Persists an ordered message in an AI assistant conversation.
-// ABOUTME: Stores bounded role/content and image attachment metadata without provider SDK dependencies.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

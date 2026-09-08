@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for support-access BFF endpoint forwarding and mutation safety.
-// ABOUTME: Verifies browser-facing support-access endpoints preserve server-owned trust boundaries.
-
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;

@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for verified incoming webhook callback idempotency rows.
-// ABOUTME: Ensures provider callbacks are captured before outbox-backed side effects mutate aggregates.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

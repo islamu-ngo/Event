@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for tenant-scoped custom-property projection rebuild status rows.
-// ABOUTME: Used by the projection rebuild worker and operator admin endpoints to coordinate and observe rebuilds.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

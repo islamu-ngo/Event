@@ -1,5 +1,3 @@
-// ABOUTME: Exercises rendered Local lifecycle forms with generated contracts at the browser interop boundary.
-// ABOUTME: Uses event barriers to prove memory-only credential clearing and rejection of late navigation replies.
 
 using System.Security.Cryptography;
 using AngleSharp.Html.Dom;

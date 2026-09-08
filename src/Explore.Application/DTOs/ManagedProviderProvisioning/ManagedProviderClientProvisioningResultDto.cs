@@ -1,6 +1,3 @@
-// ABOUTME: Result payload returned after a managed provider customer is provisioned.
-// ABOUTME: Exposes tenant, user actor, tenant-admin role grant, and optional organizer IDs without implying platform authority.
-
 namespace Explore.Application.DTOs.ManagedProviderProvisioning;
 
 public sealed record ManagedProviderClientProvisioningResultDto

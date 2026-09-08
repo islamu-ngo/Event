@@ -1,6 +1,3 @@
-// ABOUTME: Weblate TMS provider implementation using Weblate REST API.
-// ABOUTME: Supports import, export, language listing with Token authentication.
-
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;

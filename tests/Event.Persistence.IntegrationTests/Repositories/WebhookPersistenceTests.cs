@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL persistence tests for webhook canonical tables and repository behavior.
-// ABOUTME: Verifies tenant isolation, endpoint subscription filtering, idempotency, and payload cleanup.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
@@ -575,7 +572,7 @@ public sealed class WebhookPersistenceTests(PostgreSqlContainerFixture fixture)
 
     private ExploreDbContext CreateRetryingDbContext()
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString, npgsql => npgsql.EnableRetryOnFailure())
             .UseSnakeCaseNamingConvention()
             .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning))

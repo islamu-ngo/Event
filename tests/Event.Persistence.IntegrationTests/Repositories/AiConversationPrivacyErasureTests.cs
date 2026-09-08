@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL proofs for exact-subject AI conversation graph hard delete.
-// ABOUTME: Verifies cross-tenant graph removal, unrelated-graph stability, idempotency, and rollback on cancellation.
-
 using System.Text.Json;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;

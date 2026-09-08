@@ -1,6 +1,3 @@
-// ABOUTME: Normalizes and validates one pinned native submission before atomically persisting answers or safe issues.
-// ABOUTME: Uses the published form graph, Phase 7 condition evaluator, manual validation, and ciphertext-only sensitive storage.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

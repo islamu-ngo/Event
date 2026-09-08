@@ -1,6 +1,3 @@
-// ABOUTME: Pure projections from Application DTOs to Event MCP descriptor shapes.
-// ABOUTME: No I/O, no authorization, no ambient state — every bound comes from EventMcpBounds.
-
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;

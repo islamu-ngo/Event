@@ -1,6 +1,3 @@
-// ABOUTME: Query request for the current tenant's effective moderation reporting routing state.
-// ABOUTME: Carries tenant-setting authorization context so provider routing reads fail closed.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventReporting;
 using MediatR;

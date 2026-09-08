@@ -1,6 +1,3 @@
-// ABOUTME: Maps immutable registration-form versions with language, provenance, and lifecycle metadata.
-// ABOUTME: Enforces composite form ownership, version uniqueness, concurrency, and restrictive history.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

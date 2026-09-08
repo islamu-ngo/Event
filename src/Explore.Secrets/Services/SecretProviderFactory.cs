@@ -1,4 +1,3 @@
-// ABOUTME: Factory for creating secret provider instances based on configuration.
 // Instantiates the appropriate provider type from SecretProviderOptions.
 
 using Explore.Secrets.Abstractions;

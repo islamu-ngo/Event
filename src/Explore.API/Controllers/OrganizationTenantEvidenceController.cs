@@ -1,6 +1,3 @@
-// ABOUTME: Authenticated REST endpoints for OrganizationTenant legitimacy-evidence submission and review.
-// ABOUTME: Returns HAL-safe document metadata while delegating tenant authority and retention checks to CQRS handlers.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

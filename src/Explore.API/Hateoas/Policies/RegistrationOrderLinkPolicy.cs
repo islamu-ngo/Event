@@ -1,6 +1,3 @@
-// ABOUTME: Defines authenticated HAL links for account-owned registration-order detail resources.
-// ABOUTME: Carries only server-known order authorization attributes and never guest capabilities.
-
 using System.Security.Claims;
 using Explore.API.Hateoas;
 using Explore.Application.Authorization;

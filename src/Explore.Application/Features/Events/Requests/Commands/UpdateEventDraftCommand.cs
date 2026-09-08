@@ -1,6 +1,3 @@
-// ABOUTME: Updates draft-editable event shell fields through a local workflow contract.
-// ABOUTME: Keeps lifecycle status, session projections, and public API updates separate.
-
 using System;
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Event;

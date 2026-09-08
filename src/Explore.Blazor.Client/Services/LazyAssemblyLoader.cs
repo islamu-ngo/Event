@@ -1,6 +1,3 @@
-// ABOUTME: Default implementation of Blazor WASM lazy assembly loading.
-// ABOUTME: Routes diagnostics through ILogger rather than Console for consistent observability.
-
 using System.Reflection;
 using Explore.Blazor.Client.Contracts.Providers;
 using Microsoft.Extensions.Logging;

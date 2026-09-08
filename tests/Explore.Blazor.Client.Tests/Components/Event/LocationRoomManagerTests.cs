@@ -1,6 +1,3 @@
-// ABOUTME: bUnit tests for LocationRoomManager verifying room chip rendering, empty state, and manage controls.
-// ABOUTME: Tests location-required guard, chip display with capacity, and add/edit/delete visibility.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Events;
 using Microsoft.Extensions.Logging;

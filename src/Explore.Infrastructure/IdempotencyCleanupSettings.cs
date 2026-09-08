@@ -1,6 +1,3 @@
-// ABOUTME: Runtime settings for expired idempotency replay-cache cleanup.
-// ABOUTME: Controls scheduling, grace period, batch size, and dry-run safety mode.
-
 namespace Explore.Infrastructure;
 
 public sealed class IdempotencyCleanupSettings

@@ -1,6 +1,3 @@
-// ABOUTME: Result type for email send and connection test operations.
-// ABOUTME: Captures typed handoff evidence, safe error details, and timing diagnostics.
-
 namespace Explore.Application.Models;
 
 /// <summary>

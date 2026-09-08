@@ -1,5 +1,3 @@
-// ABOUTME: Coordinates generated Local creation, exact reconciliation, and one-time administrative handover.
-// ABOUTME: Rechecks current instance authority before mutations and disclosure while keeping operation replay read-only.
 
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;

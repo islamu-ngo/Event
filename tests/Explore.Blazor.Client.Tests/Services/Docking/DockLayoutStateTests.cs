@@ -1,6 +1,3 @@
-// ABOUTME: Behavioral tests for the generic dock layout state engine.
-// ABOUTME: Protects descriptor registration, panel state changes, clamping, activation, and snapshots.
-
 using Explore.Blazor.Client.Services.Docking;
 
 namespace Explore.Blazor.Client.Tests.Services.Docking;

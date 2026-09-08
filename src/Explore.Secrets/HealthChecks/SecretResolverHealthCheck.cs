@@ -1,6 +1,3 @@
-// ABOUTME: Health check for the secret resolution pipeline.
-// ABOUTME: Fails readiness when the explicitly selected Infisical authority is unavailable.
-
 namespace Explore.Secrets.HealthChecks;
 
 using Explore.Application.Contracts.Secrets;

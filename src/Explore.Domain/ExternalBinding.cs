@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral correlation record between external systems and ISLAMU Event domain entities.
-// ABOUTME: Stores idempotency-safe identity bindings only; authority comes from memberships, roles, or API-key owner type.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

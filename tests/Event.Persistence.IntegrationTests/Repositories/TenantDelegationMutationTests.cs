@@ -1,5 +1,3 @@
-// ABOUTME: Guards tenant-delegation command locking, authoritative reads, and committed notification publication.
-// ABOUTME: Exercises real administrator grants, MediatR, governance services, and SQLite transactions.
 
 using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;

@@ -1,4 +1,3 @@
-// ABOUTME: Implementation of module governance service with caching support.
 // Controls which modules are available to tenants and provides discovery endpoints.
 
 namespace Explore.Infrastructure.Services;

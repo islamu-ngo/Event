@@ -1,6 +1,3 @@
-// ABOUTME: Configures event-series content, publication indexes, and actor ownership.
-// ABOUTME: Preserves tenant-scoped slug uniqueness and optimistic concurrency.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

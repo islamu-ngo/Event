@@ -1,5 +1,3 @@
-// ABOUTME: Keeps first-use Local credential authority separate from ordinary BFF authentication.
-// ABOUTME: Owns the restricted challenge cookie lifecycle without exposing authority to browser code.
 
 using Microsoft.AspNetCore.DataProtection;
 using System.Security.Cryptography;

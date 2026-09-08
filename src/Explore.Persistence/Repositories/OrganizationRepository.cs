@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for Organization aggregate detail, membership, listing, and PII erasure queries.
-// ABOUTME: Preserves entity-returning persistence boundaries and forwards cancellation into database operations.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

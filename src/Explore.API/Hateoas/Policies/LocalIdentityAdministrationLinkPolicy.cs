@@ -1,5 +1,3 @@
-// ABOUTME: Defines separate HAL detail and collection policies for private Local identity administration.
-// ABOUTME: Keeps credential operation and issuance affordances in the native authorization-aware link pipeline.
 
 using System.Security.Claims;
 using Explore.Application.Authorization;

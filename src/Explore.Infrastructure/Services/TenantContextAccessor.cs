@@ -1,6 +1,3 @@
-// ABOUTME: Stores the resolved tenant identifier in HttpContext.Items for the current request scope.
-// ABOUTME: Provides the shared accessor foundation for API resolution and future Blazor circuit propagation.
-
 using Explore.Application.Contracts.Services;
 using Microsoft.AspNetCore.Http;
 

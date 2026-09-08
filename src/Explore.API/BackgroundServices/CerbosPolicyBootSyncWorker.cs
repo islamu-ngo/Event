@@ -1,6 +1,3 @@
-// ABOUTME: Non-blocking hosted service that triggers deployment authorization reconciliation after startup.
-// ABOUTME: Delegates bounded retry handling to CerbosPolicyBootSyncRunner so API startup remains available.
-
 using Microsoft.Extensions.Options;
 
 namespace Explore.API.BackgroundServices;

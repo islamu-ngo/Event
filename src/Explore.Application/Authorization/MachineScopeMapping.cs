@@ -1,6 +1,3 @@
-// ABOUTME: Maps external API key scopes to Cerbos resource kinds and actions for scope-gated authorization.
-// ABOUTME: Central translator between the coarse {resource}:{action} scope catalog and the fine-grained authorization actions used by handlers and policies.
-
 using Explore.Domain.Constants;
 
 namespace Explore.Application.Authorization;

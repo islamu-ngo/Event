@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped layout for always-visible event creation option summaries. */
-/* ABOUTME: Uses BEM and logical properties for RTL-safe progressive disclosure rows. */
-
 .event-options-section {
     margin-block-start: var(--isl-space-4);
 }

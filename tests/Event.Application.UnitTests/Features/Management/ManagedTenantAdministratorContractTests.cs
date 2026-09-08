@@ -1,5 +1,3 @@
-// ABOUTME: Specifies the closed managed administrator contract and durable identity-only request hash.
-// ABOUTME: Rejects retired invitation/password inputs and requires explicit directory operator readiness.
 
 using System.Text.Json;
 using Explore.Application.DTOs.Management.Validators;

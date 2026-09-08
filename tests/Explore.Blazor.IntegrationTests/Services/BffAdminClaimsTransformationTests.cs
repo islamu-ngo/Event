@@ -1,6 +1,3 @@
-// ABOUTME: Verifies post-login user synchronization precedes BFF administrative authority resolution.
-// ABOUTME: Covers authoritative internal IDs, sync failures, bearer forwarding, and stale authority cache invalidation.
-
 using System.Text;
 using System.Text.Json;
 using Event.Web.BffHosting.Authentication;

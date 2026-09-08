@@ -1,6 +1,3 @@
-// ABOUTME: Defines the event registration-workflow and immutable form-authoring response contracts.
-// ABOUTME: Carries concurrency stamps and bounded condition values without exposing Domain entities.
-
 namespace Explore.Application.DTOs.RegistrationForms;
 
 public sealed record RegistrationWorkflowDto(

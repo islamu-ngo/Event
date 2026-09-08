@@ -1,6 +1,3 @@
-// ABOUTME: Resolves the tenant-owned directory-operator document for capability readiness.
-// ABOUTME: Fails closed on missing, foreign, malformed, or incomplete identity without logging payload values.
-
 namespace Explore.Application.Services;
 
 using System.Diagnostics.Metrics;

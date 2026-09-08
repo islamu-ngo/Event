@@ -1,6 +1,3 @@
-// ABOUTME: Strongly-typed Event policy setting group resolved via batch loading.
-// ABOUTME: Keys align to EventSettingDefinitions via GovernanceSettingKeys.Events.
-
 namespace Explore.Application.Settings.Groups;
 
 using Explore.Application.Contracts.Infrastructure;

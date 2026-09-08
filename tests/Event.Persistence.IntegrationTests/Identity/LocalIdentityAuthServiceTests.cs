@@ -1,6 +1,3 @@
-// ABOUTME: Exercises Local Identity issuance policy and lockout against real ASP.NET Core Identity stores.
-// ABOUTME: Proves passwords are hashed, unverified email stays untrusted, and repeated failures lock accounts.
-
 using System.Security.Cryptography;
 using System.IdentityModel.Tokens.Jwt;
 using Event.Persistence.IntegrationTests.Fixtures;
@@ -294,6 +291,7 @@ public sealed class LocalIdentityAuthServiceTests
         private readonly CancellationTokenSource _timeout = new(TimeSpan.FromSeconds(30));
 
         private ServiceProvider? _provider;
+        private AsyncServiceScope? _scope;
 
         private TestFixture()
         {
@@ -327,14 +325,16 @@ public sealed class LocalIdentityAuthServiceTests
                     })
                     .AddRoles<LocalIdentityRole>()
                     .AddEntityFrameworkStores<ExploreDbContext>();
-                fixture._provider = services.BuildServiceProvider();
-                var context = fixture._provider.GetRequiredService<ExploreDbContext>();
+                fixture._provider = services.BuildIsolatedServiceProvider(validateScopes: true);
+                fixture._scope = fixture._provider.CreateAsyncScope();
+                IServiceProvider scopedServices = fixture._scope.Value.ServiceProvider;
+                var context = scopedServices.GetRequiredService<ExploreDbContext>();
                 await context.Database.EnsureCreatedAsync(fixture.CancellationToken);
                 fixture.Context = context;
                 await LookupTableSeeder.SeedAsync(context, fixture.CancellationToken);
                 fixture._systemSettings = new SystemSettingRepository(context,
                     new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
-                fixture.UserManager = fixture._provider
+                fixture.UserManager = scopedServices
                     .GetRequiredService<UserManager<LocalIdentityUser>>();
                 fixture.Service = new LocalIdentityAuthService(
                     fixture.UserManager,
@@ -448,6 +448,11 @@ public sealed class LocalIdentityAuthServiceTests
 
         public async ValueTask DisposeAsync()
         {
+            if (_scope is { } scope)
+            {
+                await scope.DisposeAsync();
+            }
+
             if (_provider is not null)
             {
                 await _provider.DisposeAsync();

@@ -1,6 +1,3 @@
-// ABOUTME: Assembles registration workflow and form-authoring HAL resources.
-// ABOUTME: Embeds lifecycle children while delegating every affordance to authorization-aware policies.
-
 using Explore.API.Hateoas.Policies;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.DTOs.RegistrationForms;

@@ -1,6 +1,3 @@
-// ABOUTME: Validates grouped UI theme PATCH requests and optimistic concurrency input.
-// ABOUTME: Rejects empty groups and validates only supplied metadata, state, and palettes.
-
 namespace Explore.Application.DTOs.Appearance.Validators;
 
 using Explore.Application.Contracts.Persistence;

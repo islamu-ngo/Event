@@ -1,6 +1,3 @@
-// ABOUTME: Entity-returning persistence boundary for participation requirement attachment workflows.
-// ABOUTME: Keeps every mutation and public descriptor read explicitly tenant/event scoped.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

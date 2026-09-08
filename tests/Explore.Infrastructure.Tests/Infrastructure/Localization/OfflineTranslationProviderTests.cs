@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for OfflineTranslationProvider — embedded bundle loading and language discovery.
-// ABOUTME: Verifies that offline provider reads embedded JSON resources and returns translations.
-
 using Explore.Infrastructure.Localization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;

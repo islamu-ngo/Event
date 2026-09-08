@@ -1,5 +1,3 @@
-// ABOUTME: Proves SMTP PATCH writes only supplied groups across a deterministic concurrent configuration save.
-// ABOUTME: Uses native handlers, persisted administrator grants, real SQLite settings writers, and the production lock seam.
 
 using System.Text.Json;
 using Event.Persistence.IntegrationTests.Fixtures;

@@ -1,6 +1,3 @@
-// ABOUTME: Admin DTOs for reading and presence-aware patching of tenant footer scalar settings.
-// ABOUTME: Excludes footer link groups while exposing typed social links and governance lock states.
-
 namespace Explore.Application.DTOs.Footer;
 
 using Explore.Application.Models.Common;

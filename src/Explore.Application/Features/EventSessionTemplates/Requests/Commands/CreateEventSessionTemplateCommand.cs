@@ -1,6 +1,3 @@
-// ABOUTME: Command request for creating an event session template with optional nested property definitions.
-// ABOUTME: Uses tenant-level authorization since session templates are tenant-governed configuration catalogs.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventSessionTemplate;
 using Explore.Application.Responses;

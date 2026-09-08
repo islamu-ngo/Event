@@ -1,6 +1,3 @@
-// ABOUTME: Governance definitions for ATProto event capability, validation, inbound recovery, and publication consent.
-// ABOUTME: Keeps administrator controls tenant-bounded while publication consent remains current-user-only.
-
 namespace Explore.Domain.Settings.Definitions;
 
 using Explore.Domain.Constants;

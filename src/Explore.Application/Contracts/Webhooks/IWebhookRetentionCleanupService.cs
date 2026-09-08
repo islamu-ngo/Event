@@ -1,6 +1,3 @@
-// ABOUTME: Application boundary for scheduled webhook retention cleanup across bounded active tenants.
-// ABOUTME: Exposes aggregate evidence without tenant identifiers or sensitive webhook content.
-
 using Explore.Application.Contracts.Persistence;
 
 namespace Explore.Application.Contracts.Webhooks;

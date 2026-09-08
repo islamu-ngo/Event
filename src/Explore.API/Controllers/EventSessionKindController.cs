@@ -1,6 +1,3 @@
-// ABOUTME: API controller for event session kind lookup table (read-only enumeration).
-// ABOUTME: Provides program item/session kind options (talk, workshop, panel, activity, etc.).
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Hateoas;

@@ -1,6 +1,3 @@
-// ABOUTME: Maps legal draft, localized source, version, and publication evidence portably.
-// ABOUTME: Enforces target scope, append-only identity, bounded content, and unique lifecycle slots.
-
 namespace Explore.Persistence.Configurations.Entities;
 
 using Explore.Domain;

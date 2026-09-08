@@ -1,6 +1,3 @@
-// ABOUTME: Classifies BFF request targets into bounded operational route categories for logging.
-// ABOUTME: Prevents concrete paths, query values, and endpoint identifiers from entering logs.
-
 namespace Explore.Blazor.Services;
 
 internal static class BffLogRouteClassifier

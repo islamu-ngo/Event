@@ -1,6 +1,3 @@
-// ABOUTME: Self-hosted Svix authority adapter for provider-binding profile and ownership proof.
-// ABOUTME: Requires the conformance-pinned profile plus exact application UID and ownership metadata.
-
 using Explore.Application.Contracts.Webhooks;
 using Explore.Domain;
 using Explore.Infrastructure.Configuration;

@@ -1,6 +1,3 @@
-// ABOUTME: Base class for HAL resource assemblers with batched, deduplicated link authorization.
-// ABOUTME: Flow: candidate links → normalized checks → batch auth (with dedup) → materialized HAL links.
-
 namespace Explore.API.Hateoas;
 
 using System.Security.Claims;

@@ -1,6 +1,3 @@
-// ABOUTME: Ratchets registration-order lifecycle authority into the Domain aggregate and one decision surface.
-// ABOUTME: Prevents persistence transitions, duplicated HAL state logic, and renewed growth of legacy seams.
-
 using System.Text.RegularExpressions;
 
 namespace Event.Architecture.Tests;

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies shared health endpoint JSON keeps operator diagnostics bounded and secret-free.
-// ABOUTME: Covers the ServiceDefaults writer used by both /health readiness and /alive liveness endpoints.
-
 using System.Text;
 using System.Text.Json.Nodes;
 using Event.Api.IntegrationTests.Fixtures;

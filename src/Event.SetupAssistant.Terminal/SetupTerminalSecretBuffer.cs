@@ -1,6 +1,3 @@
-// ABOUTME: Owns the sole bounded mutable secret copy used after masked target input is submitted.
-// ABOUTME: Clears its character array on replacement, completion, cancellation, signal, and disposal.
-
 namespace ISLAMU.Event.SetupAssistant.Terminal;
 
 using System.Text;

@@ -1,6 +1,3 @@
-// ABOUTME: Exercises import-session authority, expiry, replay, freshness, and pure preview behavior.
-// ABOUTME: Uses digest-only synthetic snapshots and verifies no payload values enter observability.
-
 namespace Event.Application.UnitTests.Features.ConfigurationManifest;
 
 using System.Security.Cryptography;

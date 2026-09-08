@@ -1,6 +1,3 @@
-// ABOUTME: Query handler for reading resolver configuration from the system-only resolver config service.
-// ABOUTME: Avoids the tenant-aware settings cascade to keep tenant resolution bootstrapping safe.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;

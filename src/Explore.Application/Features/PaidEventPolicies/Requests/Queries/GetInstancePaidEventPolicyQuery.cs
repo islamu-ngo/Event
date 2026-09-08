@@ -1,6 +1,3 @@
-// ABOUTME: Query request for reading the active instance paid-event policy.
-// ABOUTME: Uses the existing instance setting authorization resource boundary.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.PaidEventPolicies;
 using MediatR;

@@ -1,6 +1,3 @@
-// ABOUTME: Maps resolved tenant footer scalar settings and lock states to the admin read DTO.
-// ABOUTME: Uses one grouped settings resolution and intentionally does not load footer link entities.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Footer;

@@ -1,6 +1,3 @@
-// ABOUTME: Request body for importing a flat static localization bundle for one language.
-// ABOUTME: Carries only translation keys and values, never TMS provider credentials.
-
 using System.Collections.ObjectModel;
 
 namespace Explore.Application.DTOs.Localization;

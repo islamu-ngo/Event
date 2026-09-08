@@ -1,6 +1,3 @@
-// ABOUTME: First-class event-local day aggregate carrying authored labels, descriptions, banners, publishing state, and admin ordering.
-// ABOUTME: Not a derived GROUP BY over sessions - it outlives its sessions and owns day-level registration/business state.
-
 using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;

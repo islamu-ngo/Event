@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for tenant-scoped AI assistant conversation persistence.
-// ABOUTME: Returns domain entities so handlers own DTO mapping, authorization, and HAL shaping.
-
 using Explore.Application.Models;
 using Explore.Domain.Ai;
 

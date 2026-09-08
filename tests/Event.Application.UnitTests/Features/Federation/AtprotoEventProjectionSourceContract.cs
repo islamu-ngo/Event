@@ -1,6 +1,3 @@
-// ABOUTME: Reflects the explicit Domain source-type allowlist behind the exhaustive ATProto event projection manifest.
-// ABOUTME: Makes any added or omitted public source property fail until its disposition is independently reviewed.
-
 using System.Collections.Immutable;
 using System.Reflection;
 using Explore.Application.Contracts.LocationPrivacy;

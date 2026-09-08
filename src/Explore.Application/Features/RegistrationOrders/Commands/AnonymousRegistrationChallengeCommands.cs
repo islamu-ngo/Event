@@ -1,5 +1,3 @@
-// ABOUTME: Owns tenant/event/visitor issuance policy and the trusted typed-request proof-consumption boundary.
-// ABOUTME: Allocates no inventory and snapshots the already-digested request before granting internal authority.
 
 using System.Collections.Immutable;
 using System.Globalization;

@@ -1,6 +1,3 @@
-// ABOUTME: Query for an authenticated user's effective notification preference matrix at group scope.
-// ABOUTME: Uses group resource authorization before projecting resolver-backed preference state.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Notification;
 using MediatR;

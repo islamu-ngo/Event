@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for organization-member query authorization metadata and descriptor context.
-// ABOUTME: Proves identity-bearing member reads carry tenant and organization attributes for policy evaluation.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.OrganizationMember;
 using Explore.Application.Features.OrganizationMembers.Requests.Commands;

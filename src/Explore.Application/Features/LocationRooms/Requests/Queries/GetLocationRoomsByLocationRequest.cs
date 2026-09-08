@@ -1,6 +1,3 @@
-// ABOUTME: MediatR query for retrieving all rooms belonging to a specific location.
-// ABOUTME: Returns a list since rooms per location are typically small (< 50).
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.LocationRoom;
 using MediatR;

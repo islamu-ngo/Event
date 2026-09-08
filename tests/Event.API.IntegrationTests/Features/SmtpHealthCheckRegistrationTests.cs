@@ -1,6 +1,3 @@
-// ABOUTME: Tests API SMTP readiness health-check registration metadata.
-// ABOUTME: Guards bounded optional SMTP probes without weakening core readiness registrations.
-
 using Event.Api.IntegrationTests.Fixtures;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;

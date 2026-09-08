@@ -245,7 +245,8 @@ AT Protocol authentication uses a custom authentication handler (`AtprotoAuthent
 1. **Client Metadata Publication**: `GET /oauth/client-metadata.json` publishes canonical client metadata (including client ID, HTTPS callback redirect URIs, scope `atproto transition:generic`, grant types `authorization_code` and `refresh_token`, and token auth method `private_key_jwt`).
 2. **Public Key Set (JWKS)**: `GET /oauth/jwks.json` serves public keys from `AtprotoClientKeyProvider` for rotation-aware ES256 client assertion signing.
 3. **PKCE & DPoP Tokens**: The flow enforces mandatory PKCE (`S256`) and DPoP (Demonstrating Proof-of-Possession) bound access tokens.
-4. **Session Persistence & Identity Resolution**: OAuth flow state uses `CacheBackedOAuthStateStore` and `ApiBackedOAuthSessionStore`. User identity resolution is cached by `AtprotoIdentityCache` and handles cross-tenant session handoffs via `AtprotoTenantSessionHandoffStore`.
+4. **Session Persistence & Identity Resolution**: `ApiBackedOAuthStateStore` and `AtprotoTenantSessionHandoffStore` share the private `ApiBackedAtprotoTransientStore`; the BFF has no database reference or alternate transient cache. `ApiBackedOAuthSessionStore` retains durable OAuth-session ownership, and `AtprotoIdentityCache` remains discovery-only.
+5. **Browser Correlation**: `AtprotoBrowserProof` protects one fixed-expiry, host-only HTTPS cookie and derives an independent HMAC binding per flow. State/handoff adapters validate recovered origin, tenant and browser binding before candidate-bound consumption. Cross-origin canonical callbacks issue only opaque handoffs; the destination issues the first-party session cookie after proof validation. Proof is checked again immediately before cookie sign-in.
 
 ## Auth Diagnostic Boundary
 

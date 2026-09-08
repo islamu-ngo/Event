@@ -1,6 +1,3 @@
-// ABOUTME: Normalizes browser-supplied BFF preference values before endpoint mutation handling.
-// ABOUTME: Keeps preference endpoint validation rules centralized and behavior-preserving.
-
 namespace Explore.Blazor.Services.Preferences;
 
 using Explore.Blazor.Services;

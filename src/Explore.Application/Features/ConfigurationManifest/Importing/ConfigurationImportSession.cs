@@ -1,6 +1,3 @@
-// ABOUTME: Owns bounded target-scoped import-session lifecycle and opaque artifact references.
-// ABOUTME: Enforces expiry, cancellation, fixed-time token checks, and one-time consumption.
-
 namespace Explore.Application.Features.ConfigurationManifest.Importing;
 
 using System.Security.Cryptography;

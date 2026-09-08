@@ -1,6 +1,3 @@
-// ABOUTME: Carries the authenticated state and server-confirmed tenant identifier through the Blazor component tree.
-// ABOUTME: Keeps browser-side context display-only and free of raw user-claim authority inference.
-
 namespace Explore.Blazor.Client.Models;
 
 /// <summary>

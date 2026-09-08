@@ -1,6 +1,3 @@
-// ABOUTME: Canonical integer identifiers for event lifecycle status lookups.
-// ABOUTME: Values must match the EventStatus lookup seed data and database rows.
-
 namespace Explore.Domain.Enums;
 
 public enum EventStatusEnum

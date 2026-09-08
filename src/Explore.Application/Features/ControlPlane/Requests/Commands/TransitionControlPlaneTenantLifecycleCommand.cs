@@ -1,6 +1,3 @@
-// ABOUTME: Secured command for audited control-plane tenant lifecycle status transitions.
-// ABOUTME: Uses instance-setting update authority so tenant lifecycle controls stay instance-admin-only.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.ControlPlane;
 using Explore.Application.Responses;

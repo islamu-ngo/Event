@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral operator status for authorization policy package health diagnostics.
-// ABOUTME: Separates safe status classification from provider-specific Admin API/PDP transport details.
-
 namespace Explore.Application.Authorization;
 
 /// <param name="ContentHash">Hash of the package this deployment believes it published.</param>

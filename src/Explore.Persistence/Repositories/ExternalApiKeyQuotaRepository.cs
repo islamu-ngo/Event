@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for per-period API key credit quota tracking with race-safe atomic operations.
-// ABOUTME: Uses provider-aware EF mutations and named locks for portable lazy period provisioning.
-
 using System.Data;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

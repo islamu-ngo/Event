@@ -1,6 +1,3 @@
-// ABOUTME: Defines immutable value-safe documents and outcomes for offline configuration portability.
-// ABOUTME: Carries only frozen Wire records, stable source identity, canonical bytes, and diagnostics.
-
 namespace ISLAMU.Event.Setup.Core;
 
 using System.Collections.ObjectModel;

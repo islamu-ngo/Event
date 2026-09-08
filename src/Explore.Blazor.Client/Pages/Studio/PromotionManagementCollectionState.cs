@@ -1,6 +1,3 @@
-// ABOUTME: Safe presentation state for generated promotion management HAL resources.
-// ABOUTME: Keeps internal identifiers out of markup while preserving exact server affordances for actions.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Pages.Studio;

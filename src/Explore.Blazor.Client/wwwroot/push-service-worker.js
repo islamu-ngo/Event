@@ -1,6 +1,3 @@
-// ABOUTME: Root-scoped Web Push service worker with active-tab suppression and bounded notification grouping.
-// ABOUTME: Displays generic non-sensitive notifications, replaces by tag, and focuses an existing app window on click.
-
 const displayedNotificationLimit = 3;
 const defaultOpenPath = '/notifications';
 const defaultTag = 'islamu-notification';

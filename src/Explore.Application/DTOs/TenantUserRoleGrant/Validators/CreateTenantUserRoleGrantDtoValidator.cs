@@ -1,6 +1,3 @@
-// ABOUTME: Validates CreateTenantUserRoleGrantDto for tenant-local user and tenant-scoped role references.
-// ABOUTME: Manually instantiated per project convention (no DI for validators).
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain.Enums;
 using FluentValidation;

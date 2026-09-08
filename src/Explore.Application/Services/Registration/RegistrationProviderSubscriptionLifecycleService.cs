@@ -1,6 +1,3 @@
-// ABOUTME: Drains durable registration-provider subscription renewal and sweep leases.
-// ABOUTME: Keeps provider I/O outside claim transactions while settling fenced subscription state.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Services.Registration;

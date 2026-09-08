@@ -1,6 +1,3 @@
-// ABOUTME: Handles tenant module disablement through the application authorization pipeline.
-// ABOUTME: Delegates persistence to IModuleService after tenant update authorization succeeds.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Modules.Requests.Commands;
 using Explore.Application.Responses;

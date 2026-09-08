@@ -1,6 +1,3 @@
-// ABOUTME: Handler for creating custom roles with capability ceiling enforcement.
-// ABOUTME: Generates MasterCode from scope+name, assigns permissions, triggers PolicySync.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

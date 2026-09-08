@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning a single tag-type/tag link by ID.
-// ABOUTME: Maps junction entity to TagTypeTagsDto.
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.TagTypeTags;

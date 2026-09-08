@@ -1,6 +1,3 @@
-// ABOUTME: Supplies the outbound transport and DNS resolver used by CarpaNet OAuth sessions.
-// ABOUTME: Keeps production on the hardened ATProto handler while allowing deterministic host-level verification.
-
 using CarpaNet.Identity;
 using Explore.Atproto.Transport;
 

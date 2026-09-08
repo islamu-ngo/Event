@@ -1,6 +1,3 @@
-// ABOUTME: Defines registration-form template catalog read requests.
-// ABOUTME: Allows platform templates and current-tenant templates to share one list/detail contract.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.RegistrationForms;
 using MediatR;

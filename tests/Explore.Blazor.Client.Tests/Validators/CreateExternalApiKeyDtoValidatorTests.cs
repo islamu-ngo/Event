@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for Blazor-side external API key creation validation.
-// ABOUTME: Verifies immediate client feedback mirrors server-side API key input hardening.
-
 using Explore.Blazor.Client.Validators;
 
 namespace Explore.Blazor.Client.Tests.Validators;

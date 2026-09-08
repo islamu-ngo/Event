@@ -1,6 +1,3 @@
-// ABOUTME: First-class relational theme aggregate for platform-owned and tenant-owned UI themes.
-// ABOUTME: Stores only curated palette tokens and metadata; selection still happens through hierarchical settings references.
-
 namespace Explore.Domain;
 
 using Explore.Domain.Interfaces;

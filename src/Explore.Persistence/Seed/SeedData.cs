@@ -1,6 +1,3 @@
-// ABOUTME: Centralized seed data objects for Development environment business entities.
-// ABOUTME: References SeedIds for deterministic IDs. Used by DatabaseSeeder (Development only).
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Modules;

@@ -1,6 +1,3 @@
-// ABOUTME: Tests self-hosted Svix profile resolution and exact remote application ownership proof.
-// ABOUTME: Proves managed SaaS and mismatched UID or tenant/consumer metadata fail closed.
-
 using Explore.Application.Contracts.Webhooks;
 using Explore.Domain;
 using Explore.Infrastructure.Configuration;

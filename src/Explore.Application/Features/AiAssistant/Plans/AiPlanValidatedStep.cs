@@ -1,6 +1,3 @@
-// ABOUTME: Captures the safe validation result for one AI plan-preview step.
-// ABOUTME: Includes risk, approval, warning, and next-action metadata for proposal UI rendering.
-
 using Explore.Application.Features.AiAssistant.Tools;
 using Explore.Domain.Ai;
 

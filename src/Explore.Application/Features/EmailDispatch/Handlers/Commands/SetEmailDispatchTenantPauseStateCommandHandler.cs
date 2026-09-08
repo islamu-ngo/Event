@@ -1,6 +1,3 @@
-// ABOUTME: Handles idempotent Basic Dispatch Mode tenant pause/resume requests.
-// ABOUTME: Mutates only durable EmailDispatchTenantControl state; dispatch workers observe it on each cycle.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using Explore.Application.Features.EmailDispatch.Validators;

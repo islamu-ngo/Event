@@ -1,6 +1,3 @@
-// ABOUTME: Resolves runtime webhook delivery plans from tenant-owned consumers, subscriptions, and verified bindings.
-// ABOUTME: Fails closed unless every versioned routing, retention, and credential-reference fact is authoritative.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Domain;

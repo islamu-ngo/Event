@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for GroupPosition lookup table.
-// ABOUTME: Mirrors OrganizationPositionConfiguration — manually assigned IDs, required string properties.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

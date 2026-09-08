@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for category-based notification ownership routing.
-// ABOUTME: Locks account-authority, ISLAMU-owned product email, and external delegation defaults.
-
 using Explore.Application.Notifications;
 using Microsoft.Extensions.Options;
 

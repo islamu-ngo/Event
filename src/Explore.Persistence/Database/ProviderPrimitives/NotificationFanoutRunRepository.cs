@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for durable notification fanout run state.
-// ABOUTME: Supports idempotent source lookup and background worker polling for internal fanout.
-
 using System.Data;
 using System.Data.Common;
 using Explore.Application.Contracts.Persistence;

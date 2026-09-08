@@ -1,6 +1,3 @@
-// ABOUTME: Configuration extensions for the API project.
-// ABOUTME: Projects one isolated Environment, Infisical, or local User Secrets authority onto .NET keys.
-
 namespace Explore.API.Extensions;
 
 using Explore.Domain.Constants;

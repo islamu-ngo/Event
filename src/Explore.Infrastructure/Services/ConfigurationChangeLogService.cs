@@ -1,4 +1,3 @@
-// ABOUTME: Service that records configuration change audit entries in the database.
 // Called by settings update handlers to maintain a complete audit trail.
 
 using Explore.Application.Contracts.Infrastructure;

@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for durable native integration sync outbox rows.
-// ABOUTME: Uses bounded tenant-filter bypass queries and affected-row claims for worker-safe at-least-once processing.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;

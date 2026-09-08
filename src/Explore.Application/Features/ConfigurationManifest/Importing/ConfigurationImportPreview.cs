@@ -1,6 +1,3 @@
-// ABOUTME: Defines immutable semantic preview inputs, freshness binding, and classified outcomes.
-// ABOUTME: Composes digest-only diffs without repositories, mutation services, providers, or I/O.
-
 namespace Explore.Application.Features.ConfigurationManifest.Importing;
 
 using System.Collections.Immutable;

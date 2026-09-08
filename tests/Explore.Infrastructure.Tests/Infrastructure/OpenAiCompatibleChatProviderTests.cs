@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the OpenAI-compatible AI chat provider adapter.
-// ABOUTME: Verifies request shape, model catalog behavior, tool mapping, and safe provider error handling.
-
 using System.Diagnostics.Metrics;
 using System.Net;
 using System.Net.Http.Headers;

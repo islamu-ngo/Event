@@ -1,6 +1,3 @@
-// ABOUTME: Admin observability DTO exposing the current state of a custom-property projection per tenant.
-// ABOUTME: Maps from CustomPropertyProjectionStatus entity for the projection admin endpoints.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.DTOs.CustomPropertyProjection;

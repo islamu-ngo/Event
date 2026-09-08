@@ -1,5 +1,3 @@
-// ABOUTME: Validates supplied Local email addresses while permitting accounts with no mailbox.
-// ABOUTME: Supplements native username validation; the nullable unique database index settles concurrent email collisions.
 
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Identity;

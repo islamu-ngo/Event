@@ -1,6 +1,3 @@
-// ABOUTME: Structured-data guards for the public event JSON-LD location block.
-// ABOUTME: Proves crawler markup carries only coarse public venue data and never attendee-only fields.
-
 using System.Reflection;
 using System.Text.Json;
 using Explore.Blazor.Client.Models.Events;

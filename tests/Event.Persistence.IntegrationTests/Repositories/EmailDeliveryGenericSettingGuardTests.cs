@@ -1,5 +1,3 @@
-// ABOUTME: Proves generic setting writers cannot bypass complete SMTP policy mutation and confirmation.
-// ABOUTME: Exercises single, lock, reset, bulk, and key-alias paths against real SQLite with caught rejection and commit.
 
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;

@@ -1,5 +1,3 @@
-// ABOUTME: Exposes purpose-authorized private Local password replacement without returning an ordinary session.
-// ABOUTME: Derives all replacement authority from the validated principal and accepts only a new password in the body.
 
 using Asp.Versioning;
 using Explore.API.Attributes;

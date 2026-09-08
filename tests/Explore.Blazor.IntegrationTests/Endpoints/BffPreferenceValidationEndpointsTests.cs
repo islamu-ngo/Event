@@ -1,6 +1,3 @@
-// ABOUTME: Endpoint-level tests for browser-facing BFF preference validation.
-// ABOUTME: Proves invalid preference values are rejected before cookies or API forwarding.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Services.Preferences;
 using Microsoft.AspNetCore.Antiforgery;

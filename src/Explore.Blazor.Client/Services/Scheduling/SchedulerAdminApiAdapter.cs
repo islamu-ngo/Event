@@ -1,6 +1,3 @@
-// ABOUTME: Adapts the scheduler administration UI contract to the generated Event API client.
-// ABOUTME: Preserves generated HAL resources so server-emitted action affordances reach components unmodified.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Scheduling;
 

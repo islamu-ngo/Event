@@ -1,6 +1,3 @@
-// ABOUTME: Defines the governed PublishEvent AI tool contract for MCP proposal workflows.
-// ABOUTME: Keeps publish proposal schema, field allow-lists, readiness requirements, and HAL guidance centralized.
-
 using Explore.Application.Authorization;
 using Explore.Application.Features.AiAssistant.Actions;
 using Explore.Domain.Ai;

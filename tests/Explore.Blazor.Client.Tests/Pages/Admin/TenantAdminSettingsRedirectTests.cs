@@ -1,6 +1,3 @@
-// ABOUTME: bUnit tests for tenant settings availability across deployment modes.
-// ABOUTME: Verifies tenant administrators are never redirected into instance-only administration.
-
 using System.Text.Json;
 using Explore.Blazor.Client.Contracts.Services.Shell;
 using Explore.Blazor.Client.Contracts.Services.PaidEventPolicies;

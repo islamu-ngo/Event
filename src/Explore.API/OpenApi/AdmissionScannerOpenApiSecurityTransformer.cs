@@ -1,6 +1,3 @@
-// ABOUTME: Describes admission-scanner capability authentication in native and Swashbuckle OpenAPI.
-// ABOUTME: Replaces ordinary bearer security only on endpoints explicitly selecting AdmissionScanner.
-
 using Explore.API.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Explore.Application.Constants;

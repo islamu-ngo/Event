@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for durable notification fanout run state.
-// ABOUTME: Provides idempotent source lookup and worker-polling primitives without exposing EF Core.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

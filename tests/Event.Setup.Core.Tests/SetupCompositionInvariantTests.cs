@@ -1,6 +1,3 @@
-// ABOUTME: Executes all fourteen Phase 8 composition policy matrices before product activation.
-// ABOUTME: Leaves one attributable Red for the absent public compiler and no parser/filesystem mirror.
-
 namespace Event.Setup.Core.Tests;
 
 using System.Reflection;

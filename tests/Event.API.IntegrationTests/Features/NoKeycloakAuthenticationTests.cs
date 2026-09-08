@@ -1,6 +1,3 @@
-// ABOUTME: Tests that when no OIDC provider is configured, the API safely rejects all
-// ABOUTME: authenticated requests with 401 Unauthorized. No crash, no accidental allow.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Security;

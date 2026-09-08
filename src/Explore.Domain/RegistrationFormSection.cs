@@ -1,6 +1,3 @@
-// ABOUTME: Defines an ordered section owned by one immutable registration-form version.
-// ABOUTME: Encapsulates field membership, draft mutation seams, and deep version cloning.
-
 using Explore.Domain.Interfaces;
 using Explore.Domain.Services.Registration;
 

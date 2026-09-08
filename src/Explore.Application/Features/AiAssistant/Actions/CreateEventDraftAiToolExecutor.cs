@@ -1,6 +1,3 @@
-// ABOUTME: Executes confirmed CreateEventDraft AI actions through the canonical CreateEventCommand.
-// ABOUTME: Keeps AI tool execution behind MediatR so event creation validation and authorization stay centralized.
-
 using Explore.Application.Features.Events.Requests.Commands;
 using Explore.Application.Responses;
 using MediatR;

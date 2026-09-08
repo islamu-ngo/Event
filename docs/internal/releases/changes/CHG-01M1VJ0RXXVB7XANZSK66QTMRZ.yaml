@@ -1,0 +1,34 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records host-owned disposal of API and BFF process-signal callbacks.
+Change-Id: CHG-01M1VJ0RXXVB7XANZSK66QTMRZ
+Title: "Release disposed host signal handlers"
+Type: fix
+Scope: self-hosting
+Summary: "Release process-wide callbacks when API or BFF hosts are disposed, including startup failures."
+Group: database-backed-atproto-auth
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/TESTING.md
+    Disposition: not-applicable
+    Detail: Existing public HTTP contracts and shutdown callback behavior remain unchanged.
+  Security:
+    Reference: docs/internal/TESTING.md
+    Disposition: not-applicable
+    Detail: Changes resource ownership only; authentication and signal callback bodies are unchanged.
+  Migration:
+    Reference: docs/internal/TESTING.md
+    Disposition: not-applicable
+    Detail: No schema or data changes.
+  Configuration:
+    Reference: docs/internal/TESTING.md
+    Disposition: not-applicable
+    Detail: Uses existing shared service defaults without new settings or dependencies.
+  OpenAPI:
+    Reference: docs/internal/TESTING.md
+    Disposition: not-applicable
+    Detail: No endpoint or generated contract changes.
+  Operator:
+    Reference: docs/internal/TESTING.md
+    Disposition: not-applicable
+    Detail: No operator setting or maintenance action changes; disposal also releases hosts that fail before Run.

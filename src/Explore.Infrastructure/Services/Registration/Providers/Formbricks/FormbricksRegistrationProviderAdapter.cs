@@ -1,6 +1,3 @@
-// ABOUTME: Concrete Formbricks registration provider adapter for the documented v1 management API.
-// ABOUTME: Shares one hardened HttpClient path across presentation, schema, response, webhook, and reconciliation capabilities.
-
 using System.Buffers;
 using System.Globalization;
 using System.Net.Http.Headers;

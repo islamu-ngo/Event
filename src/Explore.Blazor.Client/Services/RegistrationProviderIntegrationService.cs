@@ -1,6 +1,3 @@
-// ABOUTME: Thin generated-client adapter for registration-provider integration management.
-// ABOUTME: Keeps HAL resources intact while passing cancellation to every backend call.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 

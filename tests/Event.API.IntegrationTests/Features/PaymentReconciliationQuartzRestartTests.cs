@@ -1,6 +1,3 @@
-// ABOUTME: Proves the real payment-reconciliation Quartz job survives a PostgreSQL-backed scheduler restart.
-// ABOUTME: Awaits the exact repository claim signal after restart instead of relying on polling or fixed sleeps.
-
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Scheduling;
 using Explore.Application.Contracts.Payments;

@@ -1,6 +1,3 @@
-// ABOUTME: Focused route-decision tests for generated public-experience settings and shell contracts.
-// ABOUTME: Verifies deterministic fallback routes independently of API transport behavior.
-
 namespace Explore.Blazor.Client.Tests.Services;
 
 public class PublicExperienceServiceRoutingTests

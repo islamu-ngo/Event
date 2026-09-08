@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for grouped Location PATCH payloads.
-// ABOUTME: Validates optional groups through explicit nullable control flow without suppression.
-
 using FluentValidation;
 using FluentValidation.Results;
 

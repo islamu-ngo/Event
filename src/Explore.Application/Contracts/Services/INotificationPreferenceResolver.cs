@@ -1,6 +1,3 @@
-// ABOUTME: Application contract for resolving effective notification preference decisions.
-// ABOUTME: Hides persistence hierarchy details behind a batch-friendly category/channel API.
-
 namespace Explore.Application.Contracts.Services;
 
 public sealed record NotificationPreferenceResolveRequest(

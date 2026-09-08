@@ -1,6 +1,3 @@
-// ABOUTME: Provides a lightweight repository guard for intents YAML syntax and literal-file Git commit commands.
-// ABOUTME: Deliberately owns no workflow state, digests, claims, locks, approvals, context packets, or Git mutation.
-
 using System.Text;
 using YamlDotNet.Core;
 using YamlDotNet.RepresentationModel;

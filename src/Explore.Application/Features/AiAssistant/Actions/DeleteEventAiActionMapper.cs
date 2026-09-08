@@ -1,6 +1,3 @@
-// ABOUTME: Maps untrusted AI DeleteEvent proposals into safe deletion confirmation context.
-// ABOUTME: Rejects stale-concurrency, missing HAL context, and incomplete destructive confirmation metadata.
-
 using System.Text.Json;
 using Explore.Application.Features.AiAssistant.Prompting;
 using Explore.Application.Features.AiAssistant.Tools;

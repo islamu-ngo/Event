@@ -1,6 +1,3 @@
-// ABOUTME: Reissues account-owned admission credentials through current-user authority.
-// ABOUTME: Maps protected delivery documents to QR and print transport DTOs after ownership checks.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.AdmissionTickets;

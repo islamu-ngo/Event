@@ -1,6 +1,3 @@
-// ABOUTME: Runs the shared provider-neutral corpus against the Local evaluator and records bounded diagnostics.
-// ABOUTME: The Cerbos lane in Event.API.IntegrationTests answers the same questions against a live PDP.
-
 using System.Text.Json;
 using Explore.Application.Authorization;
 using Explore.Application.Authentication;

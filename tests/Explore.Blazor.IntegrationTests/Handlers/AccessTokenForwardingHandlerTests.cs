@@ -1,6 +1,3 @@
-// ABOUTME: Unit-style DelegatingHandler tests for access token forwarding from the current authenticated context.
-// ABOUTME: Verifies Bearer authorization behavior for present token, absent token, and pre-existing Authorization headers.
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;

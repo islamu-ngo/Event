@@ -1,6 +1,3 @@
-// ABOUTME: Canonical cross-workflow lock key for tenant identity and activation mutations.
-// ABOUTME: Makes lifecycle activation and identity PATCH linearizable per tenant.
-
 using Explore.Domain.Settings.Documents;
 
 namespace Explore.Application.Settings;

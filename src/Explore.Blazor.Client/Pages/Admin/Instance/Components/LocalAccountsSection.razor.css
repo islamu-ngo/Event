@@ -1,5 +1,3 @@
-/* ABOUTME: Provides token-based responsive layout for Local account forms and private credential handover. */
-/* ABOUTME: Keeps selectable credentials contained and keyboard focus visible without global component overrides. */
 
 .local-accounts,
 .local-accounts__form,

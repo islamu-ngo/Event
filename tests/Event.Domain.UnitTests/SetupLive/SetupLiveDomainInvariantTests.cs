@@ -1,6 +1,3 @@
-// ABOUTME: Defines D2-2 Domain invariants for Setup enrollment, issuance, and secret operations.
-// ABOUTME: Exercises exact public lifecycle seams while keeping authority and secret material value-free.
-
 namespace Event.Domain.UnitTests.SetupLive;
 
 using System.Diagnostics;

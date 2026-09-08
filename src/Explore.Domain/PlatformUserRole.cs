@@ -1,6 +1,3 @@
-// ABOUTME: Maps users to global platform-scoped roles outside tenant/organization memberships.
-// ABOUTME: Used for instance-level authorization such as platform administrator checks.
-
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Explore.Domain;

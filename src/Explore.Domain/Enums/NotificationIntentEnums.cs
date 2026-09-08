@@ -1,6 +1,3 @@
-// ABOUTME: Stable lookup identifiers for durable notification intent ownership and delivery audit tables.
-// ABOUTME: Values back normalized lookup rows seeded by LookupTableSeeder and must not be renumbered.
-
 namespace Explore.Domain.Enums;
 
 public enum NotificationCategoryEnum

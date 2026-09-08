@@ -1,6 +1,3 @@
-// ABOUTME: Specifies deterministic rendering for the constrained legal Markdown contract.
-// ABOUTME: Proves identity substitution is encoded and unsafe or inaccessible shapes fail closed.
-
 namespace ISLAMU.Wire.Contracts.UnitTests.ConfigurationPortability;
 
 using ISLAMU.Wire.Contracts.ConfigurationPortability;

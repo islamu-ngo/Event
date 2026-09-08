@@ -1,6 +1,3 @@
-// ABOUTME: Resolves effective manual-address policy from hierarchical settings and named authorization.
-// ABOUTME: Produces a typed fail-closed decision without mutating a Location or trusting caller booleans.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Settings;

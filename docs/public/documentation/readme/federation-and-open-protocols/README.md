@@ -27,7 +27,7 @@ The platform intentionally does not implement:
 
 ## Related Guides & Next Steps
 
-* **[Linked AT Protocol Authentication](../security-and-identity/authentication.md#linked-at-protocol-sign-in)** — Link Bluesky handles to local user accounts.
+* **[AT Protocol Authentication](../security-and-identity/authentication.md#at-protocol-sign-in)** — Choose primary passwordless login or optional exact-DID-linked sign-in.
 * **[Multi-Tenancy Isolation](../security-and-identity/multi-tenancy.md)** — Control which community tenants participate in open federation.
 * **[Architecture & Outbox Workflows](../getting-started/architecture-and-request-flows.md)** — Understand transactional outbox guarantees for federated records.
 * **[Privacy Erasure & GDPR](../security-and-identity/privacy-erasure.md)** — How federated posts and RSVPs are handled upon account erasure.

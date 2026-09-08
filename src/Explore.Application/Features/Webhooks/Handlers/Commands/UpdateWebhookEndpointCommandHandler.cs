@@ -1,6 +1,3 @@
-// ABOUTME: Handles endpoint update validation, URL uniqueness, and subscription replacement.
-// ABOUTME: Keeps secret rotation separate from normal endpoint edits and delegates persistence to repositories.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;

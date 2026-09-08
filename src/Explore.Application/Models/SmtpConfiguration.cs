@@ -1,4 +1,3 @@
-// ABOUTME: SMTP configuration POCO resolved from the cascading settings engine.
 // Supports any SMTP provider (SendGrid, SES, Mailgun, Office 365, self-hosted Postfix, etc.).
 
 namespace Explore.Application.Models;

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the optional RabbitMQ EmailDispatch health check adapter.
-// ABOUTME: Verifies disabled mode is healthy and unhealthy transport state is surfaced safely.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Telemetry;

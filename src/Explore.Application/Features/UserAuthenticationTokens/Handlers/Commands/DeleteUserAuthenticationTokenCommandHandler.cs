@@ -1,5 +1,3 @@
-// ABOUTME: Idempotently revokes the current user's local authentication session.
-// ABOUTME: Uses the user-scoped repository lookup so absent and non-owned IDs are indistinguishable.
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

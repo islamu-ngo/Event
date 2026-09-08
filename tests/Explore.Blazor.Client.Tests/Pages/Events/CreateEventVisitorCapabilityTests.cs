@@ -1,5 +1,3 @@
-// ABOUTME: Rendered CreateEvent regression coverage for visitor capability changes during submission.
-// ABOUTME: Exercises generated HTTP clients and real services with deterministic rejection and refresh boundaries.
 
 using System.Net;
 using System.Net.Http.Json;

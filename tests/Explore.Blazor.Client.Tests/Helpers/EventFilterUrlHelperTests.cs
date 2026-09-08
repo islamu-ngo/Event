@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for EventFilterUrlHelper ownership query-string round-tripping.
-// ABOUTME: Verifies public event list URLs use lower camel ownership query keys.
-
 using Explore.Blazor.Client.Helpers;
 
 namespace Explore.Blazor.Client.Tests.Helpers;

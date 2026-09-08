@@ -1,6 +1,3 @@
-// ABOUTME: Query request for paginated event template lists with optional event-type filtering.
-// ABOUTME: Tenant scoping is handled by the handler via ITenantContext, not exposed in the request.
-
 using Explore.Application.DTOs.EventTemplate;
 using Explore.Application.Responses;
 using MediatR;

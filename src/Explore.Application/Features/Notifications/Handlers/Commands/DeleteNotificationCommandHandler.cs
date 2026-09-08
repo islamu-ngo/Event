@@ -1,6 +1,3 @@
-// ABOUTME: Handles soft-deletion of a notification for the authenticated user.
-// ABOUTME: Returns true if deleted, false if not found or doesn't belong to the user.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Notifications.Requests.Commands;

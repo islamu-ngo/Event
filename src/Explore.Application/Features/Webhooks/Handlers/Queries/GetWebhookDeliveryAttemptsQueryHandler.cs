@@ -1,6 +1,3 @@
-// ABOUTME: Handles typed owner-scoped webhook delivery attempt reads for operations screens.
-// ABOUTME: Resolves ownership before bounded message and endpoint filtering.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.DTOs.Webhooks;

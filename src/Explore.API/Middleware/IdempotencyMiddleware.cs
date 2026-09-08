@@ -1,6 +1,3 @@
-// ABOUTME: Middleware that implements Idempotency-Key header support for write operations (POST/PUT/PATCH/DELETE).
-// ABOUTME: Caches responses by (Key, TenantId) and replays them on duplicate requests within a 24-hour window.
-
 using Explore.API.Attributes;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Infrastructure;

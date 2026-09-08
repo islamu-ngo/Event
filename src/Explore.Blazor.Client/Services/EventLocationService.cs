@@ -1,6 +1,3 @@
-// ABOUTME: Consumes the generated purpose-specific EventLocation API contracts for the Blazor client.
-// ABOUTME: Fails closed to empty/denied results and never fabricates disclosure the server withheld.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Events;
 using Explore.Blazor.Client.Helpers;

@@ -1,5 +1,3 @@
-// ABOUTME: Maps the independent lifecycle ledger in both primary and external Identity models.
-// ABOUTME: Enforces finite purpose, fixed expiration, and coherent consumption/mirror receipts.
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

@@ -1,6 +1,3 @@
-// ABOUTME: Handles payment-attempt composition queries, claims, active-slot release, and pre-handoff cancellation.
-// ABOUTME: Preserves idempotent claim recovery and routes handed-off attempts into reconciliation.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

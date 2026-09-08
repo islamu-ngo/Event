@@ -1,5 +1,3 @@
-// ABOUTME: Expresses supervised Local reset intent against a previously observed current operation.
-// ABOUTME: Keeps the initiating administrator server-resolved and preserves a bounded audit reason.
 
 using Explore.Application.Responses;
 using MediatR;

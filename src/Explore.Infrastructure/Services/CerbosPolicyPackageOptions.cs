@@ -1,6 +1,3 @@
-// ABOUTME: Infrastructure options for locating and validating the bundled Cerbos policy package.
-// ABOUTME: Keeps filesystem and namespace validation details out of Application contracts.
-
 namespace Explore.Infrastructure.Services;
 
 /// <summary>

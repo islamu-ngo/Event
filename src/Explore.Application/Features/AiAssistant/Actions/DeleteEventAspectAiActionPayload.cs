@@ -1,6 +1,3 @@
-// ABOUTME: Defines the safe AI-proposed payload shape for event aspect deletion proposals.
-// ABOUTME: Carries aspect module context, concurrency, HAL context, and destructive confirmation data.
-
 namespace Explore.Application.Features.AiAssistant.Actions;
 
 public sealed class DeleteEventAspectAiActionPayload

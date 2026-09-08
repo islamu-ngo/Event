@@ -1,6 +1,3 @@
-/* ABOUTME: Isolated responsive layout for the instance paid-event policy ceiling. */
-/* ABOUTME: Uses shared tokens and logical properties for accessible policy groups and currency rows. */
-
 .instance-paid-policy,
 .instance-paid-policy__group {
     display: grid;

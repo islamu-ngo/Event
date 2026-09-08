@@ -1,6 +1,3 @@
-// ABOUTME: Builds the mode-agnostic Control Plane overview from existing instance services.
-// ABOUTME: Keeps the first read model small, redacted, and server-authoritative for HAL-driven UI.
-
 using System.Reflection;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

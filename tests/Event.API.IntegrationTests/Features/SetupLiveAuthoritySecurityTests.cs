@@ -1,6 +1,3 @@
-// ABOUTME: Defines Tier 1 HTTP invariant breakers for Setup live enrollment and secret binding.
-// ABOUTME: Uses literal reviewed routes and runtime canaries without mirroring absent product owners.
-
 namespace Event.Api.IntegrationTests.Features;
 
 using System.Collections;

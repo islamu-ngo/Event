@@ -1,6 +1,3 @@
-// ABOUTME: Repository implementation for event-scoped runtime custom-property definitions, options, and values.
-// ABOUTME: Supports CQRS read/write flows, single/multi-value persistence, and provenance-aware queries.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;

@@ -1,6 +1,3 @@
-// ABOUTME: Application result for retention-aware webhook payload reads.
-// ABOUTME: Distinguishes available, tenant-safe not-found, and known-but-gone outcomes.
-
 using Explore.Application.DTOs.Webhooks;
 
 namespace Explore.Application.Responses;

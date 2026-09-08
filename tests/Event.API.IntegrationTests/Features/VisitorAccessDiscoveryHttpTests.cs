@@ -1,5 +1,3 @@
-// ABOUTME: Exercises visitor discovery through real API projections, HAL policies and SQLite provider/settings reads.
-// ABOUTME: Keeps operator login separate from signup and proves policy changes do not leave cached native-start affordances.
 
 using System.Net;
 using System.Net.Http.Headers;

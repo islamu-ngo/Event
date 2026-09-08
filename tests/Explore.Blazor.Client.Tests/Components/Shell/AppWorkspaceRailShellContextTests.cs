@@ -1,6 +1,3 @@
-// ABOUTME: bUnit tests for AppWorkspaceRail server-gated workspace visibility from UiShellContextService.
-// ABOUTME: Verifies Studio is hidden/visible based on context and anonymous users never call the endpoint.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.Shell;
 using Explore.Blazor.Client.Contracts.Services;

@@ -1,6 +1,3 @@
-// ABOUTME: Exercises authenticated and capability-scoped native registration submission routes through the HTTP host.
-// ABOUTME: Verifies authorization, safe validation problems, token transport, and HAL-owned affordance contracts.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;

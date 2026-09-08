@@ -1,6 +1,3 @@
-// ABOUTME: Defines the private address-suggestion request and governed local result contracts.
-// ABOUTME: Keeps caller intent separate from trusted tenant, actor, provider, and coordinate authority.
-
 using Explore.Domain.Enums;
 using System.Text.Json.Serialization;
 

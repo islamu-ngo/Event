@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for RuntimeTranslationProvider — provider routing, fallback behavior, and cache.
-// ABOUTME: Verifies None→Offline, Tolgee/Weblate routing, and graceful degradation on TMS errors.
-
 using System.Net;
 using System.Text;
 using Explore.Application.Contracts.Infrastructure;

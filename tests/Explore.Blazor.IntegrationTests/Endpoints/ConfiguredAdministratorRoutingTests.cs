@@ -1,6 +1,3 @@
-// ABOUTME: Exercises configured-administrator startup and provider routing through the real BFF HTTP pipeline.
-// ABOUTME: Proves exact-provider admission, closed-state denial, safe redirects, and browser token boundaries.
-
 using System.Text.Encodings.Web;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Constants;

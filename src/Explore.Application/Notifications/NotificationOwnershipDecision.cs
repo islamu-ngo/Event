@@ -1,6 +1,3 @@
-// ABOUTME: Describes the resolved owner for a notification intent.
-// ABOUTME: Records account-authority and external-provider details without invoking delivery infrastructure.
-
 namespace Explore.Application.Notifications;
 
 public sealed record NotificationOwnershipDecision(

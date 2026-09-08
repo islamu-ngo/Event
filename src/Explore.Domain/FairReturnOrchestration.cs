@@ -1,6 +1,3 @@
-// ABOUTME: Defines pointer-only fair-return payment intents and durable orchestration effects.
-// ABOUTME: Owns stable operation identity, leases, retries, terminal outcomes, and restart recovery.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

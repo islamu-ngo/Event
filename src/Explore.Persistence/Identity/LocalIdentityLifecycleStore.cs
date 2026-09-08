@@ -1,5 +1,3 @@
-// ABOUTME: Owns selected-store, purpose-bound Local lifecycle operations and one-use Identity mutations.
-// ABOUTME: Uses native token/password providers and independent mirror receipts without creating sessions.
 
 using System.Data;
 using System.Data.Common;

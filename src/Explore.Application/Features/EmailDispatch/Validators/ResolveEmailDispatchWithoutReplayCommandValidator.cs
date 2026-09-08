@@ -1,6 +1,3 @@
-// ABOUTME: Validates explicit operator resolution of replayable email dispatch work.
-// ABOUTME: Requires tenant and outbox identifiers plus a bounded audit reason.
-
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using FluentValidation;
 

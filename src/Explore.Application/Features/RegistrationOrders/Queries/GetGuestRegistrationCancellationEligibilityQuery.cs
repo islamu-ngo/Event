@@ -1,5 +1,3 @@
-// ABOUTME: Supplies read-only HAL eligibility from the same native authority and evidence as cancellation.
-// ABOUTME: Null means no authority; false never grants a cancelled, paid, attended or unsupported order a mutation.
 
 using Explore.Application.Services.Registration;
 using MediatR;

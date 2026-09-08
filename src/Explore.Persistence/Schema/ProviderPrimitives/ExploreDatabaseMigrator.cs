@@ -1,6 +1,3 @@
-// ABOUTME: Provides the shared entry point for Explore database migration and startup seeding.
-// ABOUTME: Lets deployment workers and the standalone host apply the same provider-specific bootstrap.
-
 using Explore.Application.Configuration;
 using Explore.Persistence.Database;
 using Explore.Persistence.Privacy.ErasureAuthority;

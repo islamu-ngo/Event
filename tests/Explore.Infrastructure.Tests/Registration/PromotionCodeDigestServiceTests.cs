@@ -1,6 +1,3 @@
-// ABOUTME: Focused tests for versioned promotion-code lookup HMAC digests.
-// ABOUTME: Proves normalization, scope isolation, rotation candidates, and fail-closed key resolution.
-
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application;

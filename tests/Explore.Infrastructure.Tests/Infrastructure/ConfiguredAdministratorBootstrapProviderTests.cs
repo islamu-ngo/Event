@@ -1,6 +1,3 @@
-// ABOUTME: Proves configured-administrator parsing, exact identity binding, recovery, and finality.
-// ABOUTME: Uses real SQLite persistence and scans all failure evidence for bootstrap identity values.
-
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;

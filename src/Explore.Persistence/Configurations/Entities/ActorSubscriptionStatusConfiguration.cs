@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for actor subscription status lookup values.
-// ABOUTME: Keeps lifecycle state IDs stable for subscription command and fanout logic.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

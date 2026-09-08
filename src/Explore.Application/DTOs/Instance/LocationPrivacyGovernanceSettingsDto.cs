@@ -1,6 +1,3 @@
-// ABOUTME: Carries instance-level ceilings for EventLocation creation and disclosure.
-// ABOUTME: Uses conservative defaults when older clients omit the location-privacy section.
-
 namespace Explore.Application.DTOs.Instance;
 
 public sealed record LocationPrivacyGovernanceSettingsDto

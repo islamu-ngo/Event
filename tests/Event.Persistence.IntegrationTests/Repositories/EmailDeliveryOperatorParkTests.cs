@@ -1,5 +1,3 @@
-// ABOUTME: Verifies operator-park command transitions through real SQLite repositories and durable reads.
-// ABOUTME: Distinguishes capability recovery from explicit operator holds while preserving tenant, redaction, and handoff fences.
 
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Features.EmailDispatch;

@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for tenant-scoped projection rebuild status rows.
-// ABOUTME: Composite PK on (projection_name, projection_version, tenant_id) with optimistic concurrency.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

@@ -1,6 +1,3 @@
-// ABOUTME: Authorizes and atomically executes admission stop, restore, and reconcile controls.
-// ABOUTME: Persists only bounded reason codes and exposes exact-target health without attendee data.
-
 using System.Text.Json;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Admissions;

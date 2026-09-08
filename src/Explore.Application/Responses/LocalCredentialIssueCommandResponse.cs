@@ -1,5 +1,3 @@
-// ABOUTME: Carries bounded command failures or one-time Local credential issuance without mixing their payloads.
-// ABOUTME: Keeps operation identifiers recoverable while preventing secret data on failure and replay.
 
 using Explore.Application.Features.Authentication.Local.Models;
 

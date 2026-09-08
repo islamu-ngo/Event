@@ -1,6 +1,3 @@
-// ABOUTME: MediatR query request for retrieving Groups the current user belongs to.
-// ABOUTME: Returns PaginatedResult<GroupListDto> with the normalized CurrentUserRoleId populated per group.
-
 using Explore.Application.DTOs.Group;
 using Explore.Application.Responses;
 using MediatR;

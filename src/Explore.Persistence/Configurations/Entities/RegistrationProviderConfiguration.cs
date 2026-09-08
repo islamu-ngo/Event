@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mappings for provider-neutral registration connection, binding, mappings, capability, and schema rows.
-// ABOUTME: Enforces tenant filters, credential-reference-only columns, unique provider identities, and immutable revision shape.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;

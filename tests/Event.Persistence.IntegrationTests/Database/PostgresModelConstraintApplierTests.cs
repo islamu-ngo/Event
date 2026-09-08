@@ -1,6 +1,3 @@
-// ABOUTME: Verifies PostgreSQL model constraints against the real post-migration application schema.
-// ABOUTME: Guards schema-qualified preflight and catalog lookup behavior after namespace cutovers.
-
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Schema;
@@ -39,12 +36,9 @@ public sealed class PostgresModelConstraintApplierTests
             Password = container.Password,
             TlsMode = PrimaryDatabaseTlsMode.Disabled,
         };
-        var optionsBuilder = new DbContextOptionsBuilder<ExploreDbContext>();
-        optionsBuilder.EnableServiceProviderCaching(false);
+        var optionsBuilder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseConnectionResult configured =
             PrimaryDatabaseProviderComposition.ConfigureApplication(optionsBuilder, options);
-        optionsBuilder.ConfigureWarnings(warnings =>
-            warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning));
         await using var context = new ExploreDbContext(optionsBuilder.Options);
         await context.Database.MigrateAsync();
 

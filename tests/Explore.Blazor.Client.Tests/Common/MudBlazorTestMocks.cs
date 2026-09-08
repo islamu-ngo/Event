@@ -1,6 +1,3 @@
-// ABOUTME: Concrete mock implementations for MudBlazor JS-dependent services.
-// ABOUTME: Prevents JSInterop calls during bUnit tests by providing no-op service implementations.
-
 using Microsoft.AspNetCore.Components.Web;
 using MudBlazor;
 using MudBlazor.Interop;

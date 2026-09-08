@@ -1,6 +1,3 @@
-// ABOUTME: Fetches a single external API key visible to the current caller.
-// ABOUTME: Checks owner authority across all five owner types while exposing only safe metadata.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ExternalApiKey;

@@ -17,13 +17,12 @@ Plan, context, and tasks repeat only this compact shared state:
 
 ```text
 - I-VSD report: <relative path>
-- I-VSD reviewed input revision: <Git object or SHA-256 digest>
 - I-VSD status / disposition: <current + plan-aligned, or blocking state>
-- CTO review: Not reviewed | Changes required | <linked review artifact>
-- User approval: Awaiting approval | Approved for <workstream revision>
+- CTO review: Not reviewed | Changes required | Approved | <linked review artifact>
+- User approval: Awaiting approval | Approved
 ```
 
-The I-VSD report owns moral analysis; the CTO review owns technical-readiness detail. The triad stores links and current state, not duplicate narratives.
+The I-VSD report owns moral analysis; the CTO review owns technical-readiness detail. The artifacts store links and current status, not duplicate narratives.
 
 ## Context File
 
@@ -100,27 +99,23 @@ Use this structure for `dev/active/<task-name>/<task-name>-tasks.md`:
 Last Updated: YYYY-MM-DD Europe/Brussels
 
 ## Status Summary
-- **Overall status:** Draft / User-reviewed / In implementation / Blocked / Complete
-- **Completed:** 0/N implementation tasks (phase verification and commit closure tracked separately)
-- **Current priority:**
-- **Next recommended slice:**
-- **Review state:** I-VSD path/revision/disposition, CTO review, and user approval from the shared contract.
+- **Overall status:** Draft / Approved / In implementation / Complete
+- **Current Phase:** Phase 1
+- **Review state:** I-VSD status, CTO review, and user approval from the shared contract.
 
 ## Implementation Maintenance Rules
-- Read the full workstream once at initial implementation start; on resume, read context/tasks first and only relevant plan sections.
+- Read the active plan and tasks once at implementation start; on resume, read tasks first and only relevant plan sections.
 - Do not reread unchanged artifacts after every task.
-- Mark a substantial task `🟡 IN PROGRESS` when it is likely to span multiple edits or a handoff; skip this churn for tiny tasks completed immediately.
-- Check a substantial completed task immediately; reconcile small completed tasks no later than phase end.
-- Add discovered work where it belongs and keep completed count, priority, next slice, deferred work, and update date accurate.
-- Check a phase complete only after all implementation, phase-verification disposition, and phase-commit checkboxes pass.
-- Close every verified phase immediately with phase-owned Conventional Commit(s); for large phases (touching dozens or hundreds of files) or multi-concern scopes, sequence multiple atomic commits following `conventional-commit` rules 1 & 13. Commits must strictly target only phase-owned files related to this implementation plan. The approved checklist authorizes the implementing agent to commit without another prompt.
+- Batch task checkbox updates at logical phase milestones or phase verification gates rather than churning status on every minor edit.
+- Add discovered work where it belongs and keep phase task lists accurate.
+- Close every verified phase immediately on the task branch (`feat/<task-name>`) using the planned declarative Conventional Commit contract(s); for large phases (touching dozens or hundreds of files) or multi-concern scopes, sequence multiple atomic commits following `conventional-commit` rules 1 & 13.
 - Use the planning-authored default title, description, changelog treatment, and trailers unchanged when they remain truthful; do not spend implementation context recomposing them.
 - Do not load `conventional-commit` merely to reuse the approved contract; load it only when a permitted material divergence requires replacement contracts.
-- Override a planned message only for a recorded material divergence, never stylistic preference.
-- Update context after a phase, decision, blocker, validation failure, material discovery, or handoff.
-- Update the plan only when scope, architecture, sequencing, acceptance criteria, risk, or validation strategy changes.
+- Update `context.md` only when pausing, transferring across sessions, or handling unexpected blockers.
+- Update the plan only when scope, architecture, sequencing, acceptance criteria, or risk strategy changes.
 - Do not run build/tests after individual tasks; verify once at phase end.
 - planning itself never creates branches or worktrees; plan artifacts live in the root dev/active/ directory.
+- Do not start the app, browser, Docker, Aspire, Playwright, Chrome DevTools MCP, or live services for verification.
 
 ## Phase 1: <Name> ⏳ NOT STARTED
 **Phase-owned paths:** exact files this phase may stage; update before verification when legitimate phase work discovers or generates another file.
@@ -132,35 +127,27 @@ Last Updated: YYYY-MM-DD Europe/Brussels
   - **Dependencies:** task ids
 
 ### Phase 1 Verification — RUN ONCE AFTER ALL PHASE TASKS
-- [ ] Run `dotnet build --configuration Release --verbosity quiet` once and record pass evidence or the exact proven unrelated shared-tree failure.
-- [ ] Run `dotnet test --project <one-relevant-project>.csproj --configuration Release --verbosity quiet` once and record pass evidence or the exact proven unrelated shared-tree failure.
-- [ ] Confirm the phase-owned verification lane is green and no phase-attributable failure remains.
+- [ ] Run `dotnet build --configuration Release --verbosity quiet` once.
+- [ ] Run `dotnet test --project <one-relevant-project>.csproj --configuration Release --verbosity quiet` once.
+- [ ] Confirm the phase-owned verification lane is green.
 
 ### Phase 1 Commit(s) — RUN IMMEDIATELY AFTER VERIFICATION
-*(Note: If Phase 1 is large or touches dozens/hundreds of files across multiple concerns, sequence multiple atomic commit contracts below instead of one monolithic umbrella commit. Every commit MUST strictly stage and commit ONLY its own phase-owned files related to this implementation plan, leaving unrelated working-tree modifications untouched).*
+*(Note: If Phase 1 is large or touches dozens/hundreds of files across multiple concerns, sequence multiple atomic commit contracts below instead of one monolithic umbrella commit).*
 
 #### Planned Commit Contract [Contract 1 of N for multi-commit phases]
-- **Default title:** `type(scope): benefit-led phase outcome`
-- **Default description:** Exact motivation and data/control-flow description for this phase.
+- **Type & Scope:** `type(scope)`
+- **Title:** `benefit-led phase outcome`
+- **Description:** Exact motivation and data/control-flow description for this phase.
 - **Changelog treatment:** Public feature/fix | Change fragment `CHG-YYYY-NNNN` | `Changelog: skip`
 - **Required trailers:** Exact terminal trailer lines, or `None`
 - **Commit paths:** Exact ordered list of wholly phase-owned files for this commit.
-- **Pre-commit inspection commands:**
-  - `git status --short`
-  - `git diff --name-only`
-  - `git diff --cached --name-only`
-- **Staging command:** `git add -- <every exact commit path>`
-- **Commit command:** `git commit --only -m "<exact title>" -m "<exact description>" <exact trailer arguments> -- <every exact commit path>`
-- **Post-commit verification command:** `git show --name-only --format=fuller HEAD`
 - **Message override:** Not overridden
 
 <!-- Repeat Planned Commit Contract block for Contract 2, 3, etc. if phase is large -->
 
-The completed workstream MUST replace every placeholder above with concrete paths and commands. The staging/commit pathspecs must exactly equal `Commit paths`, and the commit command must encode the declared message and trailers.
-
-- [ ] Without loading `conventional-commit`, run the exact inspection commands, confirm every path/hunk is wholly phase-owned and related to this plan, and execute the exact staging and commit commands when the contract remains truthful. If multiple atomic commits are defined, execute each in sequence.
-- [ ] Only when the default will not be used, load `conventional-commit` and record `Message override: Yes`, `Reason`, and complete `Actual commit contracts` containing every metadata, path, and command field above.
-- [ ] Run the exact post-commit verification command, confirm the resulting file list equals `Commit paths`, and record the hash before completing Phase 1.
+- [ ] Stage exact phase-owned paths using `git add -- <paths>` and execute commit using the declarative contract on `feat/<task-name>`.
+- [ ] Only when the default will not be used, load `conventional-commit` and record `Message override: Yes`, `Reason`, and complete replacement contract.
+- [ ] Confirm clean git status on feature branch before completing Phase 1.
 
 ## Remaining / Deferred Work & Knowledge Graduation
 - **Deferred Work:** Explicit deferral, reason, trigger, and target backlog item (`dev/backlog/<slug>.md`).
@@ -176,15 +163,13 @@ Repeat phase sections for every phase in the plan. Task ids, names, status, depe
 After writing all three artifacts, compare:
 
 - planning and overall status;
-- completed count and checked tasks;
-- current priority and next recommended slice;
 - phase/task ids and names;
 - blockers and unknowns;
 - decisions and constraints;
 - validation baseline;
-- phase-owned paths, verification disposition, planned/actual commit metadata and command packet, override reason, and phase commit hash;
+- phase-owned paths, verification disposition, planned declarative commit contract, and override reason;
 - deferred work and risks;
-- I-VSD path/revision/status, CTO review, and user approval.
+- I-VSD path/status, CTO review, and user approval.
 
 Any disagreement is a planning defect; fix it before handoff.
 
@@ -194,18 +179,16 @@ Use the lightest update that keeps repository state truthful:
 
 | Trigger | Required update | Do not do |
 |---|---|---|
-| Substantial task started | Mark it `🟡 IN PROGRESS` and set current priority when it will span meaningful work | Update docs for a tiny task completed immediately |
-| Substantial task completed | Check its box, update completed count/current priority/next slice/date | Rewrite context or plan without another trigger |
-| Several small related tasks completed | Batch their checkbox updates before starting another phase | Defer updates to a later cleanup command |
-| Phase implementation completed | Reconcile every task, run the two phase-end checks once, and classify each failure by ownership | Mark a phase-attributable failure external or repair another contributor's files |
-| Phase verification resolved | Use the self-sufficient planned contract(s) without loading `conventional-commit`, commit only exact phase-owned paths related to the plan (sequencing multiple atomic commits if phase is large), and record the verified hash(es) | Reload/recompose a truthful contract, defer to a new session, use blind staging, create an oversized umbrella commit, or include unrelated work |
-| Planned commit message became false | Load `conventional-commit`, then record the permitted material-divergence reason and an `Actual commit contracts` list containing a complete contract for every resulting commit; update plan/context when their owned state changed | Silently override for style, preference, or convenience |
+| Task(s) completed | Batch checkbox updates at logical phase milestones or phase verification | Churn status on every minor edit |
+| Phase implementation completed | Reconcile phase tasks and run the two phase-end checks once | Run tests after individual tasks |
+| Phase verification resolved | Use planned declarative contract without loading `conventional-commit`, commit exact phase-owned paths on task branch | Reload/recompose truthful contract, defer to new session, or record commit hashes |
+| Planned commit message became false | Load `conventional-commit`, record override reason and updated contract | Silently override for style or preference |
 | New task discovered | Add it under the owning phase with acceptance criteria and dependencies | Hide it in chat or context only |
-| Blocker or validation failure | Mark affected work in progress/blocked and record cause plus recovery action in tasks/context; proven unrelated failures name their external path/evidence | Claim the repository is green or block/fix unrelated work without an ownership decision |
-| Scope, architecture, sequence, risk, or acceptance changed | Update plan, then mirror task/context impact | Re-baseline unchanged sections |
-| Pause, compaction, transfer, or PR | Reconcile affected tasks and add a concise context handoff | Perform a broad unrelated workstream sweep |
+| Blocker or validation failure | Mark affected work blocked and record cause plus recovery action in tasks; investigate root cause | Claim the repository is green without resolving failure |
+| Scope, architecture, sequence, risk, or acceptance changed | Update plan, then mirror task impact | Re-baseline unchanged sections |
+| Pause, compaction, or session transfer | Reconcile affected tasks and add a concise context handoff | Leave incomplete work undocumented |
 
-Implementation completion, verification disposition, and phase completion are distinct. Check an implementation task when its acceptance criteria are satisfied. The phase completes only after its own verification is green, any unrelated shared-tree failure is explicitly recorded, and all phase-owned Conventional Commits succeed.
+Implementation completion, verification disposition, and phase completion are distinct. Check an implementation task when its acceptance criteria are satisfied. The phase completes only after its own verification is green and all phase-owned Conventional Commits succeed.
 
 ## Read Cadence
 

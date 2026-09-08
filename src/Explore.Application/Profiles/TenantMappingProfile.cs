@@ -1,6 +1,3 @@
-// ABOUTME: AutoMapper profile for Tenant, TenantNavigationLink, tenant role grants, and Footer entities.
-// ABOUTME: Split from monolithic MappingProfile.cs for domain-cohesion.
-
 using AutoMapper;
 using Explore.Application.DTOs.Footer;
 using Explore.Application.DTOs.Tenant;

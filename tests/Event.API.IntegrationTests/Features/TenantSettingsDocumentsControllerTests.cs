@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for tenant branding and directory-operator typed document endpoints.
-// ABOUTME: Covers authentication gates, optimistic patches, cache effects, and authorized HAL responses.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;

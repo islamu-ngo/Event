@@ -1,6 +1,3 @@
-// ABOUTME: Tests create-event nav eligibility against the server-provided event creation context.
-// ABOUTME: Prevents local role-derived write affordances from reappearing in the nav service.
-
 namespace Explore.Blazor.Client.Tests.Services;
 
 public class EventCreationEligibilityServiceTests

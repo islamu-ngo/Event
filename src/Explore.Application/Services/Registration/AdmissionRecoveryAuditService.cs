@@ -1,6 +1,3 @@
-// ABOUTME: Persists minimal PII-free audit facts for successful recovery lifecycle transitions.
-// ABOUTME: Excludes identity, recipient, capability, digest, ticket bearer, and provider payloads.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Persistence;

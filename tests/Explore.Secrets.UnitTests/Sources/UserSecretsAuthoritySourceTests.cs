@@ -1,6 +1,3 @@
-// ABOUTME: Tests resolver reads from the explicitly selected User Secrets authority.
-// ABOUTME: Proves a process Environment value cannot override the isolated development store.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Explore.Secrets.Abstractions;

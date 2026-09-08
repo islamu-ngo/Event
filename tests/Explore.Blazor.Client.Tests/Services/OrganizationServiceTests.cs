@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for OrganizationService covering read and write operations with HAL conversion.
-// ABOUTME: Validates pagination constants, If-Match forwarding, error handling, and API call contracts.
-
 using System.Net;
 using System.Net.Http.Json;
 using Explore.Blazor.Client.Constants;

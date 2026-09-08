@@ -1,6 +1,3 @@
-// ABOUTME: Link-policy contract tests for storage object and storage admin HAL affordances.
-// ABOUTME: Protects storage UI action gates from drifting away from server authorization metadata.
-
 using System.Security.Claims;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Hateoas;

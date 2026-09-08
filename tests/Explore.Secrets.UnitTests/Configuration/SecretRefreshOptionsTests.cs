@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for SecretRefreshOptions backoff calculations.
-// ABOUTME: Tests exponential backoff and jitter behavior.
-
 using Explore.Secrets.Configuration;
 using TUnit.Core;
 

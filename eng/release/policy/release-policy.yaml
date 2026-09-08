@@ -1,5 +1,3 @@
-# ABOUTME: Defines release-engine commit classification rules independent of git-cliff and forge metadata.
-# ABOUTME: Keeps skip, breaking-change, visibility, and input-bound policy in repository-owned data.
 schemaVersion: 1
 maximumCommitMessageBytes: 8192
 releaseVisibleTypes:

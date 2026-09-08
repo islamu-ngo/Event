@@ -1,6 +1,3 @@
-// ABOUTME: HSL color representation for algorithmic palette generation from natural + brand colors.
-// ABOUTME: Supports conversion from hex, lightness/saturation adjustments, and contrast-aware text color selection.
-
 namespace Explore.Application.Services;
 
 using System.Globalization;

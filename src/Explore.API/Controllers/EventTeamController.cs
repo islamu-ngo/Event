@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for event team management scoped to a single event.
-// ABOUTME: Exposes team listing, permissions, assignable presets, assignment, and revocation.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

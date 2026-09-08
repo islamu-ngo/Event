@@ -1,6 +1,3 @@
-// ABOUTME: Guards the ELP-230C contraction that mediates every physical venue reference by an EventLocation.
-// ABOUTME: Asserts the constraint exists in each carrier configuration and in all five provider migrations.
-
 namespace Event.Architecture.Tests;
 
 public sealed class EventLocationSchemaContractionTests

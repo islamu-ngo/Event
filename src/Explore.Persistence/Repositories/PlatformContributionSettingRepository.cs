@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for the active instance-scoped platform contribution-setting version.
-// ABOUTME: Loads stored contribution choices as entities for immutable revision handling.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

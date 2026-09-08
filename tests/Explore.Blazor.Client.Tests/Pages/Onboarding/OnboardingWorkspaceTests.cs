@@ -1,6 +1,3 @@
-// ABOUTME: Focused bUnit matrix for the display-only onboarding workspace primitive.
-// ABOUTME: Verifies landmarks, projected content, conditional progress, native actions, and visible state text.
-
 using Explore.Blazor.Client.Pages.Onboarding.Components;
 
 namespace Explore.Blazor.Client.Tests.Pages.Onboarding;

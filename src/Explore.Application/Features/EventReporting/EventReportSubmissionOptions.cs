@@ -1,6 +1,3 @@
-// ABOUTME: Configurable limits and defaults for event-report submission handling.
-// ABOUTME: Binds from the Reporting configuration section used by local-first moderation intake.
-
 namespace Explore.Application.Features.EventReporting;
 
 public sealed class EventReportSubmissionOptions

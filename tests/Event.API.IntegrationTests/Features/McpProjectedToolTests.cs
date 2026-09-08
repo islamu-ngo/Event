@@ -1,6 +1,3 @@
-// ABOUTME: Tests first-class MCP tools projected from the AI Tool Contract Registry.
-// ABOUTME: Verifies schema parity, authorization metadata, SDK hints, and proposal-first command mapping.
-
 using System.Text.Json;
 using Explore.API.Mcp;
 using Explore.Application.Features.AiAssistant.Requests.Commands;

@@ -1,6 +1,3 @@
-// ABOUTME: Defines immutable separated totals for organizer-directed order lines, fees, and platform contributions.
-// ABOUTME: Uses minor-unit values only so payment composition cannot mix contribution money into organizer earnings.
-
 using Explore.Domain.ValueObjects;
 
 namespace Explore.Domain;

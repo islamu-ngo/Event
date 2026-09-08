@@ -1,6 +1,3 @@
-// ABOUTME: CQRS query request for listing tenant user role grants.
-// ABOUTME: Returns List<TenantUserRoleGrantListDto> with user, tenant, role, and grant audit info.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.TenantUserRoleGrant;
 using MediatR;

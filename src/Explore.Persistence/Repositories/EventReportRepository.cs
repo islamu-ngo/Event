@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for event-report intake, reporter status, and moderation queue lookups.
-// ABOUTME: Uses no-tracking reads, tenant-bounded predicates, and safe report graph includes by default.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Specifications.EventReports;
 using Explore.Domain;

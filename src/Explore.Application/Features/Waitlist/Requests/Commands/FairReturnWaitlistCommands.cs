@@ -1,6 +1,3 @@
-// ABOUTME: Defines immutable CQRS commands for line-scoped fair-return waitlist writes.
-// ABOUTME: Carries route identities only; tenant, user, priority, and policy remain server-owned.
-
 using Explore.Application.DTOs.Waitlist;
 using MediatR;
 

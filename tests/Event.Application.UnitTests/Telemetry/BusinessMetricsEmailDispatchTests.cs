@@ -1,6 +1,3 @@
-// ABOUTME: Verifies Basic Dispatch Mode email metrics use bounded, safe OpenTelemetry tags.
-// ABOUTME: Guards against exposing email body, recipient, subject, or secret-like data in metric dimensions.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Notifications;

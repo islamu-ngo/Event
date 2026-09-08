@@ -1,6 +1,3 @@
-// ABOUTME: Startup worker that upserts canonical webhook event types into local persistence.
-// ABOUTME: Gives endpoint management stable event type IDs before Local or Svix provider delivery is used.
-
 using Explore.Application.Contracts.Webhooks;
 
 namespace Explore.API.BackgroundServices;

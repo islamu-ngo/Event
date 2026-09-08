@@ -1,6 +1,3 @@
-// ABOUTME: Defines the minimal browser-readable Blazor authentication-state claim contract.
-// ABOUTME: Keeps server authorization claims out of InteractiveAuto/WebAssembly auth-state serialization.
-
 using System.Security.Claims;
 using Microsoft.AspNetCore.Components.Authorization;
 

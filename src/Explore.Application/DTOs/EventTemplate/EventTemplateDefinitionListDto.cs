@@ -1,6 +1,3 @@
-// ABOUTME: Lightweight list DTO for template property definitions, used in paginated definition listings.
-// ABOUTME: Includes OptionCount instead of full option list to reduce payload size.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.DTOs.EventTemplate;

@@ -1,0 +1,30 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M1TJAWHHH71J5ZDRCPZM365M
+Title: "Keep OIDC provider identities consistent with their issuer"
+Type: fix
+Scope: access
+Summary: "Recognize direct Google accounts while keeping brokered identities bound to their Keycloak issuer and rejecting provider-hint namespace confusion."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: not-applicable
+    Detail: Corrects provider classification without changing serialized issuer-subject account keys or adding compatibility aliases.
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Detail: Provider code and account-key kind use the same exact normalized issuer; broker hints and hostname substrings cannot substitute account authority.
+  Migration:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: Direct Google and Keycloak-brokered login retain distinct account namespaces under the configured issuer.

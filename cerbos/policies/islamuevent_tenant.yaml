@@ -1,4 +1,3 @@
-# ABOUTME: Cerbos resource policy for tenant resources.
 # Tenants: instance admins manage all, tenant admins manage their own tenant.
 
 apiVersion: api.cerbos.dev/v1

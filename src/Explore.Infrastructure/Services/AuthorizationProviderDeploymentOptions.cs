@@ -1,6 +1,3 @@
-// ABOUTME: Validated deployment selector for the instance authorization provider.
-// ABOUTME: Distinguishes explicit Local or Cerbos intent from unset manual onboarding.
-
 namespace Explore.Infrastructure.Services;
 
 public sealed class AuthorizationProviderDeploymentOptions

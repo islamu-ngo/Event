@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for organization CRUD operations with verification and member management.
-// ABOUTME: Supports two-tier verification system, role-based access, and cascading organization settings.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

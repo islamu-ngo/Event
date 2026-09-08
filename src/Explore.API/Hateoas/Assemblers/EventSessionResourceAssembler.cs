@@ -1,6 +1,3 @@
-// ABOUTME: Assembles EventSession DTOs into HAL resources and capability links.
-// ABOUTME: Keeps public session representations principal-independent while preserving managed-route affordances.
-
 namespace Explore.API.Hateoas.Assemblers;
 
 using System.Security.Claims;

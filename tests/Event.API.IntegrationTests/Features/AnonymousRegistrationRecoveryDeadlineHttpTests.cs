@@ -1,5 +1,3 @@
-// ABOUTME: Rejects historical capability disclosure when real idempotency database waits cross RecoverUntil.
-// ABOUTME: Uses native HTTP allocation and event barriers without replacing repositories or replay middleware.
 
 using System.Data.Common;
 using System.Net;

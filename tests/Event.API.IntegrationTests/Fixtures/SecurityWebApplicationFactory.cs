@@ -1,6 +1,3 @@
-// ABOUTME: WebApplicationFactory that uses real JWT Bearer validation against a containerized Keycloak.
-// ABOUTME: Does NOT use TestAuthHandler — tokens must come from the Keycloak container's OIDC endpoint.
-
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Threading.Channels;

@@ -1,6 +1,3 @@
-// ABOUTME: Structural validation for grouped session agenda item PATCH requests.
-// ABOUTME: Merged schedule and relationship invariants remain handler-owned because they require persisted state.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.EventSessionAgendaItem.Validators;

@@ -1,6 +1,3 @@
-// ABOUTME: Persists guarded publication-policy snapshots and coordinated tenant or instance setting batches.
-// ABOUTME: Uses the caller-owned transaction and returns provider-neutral raw JSON value changes.
-
 namespace Explore.Persistence.Repositories;
 
 using System.Collections.Immutable;

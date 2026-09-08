@@ -1,4 +1,3 @@
-// ABOUTME: Core interface for secret providers.
 // Abstracts secret retrieval from various backends (Infisical, Vault, Azure KV, AWS SM).
 
 namespace Explore.Secrets.Abstractions;

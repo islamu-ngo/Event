@@ -1,6 +1,3 @@
-// ABOUTME: Service implementation for provider-neutral instance storage administration.
-// ABOUTME: Reads redacted settings, tests selected providers, and reconciles instance usage counters.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Validates rebuild request payload ensuring tenant ID is present and batch size is within bounds.
-// ABOUTME: Manually instantiated per project convention (no DI).
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.CustomPropertyProjection.Validators;

@@ -1,6 +1,3 @@
-// ABOUTME: Query contract for fetching a paginated EventWithSessions aggregate listing.
-// ABOUTME: Carries narrow filter criteria plus an exposure ceiling for facet emission.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventAggregateView;
 using Explore.Application.Responses;

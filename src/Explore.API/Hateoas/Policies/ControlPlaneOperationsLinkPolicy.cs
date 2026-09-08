@@ -1,6 +1,3 @@
-// ABOUTME: HAL link policy for the Control Plane operations resource.
-// ABOUTME: Emits instance-setting permission metadata for operational status navigation.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Security.Claims;

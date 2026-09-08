@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for per-period API key credit quota tracking.
-// ABOUTME: Enforces unique (ApiKeyId, PeriodStart) constraint and cascading delete from parent key.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

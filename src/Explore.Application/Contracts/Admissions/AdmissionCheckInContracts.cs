@@ -1,6 +1,3 @@
-// ABOUTME: Defines provider-neutral admission check-in, authorization, digest, and persistence contracts.
-// ABOUTME: Keeps credential-bearing inputs redacted and door-facing results deliberately bounded.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 

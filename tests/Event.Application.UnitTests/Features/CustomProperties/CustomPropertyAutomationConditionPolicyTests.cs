@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for event custom-property automation-condition eligibility guardrails.
-// ABOUTME: Verifies only tenant-owned projected metadata can drive automation and core workflow state stays explicit.
-
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;

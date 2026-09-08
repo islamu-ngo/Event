@@ -1,6 +1,3 @@
-// ABOUTME: Typed public-experience shell read model for anonymous tenant-local public UI composition.
-// ABOUTME: Keeps organization-centric posture in Application DTOs rather than Domain entities or UI settings blobs.
-
 using Explore.Application.DTOs.Footer;
 using Explore.Application.Models;
 using Explore.Application.Models.PublicExperience;

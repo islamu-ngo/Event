@@ -1,6 +1,3 @@
-// ABOUTME: Records validated requirement outcomes and drains their shared durable finalization effects.
-// ABOUTME: Keeps native and provider completion paths behind one tenant-safe fenced Application handler.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

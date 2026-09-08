@@ -1,6 +1,3 @@
-// ABOUTME: Defines managed-control-plane and tenant-provisioning mutation requests.
-// ABOUTME: Keeps management writes in the canonical CQRS commands namespace.
-
 using Explore.Application.DTOs.Management;
 using Explore.Application.Responses;
 using MediatR;

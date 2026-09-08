@@ -1,6 +1,3 @@
-// ABOUTME: Query handler for event-scoped program item creation context.
-// ABOUTME: Returns only locations and rooms already referenced by the authorized event boundary.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSession;
 using Explore.Application.Features.EventSessions.Requests.Queries;

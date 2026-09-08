@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for provider subscription renewal and sweep state claims.
-// ABOUTME: Returns tenant-owned entities while using transaction locks to avoid duplicate workers.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.Database;

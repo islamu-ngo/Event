@@ -1,6 +1,3 @@
-// ABOUTME: Sensitive evidence row attached to event reports.
-// ABOUTME: Stores reporter text separately from report metadata for privacy and retention controls.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

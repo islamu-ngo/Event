@@ -1,6 +1,3 @@
-// ABOUTME: Shared validation for relative application routes and operator-governed external URL schemes.
-// ABOUTME: Absolute URLs default to HTTPS while an instance setting may permit HTTP on private networks.
-
 namespace Explore.Application.Validation;
 
 public static class UrlSchemePolicy

@@ -1,5 +1,3 @@
-// ABOUTME: Renders setup-only Local enrollment over the real generated onboarding client and service.
-// ABOUTME: Checks explicit legal identity, recovered operation IDs, secret cleanup, and absence of ordinary session work.
 
 using System.Net;
 using System.Net.Http.Json;

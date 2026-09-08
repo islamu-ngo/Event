@@ -1,6 +1,3 @@
-// ABOUTME: Composes relevant-only dotenv documents directly from validated catalogue activation and sensitivity policy.
-// ABOUTME: Keeps no-secret and secret-bearing input modes explicit while omitting unchanged canonical defaults.
-
 namespace ISLAMU.Event.Setup.Core.Environment;
 
 public sealed class DotenvCompositionResult

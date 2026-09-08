@@ -1,6 +1,3 @@
-// ABOUTME: Handles provider-neutral storage provider self-tests for instance administrators.
-// ABOUTME: Delegates provider resolution and secret-safe status mapping to the storage settings service.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;

@@ -1,6 +1,3 @@
-// ABOUTME: Serializes advisory AI evaluation reports as redacted JSON and Markdown artifacts.
-// ABOUTME: Keeps generated report output deterministic apart from the explicit generation timestamp.
-
 using System.Text.Json;
 using System.Text.Json.Serialization;
 

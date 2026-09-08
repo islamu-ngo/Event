@@ -1,6 +1,3 @@
-// ABOUTME: Request DTO for rotating a tenant-scoped outgoing webhook endpoint signing secret reference.
-// ABOUTME: Accepts secret references only so raw webhook signing material never crosses the public API contract.
-
 namespace Explore.Application.DTOs.Webhooks;
 
 public sealed record RotateWebhookEndpointSecretRequestDto

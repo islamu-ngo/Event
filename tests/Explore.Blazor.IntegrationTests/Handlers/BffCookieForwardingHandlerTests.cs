@@ -1,6 +1,3 @@
-// ABOUTME: Verifies BFF self-call cookie forwarding works across circuit activity boundaries.
-// ABOUTME: Ensures the handler can read the current circuit cookie from the activity-scoped bridge.
-
 using System.Security.Claims;
 using Explore.Blazor.Services;
 using Microsoft.AspNetCore.Http;

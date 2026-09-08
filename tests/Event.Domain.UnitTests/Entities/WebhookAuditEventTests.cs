@@ -1,6 +1,3 @@
-// ABOUTME: Tests normalized webhook administrative audit construction and safe-metadata enforcement.
-// ABOUTME: Proves credential, payload, URL, signature, and raw provider-error evidence is rejected.
-
 using Explore.Domain;
 using TUnit.Core;
 

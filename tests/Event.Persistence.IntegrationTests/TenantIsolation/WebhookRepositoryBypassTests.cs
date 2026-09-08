@@ -1,6 +1,3 @@
-// ABOUTME: Verifies webhook repository tenant-filter bypasses stay bounded to webhook predicates.
-// ABOUTME: Proves tenant operations and worker queues do not leak ambient tenant rows.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

@@ -1,6 +1,3 @@
-// ABOUTME: Represents a strict ordered half-open range of UTC-normalized instants.
-// ABOUTME: Keeps local-calendar projection, timezone conversion, and persistence concerns outside the value.
-
 using System.Globalization;
 
 namespace Explore.Domain.ValueObjects;

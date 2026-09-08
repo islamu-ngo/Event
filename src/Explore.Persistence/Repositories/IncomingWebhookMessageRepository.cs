@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for incoming integration webhook idempotency and processing state.
-// ABOUTME: Captures provider callbacks safely before outbox-backed aggregate mutations run.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
 using Explore.Domain;

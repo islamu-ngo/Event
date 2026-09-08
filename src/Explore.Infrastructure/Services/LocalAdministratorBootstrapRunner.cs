@@ -1,5 +1,3 @@
-// ABOUTME: Runs deployment-authorized Local bootstrap after durable generation preparation.
-// ABOUTME: Reconciles completed setup without consulting leftover deployment credentials or selectors.
 
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.InstanceOnboarding.Services;

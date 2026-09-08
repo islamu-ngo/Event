@@ -94,7 +94,7 @@ This ADR does not authorize implementation. Phase 6 begins only after explicit u
 
 ## Related
 
-- [Home discovery plan](../../../dev/active/home-discovery-experience/home-discovery-experience-plan.md)
+- Historical planning workstream: `home-discovery-experience` (gitignored local working memory).
 - [ARCHITECTURE.md](../ARCHITECTURE.md)
 - [DOMAIN.md](../DOMAIN.md)
 - [SELF_HOSTING.md](../SELF_HOSTING.md)

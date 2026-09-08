@@ -1,6 +1,3 @@
-// ABOUTME: Assembles source-aware public event discovery items into HAL resources and collections.
-// ABOUTME: Uses the standard batched authorization pipeline for delegated local actions and source links.
-
 using System.Security.Claims;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Services;

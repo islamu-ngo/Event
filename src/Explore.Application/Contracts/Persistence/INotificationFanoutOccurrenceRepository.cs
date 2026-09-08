@@ -1,6 +1,3 @@
-// ABOUTME: Persistence contract for immutable notification fanout occurrences.
-// ABOUTME: Loads a worker occurrence only through its tenant-scoped PII-free pointer.
-
 using Explore.Application.Models.InternalEvents;
 using Explore.Domain;
 

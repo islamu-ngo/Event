@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning all session-language links.
-// ABOUTME: Maps junction entities to EventSessionLanguageDto list.
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;

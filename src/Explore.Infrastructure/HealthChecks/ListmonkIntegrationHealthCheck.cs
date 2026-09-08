@@ -1,6 +1,3 @@
-// ABOUTME: Health check for the native Listmonk subscriber sync integration.
-// ABOUTME: Validates generated-client reachability without exposing tenant API credentials.
-
 using System.Net.Http.Headers;
 using System.Text;
 using Explore.Application.Contracts.Infrastructure;

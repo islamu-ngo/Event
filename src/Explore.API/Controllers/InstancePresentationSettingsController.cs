@@ -1,6 +1,3 @@
-// ABOUTME: Instance presentation settings endpoints for branding, domains, admin portal, render policy, and mode.
-// ABOUTME: Deployment mode is included here because it selects the shell a self-hoster actually serves.
-
 using Explore.Application.Authentication;
 using Asp.Versioning;
 using Explore.API.Attributes;

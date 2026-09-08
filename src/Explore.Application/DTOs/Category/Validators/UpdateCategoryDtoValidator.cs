@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation validator for grouped Category PATCH payloads.
-// ABOUTME: Manually instantiated by UpdateCategoryCommandHandler with repository dependencies.
-
 using Explore.Application.Contracts.Persistence;
 using FluentValidation;
 

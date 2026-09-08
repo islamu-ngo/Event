@@ -1,6 +1,3 @@
-// ABOUTME: Defines the explicit operator action that resumes durable refund campaign generation.
-// ABOUTME: Uses event commercial authority and never invokes a payment provider in the HTTP request path.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.RegistrationOrders;
 using MediatR;

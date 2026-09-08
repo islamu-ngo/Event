@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped styles for the permanent application workspace rail. */
-/* ABOUTME: Desktop renders a fixed 64px inline-start rail; mobile projects to bottom navigation. */
-
 .app-workspace-rail {
     position: fixed;
     inset-block-start: var(--mud-appbar-height, 4rem);

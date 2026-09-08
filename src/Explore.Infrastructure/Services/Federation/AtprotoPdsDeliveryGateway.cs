@@ -1,6 +1,3 @@
-// ABOUTME: Restores a tenant/user-bound CarpaNet OAuth client and delivers one idempotent PDS record mutation.
-// ABOUTME: Reconciles stable record keys, uses CID compare-and-swap, and returns only bounded failure codes.
-
 using System.Net;
 using System.Security.Cryptography;
 using System.Text.Json;

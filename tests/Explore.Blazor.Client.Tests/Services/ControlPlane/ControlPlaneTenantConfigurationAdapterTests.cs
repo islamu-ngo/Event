@@ -1,6 +1,3 @@
-// ABOUTME: Focused tests for mapping tenant effective configuration through the public Blazor control-plane adapter.
-// ABOUTME: Protects per-setting HAL affordances, generated mutation calls, safe failures, and shared DI registration.
-
 using Explore.Blazor.Client.Contracts.ControlPlane;
 using Explore.Blazor.Client.Contracts.Services.ControlPlane;
 using Explore.Blazor.Client.Extensions;

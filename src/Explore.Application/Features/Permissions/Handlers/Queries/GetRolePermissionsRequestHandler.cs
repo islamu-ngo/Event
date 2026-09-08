@@ -1,6 +1,3 @@
-// ABOUTME: Handler for getting all permissions assigned to a specific role.
-// ABOUTME: Joins through RolePermission table via IRoleRepository.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Permission;
 using Explore.Application.Features.Permissions.Requests.Queries;

@@ -1,6 +1,3 @@
-// ABOUTME: Records that one typed privacy-erasure intent completed one policy version locally.
-// ABOUTME: Uses the intent, subject kind, and policy version as the immutable replay coverage identity.
-
 namespace Explore.Domain;
 
 public sealed class PrivacyErasurePolicyCoverage

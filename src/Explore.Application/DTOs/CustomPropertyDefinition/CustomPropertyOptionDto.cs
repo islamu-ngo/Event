@@ -1,6 +1,3 @@
-// ABOUTME: Read DTO for a selectable option belonging to a shared Layer 3 custom-property definition.
-// ABOUTME: Exposes machine identity and display metadata for admin/query flows.
-
 namespace Explore.Application.DTOs.CustomPropertyDefinition;
 
 public sealed record CustomPropertyOptionDto

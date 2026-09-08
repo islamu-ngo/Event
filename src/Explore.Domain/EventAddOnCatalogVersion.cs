@@ -1,6 +1,3 @@
-// ABOUTME: Owns one versioned event add-on catalog and its independently selectable items.
-// ABOUTME: Makes publication immutable while allowing future catalogs to replace retired offers.
-
 using Explore.Domain.Interfaces;
 using Explore.Domain.ValueObjects;
 

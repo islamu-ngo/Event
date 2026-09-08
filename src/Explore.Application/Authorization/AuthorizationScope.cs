@@ -1,6 +1,3 @@
-// ABOUTME: Immutable scope context passed to Cerbos for per-tenant/org policy resolution.
-// ABOUTME: Used by IAuthorizableResourceDescriptor and normalized AuthorizationRequest.
-
 namespace Explore.Application.Authorization;
 
 /// <summary>

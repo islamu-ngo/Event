@@ -1,5 +1,3 @@
-// ABOUTME: MediatR command for updating storage object metadata.
-// ABOUTME: Carries the UpdateStorageObjectDto payload.
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.StorageObject;
 using Explore.Application.Responses;

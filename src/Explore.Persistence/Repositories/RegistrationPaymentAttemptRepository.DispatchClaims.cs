@@ -1,6 +1,3 @@
-// ABOUTME: Claims and prepares due checkout dispatch effects under portable worker fencing.
-// ABOUTME: Validates payment cutoffs and configuration deferrals before provider handoff.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

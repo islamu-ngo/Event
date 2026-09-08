@@ -1,6 +1,3 @@
-// ABOUTME: Contract-profile API tests for public event visibility rules.
-// ABOUTME: Verifies hidden event states stay out of anonymous list/detail responses.
-
 using System.Net;
 using Event.Api.IntegrationTests.Builders;
 using Event.Api.IntegrationTests.Fixtures;

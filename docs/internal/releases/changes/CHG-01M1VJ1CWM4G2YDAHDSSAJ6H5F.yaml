@@ -1,0 +1,51 @@
+# ABOUTME: Public change fragment for bounded privacy-erasure authority retention and restore safety.
+# ABOUTME: Records floor-aware replay, hold pseudonymization, provider migrations, and operator recovery impact.
+Change-Id: CHG-01M1VJ1CWM4G2YDAHDSSAJ6H5F
+Title: Bounded privacy-erasure authority retention with fail-closed restore checks
+Type: feat
+Scope: privacy
+Summary: >-
+  Retained erasure authorities now publish durable high-water and floor state,
+  compact expired evidence atomically, and reject restores older than retained
+  replay evidence.
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/BACKUP_RESTORE_UPGRADE.md
+    Disposition: documented
+    Detail: >-
+      PrivacyErasure:Authority:Topology=None is removed. After compaction
+      advances the retained floor, a primary backup whose checkpoint is below
+      that floor is intentionally rejected at startup, and lifecycle rollback
+      requires matched backup restore rather than an EF Down migration.
+  Security:
+    Reference: docs/PRIVACY_ERASURE.md
+    Disposition: documented
+    Detail: >-
+      Legal-hold maintenance requires an explicit PII-free hold sequence set;
+      held rows replace live identifiers with random audit tokens, and external
+      PostgreSQL runtime access remains function-only with zero table DML or
+      compact permission; compaction belongs only to the migrator role.
+  Migration:
+    Reference: docs/SELF_HOSTING.md
+    Disposition: documented
+    Detail: >-
+      Provider-owned SQLite, co-located PostgreSQL, and external PostgreSQL
+      migrations add the retained floor, hold marker, and native constraints.
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: documented
+    Detail: >-
+      Topology None is removed, external runtime and migrator usernames must be
+      distinct, and existing backup-horizon, safety-margin, cleanup dry-run, and
+      batch settings are documented; no secret is added.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+    Detail: No HTTP or OpenAPI contract changes.
+  Operator:
+    Reference: docs/TROUBLESHOOTING.md
+    Disposition: documented
+    Detail: >-
+      Readiness exposes aggregate high-water/floor state and bounded stale,
+      ahead, gap, pending, and ready reason codes without identifiers or raw errors.

@@ -1,6 +1,3 @@
-// ABOUTME: Generates deterministic AI agent contract inventory docs from ATCR metadata.
-// ABOUTME: Preserves manual sections while excluding prompts, payloads, secrets, tenants, and provider details.
-
 using System.Text;
 using Explore.Application.Features.AiAssistant.Tools;
 

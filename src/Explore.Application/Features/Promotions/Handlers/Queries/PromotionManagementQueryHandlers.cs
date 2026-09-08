@@ -1,6 +1,3 @@
-// ABOUTME: Handles organizer promotion management list and detail queries.
-// ABOUTME: Maps repository-returned Domain entities into safe DTOs with hidden authority metadata.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Promotions.Handlers.Commands;

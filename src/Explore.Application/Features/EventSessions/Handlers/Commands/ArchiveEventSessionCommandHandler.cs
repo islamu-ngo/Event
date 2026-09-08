@@ -1,6 +1,3 @@
-// ABOUTME: Handler that transitions an event session to the Archived lifecycle state.
-// ABOUTME: Uses the shared session lifecycle path so cache invalidation and schedule recalculation stay consistent.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventSessions.Requests.Commands;
 using Explore.Domain;

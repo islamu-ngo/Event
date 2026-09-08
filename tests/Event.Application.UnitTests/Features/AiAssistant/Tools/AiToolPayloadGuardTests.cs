@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the shared AI tool payload guard.
-// ABOUTME: Verifies malformed, non-object, unknown, and forbidden payload fields fail closed safely.
-
 using Explore.Application.Features.AiAssistant.Tools;
 
 namespace Event.Application.UnitTests.Features.AiAssistant.Tools;

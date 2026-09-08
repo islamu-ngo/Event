@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for GetEventTemplateDiffQueryHandler ensuring diff-service delegation and response wrapping.
-// ABOUTME: Confirms the query path stays thin and preserves the BaseCommandResponse envelope.
-
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventTemplateSync;
 using Explore.Application.Features.EventTemplateSync.Queries.GetEventTemplateDiff;

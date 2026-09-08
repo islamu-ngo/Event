@@ -1,6 +1,3 @@
-// ABOUTME: Reads the current HTTP request's ClaimsPrincipal and exposes any API-key-derived machine principal context.
-// ABOUTME: Delegates claim parsing to ApiAuthenticationPrincipalExtensions for a single parsing contract.
-
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
 using Microsoft.AspNetCore.Http;

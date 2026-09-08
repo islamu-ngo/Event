@@ -1,6 +1,3 @@
-// ABOUTME: Repository implementation for relational UI theme catalogs spanning platform-owned and tenant-owned themes.
-// ABOUTME: Keeps theme retrieval explicit so future runtime services can resolve defaults and available choices predictably.
-
 namespace Explore.Persistence.Repositories;
 
 using Explore.Application.Contracts.Persistence;

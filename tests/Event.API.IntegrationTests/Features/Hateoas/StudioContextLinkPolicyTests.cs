@@ -1,6 +1,3 @@
-// ABOUTME: Verifies actor-scoped Studio navigation is exposed only through server-authored HAL links.
-// ABOUTME: Ensures a missing order relation candidate yields no cross-event operational navigation.
-
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.DTOs.Studio;

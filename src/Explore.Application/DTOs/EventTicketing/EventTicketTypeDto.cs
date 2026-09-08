@@ -1,5 +1,3 @@
-// ABOUTME: Read model for an event ticket type in a ticket catalog.
-// ABOUTME: Includes persisted identifiers for HAL/API management responses.
 namespace Explore.Application.DTOs.EventTicketing;
 
 public sealed record EventTicketTypeDto

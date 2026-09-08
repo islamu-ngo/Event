@@ -1,6 +1,3 @@
-// ABOUTME: Owner-scoped join row linking a webhook endpoint to an enabled canonical event type.
-// ABOUTME: Preserves instance-or-tenant query scope while ownership is inherited from the endpoint consumer.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

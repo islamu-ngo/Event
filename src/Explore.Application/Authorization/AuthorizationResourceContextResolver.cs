@@ -1,6 +1,3 @@
-// ABOUTME: Resolves trusted authorization facts from loaded entities after request-specific enrichers run.
-// ABOUTME: Server-loaded state always overrides request-declared facts, and an unresolvable resource denies.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;

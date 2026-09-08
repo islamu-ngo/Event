@@ -1,6 +1,3 @@
-// ABOUTME: Tests that BYO Cerbos failure_mode=closed activates a one-way safe-mode latch.
-// ABOUTME: Only instance admin emergency access is permitted — all other users are denied.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Security;

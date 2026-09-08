@@ -1,6 +1,3 @@
-// ABOUTME: Reports bounded refund-reconciliation readiness without identifiers or money dimensions.
-// ABOUTME: Degrades on ambiguous, failed, action-required, operator-blocked, or stale non-terminal work.
-
 using Explore.Application.Contracts.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;

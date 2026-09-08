@@ -1,6 +1,3 @@
-// ABOUTME: Setting definitions for notification user preferences (display density, default scope).
-// ABOUTME: Overridable at User scope so each user can customize their notification experience.
-
 namespace Explore.Domain.Settings.Definitions;
 
 public static class NotificationSettingDefinitions

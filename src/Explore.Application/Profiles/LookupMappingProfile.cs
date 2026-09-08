@@ -1,6 +1,3 @@
-// ABOUTME: AutoMapper profile for all lookup/taxonomy entities (Location, Tag, Language, CategoryType, TagType, Madhab, EventStatus, etc.).
-// ABOUTME: Split from monolithic MappingProfile.cs for domain-cohesion.
-
 using AutoMapper;
 using Explore.Application.DTOs.ActorType;
 using Explore.Application.DTOs.CategoryType;

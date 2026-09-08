@@ -1,6 +1,3 @@
-// ABOUTME: Keycloak adapter for account-authority-owned identity lifecycle email requests.
-// ABOUTME: Calls Keycloak required-action email APIs while returning only safe local outcomes.
-
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;

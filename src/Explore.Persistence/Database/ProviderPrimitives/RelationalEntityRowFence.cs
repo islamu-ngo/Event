@@ -1,6 +1,3 @@
-// ABOUTME: Builds provider-correct exclusive row fences for admission authority decisions.
-// ABOUTME: Resolves mapped schemas and prefixes so every supported relational engine shares one lock protocol.
-
 using System.Linq.Expressions;
 using Explore.Domain.Interfaces;
 using Microsoft.EntityFrameworkCore;

@@ -1,6 +1,3 @@
-// ABOUTME: Persists the deterministic share of a refund assigned to one accepted order line.
-// ABOUTME: Keeps organizer, fee, contribution, and total minor units exact across partial refunds.
-
 using Explore.Domain.Interfaces;
 using Explore.Domain.ValueObjects;
 

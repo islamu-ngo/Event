@@ -1,6 +1,3 @@
-// ABOUTME: Component tests for tenant lookup tables section loading/error/success states.
-// ABOUTME: Verifies parallel lookup loading and consolidated lookup tab rendering.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Contracts.Services.Lookup;

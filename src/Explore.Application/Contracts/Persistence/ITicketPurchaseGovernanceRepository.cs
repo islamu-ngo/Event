@@ -1,6 +1,3 @@
-// ABOUTME: Defines tenant-qualified persistence for versioned purchase policy and durable authority reservations.
-// ABOUTME: Returns Domain outcomes while keeping provider transactions and canonical locks behind the boundary.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

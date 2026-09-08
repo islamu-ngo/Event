@@ -1,6 +1,3 @@
-// ABOUTME: Lookup-table entity for notification recipient scope classifiers.
-// ABOUTME: Replaces reuse of ActorType for personal, organization, group, and system notification scopes.
-
 namespace Explore.Domain;
 
 public class NotificationScopeType

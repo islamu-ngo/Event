@@ -1,6 +1,3 @@
-// ABOUTME: Verifies storage reconciliation bypasses tenant filters only for explicit storage predicates.
-// ABOUTME: Proves delete-requested resource lookup is bounded by tenant, lifecycle, provider, and resource.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;

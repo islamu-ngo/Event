@@ -1,6 +1,3 @@
-// ABOUTME: Persistence contract for active and historical paid-event policy versions.
-// ABOUTME: Returns Domain entities so policy revision flows keep entity-owned invariants.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

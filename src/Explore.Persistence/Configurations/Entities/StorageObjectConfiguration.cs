@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for provider-neutral storage objects and legacy image references.
-// ABOUTME: Enforces tenant/provider indexes, lifecycle constraints, soft-delete metadata, and concurrency.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

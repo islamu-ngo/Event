@@ -1,6 +1,3 @@
-// ABOUTME: Carries the validated primary-database schema through EF options and model-cache boundaries.
-// ABOUTME: Separates models and migration services when schema-capable providers use different namespaces.
-
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 

@@ -38,7 +38,7 @@ Kubernetes/Helm, ActivityPub, first-party AT Protocol PDS/AppView hosting, and i
 
 ## Architecture at a glance
 
-Browser traffic enters through the Blazor BFF. The BFF owns browser session handling and forwards access tokens to the API. The API dispatches application requests through MediatR, persists business state, and emits durable work through outboxes. Keycloak is the required browser identity authority. Runtime authorization is explicitly selected between Cerbos and local DB-backed RBAC.
+Browser traffic enters through the Blazor BFF. The BFF owns browser session handling and forwards access tokens to the API. The API dispatches application requests through MediatR, persists business state, and emits durable work through outboxes. Local Identity, Keycloak, or AT Protocol can be the primary browser identity authority. Runtime authorization is explicitly selected between Cerbos and local DB-backed RBAC.
 
 Clients do not infer mutation rights from roles or claims. HAL `_links` returned by the server are the source of truth for actions such as edit, delete, check-in, refund, and administration.
 

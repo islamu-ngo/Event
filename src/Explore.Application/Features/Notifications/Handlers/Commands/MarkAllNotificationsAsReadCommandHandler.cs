@@ -1,6 +1,3 @@
-// ABOUTME: Handles bulk marking all unread notifications as read (YouTube-style).
-// ABOUTME: Uses timestamp cutoff to prevent race conditions with newly arrived notifications.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Notifications.Requests.Commands;

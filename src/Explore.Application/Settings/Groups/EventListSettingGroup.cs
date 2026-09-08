@@ -1,6 +1,3 @@
-// ABOUTME: Strongly-typed EventList setting group for browse/display preferences resolved via hierarchical cascade.
-// ABOUTME: Covers browse mode, page size, layout mode, and card field visibility — all user-overridable.
-
 namespace Explore.Application.Settings.Groups;
 
 using Explore.Application.Contracts.Infrastructure;

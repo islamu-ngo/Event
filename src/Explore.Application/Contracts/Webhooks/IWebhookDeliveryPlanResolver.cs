@@ -1,6 +1,3 @@
-// ABOUTME: Application contract for resolving governed immutable outgoing webhook delivery-plan facts.
-// ABOUTME: Keeps provider bindings and Local targets fail-closed before atomic materialization.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Webhooks;

@@ -1,0 +1,43 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M1RR9K6M4YAAKCXANW60PSR1
+Title: "Relational ATProto transient storage"
+Type: feat
+Scope: access
+Summary: "Persist encrypted login transients and replay claims with tenant-bound single-use consumption across supported relational providers."
+Group: database-backed-atproto-auth-storage
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/adr/ADR-014-atproto-session-trust-bridge.md
+    Disposition: not-applicable
+    Detail: This additive storage phase does not switch existing BFF consumers.
+  Security:
+    Reference: docs/internal/adr/ADR-014-atproto-session-trust-bridge.md
+    Disposition: documented
+    Detail: >-
+      Instance-owned encrypted transients retain mandatory tenant binding for
+      authentication payloads. Unique replay claims and candidate-qualified
+      committed deletion prevent duplicate ownership without business filter bypass.
+  Migration:
+    Reference: schemas/islamu-event.md
+    Disposition: documented
+    Detail: >-
+      Apply AddAtprotoTransientAuthentication in the selected application-provider
+      migration history before enabling database-backed login. Two new tables
+      hold bounded ciphertext and assertion digests; existing data is unchanged.
+  Configuration:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: Storage uses the existing primary relational database authority.
+  OpenAPI:
+    Reference: docs/internal/adr/ADR-014-atproto-session-trust-bridge.md
+    Disposition: not-applicable
+    Detail: This schema phase introduces no public endpoint or generated client contract.
+  Operator:
+    Reference: docs/internal/adr/ADR-014-atproto-session-trust-bridge.md
+    Disposition: documented
+    Detail: >-
+      An uncertain committed consume requires a fresh login, not a destructive
+      retry. Provider DDL failures require forward repair; backup retention can
+      outlive deletion of expired transient rows.

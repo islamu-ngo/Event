@@ -1,6 +1,3 @@
-// ABOUTME: Validates curator claim-review transitions before domain state changes.
-// ABOUTME: Requires a supported decision, reason code, and concurrency token.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.EventOrganizerClaim.Validators;

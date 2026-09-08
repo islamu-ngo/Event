@@ -1,6 +1,3 @@
-// ABOUTME: Builds one current Day 2 configuration manifest for the instance and every active tenant.
-// ABOUTME: Reuses closed catalogs, typed resolvers, paid-policy authority, and validation before serialization.
-
 namespace Explore.Application.Features.ConfigurationManifest.Handlers.Queries;
 
 using System.Text.Json;

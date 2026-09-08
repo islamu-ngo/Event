@@ -1,6 +1,3 @@
-// ABOUTME: Handles tenant creation with optional automatic admin assignment for the requesting user.
-// ABOUTME: Validates input, enforces slug uniqueness, and atomically creates tenant, branding, and role grants.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;

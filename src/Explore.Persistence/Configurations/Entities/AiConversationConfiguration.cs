@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for tenant-scoped AI assistant conversations.
-// ABOUTME: Applies lifecycle indexes, provider metadata bounds, and optimistic concurrency.
-
 using Explore.Domain.Ai;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

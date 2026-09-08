@@ -1,6 +1,3 @@
-// ABOUTME: Verifies scoped Jetstream persistence and recovery dispatch through the Infrastructure host boundary.
-// ABOUTME: Ensures only successful discovery mutations evict public ATProto response caches.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Federation.Atproto.Models;

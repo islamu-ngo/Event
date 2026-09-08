@@ -1,6 +1,3 @@
-// ABOUTME: Configuration extensions for the Blazor Server project.
-// ABOUTME: Adds Infisical as configuration source and maps Infisical secret names to .NET config keys.
-
 using Explore.Blazor.Configuration;
 using Explore.Blazor.Services.Auth;
 using Microsoft.Extensions.Hosting;

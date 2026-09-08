@@ -1,6 +1,3 @@
-// ABOUTME: Finds the repository root for local doctor checks.
-// ABOUTME: Uses sentinel files rather than environment-specific absolute paths.
-
 namespace Explore.Diagnostic.Doctor;
 
 public static class DoctorRepositoryLocator

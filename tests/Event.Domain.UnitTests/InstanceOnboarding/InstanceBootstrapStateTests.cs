@@ -1,6 +1,3 @@
-// ABOUTME: Specifies the typed instance-bootstrap lifecycle, correction fencing, and finality contract.
-// ABOUTME: Exercises direct public transitions with UUIDv7, UTC, and fingerprint adversarial inputs.
-
 namespace Event.Domain.UnitTests.InstanceOnboarding;
 
 using System.Text.Json;

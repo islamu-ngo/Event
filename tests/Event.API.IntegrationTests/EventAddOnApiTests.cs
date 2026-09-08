@@ -1,6 +1,3 @@
-// ABOUTME: Defines prospective API, HAL, OpenAPI, privacy, and authorization contracts for add-ons.
-// ABOUTME: Pins optional disclosure, immutable totals, management, fulfillment, refund, and admission isolation.
-
 using System.Net;
 using System.Reflection;
 using System.Text.Json;

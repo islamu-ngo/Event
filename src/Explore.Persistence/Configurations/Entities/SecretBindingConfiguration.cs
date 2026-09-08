@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for SecretBinding with normalized metadata columns,
-// ABOUTME: CHECK constraints enforcing source-type/metadata consistency, and filtered unique indexes for Postgres NULL semantics.
-
 namespace Explore.Persistence.Configurations.Entities;
 
 using Explore.Domain.Secrets;

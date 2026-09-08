@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for TenantNavLinksState cache loading and teardown behavior.
-// ABOUTME: Guards Blazor circuit teardown races from surfacing disposed SemaphoreSlim errors.
-
 namespace Explore.Blazor.Client.Tests.Services;
 
 public sealed class TenantNavLinksStateTests

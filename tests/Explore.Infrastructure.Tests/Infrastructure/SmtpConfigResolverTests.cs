@@ -1,6 +1,3 @@
-// ABOUTME: Exercises SMTP capability and transport ownership through real relational settings resolution.
-// ABOUTME: Guards delivery disablement, governance locks, and cross-scope credential disclosure.
-
 using System.Text.Json;
 using SettingsDatabase = Explore.Tests.Shared.Settings.SmtpSettingsDatabase;
 using Explore.Application.Contracts.Infrastructure;

@@ -1,6 +1,3 @@
-// ABOUTME: Domain tests for storage upload reservation session state transitions.
-// ABOUTME: Verifies reserved/uploading/finalized/expired state rules without provider dependencies.
-
 namespace Event.Domain.UnitTests.Entities;
 
 using Explore.Domain;

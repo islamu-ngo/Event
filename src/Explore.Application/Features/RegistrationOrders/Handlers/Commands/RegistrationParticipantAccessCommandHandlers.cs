@@ -1,6 +1,3 @@
-// ABOUTME: Gates participant mutations through current-account ownership or an opaque guest order capability.
-// ABOUTME: Dispatches the existing participant CQRS commands only after the shared order access guard succeeds.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

@@ -1,6 +1,3 @@
-// ABOUTME: Records durable subject-scoped evidence that one registration requirement was fulfilled or skipped.
-// ABOUTME: Keeps optional skips auditable without allowing them to satisfy mandatory workflow requirements.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Classifies prohibited reflection dispatch, string-selected types, and raw product-source assurance with Roslyn.
-// ABOUTME: Permits compiled metadata and structured artifact parsing while reporting deterministic bounded locations.
-
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;

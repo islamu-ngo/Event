@@ -1,6 +1,3 @@
-// ABOUTME: Produces the authenticated Infisical.Sdk client and wraps it in a library-agnostic
-// ABOUTME: facade (IInfisicalClient) so the Application layer never references the SDK directly.
-
 using Explore.Application.Contracts.Secrets;
 using Explore.Secrets.Configuration;
 using Infisical.Sdk;

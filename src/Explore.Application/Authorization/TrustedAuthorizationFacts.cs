@@ -1,6 +1,3 @@
-// ABOUTME: Closed catalog of trusted authorization fact records for every authorizable resource family.
-// ABOUTME: Providers may only read these typed records; arbitrary caller-authored attribute bags are not a policy input.
-
 using Explore.Domain;
 
 namespace Explore.Application.Authorization;

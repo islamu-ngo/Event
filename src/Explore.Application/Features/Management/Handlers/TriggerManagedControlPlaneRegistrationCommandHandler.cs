@@ -1,6 +1,3 @@
-// ABOUTME: Creates and retries one durable Event-to-Control-Plane registration attempt outside database transactions.
-// ABOUTME: Uses deployment-owned directional credentials referenced by SecretBinding metadata.
-
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;

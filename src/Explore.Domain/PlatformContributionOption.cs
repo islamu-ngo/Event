@@ -1,6 +1,3 @@
-// ABOUTME: Defines one stored percentage choice in an instance-scoped contribution setting version.
-// ABOUTME: Makes the zero default and ordered contribution choices part of immutable configuration data.
-
 using Explore.Domain.ValueObjects;
 
 namespace Explore.Domain;

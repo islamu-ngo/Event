@@ -1,6 +1,3 @@
-// ABOUTME: RED cache-invalidation tests for reporting-intake HAL and options response changes.
-// ABOUTME: Requires a dedicated reporting cache boundary after hierarchical setting cache eviction.
-
 namespace Event.Api.IntegrationTests.Features;
 
 using Explore.API.Hosting;

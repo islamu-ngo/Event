@@ -1,6 +1,3 @@
-// ABOUTME: Builds the linkless non-final reporter follow-up for a NeedsMoreInfo decision.
-// ABOUTME: Keeps in-app delivery required while gating optional SMTP by follow-up consent and current authority.
-
 using Explore.Application.Contracts.Notifications;
 using Explore.Domain;
 using Explore.Domain.Enums;

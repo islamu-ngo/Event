@@ -1,6 +1,3 @@
-// ABOUTME: Cerbos policy compilation and structural validation tests.
-// ABOUTME: Verifies all policy files are loadable, the Cerbos container accepts them, and the health API confirms readiness.
-
 using Event.Api.IntegrationTests.Fixtures;
 using TUnit.Core;
 

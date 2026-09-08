@@ -1,6 +1,3 @@
-// ABOUTME: Proves admission order fences contend on every supported external relational engine.
-// ABOUTME: Executes production-mapped schema and prefix SQL against real SQL Server, MariaDB, and MySQL.
-
 using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
@@ -127,7 +124,7 @@ public sealed class AdmissionAuthorityRowFenceProviderTests(
 
     private ExploreDbContext CreateContext(PrimaryDatabaseProvider provider)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>();
+        var options = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(
             options,
             fixture.CreateOptions(provider));

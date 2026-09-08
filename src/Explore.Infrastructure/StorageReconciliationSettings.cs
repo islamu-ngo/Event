@@ -1,6 +1,3 @@
-// ABOUTME: Runtime settings for dry-run-first storage reconciliation.
-// ABOUTME: Controls scan cadence, bounded batch size, quarantine, and deletion safety flags.
-
 namespace Explore.Infrastructure;
 
 public sealed class StorageReconciliationSettings

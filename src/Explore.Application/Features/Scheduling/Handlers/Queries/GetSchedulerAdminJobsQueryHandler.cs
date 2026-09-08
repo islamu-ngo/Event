@@ -1,6 +1,3 @@
-// ABOUTME: Lists every scheduled job with its trigger states and fire timeline for the operator surface.
-// ABOUTME: Returns scheduling metadata only; trigger data maps and job payloads are never read or projected.
-
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.DTOs.Scheduling;
 using Explore.Application.Features.Scheduling.Requests.Queries;

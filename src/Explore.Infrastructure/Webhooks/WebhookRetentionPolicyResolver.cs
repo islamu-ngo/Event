@@ -1,6 +1,3 @@
-// ABOUTME: Resolves deterministic immutable webhook retention cutoffs from validated runtime settings.
-// ABOUTME: Allows event-contract outbound payload overrides while versioning every independent evidence horizon.
-
 using Explore.Application.Contracts.Webhooks;
 using Microsoft.Extensions.Options;
 

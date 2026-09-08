@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for EventSessionSpeakerService generated-client speaker management flow.
-// ABOUTME: Verifies session-scoped API calls and HAL affordance extraction used by the dialog.
-
 using Explore.Blazor.Client.Helpers;
 
 namespace Explore.Blazor.Client.Tests.Services;

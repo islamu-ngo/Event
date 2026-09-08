@@ -1,6 +1,3 @@
-// ABOUTME: Centralizes all HttpClient registrations for the Blazor BFF server.
-// ABOUTME: Eliminates repeated ConfigurePrimaryHttpMessageHandler blocks for dev cert bypass.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Explore.Blazor.Client.Extensions;
@@ -89,6 +86,20 @@ public static class HttpClientExtensions
             client.Timeout = TimeSpan.FromSeconds(20);
         }).ConfigureApiTransport(environment, profile, allowAutoRedirect: false)
           .RemoveAllResilienceHandlers();
+#pragma warning restore EXTEXP0001
+
+        var transient = services.AddHttpClient(ApiBackedAtprotoTransientStore.HttpClientName, client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(20);
+        });
+        if (profile == BlazorHostProfile.Combined)
+            transient.ConfigurePrimaryHttpMessageHandler<InProcessEventApiHttpMessageHandler>();
+        else
+            transient.ConfigureDevCertBypass(environment, allowAutoRedirect: false);
+#pragma warning disable EXTEXP0001
+        // A lost consume response is indeterminate: neither global retries nor hedging may resend it.
+        transient.RemoveAllResilienceHandlers();
 #pragma warning restore EXTEXP0001
 
         return services;

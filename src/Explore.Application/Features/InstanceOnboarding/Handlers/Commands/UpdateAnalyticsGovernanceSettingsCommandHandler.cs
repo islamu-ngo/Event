@@ -1,6 +1,3 @@
-// ABOUTME: Handles UpdateAnalyticsGovernanceSettingsCommand — persists analytics governance settings.
-// ABOUTME: Validates settings against provider capabilities before writing at Instance scope.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;

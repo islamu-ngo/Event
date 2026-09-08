@@ -1,6 +1,3 @@
-// ABOUTME: Walks complete public type graphs for provider-specific admission contract leakage.
-// ABOUTME: Traverses arrays, nullable and generic arguments, base types, and interfaces with cycle protection.
-
 namespace ApplicationUnitTests.Contracts.Admissions.Support;
 
 internal static class ProviderNeutralTypeGraph

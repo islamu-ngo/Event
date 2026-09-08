@@ -1,6 +1,3 @@
-// ABOUTME: Validates the selected Environment, Infisical, or local User Secrets authority.
-// ABOUTME: Runs at startup so unsupported or incomplete authority modes fail closed.
-
 using Explore.Secrets.Abstractions;
 using Explore.Secrets.Configuration;
 using Microsoft.Extensions.Options;

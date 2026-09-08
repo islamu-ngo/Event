@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos resource policy for organization_member resources.
-# ABOUTME: Organization members expose identity and role data, so reads require admin authority.
-
 apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   resource: "islamuevent_organization_member"

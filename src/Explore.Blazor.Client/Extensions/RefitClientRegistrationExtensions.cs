@@ -1,6 +1,3 @@
-// ABOUTME: Registers shared Refit clients for Blazor BFF endpoints with secure handlers.
-// ABOUTME: Requires host-supplied same-origin BaseAddress values so routes stay behind BFF/YARP.
-
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Explore.Blazor.Client.Services.Http;

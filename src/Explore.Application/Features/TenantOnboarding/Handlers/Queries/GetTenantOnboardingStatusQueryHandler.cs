@@ -1,6 +1,3 @@
-// ABOUTME: Handles tenant onboarding status queries for startup flow routing decisions.
-// ABOUTME: Combines tenant onboarding completion state with current user's tenant/instance admin eligibility.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;

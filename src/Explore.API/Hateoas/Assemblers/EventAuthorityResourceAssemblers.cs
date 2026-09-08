@@ -1,6 +1,3 @@
-// ABOUTME: Resource assemblers for event public-action and organizer-claim HAL payloads.
-// ABOUTME: Connects Phase 1 authority DTOs to the shared authorization-aware link pipeline.
-
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.EventOrganizerClaim;

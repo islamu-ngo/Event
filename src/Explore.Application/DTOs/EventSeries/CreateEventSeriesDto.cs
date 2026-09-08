@@ -1,6 +1,3 @@
-// ABOUTME: DTO for creating a new event series.
-// ABOUTME: Carries title, description, slug, featured image, actor, and publish state.
-
 using System;
 
 namespace Explore.Application.DTOs.EventSeries;

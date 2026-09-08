@@ -1,8 +1,6 @@
 ---
 description: Comprehensive reference for all baseline, advanced, and profile-specific environment variables.
 ---
-<!-- ABOUTME: Public operator reference for supported environment-backed configuration. -->
-<!-- ABOUTME: Distinguishes baseline settings, secret values, and optional deployment profiles. -->
 
 # Environment Variables Reference
 
@@ -325,12 +323,75 @@ Defaults below are declared metadata, never values read from a deployment or sec
 
 | Variable | Category | Sensitivity | Default | Requirement | Restart |
 |---|---|---|---|---|---|
-| `ASPNETCORE_ENVIRONMENT` | deployment | public | None | optional | process |
-| `DOTNET_ENVIRONMENT` | deployment | public | None | optional | process |
+| `PUBLIC_BASE_URL` | platform | public | None | required | process |
 | `API_HTTP_PORT` | deployment | public | None | optional | deployment |
 | `UI_HTTP_PORT` | deployment | public | None | optional | deployment |
 | `KEYCLOAK_HTTP_PORT` | identity | public | None | optional | process |
 | `MAILPIT_UI_PORT` | integration | public | 8025 | defaulted | deployment |
+| `DEPLOYMENT_MODE` | deployment | public | None | optional | deployment |
+| `SECRET_PROVIDER` | security | sensitive | None | required | process |
+| `DATABASE_PROVIDER` | database | public | PostgreSql | defaulted | process |
+| `DATABASE_HOST` | database | public | None | required | process |
+| `DATABASE_PORT` | database | public | None | optional | process |
+| `DATABASE_NAME` | database | public | None | required | process |
+| `DATABASE_SCHEMA` | database | public | islamu_event | defaulted | process |
+| `DATABASE_RUNTIME_USERNAME` | database | public | None | required | process |
+| `DATABASE_RUNTIME_PASSWORD` | database | sensitive | None | required | process |
+| `DATABASE_MIGRATOR_USERNAME` | database | public | None | required | process |
+| `DATABASE_MIGRATOR_PASSWORD` | database | sensitive | None | required | process |
+| `DATABASE_TLS_MODE` | database | public | Prefer | defaulted | process |
+| `AUTHENTICATION_PROVIDER` | platform | public | None | optional | process |
+| `ATPROTO_LOGIN_ENABLED` | platform | public | None | optional | process |
+| `INSTANCE_BOOTSTRAP_ADMIN_PROVIDER` | identity | public | None | required | process |
+| `INSTANCE_BOOTSTRAP_ADMIN_SUBJECT` | identity | sensitive | None | required | process |
+| `INSTANCE_BOOTSTRAP_BINDING_GENERATION` | identity | public | None | required | process |
+| `INSTANCE_BOOTSTRAP_ADMIN_EMAIL` | identity | sensitive | None | optional | process |
+| `INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME` | identity | sensitive | None | optional | process |
+| `INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME` | identity | sensitive | None | optional | process |
+| `INSTANCE_BOOTSTRAP_LOCAL_PASSWORD` | identity | secret | None (secret) | required | process |
+| `AUTHENTICATION_LOCAL_JWT_KEY` | security | secret | None (secret) | optional | process |
+| `AUTHENTICATION_LOCAL_LOCKOUT_THRESHOLD` | security | public | 5 | defaulted | process |
+| `AUTHENTICATION_LOCAL_LOCKOUT_DURATION_MINUTES` | security | public | 15 | defaulted | process |
+| `IDENTITY_DATABASE_TOPOLOGY` | integration | public | colocated | defaulted | process |
+| `KEYCLOAK_ENDPOINT` | identity | secret | None (secret) | required | process |
+| `KEYCLOAK_REALM` | identity | secret | None (secret) | required | process |
+| `KEYCLOAK_BLAZOR_CLIENT_ID` | identity | public | None | required | process |
+| `KEYCLOAK_BLAZOR_CLIENT_SECRET` | identity | secret | None (secret) | required | process |
+| `KEYCLOAK_DB_DATABASE` | integration | public | None | optional | deployment |
+| `KEYCLOAK_DB_USERNAME` | integration | public | None | optional | deployment |
+| `KEYCLOAK_DB_PASSWORD` | integration | secret | None (secret) | optional | deployment |
+| `KEYCLOAK_ADMIN` | integration | public | None | optional | deployment |
+| `KEYCLOAK_ADMIN_PASSWORD` | integration | secret | None (secret) | optional | deployment |
+| `LOCAL_STORAGE_ROOT_PATH` | storage | public | None | optional | capability |
+| `EMAIL_DISPATCH_RABBITMQ_ENABLED` | messaging | public | false | defaulted | capability |
+| `ERASURE_TOPOLOGY` | platform | public | None | optional | process |
+| `ERASURE_EMBEDDED_PATH` | platform | public | None | optional | process |
+| `SETUP_SECRET` | platform | secret | None (secret) | required | process |
+| `INSTANCE_BOOTSTRAP_MODE` | identity | public | None | required | process |
+| `INSTANCE__OPERATORIDENTITY__OPERATORID` | identity | public | None | required | process |
+| `INSTANCE__OPERATORIDENTITY__PUBLICNAME` | identity | public | None | required | process |
+| `INSTANCE__OPERATORIDENTITY__LEGALNAME` | identity | public | None | required | process |
+| `INSTANCE__OPERATORIDENTITY__ISOFFICIALINSTANCE` | identity | public | None | optional | process |
+| `INSTANCE__OPERATORIDENTITY__OFFICIALORIGIN` | identity | public | None | optional | process |
+| `INSTANCE__OPERATORIDENTITY__OPERATORKINDCODE` | identity | public | None | required | process |
+| `INSTANCE__OPERATORIDENTITY__JURISDICTIONCOUNTRYCODE` | identity | public | None | required | process |
+| `INSTANCE__OPERATORIDENTITY__PUBLICCONTACTEMAIL` | identity | sensitive | None | optional | process |
+| `INSTANCE__OPERATORIDENTITY__WEBSITEURL` | identity | public | None | optional | process |
+| `INSTANCE__OPERATORIDENTITY__LEGALNOTICEURL` | identity | public | None | optional | process |
+| `INSTANCE__OPERATORIDENTITY__TERMSURL` | identity | public | None | optional | process |
+| `INSTANCE__OPERATORIDENTITY__PRIVACYURL` | identity | public | None | optional | process |
+| `CONFIGURATION_MANIFEST_MODE` | deployment | public | Off | defaulted | deployment |
+| `CONFIGURATION_MANIFEST_PATH` | deployment | public | None | optional | deployment |
+| `CONFIGURATION_MANIFEST_HOST_DIRECTORY` | deployment | public | None | optional | deployment |
+| `ASPNETCORE_ENVIRONMENT` | deployment | public | None | optional | process |
+| `DOTNET_ENVIRONMENT` | deployment | public | None | optional | process |
+| `MAIL_SMTP_HOST` | messaging | secret | None (secret) | optional | capability |
+| `MAIL_SMTP_PORT` | messaging | secret | None (secret) | optional | capability |
+| `MAIL_SMTP_FROM_ADDRESS` | messaging | secret | None (secret) | optional | capability |
+| `MAIL_SMTP_FROM_NAME` | messaging | secret | None (secret) | optional | capability |
+| `MAIL_SMTP_USERNAME` | messaging | secret | None (secret) | optional | capability |
+| `MAIL_SMTP_PASSWORD` | messaging | secret | None (secret) | optional | capability |
+| `MAIL_SMTP_ENCRYPTION` | messaging | public | None | optional | capability |
 | `MINIO_API_PORT` | integration | public | None | optional | deployment |
 | `MINIO_CONSOLE_PORT` | integration | public | None | optional | deployment |
 | `CERBOS_HTTP_PORT` | deployment | public | None | optional | deployment |
@@ -351,30 +412,12 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `FORMBRICKS_CRON_SECRET` | integration | sensitive | None | required | deployment |
 | `FORMBRICKS_HUB_API_KEY` | integration | sensitive | None | required | deployment |
 | `FORMBRICKS_CUBEJS_API_SECRET` | integration | sensitive | None | required | deployment |
-| `CONFIGURATION_MANIFEST_MODE` | deployment | public | Off | defaulted | deployment |
-| `CONFIGURATION_MANIFEST_PATH` | deployment | public | None | optional | deployment |
-| `CONFIGURATION_MANIFEST_HOST_DIRECTORY` | deployment | public | None | optional | deployment |
-| `SECRET_PROVIDER` | security | sensitive | None | required | process |
 | `INFISICAL_URL` | security | public | None | optional | process |
 | `INFISICAL_PROJECT_ID` | security | public | None | optional | process |
 | `INFISICAL_CLIENT_ID` | security | public | None | optional | process |
 | `INFISICAL_CLIENT_SECRET` | security | sensitive | None | optional | process |
 | `INFISICAL_ENV` | security | public | None | optional | process |
-| `DATABASE_PROVIDER` | database | public | PostgreSql | defaulted | process |
-| `DATABASE_HOST` | database | public | None | required | process |
-| `DATABASE_PORT` | database | public | None | optional | process |
-| `DATABASE_NAME` | database | public | None | required | process |
-| `DATABASE_SCHEMA` | database | public | islamu_event | defaulted | process |
-| `DATABASE_TLS_MODE` | database | public | Prefer | defaulted | process |
 | `DATABASE_TRUST_SERVER_CERTIFICATE` | database | public | false | defaulted | process |
-| `DATABASE_RUNTIME_USERNAME` | database | public | None | required | process |
-| `DATABASE_RUNTIME_PASSWORD` | database | sensitive | None | required | process |
-| `DATABASE_MIGRATOR_USERNAME` | database | public | None | required | process |
-| `DATABASE_MIGRATOR_PASSWORD` | database | sensitive | None | required | process |
-| `KEYCLOAK_REALM` | identity | secret | None (secret) | required | process |
-| `KEYCLOAK_ENDPOINT` | identity | secret | None (secret) | required | process |
-| `KEYCLOAK_BLAZOR_CLIENT_ID` | identity | public | None | required | process |
-| `KEYCLOAK_BLAZOR_CLIENT_SECRET` | identity | secret | None (secret) | required | process |
 | `KEYCLOAK_API_CLIENT_SECRET` | identity | secret | None (secret) | required | process |
 | `KEYCLOAK_BLAZOR_REDIRECT_URIS` | identity | public | None | optional | process |
 | `KEYCLOAK_BLAZOR_WEB_ORIGINS` | identity | public | None | optional | process |
@@ -391,18 +434,7 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `KEYCLOAK_SMTP_ENVELOPE_FROM` | identity | public | None | optional | process |
 | `KEYCLOAK_SMTP_USER` | identity | public | None | optional | process |
 | `KEYCLOAK_SMTP_PASSWORD` | identity | sensitive | None | optional | process |
-| `KEYCLOAK_ADMIN` | integration | public | None | optional | deployment |
-| `KEYCLOAK_ADMIN_PASSWORD` | integration | secret | None (secret) | optional | deployment |
-| `KEYCLOAK_DB_DATABASE` | integration | public | None | optional | deployment |
-| `KEYCLOAK_DB_USERNAME` | integration | public | None | optional | deployment |
-| `KEYCLOAK_DB_PASSWORD` | integration | secret | None (secret) | optional | deployment |
 | `KEYCLOAK_REQUIRE_HTTPS_METADATA` | identity | public | None | optional | process |
-| `AUTHENTICATION_PROVIDER` | platform | public | None | optional | process |
-| `ATPROTO_LOGIN_ENABLED` | platform | public | None | optional | process |
-| `AUTHENTICATION_LOCAL_JWT_KEY` | security | secret | None (secret) | optional | process |
-| `AUTHENTICATION_LOCAL_LOCKOUT_THRESHOLD` | security | public | 5 | defaulted | process |
-| `AUTHENTICATION_LOCAL_LOCKOUT_DURATION_MINUTES` | security | public | 15 | defaulted | process |
-| `IDENTITY_DATABASE_TOPOLOGY` | integration | public | colocated | defaulted | process |
 | `IDENTITY_DATABASE_PROVIDER` | integration | public | None | optional | process |
 | `IDENTITY_DATABASE_CONNECTION_STRING` | integration | secret | None (secret) | optional | process |
 | `IDENTITY_DATABASE_HOST` | integration | public | None | optional | process |
@@ -415,20 +447,10 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `IDENTITY_DATABASE_RUNTIME_PASSWORD` | integration | secret | None (secret) | optional | process |
 | `IDENTITY_DATABASE_MIGRATOR_USERNAME` | integration | public | None | optional | process |
 | `IDENTITY_DATABASE_MIGRATOR_PASSWORD` | integration | secret | None (secret) | optional | process |
-| `SETUP_SECRET` | platform | secret | None (secret) | required | process |
 | `SETUP_SECRET_REQUIRED` | platform | sensitive | None | optional | process |
-| `INSTANCE_BOOTSTRAP_MODE` | identity | public | None | required | process |
-| `INSTANCE_BOOTSTRAP_ADMIN_PROVIDER` | identity | public | None | required | process |
-| `INSTANCE_BOOTSTRAP_ADMIN_SUBJECT` | identity | sensitive | None | required | process |
-| `INSTANCE_BOOTSTRAP_BINDING_GENERATION` | identity | public | None | required | process |
-| `INSTANCE_BOOTSTRAP_ADMIN_EMAIL` | identity | sensitive | None | optional | process |
-| `INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME` | identity | sensitive | None | optional | process |
-| `INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME` | identity | sensitive | None | optional | process |
-| `INSTANCE_BOOTSTRAP_LOCAL_PASSWORD` | identity | secret | None (secret) | required | process |
 | `HOSTING_REPLICA_COUNT` | deployment | public | 1 | defaulted | deployment |
 | `PROMOTIONS_CODE_LOOKUP_ACTIVE_KEY_VERSION` | platform | public | None | optional | process |
 | `PROMOTIONS_CODE_LOOKUP_HMAC_KEY` | security | secret | None (secret) | optional | process |
-| `DEPLOYMENT_MODE` | deployment | public | None | optional | deployment |
 | `CONTROL_PLANE_MANAGED_MODE` | deployment | public | None | optional | deployment |
 | `CONTROL_PLANE_URL` | deployment | public | None | optional | deployment |
 | `CONTROL_PLANE_INSTANCE_ID` | deployment | public | None | optional | deployment |
@@ -457,20 +479,7 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `PHYSICAL_TENANCY_MODE` | platform | public | None | optional | process |
 | `API_ENDPOINT` | platform | public | None | optional | process |
 | `CONTROL_PLANE_PUBLIC_ORIGIN` | deployment | public | None | optional | deployment |
-| `INSTANCE__OPERATORIDENTITY__OPERATORID` | identity | public | None | required | process |
-| `INSTANCE__OPERATORIDENTITY__PUBLICNAME` | identity | public | None | required | process |
-| `INSTANCE__OPERATORIDENTITY__LEGALNAME` | identity | public | None | required | process |
-| `INSTANCE__OPERATORIDENTITY__ISOFFICIALINSTANCE` | identity | public | None | optional | process |
-| `INSTANCE__OPERATORIDENTITY__OFFICIALORIGIN` | identity | public | None | optional | process |
-| `INSTANCE__OPERATORIDENTITY__OPERATORKINDCODE` | identity | public | None | required | process |
-| `INSTANCE__OPERATORIDENTITY__JURISDICTIONCOUNTRYCODE` | identity | public | None | required | process |
 | `INSTANCE__OPERATORIDENTITY__REGISTRATIONIDENTIFIER` | identity | public | None | optional | process |
-| `INSTANCE__OPERATORIDENTITY__PUBLICCONTACTEMAIL` | identity | sensitive | None | optional | process |
-| `INSTANCE__OPERATORIDENTITY__WEBSITEURL` | identity | public | None | optional | process |
-| `INSTANCE__OPERATORIDENTITY__LEGALNOTICEURL` | identity | public | None | optional | process |
-| `INSTANCE__OPERATORIDENTITY__TERMSURL` | identity | public | None | optional | process |
-| `INSTANCE__OPERATORIDENTITY__PRIVACYURL` | identity | public | None | optional | process |
-| `PUBLIC_BASE_URL` | platform | public | None | required | process |
 | `PAYMENTS_STRIPE_MODE` | platform | public | None | optional | process |
 | `PAYMENTS_ORGANIZER_DIRECT_PROVIDER_CODE` | platform | public | None | optional | process |
 | `PAYMENTS_ORGANIZER_DIRECT_CONNECT_PLATFORM_ID` | platform | public | None | optional | process |
@@ -532,7 +541,6 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `STORAGE_S3_BUCKET_NAME` | storage | secret | None (secret) | optional | capability |
 | `STORAGE_S3_ACCESS_KEY_ID` | storage | secret | None (secret) | optional | capability |
 | `STORAGE_S3_SECRET_ACCESS_KEY` | storage | secret | None (secret) | optional | capability |
-| `LOCAL_STORAGE_ROOT_PATH` | storage | public | None | optional | capability |
 | `LOCAL_STORAGE_CREATE_ROOT_IF_MISSING` | storage | public | None | optional | capability |
 | `STORAGE_RECONCILIATION_ENABLED` | storage | public | false | defaulted | capability |
 | `STORAGE_RECONCILIATION_DRY_RUN` | storage | public | false | defaulted | capability |
@@ -548,19 +556,11 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `MCP_ENDPOINT_PATH` | platform | public | None | optional | process |
 | `MCP_STATELESS` | platform | public | None | optional | process |
 | `MCP_ENABLE_LEGACY_SSE` | platform | public | None | optional | process |
-| `MAIL_SMTP_HOST` | messaging | secret | None (secret) | optional | capability |
-| `MAIL_SMTP_PORT` | messaging | secret | None (secret) | optional | capability |
-| `MAIL_SMTP_USERNAME` | messaging | secret | None (secret) | optional | capability |
-| `MAIL_SMTP_PASSWORD` | messaging | secret | None (secret) | optional | capability |
-| `MAIL_SMTP_ENCRYPTION` | messaging | public | None | optional | capability |
-| `MAIL_SMTP_FROM_ADDRESS` | messaging | secret | None (secret) | optional | capability |
-| `MAIL_SMTP_FROM_NAME` | messaging | secret | None (secret) | optional | capability |
 | `WEB_PUSH_ENABLED` | messaging | public | false | defaulted | capability |
 | `VAPID_SUBJECT` | messaging | public | None | optional | capability |
 | `VAPID_PUBLIC_KEY` | messaging | public | None | optional | capability |
 | `VAPID_PRIVATE_KEY` | messaging | sensitive | None | optional | capability |
 | `MESSAGING_URI` | messaging | public | None | optional | capability |
-| `EMAIL_DISPATCH_RABBITMQ_ENABLED` | messaging | public | false | defaulted | capability |
 | `EMAIL_DISPATCH_RABBITMQ_CONNECTION_STRING_NAME` | messaging | sensitive | None | optional | capability |
 | `EMAIL_DISPATCH_RABBITMQ_CONNECTION_STRING` | messaging | sensitive | None | optional | capability |
 | `EMAIL_DISPATCH_RABBITMQ_EXCHANGE_NAME` | messaging | public | None | optional | capability |
@@ -652,8 +652,6 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `LISTMONK_SYNC_ON_REGISTRATION` | integration | public | None | optional | capability |
 | `LISTMONK_API_USERNAME` | integration | secret | None (secret) | optional | capability |
 | `LISTMONK_API_KEY` | integration | secret | None (secret) | optional | capability |
-| `ERASURE_TOPOLOGY` | platform | public | None | optional | process |
-| `ERASURE_EMBEDDED_PATH` | platform | public | None | optional | process |
 | `ERASURE_WRITER_REPLICA_COUNT` | platform | public | None | optional | process |
 | `ERASURE_BUSY_TIMEOUT_SECONDS` | platform | public | None | optional | process |
 | `DATABASE_ERASURE_HOST` | database | public | None | optional | process |

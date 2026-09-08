@@ -1,6 +1,3 @@
-// ABOUTME: Verifies location editing emits only trimmed manual update groups and no coordinate authority.
-// ABOUTME: Keeps private-home consent on its independent dialog action using deterministic render events.
-
 using System.Reflection;
 using AngleSharp.Dom;
 using Explore.Blazor.Client.Pages.Admin.Dialogs;

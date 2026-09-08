@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for tenant/provider storage usage counters used by quota checks.
-// ABOUTME: Keeps usage accounting entity-based and persistence-owned without exposing IQueryable.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

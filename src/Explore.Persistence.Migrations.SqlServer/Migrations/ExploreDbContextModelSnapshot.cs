@@ -3190,6 +3190,82 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Explore.Domain.AtprotoTransientAssertionReplay", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AssertionDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nchar(64)")
+                        .HasColumnName("assertion_digest")
+                        .IsFixedLength();
+
+                    b.Property<long>("ExpiresAtUnixMilliseconds")
+                        .HasColumnType("bigint")
+                        .HasColumnName("expires_at_unix_milliseconds");
+
+                    b.HasKey("Id")
+                        .HasName("pk_atproto_transient_assertion_replays");
+
+                    b.HasIndex("AssertionDigest")
+                        .IsUnique()
+                        .HasDatabaseName("ix_atproto_transient_assertion_replays_assertion_digest");
+
+                    b.HasIndex("ExpiresAtUnixMilliseconds")
+                        .HasDatabaseName("ix_atproto_transient_assertion_replays_expires_at_unix_milliseconds");
+
+                    b.ToTable("atproto_transient_assertion_replays", "islamu_event");
+                });
+
+            modelBuilder.Entity("Explore.Domain.AtprotoTransientRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<long>("ExpiresAtUnixMilliseconds")
+                        .HasColumnType("bigint")
+                        .HasColumnName("expires_at_unix_milliseconds");
+
+                    b.Property<string>("ProtectedPayload")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("protected_payload");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("int")
+                        .HasColumnName("purpose");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("TokenDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nchar(64)")
+                        .HasColumnName("token_digest")
+                        .IsFixedLength();
+
+                    b.HasKey("Id")
+                        .HasName("pk_atproto_transient_records");
+
+                    b.HasIndex("ExpiresAtUnixMilliseconds")
+                        .HasDatabaseName("ix_atproto_transient_records_expires_at_unix_milliseconds");
+
+                    b.HasIndex("Purpose", "TokenDigest")
+                        .IsUnique()
+                        .HasDatabaseName("ix_atproto_transient_records_purpose_token_digest");
+
+                    b.ToTable("atproto_transient_records", "islamu_event", t =>
+                        {
+                            t.HasCheckConstraint("ck_atproto_transients_tenant_purpose", "(purpose = 3 AND tenant_id IS NULL) OR (purpose IN (1, 2) AND tenant_id IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("Explore.Domain.AudienceAge", b =>
                 {
                     b.Property<int>("Id")
@@ -16168,18 +16244,15 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
 
                     b.Property<string>("DisplaySortKey")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(14000)
-                        .HasColumnType("nvarchar(max)")
-                        .HasDefaultValue("")
+                        .HasMaxLength(2000)
+                        .IsUnicode(true)
+                        .HasColumnType("nvarchar(2000)")
                         .HasColumnName("display_sort_key")
                         .UseCollation("Latin1_General_100_BIN2")
-                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
+                        .HasAnnotation("Explore:LocationUnicode", true);
 
                     b.Property<short>("DisplaySortKeyVersion")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("smallint")
-                        .HasDefaultValue((short)0)
                         .HasColumnName("display_sort_key_version");
 
                     b.Property<string>("FullName")
@@ -16269,7 +16342,7 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                         {
                             t.HasCheckConstraint("ck_locations_address_visibility_scope", "(address_visibility_id = 1 AND address_organization_id IS NULL) OR (address_visibility_id = 2 AND created_by IS NOT NULL AND address_organization_id IS NULL) OR (address_visibility_id = 3 AND created_by IS NOT NULL AND address_organization_id IS NOT NULL) OR address_visibility_id = 4");
 
-                            t.HasCheckConstraint("ck_locations_display_sort_key_version", "(display_sort_key_version = 0 AND display_sort_key = '') OR (display_sort_key_version = 1 AND display_sort_key <> '' AND len(display_sort_key) % 7 = 0)");
+                            t.HasCheckConstraint("ck_locations_display_sort_key_version", "display_sort_key_version = 2 AND display_sort_key <> ''");
 
                             t.HasCheckConstraint("ck_locations_erased_address_quarantined", "location_privacy_state_id <> 3 OR (address_visibility_id = 1 AND address_organization_id IS NULL)");
 
@@ -16278,8 +16351,6 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
                             t.HasCheckConstraint("ck_locations_owner_private_home", "owner_user_id IS NULL OR location_kind_id = 5");
 
                             t.HasCheckConstraint("ck_locations_private_home_address_visibility", "location_kind_id <> 5 OR address_visibility_id <> 4");
-
-                            t.HasCheckConstraint("ck_locations_tenant_approved_display_sort_key", "address_visibility_id <> 4 OR display_sort_key_version = 1");
                         });
                 });
 
@@ -16429,18 +16500,15 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
 
                     b.Property<string>("AddressSubstringKey")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(14000)
-                        .HasColumnType("nvarchar(max)")
-                        .HasDefaultValue("")
+                        .HasMaxLength(2000)
+                        .IsUnicode(true)
+                        .HasColumnType("nvarchar(2000)")
                         .HasColumnName("address_substring_key")
                         .UseCollation("Latin1_General_100_BIN2")
-                        .HasAnnotation("Explore:PortableOrdinalAscii", true);
+                        .HasAnnotation("Explore:LocationUnicode", true);
 
                     b.Property<short>("AddressSubstringKeyVersion")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("smallint")
-                        .HasDefaultValue((short)0)
                         .HasColumnName("address_substring_key_version");
 
                     b.Property<double?>("Latitude")
@@ -16462,7 +16530,7 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations
 
                     b.ToTable("location_pii", "islamu_event", t =>
                         {
-                            t.HasCheckConstraint("ck_location_pii_address_substring_key_version", "(address_substring_key_version = 0 AND address_substring_key = '') OR (address_substring_key_version = 1 AND address_substring_key <> '' AND len(address_substring_key) % 7 = 0)");
+                            t.HasCheckConstraint("ck_location_pii_address_substring_key_version", "address_substring_key_version = 2 AND address_substring_key <> ''");
 
                             t.HasCheckConstraint("ck_location_pii_coordinate_shape", "(latitude IS NULL AND longitude IS NULL)\nOR (latitude IS NOT NULL AND longitude IS NOT NULL\n    AND latitude BETWEEN -90 AND 90\n    AND longitude BETWEEN -180 AND 180)");
                         });

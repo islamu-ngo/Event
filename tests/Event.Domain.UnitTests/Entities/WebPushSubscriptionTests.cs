@@ -1,6 +1,3 @@
-// ABOUTME: Verifies WebPushSubscription domain lifecycle transitions for browser-owned devices.
-// ABOUTME: Protects active, touch, unsubscribe, and stale-deactivation semantics before persistence wiring.
-
 namespace Event.Domain.UnitTests.Entities;
 
 public sealed class WebPushSubscriptionTests

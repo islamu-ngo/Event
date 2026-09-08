@@ -1,6 +1,3 @@
-// ABOUTME: Tests for the SettingValueSerializer ensuring correct JSON deserialization with fallbacks.
-// ABOUTME: Covers edge cases: null, empty, malformed JSON, type mismatches, and plain text values.
-
 namespace Event.Application.UnitTests.Settings;
 
 using Explore.Application.Settings;

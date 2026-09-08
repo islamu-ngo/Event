@@ -1,6 +1,3 @@
-// ABOUTME: Component-behavior tests for the event-template admin list page.
-// ABOUTME: Verifies global create affordance is gated by collection HAL links only.
-
 using System.Reflection;
 using Explore.Blazor.Client.Pages.Admin.EventTemplates;
 using MudBlazor;

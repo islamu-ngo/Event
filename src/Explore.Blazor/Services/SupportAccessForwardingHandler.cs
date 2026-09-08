@@ -1,6 +1,3 @@
-// ABOUTME: DelegatingHandler that forwards BFF-owned support-access context to API requests.
-// ABOUTME: Strips browser-controlled support headers and injects only the cached trusted session ID.
-
 using Event.Web.BffHosting.Security;
 
 namespace Explore.Blazor.Services;

@@ -1,5 +1,3 @@
-// ABOUTME: Enumerates the closed failure categories for publishing email-dispatch broker pointers.
-// ABOUTME: Maps typed failures to bounded persistence and telemetry codes without exposing broker text.
 
 namespace Explore.Application.Contracts.Infrastructure;
 

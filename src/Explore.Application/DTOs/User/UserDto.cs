@@ -1,6 +1,3 @@
-// ABOUTME: Public DTO for authenticated user profile details.
-// ABOUTME: Includes actor display metadata and the user concurrency stamp for PATCH If-Match updates.
-
 using System;
 
 namespace Explore.Application.DTOs.User;

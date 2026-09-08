@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for event-report intake commands.
-// ABOUTME: Validates only syntactic input; handler performs tenant, event, duplicate, and quota checks.
-
 using Explore.Application.Features.EventReporting.Policies;
 using Explore.Application.Features.EventReporting.Requests.Commands;
 using FluentValidation;

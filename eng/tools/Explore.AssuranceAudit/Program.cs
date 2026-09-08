@@ -1,6 +1,3 @@
-// ABOUTME: Runs the deterministic assurance audit over explicitly governed test-project roots.
-// ABOUTME: Prints bounded diagnostics and returns a nonzero exit code when prohibited assurance is found.
-
 namespace Explore.AssuranceAudit;
 
 internal static class Program

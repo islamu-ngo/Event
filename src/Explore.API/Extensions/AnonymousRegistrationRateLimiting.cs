@@ -1,5 +1,3 @@
-// ABOUTME: Adds bounded effective-IP, subnet, and process concurrency limits to anonymous challenge/start intake.
-// ABOUTME: Uses process-keyed fixed bucket partitions with no raw network identifiers or durable seat counters.
 
 using System.Buffers.Binary;
 using System.Net;

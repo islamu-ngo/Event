@@ -1,4 +1,3 @@
-# ABOUTME: Cerbos policy test suite for tenant_setting resources.
 # Tests the instance lock override and tenant admin conditional update.
 
 name: TenantSettingPolicyTests

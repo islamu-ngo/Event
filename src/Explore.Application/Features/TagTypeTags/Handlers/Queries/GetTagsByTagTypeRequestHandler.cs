@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning all tags belonging to a given tag type.
-// ABOUTME: Used for tag group filtering.
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Tag;

@@ -1,6 +1,3 @@
-// ABOUTME: Handler for creating or updating a session-to-group assignment.
-// ABOUTME: Enforces same-event membership and ensures only one primary group per session.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionGroup.Validators;
 using Explore.Application.Features.EventSessionGroups.Requests.Commands;

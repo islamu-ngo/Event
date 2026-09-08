@@ -1,6 +1,3 @@
-// ABOUTME: Structural validation for grouped tag-type relationship updates.
-// ABOUTME: Persisted tenant, lookup existence, and duplicate checks remain handler-owned.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.TagTypeTags.Validators;

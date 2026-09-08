@@ -1,6 +1,3 @@
-// ABOUTME: Executes each incoming webhook claim in a fresh tenant-bound DI scope and machine principal.
-// ABOUTME: Authorizes the narrow processing action and clears all ambient execution state on every exit path.
-
 using Explore.Application.Authentication;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;

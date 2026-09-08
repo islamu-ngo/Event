@@ -1,6 +1,3 @@
-// ABOUTME: DTO for available theme presets (platform + tenant catalogs) separated from user-owned profiles.
-// ABOUTME: The quick switcher shows these as selectable templates; clicking one clones it into a user profile.
-
 namespace Explore.Application.DTOs.Appearance;
 
 public sealed record AvailablePresetDto

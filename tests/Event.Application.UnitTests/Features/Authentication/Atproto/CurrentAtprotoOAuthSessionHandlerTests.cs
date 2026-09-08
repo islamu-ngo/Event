@@ -1,6 +1,3 @@
-// ABOUTME: Tests current ATProto OAuth session reads through the scoped gateway.
-// ABOUTME: Proves malformed identity tuples are rejected before any credential storage access.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Authentication.Atproto.Handlers.Queries;
 using Explore.Application.Features.Authentication.Atproto.Models;

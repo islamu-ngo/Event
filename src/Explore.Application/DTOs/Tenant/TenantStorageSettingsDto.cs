@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral DTOs for tenant-level storage administration.
-// ABOUTME: Exposes effective policy, read-only lock state, usage, and redacted optional S3 overrides.
-
 using Explore.Application.DTOs.Storage;
 using Explore.Application.Models.Common;
 using Explore.Domain;

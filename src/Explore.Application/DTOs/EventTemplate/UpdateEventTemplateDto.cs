@@ -1,6 +1,3 @@
-// ABOUTME: Grouped partial-update contract for event template metadata and definitions.
-// ABOUTME: Identity and concurrency come from the route and If-Match header, never the body.
-
 using Explore.Application.Models.Common;
 
 namespace Explore.Application.DTOs.EventTemplate;

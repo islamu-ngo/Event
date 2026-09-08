@@ -1,6 +1,3 @@
-// ABOUTME: Maps append-only incoming webhook claim and outcome evidence by generation and fence.
-// ABOUTME: Bounds failure metadata and keeps each execution event tenant-constrained to its inbox row.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

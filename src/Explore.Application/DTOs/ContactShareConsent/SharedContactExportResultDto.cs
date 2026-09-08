@@ -1,6 +1,3 @@
-// ABOUTME: DTO returned after an export operation with audit metadata.
-// ABOUTME: Contains the export ID, row count, and format for client confirmation.
-
 namespace Explore.Application.DTOs.ContactShareConsent;
 
 public sealed record SharedContactExportResultDto

@@ -1,6 +1,3 @@
-// ABOUTME: Builds the attendee-safe contract for one pinned native registration attempt.
-// ABOUTME: Derives exact answer subjects and progress from server-owned order lineage and fulfillment evidence.
-
 using Explore.Application.DTOs.RegistrationForms;
 using Explore.Application.DTOs.RegistrationSubmissions;
 using Explore.Application.Features.RegistrationForms;

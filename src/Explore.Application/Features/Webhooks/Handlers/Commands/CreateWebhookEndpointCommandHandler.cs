@@ -1,6 +1,3 @@
-// ABOUTME: Handles endpoint creation with inherited owner scope and safe delivery-control validation.
-// ABOUTME: Persists endpoint subscriptions through repository operations instead of mutating navigations.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;

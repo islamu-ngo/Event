@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the ticket UI service preserves HAL authority and safe recovery outcomes.
-// ABOUTME: Covers typed collection mapping, exact POST links, and the same-origin BFF bridge.
-
 using System.Net;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Admissions;

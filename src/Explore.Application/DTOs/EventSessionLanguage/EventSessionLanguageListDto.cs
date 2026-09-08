@@ -1,6 +1,3 @@
-// ABOUTME: List DTO for event-session language assignments.
-// ABOUTME: Includes concurrency metadata so list-driven editors can issue safe PATCH requests.
-
 using System;
 
 namespace Explore.Application.DTOs.EventSessionLanguage;

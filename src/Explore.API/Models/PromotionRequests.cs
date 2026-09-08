@@ -1,6 +1,3 @@
-// ABOUTME: Request contracts for promotion management and registration-order promotion operations.
-// ABOUTME: Keeps plaintext promotion codes write-only and route-owned identity out of request bodies.
-
 namespace Explore.API.Models;
 
 public sealed record CreatePromotionDraftRequest(

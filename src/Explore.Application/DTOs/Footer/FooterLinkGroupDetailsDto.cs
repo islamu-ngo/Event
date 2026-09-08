@@ -1,6 +1,3 @@
-// ABOUTME: Full detail DTO for a footer link group including all child links.
-// ABOUTME: Returned by GetFooterLinkGroupDetailsQuery for admin edit views.
-
 namespace Explore.Application.DTOs.Footer;
 
 public sealed record FooterLinkGroupDetailsDto

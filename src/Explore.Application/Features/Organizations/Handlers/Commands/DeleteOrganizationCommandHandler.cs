@@ -1,6 +1,3 @@
-// ABOUTME: Handler for soft-deleting organizations after verifying requester membership authority.
-// ABOUTME: Prevents the API delete endpoint from returning success without actually changing persistence state.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;

@@ -1,6 +1,3 @@
-// ABOUTME: API and HAL contract tests for provider publication operational resources.
-// ABOUTME: Verifies handler-authorized reads, authorized writes, state gating, and command mapping.
-
 using System.Reflection;
 using System.Security.Claims;
 using Explore.API.Attributes;

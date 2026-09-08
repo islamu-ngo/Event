@@ -1,6 +1,3 @@
-// ABOUTME: Provider-backed deletion service for storage objects already marked delete-requested.
-// ABOUTME: Deletes bytes through storage providers and leaves failed metadata rows retryable without logging object keys.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

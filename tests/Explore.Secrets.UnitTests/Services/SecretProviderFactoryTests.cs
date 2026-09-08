@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the closed Environment/Infisical provider factory.
-// ABOUTME: Verifies explicit supported selection and unspecified fail-closed behavior.
-
 using Explore.Secrets.Abstractions;
 using Explore.Secrets.Configuration;
 using Explore.Secrets.Providers;

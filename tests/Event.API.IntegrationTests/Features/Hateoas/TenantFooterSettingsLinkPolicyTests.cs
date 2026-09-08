@@ -1,6 +1,3 @@
-// ABOUTME: Tests authorization-gated HAL links for tenant footer admin settings.
-// ABOUTME: Covers scalar edit and link-group management relations through server authorization.
-
 using System.Security.Claims;
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;

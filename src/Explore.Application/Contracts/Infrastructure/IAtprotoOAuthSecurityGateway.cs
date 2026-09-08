@@ -1,6 +1,3 @@
-// ABOUTME: Defines the Application boundary for independently verifying and persisting ATProto OAuth sessions.
-// ABOUTME: Keeps CarpaNet credential types and PDS network access in Infrastructure.
-
 using Explore.Application.Features.Authentication.Atproto.Models;
 using Explore.Domain.ValueObjects;
 

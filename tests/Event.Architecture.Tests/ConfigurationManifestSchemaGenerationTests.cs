@@ -1,6 +1,3 @@
-// ABOUTME: Governs the generated ConfigurationManifest JSON Schema as an exact repository artifact.
-// ABOUTME: Locks byte equality, deterministic ordering, closed objects, and explicit catalog safety.
-
 namespace Event.Architecture.Tests;
 
 using System.Globalization;

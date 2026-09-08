@@ -1,6 +1,3 @@
-// ABOUTME: Scoped generated-client adapter for private Studio context and event order collections.
-// ABOUTME: Keeps purchaser PII and guest capabilities outside Studio order reads.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 

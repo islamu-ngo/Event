@@ -1,6 +1,3 @@
-// ABOUTME: Handler for unified role list query with optional scope filter.
-// ABOUTME: Uses IRoleRepository to fetch roles, maps to RoleListDto.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Role;

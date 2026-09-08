@@ -1,6 +1,3 @@
-// ABOUTME: Lightweight list DTO for event templates, used in paginated collection responses.
-// ABOUTME: Includes DefinitionCount instead of full definitions to reduce payload size.
-
 namespace Explore.Application.DTOs.EventTemplate;
 
 public sealed record EventTemplateListDto

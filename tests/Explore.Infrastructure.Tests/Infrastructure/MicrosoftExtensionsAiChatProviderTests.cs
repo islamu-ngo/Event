@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the Microsoft.Extensions.AI adapter behind the platform AI provider contract.
-// ABOUTME: Verifies message/options mapping, usage mapping, safe tool proposal extraction, and content-filter failures.
-
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.Text.Json;

@@ -1,6 +1,3 @@
-// ABOUTME: Failing public-contract specifications for AI-assisted Event draft Location writes.
-// ABOUTME: Proves the tool schema, registry normalization, and mapper cannot grant coordinate authority.
-
 using System.Reflection;
 using System.Text.Json;
 using Explore.Application.Features.AiAssistant.Actions;

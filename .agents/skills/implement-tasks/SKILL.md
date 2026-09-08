@@ -1,12 +1,12 @@
 ---
 name: implement-tasks
-description: "Load when executing, running, or implementing an approved task plan from `dev/active/<task>/`; orchestrates phase execution, canonical worktree isolation (`git worktree` in `.worktrees/` + plan `mv`), Red/Green/Refactor task loops, semantic phase commits, pre-PR rebase conflict protection, and PR lifecycle teardown."
+description: "Load when executing, running, or resuming an approved task plan from `dev/active/<task>/` or `.worktrees/<task>`; orchestrates fresh worktree setup, in-flight worktree/develop resume, Red/Green/Refactor task loops, failure triage/quarantine, semantic phase commits, pre-PR rebase conflict protection, PR creation with pre-flight Release Impact, and parked worktree lifecycle."
 type: workflow
 enforcement: suggest
 priority: high
 ---
-<!-- ABOUTME: Workflow skill for executing approved implementation tasks from dev/active/<task>/. -->
-<!-- ABOUTME: Guides isolated worktree execution (.worktrees/<task>), plan mv, semantic phase commits, pre-PR rebase, and PR teardown. -->
+<!-- ABOUTME: Workflow skill for executing or resuming approved implementation tasks from dev/active/<task>/ or .worktrees/<task>. -->
+<!-- ABOUTME: Guides isolated worktree execution, develop in-tree resume, plan mv, semantic phase commits, pre-PR rebase, and parked worktree lifecycle. -->
 
 ## Must-Read Docs
 - [../../../AGENTS.md](../../../AGENTS.md)
@@ -16,72 +16,164 @@ priority: high
 ## Top Invariants
 
 1. **Execute Only Approved Plans**: Never implement without an approved task plan (`tasks.md`, `context.md`, `plan.md`). Verify approval state before modifying runtime code.
-2. **Canonical Execution Topology (Root-Scoped Worktree Isolation)**: Never switch or hijack the main repository workspace branch (which remains cleanly parked on `develop` for developer use and concurrent sessions). The standard and default execution mode is **Worktree Isolation in `.worktrees/<task-name>`**:
-   - Keep worktrees within the repository workspace root under `.worktrees/<task-name>` (which is gitignored). This guarantees that all AI agent tools (file viewing, editing, bash execution with `Cwd`) operate strictly within the workspace sandbox without crossing harness boundaries.
-   - Upstream base freshness: `git fetch origin develop`
-   - Create worktree: `git worktree add -b feat/<task-name> .worktrees/<task-name> origin/develop`
-3. **Plan Transfer Protocol (`plan mv`)**:
-   - Move (do not copy) the active task folder into the worktree:
-     ```bash
-     mkdir -p .worktrees/<task-name>/dev/active && mv dev/active/<task-name> .worktrees/<task-name>/dev/active/
-     ```
-   - Moving preserves strict single-source-of-truth for `tasks.md` and `context.md`, eliminates split-brain checklists, and ensures that upon worktree removal, ephemeral planning debris is automatically garbage-collected without polluting the parent workspace.
-4. **Dev-Doc Working Memory & Native Tools**: Active plan files (`tasks.md`, `context.md`) are gitignored local working memory living in `.worktrees/<task-name>/dev/active/<task-name>/`. Read and edit them using native harness file tools by deterministic path. Do not use ad-hoc shell scripts (`cat`, `sed`, `awk`) for file manipulation (Critical Rule #9).
-5. **Phase-by-Phase Execution Cadence & Semantic Commits**:
-   - **Red**: Author failing invariant/specification tests first for core domain, concurrency, state machines, and security boundaries. Scaffold compilable stub types/interfaces so the project builds cleanly while the test fails at runtime.
+2. **Topology Discovery & Execution Context (Worktree vs In-Tree)**:
+   Before executing or resuming, discover the active execution topology for `<task>`:
+   - **Case A: Isolated Worktree In-Flight (`.worktrees/<task-name>`)**:
+     If `.worktrees/<task-name>` already exists (check `git worktree list` or `.worktrees/<task-name>` path):
+     - Active branch: `feat/<task-name>`
+     - Task folder: `.worktrees/<task-name>/dev/active/<task-name>/`
+     - Execution context: all shell commands set `Cwd: .worktrees/<task-name>`; all file edits target `.worktrees/<task-name>/...`
+     - **Action**: Do NOT recreate worktree or run `mv`. Skip setup steps and resume directly inside the existing worktree. If `AGENTS.local.md` exists in the repository root and is missing in `.worktrees/<task-name>`, copy it: `[ -f AGENTS.local.md ] && [ ! -f .worktrees/<task-name>/AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task-name>/`.
+   - **Case B: In-Tree / Develop In-Flight (`dev/active/<task-name>`)**:
+     If `dev/active/<task-name>` exists in the repository root and work is already in-progress (e.g. checked items `[x]` in `tasks.md`, existing commits, or user explicitly requested running directly on `develop` or current branch):
+     - Active branch: current branch (e.g. `develop` or current feature branch)
+     - Task folder: `dev/active/<task-name>/`
+     - Execution context: repository root (`Cwd: .`)
+     - **Action**: Do NOT create a worktree or move files. Respect in-tree execution and resume directly in the root workspace.
+   - **Case C: Fresh Worktree Setup (Default New Implementation)**:
+     If starting a brand-new plan where `dev/active/<task-name>` exists at the root, `.worktrees/<task-name>` does not exist, and user did not mandate in-tree execution:
+     - Canonical root-scoped worktree isolation applies:
+       ```bash
+       git fetch origin develop
+       git worktree add -b feat/<task-name> .worktrees/<task-name> origin/develop
+       mkdir -p .worktrees/<task-name>/dev/active && mv dev/active/<task-name> .worktrees/<task-name>/dev/active/
+       [ -f AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task-name>/
+       ```
+     - Moving preserves strict single-source-of-truth, eliminates split-brain checklists, and ensures clean garbage collection on worktree removal.
+     - **Copy `AGENTS.local.md` (Never Move)**: If `AGENTS.local.md` exists in the repository root, copy it into `.worktrees/<task-name>/AGENTS.local.md`. It must be **copied (never moved)** so that local developer overrides and environment constraints remain in effect inside the isolated worktree while preserving the root configuration for subsequent sessions or tasks. (Because `AGENTS.local.md` is gitignored, it will not be staged or committed).
+3. **Resume Protocol & Working Memory Discipline**:
+   When instructed to `resume <task>`, or when auto-detecting an in-flight plan:
+   - **Holistic Orientation (Read Once per Session)**: On session start or cold resume, read `*-context.md` (`## Quick Resume`, current milestone, blockers), `*-tasks.md` (identify active phase and unchecked `[ ]` tasks), and read `*-plan.md` to establish the holistic mental model (system architecture, cross-cutting invariants, and downstream phase contracts). Never implement blind to future phase dependencies.
+   - **Execution Economy (Inner Loop Zooming)**: Once oriented within the session, do NOT re-read the entire plan on every task turn. Zoom into the active phase heading in `*-plan.md` and manage granular state via `*-tasks.md`.
+   - **Re-Orientation Triggers**: Re-read the full plan (or downstream phases) immediately if an unexpected blocker arises, domain model friction occurs, cross-phase contracts conflict, or the user redirects requirements.
+   - **Inner Loop Baseline Sanity**: Run a fast Ring 1 sliced test (`--treenode-filter`) in the target execution context (`Cwd`) to verify the previous session's green baseline before modifying code.
+   - **Quarantine Rot & Differential Baseline Attribution**: If an unexpected failure occurs outside touched paths (e.g. in Persistence or Architecture tests), do NOT debug or absorb it into this task. Run a differential baseline check against clean `origin/develop` (`git -C <repo-root> test --project <project> --filter "<FailingTest>"`). If it reproduces on `develop`, it is Class C baseline rot: log the failure signature under `## Quarantined Baseline Failures` in `*-context.md` and quarantine it immediately. Never derail the task to fix pre-existing baseline rot.
+   - **Continue the Phased Loop**: Pick up execution directly at the first unchecked task `[ ]` in the active phase.
+4. **Dev-Doc Working Memory & Task Ledger Mutation Guardrails**:
+   - Active plan files (`tasks.md`, `context.md`) live inside the resolved task folder (`.worktrees/<task>/dev/active/<task>/` or `dev/active/<task>/`). Read and edit them using native harness file tools by deterministic path. Do not use ad-hoc shell scripts (`cat`, `sed`, `awk`) for file manipulation (Critical Rule #9).
+   - **Anti-Sprawl Task Ledger Guardrail**: Executing agents may check off tasks `[x]` and append atomic verification sub-bullets under an active task. Agents are strictly FORBIDDEN from creating new phase headings or inflating `tasks.md` with runtime finding tasks (which causes runaway 50+ item sprawls). New findings, bugs, or ideas belong in `context.md` notes or `dev/backlog/` graduation—never dynamically injected as feature scope without explicit user alignment via a Decision Brief.
+5. **Phase-by-Phase Execution Cadence & Progressive Verification**:
+   - **Red**: Author failing invariant/specification tests first for core domain, concurrency, state machines, and security boundaries. Shift pure domain invariants to `Event.Domain.UnitTests`. Scaffold compilable stub types/interfaces so the project builds cleanly while the test fails at runtime.
    - **Green**: Implement production code to satisfy invariants.
-   - **Sliced Verification**: Run targeted test class via `--treenode-filter` (~1.5s) inside the worktree directory.
-   - **Phase Verification**: Run Release build and single selected project test within the worktree.
-   - **Semantic Phase Commit**: In the isolated worktree, all file changes belong exclusively to this task phase. Stage changes via `git add -A` (or phase-touched paths) and commit using the planned semantic Conventional Commit contract (type, scope, title, description, trailers) from `tasks.md`. Planning defines semantic meaning; execution handles file discovery.
+   - **Ring 1 Sliced Verification (Inner Loop, < 2s)**: Run targeted test class via `--treenode-filter "/*/*/*<TestClass>/*"` in-memory (`Event.Domain.UnitTests` or `Event.Application.UnitTests`). Zero Docker containers, zero network I/O, zero database setup lag.
+   - **Ring 2 Phase Verification (Phase Exit Gate, < 15s)**: Run Release build (`dotnet build -c Release -v q`) and at most ONE selected project test against ONE canonical provider within the execution context. Forbid multi-database provider matrices during intermediate phases.
+   - **Three-Tier Failure Triage**:
+     - *Class A (Direct Feature Regressions)*: Failing assertions in code touched by this feature. Must resolve in-phase.
+     - *Class B (Feature-Induced Integration Ripple)*: Unmodified callers/fixtures broken by changed contracts. If mechanical and minor (< 15m), align immediately. If structural/cross-domain, pause with a Decision Brief before absorbing.
+     - *Class C (Pre-Existing Baseline Rot)*: Environment quirks, unmigrated table assumptions, or failures reproducing on clean `origin/develop`. Strictly quarantine into `*-context.md`; never add to `tasks.md` or debug in the feature worktree.
+   - **Semantic Phase Commit**: In the execution context, stage changes and commit using the planned semantic Conventional Commit contract (type, scope, title, description, trailers) from `tasks.md`. Planning defines semantic meaning; execution handles file discovery.
    - **Reconcile Ledger**: Batch task checkbox updates at phase gates in `tasks.md`.
-6. **Knowledge Graduation Gate (Mandatory Before PR)**:
-   Before declaring work complete or pushing, promote durable knowledge within the worktree:
+6. **Self-Contained Phase Reporting, Decision Briefs & Mid-Flight Slicing**:
+   When pausing for user feedback, milestone approvals, or architectural decisions between phases, executing agents must **never** send cryptic prompts referencing bare IDs. Always provide an inline **Decision Brief**:
+   - Current progress milestone in plain English.
+   - Descriptive names of components/services involved.
+   - The concrete decision required, why it matters, and trade-offs.
+   - Explicit numbered options with a recommended default.
+   - Immediate next action upon reply.
+   - **Mid-Flight Workstream Slicing Trigger**: If an approved plan spans > 3 functional domains or integration repairs reveal that downstream phases will trigger wide structural refactoring, the agent MUST proactively propose slicing the workstream via a Decision Brief: ship completed, green phases in the current PR to lock in value, and spin off remaining phases into a clean follow-up worktree.
+7. **Knowledge Graduation Gate (Mandatory Before PR)**:
+   Before declaring work complete or pushing, promote durable knowledge within the execution context:
    - **Deferred Work**: Create `dev/backlog/<topic-slug>.md` with problem statement and acceptance criteria.
    - **Architectural Decisions**: Create an ADR in `docs/internal/adr/ADR-XXX-<name>.md`.
    - **Lessons & Quirks**: Append to `dev/_journal/domains/<domain>.md` or `dev/_journal/journal.md`.
-   - Stage and commit these persistent files on `feat/<task-name>` so they merge into `develop`!
-7. **Pre-PR Rebase Gate (Concurrency Conflict Protection)**:
-   Before pushing, absorb any concurrent merges from other tasks/agents:
-   ```bash
-   git fetch origin develop && git rebase origin/develop
-   ```
-   - If clean: proceed to push.
-   - If merge conflicts occur: resolve conflicts inside `.worktrees/<task-name>`, run project verification tests, and complete the rebase (`git rebase --continue`).
-8. **Pull Request Lifecycle & Worktree Disposal**:
-   - Push branch to origin: `git push -u origin feat/<task-name> --force-with-lease`
-   - Open Pull Request for CI/CD and review: `gh pr create --base develop --fill`
-   - Teardown: From the root workspace (or once PR is submitted):
+   - Stage and commit these persistent files on the task branch so they merge into `develop`.
+8. **Ring 3 Plan Exit Gate & Mass-Failure Circuit Breaker**:
+   - **Ring 3 Plan Exit Gate**: Run full 5-database matrix, EF Core migrations, and `Event.Architecture.Tests` once at workstream completion before PR creation.
+   - **Mass-Failure Circuit Breaker (> 10 Failures)**: If Ring 3 execution yields > 10 failures, the agent MUST NOT generate dozens of individual subtasks or start fixing them one-by-one. Cluster failures by root cause (shared fixture, missing test migration, secret binding, or base divergence). If failures stem from pre-existing baseline rot (Class C), quarantine them. If caused by widespread architectural mismatch, pause and deliver a Decision Brief.
+   - **Pre-PR Rebase (Concurrency Conflict Protection)**:
      ```bash
-     git worktree remove .worktrees/<task-name>
+     git fetch origin develop && git rebase origin/develop
      ```
-   - Ephemeral plan files in `dev/active/<task-name>` vanish cleanly with the worktree.
+     Resolve any conflicts inside the execution context, verify tests, and complete rebase (`git rebase --continue`).
+9. **Pull Request Creation & Lifecycle Protocol**:
+   - **Push Branch**: `git push -u origin <branch> --force-with-lease`
+   - **Pre-Flight PR Release Impact Generation (Zero CI Failures)**:
+     Never use a bare `gh pr create --fill` that omits metadata. PR descriptions MUST contain the `## Release Impact` checklist mandated by `.ci/scripts/validate-release-impact-pr.cs`. Inspect changed files against category rules:
+     - `security` (auth, cerbos, keycloak, cla, secrets): `- [x] Security/auth impact documented`
+     - `migration` (migrations, seed data): `- [x] Migration/data/rollback impact documented`
+     - `configuration` (config, secrets, appsettings, compose, Dockerfile): `- [x] Configuration/secrets/deployment impact documented`
+     - `openapi` (openapi schemas, api changelog, api controllers): `- [x] OpenAPI/client contract impact documented`
+     - `operator` (self-hosting, operations, deployment, release checklist): `- [x] Operator/self-hosting/release-note impact documented`
+     - If none apply: `- [x] Not applicable`
+     Always provide a non-empty `Details:` section explaining the impact, release-note location, or why no release note is needed.
+     Submit the PR using:
+     ```bash
+     gh pr create --base develop --title "<type>(<scope>): <title>" --body "<body-with-release-impact>"
+     ```
+   - **Park the Worktree (When using Worktree isolation)**:
+     Never delete `.worktrees/<task-name>` upon PR creation. The worktree must remain parked and intact so that any subsequent bot reviews (Copilot, CodeQL) or CI check failures can be resolved immediately in-place with zero setup overhead.
+   - **Halt and Deliver Partitioned Status Brief**:
+     Immediately after PR creation, the agent must halt its execution and deliver a self-contained status brief:
+     1. PR URL and branch name.
+     2. Confirmation of worktree status (e.g. parked at `.worktrees/<task-name>`).
+     3. **Partitioned Workstream Summary**:
+        - *Delivered Features*: Capabilities and behaviors added by the approved plan.
+        - *Integration Repairs*: Necessary mechanical adjustments to fixtures/callers matching new contracts.
+        - *Quarantined Baseline Issues*: Pre-existing repo rot or flaky suites logged in `context.md` / `dev/backlog/` and excluded from this PR.
+     4. Notification that CI checks and automated bot reviewers are running.
+     5. Clear instruction to user: notify agent of any review comments or CI failures; OR confirm PR approval/merge to trigger teardown.
+   - **Worktree Teardown (Only Upon Explicit User Confirmation)**:
+     Only when the user confirms that the PR is approved/merged or explicitly instructs to clean up:
+     - If Worktree topology: `git worktree remove .worktrees/<task-name>` (from root workspace).
+     - Ephemeral plan files in `dev/active/<task-name>` vanish cleanly with the worktree.
 
 ## Workflow
 
 ```text
-1. Inspect approved dev/active/<task>/ (tasks.md, context.md, plan.md)
-2. Setup isolated worktree under workspace root:
-   git fetch origin develop
-   git worktree add -b feat/<task> .worktrees/<task> origin/develop
-   mkdir -p .worktrees/<task>/dev/active && mv dev/active/<task> .worktrees/<task>/dev/active/
-3. Loop through Phases inside .worktrees/<task>:
-   a. Red: compilable stubs + failing invariant test
-   b. Green: implementation code
-   c. Verify: sliced test -> phase build & test (Cwd: .worktrees/<task>)
+1. Topology & Execution Context Discovery:
+   Resolve target task directory and execution context (Worktree vs In-Tree):
+   - Check if .worktrees/<task> exists (or git worktree list):
+     -> FOUND: Topology = Worktree. Set Cwd = .worktrees/<task>, PlanPath = .worktrees/<task>/dev/active/<task>/.
+        Skip worktree creation and plan mv. If AGENTS.local.md exists in root and is missing in worktree, copy it:
+        [ -f AGENTS.local.md ] && [ ! -f .worktrees/<task>/AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task>/
+     -> NOT FOUND:
+        - If dev/active/<task> exists and (resuming OR user mandated in-tree):
+          Topology = In-Tree. Set Cwd = repo root, PlanPath = dev/active/<task>/.
+        - If fresh execution on default topology:
+          Topology = New Worktree.
+          git fetch origin develop
+          git worktree add -b feat/<task> .worktrees/<task> origin/develop
+          mkdir -p .worktrees/<task>/dev/active && mv dev/active/<task> .worktrees/<task>/dev/active/
+          [ -f AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task>/
+          Set Cwd = .worktrees/<task>, PlanPath = .worktrees/<task>/dev/active/<task>/.
+
+2. Context Load & Holistic Orientation:
+   - Read <PlanPath>/<task>-context.md (Quick Resume, blockers, baseline).
+   - Read <PlanPath>/<task>-tasks.md (find first unchecked [ ] task and active Phase).
+   - Read <PlanPath>/<task>-plan.md once per session to establish holistic context (architecture, cross-phase contracts); zoom into the active phase heading for execution.
+   - (If Resuming): Run quick Ring 1 test in Cwd to verify baseline health before editing.
+
+3. Loop through Remaining Phases (in resolved Cwd):
+   a. Red: compilable stubs + failing invariant test (in-memory domain first)
+   b. Green: minimal implementation code
+   c. Verify: Ring 1 sliced test (< 2s) -> Ring 2 phase build & single-provider test (< 15s)
+      - Apply Three-Tier Failure Triage (Class A: fix, Class B: align or brief, Class C: quarantine)
+      - Differential Baseline Check: verify unexpected failures against clean origin/develop
    d. Commit: git add -A && git commit using semantic phase contract from tasks.md
-   e. Update: batch checkbox updates in tasks.md
-4. Knowledge Graduation (in worktree):
+   e. Update: batch checkbox updates in tasks.md (obey anti-sprawl ledger cap; never add dynamic finding tasks)
+   f. Pause / Slice: If phase boundary requires user decision or blast radius expands, output Decision Brief (propose Mid-Flight PR Slice if scope ballooned).
+
+4. Knowledge Graduation (in resolved Cwd):
    a. Any deferred items? -> write dev/backlog/<slug>.md
    b. Any non-obvious lessons? -> append to dev/_journal/
    c. Any new architectural invariants? -> write ADR in docs/internal/adr/
-   d. Stage and commit graduation files on feat/<task>
-5. Pre-PR Rebase Gate:
-   git fetch origin develop && git rebase origin/develop
-   dotnet test (verify regression-free rebase)
-6. PR Creation & Teardown:
-   git push -u origin feat/<task> --force-with-lease
-   gh pr create --base develop --fill
-   (from root) git worktree remove .worktrees/<task>
+   d. Stage and commit graduation files on task branch
+
+5. Ring 3 Plan Exit Gate & Pre-PR Rebase:
+   a. Ring 3: Run full multi-provider matrix & architecture tests in Cwd
+      - Mass-Failure Circuit Breaker: if > 10 failures, cluster root causes; do NOT add 10+ tasks to tasks.md
+   b. git fetch origin develop && git rebase origin/develop (in Cwd)
+   c. dotnet test (verify regression-free rebase)
+
+6. PR Creation & Handoff:
+   a. git push -u origin <branch> --force-with-lease
+   b. Inspect changed files and construct PR body with mandatory `## Release Impact` checklist
+   c. gh pr create --base develop --title "..." --body "..."
+   d. If Worktree topology: PARK .worktrees/<task> — DO NOT remove it!
+   e. Stop and deliver partitioned status brief to user (Delivered Features, Integration Repairs, Quarantined Baseline Issues).
+
+7. Teardown (Deferred — Only Upon User Confirmation):
+   If Worktree: (from root workspace) git worktree remove .worktrees/<task>
 ```
 
 ## Verification Hooks

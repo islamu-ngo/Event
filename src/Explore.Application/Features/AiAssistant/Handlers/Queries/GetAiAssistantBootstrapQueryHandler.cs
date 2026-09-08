@@ -1,6 +1,3 @@
-// ABOUTME: Resolves tenant-scoped AI assistant bootstrap metadata without exposing secrets.
-// ABOUTME: Builds safe model, actor-context, feature, limit, and disabled-state details from hierarchical settings.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.DTOs.Ai;

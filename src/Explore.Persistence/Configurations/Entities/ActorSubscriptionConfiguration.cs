@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for tenant-local actor subscriptions.
-// ABOUTME: Enforces one durable non-deleted subscription row per subscriber and target actor.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Microsoft.EntityFrameworkCore;

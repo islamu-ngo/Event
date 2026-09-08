@@ -1,5 +1,3 @@
-// ABOUTME: Returns bounded Local identity administration pages only to current instance administrators.
-// ABOUTME: Validates pagination before native reads and rechecks authority before disclosing identity summaries.
 
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;

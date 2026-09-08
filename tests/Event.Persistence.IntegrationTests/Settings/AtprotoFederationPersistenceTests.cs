@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL integration tests for ATProto event governance seed state and community-minimum events.
-// ABOUTME: Proves locked instance defaults and local persistence without requiring a scheduled session.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Constants;
@@ -13,6 +10,7 @@ using TUnit.Core;
 namespace Event.Persistence.IntegrationTests.Settings;
 
 [ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
+[NotInParallel("PersistenceDb")]
 public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture fixture)
 {
     [Test]

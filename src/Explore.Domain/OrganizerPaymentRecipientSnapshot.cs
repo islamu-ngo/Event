@@ -1,6 +1,3 @@
-// ABOUTME: Immutable OrganizerDirect recipient facts for future paid-event snapshots.
-// ABOUTME: Pins actor, provider, account, currency, country, and policy versions without buyer data.
-
 namespace Explore.Domain;
 
 public sealed class OrganizerPaymentRecipientSnapshot

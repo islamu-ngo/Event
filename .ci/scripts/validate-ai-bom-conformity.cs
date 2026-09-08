@@ -1,5 +1,3 @@
-// ABOUTME: Validates that AI-BOM (ai-bom.v1.json) and EU AI Act technical conformity assets are present and valid.
-// ABOUTME: Enforces CycloneDX 1.6 AI-BOM schema invariants and Article 50 transparency documentation.
 #:property RestorePackagesWithLockFile=false
 
 using System.Text.Json;

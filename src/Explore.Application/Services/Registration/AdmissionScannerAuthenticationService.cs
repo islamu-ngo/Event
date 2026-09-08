@@ -1,6 +1,3 @@
-// ABOUTME: Authenticates an opaque scanner bearer through bounded keyed-digest candidates and one entity lookup.
-// ABOUTME: Validates current singular scope and returns one generic failure without retaining bearer material.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Domain;
 

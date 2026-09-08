@@ -1,5 +1,3 @@
-// ABOUTME: Exercises restricted Local handover with native BFF cookies, Data Protection, and antiforgery.
-// ABOUTME: Stubs only outbound API transport while checking browser authority isolation and request forwarding.
 
 using System.IdentityModel.Tokens.Jwt;
 using System.Buffers;

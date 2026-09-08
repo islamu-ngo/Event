@@ -1,5 +1,3 @@
-// ABOUTME: Forces both native cancellation race winners and rollback at every persisted mutation boundary.
-// ABOUTME: Barriers subscribe before triggering real database work and never depend on sleeps or mock readiness.
 
 using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;

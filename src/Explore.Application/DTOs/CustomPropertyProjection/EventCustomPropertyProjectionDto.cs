@@ -1,6 +1,3 @@
-// ABOUTME: Full admin-shape DTO for an event custom-property projection row.
-// ABOUTME: Includes all flags, typed values, and normalized value for admin inspection.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.DTOs.CustomPropertyProjection;

@@ -1,6 +1,3 @@
-// ABOUTME: Provides tenant and principal context for registry-backed AI tool validation/execution.
-// ABOUTME: Keeps future executors fail-closed without depending on API, Blazor, or persistence types.
-
 namespace Explore.Application.Features.AiAssistant.Tools;
 
 public sealed record AiToolExecutionContext(

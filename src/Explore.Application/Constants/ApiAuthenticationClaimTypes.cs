@@ -1,6 +1,3 @@
-// ABOUTME: Defines machine-auth claim types shared by API authentication, middleware, and tests.
-// ABOUTME: Separates persisted credentials from runtime principal identity and authorization context.
-
 namespace Explore.Application.Constants;
 
 public static class ApiAuthenticationClaimTypes

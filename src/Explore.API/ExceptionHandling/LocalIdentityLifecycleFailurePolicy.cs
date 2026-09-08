@@ -1,5 +1,3 @@
-// ABOUTME: Maps Local lifecycle command failures to the native RFC 7807 HTTP conventions.
-// ABOUTME: Keeps invalid operation, stale synchronization, authentication, and global availability outcomes explicit.
 
 using Explore.Application.Responses;
 

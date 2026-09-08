@@ -1,5 +1,3 @@
-/* ABOUTME: Keeps SMTP impact confirmation readable at narrow widths. */
-/* ABOUTME: Uses logical spacing and native layout without overriding MudBlazor controls. */
 
 .email-delivery-confirmation {
     padding-block: var(--isl-space-3);

@@ -1,6 +1,3 @@
-// ABOUTME: Defines same-origin add-on catalog, order, reservation, fulfillment, and refund operations.
-// ABOUTME: Keeps browser components on HAL resources and outside token or downstream API concerns.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services;

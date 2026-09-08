@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for instance paid-event policy HAL affordance and safety behavior.
-// ABOUTME: Verifies read-only rendering, bounded writes, mandatory refund floors, conflicts, and cancellation.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Contracts.Services.PaidEventPolicies;

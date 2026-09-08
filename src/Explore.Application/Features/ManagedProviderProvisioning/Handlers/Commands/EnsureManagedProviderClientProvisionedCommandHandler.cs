@@ -1,6 +1,3 @@
-// ABOUTME: Application-layer orchestration for provider-provisioned tenant, user actor, and tenant-admin role grant creation.
-// ABOUTME: Links existing Local administrators without credential mutation and fences tenant grants by live authority.
-
 using System.Text.Json;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Infrastructure;

@@ -180,8 +180,10 @@ only in the fragment, is removed from history before BFF forwarding, and remains
 memory-only. The BFF preserves antiforgery, private responses and cookie protection
 for ordinary password change.
 
-Generate `LocalIdentityLifecycle` migrations for both primary and external
-Identity stores from the settled model. Keep their schema and code together;
+The primary catalog's generated `EmailOptionalSelfHostingIntegration` tail owns
+Local lifecycle storage alongside the other application feature changes. The
+independent external Identity catalog retains its `LocalIdentityLifecycle`
+migration. Keep each complete generated catalog and its code together;
 never hand-edit snapshots or treat rollback as token recovery. Native Local
 credential erasure is a pre-existing unsupported path: Application erasure fences
 and removes bindings, but does not delete native credential receipts. The new

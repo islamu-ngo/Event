@@ -1,6 +1,3 @@
-// ABOUTME: Verifies manual location creation renders and submits only coordinate-free browser input.
-// ABOUTME: Uses stable machine attributes and the dialog result boundary without timing-based waits.
-
 using System.Reflection;
 using AngleSharp.Dom;
 using Explore.Blazor.Client.Pages.Admin.Dialogs;

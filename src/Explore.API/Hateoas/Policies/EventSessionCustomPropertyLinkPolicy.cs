@@ -1,6 +1,3 @@
-// ABOUTME: HATEOAS link policies for event-session-level custom property definition detail and collection views.
-// ABOUTME: Controls which links appear based on resource state and user permissions.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Collections.Generic;

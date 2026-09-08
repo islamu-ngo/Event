@@ -1,4 +1,3 @@
-// ABOUTME: Constants for named query filter names used with EF Core 10+ named filters.
 // These names are used to selectively disable filters via IgnoreQueryFilter().
 
 namespace Explore.Persistence.QueryFilters;

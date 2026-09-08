@@ -1,6 +1,3 @@
-// ABOUTME: Persists a domain reference attached to an AI conversation for prompt context and audit.
-// ABOUTME: Keeps reference identity tenant-scoped and typed before the Application layer builds prompts.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

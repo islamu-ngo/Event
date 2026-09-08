@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for ticket entitlements targeting event schedule scopes.
-// ABOUTME: Preserves tenant-composite foreign keys and restrictive lookup/history delete behavior.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

@@ -1,6 +1,3 @@
-// ABOUTME: Authorization matrix for setup-secret authentication on canonical instance provider GET and PATCH routes.
-// ABOUTME: Proves exact-route selection, fail-closed credentials, and unchanged bearer-admin authentication.
-
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;

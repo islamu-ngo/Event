@@ -1,6 +1,3 @@
-// ABOUTME: Verifies support-access business metrics use bounded, safe OpenTelemetry tags.
-// ABOUTME: Guards against exposing support session IDs, users, tickets, reasons, routes, or exception text in dimensions.
-
 using System.Diagnostics.Metrics;
 using Explore.Application.Features.SupportAccess;
 using Explore.Application.Telemetry;

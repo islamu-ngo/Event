@@ -1,6 +1,3 @@
-// ABOUTME: Architecture guardrails for the control-plane surface owned by Explore.Blazor.Client.
-// ABOUTME: Enforces relocated contracts, routing, services, and local control-plane UI primitives.
-
 using System.Text.RegularExpressions;
 
 namespace Event.Architecture.Tests;
@@ -308,11 +305,6 @@ public sealed class EventControlPlaneClientArchitectureTests
         {
             var content = await File.ReadAllTextAsync(file);
             var relative = Path.GetRelativePath(RepoRoot, file).Replace('\\', '/');
-
-            if (!content.Contains("ABOUTME:", StringComparison.Ordinal))
-            {
-                cssViolations.Add($"{relative} is missing ABOUTME header comments");
-            }
 
             if (!content.Contains(".control-plane-", StringComparison.Ordinal))
             {

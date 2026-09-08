@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped fullscreen image sizing and interaction styling for the event-image lightbox. */
-/* ABOUTME: Keeps the event image centered while MudBlazor's modal backdrop dims the application. */
-
 .event-image-lightbox-dialog__surface {
     position: absolute;
     inset: 0;

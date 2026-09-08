@@ -1,6 +1,3 @@
-// ABOUTME: Query to retrieve current projection status rows for a tenant's event custom-property projections.
-// ABOUTME: Returns status, rebuild timestamps, and error messages for operator observability.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.CustomPropertyProjection;

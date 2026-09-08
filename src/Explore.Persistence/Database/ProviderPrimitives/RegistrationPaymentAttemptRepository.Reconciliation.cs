@@ -1,6 +1,3 @@
-// ABOUTME: Finds provider payments and manages payment reconciliation claims, decisions, and health.
-// ABOUTME: Applies fenced reconciliation outcomes and schedules paid registration finalization.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

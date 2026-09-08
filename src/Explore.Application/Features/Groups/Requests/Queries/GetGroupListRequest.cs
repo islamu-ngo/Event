@@ -1,6 +1,3 @@
-// ABOUTME: MediatR query request for retrieving a paginated list of all Groups.
-// ABOUTME: Returns PaginatedResult<GroupListDto> for admin/listing purposes.
-
 using Explore.Application.DTOs.Group;
 using Explore.Application.Responses;
 using MediatR;

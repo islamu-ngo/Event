@@ -1,6 +1,3 @@
-// ABOUTME: Authorized query for typed owner-scoped Local webhook delivery attempt audit rows.
-// ABOUTME: Supports bounded message and endpoint filters inside canonical configuration ownership.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Webhooks;
 using MediatR;

@@ -1,6 +1,3 @@
-// ABOUTME: Scoped in-memory holder for one guest registration order's opaque capability.
-// ABOUTME: Deliberately avoids URLs, request bodies, logs, and browser persistence for bearer capability values.
-
 namespace Explore.Blazor.Client.Contracts.Services;
 
 public interface IGuestRegistrationOrderCapabilityStore

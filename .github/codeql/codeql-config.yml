@@ -1,0 +1,7 @@
+name: "CodeQL Custom Config"
+
+paths-ignore:
+  - '**/Clients/EventApiClient.g.cs'
+  - '**/Clients/EventApiTagClients.g.cs'
+  - '**/*.g.cs'
+  - 'tests/**'

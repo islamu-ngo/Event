@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped styles for AppCard — flat card with subtle border (neo-minimal aesthetic).
-   ABOUTME: Uses BEM .app-card block + ::deep to style MudCard internals. */
-
 .app-card {
     display: contents;
 }

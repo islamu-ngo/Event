@@ -1,6 +1,3 @@
-// ABOUTME: Application service that initializes tenant branding typed settings documents.
-// ABOUTME: Creates default tenant.branding JSONB rows idempotently without scalar fallback or dual writes.
-
 namespace Explore.Application.Services;
 
 using System.Text.Json;

@@ -1,6 +1,3 @@
-// ABOUTME: Per-tenant control-plane configuration endpoints for settings, locks, and plan assignment moves.
-// ABOUTME: Governs how a published plan applies to one tenant; it never authors plan definitions.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

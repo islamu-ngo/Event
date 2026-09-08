@@ -1,6 +1,3 @@
-// ABOUTME: Shared OpenAPI enum schema normalization for native OpenAPI and Swashbuckle.
-// ABOUTME: Keeps public enum schemas aligned with the API's JsonStringEnumConverter contract.
-
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;

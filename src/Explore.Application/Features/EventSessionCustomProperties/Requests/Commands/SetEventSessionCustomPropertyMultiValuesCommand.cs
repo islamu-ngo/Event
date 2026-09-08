@@ -1,6 +1,3 @@
-// ABOUTME: Command request for replacing all values of a multi-value session custom property definition.
-// ABOUTME: Atomically removes existing values and inserts the new set for the given definition+session.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventSessionCustomProperty;
 using Explore.Application.Responses;

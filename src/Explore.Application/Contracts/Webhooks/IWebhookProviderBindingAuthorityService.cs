@@ -1,6 +1,3 @@
-// ABOUTME: Application boundary for resolving and proving the active webhook provider binding profile.
-// ABOUTME: Keeps provider configuration and remote ownership checks outside CQRS handlers.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Webhooks;

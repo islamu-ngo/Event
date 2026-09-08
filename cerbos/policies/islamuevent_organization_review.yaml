@@ -1,4 +1,3 @@
-# ABOUTME: Cerbos resource policy for organization_review resources.
 # Organization reviews: users can create/view, org admins can manage reviews of their org.
 
 apiVersion: api.cerbos.dev/v1

@@ -1,6 +1,3 @@
-// ABOUTME: Command handler for removing a setting override, reverting to parent scope cascade.
-// ABOUTME: User scope uses IUserPreferenceRepository; Tenant/Org/Group uses resolver.RemoveOverrideAsync.
-
 namespace Explore.Application.Features.Settings.Handlers.Commands;
 
 using Explore.Application.Contracts.Identity;

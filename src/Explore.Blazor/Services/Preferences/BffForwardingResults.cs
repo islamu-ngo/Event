@@ -1,6 +1,3 @@
-// ABOUTME: Safe Minimal API result translators for BFF-to-API forwarding responses.
-// ABOUTME: Centralizes generic error bodies while preserving endpoint-owned auth and antiforgery checks.
-
 namespace Explore.Blazor.Services.Preferences;
 
 using Explore.Blazor.Client.Clients;

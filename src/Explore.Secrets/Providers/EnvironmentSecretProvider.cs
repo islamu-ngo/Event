@@ -1,6 +1,3 @@
-// ABOUTME: Local secret provider for one explicitly selected Environment or User Secrets authority.
-// ABOUTME: Emits no key names, paths, values, or read-audit records and never crosses authorities.
-
 using Explore.Secrets.Abstractions;
 using Explore.Secrets.Configuration;
 using Microsoft.Extensions.Logging;

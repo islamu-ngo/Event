@@ -1,6 +1,3 @@
-// ABOUTME: Persistence contract for event-session language assignment queries.
-// ABOUTME: Keeps session-language reads entity-first and cancellation-aware for CQRS handlers.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

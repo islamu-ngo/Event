@@ -1,6 +1,3 @@
-// ABOUTME: Exercises admission delivery through the real production intent dispatcher and composite outbox route.
-// ABOUTME: Proves protected delivery state and rejects sensitive persistence diagnostics on downstream failure.
-
 using System.Diagnostics.Metrics;
 using System.Security.Cryptography;
 using System.Text.Json;

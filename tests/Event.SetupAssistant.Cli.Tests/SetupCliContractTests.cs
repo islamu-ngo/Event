@@ -1,6 +1,3 @@
-// ABOUTME: Pins the SA-410 machine command, exit, explicit-I/O, and no-leak public contract.
-// ABOUTME: Leaves one aggregate Red prerequisite for the absent SA-420 executable command owners.
-
 using System.Reflection;
 using System.Text;
 using System.Text.Json.Nodes;

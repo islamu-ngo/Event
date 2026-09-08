@@ -1,6 +1,3 @@
-// ABOUTME: Controlled notification categories used by ownership routing decisions.
-// ABOUTME: Prevents provider and delivery settings from replacing product-domain responsibility rules.
-
 namespace Explore.Application.Notifications;
 
 public enum NotificationCategory

@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL tests for atomic incoming webhook effect, receipt, attempt, and settlement commits.
-// ABOUTME: Injects failures at handler, receipt, and save boundaries to prove all local writes roll back together.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;

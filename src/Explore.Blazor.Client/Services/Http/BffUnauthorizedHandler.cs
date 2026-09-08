@@ -1,6 +1,3 @@
-// ABOUTME: HTTP handler that redirects interactive users to login when BFF API calls return 401.
-// ABOUTME: Suppresses redirects for anonymous endpoints and pre-navigation render phases.
-
 using System.Linq;
 using System.Net;
 using System.Net.Http;

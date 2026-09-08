@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for browser-facing setup-secret BFF endpoint sanitization.
-// ABOUTME: Verifies local request validation and safe upstream error translation.
-
 using System.Text;
 using System.Threading.RateLimiting;
 using Explore.Blazor.Client.Clients;

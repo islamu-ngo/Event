@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for event category CRUD operations with HATEOAS support.
-// ABOUTME: Manages event categories used for discovery, filtering, and event classification.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

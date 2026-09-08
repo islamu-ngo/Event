@@ -1,6 +1,3 @@
-// ABOUTME: PATCH wrapper DTO for event-level agenda item updates using nullable logical groups.
-// ABOUTME: Route ID targets the row; groups express independent property update intent.
-
 namespace Explore.Application.DTOs.EventAgendaItem;
 
 using Explore.Application.Models.Common;

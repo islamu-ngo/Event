@@ -1,6 +1,3 @@
-// ABOUTME: REST API controller for tenant moderation-reporting dashboard health.
-// ABOUTME: Returns redacted queue and provider sync counts while CQRS enforces tenant settings authorization.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Hateoas;

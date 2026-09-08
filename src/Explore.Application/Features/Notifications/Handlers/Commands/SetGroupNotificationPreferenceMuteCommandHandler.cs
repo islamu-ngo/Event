@@ -1,6 +1,3 @@
-// ABOUTME: Handles group-scoped notification preference global mute updates.
-// ABOUTME: Includes parent organization context before writing group profile state transactionally.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Notifications.Requests.Commands;

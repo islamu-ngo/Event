@@ -48,7 +48,7 @@ its branch has moved and after it has been deleted.
 Before publishing a GitHub Release, download the retained CI/CD artifacts listed in this checklist into a local evidence directory. For governed release-mode bundles, the artifact tree must contain exactly one final canonical manifest from `verify-tag`:
 
 ```text
-docs/releases/<version>/release-evidence.v1.json
+docs/internal/releases/<version>/release-evidence.v1.json
 ```
 
 That manifest exclusively owns release identity: version, line, tag name, tag object, final commit `B`, candidate-manifest digest, release descriptor/summary/context/notes hashes, and trusted bundle/tool/policy/config/trust hashes. Bundle collection time, workflow/provider run IDs, URLs, CLA status, and transport metadata are noncanonical and cannot override it.
@@ -92,7 +92,7 @@ Use `Not applicable` only when the change has no release-impact category. If the
 - [ ] `preflight-range --target develop --head <feature-head>` passes before
   merge conflict resolution begins.
 - [ ] Any immutable-footer correction has one reviewed
-  `docs/releases/change-id-renames/<full-commit-oid>.yaml` record and generated
+  `docs/internal/releases/change-id-renames/<full-commit-oid>.yaml` record and generated
   replacement fragment; no amend, rebase, force-push, or loose alias was used.
 
 ## Release Metadata

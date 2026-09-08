@@ -1,6 +1,3 @@
-// ABOUTME: Bridges circuit user identity into the current inbound activity for cross-scope handler access.
-// ABOUTME: Avoids relying on OnCircuitOpenedAsync execution context flowing into pooled HttpClient handlers.
-
 namespace Explore.Blazor.Services;
 
 /// <summary>

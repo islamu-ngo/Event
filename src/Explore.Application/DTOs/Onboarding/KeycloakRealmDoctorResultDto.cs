@@ -1,6 +1,3 @@
-// ABOUTME: Safe aggregate result for read-only Keycloak realm compatibility diagnostics.
-// ABOUTME: Reports high-level realm health without exposing secrets, tokens, or raw provider payloads.
-
 namespace Explore.Application.DTOs.Onboarding;
 
 public sealed record KeycloakRealmDoctorResultDto

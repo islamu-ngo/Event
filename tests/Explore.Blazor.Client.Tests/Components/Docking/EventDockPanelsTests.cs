@@ -1,6 +1,3 @@
-// ABOUTME: Contract tests for event-list workspace dock panel descriptors.
-// ABOUTME: Guards stable IDs, scope, placement, and persistence behavior for workspace migration.
-
 using Explore.Blazor.Client.Pages.Events;
 using Explore.Blazor.Client.Services.Docking;
 

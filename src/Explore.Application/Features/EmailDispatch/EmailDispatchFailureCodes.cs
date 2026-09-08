@@ -1,6 +1,3 @@
-// ABOUTME: Machine-readable failure codes for EmailDispatch operator commands.
-// ABOUTME: Keeps admin ProblemDetails and HAL affordances aligned with Application-layer transition outcomes.
-
 namespace Explore.Application.Features.EmailDispatch;
 
 public static class EmailDispatchFailureCodes

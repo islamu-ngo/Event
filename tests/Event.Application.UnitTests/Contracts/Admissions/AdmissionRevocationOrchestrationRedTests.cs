@@ -1,6 +1,3 @@
-// ABOUTME: Executes AdmissionRevocationService.ReconcileAsync against the complete per-line refund matrix.
-// ABOUTME: Requires every result to partition exact issued ticket identities into revoked and preserved sets.
-
 using ApplicationUnitTests.Contracts.Admissions.Support;
 using Explore.Application.Contracts.Admissions;
 

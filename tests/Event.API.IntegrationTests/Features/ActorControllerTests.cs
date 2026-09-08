@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for public Actor reads and dedicated moderation routes.
-// ABOUTME: Verifies generic identity CRUD stays absent from the HTTP surface.
-
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Net;

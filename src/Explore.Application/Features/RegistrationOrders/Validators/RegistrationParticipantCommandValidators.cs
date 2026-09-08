@@ -1,6 +1,3 @@
-// ABOUTME: Validates participant, concrete ordinal, bulk payload, and explicit UTC deadline command shapes.
-// ABOUTME: Leaves order ownership, catalog mode, guardian, and eligibility checks to transaction-bound handlers.
-
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using FluentValidation;
 

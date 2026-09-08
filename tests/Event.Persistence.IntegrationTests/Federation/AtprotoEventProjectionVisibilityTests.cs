@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL integration tests for public ATProto projection moderation and identity visibility.
-// ABOUTME: Proves inbound safeguards remain intact while local owned echoes use central Event eligibility.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

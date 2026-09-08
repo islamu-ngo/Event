@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the EF boundary for participation requirement attachments.
-// ABOUTME: Pins tenant/event lineage, active uniqueness, standalone uniqueness, and concurrency metadata.
-
 using Explore.Domain;
 using Explore.Persistence;
 using Explore.Persistence.QueryFilters;
@@ -16,7 +13,7 @@ public sealed class ParticipationRequirementAttachmentPersistenceTests
     public async Task EfModelEnforcesAttachmentLineageAndActiveUniqueness()
     {
         await using var context = new ExploreDbContext(
-            new DbContextOptionsBuilder<ExploreDbContext>()
+            TestDbContextOptions.Create<ExploreDbContext>()
                 .UseNpgsql("Host=localhost;Database=task77_model;Username=unused;Password=unused")
                 .UseSnakeCaseNamingConvention().Options);
         IEntityType entity = context.GetService<IDesignTimeModel>().Model

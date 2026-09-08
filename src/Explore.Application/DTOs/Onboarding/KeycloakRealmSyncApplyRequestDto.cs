@@ -1,6 +1,3 @@
-// ABOUTME: Request contract for backup-confirmed Keycloak realm sync apply operations.
-// ABOUTME: Carries temporary admin credentials for one request without persisting them.
-
 namespace Explore.Application.DTOs.Onboarding;
 
 public sealed record KeycloakRealmSyncApplyRequestDto

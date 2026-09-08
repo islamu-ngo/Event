@@ -1,6 +1,3 @@
-// ABOUTME: Canonical external and internal binding type strings for managed provider provisioning.
-// ABOUTME: Keeps correlation records authority-neutral while avoiding hard-coded string drift across handlers and tests.
-
 namespace Explore.Domain.Constants;
 
 public static class ExternalBindingTypes

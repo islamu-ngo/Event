@@ -1,6 +1,3 @@
-// ABOUTME: Implements the Anthropic-compatible chat provider adapter using Refit and platform contracts.
-// ABOUTME: Maps Anthropic Messages API responses into safe provider-neutral results with full tool calling support.
-
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;

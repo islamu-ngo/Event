@@ -1,4 +1,3 @@
-// ABOUTME: Unit tests for AdminRouteGuard that restricts /admin/* routes to BFF-confirmed instance admins.
 // Verifies browser admin claims are not treated as route authority.
 
 using Blazouter.Models;

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for MarkNotificationAsReadCommandHandler.
-// ABOUTME: Tests single notification read marking with auth and ownership checks.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Notifications.Handlers.Commands;

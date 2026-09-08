@@ -1,6 +1,3 @@
-// ABOUTME: Durable identifiers-only outbound effect for ProviderApi registration submission writes.
-// ABOUTME: Uses fenced leases and terminal parking so provider uncertainty never mutates finalized orders.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

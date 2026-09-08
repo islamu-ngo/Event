@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for the reporter-facing event report dialog.
-// ABOUTME: Coordinates option loading, client validation, submission, and accessible announcements.
-
 using System.Globalization;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;

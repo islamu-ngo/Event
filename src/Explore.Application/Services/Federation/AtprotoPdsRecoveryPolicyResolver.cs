@@ -1,6 +1,3 @@
-// ABOUTME: Resolves the effective tenant audience and mode for globally canonical ATProto PDS recovery.
-// ABOUTME: Applies active-tenant, deployment-mode, and instance-lock semantics with fixed-count setting reads.
-
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Contracts.Persistence;

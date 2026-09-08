@@ -1,6 +1,3 @@
-// ABOUTME: Adapts the effective email capability to the active tenant's SMTP transport.
-// ABOUTME: Reuses hierarchical cache invalidation and never caches plaintext transport credentials.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Models;
 using Explore.Domain.Settings;

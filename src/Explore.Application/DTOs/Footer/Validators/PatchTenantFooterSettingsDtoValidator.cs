@@ -1,6 +1,3 @@
-// ABOUTME: Validates presence-aware grouped tenant footer settings patches.
-// ABOUTME: Rejects empty patches and supplied null values for non-nullable footer setting leaves.
-
 namespace Explore.Application.DTOs.Footer.Validators;
 
 using FluentValidation;

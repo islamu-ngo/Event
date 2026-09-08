@@ -1,6 +1,3 @@
-// ABOUTME: Maps registration provider subscription state for durable watch renewal and sweeps.
-// ABOUTME: Preserves tenant binding ownership, optimistic concurrency, and worker poll indexes.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

@@ -1,6 +1,3 @@
-// ABOUTME: Configures organization and group tenant participation persistence.
-// ABOUTME: Enforces tenant-local policy, hierarchy, membership, settings, and media ownership.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.ValueGenerators;

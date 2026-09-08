@@ -1,5 +1,3 @@
-// ABOUTME: Atomically charges durable tenant/event challenge budgets inside the issuer's serializable transaction.
-// ABOUTME: Uses uncached canonical settings, database UTC minutes and savepoint rollback without process-local locks.
 
 using System.Data;
 using System.Globalization;

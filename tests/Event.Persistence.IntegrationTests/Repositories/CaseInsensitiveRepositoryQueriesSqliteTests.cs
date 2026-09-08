@@ -1,6 +1,3 @@
-// ABOUTME: File-backed SQLite regressions for provider-neutral case-insensitive repository queries.
-// ABOUTME: Proves privacy-provider equality and wildcard actor search without PostgreSQL ILIKE.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -41,12 +38,21 @@ public sealed class CaseInsensitiveRepositoryQueriesSqliteTests
                 CreatedAt = DateTime.UtcNow
             };
             var user = CreateUser("privacy");
+            var provider = new AuthenticationProvider
+            {
+                Id = (int)"KeYcLoAk".ParseAuthenticationProviderKind(),
+                MasterCode = "keycloak",
+                FullName = "Keycloak"
+            };
             var login = new UserExternalLogin { Id = Guid.CreateVersion7(),
-            UserId = user.Id,
-            User = user,
-            AuthenticationProviderId = (int)"KeYcLoAk".ParseAuthenticationProviderKind(), AuthenticationProvider = null!, ProviderKey = "sqlite-keycloak-subject",
-            CreatedAt = DateTime.UtcNow };
-            context.AddRange(status, tenant, user, login);
+                UserId = user.Id,
+                User = user,
+                AuthenticationProviderId = provider.Id,
+                AuthenticationProvider = provider,
+                ProviderKey = "sqlite-keycloak-subject",
+                CreatedAt = DateTime.UtcNow
+            };
+            context.AddRange(status, tenant, user, provider, login);
             await context.SaveChangesAsync();
 
             var repository = new UserLocationPrivacyErasureRepository(context);
@@ -121,7 +127,7 @@ public sealed class CaseInsensitiveRepositoryQueriesSqliteTests
         }.ToString();
 
         return new ExploreDbContext(
-            new DbContextOptionsBuilder<ExploreDbContext>()
+            TestDbContextOptions.Create<ExploreDbContext>()
                 .UseSqlite(connectionString, options =>
                     options.MigrationsAssembly("Explore.Persistence.Migrations.Sqlite"))
                 .UseSnakeCaseNamingConvention()

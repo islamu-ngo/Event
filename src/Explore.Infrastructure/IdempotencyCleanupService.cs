@@ -1,6 +1,3 @@
-// ABOUTME: Deletes expired idempotency replay-cache rows in bounded batches.
-// ABOUTME: Supports dry-run mode and emits bounded metrics without exposing idempotency keys or request paths.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Models;

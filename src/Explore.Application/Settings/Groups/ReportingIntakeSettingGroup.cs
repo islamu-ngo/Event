@@ -1,6 +1,3 @@
-// ABOUTME: Strongly-typed reporting-intake policy setting group resolved through the hierarchical settings engine.
-// ABOUTME: Keeps report-intake enablement separate from external-provider reporting configuration.
-
 namespace Explore.Application.Settings.Groups;
 
 using Explore.Application.Contracts.Infrastructure;

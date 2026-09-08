@@ -1,5 +1,3 @@
-// ABOUTME: Maps server-resolved Local lifecycle capability to native named POST HAL affordances.
-// ABOUTME: Shares discovery relations between public authentication configuration and the current-account resource.
 
 using Explore.Application.Features.Authentication.Local.Handlers.Queries;
 using Explore.Application.Hateoas;

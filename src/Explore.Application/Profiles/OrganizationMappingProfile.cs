@@ -1,6 +1,3 @@
-// ABOUTME: AutoMapper profile for Organization, Group, GroupMember, OrganizationMember, ApprovalStatus, and OrganizationReview entities.
-// ABOUTME: Split from monolithic MappingProfile.cs for domain-cohesion.
-
 using AutoMapper;
 using Explore.Application.DTOs.Group;
 using Explore.Application.DTOs.GroupMember;

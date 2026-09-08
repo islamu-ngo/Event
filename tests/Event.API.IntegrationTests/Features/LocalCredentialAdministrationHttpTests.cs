@@ -1,5 +1,3 @@
-// ABOUTME: Exercises instance Local credential administration through native HTTP authority and SQLite persistence.
-// ABOUTME: Guards one-time handover, exact recovery, current grants, bounded discovery, and non-mutating reads.
 
 using System.Data.Common;
 using System.Net;

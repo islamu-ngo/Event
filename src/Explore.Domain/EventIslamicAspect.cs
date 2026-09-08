@@ -1,4 +1,3 @@
-// ABOUTME: Islamic aspect for events containing Madhab, prayer-based scheduling, and gender segregation.
 // Uses 1:1 shared primary key pattern where Id is both PK and FK to Event.
 
 namespace Explore.Domain;

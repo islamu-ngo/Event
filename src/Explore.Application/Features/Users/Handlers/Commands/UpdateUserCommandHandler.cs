@@ -1,6 +1,3 @@
-// ABOUTME: Handler for updating user profile fields with validation.
-// ABOUTME: Rejects fenced Users, then updates profile data and linked actor storage atomically.
-
 using System.Linq;
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;

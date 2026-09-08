@@ -1,5 +1,3 @@
-// ABOUTME: Exercises BFF provider discovery through native HTTP and the generated upstream client.
-// ABOUTME: Verifies wire capability passthrough without deriving signup from Local operator schemes.
 
 using System.Text;
 using System.Text.Json;

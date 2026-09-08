@@ -1,6 +1,3 @@
-// ABOUTME: Represents one global group's policy-controlled participation in a tenant.
-// ABOUTME: Owns tenant approval, moderation, local profile overrides, hierarchy, members, and settings.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

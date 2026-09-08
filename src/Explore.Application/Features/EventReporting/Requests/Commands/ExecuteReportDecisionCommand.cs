@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for executing a captured local event-report decision.
-// ABOUTME: Uses event-level authorization and delegates light/heavy enforcement to existing moderation commands.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using MediatR;

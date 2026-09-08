@@ -1,6 +1,3 @@
-// ABOUTME: Maps fair-return policy, supply, queue, offer, binding, observation, and refund facts.
-// ABOUTME: Enforces tenant-qualified lineage, open-slot uniqueness, immutable commerce, and pointer-only intent state.
-
 using Explore.Domain;
 using Explore.Domain.Interfaces;
 using Microsoft.EntityFrameworkCore;

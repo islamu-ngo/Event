@@ -1,6 +1,3 @@
-// ABOUTME: Command-line entry point for deterministic generated-contract transformation.
-// ABOUTME: Validates one generated C# input and reports the applied record policy.
-
 namespace Explore.GeneratedContracts.Cli;
 
 internal static class Program

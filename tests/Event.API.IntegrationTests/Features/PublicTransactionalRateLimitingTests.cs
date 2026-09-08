@@ -1,6 +1,3 @@
-// ABOUTME: Focused runtime tests for the PublicTransactional API rate-limit policy.
-// ABOUTME: Verifies the enabled fixed window and the Testing NoLimiter override without product endpoints.
-
 using System.Net;
 using Explore.API.Extensions;
 using Microsoft.AspNetCore.Builder;

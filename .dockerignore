@@ -1,5 +1,3 @@
-# ABOUTME: Keeps Docker build contexts limited to deployable repository inputs.
-# ABOUTME: Excludes local tooling, worktree, build, and editor artifacts from image builds.
 .worktrees
 .omo
 .codegraph

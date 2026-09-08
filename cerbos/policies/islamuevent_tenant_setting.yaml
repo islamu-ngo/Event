@@ -1,4 +1,3 @@
-# ABOUTME: Cerbos resource policy for tenant-level settings.
 # Tenant admins can update scalar settings ONLY IF not locked by instance admin.
 # tenant.branding is a typed document whose field-level locks are enforced by the handler.
 # Instance admins bypass all lock checks.

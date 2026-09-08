@@ -1,6 +1,3 @@
-// ABOUTME: Validates UI theme creation requests for key uniqueness, palette completeness, and valid default semantics.
-// ABOUTME: Uses repository-backed checks so duplicate keys are rejected before persistence.
-
 namespace Explore.Application.DTOs.Appearance.Validators;
 
 using Explore.Application.Contracts.Persistence;

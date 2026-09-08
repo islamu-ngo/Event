@@ -1,6 +1,3 @@
-// ABOUTME: Scheduler-neutral descriptor for platform background jobs.
-// ABOUTME: Exposes operational contracts without leaking scheduler persistence or operator-surface internals.
-
 namespace Explore.Application.Contracts.Scheduling;
 
 public sealed record ScheduledJobDescriptor(

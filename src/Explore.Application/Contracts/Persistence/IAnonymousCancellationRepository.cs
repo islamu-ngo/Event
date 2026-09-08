@@ -1,5 +1,3 @@
-// ABOUTME: Loads exact cancellation evidence under retained issuance, readiness, ticket and target fences.
-// ABOUTME: Releases only the exact consumed inventory identities authorized by the cancelled aggregate.
 
 using Explore.Domain;
 using Explore.Domain.Services.Registration;

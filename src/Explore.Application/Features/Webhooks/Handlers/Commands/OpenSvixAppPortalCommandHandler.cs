@@ -1,6 +1,3 @@
-// ABOUTME: Handles Svix App Portal access creation through the provider-neutral webhook portal contract.
-// ABOUTME: Keeps provider SDK calls in Infrastructure while preserving command-response API conventions.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;

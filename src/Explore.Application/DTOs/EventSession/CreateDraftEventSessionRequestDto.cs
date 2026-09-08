@@ -1,6 +1,3 @@
-// ABOUTME: Request payload for creating an unscheduled draft event session.
-// ABOUTME: Keeps draft sessions structurally valid while schedule and publication fields remain lifecycle-gated.
-
 namespace Explore.Application.DTOs.EventSession;
 
 public sealed record CreateDraftEventSessionRequestDto

@@ -1,6 +1,3 @@
-// ABOUTME: Resolves finalized relational key, index, and exclusion identifiers from the active EF model.
-// ABOUTME: Keeps provider-specific exception classification aligned with conventions and identifier limits.
-
 using Explore.Persistence.Schema;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;

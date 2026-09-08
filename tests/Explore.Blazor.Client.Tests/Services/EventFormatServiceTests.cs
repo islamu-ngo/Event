@@ -1,4 +1,3 @@
-// ABOUTME: Unit tests for EventFormatService covering format list and by-id retrieval behavior.
 // Verifies successful pass-through and exception propagation from the API client.
 
 namespace Explore.Blazor.Client.Tests.Services;

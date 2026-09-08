@@ -1,6 +1,3 @@
-// ABOUTME: Application contract for requesting account-authority-owned identity lifecycle email actions.
-// ABOUTME: Models verification and reset email delegation without exposing provider tokens or secrets.
-
 using Explore.Application.Authentication;
 using Explore.Application.Notifications;
 

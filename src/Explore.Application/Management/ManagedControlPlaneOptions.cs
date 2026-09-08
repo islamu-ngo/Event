@@ -1,6 +1,3 @@
-// ABOUTME: Defines the optional public Event managed-mode bootstrap configuration.
-// ABOUTME: Defaults managed mode off so standalone Event deployments require no Control Plane settings.
-
 namespace Explore.Application.Management;
 
 using Explore.Domain.Constants;

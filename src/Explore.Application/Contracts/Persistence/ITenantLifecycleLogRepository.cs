@@ -1,6 +1,3 @@
-// ABOUTME: Repository interface for TenantLifecycleLog audit entity.
-// ABOUTME: Provides query methods for retrieving tenant lifecycle transition history.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

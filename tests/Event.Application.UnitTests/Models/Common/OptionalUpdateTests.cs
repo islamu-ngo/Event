@@ -1,6 +1,3 @@
-// ABOUTME: Tests OptionalUpdate<T> clear-null semantics for grouped partial update DTOs.
-// ABOUTME: Guards the JSON contract that distinguishes omitted fields, explicit set, and explicit clear.
-
 using System.Text.Json;
 using Explore.Application.Models.Common;
 

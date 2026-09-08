@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for global Actor identity and public profile reads.
-// ABOUTME: Composes tenant-local discoverability without creating tenant Actor or presence records.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;

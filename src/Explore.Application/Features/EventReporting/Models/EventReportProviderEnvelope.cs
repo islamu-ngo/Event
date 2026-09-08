@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral envelope for synchronizing event reports to moderation integrations.
-// ABOUTME: Carries stable IDs and safe metadata only; encrypted evidence and reporter hashes stay local.
-
 namespace Explore.Application.Features.EventReporting.Models;
 
 using Explore.Domain.Enums;

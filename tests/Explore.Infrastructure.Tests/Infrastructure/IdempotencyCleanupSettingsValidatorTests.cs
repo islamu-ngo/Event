@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for IdempotencyCleanupSettingsValidator.
-// ABOUTME: Verifies expired idempotency cleanup rejects unsafe scheduling and batch settings.
-
 using Explore.Infrastructure;
 
 namespace Explore.Infrastructure.Tests.Infrastructure;

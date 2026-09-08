@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for the public tenant effective-configuration administration page.
-// ABOUTME: Proves per-setting HAL actions, safe state handling, and accessible mutation feedback.
-
 using Explore.Blazor.Client.Contracts.ControlPlane;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Contracts.Services.ControlPlane;

@@ -1,5 +1,3 @@
-// ABOUTME: Pure five-tier settings merge shared by cached resolution and authoritative persistence reads.
-// ABOUTME: Preserves registry defaults, scope limits, and instance/tenant lock precedence without I/O.
 
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;

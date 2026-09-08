@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for Studio actor identity, pinned mode, and session switching.
-// ABOUTME: Verifies actor options come only from the authenticated UI-shell context.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.Shell.Workspaces;
 using Explore.Blazor.Client.Contracts.Services.Shell;

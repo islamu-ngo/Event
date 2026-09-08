@@ -1,6 +1,3 @@
-// ABOUTME: Enables SQLite write-ahead logging after the application schema is migrated.
-// ABOUTME: Gates the SQLite-specific command so every other provider remains untouched.
-
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Database;

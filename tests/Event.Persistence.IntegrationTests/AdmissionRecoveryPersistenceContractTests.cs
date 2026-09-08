@@ -1,12 +1,10 @@
-// ABOUTME: Specifies tenant-filtered digest-only admission recovery persistence metadata.
-// ABOUTME: Requires portable lineage uniqueness, concurrency, and no plaintext capability or identity fields.
-
 using Explore.Domain;
 using Explore.Persistence;
 using Explore.Persistence.QueryFilters;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace Event.Persistence.IntegrationTests;
 
@@ -17,25 +15,34 @@ public sealed class AdmissionRecoveryPersistenceContractTests
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connection)
             .UseSnakeCaseNamingConvention()
             .Options;
         await using var context = new ExploreDbContext(options);
 
-        IEntityType? entity = context.Model.FindEntityType(typeof(AdmissionRecoveryCapability));
-        IEntityType? delivery = context.Model.FindEntityType(typeof(AdmissionRecoveryDeliveryIntent));
-        IEntityType? requestIntent = context.Model.FindEntityType(typeof(AdmissionRecoveryRequestIntent));
+        IModel model = context.GetService<IDesignTimeModel>().Model;
+        IEntityType? entity = model.FindEntityType(typeof(AdmissionRecoveryCapability));
+        IEntityType? delivery = model.FindEntityType(typeof(AdmissionRecoveryDeliveryIntent));
+        IEntityType? requestIntent = model.FindEntityType(typeof(AdmissionRecoveryRequestIntent));
         string[] propertyNames = entity?.GetProperties().Select(property => property.Name).ToArray() ?? [];
         await Assert.That(entity).IsNotNull();
         await Assert.That(entity!.GetTableName()).IsEqualTo("ie_admission_recovery_capabilities");
         await Assert.That(entity.FindDeclaredQueryFilter(QueryFilterNames.Tenant)).IsNotNull();
         await Assert.That(entity.FindProperty(nameof(AdmissionRecoveryCapability.ConcurrencyStamp))!
             .IsConcurrencyToken).IsTrue();
-        await Assert.That(entity.FindProperty(nameof(AdmissionRecoveryCapability.LookupDigest))!
-            .GetTypeMapping().Converter!.ProviderClrType).IsEqualTo(typeof(byte[]));
-        await Assert.That(entity.FindProperty(nameof(AdmissionRecoveryCapability.LocatorDigest))!
-            .GetTypeMapping().Converter!.ProviderClrType).IsEqualTo(typeof(byte[]));
+        foreach (string digestProperty in new[]
+                 {
+                     nameof(AdmissionRecoveryCapability.LookupDigest),
+                     nameof(AdmissionRecoveryCapability.LocatorDigest)
+                 })
+        {
+            IProperty property = entity.FindProperty(digestProperty)!;
+            await Assert.That(property.ClrType).IsEqualTo(typeof(string));
+            await Assert.That(property.GetMaxLength()).IsEqualTo(44);
+             await Assert.That(property.IsFixedLength()).IsTrue();
+             await Assert.That(property.IsNullable).IsFalse();
+         }
         IIndex digest = FindIndex(
             entity,
             "TenantId",

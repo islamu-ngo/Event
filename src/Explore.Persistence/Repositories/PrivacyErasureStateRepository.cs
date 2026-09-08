@@ -1,6 +1,3 @@
-// ABOUTME: Persists privacy-erasure fences, receipt hashes, and completed policy coverage.
-// ABOUTME: Keeps mutable saga state tracked while using bounded queries for receipt cleanup.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

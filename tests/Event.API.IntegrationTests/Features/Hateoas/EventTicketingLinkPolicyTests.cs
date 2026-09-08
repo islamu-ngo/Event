@@ -1,6 +1,3 @@
-// ABOUTME: Unit-level HATEOAS policy tests for event ticket catalog management.
-// ABOUTME: Guards lifecycle-specific catalog actions and parent-event ticket authorization metadata.
-
 using System.Text.Json;
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;

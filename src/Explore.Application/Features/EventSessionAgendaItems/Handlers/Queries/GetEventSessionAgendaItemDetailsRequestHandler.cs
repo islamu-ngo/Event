@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning a single agenda item by ID.
-// ABOUTME: Maps entity to EventSessionAgendaItemDto.
 using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;

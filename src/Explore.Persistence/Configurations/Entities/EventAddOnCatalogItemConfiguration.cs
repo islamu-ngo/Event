@@ -1,6 +1,3 @@
-// ABOUTME: Maps immutable add-on catalog items and their exact commercial facts.
-// ABOUTME: Keeps price and finite capacity tenant-bound to one catalog version.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

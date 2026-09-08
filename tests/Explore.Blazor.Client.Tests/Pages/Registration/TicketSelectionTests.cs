@@ -1,6 +1,3 @@
-// ABOUTME: bUnit coverage for attendee ticket selection and structured operator disclosure.
-// ABOUTME: Verifies server composition drives guest orders without a prose identity fallback.
-
 using System.Reflection;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;

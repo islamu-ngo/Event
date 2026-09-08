@@ -1,6 +1,3 @@
-// ABOUTME: Cancels owned AI provider runs that have not reached a terminal state.
-// ABOUTME: Fails closed for other users or completed runs and avoids creating proposed actions.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.AiAssistant.Requests.Commands;

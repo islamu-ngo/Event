@@ -1,6 +1,3 @@
-// ABOUTME: Normalized setting override row belonging to a tenant plan version.
-// ABOUTME: References code-defined governance setting keys while storing values as JSON.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

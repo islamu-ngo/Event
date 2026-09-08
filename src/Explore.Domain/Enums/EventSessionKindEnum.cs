@@ -1,6 +1,3 @@
-// ABOUTME: Enum mirror of the EventSessionKind lookup used to classify program items.
-// ABOUTME: Values are stable lookup table ids; add new kinds here and to the seeder together.
-
 namespace Explore.Domain.Enums;
 
 public enum EventSessionKindEnum

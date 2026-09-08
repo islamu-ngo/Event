@@ -1,4 +1,3 @@
-// ABOUTME: EF Core configuration for ConfigurationChangeLog audit entity.
 // Indexes on UserId, SettingKey, and Timestamp for efficient audit trail queries.
 
 namespace Explore.Persistence.Configurations.Entities;

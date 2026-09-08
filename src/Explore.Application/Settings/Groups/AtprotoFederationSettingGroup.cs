@@ -1,6 +1,3 @@
-// ABOUTME: Strongly typed ATProto event and inbound-recovery settings from the hierarchical governance engine.
-// ABOUTME: Fails closed to platform validation and downtime-only recovery when stored state is invalid.
-
 namespace Explore.Application.Settings.Groups;
 
 using Explore.Application.Contracts.Infrastructure;

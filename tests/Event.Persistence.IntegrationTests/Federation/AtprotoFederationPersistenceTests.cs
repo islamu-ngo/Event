@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL integration tests for fenced AT Protocol outbox settlement and atomic Jetstream cursor application.
-// ABOUTME: Covers stale-worker rollback, idempotent replay, UUID allocation, and tenant presentation isolation.
-
 using System.Data.Common;
 using System.Text.Json;
 using Event.Persistence.IntegrationTests.Fixtures;
@@ -742,7 +739,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(value => value.LeaseExpiresAt, now.AddSeconds(-1)));
         });
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString)
             .UseSnakeCaseNamingConvention()
             .ConfigureWarnings(value => value.Ignore(RelationalEventId.PendingModelChangesWarning))
@@ -802,7 +799,7 @@ public sealed class AtprotoFederationPersistenceTests(PostgreSqlContainerFixture
                 TimeSpan.FromMinutes(5));
             await Assert.That(reclaimed).HasSingleItem();
         });
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(fixture.ConnectionString)
             .UseSnakeCaseNamingConvention()
             .ConfigureWarnings(value => value.Ignore(RelationalEventId.PendingModelChangesWarning))

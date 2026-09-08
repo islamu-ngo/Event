@@ -1,6 +1,3 @@
-// ABOUTME: Proves trust activation accepts only two distinct reviewed public keys and fails closed otherwise.
-// ABOUTME: Verifies the produced roots actually authorize a real signed tag through the shipped signer policy.
-
 using System.Diagnostics;
 using ISLAMU.ReleaseEngineering;
 

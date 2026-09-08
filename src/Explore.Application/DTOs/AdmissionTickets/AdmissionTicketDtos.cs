@@ -1,6 +1,3 @@
-// ABOUTME: Defines account and one-time recovery admission ticket delivery documents.
-// ABOUTME: Marks bearer-bearing fields explicitly while keeping recovery wrappers link-free.
-
 using System.Collections.Immutable;
 
 namespace Explore.Application.DTOs.AdmissionTickets;

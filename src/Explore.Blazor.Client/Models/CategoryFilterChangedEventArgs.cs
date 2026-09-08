@@ -1,4 +1,3 @@
-// ABOUTME: Event args emitted by the TriStateCategoryFilterDropdown when category selections change.
 // Contains the lists of included/excluded category IDs and their combination modes.
 
 namespace Explore.Blazor.Client.Models;

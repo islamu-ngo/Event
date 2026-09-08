@@ -1,6 +1,3 @@
-// ABOUTME: Resolves private Studio navigation capabilities for an authorized acting actor.
-// ABOUTME: Fails closed on invalid actor context or authorization errors and returns no role or event inventory data.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;

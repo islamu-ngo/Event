@@ -1,6 +1,3 @@
-// ABOUTME: Orchestrates registration-order state changes, conditional inventory use, and interim admissions.
-// ABOUTME: Keeps every lifecycle write in one unit-of-work transaction and creates only PII-free outbox intent.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Scheduling;
 using Explore.Application.Contracts.Services;

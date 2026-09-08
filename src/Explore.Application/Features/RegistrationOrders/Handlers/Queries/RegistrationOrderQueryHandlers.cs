@@ -1,6 +1,3 @@
-// ABOUTME: Maps tenant-filtered registration-order entities into safe lifecycle read DTOs.
-// ABOUTME: Leaves authorization policy and HAL affordance synthesis to the later API slice.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Features.RegistrationOrders.Requests.Queries;

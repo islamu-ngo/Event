@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for SecretRefreshService.
-// ABOUTME: Tests refresh scheduling, backoff behavior, and metrics integration.
-
 using Explore.Secrets.Abstractions;
 using Explore.Secrets.Configuration;
 using Explore.Secrets.Observability;

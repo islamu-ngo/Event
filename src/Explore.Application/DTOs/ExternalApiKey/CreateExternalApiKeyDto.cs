@@ -1,6 +1,3 @@
-// ABOUTME: Input model for issuing an external API key for any of the five owner types.
-// ABOUTME: Supports User, Organization, Group, Tenant, and InstanceAdmin keys with optional credit quota configuration.
-
 namespace Explore.Application.DTOs.ExternalApiKey;
 
 public sealed record CreateExternalApiKeyDto

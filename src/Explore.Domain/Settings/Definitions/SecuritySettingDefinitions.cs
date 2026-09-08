@@ -1,6 +1,3 @@
-// ABOUTME: Instance security settings for authorization selection and external URL transport policy.
-// ABOUTME: Defaults public-facing URLs to HTTPS while permitting explicit private-network opt-out.
-
 using Explore.Domain.Constants;
 
 namespace Explore.Domain.Settings.Definitions;

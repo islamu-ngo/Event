@@ -1,6 +1,3 @@
-/* ABOUTME: Resize handle styling for generic dock panels.
-   ABOUTME: Uses logical placement so start/end handles remain RTL-safe. */
-
 .dock-resize-handle {
     position: absolute;
     inset-block: 0;

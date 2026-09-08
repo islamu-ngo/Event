@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL-backed tests proving tenant query filters fail closed without ambient tenant context.
-// ABOUTME: Certifies explicit tenant context and explicit bypass paths after removing null-context broad reads.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain;

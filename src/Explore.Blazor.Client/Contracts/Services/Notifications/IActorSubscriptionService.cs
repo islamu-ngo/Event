@@ -1,6 +1,3 @@
-// ABOUTME: Blazor service contract for current-user actor subscription operations.
-// ABOUTME: Keeps components behind the BFF service layer instead of calling generated clients directly.
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Contracts.Services.Notifications;

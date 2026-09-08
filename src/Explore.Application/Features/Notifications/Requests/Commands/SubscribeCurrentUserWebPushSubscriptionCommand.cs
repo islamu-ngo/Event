@@ -1,6 +1,3 @@
-// ABOUTME: Command request for registering the authenticated user's browser Web Push subscription.
-// ABOUTME: Tenant and user ownership are taken from server context, never from client-supplied fields.
-
 using Explore.Application.Responses;
 using MediatR;
 

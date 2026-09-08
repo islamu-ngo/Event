@@ -1,6 +1,3 @@
-// ABOUTME: Formats generated ticket price summaries for public event surfaces.
-// ABOUTME: Converts integer minor units without floating-point arithmetic and centralizes summary-code labels.
-
 using System.Globalization;
 
 using Explore.Blazor.Client.Clients;

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies login/logout redirect behavior and accessible ATProto handle submission.
-// ABOUTME: Guards the BFF boundary by proving ATProto handles are posted and never copied into browser URLs.
-
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;

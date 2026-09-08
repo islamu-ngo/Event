@@ -1,6 +1,3 @@
-// ABOUTME: Operator-safe status DTO for Basic Dispatch Mode email outbox rows.
-// ABOUTME: Exposes lifecycle and retry fields while excluding recipient, body, subject, and provider secrets.
-
 using Explore.Domain;
 
 namespace Explore.Application.DTOs.EmailDispatch;

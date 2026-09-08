@@ -1,6 +1,3 @@
-// ABOUTME: Decision record created from local or provider report review.
-// ABOUTME: Captures safe decision metadata before existing moderation enforcement runs.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

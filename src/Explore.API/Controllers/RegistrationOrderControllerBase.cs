@@ -1,6 +1,3 @@
-// ABOUTME: Shared registration-order checkout protocol for the guest and authenticated controller family.
-// ABOUTME: Keeps native attempt, requirement, and participant handling identical across both entry paths.
-
 using Asp.Versioning;
 using System.Text.Json;
 using Explore.API.Attributes;

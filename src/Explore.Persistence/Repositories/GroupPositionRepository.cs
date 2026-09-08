@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for GroupPosition lookup table.
-// ABOUTME: Follows OrganizationPositionRepository pattern — generic repo, no custom queries.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 

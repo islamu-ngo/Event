@@ -1,6 +1,3 @@
-// ABOUTME: Maps retained OrganizationTenant legitimacy evidence with tenant-safe composite foreign keys.
-// ABOUTME: Enforces immutable document attachment identity, review audit relationships, and replay uniqueness.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.ValueGenerators;

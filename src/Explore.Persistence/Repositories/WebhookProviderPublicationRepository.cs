@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for authoritative provider-publication aggregates and atomic worker claims.
-// ABOUTME: Enforces explicit tenant predicates, entity-returning leases, append-only evidence, and fenced updates.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.Database;

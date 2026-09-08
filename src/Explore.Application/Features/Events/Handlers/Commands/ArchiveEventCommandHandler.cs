@@ -1,6 +1,3 @@
-// ABOUTME: Handler that transitions an event to the Archived lifecycle state.
-// ABOUTME: Tolerant path: skips publish readiness and emits no public outbox events.
-
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;

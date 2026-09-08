@@ -1,5 +1,3 @@
-// ABOUTME: Exercises the native exact-order recovery read while its original authority reaches RecoverUntil.
-// ABOUTME: A preinstalled EF read barrier advances the injected clock without mocking allocation or recovery.
 
 using System.Data.Common;
 using Event.Persistence.IntegrationTests.Fixtures;

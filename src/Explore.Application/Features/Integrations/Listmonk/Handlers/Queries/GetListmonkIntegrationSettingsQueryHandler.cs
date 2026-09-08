@@ -1,6 +1,3 @@
-// ABOUTME: Resolves sanitized Listmonk integration settings for the current tenant.
-// ABOUTME: Avoids the generic settings DTO because Listmonk has secret-backed keys.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Secrets;

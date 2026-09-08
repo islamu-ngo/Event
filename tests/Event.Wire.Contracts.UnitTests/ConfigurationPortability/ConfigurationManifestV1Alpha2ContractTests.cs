@@ -1,6 +1,3 @@
-// ABOUTME: Specifies the clean v1alpha2 manifest and tenant-package public contracts.
-// ABOUTME: Prevents portable artifact metadata from becoming target authorization.
-
 namespace ISLAMU.Wire.Contracts.UnitTests.ConfigurationPortability;
 
 using System.Reflection;

@@ -1,5 +1,3 @@
-// ABOUTME: Exercises delivery evidence through MailKit and a controlled loopback SMTP peer.
-// ABOUTME: Prevents duplicate handoffs after lost acknowledgements or failed connection teardown.
 
 using System.Net;
 using SmtpSettingsDatabase = Explore.Tests.Shared.Settings.SmtpSettingsDatabase;

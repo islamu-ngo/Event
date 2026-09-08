@@ -1,6 +1,3 @@
-// ABOUTME: Verifies topology-specific privacy-erasure authority composition and connection validation.
-// ABOUTME: Proves EmbeddedSqlite is the default while malformed external provider settings fail closed.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.PrivacyErasure;
@@ -48,7 +45,7 @@ public sealed class PrivacyErasureAuthorityCompositionValidationTests(
             configuration,
             skipLookupCacheInitializer: true);
 
-        await using ServiceProvider provider = services.BuildServiceProvider(
+        await using ServiceProvider provider = services.BuildIsolatedServiceProvider(
             new ServiceProviderOptions { ValidateScopes = true });
         await using AsyncServiceScope scope = provider.CreateAsyncScope();
         IPrivacyErasureAuthority authority =
@@ -83,8 +80,9 @@ public sealed class PrivacyErasureAuthorityCompositionValidationTests(
             configuration,
             skipDbContextRegistration: true,
             skipLookupCacheInitializer: true);
-
-        await using ServiceProvider provider = services.BuildServiceProvider(
+        services.ConfigureDbContext<CoLocatedPrivacyErasureAuthorityDbContext>(
+            TestDbContextOptions.Apply);
+        await using ServiceProvider provider = services.BuildIsolatedServiceProvider(
             new ServiceProviderOptions { ValidateScopes = true });
         await using AsyncServiceScope scope = provider.CreateAsyncScope();
         await using CoLocatedPrivacyErasureAuthorityDbContext context = scope.ServiceProvider
@@ -109,11 +107,8 @@ public sealed class PrivacyErasureAuthorityCompositionValidationTests(
         await fixture.ResetAsync();
 
         const string schema = "custom_event";
-        var migratorOptions = new DbContextOptionsBuilder<CoLocatedPrivacyErasureAuthorityDbContext>();
-        PrimaryDatabaseProviderComposition.ConfigureCoLocatedPrivacyErasureAuthority(
-            migratorOptions,
-            CreatePostgresOptions(fixture.ConnectionString, PrimaryDatabaseRole.Migrator, schema));
-        await using (var migrator = new CoLocatedPrivacyErasureAuthorityDbContext(migratorOptions.Options))
+        await using (var migrator = new CoLocatedPrivacyErasureAuthorityDbContext(
+            CreateAuthorityOptions(PrimaryDatabaseRole.Migrator, schema)))
         {
             string migration = migrator.Database.GetMigrations().Single();
             IMigrator migrationRunner = migrator.GetService<IMigrator>();
@@ -123,11 +118,9 @@ public sealed class PrivacyErasureAuthorityCompositionValidationTests(
             await migrationRunner.MigrateAsync(migration);
         }
 
-        var runtimeOptions = new DbContextOptionsBuilder<CoLocatedPrivacyErasureAuthorityDbContext>();
-        PrimaryDatabaseProviderComposition.ConfigureCoLocatedPrivacyErasureAuthority(
-            runtimeOptions,
-            CreatePostgresOptions(fixture.ConnectionString, PrimaryDatabaseRole.Runtime, schema));
-        await using var context = new CoLocatedPrivacyErasureAuthorityDbContext(runtimeOptions.Options);
+        DbContextOptions<CoLocatedPrivacyErasureAuthorityDbContext> runtimeOptions =
+            CreateAuthorityOptions(PrimaryDatabaseRole.Runtime, schema);
+        await using var context = new CoLocatedPrivacyErasureAuthorityDbContext(runtimeOptions);
         var authority = new CoLocatedPostgresPrivacyErasureAuthorityRepository(
             context,
             TimeProvider.System,
@@ -157,10 +150,8 @@ public sealed class PrivacyErasureAuthorityCompositionValidationTests(
             DateTime.UtcNow.AddDays(-1),
             appended.AuthoritySequence);
 
-        await using var appendContext = new CoLocatedPrivacyErasureAuthorityDbContext(
-            runtimeOptions.Options);
-        await using var compactContext = new CoLocatedPrivacyErasureAuthorityDbContext(
-            runtimeOptions.Options);
+        await using var appendContext = new CoLocatedPrivacyErasureAuthorityDbContext(runtimeOptions);
+        await using var compactContext = new CoLocatedPrivacyErasureAuthorityDbContext(runtimeOptions);
         var appendAuthority = new CoLocatedPostgresPrivacyErasureAuthorityRepository(
             appendContext,
             TimeProvider.System,
@@ -202,6 +193,63 @@ public sealed class PrivacyErasureAuthorityCompositionValidationTests(
     }
 
     [Test]
+    [Category("Runtime")]
+    [Timeout(240_000)]
+    public async Task CoLocatedPostgresTopologies_KeepMigratedAuthorityDataIsolatedAcrossSchemas()
+    {
+        await fixture.ResetAsync();
+        var schemas = Enumerable.Range(0, 24)
+            .Select(index => $"authority_isolation_{index}")
+            .ToArray();
+        var requests = schemas.Select(_ => PrivacyErasureRequest.Create(
+            Guid.CreateVersion7(),
+            PrivacyErasureSubjectKind.User,
+            Guid.CreateVersion7(),
+            PrivacyErasureReasonCode.SubjectErasureRequest,
+            1)).ToArray();
+        var retainedIds = new Guid[schemas.Length];
+
+        for (var index = 0; index < schemas.Length; index++)
+        {
+            await using (var migrator = new CoLocatedPrivacyErasureAuthorityDbContext(
+                CreateAuthorityOptions(PrimaryDatabaseRole.Migrator, schemas[index])))
+            {
+                await migrator.Database.MigrateAsync();
+            }
+
+            await using var context = new CoLocatedPrivacyErasureAuthorityDbContext(
+                CreateAuthorityOptions(PrimaryDatabaseRole.Runtime, schemas[index]));
+            var authority = new CoLocatedPostgresPrivacyErasureAuthorityRepository(
+                context, TimeProvider.System, Options.Create(new PrivacyErasureOptions()));
+            PrivacyErasureIntent retained = await authority.AppendAsync(requests[index]);
+            retainedIds[index] = retained.IntentId;
+            await Assert.That(retained.AuthoritySequence).IsEqualTo(1);
+        }
+
+        for (var index = 0; index < schemas.Length; index++)
+        {
+            await using var context = new CoLocatedPrivacyErasureAuthorityDbContext(
+                CreateAuthorityOptions(PrimaryDatabaseRole.Runtime, schemas[index]));
+            var authority = new CoLocatedPostgresPrivacyErasureAuthorityRepository(
+                context, TimeProvider.System, Options.Create(new PrivacyErasureOptions()));
+            IReadOnlyList<PrivacyErasureIntent> replay = await authority.ReadAfterAsync(0, 10);
+            await Assert.That(replay.Select(intent => intent.IntentId))
+                .IsEquivalentTo(new[] { retainedIds[index] });
+        }
+    }
+
+    private DbContextOptions<CoLocatedPrivacyErasureAuthorityDbContext> CreateAuthorityOptions(
+        PrimaryDatabaseRole role,
+        string schema)
+    {
+        var options = TestDbContextOptions.Create<CoLocatedPrivacyErasureAuthorityDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureCoLocatedPrivacyErasureAuthority(
+            options,
+            CreatePostgresOptions(fixture.ConnectionString, role, schema));
+        return options.Options;
+    }
+
+    [Test]
     public async Task CoLocatedSqliteTopology_UsesPrimaryFileAndFixedPrefixWithoutEmbeddedStorage()
     {
         string primaryPath = Path.Combine(
@@ -222,9 +270,12 @@ public sealed class PrivacyErasureAuthorityCompositionValidationTests(
             skipDbContextRegistration: true,
             skipLookupCacheInitializer: true);
 
+        services.ConfigureDbContext<EmbeddedPrivacyErasureAuthorityDbContext>(
+            TestDbContextOptions.Apply,
+            ServiceLifetime.Singleton);
         try
         {
-            await using ServiceProvider provider = services.BuildServiceProvider(
+            await using ServiceProvider provider = services.BuildIsolatedServiceProvider(
                 new ServiceProviderOptions { ValidateScopes = true });
             await using AsyncServiceScope scope = provider.CreateAsyncScope();
             IPrivacyErasureAuthority authority =

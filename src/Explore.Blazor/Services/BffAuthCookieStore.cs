@@ -1,6 +1,3 @@
-// ABOUTME: Stores the BFF auth cookie per circuit and exposes it during inbound activity execution.
-// ABOUTME: Enables pooled self-call handlers to read the current circuit cookie via AsyncLocal.
-
 namespace Explore.Blazor.Services;
 
 public interface IBffAuthCookieStore

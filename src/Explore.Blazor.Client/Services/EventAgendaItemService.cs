@@ -1,6 +1,3 @@
-// ABOUTME: Service for managing EventAgendaItem entities via API calls.
-// ABOUTME: Provides CRUD operations for agenda items within an event.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Events;
 using Explore.Blazor.Client.Helpers;

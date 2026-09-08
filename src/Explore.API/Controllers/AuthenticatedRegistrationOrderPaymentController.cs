@@ -1,6 +1,3 @@
-// ABOUTME: Authenticated purchaser payment endpoints enforce current-account ownership in Application handlers.
-// ABOUTME: Start and retry create only durable local work while status remains private and authoritative.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Extensions;

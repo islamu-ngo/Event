@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query request for fetching a single event-tag link by ID.
-// ABOUTME: Returns EventTagsDto.
 using System;
 using Explore.Application.DTOs.EventTags;
 using MediatR;

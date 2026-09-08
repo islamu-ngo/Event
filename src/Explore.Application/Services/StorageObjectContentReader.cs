@@ -1,6 +1,3 @@
-// ABOUTME: Metadata-first storage content reader for provider-neutral download endpoints.
-// ABOUTME: Enforces lifecycle and visibility before opening server-owned provider object keys.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

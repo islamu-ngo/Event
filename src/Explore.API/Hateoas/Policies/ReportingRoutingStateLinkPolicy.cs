@@ -1,6 +1,3 @@
-// ABOUTME: HAL link policy for moderation reporting routing-state resources.
-// ABOUTME: Emits authorized read and tenant update affordances without exposing provider secrets.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Collections.Generic;

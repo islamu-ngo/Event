@@ -1,6 +1,3 @@
-// ABOUTME: API controller for notification management and one-way refresh hints.
-// ABOUTME: All endpoints require authentication because notifications are personal user data.
-
 using System.Globalization;
 using System.Net.ServerSentEvents;
 using System.Runtime.CompilerServices;

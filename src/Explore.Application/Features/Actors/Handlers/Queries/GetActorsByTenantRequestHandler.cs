@@ -1,5 +1,3 @@
-// ABOUTME: Query handler returning all actors belonging to a specific tenant.
-// ABOUTME: Used for tenant-scoped actor resolution.
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Actor;

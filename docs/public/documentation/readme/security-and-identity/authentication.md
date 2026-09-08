@@ -1,8 +1,6 @@
 ---
 description: Operate Local Identity, Keycloak, or passwordless AT Protocol authentication.
 ---
-<!-- ABOUTME: Operator guide for Local Identity, Keycloak, and AT Protocol primary providers. -->
-<!-- ABOUTME: Explains BFF sessions, passwordless JIT identity, storage, and safe provider switching. -->
 
 # Authentication Architecture
 
@@ -33,6 +31,7 @@ The browser communicates strictly with `Explore.Blazor` over HTTPS regardless of
 * Authentication state is tracked via an encrypted `SameSite=Lax` session cookie managed by the BFF.
 * Local login posts through an antiforgery-protected BFF endpoint. The BFF stores the returned bearer token only in server-side authentication properties. Public Local registration is not available.
 * The API validates Local and Keycloak tokens with isolated bearer schemes. A token signed or issued for one authority cannot authenticate through the other.
+* Direct Google sign-in and Google sign-in brokered by Keycloak use separate provider account namespaces. A brokered login remains bound to the Keycloak issuer and subject; a provider hint does not turn it into a direct Google account. Keep the configured issuer stable when diagnosing account-linking failures.
 
 ### Local Identity
 
@@ -226,14 +225,15 @@ External programmatic clients and integration workers authenticate using either:
 
 ---
 
-## Linked AT Protocol Sign-In
+## AT Protocol Sign-In
 
 Optional or primary [AT Protocol Authentication](../federation-and-open-protocols/at-protocol-and-bluesky-jetstream.md) enables users to sign in using their Bluesky handle (`@handle.bsky.social`) or Decentralized Identifier (DID):
 * Links strictly by the DID verified with the personal data server.
 * JIT-creates a passwordless account when AT Protocol is primary.
 * Never creates accounts through opportunistic email matching.
 * Does not implicitly grant event publication or federation consent.
-* Operates under the same unified [Authorization](authorization.md) rules as standard Keycloak users.
+* Requires an existing exact DID-linked account when optional under Local Identity or Keycloak.
+* Operates under the same provider-neutral [Authorization](authorization.md) rules as Local Identity and Keycloak users.
 
 ---
 

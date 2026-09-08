@@ -1,6 +1,3 @@
-// ABOUTME: Authenticated API controller for outgoing webhook provider management actions.
-// ABOUTME: Exposes backend-generated Svix App Portal access without leaking provider credentials.
-
 using Explore.Application.Authentication;
 using Asp.Versioning;
 using Explore.API.Attributes;

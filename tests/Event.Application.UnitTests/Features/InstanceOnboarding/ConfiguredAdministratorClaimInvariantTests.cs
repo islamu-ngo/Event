@@ -1,6 +1,3 @@
-// ABOUTME: Adversarial tests for exact configured-administrator provider authority and replay fencing.
-// ABOUTME: Verifies mismatched claims remain bounded and produce no durable writes or post-commit effects.
-
 using Explore.Application.Authentication;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
@@ -30,13 +27,32 @@ public sealed class ConfiguredAdministratorClaimInvariantTests
         var scenario = new OnboardingCompletionScenario(
             providerKind: AuthenticationProviderKind.Local);
 
-        BaseCommandResponse<Guid> response = await scenario.ClaimAsync();
+        BaseCommandResponse<Guid> unprovisioned = await scenario.ClaimAsync();
+
+        await Assert.That(unprovisioned.IsSuccess).IsFalse();
+        await Assert.That(unprovisioned.FailureCode).IsEqualTo("local_bootstrap_authority_invalid");
+        await Assert.That(scenario.Bootstrap.Status).IsEqualTo(InstanceBootstrapStatus.Pending);
+        await Assert.That(scenario.CommittedWrites).IsEmpty();
+        await Assert.That(scenario.PostCommitEffects).IsEmpty();
+
+        BaseCommandResponse<Guid> response = await scenario.CompleteProvisionedLocalAsync();
 
         await Assert.That(response.IsSuccess).IsTrue();
         await Assert.That(scenario.Bootstrap.ProviderKind)
             .IsEqualTo(AuthenticationProviderKind.Local);
         await Assert.That(scenario.Bootstrap.CompletedByUserId)
             .IsEqualTo(scenario.UserId);
+        await Assert.That(scenario.EventSequence.Last()).IsEqualTo("credential-activation");
+        scenario.EventSequence.Clear();
+
+        BaseCommandResponse<Guid> replay = await scenario.ClaimAsync();
+
+        await Assert.That(replay.IsSuccess).IsTrue();
+        await Assert.That(replay.Id).IsEqualTo(response.Id);
+        await Assert.That(scenario.CommittedWrites).IsEmpty();
+        await Assert.That(scenario.Users).IsEquivalentTo([scenario.UserId]);
+        await Assert.That(scenario.PostCommitEffects)
+            .IsEquivalentTo(["secret-lock", "admin-cache", "deployment-cache", "jwt-reload", "audit"]);
     }
 
     [Test]

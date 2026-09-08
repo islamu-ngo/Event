@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL constraint tests for heavy event redaction sentinel values.
-// ABOUTME: Verifies representative redacted event graphs persist without retaining original text or image references.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Features.Events.Moderation;
 using Explore.Domain;

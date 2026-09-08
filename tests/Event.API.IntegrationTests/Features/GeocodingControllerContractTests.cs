@@ -1,6 +1,3 @@
-// ABOUTME: Specifies the private address-suggestion HTTP contract before its implementation.
-// ABOUTME: Pins authentication, no-store caching, throttling, body authority, and error metadata.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;

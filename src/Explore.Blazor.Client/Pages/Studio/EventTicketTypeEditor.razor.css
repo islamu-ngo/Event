@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped responsive layout for Studio ticket-type and entitlement authoring. */
-/* ABOUTME: Keeps dense pricing and admission fields readable without global style leakage. */
-
 .ticket-type-editor,
 .ticket-type-editor__entitlement {
     display: grid;

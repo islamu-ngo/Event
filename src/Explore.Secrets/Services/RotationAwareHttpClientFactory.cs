@@ -1,6 +1,3 @@
-// ABOUTME: HTTP client factory that validates candidates before process-local credential activation.
-// ABOUTME: Returns value-free local acknowledgements and never claims deployment convergence.
-
 using System.Collections.Concurrent;
 using Explore.Secrets.Configuration;
 using Microsoft.Extensions.Logging;

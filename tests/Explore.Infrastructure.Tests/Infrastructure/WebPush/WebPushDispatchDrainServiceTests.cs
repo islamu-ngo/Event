@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for durable Web Push dispatch drainage over subscription outbox rows.
-// ABOUTME: Verifies preference gating, lease-safe transitions, stale cleanup, retries, and generic payloads.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

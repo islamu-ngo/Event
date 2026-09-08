@@ -1,6 +1,3 @@
-// ABOUTME: EF configuration for LocationRoom - tenant-scoped child of Location used by room-aware scheduling.
-// ABOUTME: Enforces per-location name uniqueness and exposes the concurrency stamp as the optimistic concurrency token.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

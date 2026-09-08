@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for assigning a local event-report case.
-// ABOUTME: Ensures identifiers and optimistic concurrency input are present before repository work.
-
 using Explore.Application.Features.EventReporting.Requests.Commands;
 using FluentValidation;
 

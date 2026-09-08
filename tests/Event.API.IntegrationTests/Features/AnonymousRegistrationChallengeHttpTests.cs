@@ -1,5 +1,3 @@
-// ABOUTME: Exercises anonymous proof, response-store crash recovery, and replica replay through native HTTP and SQLite.
-// ABOUTME: Uses real middleware, repositories, allocation, quotas and shared Data Protection keys with preinstalled database barriers.
 
 using System.Data.Common;
 using System.Globalization;

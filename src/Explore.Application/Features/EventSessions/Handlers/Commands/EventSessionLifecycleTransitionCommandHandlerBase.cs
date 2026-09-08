@@ -1,6 +1,3 @@
-// ABOUTME: Shared handler base for explicit event-session terminal lifecycle transitions.
-// ABOUTME: Centralizes atomic transition hooks, schedule refresh, and post-commit cache invalidation.
-
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSession.Validators;

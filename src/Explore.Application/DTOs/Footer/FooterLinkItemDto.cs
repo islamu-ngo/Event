@@ -1,6 +1,3 @@
-// ABOUTME: DTO for a single link within a footer link group column.
-// ABOUTME: Maps from TenantFooterLink entity for public/tenant consumption.
-
 namespace Explore.Application.DTOs.Footer;
 
 public sealed record FooterLinkItemDto

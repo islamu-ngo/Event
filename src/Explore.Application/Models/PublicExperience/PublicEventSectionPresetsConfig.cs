@@ -1,6 +1,3 @@
-// ABOUTME: Application-owned versioned configuration records for typed public event-section presets.
-// ABOUTME: Persists structured filters instead of query strings or display-layer DTOs.
-
 namespace Explore.Application.Models.PublicExperience;
 
 public sealed record PublicEventSectionPresetsConfig(

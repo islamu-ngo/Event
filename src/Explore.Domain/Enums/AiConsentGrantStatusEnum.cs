@@ -1,6 +1,3 @@
-// ABOUTME: Lifecycle status for an AI data-disclosure consent grant.
-// ABOUTME: Values ordered Pending → Granted → (Revoked|Expired); only Granted authorizes disclosure.
-
 namespace Explore.Domain.Enums;
 
 public enum AiConsentGrantStatusEnum

@@ -1,6 +1,3 @@
-// ABOUTME: Lookup-table entity for analytics providers available to tenant and instance settings.
-// ABOUTME: Source of truth for provider ids used by AnalyticsProviderEnum.
-
 namespace Explore.Domain;
 
 public class AnalyticsProvider

@@ -1,6 +1,3 @@
-// ABOUTME: Handles authenticated event-report submissions with duplicate, quota, and status checks.
-// ABOUTME: Persists report metadata, target, encrypted evidence, local case, and outbox intent atomically.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;

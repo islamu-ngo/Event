@@ -1,6 +1,3 @@
-// ABOUTME: Handles Basic Dispatch Mode status queries by mapping EmailDispatchOutbox entities to safe DTOs.
-// ABOUTME: Keeps repository boundaries entity-first and strips email content before returning operator status.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EmailDispatch;
 using Explore.Application.Features.EmailDispatch.Requests.Queries;

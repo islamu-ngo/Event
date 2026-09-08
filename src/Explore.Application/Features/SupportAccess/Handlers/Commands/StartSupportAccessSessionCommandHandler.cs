@@ -1,6 +1,3 @@
-// ABOUTME: Handles support-access session start with policy, target, and audit validation.
-// ABOUTME: Creates the session and lifecycle audit event in one transactional boundary.
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

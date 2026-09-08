@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the control-plane operations status read model.
-// ABOUTME: Verifies bounded outbox, email dispatch, and storage warnings stay sanitized and count-based.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

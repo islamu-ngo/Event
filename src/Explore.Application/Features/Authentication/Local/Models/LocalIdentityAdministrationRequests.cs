@@ -1,5 +1,3 @@
-// ABOUTME: Defines closed request bodies for generated-only administrative Local credential issuance.
-// ABOUTME: Keeps actor authority, target routing, verification, and passwords outside client-controlled creation intent.
 
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;

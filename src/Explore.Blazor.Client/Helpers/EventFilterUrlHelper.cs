@@ -1,6 +1,3 @@
-// ABOUTME: Lightweight helper for URL ↔ event filter state sync using modern Blazor patterns.
-// ABOUTME: Builds URLs via GetUriWithQueryParameters, syncs filter bar state, and provides CSV parsing for [SupplyParameterFromQuery].
-
 using System.Globalization;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Models;

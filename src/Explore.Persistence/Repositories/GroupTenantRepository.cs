@@ -1,6 +1,3 @@
-// ABOUTME: Persists tenant-local group participation, hierarchy, and policy state.
-// ABOUTME: Loads the global group and Actor graph needed by participation-aware handlers.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;

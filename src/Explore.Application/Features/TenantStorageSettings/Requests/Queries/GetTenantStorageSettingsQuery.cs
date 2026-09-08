@@ -1,6 +1,3 @@
-// ABOUTME: Query contract for reading current-tenant storage administration settings.
-// ABOUTME: Returns effective policy, usage, lock state, and redacted optional S3 configuration.
-
 using Explore.Application.DTOs.Tenant;
 using MediatR;
 

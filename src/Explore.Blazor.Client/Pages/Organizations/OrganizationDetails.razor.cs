@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for the OrganizationDetails page.
-// ABOUTME: Uses HAL _links from API response to determine edit permissions instead of client-side role checks.
-
 using Blazouter.Services;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.Events;

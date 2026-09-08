@@ -1,6 +1,3 @@
-// ABOUTME: Event-local Layer 3 custom-property definition materialized from a template or created directly on the event.
-// ABOUTME: Event runtime reads use these definitions, not template rows, and track provenance for supportable sync behavior.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;

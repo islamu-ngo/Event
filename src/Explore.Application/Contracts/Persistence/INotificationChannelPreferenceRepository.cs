@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for normalized notification matrix cell preferences.
-// ABOUTME: Returns entities so Application handlers own DTO/projection mapping.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

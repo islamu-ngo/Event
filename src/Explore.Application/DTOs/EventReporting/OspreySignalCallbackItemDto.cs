@@ -1,6 +1,3 @@
-// ABOUTME: One Osprey callback signal item accepted by the moderation integration API.
-// ABOUTME: Uses provider text codes at the boundary and leaves normalization to the Application handler.
-
 namespace Explore.Application.DTOs.EventReporting;
 
 public sealed record OspreySignalCallbackItemDto

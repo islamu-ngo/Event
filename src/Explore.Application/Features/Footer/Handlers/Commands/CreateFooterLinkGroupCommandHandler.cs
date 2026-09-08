@@ -1,6 +1,3 @@
-// ABOUTME: Handles CreateFooterLinkGroupCommand for tenant-scoped footer link groups.
-// ABOUTME: Auto-assigns Order as max+1 and persists the authorized tenant context.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Footer.Requests.Commands;
 using Explore.Application.Responses;

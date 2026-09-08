@@ -1,6 +1,3 @@
-// ABOUTME: Append-only persistence contract for exceptional exact EventLocation read evidence.
-// ABOUTME: Exposes bounded tenant-filtered entity reads without update, delete, DTO, or queryable surfaces.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

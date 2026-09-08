@@ -1,6 +1,3 @@
-// ABOUTME: Stable relational lookup rows for supported webhook delivery providers.
-// ABOUTME: Mirrors WebhookProviderKind identifiers used by bindings and provider publications.
-
 namespace Explore.Domain;
 
 public sealed class WebhookProviderKindLookup

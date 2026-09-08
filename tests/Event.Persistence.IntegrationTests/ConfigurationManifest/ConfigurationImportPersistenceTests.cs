@@ -1,6 +1,3 @@
-// ABOUTME: Verifies encrypted durable import bytes, target-isolated sessions, and expiry cleanup.
-// ABOUTME: Proves plaintext never reaches storage and every provider model includes generated metadata.
-
 namespace Event.Persistence.IntegrationTests.ConfigurationManifest;
 
 using System.Text;
@@ -379,7 +376,7 @@ public sealed class ConfigurationImportPersistenceTests
     private static ExploreDbContext CreateModelContext(
         PrimaryDatabaseProvider provider)
     {
-        var optionsBuilder = new DbContextOptionsBuilder<ExploreDbContext>();
+        var optionsBuilder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(
             optionsBuilder,
             CreateOptions(provider));
@@ -450,7 +447,7 @@ public sealed class ConfigurationImportPersistenceTests
                     DataSource = ":memory:"
                 }.ToString());
             await connection.OpenAsync();
-            var options = new DbContextOptionsBuilder<ExploreDbContext>()
+            var options = TestDbContextOptions.Create<ExploreDbContext>()
                 .UseSqlite(connection)
                 .UseSnakeCaseNamingConvention()
                 .Options;

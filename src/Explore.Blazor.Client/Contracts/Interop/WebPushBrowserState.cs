@@ -1,6 +1,3 @@
-// ABOUTME: Browser-owned Web Push permission and subscription state returned through JavaScript interop.
-// ABOUTME: Carries only public enrollment material required by the authenticated BFF subscription flow.
-
 namespace Explore.Blazor.Client.Contracts.Interop;
 
 public sealed record WebPushBrowserState(

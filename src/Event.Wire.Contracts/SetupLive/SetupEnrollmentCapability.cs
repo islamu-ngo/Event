@@ -1,6 +1,3 @@
-// ABOUTME: Enforces the canonical 32-byte Setup enrollment capability syntax.
-// ABOUTME: Redacts capability-bearing string and debugger representations.
-
 namespace ISLAMU.Wire.Contracts.SetupLive;
 
 using System.Diagnostics;

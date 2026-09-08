@@ -1,6 +1,3 @@
-// ABOUTME: Verifies runtime primary-provider precedence, cache invalidation, and fail-closed selection.
-// ABOUTME: Proves switching changes new-login routing without timing waits or provider-name persistence.
-
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

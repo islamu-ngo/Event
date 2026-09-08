@@ -1,6 +1,3 @@
-// ABOUTME: Locks canonical legal-identity and payment-operations environment projection into Compose.
-// ABOUTME: Prevents documented startup governance from disappearing between .env and runtime containers.
-
 namespace Event.Architecture.Tests;
 
 public sealed class LegalIdentityDeploymentContractTests

@@ -1,6 +1,3 @@
-// ABOUTME: Scheduled event content with UTC truth, cached local projections, and mediated EventLocation placement.
-// ABOUTME: Domain methods own schedule projection and derive retained physical room keys from event-local authority.
-
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -349,6 +346,10 @@ public class EventSession : ITenantEntity, IAuditableEntity, ISoftDeletable, ICo
     {
         EventLocationId = null;
         EventLocation = null;
+        LocationId = null;
+        Location = null;
+        RoomId = null;
+        Room = null;
     }
 
     private EventSessionStatusEnum CurrentStatus => (EventSessionStatusEnum)EventSessionStatusId;

@@ -1,6 +1,3 @@
-// ABOUTME: Keeps configured-administrator bootstrap unavailable until runtime activation is complete.
-// ABOUTME: Performs no configuration, management, network, or identity-selection behavior.
-
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Models;

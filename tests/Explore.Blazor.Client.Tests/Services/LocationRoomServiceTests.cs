@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for LocationRoomService covering CRUD operations.
-// ABOUTME: Tests GetRoomsByLocation, GetRoomById, CreateRoom, UpdateRoom, DeleteRoom with success and error paths.
-
 namespace Explore.Blazor.Client.Tests.Services;
 
 public class LocationRoomServiceTests

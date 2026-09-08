@@ -1,6 +1,3 @@
-// ABOUTME: Defines fixed-cardinality admission check-in telemetry facts and operational hooks.
-// ABOUTME: Prevents identifiers, bearer material, device labels, and free-form reasons from becoming metric labels.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Contracts.Admissions;

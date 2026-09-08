@@ -1,6 +1,3 @@
-// ABOUTME: Verifies browser-import bytes use strict v1alpha2 parsing and value-safe failures.
-// ABOUTME: Covers exact-byte digesting, duplicate/unknown members, invalid JSON, and size limits.
-
 namespace Event.Application.UnitTests.Features.ConfigurationManifest;
 
 using System.Text;

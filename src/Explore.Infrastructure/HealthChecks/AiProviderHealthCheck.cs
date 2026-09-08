@@ -1,6 +1,3 @@
-// ABOUTME: Readiness health check for AI provider configuration and egress safety.
-// ABOUTME: Reports disabled mode as healthy while surfacing misconfiguration without exposing secrets.
-
 using Explore.Application.Contracts.Infrastructure.Ai;
 using Explore.Application.Telemetry;
 using Explore.Infrastructure.Ai;

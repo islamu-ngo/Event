@@ -1,6 +1,3 @@
-// ABOUTME: Evicts output-cache responses whose HAL reporting affordances depend on tenant intake settings.
-// ABOUTME: Uses the canonical event detail and collection cache tags in deterministic order.
-
 using Explore.Application.Contracts.Infrastructure;
 using Microsoft.AspNetCore.OutputCaching;
 

@@ -1,5 +1,3 @@
-// ABOUTME: Defines Local lifecycle CQRS commands with session authority supplied only by trusted adapters.
-// ABOUTME: Keeps anonymous intake and operation consumption separate from authentication and session issuance.
 
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Authentication.Local.Models;

@@ -1,6 +1,3 @@
-// ABOUTME: API controller tests for tenant storage settings routes.
-// ABOUTME: Verifies CQRS dispatch and HTTP result mapping for tenant storage administration.
-
 using System.Reflection;
 using System.Security.Claims;
 using Event.Api.IntegrationTests.Fixtures;

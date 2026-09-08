@@ -1,5 +1,3 @@
-// ABOUTME: Publishes immutable bounded proof work without revealing the enclosed guest capability.
-// ABOUTME: Redacts the protected bearer envelope from ordinary record formatting.
 
 namespace Explore.Application.DTOs.RegistrationOrders;
 

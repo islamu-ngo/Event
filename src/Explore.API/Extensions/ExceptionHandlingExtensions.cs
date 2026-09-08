@@ -1,6 +1,3 @@
-// ABOUTME: Registers and wires API exception handling services and middleware.
-// ABOUTME: Configures chained IExceptionHandler implementations with ProblemDetails.
-
 using Explore.API.ExceptionHandling;
 using Microsoft.AspNetCore.Diagnostics;
 

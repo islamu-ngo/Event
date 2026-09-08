@@ -1,6 +1,3 @@
-// ABOUTME: Authenticates opaque scanner bearers into one bounded Domain-backed target scope.
-// ABOUTME: Returns generic failure and never exposes plaintext, keyed digests, or cryptographic keys.
-
 namespace Explore.Application.Contracts.Admissions;
 
 public sealed record AdmissionScannerAuthenticationRequest(string Capability)

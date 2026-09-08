@@ -1,6 +1,3 @@
-// ABOUTME: Orchestrates registered tenant resolvers and applies single-tenant fallback when appropriate.
-// ABOUTME: In multi-tenant mode, unresolved requests fail closed instead of silently falling back to the default tenant.
-
 using Explore.Application.Contracts.Services;
 using Microsoft.Extensions.Options;
 

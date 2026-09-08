@@ -1,6 +1,3 @@
-// ABOUTME: Validates manual provider publication abandonment evidence before aggregate mutation.
-// ABOUTME: Requires optimistic version and normalized audit reason values for operator accountability.
-
 using Explore.Application.Features.Webhooks.Requests.Commands;
 using Explore.Domain;
 using FluentValidation;

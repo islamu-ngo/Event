@@ -1,6 +1,3 @@
-// ABOUTME: SaaS tenant plan aggregate containing stable tier identity and published versions.
-// ABOUTME: Stores plan metadata separately from versioned settings, quotas, and tenant assignments.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

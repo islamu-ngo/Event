@@ -1,6 +1,3 @@
-// ABOUTME: Exhaustive pure-policy tests for contextual EventLocation disclosure decisions.
-// ABOUTME: Proves ordered fail-closed gates, server-time reveal, field selection, and Private Home redaction.
-
 using System.Collections.Immutable;
 using System.Reflection;
 using Explore.Application.Contracts.LocationPrivacy;
@@ -821,7 +818,9 @@ public sealed class EventLocationDisclosureEvaluatorTests
     [Category("EventLocationPrivacy")]
     public async Task Evaluate_WhitespaceLegacyPiiSource_IsHidden()
     {
-        var location = CreateLocation(fullName: " ", city: "\t", country: "");
+        var location = CreateLocation(city: "\t", country: "");
+        typeof(Location).GetField("_fullName", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(location, " ");
         MaterializeLegacyPii(location, " ", " ", 50.85, 4.35);
 
         var result = _evaluator.Evaluate(CreateFacts(location: location, room: null, roomId: null));

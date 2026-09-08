@@ -1,6 +1,3 @@
-// ABOUTME: Handler for getting permissions assignable by the current user.
-// ABOUTME: Delegates to IPermissionRepository capability ceiling logic.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Permission;

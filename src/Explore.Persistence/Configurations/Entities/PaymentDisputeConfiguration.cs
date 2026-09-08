@@ -1,6 +1,3 @@
-// ABOUTME: Maps independent payment-dispute projections with tenant-qualified provider identities.
-// ABOUTME: Preserves multiple disputes per payment while rejecting duplicate provider observations.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

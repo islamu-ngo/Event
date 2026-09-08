@@ -1,6 +1,3 @@
-// ABOUTME: Maps private fair-return waitlist reads and antiforgery-protected browser mutations.
-// ABOUTME: Keeps registration-order capability in one header and forwards only through the generated API client.
-
 using Explore.Blazor.Client.Clients;
 using Microsoft.AspNetCore.Mvc;
 

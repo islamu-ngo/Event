@@ -1,6 +1,3 @@
-// ABOUTME: Fixture-backed Formbricks adapter tests for exact tuples, HMAC callbacks, and v1 management contracts.
-// ABOUTME: Uses recorded JSON only; no live Formbricks network dependency or undocumented API assertion.
-
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;

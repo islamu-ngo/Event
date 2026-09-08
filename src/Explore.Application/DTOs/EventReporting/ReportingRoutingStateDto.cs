@@ -1,6 +1,3 @@
-// ABOUTME: DTOs for redacted moderation reporting provider routing state.
-// ABOUTME: Exposes effective provider routing without leaking endpoints, API keys, or provider payloads.
-
 namespace Explore.Application.DTOs.EventReporting;
 
 public sealed record ReportingRoutingStateDto

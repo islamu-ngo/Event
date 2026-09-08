@@ -1,5 +1,3 @@
-<!-- ABOUTME: Builds the explicit OpenAPI-to-Markdown inventory generator. -->
-<!-- ABOUTME: Keeps documentation generation outside product test projects. -->
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>

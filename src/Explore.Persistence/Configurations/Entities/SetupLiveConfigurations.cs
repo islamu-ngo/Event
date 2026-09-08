@@ -1,6 +1,3 @@
-// ABOUTME: Maps Setup live enrollment, replay claim, and value-free secret-operation state.
-// ABOUTME: Enforces tenant/actor lineage, replay uniqueness, positive versions, and closed lifecycles.
-
 namespace Explore.Persistence.Configurations.Entities;
 
 using Explore.Domain;

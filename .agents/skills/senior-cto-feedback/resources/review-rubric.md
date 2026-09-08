@@ -1,12 +1,12 @@
 <!-- ABOUTME: Scoring and decision rubric for Senior CTO reviews of /dev-docs implementation-plan workstreams. -->
-<!-- ABOUTME: Focuses on architecture integrity, self-hosting, security, sequencing, and whether future agents can safely implement from the plan. -->
+<!-- ABOUTME: Focuses on architecture integrity, self-hosting, security, sequencing, and directly updating the workstream triad. -->
 # Senior CTO Review Rubric
 
-Use this rubric to evaluate implementation plans for enterprise-grade self-hostable software.
+Use this rubric to evaluate implementation plans for enterprise-grade self-hostable software and directly refine the active workstream triad (`plan.md`, `context.md`, `tasks.md`).
 
 Score only when useful. Prefer practical judgment over mechanical scoring.
 
-The main target is a `/dev-docs` workstream, so include artifact quality in the review, not just architecture quality.
+The CTO does not write a separate review markdown file. Instead, this rubric guides direct, in-place refinements to the triad and structures the high-signal chat summary.
 
 ## 0. The 3-Dimensional Evaluation Scorecard
 
@@ -216,44 +216,40 @@ Check:
 - Docs update with behavior changes.
 - Each PR has clear exit criteria.
 - Rollback/reset path exists for self-hosters.
-- Every phase declares exact phase-owned paths and closes with its verification disposition followed immediately by task(s) containing concrete planned Conventional Commit contract(s).
+- Every phase declares exact phase-owned paths and closes with its verification disposition followed immediately by task(s) containing concrete planned declarative Conventional Commit contract(s).
 - If a phase is large (touching dozens or hundreds of files) or spans multiple separable concerns, it MUST provide an ordered sequence of atomic commit contracts following `conventional-commit` rules 1 and 13; reject monolithic umbrella commits unless provably indivisible under rule 14.
 - Every planned default title uses an allowed capability/engineering scope and benefit-led subject; its exact description explains the phase motivation and data/control flow; its changelog treatment and trailers satisfy `conventional-commit`.
-- Every contract contains exact commit paths, inspection commands, `git add`, path-limited `git commit`, and post-commit verification. Command pathspecs equal `Commit paths`; the commit command encodes the reviewed metadata/trailers.
-- Commit commands and staging MUST commit ONLY files belonging to the implementation plan and specific phase/slice, explicitly preventing the absorption of unrelated dirty or modified files in the working tree.
-- No phase leaves placeholders, generic “complete phase” wording, or message composition to the implementation agent.
+- Every contract contains exact commit paths, declarative type/scope/title/description, and trailers. No phase leaves placeholders, generic “complete phase” wording, or message composition to the implementation agent.
 - Planning and CTO review load `conventional-commit`; the approved task embeds everything normal execution needs. The implementation agent must not reload the skill when using the truthful default.
-- The approved tasks file authorizes the implementing agent to commit in the same session; no final commit-only session or repeat user invocation is required.
+- The approved tasks file authorizes the implementing agent to commit on the task branch in the same session; no final commit-only session or repeat user invocation is required.
 - The implementation agent must use the planned contract unchanged while truthful. Only an allowed override loads `conventional-commit`; triggers are explicit user-driven outcome changes, atomic phase splits, material implementation divergence, changed breaking/change-fragment classification, or factual invalidity.
-- Any override must be recorded before commit with the reason and a complete metadata/path/command packet for every resulting commit; stylistic preference is rejected.
-- Task branch staging is explicit-path only. The plan forbids blind staging, modifying or unstaging another contributor's work, and absorbing unrelated dirty or pre-staged files.
-- Path-limited commit guidance applies only to wholly phase-owned files; a file containing another contributor's hunks blocks phase closure until ownership is separated or coordinated.
-- Phase-attributable failures block the commit. Proven unrelated shared-tree failures name exact external evidence, remain untouched, and never become a false green claim.
-- The phase records the resulting commit hash(es) and verifies its file list before completion; atomicity requires multiple atomic commits for large phases rather than an umbrella phase commit.
+- Any override must be recorded before commit with the reason and an updated declarative contract; stylistic preference is rejected.
+- Task branch staging is explicit-path only (`git add -- <paths>`). The plan forbids blind staging (`git add .`, `git add -A`).
+- Phase-attributable failures block the commit and must be resolved before phase completion.
+- The phase executes the commit on the task branch and confirms clean git status before completion; atomicity requires multiple atomic commits for large phases rather than an umbrella phase commit.
 
 ## 12. Dev-Docs Quality
 
 | Score | Meaning |
 |---|---|
-| 5 | `plan.md`, `context.md`, and `tasks.md` are consistent, current, and implementation-ready |
+| 5 | `plan.md` and `tasks.md` (and `context.md` if present) are consistent, current, and implementation-ready |
 | 3 | Useful artifacts exist, but one file is stale, vague, or inconsistent |
 | 1 | The workstream is not resumable by another agent without rediscovery |
 
 Check:
 
 - `plan.md` distinguishes verified evidence from assumptions and defines high-level architectural phase exit criteria without embedding granular task execution checklists, `- [ ]` checkboxes, or session handoffs.
-- `context.md` has current progress, next step, blockers, validation baseline, unrelated shared-tree failure evidence, phase commit hashes, and dated handoffs.
-- `tasks.md` maps cleanly to phases and contains the hot execution ledger (Red/Green task sequence, phase-owned paths, verification disposition, concrete planned commit contracts, tightly governed overrides, and immediate commit checkboxes).
-- Status across all three files agrees.
+- `context.md` (when present) has current progress, next step, blockers, validation baseline, and dated handoffs.
+- `tasks.md` maps cleanly to phases and contains the hot execution ledger (Red/Green task sequence, phase-owned paths, verification disposition, concrete planned declarative commit contracts, tightly governed overrides, and immediate commit checkboxes).
+- Status across all artifacts agrees.
 - Another implementation agent could resume without re-asking the user for core context.
 - Knowledge Graduation: Out-of-scope, follow-up, or deferred items are explicitly identified for promotion to `dev/backlog/<slug>.md` (and durable architecture to `docs/internal/adr/`), rather than being left as dead text in an ephemeral plan.
 
-## CTO Decision Labels
+## CTO Decisions & Direct Triad Actions
 
-Use one:
+The CTO decides the path forward and applies it directly to the triad without creating review files:
 
-- **Approve** — plan is ready to implement.
-- **Approve with required changes** — direction is right; named changes must be made first.
-- **Split before approval** — scope is too large or mixed.
-- **Reject** — wrong architecture or unacceptable risk.
-- **Defer** — valuable, but not the right time or missing a foundational dependency.
+- **Approved as Refined** — The plan's architecture is sound or has been directly refined to be execution-ready; update metadata to `Applied & Aligned` in `plan.md`, synchronize `context.md`, and ensure `tasks.md` has complete Red/Green sequences and atomic commit contracts.
+- **Split Applied** — Scope exceeded right-sizing limits (2+ conditions met); directly restructure the active triad to scope strictly to the primary slice, and graduate deferred scope to `dev/backlog/<slug>.md`.
+- **Scope Pruned & Re-Aligned** — Direction was viable but contained bloat or backward-compatibility shims; directly excise the legacy shims from `plan.md` and `tasks.md`.
+- **Reject / Defer** — Fundamental architectural flaw or missing foundational prerequisite; update `context.md` with explicit blockers and explain the rationale in the chat summary.

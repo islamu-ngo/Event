@@ -1,6 +1,3 @@
-// ABOUTME: Holds ephemeral native registration answers and safe server field issues for one rendered attempt.
-// ABOUTME: Keeps sensitive answers in component memory only and clears hidden answers when conditions change.
-
 namespace Explore.Blazor.Client.Components.Registration.FormRenderer;
 
 public sealed class RegistrationFormAnswerState

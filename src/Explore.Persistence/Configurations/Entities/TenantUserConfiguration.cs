@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for tenant-local user participation records.
-// ABOUTME: Enforces one active tenant-user row per global user and tenant boundary.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Microsoft.EntityFrameworkCore;

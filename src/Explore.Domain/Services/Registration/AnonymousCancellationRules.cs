@@ -1,5 +1,3 @@
-// ABOUTME: Authorizes only pinned free anonymous orders with no exact paid or attendance history.
-// ABOUTME: Keeps confirmed terminal in the generic lifecycle while defining a separate cancellation boundary.
 
 using Explore.Domain.Enums;
 

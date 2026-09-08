@@ -1,6 +1,3 @@
-// ABOUTME: Unit-style tests for the EventLocation privacy remediation readiness probe.
-// ABOUTME: Proves threshold behaviour, aggregate-only data, and fail-safe reporting when the store is down.
-
 using Explore.API.HealthChecks;
 using Explore.Application.Contracts.Services;
 using Microsoft.Extensions.Diagnostics.HealthChecks;

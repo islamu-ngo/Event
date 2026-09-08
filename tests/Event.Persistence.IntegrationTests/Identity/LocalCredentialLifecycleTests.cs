@@ -1,5 +1,3 @@
-// ABOUTME: Guards mandatory Local credential lifecycle authority in colocated and external native Identity stores.
-// ABOUTME: Exercises signed Ready admission, corrupt-state rejection, and fresh state reads after independent commits.
 
 using System.Data.Common;
 using System.IdentityModel.Tokens.Jwt;
@@ -346,7 +344,7 @@ public sealed class LocalCredentialLifecycleTests
             {
                 builder.AddEntityFrameworkStores<ExploreDbContext>();
             }
-            _provider = services.BuildServiceProvider();
+            _provider = services.BuildIsolatedServiceProvider();
             _scope = _provider.CreateAsyncScope();
             IServiceProvider scoped = _scope.Value.ServiceProvider;
             var application = scoped.GetRequiredService<ExploreDbContext>();

@@ -1,6 +1,3 @@
-// ABOUTME: Converts authorization middleware challenge/forbid results into RFC 7807 responses.
-// ABOUTME: Preserves default authentication-scheme behavior before writing API ProblemDetails bodies.
-
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.AspNetCore.Mvc;

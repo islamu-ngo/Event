@@ -1,6 +1,3 @@
-// ABOUTME: Defines immutable API-facing ticketing capability matrix DTOs.
-// ABOUTME: Exposes closed status and gate codes without deployment secrets or mutable authority.
-
 namespace Explore.Application.DTOs.Deployment;
 
 public sealed record TicketingDeploymentCapabilityDto(

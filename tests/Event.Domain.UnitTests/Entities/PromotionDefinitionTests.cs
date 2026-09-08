@@ -1,6 +1,3 @@
-// ABOUTME: Covers Phase 17 promotion definition lifecycle, eligibility, limits, and allocation contracts.
-// ABOUTME: Keeps promotion-domain tests provider-neutral before persistence, API, or HMAC lookup wiring exists.
-
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 

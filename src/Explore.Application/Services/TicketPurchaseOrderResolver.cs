@@ -1,6 +1,3 @@
-// ABOUTME: Resolves purchase-governed quantity from the persisted registration order and lines.
-// ABOUTME: Rejects wrong-tenant, wrong-event, empty, and overflowing order graphs before authority consumption.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Domain;

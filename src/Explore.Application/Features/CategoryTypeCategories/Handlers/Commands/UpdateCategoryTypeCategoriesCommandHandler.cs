@@ -1,6 +1,3 @@
-// ABOUTME: Applies grouped Application-only updates to category-to-category-type junctions.
-// ABOUTME: Enforces persisted tenant ownership and duplicate-pair rejection before one save.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.CategoryTypeCategories.Validators;

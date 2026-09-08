@@ -1,6 +1,3 @@
-// ABOUTME: Generates absolute public URLs from HttpContext, respecting reverse proxy and tenant context.
-// ABOUTME: Single source of truth for all external-facing URLs used in OG tags, sharing, and calendar links.
-
 using Explore.Application.Contracts.Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;

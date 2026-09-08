@@ -1,6 +1,3 @@
-// ABOUTME: Output envelope for the AI context disclosure gateway.
-// ABOUTME: Carries the disclosed fields plus redaction/denial audit metadata.
-
 using Explore.Domain.Enums;
 
 namespace Explore.Application.Features.AiAssistant.Disclosure;

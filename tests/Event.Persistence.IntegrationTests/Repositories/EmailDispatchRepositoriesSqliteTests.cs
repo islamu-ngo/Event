@@ -1,6 +1,3 @@
-// ABOUTME: File-backed SQLite regressions for provider-portable email repository claims and suppression.
-// ABOUTME: Proves leases, typed SMTP settlements, atomic configuration parking, and reminder/fanout ledger alignment.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;
@@ -655,7 +652,7 @@ public sealed class EmailDispatchRepositoriesSqliteTests
             DefaultTimeout = 30,
             Pooling = true
         }.ToString();
-        var options = new DbContextOptionsBuilder<ExploreDbContext>()
+        var options = TestDbContextOptions.Create<ExploreDbContext>()
             .UseSqlite(connectionString)
             .UseSnakeCaseNamingConvention()
             .AddInterceptors(

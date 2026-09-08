@@ -1,6 +1,3 @@
-// ABOUTME: Applies exact provider-neutral refund and cancellation facts to admission tickets.
-// ABOUTME: Serializes credential revocation and returns complete revoked/preserved identity sets.
-
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

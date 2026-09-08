@@ -1,5 +1,3 @@
-// ABOUTME: Write model for creating or updating an event capacity pool.
-// ABOUTME: Omits the persisted pool identifier; update identity comes from the route.
 namespace Explore.Application.DTOs.EventTicketing;
 
 public sealed record ManageEventCapacityPoolDto

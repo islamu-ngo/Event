@@ -1,6 +1,3 @@
-// ABOUTME: Query-bound filter model for event-scoped moderation report queues.
-// ABOUTME: Validates stable text codes before mapping HTTP filters to domain enums.
-
 using System.ComponentModel.DataAnnotations;
 using Explore.Domain.Enums;
 

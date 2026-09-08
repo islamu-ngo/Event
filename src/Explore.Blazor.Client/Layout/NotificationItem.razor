@@ -1,6 +1,3 @@
-@* ABOUTME: Individual notification row showing type icon, scope badge, title, body, relative time.
-    ABOUTME: Click navigates to entity; archive/snooze/delete actions on hover. Unread items have highlight. *@
-
 <div class="notification-item @(IsUnread ? "notification-item--unread" : "") @(IsArchived ? "notification-item--archived" : "") @(IsSnoozed ? "notification-item--snoozed" : "")"
      @onclick="() => OnClick.InvokeAsync(Notification)"
      @onkeydown="HandleKeyDown"

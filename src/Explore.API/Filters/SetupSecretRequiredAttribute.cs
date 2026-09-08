@@ -1,6 +1,3 @@
-// ABOUTME: Action filter attribute that gates onboarding write endpoints behind the setup secret.
-// ABOUTME: Uses TypeFilterAttribute pattern for DI-aware filtering with ISetupSecretProvider validation.
-
 using Explore.API.ExceptionHandling;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Onboarding;

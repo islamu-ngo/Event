@@ -1,6 +1,3 @@
-// ABOUTME: Authenticated API controller for safe user authentication-session metadata.
-// ABOUTME: Exposes self-scoped reads and idempotent local session revocation without credential mutation.
-
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Asp.Versioning;

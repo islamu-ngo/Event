@@ -1,6 +1,3 @@
-// ABOUTME: Proves strict native registration normalization for every portable non-file field type.
-// ABOUTME: Covers valid, invalid, and boundary values without string-to-primitive coercion or HTML sanitization.
-
 using System.Text.Json;
 using Explore.Application.Features.RegistrationSubmissions;
 using Explore.Domain.Enums;

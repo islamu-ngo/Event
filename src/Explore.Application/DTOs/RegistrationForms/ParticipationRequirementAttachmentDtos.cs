@@ -1,6 +1,3 @@
-// ABOUTME: Defines attachment input and anonymous published-questionnaire descriptor contracts.
-// ABOUTME: Exposes immutable identities and schema artifacts without registration or participant state.
-
 namespace Explore.Application.DTOs.RegistrationForms;
 
 public sealed record AttachRegistrationRequirementInputDto(

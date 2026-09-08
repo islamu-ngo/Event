@@ -1,6 +1,3 @@
-// ABOUTME: Result model for durable notification intent orchestration.
-// ABOUTME: Exposes persisted entities created by the Application orchestrator without transport details.
-
 using Explore.Domain;
 
 namespace Explore.Application.Notifications;

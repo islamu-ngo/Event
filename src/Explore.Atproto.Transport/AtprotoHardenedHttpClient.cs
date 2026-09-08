@@ -1,6 +1,3 @@
-// ABOUTME: Creates redirect-free ATProto transports that connect only to validated DNS answers.
-// ABOUTME: Bounds response bodies, preserves headers and cancellation, and disposes failed responses.
-
 using System.Net;
 using System.Net.Sockets;
 

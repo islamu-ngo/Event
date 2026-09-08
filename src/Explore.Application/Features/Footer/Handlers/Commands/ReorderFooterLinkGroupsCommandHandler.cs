@@ -1,6 +1,3 @@
-// ABOUTME: Handles ReorderFooterLinkGroupsCommand — bulk-updates Order on multiple groups atomically.
-// ABOUTME: Only reorders groups that belong to the current tenant.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Footer.Requests.Commands;

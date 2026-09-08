@@ -1,5 +1,3 @@
-// ABOUTME: Controlled loopback SMTP peer for real MailKit lifecycle handoff and MIME inspection.
-// ABOUTME: Awaits exact SMTP DATA completion with bounded cancellation and never polls or sleeps.
 
 using System.Net;
 using System.Net.Sockets;

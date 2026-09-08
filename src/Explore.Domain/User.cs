@@ -1,6 +1,3 @@
-// ABOUTME: Domain aggregate for authenticated users and their linked personal actor.
-// ABOUTME: Keeps PII in the extension row while exposing profile delegates and concurrency metadata.
-
 using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;

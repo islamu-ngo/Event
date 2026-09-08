@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for footer management authorization posture.
-// ABOUTME: Ensures authenticated footer writes still fail closed when resource authorization denies.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;

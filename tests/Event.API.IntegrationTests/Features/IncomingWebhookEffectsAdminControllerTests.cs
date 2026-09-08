@@ -1,6 +1,3 @@
-// ABOUTME: Verifies incoming Coop effect operator routes, authorization, and HAL redrive affordances.
-// ABOUTME: Ensures redrive is server-authored only for dead-lettered durable pointer state.
-
 using System.Reflection;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;

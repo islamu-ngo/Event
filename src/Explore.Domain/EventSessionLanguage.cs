@@ -1,6 +1,3 @@
-// ABOUTME: Tenant-scoped junction entity linking event sessions to supported languages.
-// ABOUTME: Carries a concurrency stamp so language assignment PATCH requests can use If-Match.
-
 using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;

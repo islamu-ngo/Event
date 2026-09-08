@@ -1,6 +1,3 @@
-// ABOUTME: Persistence integration tests for EventRepository CRUD and aggregate loading.
-// ABOUTME: Seeds required tenant, actor, and lookup relationships against PostgreSQL.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -12,6 +9,7 @@ using TUnit.Core;
 namespace Event.Persistence.IntegrationTests.Repositories;
 
 [ClassDataSource<PostgreSqlContainerFixture>(Shared = SharedType.PerAssembly)]
+[NotInParallel("PersistenceDb")]
 public class EventRepositoryTests
 {
     private readonly PostgreSqlContainerFixture _fixture;
@@ -55,6 +53,8 @@ public class EventRepositoryTests
 
         await context.SaveChangesAsync();
 
+        var eventType = await SeedConferenceEventTypeAsync(context);
+
         var eventId = Guid.NewGuid();
         var @event = new Explore.Domain.Event(EventStatusEnum.Draft)
         {
@@ -65,7 +65,8 @@ public class EventRepositoryTests
             Description = "Test Description",
             FirstSessionDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
             LastSessionDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1).AddHours(2)),
-            EventTypeId = 1,
+            EventTypeId = eventType.Id,
+            EventType = eventType,
             AudienceGenderId = 1,
             AudienceAgeId = 1,
             ActorId = actor.Id,
@@ -131,13 +132,16 @@ public class EventRepositoryTests
 
         await context.SaveChangesAsync();
 
+        var eventType = await SeedConferenceEventTypeAsync(context);
+
         var eventId = Guid.NewGuid();
         var @event = new Explore.Domain.Event(EventStatusEnum.Draft)
         {
             Id = eventId,
             Title = "Detailed Event",
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            EventTypeId = 1,
+            EventTypeId = eventType.Id,
+            EventType = eventType,
             AudienceGenderId = 1,
             AudienceAgeId = 1,
             ActorId = actor.Id,
@@ -160,5 +164,22 @@ public class EventRepositoryTests
         // Assert
         await Assert.That(result).IsNotNull();
         await Assert.That(result.Id).IsEqualTo(eventId);
+    }
+
+    private static async Task<EventType> SeedConferenceEventTypeAsync(ExploreDbContext context)
+    {
+        var eventType = await context.EventTypes.FindAsync((int)EventTypeEnum.Conference);
+        if (eventType is not null)
+            return eventType;
+
+        eventType = new EventType
+        {
+            Id = (int)EventTypeEnum.Conference,
+            MasterCode = "CONFERENCE",
+            FullName = "Conference"
+        };
+        context.EventTypes.Add(eventType);
+        await context.SaveChangesAsync();
+        return eventType;
     }
 }

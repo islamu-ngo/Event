@@ -1,6 +1,3 @@
-// ABOUTME: Authorizes and maps admission entities into exact-target summaries and export-safe audit pages.
-// ABOUTME: Returns generic absence for invalid authority or lineage and never exports sensitive event fields.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;

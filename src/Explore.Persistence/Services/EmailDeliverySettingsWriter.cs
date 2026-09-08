@@ -1,5 +1,3 @@
-// ABOUTME: Applies complete SMTP policy changes under the shared pretransaction lease and serializable transaction.
-// ABOUTME: Evaluates detached final state before writes and reserves direct disable for current confirmation evidence.
 
 using System.Collections.Immutable;
 using System.Data;

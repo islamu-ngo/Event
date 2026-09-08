@@ -1,6 +1,3 @@
-// ABOUTME: Validator for tenant-level Basic Dispatch Mode pause and resume commands.
-// ABOUTME: Enforces a concrete tenant target and bounded operator reason text before persistence.
-
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using FluentValidation;
 

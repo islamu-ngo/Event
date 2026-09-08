@@ -1,6 +1,3 @@
-// ABOUTME: Query handler returning all available registration scopes.
-// ABOUTME: Maps RegistrationScope entities to RegistrationScopeListDto list.
-
 using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.RegistrationScope;

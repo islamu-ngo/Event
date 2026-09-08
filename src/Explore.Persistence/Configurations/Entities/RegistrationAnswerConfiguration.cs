@@ -1,6 +1,3 @@
-// ABOUTME: Maps atomic typed registration answers with immutable submission, field, requirement, and subject lineage.
-// ABOUTME: Enforces PostgreSQL value/type agreement, subject applicability, null-safe identity, and restrictive FKs.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Microsoft.EntityFrameworkCore;

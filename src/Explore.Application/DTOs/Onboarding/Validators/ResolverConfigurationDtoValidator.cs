@@ -1,6 +1,3 @@
-// ABOUTME: Validator for resolver configuration updates performed by instance administrators.
-// ABOUTME: Enforces fixed resolver rules before settings are written to the system settings store.
-
 using Explore.Application.DTOs.Onboarding;
 using FluentValidation;
 

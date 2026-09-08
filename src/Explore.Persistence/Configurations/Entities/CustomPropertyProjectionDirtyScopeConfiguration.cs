@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for the custom-property projection dirty-scope backlog.
-// ABOUTME: Enforces idempotent upsert uniqueness and a partial index for pending-drain scans.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

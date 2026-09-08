@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the event-level registration-workflow management affordance.
-// ABOUTME: Guards its exact route, purpose, and tenant-scoped authorization metadata.
-
 using System.Security.Claims;
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Assemblers;

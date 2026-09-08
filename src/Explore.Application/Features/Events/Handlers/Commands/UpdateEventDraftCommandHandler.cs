@@ -1,6 +1,3 @@
-// ABOUTME: Applies local draft-event workflow updates without AutoMapper broad-field ownership leaks.
-// ABOUTME: Preserves status, actor, tenant, and session-derived projection fields as server-owned state.
-
 using System;
 using System.Linq;
 using System.Threading;

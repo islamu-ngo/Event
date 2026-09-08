@@ -1,6 +1,3 @@
-// ABOUTME: MediatR pipeline behavior that enforces authorization before command execution.
-// ABOUTME: Delegates request-specific resource lookup to closed generic authorization context enrichers.
-
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;

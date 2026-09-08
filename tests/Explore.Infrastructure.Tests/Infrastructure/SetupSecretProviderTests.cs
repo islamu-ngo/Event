@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for SetupSecretProvider covering secret source, validation, setup mode, and lock behavior.
-// ABOUTME: Verifies bootstrap-state gating and secret validation through the configured secure seam.
-
 using System.Security.Cryptography;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;

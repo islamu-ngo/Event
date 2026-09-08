@@ -1,6 +1,3 @@
-// ABOUTME: Derives tenant-separated retry-stable UUIDv7 admission issuance identities.
-// ABOUTME: Preserves the durable effect timestamp while hashing tenant, assignment, and purpose.
-
 using System.Security.Cryptography;
 using System.Text;
 

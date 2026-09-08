@@ -1,6 +1,3 @@
-// ABOUTME: Establishes deterministic public instance identity for every API integration host.
-// ABOUTME: Preserves runtime startup validation while covering ad hoc WebApplicationFactory fixtures.
-
 using TUnit.Core;
 
 namespace Event.Api.IntegrationTests.Fixtures;

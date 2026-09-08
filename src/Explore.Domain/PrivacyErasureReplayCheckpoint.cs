@@ -1,6 +1,3 @@
-// ABOUTME: Immutable local fact proving one contiguous platform privacy-erasure intent was applied.
-// ABOUTME: Binds checkpoint identity to the exact typed fact, prior checkpoint, policy, and UTC application time.
-
 namespace Explore.Domain;
 
 public sealed class PrivacyErasureReplayCheckpoint

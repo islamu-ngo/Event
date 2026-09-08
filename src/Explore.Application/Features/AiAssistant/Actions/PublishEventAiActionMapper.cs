@@ -1,6 +1,3 @@
-// ABOUTME: Maps untrusted AI PublishEvent proposals into safe publish request DTOs.
-// ABOUTME: Rejects unknown, privileged, stale-concurrency, and not-ready payloads before confirmation.
-
 using System.Text.Json;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Features.AiAssistant.Prompting;

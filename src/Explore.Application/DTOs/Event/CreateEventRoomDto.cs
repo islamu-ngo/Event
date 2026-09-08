@@ -1,6 +1,3 @@
-// ABOUTME: Sub-DTO for creating rooms within event locations in the scheduling graph.
-// ABOUTME: References a location by existing ID or temp key for pre-persistence linkage.
-
 using System;
 
 namespace Explore.Application.DTOs.Event;

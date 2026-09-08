@@ -1,6 +1,3 @@
-# ABOUTME: Minimal Tangled preview discovery workflow for untrusted candidate feedback.
-# ABOUTME: Runs only preview reporting with no final protected-release job surface.
-
 name: Release Adapter Preview Discovery
 
 on:

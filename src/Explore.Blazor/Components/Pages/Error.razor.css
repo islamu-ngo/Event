@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped styles for the server-hosted branded error page. */
-/* ABOUTME: Keeps exception fallback presentation safe, accessible, and token-aligned. */
-
 .server-error {
     display: grid;
     min-height: 70vh;

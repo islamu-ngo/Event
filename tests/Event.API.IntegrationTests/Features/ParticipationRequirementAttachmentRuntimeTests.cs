@@ -1,6 +1,3 @@
-// ABOUTME: Exercises participation requirement attachments through real TestServer, MediatR, EF Core, and PostgreSQL.
-// ABOUTME: Proves mode rules, isolation, rollback, database uniqueness, HAL disclosure, and zero registration side effects.
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;

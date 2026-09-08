@@ -1,6 +1,3 @@
-// ABOUTME: Repository contract for authoritative provider-publication aggregates and identity lookup.
-// ABOUTME: Returns domain entities so transition rules remain owned by the aggregate and handlers.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Persistence;

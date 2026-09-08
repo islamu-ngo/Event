@@ -1,6 +1,3 @@
-// ABOUTME: LocalProvider retry schedule for webhook delivery attempts.
-// ABOUTME: Applies configured exponential full jitter and bounded Retry-After guidance.
-
 using Explore.Infrastructure.Configuration;
 using Microsoft.Extensions.Options;
 

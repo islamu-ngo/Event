@@ -1,6 +1,3 @@
-// ABOUTME: Reconciles ambiguous provider acceptance through bounded conformance-proven lookup only.
-// ABOUTME: Settles exact matches, retries proven absence unchanged, and routes uncertainty to manual review.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Microsoft.Extensions.Options;

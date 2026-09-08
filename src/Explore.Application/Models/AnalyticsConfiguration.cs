@@ -1,6 +1,3 @@
-// ABOUTME: Analytics configuration POCO resolved from the cascading settings engine.
-// ABOUTME: Supports Posthog, Plausible, Rybbit, RudderStack, or None — provider-agnostic configuration.
-
 using Explore.Application.Analytics;
 using Explore.Domain.Enums;
 

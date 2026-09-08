@@ -1,6 +1,3 @@
-// ABOUTME: Durable browser Web Push dispatch row for provider-independent delivery state.
-// ABOUTME: Stores generic payload hints only and tracks retry, terminal, skip, and processing lease state.
-
 using Explore.Domain.Interfaces;
 
 namespace Explore.Domain;

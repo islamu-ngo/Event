@@ -1,6 +1,3 @@
-// ABOUTME: Defines the Phase 21 rehydratable admission-state and pure check-in rules contract in RED.
-// ABOUTME: Covers exact scopes, entitlement, windows, re-entry, ordered facts, undo, and projection invariants.
-
 using System.Reflection;
 using Explore.Domain;
 using Explore.Domain.Enums;

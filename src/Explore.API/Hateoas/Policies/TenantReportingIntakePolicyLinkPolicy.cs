@@ -1,6 +1,3 @@
-// ABOUTME: HAL policies for the current tenant's reporting-intake administration resource.
-// ABOUTME: Emits permission-bound self/edit links and suppresses mutation when an instance lock is authoritative.
-
 using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;

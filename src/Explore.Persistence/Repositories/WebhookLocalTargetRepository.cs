@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL repository for fair, fenced Local webhook target claims and recovery.
-// ABOUTME: Claims immutable target snapshots atomically and appends lease-expiry attempt evidence.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.Database;

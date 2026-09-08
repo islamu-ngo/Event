@@ -1,6 +1,3 @@
-// ABOUTME: API integration and route contract tests for event controller endpoints.
-// ABOUTME: Verifies public event reads and authenticated lifecycle/management contracts.
-
 using System.Net;
 using System.Reflection;
 using Event.Api.IntegrationTests.Fixtures;

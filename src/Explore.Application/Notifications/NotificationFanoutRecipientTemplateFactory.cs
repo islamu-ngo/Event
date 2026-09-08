@@ -1,6 +1,3 @@
-// ABOUTME: Maps the closed version-one fanout template set into one recipient notification graph.
-// ABOUTME: Renders only immutable occurrence values after applying a recipient location field mask.
-
 using System.Globalization;
 using System.Net;
 using System.Text.Json;

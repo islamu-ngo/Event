@@ -1,5 +1,3 @@
-// ABOUTME: Routes exact persisted Local account authority into durable native lifecycle delivery ownership.
-// ABOUTME: Does not fabricate tenant notification delegation or mint tokens in the accepting request.
 
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Notifications;

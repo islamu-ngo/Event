@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for LocationService covering location CRUD and city/country lookup behavior.
-// ABOUTME: Verifies HAL conversion, pagination constants, If-Match forwarding, and failure handling.
-
 using Explore.Blazor.Client.Constants;
 using Explore.Blazor.Client.Helpers;
 

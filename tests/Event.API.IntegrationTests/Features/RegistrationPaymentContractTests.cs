@@ -1,6 +1,3 @@
-// ABOUTME: Pins the payment start/status/retry HTTP contract for guest, account, and Studio callers.
-// ABOUTME: Verifies transactional safeguards, private caching, and named route stability before implementation.
-
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using Explore.API.Attributes;
@@ -49,7 +46,10 @@ public sealed class RegistrationPaymentContractTests
     {
         string[] requiredProperties =
         [
-            "IsOfficialInstance",
+            "OrganizerMerchant",
+            "TenantDirectoryOperator",
+            "InstanceOperator",
+            "PaymentOperations",
             "DeliveryStartsAtUtc",
             "DeliveryEndsAtUtc",
             "CurrencyMinorUnitDigits",
@@ -70,6 +70,10 @@ public sealed class RegistrationPaymentContractTests
         {
             await Assert.That(property.GetCustomAttribute<RequiredMemberAttribute>()).IsNotNull();
         }
+
+        PropertyInfo officialInstance = typeof(PaidOrderAcceptanceInstanceOperatorDto)
+            .GetProperty(nameof(PaidOrderAcceptanceInstanceOperatorDto.IsOfficialInstance))!;
+        await Assert.That(officialInstance.GetCustomAttribute<RequiredMemberAttribute>()).IsNotNull();
     }
 
     [Test]

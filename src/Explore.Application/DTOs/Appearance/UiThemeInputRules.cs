@@ -1,6 +1,3 @@
-// ABOUTME: Central validation and normalization helpers for UI theme keys and palette values.
-// ABOUTME: Keeps theme DTO validators and handlers consistent without leaking formatting rules into the domain layer.
-
 namespace Explore.Application.DTOs.Appearance;
 
 using System.Text.RegularExpressions;

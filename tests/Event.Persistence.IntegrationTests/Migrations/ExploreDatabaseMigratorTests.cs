@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the application migration seam and MigrationService topology orchestration.
-// ABOUTME: Proves retry safety and one authority migration path without requiring every provider runtime.
-
 #nullable enable
 
 using Event.Persistence.IntegrationTests.Fixtures;
@@ -62,6 +59,7 @@ public sealed class ExploreDatabaseMigratorTests(RecipientDeliveryMigrationConta
     [Test]
     [Arguments(PrivacyErasureAuthorityTopology.CoLocated, "AuthorityCoLocatedPostgreSql")]
     [Arguments(PrivacyErasureAuthorityTopology.ExternalDatabase, "AuthorityExternalDatabasePostgreSql")]
+    [TUnit.Core.Executors.TestExecutor<FreshEfProcessExecutor>]
     public async Task MigrateAndSeedAsync_PostgreSqlAppliesExactlyOneAuthorityPath(
         PrivacyErasureAuthorityTopology topology,
         string authorityOperation)
@@ -98,7 +96,7 @@ public sealed class ExploreDatabaseMigratorTests(RecipientDeliveryMigrationConta
 
             if (topology == PrivacyErasureAuthorityTopology.CoLocated)
             {
-                var options = new DbContextOptionsBuilder<CoLocatedPrivacyErasureAuthorityDbContext>();
+                var options = TestDbContextOptions.Create<CoLocatedPrivacyErasureAuthorityDbContext>();
                 PrimaryDatabaseProviderComposition.ConfigureCoLocatedPrivacyErasureAuthority(options, migrationDatabase);
                 await using var authority = new CoLocatedPrivacyErasureAuthorityDbContext(options.Options);
                 await ExploreDatabaseMigratorTopologyTests.AssertMigrationSetCompleteAsync(authority);
@@ -109,7 +107,7 @@ public sealed class ExploreDatabaseMigratorTests(RecipientDeliveryMigrationConta
                     new PrivacyErasureAuthorityDbContextFactory().CreateDbContext(configuration);
                 await ExploreDatabaseMigratorTopologyTests.AssertMigrationSetCompleteAsync(authority);
 
-                var unselectedOptions = new DbContextOptionsBuilder<CoLocatedPrivacyErasureAuthorityDbContext>();
+                var unselectedOptions = TestDbContextOptions.Create<CoLocatedPrivacyErasureAuthorityDbContext>();
                 PrimaryDatabaseProviderComposition.ConfigureCoLocatedPrivacyErasureAuthority(
                     unselectedOptions,
                     migrationDatabase);
@@ -129,6 +127,7 @@ public sealed class ExploreDatabaseMigratorTests(RecipientDeliveryMigrationConta
     }
 
     [Test]
+    [TUnit.Core.Executors.TestExecutor<FreshEfProcessExecutor>]
     public async Task MigrateAndSeedAsync_ExternalAuthoritySameTarget_FailsBeforeMigrationIo()
     {
         string databaseName = $"migrator_same_target_{Guid.NewGuid():N}";
@@ -226,7 +225,7 @@ public sealed class ExploreDatabaseMigratorTests(RecipientDeliveryMigrationConta
 
     private static ExploreDbContext CreateContext(string connectionString)
     {
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>()
+        var builder = TestDbContextOptions.Create<ExploreDbContext>()
             .UseNpgsql(
                 connectionString,
                 postgres => postgres.MigrationsAssembly(typeof(Task4MigrationProbe).Assembly.FullName))
@@ -234,9 +233,7 @@ public sealed class ExploreDatabaseMigratorTests(RecipientDeliveryMigrationConta
             .ConfigureWarnings(warnings =>
             {
                 warnings.Ignore(RelationalEventId.PendingModelChangesWarning);
-                warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning);
             });
-        builder.EnableServiceProviderCaching(false);
         return new Task4MigrationProbeContext(builder.Options);
     }
 
@@ -284,18 +281,15 @@ public sealed class ExploreDatabaseMigratorTests(RecipientDeliveryMigrationConta
     private static ExploreDbContext CreatePostgresApplicationContext(
         PrimaryDatabaseConnectionOptions database)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>();
-        options.EnableServiceProviderCaching(false);
+        var options = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(options, database);
-        options.ConfigureWarnings(warnings =>
-            warnings.Log(CoreEventId.ManyServiceProvidersCreatedWarning));
         return new ExploreDbContext(options.Options);
     }
 
     private static DataProtectionKeyContext CreatePostgresDataProtectionContext(
         PrimaryDatabaseConnectionOptions database)
     {
-        var options = new DbContextOptionsBuilder<DataProtectionKeyContext>();
+        var options = TestDbContextOptions.Create<DataProtectionKeyContext>();
         PrimaryDatabaseProviderComposition.ConfigureDataProtection(options, database);
         return new DataProtectionKeyContext(options.Options);
     }
@@ -347,6 +341,7 @@ public sealed class ExploreDatabaseMigratorTopologyTests
     [Test]
     [Arguments(PrivacyErasureAuthorityTopology.EmbeddedSqlite, "AuthorityEmbeddedSqlite")]
     [Arguments(PrivacyErasureAuthorityTopology.CoLocated, "AuthorityCoLocatedSqlite")]
+    [TUnit.Core.Executors.TestExecutor<FreshEfProcessExecutor>]
     public async Task MigrateAndSeedAsync_SqliteAppliesExactlyOneAuthorityPath(
         PrivacyErasureAuthorityTopology topology,
         string authorityOperation)
@@ -423,14 +418,14 @@ public sealed class ExploreDatabaseMigratorTopologyTests
 
     private static ExploreDbContext CreateApplicationContext(PrimaryDatabaseConnectionOptions database)
     {
-        var options = new DbContextOptionsBuilder<ExploreDbContext>();
+        var options = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(options, database);
         return new ExploreDbContext(options.Options);
     }
 
     private static DataProtectionKeyContext CreateDataProtectionContext(PrimaryDatabaseConnectionOptions database)
     {
-        var options = new DbContextOptionsBuilder<DataProtectionKeyContext>();
+        var options = TestDbContextOptions.Create<DataProtectionKeyContext>();
         PrimaryDatabaseProviderComposition.ConfigureDataProtection(options, database);
         return new DataProtectionKeyContext(options.Options);
     }
@@ -440,7 +435,7 @@ public sealed class ExploreDatabaseMigratorTopologyTests
         PrimaryDatabaseConnectionOptions database,
         string embeddedPath)
     {
-        var options = new DbContextOptionsBuilder<EmbeddedPrivacyErasureAuthorityDbContext>();
+        var options = TestDbContextOptions.Create<EmbeddedPrivacyErasureAuthorityDbContext>();
         if (topology == PrivacyErasureAuthorityTopology.CoLocated)
         {
             EmbeddedPrivacyErasureAuthorityDbContextFactory.ConfigureCoLocated(options, database);

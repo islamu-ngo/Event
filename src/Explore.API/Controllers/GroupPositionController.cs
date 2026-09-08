@@ -1,6 +1,3 @@
-// ABOUTME: API controller for GroupPosition lookup table.
-// ABOUTME: Read-only endpoints matching OrganizationPositionController pattern.
-
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Asp.Versioning;

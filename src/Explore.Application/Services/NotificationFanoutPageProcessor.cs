@@ -1,6 +1,3 @@
-// ABOUTME: Processes one already-fenced notification fanout claim through deterministic audience pages.
-// ABOUTME: Commits every recipient graph before advancing the durable compound cursor.
-
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;

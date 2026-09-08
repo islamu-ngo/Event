@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for secret source type lookup values.
-// ABOUTME: Maps SecretSourceTypeLookup to the secret_source_types table.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

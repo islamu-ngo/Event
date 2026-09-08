@@ -1,6 +1,3 @@
-// ABOUTME: Defines typed verified purchaser identity precedence for promotion redemption limits.
-// ABOUTME: Avoids treating guest capability possession as a reusable purchaser identity.
-
 namespace Explore.Domain;
 
 public sealed record VerifiedPurchaserIdentity(string Kind, string Value)

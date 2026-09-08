@@ -1,6 +1,3 @@
-// ABOUTME: Handles RevokeAiConsentCommand — revokes an active consent grant and triggers transcript hygiene.
-// ABOUTME: Uses IAiContextHygieneService to cascade PII redaction to affected conversation transcripts.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.AiAssistant.Disclosure;
 using Explore.Application.Features.AiAssistant.Requests.Commands;

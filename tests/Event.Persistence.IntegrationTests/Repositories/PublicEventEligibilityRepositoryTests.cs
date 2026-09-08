@@ -1,6 +1,3 @@
-// ABOUTME: Deterministic repository tests for the central public Event eligibility predicate.
-// ABOUTME: Covers local owner participation, federated source correlation, and public read consistency without Docker.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Specifications.Events;
@@ -220,8 +217,8 @@ public sealed class PublicEventEligibilityRepositoryTests
 
     private static ExploreDbContext CreateContext(Guid tenantId)
     {
-        var context = new ExploreDbContext(new DbContextOptionsBuilder<ExploreDbContext>()
-            .UseInMemoryDatabase($"public-event-eligibility-{Guid.NewGuid():N}")
+        var context = new ExploreDbContext(TestDbContextOptions.Create<ExploreDbContext>()
+            .UseTestInMemoryDatabase($"public-event-eligibility-{Guid.NewGuid():N}")
             .Options)
         {
             TenantContext = new TestTenantContext(tenantId)

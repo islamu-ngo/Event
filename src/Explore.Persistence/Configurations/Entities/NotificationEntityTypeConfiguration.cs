@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for the NotificationEntityType lookup entity.
-// ABOUTME: Follows ApprovalStatusConfiguration pattern with ValueGeneratedNever.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

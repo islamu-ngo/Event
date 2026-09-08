@@ -1,6 +1,3 @@
-// ABOUTME: Safe operations DTO for an authoritative provider publication aggregate.
-// ABOUTME: Exposes normalized lifecycle and immutable evidence while omitting payloads and credentials.
-
 namespace Explore.Application.DTOs.Webhooks;
 
 public sealed record WebhookProviderPublicationDto

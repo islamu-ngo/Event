@@ -1,6 +1,3 @@
-// ABOUTME: Applies verified normalized Stripe refund evidence without performing provider I/O.
-// ABOUTME: Requires the persisted attempt's original account and exact money before advancing state.
-
 using Explore.Application.Contracts.Payments;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;

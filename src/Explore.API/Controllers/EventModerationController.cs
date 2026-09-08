@@ -1,6 +1,3 @@
-// ABOUTME: Administrative event moderation endpoints for light, heavy, and reversal actions.
-// ABOUTME: Reason-code normalization lives in the command handlers so every caller is held to one rule.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;

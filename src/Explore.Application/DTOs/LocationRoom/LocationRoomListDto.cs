@@ -1,6 +1,3 @@
-// ABOUTME: List read-model DTO for LocationRoom in collection responses.
-// ABOUTME: Lightweight projection for room selectors and agenda column headers.
-
 namespace Explore.Application.DTOs.LocationRoom;
 
 public sealed record LocationRoomListDto

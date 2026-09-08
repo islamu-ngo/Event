@@ -1,6 +1,3 @@
-// ABOUTME: Handles tenant user role grant creation with tenant-local lifecycle validation.
-// ABOUTME: Creates auditable authority evidence only for active TenantUser records.
-
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.TenantUserRoleGrant.Validators;

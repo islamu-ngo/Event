@@ -1,5 +1,3 @@
-// ABOUTME: Exposes confirmed cancellation only through the finite P09 limited guest capability.
-// ABOUTME: Keeps invalid authority indistinguishable and authorized ineligibility separately machine-readable.
 
 using Explore.Application.Responses;
 using Explore.Application.Services.Registration;

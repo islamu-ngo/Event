@@ -1,6 +1,3 @@
-// ABOUTME: Schedules, reads, cancels, and processes durable Event-owned tenant provisioning operations.
-// ABOUTME: Rejects mode, capacity, trust, and bootstrap policy before mutation and dispatches only an outbox pointer.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;

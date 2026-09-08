@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped bottom-tray styling for Create Event theme studio. */
-/* ABOUTME: Provides accessible overlay chrome with calm backdrop and tokenized spacing. */
-
 .theme-studio-tray {
     position: fixed;
     inset: 0;

@@ -1,5 +1,3 @@
-// ABOUTME: Authenticates bounded anonymous proof transport before idempotency state can disclose authority.
-// ABOUTME: Recovers only an exact committed allocation without claiming or invoking a competing starter.
 
 using System.Text.Json;
 using Explore.API.Hateoas;

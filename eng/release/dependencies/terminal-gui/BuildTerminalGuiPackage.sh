@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# ABOUTME: Rebuilds the exact ISLAMU Terminal.Gui package from the pinned official source and patch.
-# ABOUTME: Produces the local feed, locked closure, package evidence, and CycloneDX SBOM without vendoring source.
-
 set -euo pipefail
 
 if [[ ${1:-} != "--write" && ${1:-} != "--check" ]]; then

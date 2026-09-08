@@ -1,6 +1,3 @@
-// ABOUTME: Blazor BFF security integration tests verifying real OIDC against containerized Keycloak.
-// ABOUTME: Tests challenge redirects, provider discovery, auth status, and signout behavior.
-
 using System.Text.RegularExpressions;
 using Explore.Blazor.IntegrationTests.Fixtures;
 using TUnit.Core;

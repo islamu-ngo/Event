@@ -1,6 +1,3 @@
-// ABOUTME: Validates unsubscribe payload shape before current-user ownership checks.
-// ABOUTME: Requires the caller's observed concurrency stamp for explicit stale-write handling.
-
 using FluentValidation;
 
 namespace Explore.Application.DTOs.ActorSubscription.Validators;

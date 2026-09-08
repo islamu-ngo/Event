@@ -1,6 +1,3 @@
-// ABOUTME: Defines safe AI-proposed payload shapes for event moderation proposals.
-// ABOUTME: Carries only event identity, concurrency, HAL context, reason metadata, and heavy-action acknowledgement.
-
 namespace Explore.Application.Features.AiAssistant.Actions;
 
 public sealed class EventModerationAiActionPayload

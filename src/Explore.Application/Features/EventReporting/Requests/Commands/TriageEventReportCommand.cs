@@ -1,6 +1,3 @@
-// ABOUTME: MediatR command for local moderator triage of an event report case.
-// ABOUTME: Uses event-level moderation authorization while handler verifies the report-event relationship.
-
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;

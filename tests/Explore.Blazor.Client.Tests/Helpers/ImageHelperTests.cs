@@ -1,6 +1,3 @@
-// ABOUTME: Tests local image fallbacks for events and organizations.
-// ABOUTME: Verifies event artwork is deterministic, title-free gradient mesh SVG while organization fallbacks retain labels.
-
 using Explore.Blazor.Client.Helpers;
 
 namespace Explore.Blazor.Client.Tests.Helpers;

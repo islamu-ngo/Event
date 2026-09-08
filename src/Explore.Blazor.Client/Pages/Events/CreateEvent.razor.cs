@@ -1,6 +1,3 @@
-// ABOUTME: Code-behind for the single-page Create Event page (Luma-inspired layout).
-// ABOUTME: Handles publisher selection, inline image upload, description dialog, session management, and event creation.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Components.Forms;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;

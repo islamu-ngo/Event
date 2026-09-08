@@ -1,5 +1,3 @@
-// ABOUTME: Handler for removing a member from a group.
-// ABOUTME: Validates authorization, fetches the join record, delegates deletion.
 using System;
 using System.Linq;
 using System.Threading;

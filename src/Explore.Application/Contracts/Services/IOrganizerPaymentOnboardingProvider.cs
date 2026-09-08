@@ -1,6 +1,3 @@
-// ABOUTME: Provider-neutral contract for organizer payment account onboarding handoffs.
-// ABOUTME: Keeps external account and hosted-link operations outside Application transactions and SDK types.
-
 namespace Explore.Application.Contracts.Services;
 
 public interface IOrganizerPaymentOnboardingProvider

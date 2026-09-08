@@ -1,6 +1,3 @@
-// ABOUTME: Maps one-time admission documents plus presentation facts to transport delivery DTOs.
-// ABOUTME: Keeps holder and event/day/session entitlement projection identical across delivery surfaces.
-
 using System.Collections.Immutable;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.DTOs.AdmissionTickets;

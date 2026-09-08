@@ -1,6 +1,3 @@
-// ABOUTME: Defines server-owned resolution of the stable authority dimension controlling a ticket purchase.
-// ABOUTME: Keeps account, verified-contact, and actor authorization facts outside caller-controlled commands.
-
 using Explore.Domain;
 
 namespace Explore.Application.Contracts.Services;

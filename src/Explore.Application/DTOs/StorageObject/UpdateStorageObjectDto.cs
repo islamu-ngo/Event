@@ -1,6 +1,3 @@
-// ABOUTME: Grouped PATCH contract for client-editable storage object metadata.
-// ABOUTME: Excludes provider-owned location, integrity, lifecycle, tenant, and identity fields.
-
 namespace Explore.Application.DTOs.StorageObject;
 
 public sealed record UpdateStorageObjectDto

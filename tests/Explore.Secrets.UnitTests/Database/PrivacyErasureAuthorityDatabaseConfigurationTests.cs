@@ -1,6 +1,3 @@
-// ABOUTME: Verifies structured privacy-erasure authority binding, precedence, and redaction.
-// ABOUTME: Prevents raw connection strings and non-PostgreSQL providers from entering the authority boundary.
-
 using Explore.Secrets.Database;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;

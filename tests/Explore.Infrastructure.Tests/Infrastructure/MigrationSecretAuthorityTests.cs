@@ -1,6 +1,3 @@
-// ABOUTME: Guards the migration worker's local User Secrets environment boundary.
-// ABOUTME: Proves Production rejection occurs before database bootstrap can consume values.
-
 extern alias migrationservice;
 
 using Microsoft.Extensions.Configuration;

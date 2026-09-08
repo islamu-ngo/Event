@@ -1,6 +1,3 @@
-// ABOUTME: Generates and checks value-safe environment catalogue, template, Compose parity, and docs anchors.
-// ABOUTME: Consumes compiled Core and Domain authorities and never reads local dotenv or C# source text.
-
 using System.Text;
 using System.Text.Json;
 using Explore.Domain.Secrets;

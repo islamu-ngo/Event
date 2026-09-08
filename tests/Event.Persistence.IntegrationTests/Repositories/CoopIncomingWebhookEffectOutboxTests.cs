@@ -1,6 +1,3 @@
-// ABOUTME: PostgreSQL tests for durable Coop callback pointers and their inbox retention dependency.
-// ABOUTME: Proves atomic settlement, replay identity, tenant-safe constraints, rollback, and payload cleanup ordering.
-
 using System.Text;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Persistence;
@@ -11,12 +8,16 @@ using Explore.Application.Services.Webhooks;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Repositories;
+using Explore.Persistence.Schema;
+using Explore.Secrets.Database;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Options;
 using Npgsql;
@@ -490,12 +491,7 @@ public sealed class CoopIncomingWebhookEffectOutboxTests(PostgreSqlContainerFixt
         var connectionString = await CreateDatabaseAsync(databaseName);
         try
         {
-            var options = new DbContextOptionsBuilder<ExploreDbContext>()
-                .UseNpgsql(connectionString)
-                .UseSnakeCaseNamingConvention()
-                .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning))
-                .Options;
-            await using var context = new ExploreDbContext(options);
+            await using var context = CreateMigratorContext(connectionString);
             var migrator = context.GetService<IMigrator>();
 
             await migrator.MigrateAsync();
@@ -505,6 +501,26 @@ public sealed class CoopIncomingWebhookEffectOutboxTests(PostgreSqlContainerFixt
         {
             await DropDatabaseAsync(databaseName);
         }
+    }
+
+    private static ExploreDbContext CreateMigratorContext(string connectionString)
+    {
+        var connection = new NpgsqlConnectionStringBuilder(connectionString);
+        var options = TestDbContextOptions.Create<ExploreDbContext>();
+        PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
+        {
+            Role = PrimaryDatabaseRole.Migrator,
+            Provider = PrimaryDatabaseProvider.PostgreSql,
+            Host = connection.Host,
+            Port = connection.Port,
+            Database = connection.Database,
+            Schema = RelationalModelNamespace.Name,
+            Username = connection.Username,
+            Password = connection.Password,
+            TlsMode = PrimaryDatabaseTlsMode.Disabled
+        });
+        options.ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning));
+        return new ExploreDbContext(options.Options);
     }
 
     private async Task<SeededClaim> SeedAndClaimAsync(string identity)
@@ -567,7 +583,8 @@ public sealed class CoopIncomingWebhookEffectOutboxTests(PostgreSqlContainerFixt
         await command.ExecuteNonQueryAsync();
         return new NpgsqlConnectionStringBuilder(fixture.ConnectionString)
         {
-            Database = databaseName
+            Database = databaseName,
+            SearchPath = RelationalModelNamespace.Name
         }.ConnectionString;
     }
 
@@ -590,7 +607,14 @@ public sealed class CoopIncomingWebhookEffectOutboxTests(PostgreSqlContainerFixt
         }
 
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT to_regclass('public.incoming_webhook_effect_outbox')::text";
+        IEntityType effectPointer = context.Model.FindEntityType(typeof(IncomingWebhookEffectOutbox))
+            ?? throw new InvalidOperationException("The incoming webhook effect pointer is not mapped.");
+        string schema = effectPointer.GetSchema() ?? context.Model.GetDefaultSchema()
+            ?? throw new InvalidOperationException("The event model must declare a default schema.");
+        string table = effectPointer.GetTableName()
+            ?? throw new InvalidOperationException("The incoming webhook effect pointer has no table mapping.");
+        command.CommandText = "SELECT to_regclass(@table)::text";
+        command.Parameters.AddWithValue("table", $"{schema}.{table}");
         return await command.ExecuteScalarAsync() is string;
     }
 

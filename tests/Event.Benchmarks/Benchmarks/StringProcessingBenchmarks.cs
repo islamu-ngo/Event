@@ -1,6 +1,3 @@
-// ABOUTME: String-processing benchmark suite for common formatting, slicing, and search operations.
-// ABOUTME: Compares allocation-heavy APIs against span and formatting alternatives.
-
 using System.Text;
 using BenchmarkDotNet.Attributes;
 using Event.Benchmarks.Configuration;

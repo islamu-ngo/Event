@@ -1,6 +1,3 @@
-// ABOUTME: Grouped PATCH contract for tenant moderation reporting routing settings.
-// ABOUTME: Provider credentials are explicit nested writes and remain absent from read models.
-
 using Explore.Application.Features.EventReporting.Models;
 using Explore.Application.Settings.Groups;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for NotificationService covering all eight notification operations.
-// ABOUTME: Tests GetNotifications, GetById, GetUnreadCount, MarkAsRead, MarkAllAsRead, Delete, Archive, and Snooze.
-
 namespace Explore.Blazor.Client.Tests.Services;
 
 /// <summary>

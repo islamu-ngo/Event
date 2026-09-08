@@ -1,6 +1,3 @@
-// ABOUTME: Configures API versioning using non-URL readers: media type, query string, and custom header.
-// ABOUTME: URL-segment versioning is intentionally NOT supported — each endpoint has exactly one canonical path.
-
 using Asp.Versioning;
 using Asp.Versioning.ApiExplorer;
 

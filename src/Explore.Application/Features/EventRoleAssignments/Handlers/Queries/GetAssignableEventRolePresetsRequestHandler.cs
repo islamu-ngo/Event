@@ -1,6 +1,3 @@
-// ABOUTME: Handler for event-role assignment presets filtered by same-event authority ceiling.
-// ABOUTME: Keeps Blazor/API consumers from seeing roles they cannot delegate.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventRoleAssignment;
 using Explore.Application.Features.EventRoleAssignments.Requests.Queries;

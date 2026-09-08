@@ -1,5 +1,3 @@
-// ABOUTME: Requests safe durable status for one Local credential operation without reconciliation.
-// ABOUTME: Carries only the operation identifier while the handler enforces current instance authority.
 
 using Explore.Application.Contracts.Identity;
 using MediatR;

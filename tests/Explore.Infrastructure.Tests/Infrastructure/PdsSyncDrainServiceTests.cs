@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for the scheduler-neutral AT Protocol PDS one-pass drain boundary.
-// ABOUTME: Verifies configured batch and lease controls without starting a timer or calling a provider.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Microsoft.Extensions.DependencyInjection;

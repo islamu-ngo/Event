@@ -1,6 +1,3 @@
-// ABOUTME: Maps the tenant-safe shared-primary-key participation policy owned by one Event.
-// ABOUTME: Preserves audit, soft-delete, optimistic concurrency, and normalized lookup ownership.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

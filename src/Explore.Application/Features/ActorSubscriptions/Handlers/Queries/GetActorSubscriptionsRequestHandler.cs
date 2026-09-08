@@ -1,6 +1,3 @@
-// ABOUTME: Handles paginated current-user actor subscription listing.
-// ABOUTME: Maps repository entities to compact DTOs after tenant-user ownership resolution.
-
 using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

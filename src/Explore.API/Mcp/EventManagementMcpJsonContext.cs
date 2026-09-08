@@ -1,6 +1,3 @@
-// ABOUTME: Source-generated JSON metadata for event-management MCP descriptors.
-// ABOUTME: Keeps event MCP serialization deterministic without broad reflection fallback.
-
 using System.Text.Json.Serialization;
 
 namespace Explore.API.Mcp;

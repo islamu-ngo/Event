@@ -1,6 +1,3 @@
-// ABOUTME: EF Core mapping for event-scoped role assignments with PostgreSQL-safe concurrency and partial uniqueness.
-// ABOUTME: Assignment rows are lifecycle evidence; they use tenant filtering but no normal soft delete.
-
 using Explore.Domain;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;

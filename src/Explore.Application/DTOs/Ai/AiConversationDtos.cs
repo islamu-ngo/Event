@@ -1,6 +1,3 @@
-// ABOUTME: DTO contracts for AI assistant conversations, messages, runs, references, and actions.
-// ABOUTME: Shapes private assistant history without exposing provider secrets or raw infrastructure errors.
-
 using System.Collections.ObjectModel;
 using System.Text.Json.Serialization;
 using Explore.Application.Hateoas;

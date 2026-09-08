@@ -1,6 +1,3 @@
-// ABOUTME: Strongly-typed Group policy setting group resolved via batch loading.
-// ABOUTME: Keys align to GroupSettingDefinitions via GovernanceSettingKeys.Groups.
-
 namespace Explore.Application.Settings.Groups;
 
 using Explore.Application.Contracts.Infrastructure;

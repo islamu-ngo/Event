@@ -1,6 +1,3 @@
-// ABOUTME: Tenant branding settings payload for typed document storage.
-// ABOUTME: Stores URLs and display labels, never credentials or tokens.
-
 namespace Explore.Domain.Settings.Documents.Payloads;
 
 public sealed record BrandingSettings

@@ -1,6 +1,3 @@
-// ABOUTME: Atomically pauses an active Local webhook endpoint and appends mandatory operator audit.
-// ABOUTME: Rejects non-Local modes, stale endpoint states, missing actors, and concurrent transitions.
-
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;

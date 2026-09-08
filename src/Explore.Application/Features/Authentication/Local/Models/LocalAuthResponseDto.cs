@@ -1,6 +1,3 @@
-// ABOUTME: Represents a Local session, isolated replacement challenge, or closed authentication failure.
-// ABOUTME: Keeps challenge authority separate from session claims and suppresses sensitive diagnostic formatting.
-
 using System.Collections.ObjectModel;
 using System.Text.Json.Serialization;
 using Explore.Application.Contracts.Infrastructure;

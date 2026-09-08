@@ -1,6 +1,3 @@
-// ABOUTME: Collection-processing benchmark suite for common hot-path iteration and lookup choices.
-// ABOUTME: Compares list, array/span, LINQ, manual loops, and frozen-set operations.
-
 using System.Collections.Frozen;
 using BenchmarkDotNet.Attributes;
 using Event.Benchmarks.Configuration;

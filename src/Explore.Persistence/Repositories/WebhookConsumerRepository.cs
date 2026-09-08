@@ -1,6 +1,3 @@
-// ABOUTME: EF Core repository for typed owner-scoped webhook consumers and provider app ids.
-// ABOUTME: Uses bounded owner predicates whenever bypassing ambient tenant filtering.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;

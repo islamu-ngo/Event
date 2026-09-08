@@ -1,6 +1,3 @@
-// ABOUTME: Handles explicit authorization policy package sync requests from setup and admin flows.
-// ABOUTME: Maps provider-neutral package publish results to safe command responses for UI retry handling.
-
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;

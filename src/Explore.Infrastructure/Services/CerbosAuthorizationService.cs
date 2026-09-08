@@ -1,6 +1,3 @@
-// ABOUTME: Cerbos PDP authorization service using the official gRPC SDK for policy decisions.
-// ABOUTME: Uses Cerbos.Sdk CheckResourcesAsync, prefers AuthorizationRequest.Scope over ambient tenant context.
-
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using Cerbos.Api.V1.Effect;

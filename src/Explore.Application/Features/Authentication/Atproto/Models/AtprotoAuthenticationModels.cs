@@ -1,6 +1,3 @@
-// ABOUTME: Carries server-private ATProto verification inputs, verified identity state, and session results.
-// ABOUTME: Uses opaque bytes so CarpaNet credentials never leak into public DTOs or outer clients.
-
 using Explore.Domain.ValueObjects;
 
 namespace Explore.Application.Features.Authentication.Atproto.Models;

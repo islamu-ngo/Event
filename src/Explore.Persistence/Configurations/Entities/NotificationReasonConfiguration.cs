@@ -1,6 +1,3 @@
-// ABOUTME: EF Core configuration for the NotificationReason lookup entity.
-// ABOUTME: Follows NotificationTypeConfiguration pattern with ValueGeneratedNever.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

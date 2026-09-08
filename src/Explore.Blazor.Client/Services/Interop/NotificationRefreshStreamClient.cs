@@ -1,6 +1,3 @@
-// ABOUTME: Browser EventSource wrapper for notification refresh hints from the API SSE endpoint.
-// ABOUTME: Emits minimal unread-count hint events while preserving polling as the fallback path.
-
 using Explore.Blazor.Client.Contracts.Services.Notifications;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;

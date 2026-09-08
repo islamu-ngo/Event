@@ -1,6 +1,3 @@
-// ABOUTME: Freezes the Setup live EF Core model across every supported primary database provider.
-// ABOUTME: Runs without a migrated fixture so model Green precedes generated-migration behavior Red.
-
 namespace Event.Persistence.IntegrationTests.SetupLive;
 
 using Event.Persistence.IntegrationTests.Database;

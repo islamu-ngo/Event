@@ -1,6 +1,3 @@
-// ABOUTME: DTO for the user's Connected Apps page showing granted/withdrawn consents.
-// ABOUTME: Includes organisation display info and consent status for user self-management.
-
 namespace Explore.Application.DTOs.ContactShareConsent;
 
 public sealed record UserContactShareConsentDto

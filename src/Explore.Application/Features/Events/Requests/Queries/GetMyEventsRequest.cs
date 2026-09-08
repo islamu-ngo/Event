@@ -1,5 +1,3 @@
-// ABOUTME: MediatR query request for fetching the current user's events.
-// ABOUTME: Returns IEnumerable<EventListDto>.
 using System;
 using System.Collections.Generic;
 using Explore.Application.DTOs.Event;

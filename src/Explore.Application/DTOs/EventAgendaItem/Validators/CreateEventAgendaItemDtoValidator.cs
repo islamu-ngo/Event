@@ -1,6 +1,3 @@
-// ABOUTME: FluentValidation rules for CreateEventAgendaItemDto enforcing event ownership and time ordering.
-// ABOUTME: Manually instantiated in handlers — accepts IEventRepository for async event existence check.
-
 using Explore.Application.Contracts.Persistence;
 using FluentValidation;
 

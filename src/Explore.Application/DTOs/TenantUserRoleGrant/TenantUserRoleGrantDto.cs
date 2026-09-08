@@ -1,6 +1,3 @@
-// ABOUTME: Detail DTO for an auditable tenant-local role grant.
-// ABOUTME: Used by GetTenantUserRoleGrantDetailsRequest for single-record responses.
-
 namespace Explore.Application.DTOs.TenantUserRoleGrant;
 
 public sealed record TenantUserRoleGrantDto

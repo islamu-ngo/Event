@@ -1,6 +1,3 @@
-// ABOUTME: Runtime resolver for active support-access context on authenticated requests.
-// ABOUTME: Validates persisted sessions against actor, tenant, expiry, mode, and governance settings.
-
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;

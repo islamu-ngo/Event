@@ -1,6 +1,3 @@
-// ABOUTME: Secured query for reading a tenant's active control-plane plan assignment.
-// ABOUTME: Keeps tenant plan assignment visibility under instance-setting read authority.
-
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.ControlPlane;
 using MediatR;

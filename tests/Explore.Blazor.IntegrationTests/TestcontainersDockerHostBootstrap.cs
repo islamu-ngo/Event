@@ -1,6 +1,3 @@
-// ABOUTME: Sets a deterministic Docker host for Testcontainers-based Blazor integration tests when Docker Desktop is used.
-// ABOUTME: Avoids suite-wide DockerUnavailableException failures when DOCKER_HOST is unset but the user-scoped socket exists.
-
 using System.Runtime.CompilerServices;
 
 namespace Explore.Blazor.IntegrationTests;

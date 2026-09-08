@@ -1,6 +1,3 @@
-// ABOUTME: Unit tests for EventService.
-// ABOUTME: Tests event CRUD, exact management reads, and generated session enum contracts.
-
 using Explore.Blazor.Client.Helpers;
 using Explore.Blazor.Client.Models.Events;
 

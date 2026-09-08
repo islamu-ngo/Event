@@ -1,6 +1,3 @@
-// ABOUTME: Per-user notification category preference used by unsubscribe and dispatch-time consent checks.
-// ABOUTME: Absence means the category remains enabled; explicit rows capture opt-outs and future re-subscriptions.
-
 namespace Explore.Domain;
 
 using Explore.Domain.Interfaces;

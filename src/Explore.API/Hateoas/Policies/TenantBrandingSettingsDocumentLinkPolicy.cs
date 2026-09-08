@@ -1,6 +1,3 @@
-// ABOUTME: HAL link policy for tenant branding typed settings documents.
-// ABOUTME: Emits PATCH edit affordances through field capabilities and permission checks.
-
 namespace Explore.API.Hateoas.Policies;
 
 using System.Collections.Generic;

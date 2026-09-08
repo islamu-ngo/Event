@@ -1,6 +1,3 @@
-// ABOUTME: Defines a tenant-scoped capacity reservation for one order line and pool.
-// ABOUTME: Makes expiry, release, and consumption conditional so retries cannot oversell capacity.
-
 using Explore.Domain.Enums;
 using Explore.Domain.Interfaces;
 

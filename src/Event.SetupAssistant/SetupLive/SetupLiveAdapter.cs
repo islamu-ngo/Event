@@ -1,6 +1,3 @@
-// ABOUTME: Implements the ephemeral authenticated Setup live adapter over the generated API client.
-// ABOUTME: Enforces TLS, HAL affordances, bounded authority, and value-free public results.
-
 namespace ISLAMU.Event.SetupAssistant.SetupLive;
 
 using System.Net.Http.Headers;

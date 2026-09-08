@@ -1,6 +1,3 @@
-// ABOUTME: Lookup-table entity for external API key ownership levels.
-// ABOUTME: IDs mirror ExternalApiKeyOwnerType values for machine-caller authorization.
-
 namespace Explore.Domain;
 
 public class ExternalApiKeyOwnerTypeLookup

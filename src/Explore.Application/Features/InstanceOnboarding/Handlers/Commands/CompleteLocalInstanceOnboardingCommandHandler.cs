@@ -1,5 +1,3 @@
-// ABOUTME: Validates setup-only Local enrollment under current provider and durable setup authority.
-// ABOUTME: Reuses native bootstrap convergence without minting identity, credentials, or session responses.
 
 using Explore.Application.Constants;
 using Explore.Application.Contracts.Infrastructure;

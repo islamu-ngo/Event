@@ -1,6 +1,3 @@
-// ABOUTME: Registry gate for typed settings documents and their non-secret storage boundary.
-// ABOUTME: Prevents infrastructure credentials from being introduced into JSONB governance documents.
-
 namespace Explore.Domain.Settings.Documents;
 
 using Explore.Domain.Constants;

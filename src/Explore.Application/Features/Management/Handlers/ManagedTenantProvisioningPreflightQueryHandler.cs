@@ -1,6 +1,3 @@
-// ABOUTME: Evaluates a bounded managed tenant provisioning request without mutating Event state.
-// ABOUTME: Projects current mode, registration, capacity, and Event-owned bootstrap policy for deterministic previews.
-
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Management;

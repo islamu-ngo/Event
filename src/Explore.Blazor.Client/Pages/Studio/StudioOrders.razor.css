@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped actor-order page layout for the Studio workspace. */
-/* ABOUTME: Keeps event order sections readable, responsive, and RTL-safe. */
-
 .studio-orders,
 .studio-orders__header,
 .studio-orders__state,

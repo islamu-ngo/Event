@@ -1,6 +1,3 @@
-// ABOUTME: Delegates event ticket catalog reads and mutations to the generated Event API client.
-// ABOUTME: Preserves generated HAL resources, write DTOs, identifiers, cancellation, and API failures.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Events;
 using Explore.Blazor.Client.Pages.Studio;

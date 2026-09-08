@@ -1,6 +1,3 @@
-// ABOUTME: Maps immutable buyer acceptance and normalized tenant-qualified line facts with database money constraints.
-// ABOUTME: Preserves nullable historical attempt linkage while eliminating opaque acceptance-line JSON.
-
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

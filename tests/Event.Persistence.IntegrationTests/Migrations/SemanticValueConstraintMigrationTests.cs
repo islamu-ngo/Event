@@ -1,6 +1,3 @@
-// ABOUTME: Specifies generated semantic-value check constraints across every primary database catalog.
-// ABOUTME: Proves valid scalar rows survive PostgreSQL upgrade, rollback, and idempotent reapplication without exposing PII.
-
 #nullable enable
 
 using Event.Persistence.IntegrationTests.Fixtures;
@@ -488,18 +485,18 @@ public sealed class SemanticValueConstraintMigrationTests(
 
             INSERT INTO islamu_event.locations
                 (id, full_name, country, city, tenant_id, location_kind_id,
-                 location_privacy_state_id, created_at, concurrency_stamp)
+                 location_privacy_state_id, created_at, concurrency_stamp, display_sort_key, display_sort_key_version)
             VALUES
                 (@paired_location_id, 'Paired coordinate fixture', 'Synthetic', 'Synthetic',
-                 @tenant_id, 2, 2, TIMESTAMPTZ '2026-08-25 00:00:00+00', @concurrency_stamp),
+                 @tenant_id, 2, 2, TIMESTAMPTZ '2026-08-25 00:00:00+00', @concurrency_stamp, 'PAIRED COORDINATE FIXTURE', 2),
                 (@null_location_id, 'Null coordinate fixture', 'Synthetic', 'Synthetic',
-                 @tenant_id, 2, 2, TIMESTAMPTZ '2026-08-25 00:00:00+00', @concurrency_stamp);
+                 @tenant_id, 2, 2, TIMESTAMPTZ '2026-08-25 00:00:00+00', @concurrency_stamp, 'NULL COORDINATE FIXTURE', 2);
 
             INSERT INTO islamu_event.location_pii
-                (location_id, address, postcode, latitude, longitude)
+                (location_id, address, postcode, latitude, longitude, address_substring_key, address_substring_key_version)
             VALUES
-                (@paired_location_id, @paired_address, @paired_postcode, 51.0504, 13.7373),
-                (@null_location_id, @null_address, @null_postcode, NULL, NULL);
+                (@paired_location_id, @paired_address, @paired_postcode, 51.0504, 13.7373, 'SYNTHETIC-PAIRED-ADDRESS', 2),
+                (@null_location_id, @null_address, @null_postcode, NULL, NULL, 'SYNTHETIC-NULL-ADDRESS', 2);
 
             INSERT INTO islamu_event.event_agenda_items
                 (id, event_id, title, start_time, end_time, local_start_date, local_end_date,
@@ -796,7 +793,7 @@ public sealed class SemanticValueConstraintMigrationTests(
     private ExploreDbContext CreatePostgreSqlContext(Action<string>? captureDiagnostics = null)
     {
         var connection = new NpgsqlConnectionStringBuilder(fixture.ConnectionString);
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>();
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(
             builder,
             new PrimaryDatabaseConnectionOptions
@@ -821,7 +818,7 @@ public sealed class SemanticValueConstraintMigrationTests(
 
     private static ExploreDbContext CreateCatalogContext(PrimaryDatabaseProvider provider)
     {
-        var builder = new DbContextOptionsBuilder<ExploreDbContext>();
+        var builder = TestDbContextOptions.Create<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(builder, CreateCatalogOptions(provider));
         return new ExploreDbContext(builder.Options);
     }

@@ -1,5 +1,3 @@
-// ABOUTME: Uncached native authentication configuration read port for the visitor authority.
-// ABOUTME: Provider ownership supplies all enabled tenant-usable providers under the caller's lease.
 
 using Explore.Application.Models;
 

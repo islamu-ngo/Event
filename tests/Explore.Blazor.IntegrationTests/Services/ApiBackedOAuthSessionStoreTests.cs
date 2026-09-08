@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the BFF sends CarpaNet session material only through the server-private authenticated bridge.
-// ABOUTME: Proves bridge principal substitution fails closed before any cookie-ready flow result is captured.
-
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -9,6 +6,8 @@ using CarpaNet.OAuth;
 using CarpaNet.OAuth.Crypto;
 using CarpaNet.OAuth.Storage;
 using Explore.Blazor.Services.Auth;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 
 namespace Explore.Blazor.IntegrationTests.Services;
@@ -151,6 +150,11 @@ public sealed class ApiBackedOAuthSessionStoreTests
         Guid? expectedCanonicalActorConcurrencyStamp = null)
     {
         var flow = new AtprotoOAuthFlowContext();
+        var challengeContext = new DefaultHttpContext();
+        challengeContext.Request.Scheme = "https";
+        challengeContext.Request.Host = new("events.example.com");
+        var browserBinding = new AtprotoBrowserProof(new EphemeralDataProtectionProvider(), TimeProvider.System)
+            .CreateBinding(challengeContext);
         flow.BindConsumedState(new(
             new(
                 "did:plc:alice",
@@ -162,7 +166,7 @@ public sealed class ApiBackedOAuthSessionStoreTests
                 "oauth-active",
                 "person",
                 canonicalActorId,
-                expectedCanonicalActorConcurrencyStamp),
+                expectedCanonicalActorConcurrencyStamp) { BrowserBinding = browserBinding },
             new("https://issuer.example/")));
         return flow;
     }

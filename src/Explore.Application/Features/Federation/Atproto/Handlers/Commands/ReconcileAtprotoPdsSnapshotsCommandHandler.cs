@@ -1,6 +1,3 @@
-// ABOUTME: Orchestrates bounded current-state PDS reconciliation under the existing global consumer lease.
-// ABOUTME: Keeps downtime recovery on Jetstream and applies only complete verified Full snapshots atomically.
-
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Contracts.Infrastructure;

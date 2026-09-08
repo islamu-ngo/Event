@@ -1,6 +1,3 @@
-// ABOUTME: .NET Aspire AppHost for profile-driven local development orchestration.
-// ABOUTME: Branches full, core, and lite topologies while keeping app projects unchanged.
-
 using System.Net.Sockets;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;

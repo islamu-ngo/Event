@@ -1,6 +1,3 @@
-// ABOUTME: Management projection for an event-report review case.
-// ABOUTME: Carries assignment, queue, SLA, and concurrency data used by moderator commands.
-
 using System.Text.Json.Serialization;
 
 namespace Explore.Application.DTOs.EventReporting;

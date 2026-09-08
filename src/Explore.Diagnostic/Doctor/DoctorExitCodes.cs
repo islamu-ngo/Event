@@ -1,6 +1,3 @@
-// ABOUTME: Centralizes doctor process exit-code semantics.
-// ABOUTME: Keeps warnings non-blocking while hard FAIL checks return a non-zero code.
-
 namespace Explore.Diagnostic.Doctor;
 
 public static class DoctorExitCodes

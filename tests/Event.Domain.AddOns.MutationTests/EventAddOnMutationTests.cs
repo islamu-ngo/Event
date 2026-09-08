@@ -1,6 +1,3 @@
-// ABOUTME: Kills mutations in add-on catalog, line totals, inventory, fulfillment, and refund authority.
-// ABOUTME: Uses literal values and public Domain factories so checked commerce invariants remain independently testable.
-
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;

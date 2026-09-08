@@ -1,6 +1,3 @@
-// ABOUTME: Discriminated result type for AI run status polling.
-// ABOUTME: Distinguishes success, not-found/transient failure, and authentication rejection (401).
-
 using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Services.Ai;

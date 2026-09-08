@@ -1,6 +1,3 @@
-// ABOUTME: Defines D2-3 Application contracts for Setup secret writes and commitments.
-// ABOUTME: Freezes one-way, cancellation-aware ports before handlers or providers exist.
-
 namespace Event.Application.UnitTests.Features.SetupLive;
 
 using System.Diagnostics;
@@ -1093,8 +1090,13 @@ public sealed class SetupLiveApplicationContractTests
         CustomAttributeData[] assemblyAttributes =
             ApplicationAssembly.CustomAttributes.ToArray();
         RequireContract(
-            assemblyAttributes.Length == 13,
-            "invalid-setup-live-application-assembly-attribute-count");
+            assemblyAttributes.Length == 14,
+            $"invalid-setup-live-application-assembly-attribute-count:expected=14;actual={assemblyAttributes.Length}");
+        AssertExactManifestAttribute(
+            assemblyAttributes,
+            typeof(InternalsVisibleToAttribute),
+            [typeof(string)],
+            ["Explore.Infrastructure"]);
         AssertExactManifestAttribute(
             assemblyAttributes,
             typeof(CompilationRelaxationsAttribute),

@@ -1,6 +1,3 @@
-// ABOUTME: Application command for running tenant-scoped AI assistant retention cleanup.
-// ABOUTME: Supports dry-run operator checks while using tenant settings for retention age.
-
 using Explore.Application.Models;
 using MediatR;
 

@@ -1,6 +1,3 @@
-// ABOUTME: Defines RED API, HAL, OpenAPI, privacy, and stop-control contracts for fair-return waitlists.
-// ABOUTME: Pins bounded queue output, generic conflicts, no paid priority, and server-owned affordances.
-
 using System.Net;
 using System.Reflection;
 using System.Text.Json;

@@ -1,6 +1,3 @@
-// ABOUTME: Testcontainers integration tests for projection coordination: dirty-scope upsert, drain, and rebuild status tracking.
-// ABOUTME: Covers D1 correctness invariants required by CTO Rule 17 before Milestone D1 can exit.
-
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Telemetry;

@@ -1,6 +1,3 @@
-// ABOUTME: Verifies the scheduled registration-finalization drain sends the identical fenced drain command.
-// ABOUTME: Guards the migration's central claim: only the timer moved, the claim semantics are untouched.
-
 using Explore.API.Scheduling;
 using Explore.Application.Features.RegistrationSubmissions.Commands;
 using MediatR;

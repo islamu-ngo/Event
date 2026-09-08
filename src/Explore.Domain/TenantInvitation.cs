@@ -1,6 +1,3 @@
-// ABOUTME: Invitation entity for onboarding new members into a tenant with role assignment.
-// ABOUTME: Supports token-based acceptance, domain whitelisting, and one-time use hardening.
-
 using System.ComponentModel.DataAnnotations.Schema;
 using Explore.Domain.Interfaces;
 

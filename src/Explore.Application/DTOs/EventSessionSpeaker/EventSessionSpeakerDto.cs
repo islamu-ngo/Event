@@ -1,6 +1,3 @@
-// ABOUTME: Detail DTO for an event-session speaker relationship row.
-// ABOUTME: Exposes concurrency metadata so clients can submit strong update preconditions.
-
 using System;
 
 namespace Explore.Application.DTOs.EventSessionSpeaker;

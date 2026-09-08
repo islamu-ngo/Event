@@ -1,6 +1,3 @@
-/* ABOUTME: Scoped authorization-provider content styles inside the shared onboarding workspace. */
-/* ABOUTME: Uses logical spacing, native disclosure focus, and responsive action flow. */
-
 .authz-page {
     inline-size: 100%;
 }

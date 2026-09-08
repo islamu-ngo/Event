@@ -1,6 +1,3 @@
-// ABOUTME: Setting definitions for API-hosted MCP adapter runtime governance.
-// ABOUTME: Keeps runtime enablement tenant-aware while startup configuration remains the operator ceiling.
-
 namespace Explore.Domain.Settings.Definitions;
 
 using Explore.Domain.Constants;

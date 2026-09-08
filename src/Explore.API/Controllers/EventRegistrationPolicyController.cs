@@ -1,6 +1,3 @@
-// ABOUTME: API controller for event registration policy lookup table (read-only enumeration).
-// ABOUTME: Provides registration policy options (Open, ApprovalRequired, InvitationOnly) for events.
-
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Hateoas;

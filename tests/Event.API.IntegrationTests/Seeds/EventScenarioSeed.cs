@@ -1,6 +1,3 @@
-// ABOUTME: Business-readable scenario seed for events in integration tests.
-// ABOUTME: Creates events within an established tenant context for test scenarios.
-
 using Event.Api.IntegrationTests.Builders;
 using Explore.Domain;
 using Explore.Domain.Enums;

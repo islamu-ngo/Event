@@ -1,6 +1,3 @@
-# ABOUTME: Cerbos policy tests for exact typed webhook ownership and privileged operations.
-# ABOUTME: Covers all five owner kinds, unrelated-owner denial, and tenant-only sensitive actions.
-
 name: WebhookPolicyTests
 description: "Validates exact outgoing webhook ownership boundaries"
 

@@ -1,6 +1,3 @@
-// ABOUTME: Scoped route-derived state for the active workspace and session-only route history.
-// ABOUTME: Observes Blazor navigation, preserves query strings, and reconciles revoked workspaces.
-
 namespace Explore.Blazor.Client.Services.Shell;
 
 using Explore.Blazor.Client.Clients;

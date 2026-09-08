@@ -1,6 +1,3 @@
-// ABOUTME: Stores precise location-identifying fields in a dedicated extension table.
-// ABOUTME: Restricts address and coordinate mutation to atomic Location aggregate transitions.
-
 using Explore.Domain.ValueObjects;
 
 namespace Explore.Domain;
@@ -51,19 +48,19 @@ public class LocationPii
             throw new ArgumentException("Postcode is required.", nameof(postcode));
         }
 
-        string addressSubstringKey = LocationAddressSubstringKeyV1.Create(address);
+        string addressSubstringKey = LocationTextNormalization.Normalize(address);
 
         Address = address;
         Postcode = postcode;
         AddressSubstringKey = addressSubstringKey;
-        AddressSubstringKeyVersion = LocationAddressSubstringKeyV1.Version;
+        AddressSubstringKeyVersion = LocationTextNormalization.CurrentRevision;
         Latitude = coordinate?.Latitude;
         Longitude = coordinate?.Longitude;
     }
 
     internal bool EnsureCurrentAddressSubstringKey()
     {
-        string currentKey = LocationAddressSubstringKeyV1.Create(Address);
+        string currentKey = LocationTextNormalization.Normalize(Address);
         if (HasCurrentAddressSubstringKey(currentKey))
         {
             return false;
@@ -74,13 +71,13 @@ public class LocationPii
     }
 
     internal bool HasCurrentAddressSubstringKey(string currentKey) =>
-        AddressSubstringKeyVersion == LocationAddressSubstringKeyV1.Version
+        AddressSubstringKeyVersion == LocationTextNormalization.CurrentRevision
         && string.Equals(AddressSubstringKey, currentKey, StringComparison.Ordinal);
 
     internal void SetCurrentAddressSubstringKey(string currentKey)
     {
         AddressSubstringKey = currentKey;
-        AddressSubstringKeyVersion = LocationAddressSubstringKeyV1.Version;
+        AddressSubstringKeyVersion = LocationTextNormalization.CurrentRevision;
     }
 
     internal void AssociateWith(Location location)

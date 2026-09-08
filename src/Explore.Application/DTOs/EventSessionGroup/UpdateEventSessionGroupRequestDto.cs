@@ -1,6 +1,3 @@
-// ABOUTME: Grouped PATCH contract for a program section, track, devroom, or stage.
-// ABOUTME: Keeps identity and tenant ownership server-owned while preserving omitted values.
-
 using Explore.Application.Models.Common;
 
 namespace Explore.Application.DTOs.EventSessionGroup;

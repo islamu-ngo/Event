@@ -1,6 +1,3 @@
-// ABOUTME: Implementation of IUserAppearancePreferencesService wrapping the user-appearance client.
-// ABOUTME: Handles error catching and logging for user appearance preferences.
-
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Microsoft.Extensions.Logging;

@@ -1,6 +1,3 @@
-// ABOUTME: Handles event-scoped moderation report detail reads.
-// ABOUTME: Performs explicit evidence decryption only after event management authorization succeeds.
-
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Contracts.Infrastructure;

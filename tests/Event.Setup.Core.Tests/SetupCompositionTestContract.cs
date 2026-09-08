@@ -1,6 +1,3 @@
-// ABOUTME: Defines the exact Phase 8 composition limits, security matrices, and Worst Break vectors.
-// ABOUTME: Supplies machine-consumed Red expectations without implementing parser, merger, or filesystem policy.
-
 namespace Event.Setup.Core.Tests;
 
 using System.Reflection;

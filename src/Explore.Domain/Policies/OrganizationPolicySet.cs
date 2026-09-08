@@ -1,6 +1,3 @@
-// ABOUTME: Organization-level policy aggregate — overrides tenant defaults where allowed.
-// ABOUTME: Only fields with ChildOverrideMode.Allow at the tenant level can be set here.
-
 namespace Explore.Domain.Policies;
 
 public sealed class OrganizationPolicySet

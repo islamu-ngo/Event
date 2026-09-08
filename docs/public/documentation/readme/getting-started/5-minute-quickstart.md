@@ -69,6 +69,11 @@ docker compose up -d
 | **Keycloak Administration** | [http://localhost:8080](http://localhost:8080) |
 | **Mailpit (Local Email Capture)** | [http://localhost:8025](http://localhost:8025) |
 
+{% hint style="success" %}
+**Up and running?**
+ISLAMU Event is 100% free, community-owned open-source software. If this platform brings value to your organization, consider [supporting its ongoing maintenance with a donation](https://donate.stripe.com/14A6oIesc0Oc2KYg35aR200) or learning about our [Sponsorship & Sustainability model](../contributing/sponsorship.md).
+{% endhint %}
+
 ---
 
 ## Related Guides & Next Steps

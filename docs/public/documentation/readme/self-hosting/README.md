@@ -54,3 +54,8 @@ Kubernetes, Helm, ActivityPub infrastructure, first-party PDS/AppView hosting, a
 ## Shared production gate
 
 Every path must define durable state, migrations, identity, authorization, tenant binding, secrets, TLS/DNS, health, backups, restore rehearsal, upgrade, and rollback. Continue with [Configuration & Operations](../configuration-and-operations/) after choosing a topology.
+
+{% hint style="info" %}
+**Sustaining Community Infrastructure:**
+ISLAMU Event is 100% free and open-source under the AGPL-3.0-or-later. If deploying ISLAMU Event saves your community or organization operational and licensing fees, please consider [becoming a sponsor](../contributing/sponsorship.md) or [donating directly via Stripe](https://donate.stripe.com/14A6oIesc0Oc2KYg35aR200).
+{% endhint %}

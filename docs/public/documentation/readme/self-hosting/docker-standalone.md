@@ -179,6 +179,11 @@ docker cp islamu-event-standalone:/app/data/backup_erasure.db ./backup_erasure.d
 > [!CAUTION]
 > **Privacy-Erasure Isolation**: Always restore *both* `islamu_event.db` and `privacy_erasure_authority.db` together. Restoring an old primary application database without the erasure authority database can accidentally resurrect erased user data that was legally deleted under GDPR! (See [Privacy Erasure](../security-and-identity/privacy-erasure.md)).
 
+{% hint style="info" %}
+**Operating a community deployment?**
+ISLAMU Event is 100% free and open source. If this standalone deployment powers events for your organization, please consider [supporting our work via Stripe](https://donate.stripe.com/14A6oIesc0Oc2KYg35aR200) or [becoming an official sponsor](../contributing/sponsorship.md).
+{% endhint %}
+
 ---
 
 ## Related Guides & Next Steps

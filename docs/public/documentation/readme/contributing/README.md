@@ -53,6 +53,7 @@ Interested in how we leverage autonomous AI agents with deterministic rigor? Rea
 * **[Clean Architecture Conventions](clean-architecture.md)** — Understand domain invariants, MediatR CQRS slices, and HAL link assembly.
 * **[TUnit Testing Conventions](tunit.md)** — Run fast, targeted unit and integration test slices with TUnit.
 * **[Clean-Room IP & Licensing](clean-room-ip-and-licensing.md)** — AGPLv3 guidelines, CLA requirements, and clean-room provenance rules.
+* **[Sponsorship & Sustainability](sponsorship.md)** — Support the project through individual donations or corporate sponsorship.
 
 ---
 

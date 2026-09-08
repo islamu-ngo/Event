@@ -5,7 +5,7 @@ using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services;
 using Microsoft.JSInterop;
 
-namespace Explore.Blazor.Client.Services;
+namespace Explore.Blazor.Client.Services.Interop;
 
 public sealed class AnonymousRegistrationChallengeSolver(IJSRuntime js) : IAnonymousRegistrationChallengeSolver
 {

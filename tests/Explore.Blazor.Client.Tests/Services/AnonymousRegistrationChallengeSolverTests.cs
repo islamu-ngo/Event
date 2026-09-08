@@ -2,7 +2,7 @@
 // ABOUTME: Uses exact invocation signals to prove worker cleanup finishes before success or failure escapes.
 
 using Explore.Blazor.Client.Clients;
-using Explore.Blazor.Client.Services;
+using Explore.Blazor.Client.Services.Interop;
 using Microsoft.JSInterop;
 
 namespace Explore.Blazor.Client.Tests.Services;

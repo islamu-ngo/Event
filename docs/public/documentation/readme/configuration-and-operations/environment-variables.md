@@ -330,8 +330,7 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `API_HTTP_PORT` | deployment | public | None | optional | deployment |
 | `UI_HTTP_PORT` | deployment | public | None | optional | deployment |
 | `KEYCLOAK_HTTP_PORT` | identity | public | None | optional | process |
-| `MAILPIT_SMTP_PORT` | integration | public | None | optional | deployment |
-| `MAILPIT_UI_PORT` | integration | public | None | optional | deployment |
+| `MAILPIT_UI_PORT` | integration | public | 8025 | defaulted | deployment |
 | `MINIO_API_PORT` | integration | public | None | optional | deployment |
 | `MINIO_CONSOLE_PORT` | integration | public | None | optional | deployment |
 | `CERBOS_HTTP_PORT` | deployment | public | None | optional | deployment |
@@ -342,8 +341,6 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `COOP_CLIENT_HTTP_PORT` | integration | public | None | optional | deployment |
 | `OSPREY_BIDI_STREAM_PORT` | integration | public | None | optional | deployment |
 | `OSPREY_SYNC_ACTION_PORT` | integration | public | None | optional | deployment |
-| `MAILPIT_TAG` | integration | public | None | optional | deployment |
-| `MAILPIT_MAX_MESSAGES` | integration | public | None | optional | deployment |
 | `FORMBRICKS_HTTP_PORT` | integration | public | None | optional | deployment |
 | `FORMBRICKS_WEBAPP_URL` | integration | public | None | optional | deployment |
 | `FORMBRICKS_DATABASE_NAME` | integration | public | None | optional | deployment |
@@ -563,7 +560,7 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `VAPID_PUBLIC_KEY` | messaging | public | None | optional | capability |
 | `VAPID_PRIVATE_KEY` | messaging | sensitive | None | optional | capability |
 | `MESSAGING_URI` | messaging | public | None | optional | capability |
-| `EMAIL_DISPATCH_RABBITMQ_ENABLED` | messaging | public | None | optional | capability |
+| `EMAIL_DISPATCH_RABBITMQ_ENABLED` | messaging | public | false | defaulted | capability |
 | `EMAIL_DISPATCH_RABBITMQ_CONNECTION_STRING_NAME` | messaging | sensitive | None | optional | capability |
 | `EMAIL_DISPATCH_RABBITMQ_CONNECTION_STRING` | messaging | sensitive | None | optional | capability |
 | `EMAIL_DISPATCH_RABBITMQ_EXCHANGE_NAME` | messaging | public | None | optional | capability |

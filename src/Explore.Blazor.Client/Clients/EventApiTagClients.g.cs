@@ -150861,6 +150861,9 @@ namespace Explore.Blazor.Client.Clients
         [System.Text.Json.Serialization.JsonPropertyName("defaultBrandDisplayName")]
         public string? DefaultBrandDisplayName { get; set; } = default!;
 
+        [System.Text.Json.Serialization.JsonPropertyName("supportEmail")]
+        public string? SupportEmail { get; set; } = default!;
+
         [System.Text.Json.Serialization.JsonPropertyName("defaultBrandLogoUrl")]
         public string? DefaultBrandLogoUrl { get; set; } = default!;
 

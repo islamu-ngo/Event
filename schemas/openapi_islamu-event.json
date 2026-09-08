@@ -110425,6 +110425,12 @@
           "defaultBrandDisplayName": {
             "type": "string"
           },
+          "supportEmail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "defaultBrandLogoUrl": {
             "type": "string"
           },

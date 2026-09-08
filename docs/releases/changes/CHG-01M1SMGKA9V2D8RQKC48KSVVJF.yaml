@@ -1,0 +1,32 @@
+Change-Id: CHG-01M1SMGKA9V2D8RQKC48KSVVJF
+Title: ship the operational zero-email experience
+Type: feat
+Scope: self-hosting
+Summary: Complete standalone and setup integration with optional private mail testing and durable operator guidance.
+Group: email-optional-self-hosting
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/self-hosting/docker-compose.md
+    Disposition: documented
+    Detail: Mailpit requires the mail profile, no longer publishes SMTP, and retires MAILPIT_TAG, MAILPIT_SMTP_PORT and MAILPIT_MAX_MESSAGES overrides.
+  Security:
+    Reference: docs/internal/SELF_HOSTING.md
+    Disposition: documented
+    Detail: Local capture uses a fixed image, bounded messages and a loopback inbox without permissive authentication; existing bootstrap and persisted delivery authority remain enforced.
+  Migration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+    Detail: Public support contact uses the existing system-settings store without a database schema change or implicit migration from SMTP sender configuration.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: The curated environment starts without SMTP defaults or RabbitMQ dispatch; branding.support_email stores public site identity independently of persisted SMTP settings.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: Existing BrandingSettingsDto gains nullable supportEmail; canonical OpenAPI and generated clients are regenerated without adding an endpoint.
+  Operator:
+    Reference: docs/public/documentation/readme/self-hosting/docker-standalone.md
+    Disposition: documented
+    Detail: Hosting and backup guides explain optional delivery, private Local credential replacement, external-provider ownership and database or Redis key persistence.

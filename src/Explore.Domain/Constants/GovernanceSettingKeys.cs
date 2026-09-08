@@ -122,6 +122,7 @@ public static class GovernanceSettingKeys
     public static class Branding
     {
         public const string DisplayName = "branding.display_name";
+        public const string SupportEmail = "branding.support_email";
         public const string LogoUrl = "branding.logo_url";
         public const string FaviconUrl = "branding.favicon_url";
         public const string CustomCssUrl = "branding.custom_css_url";

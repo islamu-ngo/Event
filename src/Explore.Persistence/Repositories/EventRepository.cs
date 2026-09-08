@@ -1,6 +1,7 @@
 // ABOUTME: EF Core repository for Event aggregate queries, schedule graph updates, and listing specifications.
 // ABOUTME: Query methods return domain entities; mapping and schedule invariant decisions stay in application/domain layers.
 
+using System.Globalization;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Specifications.Events;
 using Explore.Domain;
@@ -8,6 +9,7 @@ using Explore.Domain.Enums;
 using Explore.Persistence.Database;
 using Explore.Persistence.Extensions;
 using Explore.Persistence.QueryFilters;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
@@ -15,10 +17,12 @@ namespace Explore.Persistence.Repositories;
 public class EventRepository : GenericRepository<Event, Guid>, IEventRepository
 {
     private readonly ExploreDbContext _dbContext;
+    private readonly TimeProvider _timeProvider;
 
-    public EventRepository(ExploreDbContext dbContext) : base(dbContext)
+    public EventRepository(ExploreDbContext dbContext, TimeProvider? timeProvider = null) : base(dbContext)
     {
         _dbContext = dbContext;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public new async Task<Event?> GetById(Guid id)
@@ -409,7 +413,7 @@ public class EventRepository : GenericRepository<Event, Guid>, IEventRepository
             .IncludeStandardDetails()
             .AsQueryable();
 
-        var now = DateTimeOffset.UtcNow;
+        var now = _timeProvider.GetUtcNow();
         query = ApplySubqueryFilters(query, specification, now);
         query = ApplyProjectionFilters(query, specification);
 
@@ -592,8 +596,8 @@ public class EventRepository : GenericRepository<Event, Guid>, IEventRepository
                 EventSubqueryFilterType.FutureOnly => query.Where(e =>
                     e.LastSessionStartUtc == null || e.LastSessionStartUtc > (DateTimeOffset)subFilter.Value),
 
-                EventSubqueryFilterType.CurrentOrUpcomingPublishedSession => query.Where(e =>
-                    e.LastSessionEndUtc != null && e.LastSessionEndUtc > now),
+                EventSubqueryFilterType.CurrentOrUpcomingPublishedSession =>
+                    ApplyTemporalFilter(query, TemporalView.UpcomingAndOngoing, now),
 
                 EventSubqueryFilterType.TemporalView => ApplyTemporalFilter(query, subFilter),
 
@@ -795,9 +799,41 @@ public class EventRepository : GenericRepository<Event, Guid>, IEventRepository
             (!to.HasValue || p.DateTimeValue <= to.Value)));
     }
 
-    private static IQueryable<Event> ApplyTemporalFilter(IQueryable<Event> query, EventSubqueryFilter filter)
+    private IQueryable<Event> ApplyTemporalFilter(IQueryable<Event> query, EventSubqueryFilter filter)
     {
         var (view, now) = ((TemporalView, DateTimeOffset))filter.Value;
+        return ApplyTemporalFilter(query, view, now);
+    }
+
+    private const string InstantCollation = "event_directory_instant";
+
+    private IQueryable<Event> ApplyTemporalFilter(IQueryable<Event> query, TemporalView view, DateTimeOffset now)
+    {
+        if (_dbContext.Database.IsSqlite())
+        {
+            // SQLite stores DateTimeOffset as text but cannot translate its relational operators.
+            // Compare instants inside SQLite, retaining offsets and all seven fractional digits;
+            // datetime/julianday would truncate or round exact schedule boundaries.
+            // The expression casts become SQL CAST(... AS TEXT), not CLR conversions.
+            ((SqliteConnection)_dbContext.Database.GetDbConnection()).CreateCollation(InstantCollation,
+                static (left, right) => DateTimeOffset.Parse(left, CultureInfo.InvariantCulture)
+                    .CompareTo(DateTimeOffset.Parse(right, CultureInfo.InvariantCulture)));
+            var instant = now.ToString("O", CultureInfo.InvariantCulture);
+            return view switch
+            {
+                TemporalView.Upcoming => query.Where(e => e.FirstSessionStartUtc != null &&
+                    EF.Functions.Collate((string)(object)e.FirstSessionStartUtc, InstantCollation).CompareTo(instant) > 0),
+                TemporalView.Ongoing => query.Where(e => e.FirstSessionStartUtc != null &&
+                    EF.Functions.Collate((string)(object)e.FirstSessionStartUtc, InstantCollation).CompareTo(instant) <= 0 &&
+                    e.LastSessionEndUtc != null &&
+                    EF.Functions.Collate((string)(object)e.LastSessionEndUtc, InstantCollation).CompareTo(instant) > 0),
+                TemporalView.Past => query.Where(e => e.LastSessionEndUtc != null &&
+                    EF.Functions.Collate((string)(object)e.LastSessionEndUtc, InstantCollation).CompareTo(instant) <= 0),
+                TemporalView.UpcomingAndOngoing => query.Where(e => e.LastSessionEndUtc != null &&
+                    EF.Functions.Collate((string)(object)e.LastSessionEndUtc, InstantCollation).CompareTo(instant) > 0),
+                _ => query
+            };
+        }
 
         return view switch
         {

@@ -126,7 +126,8 @@ public static class DotenvComposer
                         output.Add(Placeholder(definition.Key, isProtected));
                     continue;
                 }
-                if (!ValidConfiguredBootstrapValue(definition, suppliedEntry.Value!))
+                if (!ValidConfiguredBootstrapValue(definition, suppliedEntry.Value!)
+                    || !ValidOptionalMailValue(definition.Key, suppliedEntry.Value!))
                 {
                     Add(diagnostics, "dotenv-input-value-invalid", definition.Key);
                     if (definition.Requirement == EnvironmentVariableRequirement.Required)
@@ -190,6 +191,14 @@ public static class DotenvComposer
         "profile-name" when definition.Key is "INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME"
             or "INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME" =>
             value.Length is >= 1 and <= 128 && !value.Any(char.IsControl),
+        _ => true,
+    };
+
+    private static bool ValidOptionalMailValue(string key, string value) => key switch
+    {
+        "MAILPIT_UI_PORT" => int.TryParse(value, System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture, out int port) && port is >= 1 and <= 65535,
+        "EMAIL_DISPATCH_RABBITMQ_ENABLED" => value is "true" or "false",
         _ => true,
     };
 

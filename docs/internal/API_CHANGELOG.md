@@ -5,6 +5,20 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 ## 2026-09-08
 
+- **SQLite directory temporal queries.** The existing event directory keeps
+  filtering, counts and pagination in SQLite instead of failing on unsupported
+  `DateTimeOffset` comparisons. A connection-local instant collation preserves
+  offset equivalence and 100ns boundaries for the default current/upcoming
+  filter and explicit temporal views. Visibility and tenant predicates remain
+  enforced; no endpoint, schema or migration changes.
+- **Additive public support-contact readback.** Existing `BrandingSettingsDto`
+  adds nullable `supportEmail`, sourced from instance-scoped
+  `branding.support_email`. `GET /api/instance/settings/branding`
+  (`GetInstanceBrandingSettings`) retains its route and administrator/setup
+  authority boundary; no endpoint is added. The existing onboarding support
+  contact input now persists public site identity without modifying SMTP
+  `email.from_address` or `email.delivery_enabled`. This is a DTO field addition,
+  not a new sender configuration, environment key or database migration.
 - **Event-bound anonymous data access.** Participant/ticket projections and
   registration exports omit anonymous names and answers after their original
   retention deadline, including before cleanup. Missing historical bounds do

@@ -84,7 +84,7 @@ AppHost exposes the optional Standalone HTTP endpoint through
 
 In the Combined topology, browser `/api/*` requests stay in one process. The BFF classifies its cookie session only to enforce antiforgery, obtains the server-held access token, strips untrusted privileged headers, and dispatches through the in-process API transport. API `MultiAuth` revalidates the bearer token and remains the sole controller principal; no loopback or YARP self-proxy is used. Requests without a valid BFF session keep the existing external bearer/API-key API flow.
 
-To roll back a topology change, relaunch AppHost with `Hosting:Topology=Split` (or omit it); this does not roll back data or migrations. Standalone deliberately does not select SQLite or add a standalone `docker-compose.yml` deployment. Canonical controller paths remain `/api/...`; version negotiation uses media type, `?api-version=`, or `X-Api-Version`, never `/api/v1/...`.
+To roll back an AppHost topology change, relaunch with `Hosting:Topology=Split` (or omit it); this does not roll back data or migrations. The AppHost topology selector does not itself change the database provider. The separately packaged Standalone image defaults to SQLite; `docker-compose.yml` remains the Split descriptor. Canonical controller paths remain `/api/...`; version negotiation uses media type, `?api-version=`, or `X-Api-Version`, never `/api/v1/...`.
 
 Split/Standalone is a process-composition choice only: it changes where BFF and API execute, not API contracts, authorization policy, token semantics, or versioning. The API keeps canonical `/api/*` versioning through non-URL headers and query values (`Accept: application/json;v=...`, `api-version`, `X-Api-Version`), and Standalone never adds route-based version segments.
 
@@ -94,6 +94,52 @@ Split/Standalone is a process-composition choice only: it changes where BFF and 
 | `/api/v1/...`, `/api/v0.1/...`, or any topology-specific versioned route | Unsupported | URL version segments are never added; routes and HAL links remain canonical. |
 
 Container packaging is explicit. The repository `docker-compose.yml` describes the Split deployment; Standalone is the single `Event.Standalone` image run directly with an env file and defaults to SQLite. AppHost remains the local topology selector. Selecting Standalone through AppHost does not automatically change the database provider; database selection always remains an explicit structured provider contract.
+
+### Zero-Email Hosting And Public Support Identity
+
+Both host compositions use the same persisted `email.delivery_enabled` authority,
+default `false`, and guarded SMTP settings writer. Disabled delivery does not
+resolve SMTP credentials or probe a transport. Enabled SMTP unavailability is an
+optional Degraded capability, not a blanket HTTP 503; required database, security
+and privacy-authority failures retain their fail-closed behavior. Local initial
+provisioning uses setup-secret authority and later credential administration uses
+current instance authority, with private mandatory credential replacement.
+External-provider verification remains provider-owned.
+
+Public onboarding support contact is persisted separately as instance-scoped
+`branding.support_email`. `InstanceOnboardingProfileSettingHelpers` writes that
+existing system-setting store rather than `email.from_address`;
+`BrandingSettingGroup` and `InstanceGovernanceSettingService` project nullable
+`BrandingSettingsDto.SupportEmail` through existing branding readback. There is
+no new endpoint, schema or transport policy, and setting support contact neither
+chooses a sender nor enables delivery.
+
+Compose makes Mailpit an optional `mail` profile with a digest-pinned image,
+private container SMTP, loopback inbox and a fixed 500-message capture limit.
+It is not an API dependency and does not deliver externally. Base Compose has
+no RabbitMQ broker and defaults that optional dispatch projection off. This
+does not remove its existing Keycloak dependencies when Local is selected.
+Standalone is the infrastructure-minimal path; optional third-party images
+remain separately operator-pulled, not bundled into it.
+
+### Persistent Key Ownership
+
+API composition registers Data Protection with application name `islamu-event`
+and `PersistKeysToDbContext<DataProtectionKeyContext>()` in the primary database.
+Combined Standalone keeps that store when Redis is absent. If cache is configured,
+the later BFF registration selects Redis for the combined process. Shipped Split
+uses the database for API keys and Redis
+`islamu-event:data-protection-keys` for its separate UI, backed by `redis_data`.
+The API's database registration does not propagate across processes.
+
+Neither topology creates the previously described filesystem keyring volume.
+Coordinate backups of actual database/Redis keys, Identity, media and selected
+secret authority, while preserving newer erasure facts independently of primary
+rollback. Persistence registration is not evidence of crash safety, successful
+restore or preservation of every session. See
+[SELF_HOSTING.md](SELF_HOSTING.md#persistent-keys-and-backup-boundaries) and
+[OPERATIONS.md](OPERATIONS.md#health-and-metrics-endpoints) for precise storage and
+readiness limitations.
 
 ## Layer Boundaries & Compile-Time Enforcement
 

@@ -7,7 +7,7 @@
 >
 > **Not for**: Short-term TODOs, tentative ideas, or anything you would not want to read again in six months.
 
-Last Updated: 2026-08-24
+Last Updated: 2026-09-08
 
 ---
 
@@ -22,6 +22,7 @@ Findings are organized by domain under `dev/_journal/domains/` to minimize agent
 | **Presentation** | [`domains/presentation-and-blazor.md`](domains/presentation-and-blazor.md) | MudBlazor v9, CSS isolation, HAL affordance gating, Dock Layout. |
 | **Application** | [`domains/application-and-messaging.md`](domains/application-and-messaging.md) | MediatR/CQRS handlers, Outbox dispatch, RabbitMQ/MQContract, EAV. |
 | **Testing** | [`domains/testing-and-environment.md`](domains/testing-and-environment.md) | TUnit runner, WebApplicationFactory, Podman/Docker, SDK workloads. |
+| **Email-Optional Self-Hosting** | [`domains/email-optional-self-hosting.md`](domains/email-optional-self-hosting.md) | Global Local credentials, delivery fences, anonymous recovery/cancellation, and purpose retention. |
 | **Index & Recent** | [`journal.md`](journal.md) | Central index and recent cross-cutting stream (last 30 days). |
 
 ---

@@ -2207,3 +2207,20 @@ authority reads where the operation requires fresh facts.
 - [x] Stays in journal only (authority-consistency lesson)
 
 ---
+
+[2026-09-08 Europe/Brussels] - Email-optional knowledge graduation
+
+The [email-optional domain ledger](domains/email-optional-self-hosting.md) records
+historical SMTP invalidation, checkout/status expiry, consumed-hold cancellation,
+global credential/session, stable-order replay, retention-copy, and native-fixture
+pitfalls with current source anchors. [ADR-029](../../docs/internal/adr/ADR-029-email-optional-self-hosting.md)
+records the implemented authority decisions and public support-contact separation.
+The [tenant-delegation proposal](../backlog/tenant-delegated-local-account-provisioning.md)
+and [field-evaluation backlog](../backlog/anonymous-registration-field-evaluation.md)
+remain outside this revision: delegation is not implemented and study outcomes
+are unmeasured. Setup 22/22, catalogue 20/20, dotenv 19/19, native Compose parsing,
+and the successful API schema build do not close pending native zero-email host,
+restart/restore, or final workstream acceptance. This entry indexes the domain
+findings; it does not supersede earlier evidence or quarantine dispositions.
+
+---

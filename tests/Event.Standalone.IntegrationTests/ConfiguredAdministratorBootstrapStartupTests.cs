@@ -38,6 +38,19 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
         timeline.Record("migration-dependency");
         timeline.Record("manifest-dependency");
 
+        using var environment = new EnvironmentVariableScope(new Dictionary<string, string?>
+        {
+            ["SecretProvider__Provider"] = "Environment",
+            ["Keycloak__Authority"] = "https://authority.example.test",
+            ["Database__Provider"] = "PostgreSql",
+            ["Database__Host"] = "postgres.example.test",
+            ["Database__Database"] = "event_test",
+            ["Database__Runtime__Database"] = "event_test",
+            ["Database__Migrator__Database"] = "event_test",
+            ["Database__Runtime__Username"] = "event_test",
+            ["Database__Runtime__Password"] =
+                Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))
+        });
         await using WebApplication app = BuildSplitHost(timeline);
         using var shutdown = new CancellationTokenSource();
         var state = new ApiHostCompositionState(
@@ -169,7 +182,14 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
         });
         builder.WebHost.UseTestServer();
         builder.Configuration.AddInMemoryCollection(BaseValues(ConfiguredValues()));
-        builder.Services.AddLogging();
+        builder.AddApiHostServices(static () => false);
+        builder.Services.RemoveAll<IHostedService>();
+        builder.Services.RemoveAll<IInstanceOperatorIdentity>();
+        builder.Services.RemoveAll<IInstanceBootstrapStateRepository>();
+        builder.Services.RemoveAll<IUnitOfWork>();
+        builder.Services.RemoveAll<IConfigurationManifestStartupRunner>();
+        builder.Services.RemoveAll<ISetupSecretProvider>();
+        builder.Services.RemoveAll<IPrivacyErasureReplayService>();
         builder.Services.AddSingleton<IInstanceOperatorIdentity, OperatorIdentityProbe>();
         builder.Services.AddSingleton(timeline);
         builder.Services.AddSingleton<BootstrapRepositoryProbe>();

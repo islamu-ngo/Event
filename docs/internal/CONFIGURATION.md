@@ -143,6 +143,10 @@ The canonical reference catalogue of all deployment, identity, database, and int
 
 Runtime secret binding remains authoritative in `Explore.Domain/Secrets/SecretDefinitionRegistry.cs`. Deployment topology and port mappings are governed by `docker-compose.yml`. For operational runbooks and secret provider configuration (Environment vs. Infisical), consult [SECRETS.md](SECRETS.md).
 
+`.env.example` is a curated zero-email baseline, not an exhaustive catalogue or
+a replacement for persisted governance. Optional integrations and advanced
+deployment inputs remain in the separate public reference.
+
 ## Runtime Configuration Sources
 
 The system separates ordinary configuration from secret authority:
@@ -296,9 +300,10 @@ Leave required secrets blank in the checked-in example; the Compose migration va
 
 AppHost assigns standalone HTTP dynamically through `WithHttpEndpoint(name: "http")`; HTTPS remains explicitly `https://localhost:7180` for the combined endpoint. Direct `Event.Standalone` launch profiles reserve `http://localhost:5180`.
 
-This configuration does not make SQLite the standalone default and does not
-enable a standalone Docker Compose deployment. Those remain explicit provider
-and packaging work; `docker-compose.yml` continues to use the Split services.
+Selecting the AppHost topology does not itself select a database provider.
+The separately packaged Standalone image already defaults to SQLite and runs
+its migrations in-process; `docker-compose.yml` describes the Split services,
+not a second Standalone packaging path.
 
 The three application composition roots (`Explore.API`, `Explore.Blazor`, and `Event.Standalone`) therefore share one API route convention: `/api/...` is canonical and API versioning uses `Accept`, `?api-version=`, or `X-Api-Version`; do not add a path-version segment (see [the support matrix](ARCHITECTURE.md#hosting-topology)). Switching back to the Split default changes only AppHost composition; it is not a data rollback.
 
@@ -507,6 +512,18 @@ and a 30-second SQLite timeout, needs one durable local named volume, and permit
 exactly one web replica (`Hosting__ReplicaCount=1`). Mount that volume at
 `/app/data`; the embedded authority defaults to
 `/app/data/privacy_erasure_authority.db` beside the primary database.
+
+`AddApiHostServices` persists Data Protection keys through
+`DataProtectionKeyContext` in the primary database. Combined Standalone retains
+that registration without `ConnectionStrings:cache`; configuring Redis selects
+the BFF's Redis keyring later in the same process. The separate Split UI uses
+Redis in shipped Compose (`redis_data`, key
+`islamu-event:data-protection-keys`) and does not inherit the API database ring.
+There is no shipped filesystem keyring directory or `data_protection_keys`
+volume. Preserve the actual key stores and secret authority in consistent
+backups, keeping newer erasure facts outside primary rollback. Key persistence
+is not itself crash/restore evidence; see
+[the hosting persistence contract](SELF_HOSTING.md#persistent-keys-and-backup-boundaries).
 
 For a server provider, put the shared endpoint fields plus separate migrator
 and runtime credentials in a protected `.env` file or secret store. The one
@@ -734,6 +751,23 @@ The value must be an absolute `http` or `https` URL. Public deployments should u
 
 Payment Checkout requires HTTPS with no user info, query, or fragment. A normalized application subpath is supported, for example `https://events.example.org/events`; runtime normalization adds one trailing slash and preserves `/events` in Stripe callbacks and BFF navigation. Missing or invalid configuration defers new Checkout dispatch with `checkout_return_origin_invalid`; it does not block free-order finalization or payment reconciliation.
 
+### Public Site Support Contact
+
+The existing onboarding `SelfHostOnboardingProfileDto.SupportEmail` is public
+site identity, not a credential, transport secret or sender setting.
+`InstanceOnboardingProfileSettingHelpers` normalizes and persists it as
+`branding.support_email`, an instance-only string setting with a null default.
+Blank input becomes null; the helper does not derive or overwrite
+`email.from_address` and does not enable delivery.
+
+`BrandingSettingGroup` reads the value through existing hierarchical settings;
+`InstanceGovernanceSettingService` returns it as nullable
+`BrandingSettingsDto.SupportEmail` (`supportEmail`) on existing branding readback.
+This adds no environment variable, endpoint, parallel profile store, database
+schema or migration. Legal operator contact remains the separate startup-bound
+identity contract. SMTP sender and delivery intent remain the guarded `email.*`
+settings below; support contact does not configure either.
+
 ### Explicit Outbound Email Capability
 
 `email.delivery_enabled` is an instance-to-tenant governance boolean, default `false`.
@@ -741,6 +775,25 @@ SMTP coordinates or credentials alone never enable delivery. The computed capabi
 reports `Disabled`, `Unconfigured`, `Misconfigured`, `Available`, or `Degraded` without
 hostnames, sender addresses, binding identifiers, or secrets. `Available` means local
 configuration and credential resolution succeeded; it does not prove server acceptance.
+
+Standalone and Split can retain this disabled intent without SMTP or Mailpit;
+Local setup-secret provisioning and instance-admin credential handover do not
+require a transport. External providers still own their verification policy.
+Disabled SMTP is Healthy without credential resolution or a network probe;
+enabled but unavailable transport is Degraded. Required database/security/authority
+failures still block startup or report Unhealthy. The persisted setting and
+guarded SMTP writer remain authoritative: environment values and manifest
+bootstrap are not a delivery-enable or disable-confirmation bypass.
+
+Shipped Compose leaves SMTP projections empty and defaults
+`EMAIL_DISPATCH_RABBITMQ_ENABLED=false` because base topology has no broker.
+Mailpit is available only through the optional `mail` profile, without an API
+dependency or host SMTP port. Its inbox is bound to loopback; the immutable
+image and 500-message capture limit are fixed by Compose. Only
+`MAILPIT_UI_PORT` customizes the inbox port (default 8025); capture does not
+enable Event delivery or relay to external inboxes. See
+[the Compose projection](SELF_HOSTING.md#setup-and-compose-projection) for source
+anchors and the separate optional-image licensing boundary.
 
 `EmailDeliveryPolicy` owns pure state and credential-scope rules. The Infrastructure
 `EmailDeliveryCapabilityResolver` uses the existing hierarchical settings resolver and

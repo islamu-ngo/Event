@@ -63,6 +63,33 @@ public sealed class InstanceOperatorIdentityOptionsTests
         await Assert.That(identity.JurisdictionCountryCode).IsEqualTo("BE");
     }
 
+    [Test]
+    public async Task CuratedEnvironmentTemplateBindsAValidUnofficialOperatorIdentity()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, ".env.example")))
+            directory = directory.Parent;
+        string templatePath = Path.Combine(
+            directory?.FullName ?? throw new InvalidOperationException("environment-template-not-found"),
+            ".env.example");
+        Dictionary<string, string?> values = File.ReadLines(templatePath)
+            .Where(line => line.StartsWith("INSTANCE__OPERATORIDENTITY__", StringComparison.Ordinal))
+            .Select(line => line.Split('=', 2))
+            .ToDictionary(parts => parts[0].Replace("__", ":", StringComparison.Ordinal),
+                parts => (string?)parts[1], StringComparer.OrdinalIgnoreCase);
+        IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+        InstanceOperatorIdentityOptions options = configuration
+            .GetSection(InstanceOperatorIdentityOptions.SectionName).Get<InstanceOperatorIdentityOptions>()!;
+
+        ValidateOptionsResult result = new InstanceOperatorIdentityOptionsValidator().Validate(null, options);
+
+        await Assert.That(result.Succeeded).IsTrue()
+            .Because(string.Join(';', result.Failures ?? []));
+        InstanceOperatorIdentity identity = InstanceOperatorIdentity.Create(options);
+        await Assert.That(identity.IsOfficialInstance).IsFalse();
+        await Assert.That(identity.OfficialOrigin).IsEqualTo(options.OfficialOrigin);
+    }
+
     private static InstanceOperatorIdentityOptions Complete() => new()
     {
         OperatorId = Guid.Parse("0198e2a4-5340-7f89-8abc-b8bdf43e0ea8"),

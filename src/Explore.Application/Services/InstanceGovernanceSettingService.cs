@@ -95,6 +95,7 @@ public class InstanceGovernanceSettingService : IInstanceGovernanceSettingServic
             Branding = new BrandingSettingsDto
             {
                 DefaultBrandDisplayName = branding.DisplayName,
+                SupportEmail = branding.SupportEmail,
                 DefaultBrandLogoUrl = branding.LogoUrl ?? string.Empty,
                 DefaultBrandFaviconUrl = branding.FaviconUrl ?? string.Empty,
                 DefaultBrandCustomCssUrl = branding.CustomCssUrl ?? string.Empty,

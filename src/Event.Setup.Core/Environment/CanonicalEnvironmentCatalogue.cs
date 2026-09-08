@@ -12,7 +12,6 @@ public static partial class CanonicalEnvironmentCatalogue
         API_HTTP_PORT
         UI_HTTP_PORT
         KEYCLOAK_HTTP_PORT
-        MAILPIT_SMTP_PORT
         MAILPIT_UI_PORT
         MINIO_API_PORT
         MINIO_CONSOLE_PORT
@@ -24,8 +23,6 @@ public static partial class CanonicalEnvironmentCatalogue
         COOP_CLIENT_HTTP_PORT
         OSPREY_BIDI_STREAM_PORT
         OSPREY_SYNC_ACTION_PORT
-        MAILPIT_TAG
-        MAILPIT_MAX_MESSAGES
         FORMBRICKS_HTTP_PORT
         FORMBRICKS_WEBAPP_URL
         FORMBRICKS_DATABASE_NAME
@@ -579,9 +576,6 @@ public static partial class CanonicalEnvironmentCatalogue
         CONFIGURATION_MANIFEST_MODE
         CONFIGURATION_MANIFEST_PATH
         CONFIGURATION_MANIFEST_HOST_DIRECTORY
-        MAILPIT_TAG
-        MAILPIT_MAX_MESSAGES
-        MAILPIT_SMTP_PORT
         MAILPIT_UI_PORT
         KEYCLOAK_DB_USERNAME
         KEYCLOAK_DB_PASSWORD

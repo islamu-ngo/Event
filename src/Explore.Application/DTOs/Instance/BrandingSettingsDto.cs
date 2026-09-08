@@ -6,6 +6,7 @@ namespace Explore.Application.DTOs.Instance;
 public sealed record BrandingSettingsDto
 {
     public string DefaultBrandDisplayName { get; set; } = string.Empty;
+    public string? SupportEmail { get; set; }
     public string DefaultBrandLogoUrl { get; set; } = string.Empty;
     public string DefaultBrandFaviconUrl { get; set; } = string.Empty;
     public string DefaultBrandCustomCssUrl { get; set; } = string.Empty;

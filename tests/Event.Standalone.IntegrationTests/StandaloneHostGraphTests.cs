@@ -1,6 +1,7 @@
 // ABOUTME: Verifies the standalone host exposes one explicitly owned API, BFF, UI, and health graph.
 // ABOUTME: Exercises referenced static assets and guards against duplicate controllers or YARP self-routing.
 
+using System.CodeDom.Compiler;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -238,6 +239,13 @@ public sealed class StandaloneHostGraphTests
         using var publicClient = factory.CreateClient();
         await using var scope = factory.Services.CreateAsyncScope();
 
+        var expectedInterfaces = typeof(IEventTypeClient).Assembly.GetTypes()
+            .Where(type => type.IsInterface
+                && type.Namespace == typeof(IEventTypeClient).Namespace
+                && type.GetCustomAttributes(typeof(GeneratedCodeAttribute), inherit: false)
+                    .OfType<GeneratedCodeAttribute>()
+                    .Any(attribute => attribute.Tool == "NSwag"))
+            .ToArray();
         var registrations = GeneratedEventApiClients.ClientTypes;
         var resolvedClients = registrations
             .Select(pair => scope.ServiceProvider.GetRequiredService(pair.InterfaceType))
@@ -248,8 +256,9 @@ public sealed class StandaloneHostGraphTests
             .GetRequiredService<IHttpClientFactory>()
             .CreateClient(nameof(IEventTypeClient));
 
-        await Assert.That(registrations).Count().IsEqualTo(161);
-        await Assert.That(resolvedClients).Count().IsEqualTo(161);
+        await Assert.That(expectedInterfaces).IsNotEmpty();
+        await Assert.That(registrations.Select(pair => pair.InterfaceType)).IsEquivalentTo(expectedInterfaces);
+        await Assert.That(resolvedClients).Count().IsEqualTo(expectedInterfaces.Length);
         await Assert.That(resolvedClients.Zip(registrations)
             .All(pair => pair.Second.ImplementationType.IsInstanceOfType(pair.First))).IsTrue();
         await Assert.That(configuredHttpClient.BaseAddress).IsEqualTo(InProcessEventApiDispatcher.InternalBaseAddress);

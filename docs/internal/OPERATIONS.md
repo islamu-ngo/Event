@@ -1042,21 +1042,37 @@ pending model changes. Run the selected provider's `Event.MigrationService`
 twice against the recreated database; the second successful run proves
 idempotency.
 
-Data Protection key persistence is launch-critical for the Blazor BFF. `Explore.Blazor`
-stores authentication cookies, setup-secret cookies, antiforgery state, and other
-protected payloads with ASP.NET Core Data Protection. The BFF configures a stable
-application name and persists the key ring through `DataProtectionKeyContext`, while
-`Event.MigrationService` migrates that dedicated context before the app depends on it.
-If the database and `DataProtectionKeys` rows are preserved, a fresh BFF host can read
-cookie tickets protected by the previous host. If those rows are lost, existing BFF
-auth/setup/antiforgery cookies are intentionally invalid and users must authenticate or
-repeat setup actions again. Treat unexpected mass cookie invalidation after restart as a
-database/key-ring persistence incident before debugging Keycloak or browser storage.
-The Blazor readiness check named `data-protection-keys` queries the same
-`DataProtectionKeyContext` key table. If the table or backing database is
-unreachable, Blazor `/health` returns unhealthy and logs only the bounded
-failure type; health payloads never expose key XML, connection strings, or
-database endpoints.
+ASP.NET Core Data Protection protects BFF authentication/setup cookies,
+antiforgery state and other payloads, but its persistence depends on the host.
+`AddApiHostServices` uses `DataProtectionKeyContext` in the primary database;
+the migration owner applies that context's schema. Combined Standalone retains
+this registration when no Redis cache connection is configured. Its keys live
+in the primary SQLite database, not `/app/data/dataprotection-keys/`.
+
+`AddBffDataProtection` uses application name `islamu-event`. With
+`ConnectionStrings:cache`, it selects Redis key
+`islamu-event:data-protection-keys`; shipped Split Compose supplies this connection
+to the separate UI and persists Redis in `redis_data`. Without Redis the extension
+leaves the existing key-store registration intact. A separate UI host does not
+automatically inherit the API's database registration.
+
+`DataProtectionKeyStoreHealthCheck` reports `store=redis` when a multiplexer is
+available, probes Redis and reports `keyRingPresent`. A reachable Redis with no
+keyring still returns Healthy; this check does not prove recovery of prior keys.
+Without Redis it reports `store=local` and performs a protect/unprotect roundtrip
+through the active provider. That label does not establish filesystem storage or
+restart durability, and the check does not query `DataProtectionKeyContext`.
+Probe exceptions are Unhealthy with bounded failure type, not key material.
+
+Preserve the actual database/Redis key stores, selected signing-secret authority,
+Identity state and media in coordinated backups. Keep retained erasure authority
+outside primary rollback. Lost keys can invalidate protected payloads, while
+preserved keys alone do not guarantee session validity, crash recovery or a
+successful restore. Diagnose unexpected post-restart cookie invalidation against
+the selected store and current identity authority before browser storage. See
+[SELF_HOSTING.md](SELF_HOSTING.md#persistent-keys-and-backup-boundaries) for the
+composition contract and the [public backup runbook](../public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md)
+for operator procedures.
 
 Event/session lifecycle migration notes:
 
@@ -1098,7 +1114,7 @@ Readiness interpretation:
 |---|---|---|---|---|
 | `shutdown` | API, Blazor, Control Plane BFF | Process is accepting traffic | Not used | Graceful shutdown is active; remove from load balancer |
 | `database` | API, Blazor | EF Core can reach the configured primary provider | Not used | Database unavailable or migration/runtime connectivity failed |
-| `data-protection-keys` | Blazor | Persisted ASP.NET Core Data Protection key table is reachable | Not used | BFF key-ring table or backing database is unavailable; existing cookies may fail after restart |
+| `data-protection-keys` | Blazor, Standalone | Redis probe succeeds (inspect `keyRingPresent` separately), or the active non-Redis provider completes protect/unprotect | Not used | Active key-store probe or protect/unprotect fails; this check does not prove prior-key recovery |
 | `distributed-cache` | API, Blazor, Control Plane BFF | Effective cache round-trip works | Configured Redis fell back to in-memory cache | Effective cache round-trip failed |
 | `oidc-discovery` | API, Blazor, Control Plane BFF | OIDC metadata valid, or OIDC is not configured | Not used | Configured OIDC metadata endpoint is unreachable or invalid |
 | `atproto-authentication` | Blazor | AT Protocol login is disabled, or its canonical public URL/callback, key ring, and state/session stores are ready | Not used | Login is enabled but a bounded prerequisite is unavailable |
@@ -1131,7 +1147,7 @@ Operational rules:
 - Point load balancer readiness checks at `/health` and liveness checks at `/alive`.
 - Treat `Degraded` as deployable only when the affected dependency is optional for the deployment mode and the response body clearly identifies the dependency.
 - Treat `Unhealthy` as non-deployable for rolling updates; fix the dependency or intentionally switch the related feature/provider off.
-- Treat `data-protection-keys` unhealthy as a BFF session-continuity blocker. Preserve or restore the `data_protection_keys` table before investigating Keycloak, browser storage, or cookie middleware.
+- Treat `data-protection-keys` unhealthy as an active key-store incident. Check the actual host registration: shipped Split UI uses Redis, while default Combined Standalone uses its primary database. Do not restore an invented filesystem keyring or assume Healthy proves the previous keys survived. Preserve independent erasure authority and current credential revocations during recovery.
 - SMTP is optional for core readiness. `SmtpHealthCheck` resolves instance delivery capability with a `null` tenant scope before probing. Disabled delivery is `Healthy` without SMTP network I/O; enabled but unavailable capability is `Degraded`. Configured SMTP connection/authentication failures and network timeouts are also `Degraded`, so `/health` remains HTTP 200 when core checks are healthy. `SmtpEmailService.TestConnectionAsync` explicitly resolves instance transport; it does not probe the ambient tenant's SMTP server.
 - `IEmailConnectionTester` returns ordinary network/authentication outcomes as `EmailResult`. Exceptions escaping capability or diagnostic resolution remain `Unhealthy`, including required authority/database failures; health-check composition failures retain the same fail-closed fallback. The SMTP registration keeps its five-second timeout. Health output uses bounded codes and safe metadata, never transport `Message`, `ErrorMessage`, or exception details. Database, authorization, privacy-authority, and signing-key readiness failures are not weakened by optional email.
 - Instance Cerbos readiness follows authorization fail-closed semantics: if the operator selected `authorization.provider=cerbos`, an unreachable PDP makes `/health` unhealthy rather than silently falling back to local RBAC.

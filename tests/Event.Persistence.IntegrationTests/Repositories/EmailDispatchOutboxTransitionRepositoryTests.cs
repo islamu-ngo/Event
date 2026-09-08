@@ -28,6 +28,7 @@ public sealed class EmailDispatchOutboxTransitionRepositoryTests(PostgreSqlConta
     {
         await fixture.ResetAsync();
         await using var context = fixture.CreateDbContext();
+        await EmailDispatchSqliteFixture.EnableInstanceEmailAsync(context);
         var tenant = await SeedTenantAsync(context, "eligibility-address");
         var dispatch = await SeedDispatchAsync(context, tenant.Id, EmailDispatchStatus.Pending);
         var user = await context.Users.Include(value => value.Pii).SingleAsync(value => value.Id == dispatch.RecipientUserId);
@@ -60,6 +61,7 @@ public sealed class EmailDispatchOutboxTransitionRepositoryTests(PostgreSqlConta
     {
         await fixture.ResetAsync();
         await using var context = fixture.CreateDbContext();
+        await EmailDispatchSqliteFixture.EnableInstanceEmailAsync(context);
         var firstTenant = await SeedTenantAsync(context, "smtp-global-first");
         var first = await SeedDispatchAsync(context, firstTenant.Id, EmailDispatchStatus.Pending);
         var firstLease = Guid.CreateVersion7();
@@ -104,6 +106,7 @@ public sealed class EmailDispatchOutboxTransitionRepositoryTests(PostgreSqlConta
     {
         await fixture.ResetAsync();
         await using var context = fixture.CreateDbContext();
+        await EmailDispatchSqliteFixture.EnableInstanceEmailAsync(context);
         var firstTenant = await SeedTenantAsync(context, "smtp-tenant-first");
         var first = await SeedDispatchAsync(context, firstTenant.Id, EmailDispatchStatus.Pending);
         var firstLease = Guid.CreateVersion7();
@@ -216,6 +219,7 @@ public sealed class EmailDispatchOutboxTransitionRepositoryTests(PostgreSqlConta
     {
         await fixture.ResetAsync();
         await using var context = fixture.CreateDbContext();
+        await EmailDispatchSqliteFixture.EnableInstanceEmailAsync(context);
         var tenant = await SeedTenantAsync(context, "eligibility-trust-safety-policy");
         var reportReceipt = await SeedReportReceiptDispatchAsync(context, tenant);
         var requiredModeration = await SeedDispatchAsync(context, tenant.Id, EmailDispatchStatus.Pending);
@@ -1218,6 +1222,7 @@ public sealed class EmailDispatchOutboxTransitionRepositoryTests(PostgreSqlConta
     {
         await fixture.ResetAsync();
         await using var context = fixture.CreateDbContext();
+        await EmailDispatchSqliteFixture.EnableInstanceEmailAsync(context);
         var graph = await SeedAcceptedSettlementGraphAsync(context, "retryable-settlement", DateTime.UtcNow);
         var repository = new EmailDispatchOutboxRepository(context);
         var firstLease = graph.Dispatch.ProcessingLeaseToken!.Value;

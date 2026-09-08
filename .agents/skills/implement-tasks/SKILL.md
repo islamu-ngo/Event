@@ -1,6 +1,6 @@
 ---
 name: implement-tasks
-description: "Load when executing, running, or resuming an approved task plan from `dev/active/<task>/` or `.worktrees/<task>`; orchestrates fresh worktree setup, in-flight worktree/develop resume, Red/Green/Refactor task loops, semantic phase commits, pre-PR rebase conflict protection, PR creation with pre-flight Release Impact, and parked worktree lifecycle."
+description: "Load when executing, running, or resuming an approved task plan from `dev/active/<task>/` or `.worktrees/<task>`; orchestrates fresh worktree setup, in-flight worktree/develop resume, Red/Green/Refactor task loops, failure triage/quarantine, semantic phase commits, pre-PR rebase conflict protection, PR creation with pre-flight Release Impact, and parked worktree lifecycle."
 type: workflow
 enforcement: suggest
 priority: high
@@ -47,31 +47,39 @@ priority: high
    - **Execution Economy (Inner Loop Zooming)**: Once oriented within the session, do NOT re-read the entire plan on every task turn. Zoom into the active phase heading in `*-plan.md` and manage granular state via `*-tasks.md`.
    - **Re-Orientation Triggers**: Re-read the full plan (or downstream phases) immediately if an unexpected blocker arises, domain model friction occurs, cross-phase contracts conflict, or the user redirects requirements.
    - **Inner Loop Baseline Sanity**: Run a fast Ring 1 sliced test (`--treenode-filter`) in the target execution context (`Cwd`) to verify the previous session's green baseline before modifying code.
-   - **Quarantine Rot**: If an unrelated pre-existing test failure is encountered, follow the Yak-Shaving Quarantine Rule (log in `context.md`, do not derail the task to fix unrelated issues).
+   - **Quarantine Rot & Differential Baseline Attribution**: If an unexpected failure occurs outside touched paths (e.g. in Persistence or Architecture tests), do NOT debug or absorb it into this task. Run a differential baseline check against clean `origin/develop` (`git -C <repo-root> test --project <project> --filter "<FailingTest>"`). If it reproduces on `develop`, it is Class C baseline rot: log the failure signature under `## Quarantined Baseline Failures` in `*-context.md` and quarantine it immediately. Never derail the task to fix pre-existing baseline rot.
    - **Continue the Phased Loop**: Pick up execution directly at the first unchecked task `[ ]` in the active phase.
-4. **Dev-Doc Working Memory & Native Tools**: Active plan files (`tasks.md`, `context.md`) live inside the resolved task folder (`.worktrees/<task>/dev/active/<task>/` or `dev/active/<task>/`). Read and edit them using native harness file tools by deterministic path. Do not use ad-hoc shell scripts (`cat`, `sed`, `awk`) for file manipulation (Critical Rule #9).
+4. **Dev-Doc Working Memory & Task Ledger Mutation Guardrails**:
+   - Active plan files (`tasks.md`, `context.md`) live inside the resolved task folder (`.worktrees/<task>/dev/active/<task>/` or `dev/active/<task>/`). Read and edit them using native harness file tools by deterministic path. Do not use ad-hoc shell scripts (`cat`, `sed`, `awk`) for file manipulation (Critical Rule #9).
+   - **Anti-Sprawl Task Ledger Guardrail**: Executing agents may check off tasks `[x]` and append atomic verification sub-bullets under an active task. Agents are strictly FORBIDDEN from creating new phase headings or inflating `tasks.md` with runtime finding tasks (which causes runaway 50+ item sprawls). New findings, bugs, or ideas belong in `context.md` notes or `dev/backlog/` graduation—never dynamically injected as feature scope without explicit user alignment via a Decision Brief.
 5. **Phase-by-Phase Execution Cadence & Progressive Verification**:
    - **Red**: Author failing invariant/specification tests first for core domain, concurrency, state machines, and security boundaries. Shift pure domain invariants to `Event.Domain.UnitTests`. Scaffold compilable stub types/interfaces so the project builds cleanly while the test fails at runtime.
    - **Green**: Implement production code to satisfy invariants.
    - **Ring 1 Sliced Verification (Inner Loop, < 2s)**: Run targeted test class via `--treenode-filter "/*/*/*<TestClass>/*"` in-memory (`Event.Domain.UnitTests` or `Event.Application.UnitTests`). Zero Docker containers, zero network I/O, zero database setup lag.
    - **Ring 2 Phase Verification (Phase Exit Gate, < 15s)**: Run Release build (`dotnet build -c Release -v q`) and at most ONE selected project test against ONE canonical provider within the execution context. Forbid multi-database provider matrices during intermediate phases.
+   - **Three-Tier Failure Triage**:
+     - *Class A (Direct Feature Regressions)*: Failing assertions in code touched by this feature. Must resolve in-phase.
+     - *Class B (Feature-Induced Integration Ripple)*: Unmodified callers/fixtures broken by changed contracts. If mechanical and minor (< 15m), align immediately. If structural/cross-domain, pause with a Decision Brief before absorbing.
+     - *Class C (Pre-Existing Baseline Rot)*: Environment quirks, unmigrated table assumptions, or failures reproducing on clean `origin/develop`. Strictly quarantine into `*-context.md`; never add to `tasks.md` or debug in the feature worktree.
    - **Semantic Phase Commit**: In the execution context, stage changes and commit using the planned semantic Conventional Commit contract (type, scope, title, description, trailers) from `tasks.md`. Planning defines semantic meaning; execution handles file discovery.
    - **Reconcile Ledger**: Batch task checkbox updates at phase gates in `tasks.md`.
-6. **Self-Contained Phase Reporting & Zero Plan-Opening Prompts**:
+6. **Self-Contained Phase Reporting, Decision Briefs & Mid-Flight Slicing**:
    When pausing for user feedback, milestone approvals, or architectural decisions between phases, executing agents must **never** send cryptic prompts referencing bare IDs. Always provide an inline **Decision Brief**:
    - Current progress milestone in plain English.
    - Descriptive names of components/services involved.
    - The concrete decision required, why it matters, and trade-offs.
    - Explicit numbered options with a recommended default.
    - Immediate next action upon reply.
+   - **Mid-Flight Workstream Slicing Trigger**: If an approved plan spans > 3 functional domains or integration repairs reveal that downstream phases will trigger wide structural refactoring, the agent MUST proactively propose slicing the workstream via a Decision Brief: ship completed, green phases in the current PR to lock in value, and spin off remaining phases into a clean follow-up worktree.
 7. **Knowledge Graduation Gate (Mandatory Before PR)**:
    Before declaring work complete or pushing, promote durable knowledge within the execution context:
    - **Deferred Work**: Create `dev/backlog/<topic-slug>.md` with problem statement and acceptance criteria.
    - **Architectural Decisions**: Create an ADR in `docs/internal/adr/ADR-XXX-<name>.md`.
    - **Lessons & Quirks**: Append to `dev/_journal/domains/<domain>.md` or `dev/_journal/journal.md`.
    - Stage and commit these persistent files on the task branch so they merge into `develop`.
-8. **Ring 3 Plan Exit Gate & Pre-PR Rebase Gate**:
+8. **Ring 3 Plan Exit Gate & Mass-Failure Circuit Breaker**:
    - **Ring 3 Plan Exit Gate**: Run full 5-database matrix, EF Core migrations, and `Event.Architecture.Tests` once at workstream completion before PR creation.
+   - **Mass-Failure Circuit Breaker (> 10 Failures)**: If Ring 3 execution yields > 10 failures, the agent MUST NOT generate dozens of individual subtasks or start fixing them one-by-one. Cluster failures by root cause (shared fixture, missing test migration, secret binding, or base divergence). If failures stem from pre-existing baseline rot (Class C), quarantine them. If caused by widespread architectural mismatch, pause and deliver a Decision Brief.
    - **Pre-PR Rebase (Concurrency Conflict Protection)**:
      ```bash
      git fetch origin develop && git rebase origin/develop
@@ -94,12 +102,16 @@ priority: high
      ```
    - **Park the Worktree (When using Worktree isolation)**:
      Never delete `.worktrees/<task-name>` upon PR creation. The worktree must remain parked and intact so that any subsequent bot reviews (Copilot, CodeQL) or CI check failures can be resolved immediately in-place with zero setup overhead.
-   - **Halt and Await User Direction**:
+   - **Halt and Deliver Partitioned Status Brief**:
      Immediately after PR creation, the agent must halt its execution and deliver a self-contained status brief:
      1. PR URL and branch name.
      2. Confirmation of worktree status (e.g. parked at `.worktrees/<task-name>`).
-     3. Notification that CI checks and automated bot reviewers are running.
-     4. Clear instruction to user: notify agent of any review comments or CI failures; OR confirm PR approval/merge to trigger teardown.
+     3. **Partitioned Workstream Summary**:
+        - *Delivered Features*: Capabilities and behaviors added by the approved plan.
+        - *Integration Repairs*: Necessary mechanical adjustments to fixtures/callers matching new contracts.
+        - *Quarantined Baseline Issues*: Pre-existing repo rot or flaky suites logged in `context.md` / `dev/backlog/` and excluded from this PR.
+     4. Notification that CI checks and automated bot reviewers are running.
+     5. Clear instruction to user: notify agent of any review comments or CI failures; OR confirm PR approval/merge to trigger teardown.
    - **Worktree Teardown (Only Upon Explicit User Confirmation)**:
      Only when the user confirms that the PR is approved/merged or explicitly instructs to clean up:
      - If Worktree topology: `git worktree remove .worktrees/<task-name>` (from root workspace).
@@ -135,10 +147,11 @@ priority: high
    a. Red: compilable stubs + failing invariant test (in-memory domain first)
    b. Green: minimal implementation code
    c. Verify: Ring 1 sliced test (< 2s) -> Ring 2 phase build & single-provider test (< 15s)
-      (Quarantine any unrelated pre-existing test rot into context.md)
+      - Apply Three-Tier Failure Triage (Class A: fix, Class B: align or brief, Class C: quarantine)
+      - Differential Baseline Check: verify unexpected failures against clean origin/develop
    d. Commit: git add -A && git commit using semantic phase contract from tasks.md
-   e. Update: batch checkbox updates in tasks.md
-   f. Pause: If phase boundary requires user decision, output Decision Brief.
+   e. Update: batch checkbox updates in tasks.md (obey anti-sprawl ledger cap; never add dynamic finding tasks)
+   f. Pause / Slice: If phase boundary requires user decision or blast radius expands, output Decision Brief (propose Mid-Flight PR Slice if scope ballooned).
 
 4. Knowledge Graduation (in resolved Cwd):
    a. Any deferred items? -> write dev/backlog/<slug>.md
@@ -148,6 +161,7 @@ priority: high
 
 5. Ring 3 Plan Exit Gate & Pre-PR Rebase:
    a. Ring 3: Run full multi-provider matrix & architecture tests in Cwd
+      - Mass-Failure Circuit Breaker: if > 10 failures, cluster root causes; do NOT add 10+ tasks to tasks.md
    b. git fetch origin develop && git rebase origin/develop (in Cwd)
    c. dotnet test (verify regression-free rebase)
 
@@ -156,7 +170,7 @@ priority: high
    b. Inspect changed files and construct PR body with mandatory `## Release Impact` checklist
    c. gh pr create --base develop --title "..." --body "..."
    d. If Worktree topology: PARK .worktrees/<task> — DO NOT remove it!
-   e. Stop and deliver self-contained status brief to user (PR link, checks running, next steps).
+   e. Stop and deliver partitioned status brief to user (Delivered Features, Integration Repairs, Quarantined Baseline Issues).
 
 7. Teardown (Deferred — Only Upon User Confirmation):
    If Worktree: (from root workspace) git worktree remove .worktrees/<task>

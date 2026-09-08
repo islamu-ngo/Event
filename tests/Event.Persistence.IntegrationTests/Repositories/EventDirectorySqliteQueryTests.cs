@@ -2,7 +2,10 @@ using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Specifications.Events;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Persistence;
 using Explore.Persistence.Repositories;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.Persistence.IntegrationTests.Repositories;
 
@@ -51,6 +54,32 @@ public sealed class EventDirectorySqliteQueryTests
         var (unscoped, unscopedTotal) = await repository.GetEventsWithDetailsPaged(1, 20, specification);
         await Assert.That(unscoped.Count).IsEqualTo(0);
         await Assert.That(unscopedTotal).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task Directory_instant_translation_is_registered_on_each_query_connection()
+    {
+        await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync();
+        await SeedAsync(fixture);
+        await using var firstScope = fixture.CreateScope();
+        await using var secondScope = fixture.CreateScope();
+        var first = firstScope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        var second = secondScope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        // Keep both connections open so pooling cannot turn this into a single-connection test.
+        await first.Database.OpenConnectionAsync();
+        await second.Database.OpenConnectionAsync();
+        var specification = PublicDirectory()
+            .And(EventSubqueryFilter.Temporal(TemporalView.Ongoing, Now))
+            .SortBy(EventSort.Title);
+
+        foreach (var context in new[] { first, second })
+        {
+            var (items, total) = await new EventRepository(context)
+                .GetEventsWithDetailsPaged(1, 20, specification);
+            await Assert.That(total).IsEqualTo(3);
+            await Assert.That(string.Join(',', items.Select(item => item.Title)))
+                .IsEqualTo("current,ends-after,starts-now");
+        }
     }
 
     [Test]

@@ -35,6 +35,10 @@ public sealed class RegistrationOrderConfiguration : IEntityTypeConfiguration<Re
         builder.Property(order => order.GuestStatusAccessUntilUtc).HasConversion(
             value => value,
             value => value.HasValue ? DateTime.SpecifyKind(value.Value, DateTimeKind.Utc) : (DateTime?)null);
+        var anonymousRetention = builder.Property(order => order.AnonymousPiiRetentionUntilUtc).HasConversion(
+            value => value,
+            value => value.HasValue ? DateTime.SpecifyKind(value.Value, DateTimeKind.Utc) : (DateTime?)null);
+        anonymousRetention.Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Throw);
         builder.Property(order => order.AppliedPromotionDisplayLabelSnapshot).HasMaxLength(16);
         builder.Property(order => order.PreDiscountOrganizerDirectedTotalMinorSnapshot).HasColumnType("bigint");
         builder.Property(order => order.PromotionDiscountTotalMinorSnapshot).HasColumnType("bigint");

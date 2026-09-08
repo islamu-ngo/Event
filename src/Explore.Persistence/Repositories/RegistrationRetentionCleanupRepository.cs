@@ -2,6 +2,7 @@
 // ABOUTME: Deletes dependent answers before ciphertext atomically while preserving consent and export audit evidence.
 
 using Explore.Application.Contracts.Persistence;
+using Explore.Domain;
 using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
 
@@ -25,6 +26,7 @@ public sealed class RegistrationRetentionCleanupRepository(ExploreDbContext dbCo
 
         return await unitOfWork.ExecuteInTransactionAsync(async token =>
         {
+            await ScheduleExpiredCsvDeletionAsync(tenantId, utcNow, batchSize, token);
             Guid[] answerIds = await dbContext.RegistrationAnswers
                 .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])
                 .Where(answer => answer.TenantId == tenantId && answer.RetentionUntil <= utcNow)
@@ -59,5 +61,49 @@ public sealed class RegistrationRetentionCleanupRepository(ExploreDbContext dbCo
             return new RegistrationRetentionCleanupResult(
                 answersDeleted, sensitiveValuesDeleted, orderPiiDeleted, participantPiiDeleted);
         }, cancellationToken);
+    }
+
+    private async Task ScheduleExpiredCsvDeletionAsync(
+        Guid tenantId, DateTime utcNow, int batchSize, CancellationToken cancellationToken)
+    {
+        // The immutable published form version remains authority after source answers are swept.
+        // Any held, unknown, missing or draft authority preserves the physical artifact.
+        Guid[] storageIds = await (from storage in dbContext.StorageObjects
+                .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])
+            join submission in dbContext.RegistrationSubmissions
+                    .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])
+                on new { storage.TenantId, Id = storage.OwningResourceId }
+                equals new { submission.TenantId, Id = (Guid?)submission.Id }
+            join order in dbContext.RegistrationOrders
+                    .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])
+                on new { submission.TenantId, submission.EventId, Id = submission.RegistrationOrderId }
+                equals new { order.TenantId, order.EventId, order.Id }
+            join version in dbContext.RegistrationFormVersions
+                    .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])
+                on new { submission.TenantId, submission.EventId, submission.RegistrationFormId, Id = submission.RegistrationFormVersionId }
+                equals new { version.TenantId, version.EventId, version.RegistrationFormId, version.Id }
+            where storage.TenantId == tenantId && !storage.IsDeleted &&
+                storage.OwningResourceKind == "registration_submission_sink" &&
+                storage.LifecycleState == StorageObjectLifecycleStates.Active &&
+                storage.RegistrationContentRetentionUntilUtc <= utcNow &&
+                order.AnonymousPiiRetentionUntilUtc != null &&
+                version.PublishedAt != null && version.SchemaHash != null &&
+                dbContext.RegistrationFormFields
+                    .IgnoreQueryFilters(new[] { QueryFilterNames.Tenant, QueryFilterNames.SoftDelete })
+                    .Any(field => field.TenantId == tenantId && field.RegistrationFormVersionId == version.Id) &&
+                !dbContext.RegistrationFormFields
+                    .IgnoreQueryFilters(new[] { QueryFilterNames.Tenant, QueryFilterNames.SoftDelete })
+                    .Any(field => field.TenantId == tenantId && field.RegistrationFormVersionId == version.Id &&
+                        !dbContext.RegistrationRetentionPolicies.Any(policy => policy.Id == field.RetentionPolicyId &&
+                            !policy.IsLegalHold && policy.DurationDays != null))
+            orderby storage.RegistrationContentRetentionUntilUtc, storage.Id
+            select storage.Id).Take(batchSize).ToArrayAsync(cancellationToken);
+
+        await dbContext.StorageObjects
+            .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])
+            .Where(storage => storage.TenantId == tenantId && storageIds.Contains(storage.Id))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(storage => storage.LifecycleState, StorageObjectLifecycleStates.DeleteRequested)
+                .SetProperty(storage => storage.UpdatedAt, utcNow), cancellationToken);
     }
 }

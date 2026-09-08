@@ -74,6 +74,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Http.Resilience;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Explore.Application.Features.ConfigurationManifest.Ingestion;
 using Explore.Application.Contracts.Deployment;
@@ -249,7 +250,9 @@ public static class InfrastructureServicesRegistration
         services.AddScoped<ISmtpConfigResolver, SmtpConfigResolver>();
         services.AddScoped<EmailDeliveryCapabilityResolver>();
         services.AddScoped<IEmailDeliveryCapabilityResolver>(provider => provider.GetRequiredService<EmailDeliveryCapabilityResolver>());
-        services.AddScoped<SmtpEmailService>();
+        services.AddScoped<SmtpEmailService>(provider => new SmtpEmailService(
+            provider.GetRequiredService<ISmtpConfigResolver>(), provider.GetRequiredService<ILogger<SmtpEmailService>>(),
+            provider.GetRequiredService<TimeProvider>()));
         services.AddScoped<IEmailService>(provider => provider.GetRequiredService<SmtpEmailService>());
         services.AddScoped<IEmailConnectionTester>(provider => provider.GetRequiredService<SmtpEmailService>());
         services.AddSingleton<IEmailDispatchDrainService, EmailDispatchDrainService>();
@@ -278,8 +281,10 @@ public static class InfrastructureServicesRegistration
         services.AddScoped<IAdmissionDeliveryEnvelopeProtector, AdmissionDeliveryEnvelopeProtector>();
         services.AddScoped<IAdmissionRecoveryDeliveryEnvelopeProtector, AdmissionRecoveryDeliveryEnvelopeProtector>();
         services.AddScoped<IAdmissionRecoveryRequestEnvelopeProtector, AdmissionRecoveryRequestEnvelopeProtector>();
-        services.AddScoped<IAdmissionCredentialDirectDeliveryChannel, AdmissionEmailCredentialDeliveryChannel>();
-        services.AddScoped<IAdmissionRecoveryDirectDeliveryChannel, AdmissionRecoveryEmailDeliveryChannel>();
+        services.AddScoped<IAdmissionCredentialDirectDeliveryChannel>(provider => new AdmissionEmailCredentialDeliveryChannel(
+            provider.GetRequiredService<IEmailService>(), provider.GetRequiredService<TimeProvider>()));
+        services.AddScoped<IAdmissionRecoveryDirectDeliveryChannel>(provider => new AdmissionRecoveryEmailDeliveryChannel(
+            provider.GetRequiredService<IEmailService>(), provider.GetRequiredService<IConfiguration>(), provider.GetRequiredService<TimeProvider>()));
         services.AddSingleton<IGooglePubSubOidcTokenValidator, GooglePubSubOidcTokenValidator>();
         services.AddScoped<RegistrationProviderSubscriptionLifecycleService>();
         services.AddHttpClient(FormbricksRegistrationProviderAdapter.HttpClientName, client =>
@@ -323,7 +328,8 @@ public static class InfrastructureServicesRegistration
         });
         services.AddScoped<GoogleSheetsRegistrationProviderSubmissionSink>(sp => new GoogleSheetsRegistrationProviderSubmissionSink(
             sp.GetRequiredService<IHttpClientFactory>().CreateClient(GoogleSheetsRegistrationProviderSubmissionSink.HttpClientName),
-            sp.GetRequiredService<Explore.Application.Contracts.Secrets.ISecretResolver>()));
+            sp.GetRequiredService<Explore.Application.Contracts.Secrets.ISecretResolver>(),
+            sp.GetRequiredService<TimeProvider>()));
         services.AddHttpClient(WebhookRegistrationProviderSubmissionSink.HttpClientName, client =>
         {
             client.Timeout = TimeSpan.FromSeconds(15);
@@ -338,7 +344,8 @@ public static class InfrastructureServicesRegistration
             sp.GetRequiredService<IHttpClientFactory>().CreateClient(WebhookRegistrationProviderSubmissionSink.HttpClientName),
             sp.GetRequiredService<Explore.Application.Contracts.Secrets.ISecretResolver>(),
             sp.GetRequiredService<WebhookEndpointSafetyPolicy>(),
-            sp.GetRequiredService<IOptionsMonitor<WebhookOptions>>()));
+            sp.GetRequiredService<IOptionsMonitor<WebhookOptions>>(),
+            sp.GetRequiredService<TimeProvider>()));
 
         // Legacy S3-compatible object storage service. New local-first flows use IFileStorageProvider.
         services.AddScoped<IS3ConfigResolver, S3ConfigResolver>();

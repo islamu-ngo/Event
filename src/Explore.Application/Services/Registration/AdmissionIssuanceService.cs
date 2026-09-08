@@ -142,8 +142,14 @@ public sealed class AdmissionIssuanceService(
                 new AdmissionCredentialCreateRequest(
                     context.TenantId, ticketId, credentialId, CredentialPurpose, 1),
                 cancellationToken);
+            DateTime? disclosureUntilUtc = context.DeliveryDisclosureUntilUtc;
+            AdmissionContactDeliveryPayload.RequireUnexpired(disclosureUntilUtc, timeProvider.GetUtcNow().UtcDateTime);
             AdmissionProtectedDeliveryMaterial protectedMaterial = deliveryEnvelopeProtector.Protect(
-                new AdmissionCredentialDeliveryEnvelope(context.DeliveryAddress, material.PlaintextCredential));
+                new AdmissionCredentialDeliveryEnvelope(context.DeliveryAddress, material.PlaintextCredential)
+                {
+                    DisclosureUntilUtc = disclosureUntilUtc,
+                    AccountUserId = context.DeliveryAccountUserId
+                });
             AdmissionTicket ticket = AdmissionTicket.Issue(
                 context.Order,
                 fact.OrderLine,
@@ -220,8 +226,13 @@ public sealed class AdmissionIssuanceService(
 
             try
             {
+                AdmissionContactDeliveryPayload.Read(intent.ProtectedCredential, intent.ProtectionVersion)
+                    .RequireDisclosure(context.Order, timeProvider.GetUtcNow().UtcDateTime,
+                        context.DeliveryAccountUserId.HasValue ? context.DeliveryAddress : null);
                 AdmissionCredentialDeliveryEnvelope envelope = deliveryEnvelopeProtector.Unprotect(
                     intent.ProtectedCredential, intent.ProtectionVersion);
+                if (envelope.AccountUserId.HasValue && !string.Equals(envelope.RecipientAddress, context.DeliveryAddress, StringComparison.OrdinalIgnoreCase))
+                    continue;
                 restored.Add(new AdmissionOneTimeCredential(intent.AdmissionTicketId, envelope.PlaintextCredential));
             }
             catch (InvalidOperationException)

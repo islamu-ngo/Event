@@ -33,6 +33,21 @@ tenant/event budget tables; no external Identity or reservation schema changes.
 See [the security boundary](SECURITY-MODEL.md#anonymous-registration-challenge-and-replay-boundary)
 and [operator behavior](../public/documentation/readme/events-and-ticketing/modular-event-aspects.md#anonymous-reservations-and-retry).
 
+## Anonymous Registration Retention
+
+The governed setting `anonymous_registration.retention_days` uses canonical
+decimal-string choices `"0"` through `"30"`, default `"7"`, at instance or tenant
+scope with existing parent locks. It is a persisted setting, not a new
+environment variable.
+
+Allocation resolves the finite authoritative event end plus the effective number
+of days once. Later setting or schedule changes affect future allocations, not
+an existing order's bound. Zero days means the event end itself, not immediate
+expiry at allocation. Cancellation and account claim do not change that bound.
+Legal-hold storage and the longer private-status window are separate authorities.
+See [the model](DOMAIN.md#anonymous-registration-retention) and
+[the adopter guide](../public/documentation/readme/events-and-ticketing/email-optional-participation.md#anonymous-data-and-retention).
+
 ## Headless Instance Onboarding (Configured Administrator)
 
 Instance onboarding reads eight keys from the deployment environment or

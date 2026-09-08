@@ -4,6 +4,7 @@
 using System.Text.Json;
 using Explore.Application.Contracts.Admissions;
 using Explore.Domain;
+using Explore.Domain.Services.Registration;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Services;
@@ -40,17 +41,23 @@ public sealed class AdmissionRecoveryProtectedDeliveryService(
             return new AdmissionRecoveryDeliveryResult(AdmissionRecoveryDeliveryOutcome.Accepted);
         }
 
-        string? recipient = await (
+        var contact = await (
                 from ticket in dbContext.AdmissionTickets.AsNoTracking()
+                join order in dbContext.RegistrationOrders.AsNoTracking()
+                    on new { ticket.TenantId, Id = ticket.RegistrationOrderId }
+                    equals new { order.TenantId, order.Id }
                 join pii in dbContext.RegistrationOrderPii.AsNoTracking()
                     on new { ticket.TenantId, ticket.RegistrationOrderId }
                     equals new { pii.TenantId, pii.RegistrationOrderId }
                 where ticket.TenantId == request.TenantId &&
                     ticket.Id == request.AdmissionTicketId &&
                     pii.IsEmailVerified
-                select pii.Email)
+                select new { Order = order, Pii = pii })
             .SingleOrDefaultAsync(cancellationToken);
-        if (string.IsNullOrWhiteSpace(recipient))
+        string? recipient = contact?.Pii.Email;
+        if (string.IsNullOrWhiteSpace(recipient) || contact is null ||
+            !AnonymousRegistrationRetentionPolicy.CanDisclose(
+                contact.Order, contact.Pii.RetentionUntil, timeProvider.GetUtcNow().UtcDateTime))
         {
             return new AdmissionRecoveryDeliveryResult(AdmissionRecoveryDeliveryOutcome.Pending);
         }
@@ -59,7 +66,11 @@ public sealed class AdmissionRecoveryProtectedDeliveryService(
             new AdmissionRecoveryDeliveryEnvelope(
                 recipient,
                 request.RecoveryRequestId,
-                request.Capability));
+                request.Capability)
+            {
+                DisclosureUntilUtc = AnonymousRegistrationRetentionPolicy.GetDisclosureDeadline(contact.Order, contact.Pii.RetentionUntil) is { } deadline
+                    ? DateTime.SpecifyKind(deadline, DateTimeKind.Utc) : null
+            });
         Guid intentId = Guid.CreateVersion7();
         DateTime nowUtc = timeProvider.GetUtcNow().UtcDateTime;
         var intent = new AdmissionRecoveryDeliveryIntent(

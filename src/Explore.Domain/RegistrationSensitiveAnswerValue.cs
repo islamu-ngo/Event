@@ -36,7 +36,8 @@ public sealed class RegistrationSensitiveAnswerValue : ITenantEntity, IAuditable
         string ciphertext,
         int keyVersion,
         int retentionPolicyId,
-        DateTime createdAt)
+        DateTime createdAt,
+        DateTime? anonymousUpperBoundUtc = null)
     {
         if (tenantId == Guid.Empty || keyVersion <= 0 || createdAt == default || createdAt.Kind != DateTimeKind.Utc)
         {
@@ -67,7 +68,7 @@ public sealed class RegistrationSensitiveAnswerValue : ITenantEntity, IAuditable
             TenantId = tenantId,
             Ciphertext = ciphertext,
             KeyVersion = keyVersion,
-            RetentionUntil = RegistrationRetentionDeadline.Resolve(retentionPolicyId, createdAt),
+            RetentionUntil = RegistrationRetentionDeadline.Resolve(retentionPolicyId, createdAt, anonymousUpperBoundUtc),
             CreatedAt = createdAt
         };
     }

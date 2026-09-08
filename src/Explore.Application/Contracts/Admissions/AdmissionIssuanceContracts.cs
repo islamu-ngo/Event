@@ -30,7 +30,8 @@ public enum AdmissionDeliveryFailure
     Cancelled,
     RouteUnavailable,
     EnvelopeUnavailable,
-    InvalidIntent
+    InvalidIntent,
+    RetentionExpired
 }
 
 public enum AdmissionCredentialVerificationOutcome
@@ -96,7 +97,11 @@ public sealed record AdmissionIssuanceContext(
     IReadOnlyList<AdmissionAssignmentFact> Assignments,
     IReadOnlyList<AdmissionTicket> ExistingTickets,
     string DeliveryAddress,
-    IReadOnlyList<AdmissionDeliveryIntent>? ExistingDeliveryIntents = null);
+    IReadOnlyList<AdmissionDeliveryIntent>? ExistingDeliveryIntents = null)
+{
+    public DateTime? DeliveryDisclosureUntilUtc { get; init; }
+    public Guid? DeliveryAccountUserId { get; init; }
+}
 
 public sealed record AdmissionCredentialCreateRequest(
     Guid TenantId,
@@ -157,6 +162,9 @@ public sealed record AdmissionCredentialDeliveryEnvelope(
     string RecipientAddress,
     string PlaintextCredential)
 {
+    public DateTime? DisclosureUntilUtc { get; init; }
+    public Guid? AccountUserId { get; init; }
+
     public override string ToString() => "AdmissionCredentialDeliveryEnvelope(<redacted>)";
 }
 
@@ -303,6 +311,8 @@ public sealed record AdmissionCredentialDirectDeliveryRequest(
     string RecipientAddress,
     string PlaintextCredential)
 {
+    public DateTime? DisclosureUntilUtc { get; init; }
+
     public override string ToString() =>
         $"AdmissionCredentialDirectDeliveryRequest(tenant={TenantId}, intent={DeliveryIntentId}, ticket={AdmissionTicketId}, <redacted>)";
 }
@@ -310,7 +320,8 @@ public sealed record AdmissionCredentialDirectDeliveryRequest(
 public enum AdmissionCredentialDirectDeliveryOutcome
 {
     Accepted,
-    Ambiguous
+    Ambiguous,
+    RetentionExpired
 }
 
 public sealed record AdmissionCredentialDirectDeliveryResult(

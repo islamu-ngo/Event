@@ -19,7 +19,8 @@ public sealed class RegistrationOrderPii : ITenantEntity, IAuditableEntity
         string? phone,
         string? organizationName,
         int retentionPolicyId,
-        DateTime createdAt)
+        DateTime createdAt,
+        DateTime? anonymousUpperBoundUtc)
     {
         RegistrationOrderId = registrationOrderId;
         TenantId = tenantId;
@@ -29,7 +30,7 @@ public sealed class RegistrationOrderPii : ITenantEntity, IAuditableEntity
         IsEmailVerified = false;
         Phone = Normalize(phone);
         OrganizationName = Normalize(organizationName);
-        RetentionUntil = RegistrationRetentionDeadline.Resolve(retentionPolicyId, createdAt);
+        RetentionUntil = RegistrationRetentionDeadline.Resolve(retentionPolicyId, createdAt, anonymousUpperBoundUtc);
         CreatedAt = createdAt;
     }
 
@@ -79,14 +80,15 @@ public sealed class RegistrationOrderPii : ITenantEntity, IAuditableEntity
         string? phone,
         string? organizationName,
         int retentionPolicyId,
-        DateTime createdAt)
+        DateTime createdAt,
+        DateTime? anonymousUpperBoundUtc = null)
     {
         if (registrationOrderId == Guid.Empty || tenantId == Guid.Empty)
         {
             throw new ArgumentException("Registration order and tenant identifiers are required.");
         }
 
-        return new RegistrationOrderPii(registrationOrderId, tenantId, contactName, email, phone, organizationName, retentionPolicyId, createdAt);
+        return new RegistrationOrderPii(registrationOrderId, tenantId, contactName, email, phone, organizationName, retentionPolicyId, createdAt, anonymousUpperBoundUtc);
     }
 
     public static RegistrationOrderPii CreateFromVerifiedContact(
@@ -98,14 +100,16 @@ public sealed class RegistrationOrderPii : ITenantEntity, IAuditableEntity
         string? organizationName,
         string verifiedContactNormalizedEmail,
         int retentionPolicyId,
-        DateTime createdAt)
+        DateTime createdAt,
+        DateTime? anonymousUpperBoundUtc = null)
     {
-        RegistrationOrderPii pii = Create(registrationOrderId, tenantId, contactName, email, phone, organizationName, retentionPolicyId, createdAt);
+        RegistrationOrderPii pii = Create(registrationOrderId, tenantId, contactName, email, phone, organizationName, retentionPolicyId, createdAt, anonymousUpperBoundUtc);
         pii.MarkEmailVerified(verifiedContactNormalizedEmail);
         return pii;
     }
 
-    public void Update(string? contactName, string? email, string? phone, string? organizationName, int retentionPolicyId, DateTime updatedAt)
+    public void Update(string? contactName, string? email, string? phone, string? organizationName, int retentionPolicyId, DateTime updatedAt,
+        DateTime? anonymousUpperBoundUtc = null)
     {
         ContactName = Normalize(contactName);
         string? previousNormalizedEmail = NormalizedEmail;
@@ -117,7 +121,7 @@ public sealed class RegistrationOrderPii : ITenantEntity, IAuditableEntity
         }
         Phone = Normalize(phone);
         OrganizationName = Normalize(organizationName);
-        RetentionUntil = RegistrationRetentionDeadline.Resolve(retentionPolicyId, updatedAt);
+        RetentionUntil = RegistrationRetentionDeadline.ResolveUpdate(retentionPolicyId, updatedAt, RetentionUntil, anonymousUpperBoundUtc);
     }
 
     public void MarkEmailVerified(string verifiedNormalizedEmail)

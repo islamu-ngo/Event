@@ -25598,6 +25598,10 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("add_on_total_minor_snapshot");
 
+                    b.Property<DateTime?>("AnonymousPiiRetentionUntilUtc")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("anonymous_pii_retention_until_utc");
+
                     b.Property<Guid?>("AppliedPromotionCodeIdSnapshot")
                         .HasColumnType("char(36)")
                         .HasColumnName("applied_promotion_code_id_snapshot");
@@ -29521,6 +29525,10 @@ namespace Explore.Persistence.Migrations.MySql.Migrations
                     b.Property<Guid?>("QuarantinedBy")
                         .HasColumnType("char(36)")
                         .HasColumnName("quarantined_by");
+
+                    b.Property<DateTime?>("RegistrationContentRetentionUntilUtc")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("registration_content_retention_until_utc");
 
                     b.Property<string>("SafeDisplayName")
                         .IsRequired()

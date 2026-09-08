@@ -4,6 +4,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Explore.Application.Contracts.Admissions;
+using Explore.Application.Notifications;
 using Explore.Domain;
 using Microsoft.EntityFrameworkCore;
 
@@ -38,12 +39,25 @@ public sealed class AdmissionCredentialDeliveryOutboxHandler(
             throw new InvalidOperationException("Admission delivery intent is not recoverable for handoff.");
         }
 
+        RegistrationOrder? order = await (
+            from ticket in dbContext.AdmissionTickets.AsNoTracking()
+            join owner in dbContext.RegistrationOrders.AsNoTracking()
+                on new { ticket.TenantId, Id = ticket.RegistrationOrderId } equals new { owner.TenantId, owner.Id }
+            where ticket.TenantId == intent.TenantId && ticket.Id == intent.AdmissionTicketId
+            select owner).SingleOrDefaultAsync(cancellationToken);
+        AdmissionContactDeliveryPayload payload = AdmissionContactDeliveryPayload.Read(intent.ProtectedCredential, intent.ProtectionVersion);
+        string? accountEmail = await ResolveAccountEmailAsync(payload.AccountUserId, cancellationToken);
+        payload.RequireDisclosure(order, timeProvider.GetUtcNow().UtcDateTime, accountEmail);
         AdmissionCredentialDeliveryEnvelope envelope = envelopeProtector.Unprotect(
             intent.ProtectedCredential,
             intent.ProtectionVersion);
         DateTime routedAt = timeProvider.GetUtcNow().UtcDateTime;
         intent.MarkRouted(routedAt);
         await dbContext.SaveChangesAsync(CancellationToken.None);
+        accountEmail = await ResolveAccountEmailAsync(payload.AccountUserId, cancellationToken);
+        payload.RequireDisclosure(order, timeProvider.GetUtcNow().UtcDateTime, accountEmail);
+        if (payload.AccountUserId.HasValue && !string.Equals(envelope.RecipientAddress, accountEmail, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Admission account contact has changed.");
 
         AdmissionCredentialDirectDeliveryResult delivered = await deliveryChannel.DeliverAsync(
             new AdmissionCredentialDirectDeliveryRequest(
@@ -51,8 +65,13 @@ public sealed class AdmissionCredentialDeliveryOutboxHandler(
                 intent.Id,
                 intent.AdmissionTicketId,
                 envelope.RecipientAddress,
-                envelope.PlaintextCredential),
+                envelope.PlaintextCredential)
+            {
+                DisclosureUntilUtc = payload.DisclosureUntilUtc
+            },
             cancellationToken);
+        if (delivered.Outcome == AdmissionCredentialDirectDeliveryOutcome.RetentionExpired)
+            throw new AdmissionContactRetentionExpiredException();
         if (delivered.Outcome != AdmissionCredentialDirectDeliveryOutcome.Accepted ||
             string.IsNullOrWhiteSpace(delivered.ReceiptId))
         {
@@ -61,6 +80,14 @@ public sealed class AdmissionCredentialDeliveryOutboxHandler(
 
         intent.CompleteHandoff(delivered.ReceiptId, timeProvider.GetUtcNow().UtcDateTime);
         await dbContext.SaveChangesAsync(CancellationToken.None);
+    }
+
+    private async Task<string?> ResolveAccountEmailAsync(Guid? userId, CancellationToken cancellationToken)
+    {
+        if (!userId.HasValue) return null;
+        User? user = await dbContext.Users.AsNoTracking().Include(value => value.Pii)
+            .SingleOrDefaultAsync(value => value.Id == userId.Value, cancellationToken);
+        return RecipientEmailAddressResolver.Resolve(user, userId.Value).Email;
     }
 
     private static AdmissionCredentialDeliveryPointer Parse(OutboxMessage message)

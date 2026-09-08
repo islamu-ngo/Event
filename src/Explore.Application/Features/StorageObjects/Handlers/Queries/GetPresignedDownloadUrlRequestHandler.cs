@@ -10,6 +10,7 @@ using Explore.Application.DTOs.StorageObject;
 using Explore.Application.Features.StorageObjects.Requests.Queries;
 using Explore.Application.Services;
 using Explore.Domain;
+using Explore.Domain.Services.Registration;
 using MediatR;
 using Microsoft.Extensions.Logging;
 
@@ -79,6 +80,18 @@ public class GetPresignedDownloadUrlRequestHandler : IRequestHandler<GetPresigne
                 request.Id,
                 storageObject.Visibility);
             return null;
+        }
+
+        RegistrationAnswerFile? answerFile = await _storageObjectRepository.GetRegistrationAnswerFileAsync(
+            storageObject.Id, storageObject.TenantId, cancellationToken);
+        if (StorageObjectContentReader.IsRegistrationOwned(storageObject, answerFile))
+        {
+            RegistrationOrder? order = await _storageObjectRepository.GetRegistrationContentOrderAsync(
+                storageObject, answerFile, cancellationToken);
+            // Anonymous registration content is revocable only through the mediated content route.
+            if (order is null || AnonymousRegistrationRetentionPolicy.AppliesTo(order) ||
+                answerFile is { IsDeleted: true } || answerFile is not null && !answerFile.IsReleased)
+                return null;
         }
 
         if (string.IsNullOrWhiteSpace(storageObject.ObjectKey))

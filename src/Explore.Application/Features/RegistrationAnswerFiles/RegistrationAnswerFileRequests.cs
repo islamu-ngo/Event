@@ -4,6 +4,7 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Registration;
 using Explore.Domain;
+using Explore.Domain.Services.Registration;
 using MediatR;
 
 namespace Explore.Application.Features.RegistrationAnswerFiles.Queries;
@@ -11,7 +12,9 @@ namespace Explore.Application.Features.RegistrationAnswerFiles.Queries;
 public sealed record GetRegistrationAnswerFileQuery(Guid TenantId, Guid Id)
     : IRequest<RegistrationAnswerFileDto?>;
 
-public sealed class GetRegistrationAnswerFileQueryHandler(IRegistrationAnswerFileRepository repository)
+public sealed class GetRegistrationAnswerFileQueryHandler(
+    IRegistrationAnswerFileRepository repository,
+    TimeProvider timeProvider)
     : IRequestHandler<GetRegistrationAnswerFileQuery, RegistrationAnswerFileDto?>
 {
     public async Task<RegistrationAnswerFileDto?> Handle(
@@ -24,10 +27,17 @@ public sealed class GetRegistrationAnswerFileQueryHandler(IRegistrationAnswerFil
             return null;
         }
 
+        RegistrationOrder? order = await repository.GetOrderAsync(file, cancellationToken);
         RegistrationAnswerFileRelease? release = file.IsReleased
             ? await repository.GetReleaseAsync(request.TenantId, request.Id, cancellationToken)
             : null;
-        return Map(file, release);
+        DateTime utcNow = timeProvider.GetUtcNow().UtcDateTime;
+        bool allowed = order is not null && AnonymousRegistrationRetentionPolicy.CanDisclose(order, null, utcNow);
+        return (Map(file, release) with
+        {
+            MetadataDisclosureAllowed = allowed,
+            DisclosureUntilUtc = allowed ? AnonymousRegistrationRetentionPolicy.GetDisclosureDeadline(order!, null) : null
+        }).ForDisclosureAt(utcNow);
     }
 
     private static RegistrationAnswerFileDto Map(

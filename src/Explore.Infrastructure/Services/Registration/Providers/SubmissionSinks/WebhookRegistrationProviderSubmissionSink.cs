@@ -17,8 +17,10 @@ public sealed class WebhookRegistrationProviderSubmissionSink(
     HttpClient httpClient,
     ISecretResolver secretResolver,
     WebhookEndpointSafetyPolicy endpointSafetyPolicy,
-    IOptionsMonitor<WebhookOptions> webhookOptions) : IRegistrationProviderDescriptor, IRegistrationProviderSubmissionSink
+    IOptionsMonitor<WebhookOptions> webhookOptions,
+    TimeProvider? timeProvider = null) : IRegistrationProviderDescriptor, IRegistrationProviderSubmissionSink
 {
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     public const string HttpClientName = "RegistrationProvider.WebhookSink";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -75,6 +77,13 @@ public sealed class WebhookRegistrationProviderSubmissionSink(
 
         message.Content = new ByteArrayContent(body);
         message.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+
+        if (request.DisclosureUntilUtc is { } deadline && _timeProvider.GetUtcNow().UtcDateTime >= deadline)
+        {
+            throw new RegistrationProviderSubmissionDeliveryException(
+                RegistrationProviderSubmissionDeliveryFailureKind.PermanentBeforeHandoff,
+                "registration_data_retention_expired");
+        }
 
         using HttpResponseMessage response = await httpClient.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         if (response.IsSuccessStatusCode)

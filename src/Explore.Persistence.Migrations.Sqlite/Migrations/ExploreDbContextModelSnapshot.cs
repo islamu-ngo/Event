@@ -25556,6 +25556,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("add_on_total_minor_snapshot");
 
+                    b.Property<DateTime?>("AnonymousPiiRetentionUntilUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("anonymous_pii_retention_until_utc");
+
                     b.Property<Guid?>("AppliedPromotionCodeIdSnapshot")
                         .HasColumnType("TEXT")
                         .HasColumnName("applied_promotion_code_id_snapshot");
@@ -29462,6 +29466,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Property<Guid?>("QuarantinedBy")
                         .HasColumnType("TEXT")
                         .HasColumnName("quarantined_by");
+
+                    b.Property<DateTime?>("RegistrationContentRetentionUntilUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("registration_content_retention_until_utc");
 
                     b.Property<string>("SafeDisplayName")
                         .IsRequired()

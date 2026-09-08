@@ -10,7 +10,8 @@ namespace Explore.Infrastructure.Services.Registration;
 
 public sealed class AdmissionRecoveryEmailDeliveryChannel(
     IEmailService emailService,
-    IConfiguration configuration) :
+    IConfiguration configuration,
+    TimeProvider? timeProvider = null) :
     IAdmissionRecoveryDirectDeliveryChannel
 {
     public async Task<AdmissionRecoveryDirectDeliveryResult> DeliverAsync(
@@ -43,8 +44,11 @@ public sealed class AdmissionRecoveryEmailDeliveryChannel(
         string recoveryUrl =
             $"{origin.GetLeftPart(UriPartial.Authority)}/tickets/recovery" +
             $"#capability={Uri.EscapeDataString(request.Capability)}";
+        if (request.DisclosureUntilUtc is { } deadline && (timeProvider ?? TimeProvider.System).GetUtcNow().UtcDateTime >= deadline)
+            return new AdmissionRecoveryDirectDeliveryResult(AdmissionRecoveryDirectDeliveryOutcome.RetentionExpired);
         EmailResult result = await emailService.SendAsync(new EmailMessage
         {
+            DisclosureUntilUtc = request.DisclosureUntilUtc,
             To = request.RecipientAddress,
             Subject = "Recover your admission ticket",
             PlainTextBody = $"Open this same-origin one-time recovery link:\n{recoveryUrl}",
@@ -53,6 +57,8 @@ public sealed class AdmissionRecoveryEmailDeliveryChannel(
                 ["X-Admission-Recovery-Idempotency-Key"] = idempotencyKey
             }
         }, cancellationToken);
+        if (result.Outcome == SmtpDeliveryOutcome.RetentionExpired)
+            return new AdmissionRecoveryDirectDeliveryResult(AdmissionRecoveryDirectDeliveryOutcome.RetentionExpired);
         return result.Success
             ? new AdmissionRecoveryDirectDeliveryResult(
                 AdmissionRecoveryDirectDeliveryOutcome.Accepted,

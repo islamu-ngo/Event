@@ -69,6 +69,37 @@ The existing finite private-status window still applies. An unconfirmed order
 does not gain post-confirmation cancellation authority from its checkout link.
 Contact the organizer for situations outside this narrow self-service action.
 
+## Anonymous Data And Retention
+
+When the ticket requires no attendee information, registration creates unnamed
+participants without contact details. A required entry name does not require a
+purchaser email address.
+
+Anonymous names and answers are available only until their event-purpose deadline.
+The default is the event's end plus seven days; an authorized instance or tenant
+administrator can set `anonymous_registration.retention_days` from 0 through 30
+for new registrations. Zero means the event end. A field's shorter deadline still
+applies.
+
+The deadline is fixed when the guest registration starts. Editing a name,
+claiming the registration with an account, changing the setting, cancelling or
+rescheduling does not extend it. The private status link can remain usable longer
+because it contains no attendee names or answers.
+
+Expired data becomes unavailable before the background deletion sweep runs.
+Legal holds may preserve required records without keeping them available through
+ordinary attendee, organizer or export access. Consent and audit evidence follow
+their separate policies. Existing guest data without a recorded original deadline
+is unavailable rather than receiving a new retention window.
+
+Registration exports stored by Event obey the same access boundary. An external
+provider or a person who already downloaded data may retain their own copy;
+Event's expiry does not prove deletion of those copies.
+An internal queued email is not an external delivery: an expired registration
+contact cannot be decrypted and newly sent just because it was queued earlier.
+Already-started external delivery retains its existing outcome; expiry does not
+retract a message already handed to the provider.
+
 ## Public Calendar Export
 
 When the server offers a calendar action, it uses the existing public event

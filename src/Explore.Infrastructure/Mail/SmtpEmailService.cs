@@ -29,20 +29,25 @@ public class SmtpEmailService : IEmailService, IEmailConnectionTester
 
     private readonly ISmtpConfigResolver _configResolver;
     private readonly ILogger<SmtpEmailService> _logger;
+    private readonly TimeProvider _timeProvider;
 
     public SmtpEmailService(
         ISmtpConfigResolver configResolver,
-        ILogger<SmtpEmailService> logger)
+        ILogger<SmtpEmailService> logger,
+        TimeProvider? timeProvider = null)
     {
         _configResolver = configResolver;
         _logger = logger;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public async Task<EmailResult> SendAsync(
         EmailMessage message,
         CancellationToken cancellationToken = default)
     {
+        if (ContactExpired(message)) return RetentionExpired();
         var config = await _configResolver.ResolveAsync(cancellationToken);
+        if (ContactExpired(message)) return RetentionExpired();
         if (config is null)
         {
             return EmailResult.Fail("SMTP is not configured. Configure email settings in the admin panel.",
@@ -121,6 +126,7 @@ public class SmtpEmailService : IEmailService, IEmailConnectionTester
         SmtpConfiguration config,
         CancellationToken cancellationToken)
     {
+        if (ContactExpired(message)) return RetentionExpired();
         var sw = Stopwatch.StartNew();
         var sendInitiated = false;
         var accepted = false;
@@ -139,6 +145,7 @@ public class SmtpEmailService : IEmailService, IEmailConnectionTester
                 MapSecurityMode(config.Security),
                 cancellationToken);
 
+            if (ContactExpired(message)) return RetentionExpired();
             if (!string.IsNullOrWhiteSpace(config.Username))
             {
                 authenticating = true;
@@ -146,6 +153,7 @@ public class SmtpEmailService : IEmailService, IEmailConnectionTester
                 authenticating = false;
             }
 
+            if (ContactExpired(message)) return RetentionExpired();
             sendInitiated = true;
             await client.SendAsync(mimeMessage, cancellationToken);
             accepted = true;
@@ -233,6 +241,12 @@ public class SmtpEmailService : IEmailService, IEmailConnectionTester
             sw.ElapsedMilliseconds);
         return EmailResult.Ok("SMTP accepted message.", sw.Elapsed);
     }
+
+    private bool ContactExpired(EmailMessage message) =>
+        message.DisclosureUntilUtc is { } deadline && _timeProvider.GetUtcNow().UtcDateTime >= deadline;
+
+    private static EmailResult RetentionExpired() => EmailResult.Fail(
+        "registration_data_retention_expired", outcome: SmtpDeliveryOutcome.RetentionExpired);
 
     private static void ConfigureClient(SmtpClient client, SmtpConfiguration config)
     {

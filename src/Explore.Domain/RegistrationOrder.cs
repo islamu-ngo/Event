@@ -87,6 +87,8 @@ public sealed class RegistrationOrder : ITenantEntity, IAuditableEntity, ISoftDe
 
     public DateTime? GuestStatusAccessUntilUtc { get; private set; }
 
+    public DateTime? AnonymousPiiRetentionUntilUtc { get; private set; }
+
     public string CurrencyCode { get; private set; } = string.Empty;
 
     public DateTime? ExpiresAt { get; private set; }
@@ -163,7 +165,8 @@ public sealed class RegistrationOrder : ITenantEntity, IAuditableEntity, ISoftDe
         CapabilityTokenHash? guestAccessTokenHash,
         string currencyCode,
         DateTime createdAt,
-        DateTime? expiresAt) => Create(
+        DateTime? expiresAt,
+        DateTime? anonymousPiiRetentionUntilUtc = null) => Create(
         Guid.CreateVersion7(),
         tenantId,
         eventId,
@@ -176,7 +179,8 @@ public sealed class RegistrationOrder : ITenantEntity, IAuditableEntity, ISoftDe
         guestAccessTokenHash,
         currencyCode,
         createdAt,
-        expiresAt);
+        expiresAt,
+        anonymousPiiRetentionUntilUtc);
 
     public static RegistrationOrder Create(
         Guid id,
@@ -191,7 +195,8 @@ public sealed class RegistrationOrder : ITenantEntity, IAuditableEntity, ISoftDe
         CapabilityTokenHash? guestAccessTokenHash,
         string currencyCode,
         DateTime createdAt,
-        DateTime? expiresAt)
+        DateTime? expiresAt,
+        DateTime? anonymousPiiRetentionUntilUtc = null)
     {
         if (id == Guid.Empty || tenantId == Guid.Empty || eventId == Guid.Empty || ticketCatalogVersionId == Guid.Empty ||
             accountUserId == Guid.Empty || purchaserActorId == Guid.Empty || registrationWorkflowVersionId == Guid.Empty ||
@@ -208,6 +213,18 @@ public sealed class RegistrationOrder : ITenantEntity, IAuditableEntity, ISoftDe
             throw new ArgumentException("Order expiry must be after creation.", nameof(expiresAt));
         }
 
+        if (anonymousPiiRetentionUntilUtc.HasValue)
+        {
+            EnsureUtc(anonymousPiiRetentionUntilUtc.Value, nameof(anonymousPiiRetentionUntilUtc));
+            if (accountUserId.HasValue || purchaserActorId.HasValue || guestAccessTokenHash is null ||
+                participationSnapshot.ParticipationHandlingModeId != (int)ParticipationHandlingModeEnum.PlatformManaged ||
+                participationSnapshot.IdentityAccessModeId is not ((int)IdentityAccessModeEnum.GuestAllowed) and not ((int)IdentityAccessModeEnum.CapabilityTokenAllowed) ||
+                anonymousPiiRetentionUntilUtc <= normalizedCreatedAt)
+            {
+                throw new ArgumentException("An anonymous retention bound requires a live original guest allocation.", nameof(anonymousPiiRetentionUntilUtc));
+            }
+        }
+
         return new RegistrationOrder(
             id,
             tenantId,
@@ -221,7 +238,10 @@ public sealed class RegistrationOrder : ITenantEntity, IAuditableEntity, ISoftDe
             guestAccessTokenHash,
             CurrencyMetadata.Get(currencyCode).Code,
             normalizedCreatedAt,
-            normalizedExpiresAt);
+            normalizedExpiresAt)
+        {
+            AnonymousPiiRetentionUntilUtc = anonymousPiiRetentionUntilUtc
+        };
     }
 
     // Allocation establishes the promise before payment is possible. Missing historical promises

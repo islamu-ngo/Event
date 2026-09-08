@@ -3,12 +3,14 @@
 
 using System.Collections.Immutable;
 using Explore.Application.Contracts.Admissions;
+using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Domain.Services.Registration;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Services;
 
-public sealed class AdmissionTicketPresentationResolver(ExploreDbContext dbContext) :
+public sealed class AdmissionTicketPresentationResolver(ExploreDbContext dbContext, TimeProvider? timeProvider = null) :
     IAdmissionTicketPresentationResolver
 {
     public async Task<ImmutableDictionary<Guid, AdmissionTicketPresentation>> ResolveAsync(
@@ -24,6 +26,9 @@ public sealed class AdmissionTicketPresentationResolver(ExploreDbContext dbConte
         Guid[] ticketIds = admissionTicketIds.Distinct().ToArray();
         TicketFact[] tickets = await (
                 from ticket in dbContext.AdmissionTickets.AsNoTracking()
+                join order in dbContext.RegistrationOrders.AsNoTracking()
+                    on new { ticket.TenantId, Id = ticket.RegistrationOrderId }
+                    equals new { order.TenantId, order.Id }
                 join ticketType in dbContext.EventTicketTypes.AsNoTracking()
                     on new { ticket.TenantId, Id = ticket.EventTicketTypeId }
                     equals new { ticketType.TenantId, ticketType.Id }
@@ -35,7 +40,8 @@ public sealed class AdmissionTicketPresentationResolver(ExploreDbContext dbConte
                 where ticket.TenantId == tenantId && ticketIds.Contains(ticket.Id)
                 select new TicketFact(
                     ticket.Id,
-                    pii == null ? null : pii.DisplayName,
+                    order,
+                    pii,
                     ticketType.Name))
             .ToArrayAsync(cancellationToken);
 
@@ -75,10 +81,13 @@ public sealed class AdmissionTicketPresentationResolver(ExploreDbContext dbConte
 
         ILookup<Guid, EntitlementFact> byTicket =
             entitlements.ToLookup(entitlement => entitlement.AdmissionTicketId);
+        DateTime utcNow = (timeProvider ?? TimeProvider.System).GetUtcNow().UtcDateTime;
         return tickets.ToImmutableDictionary(
             ticket => ticket.AdmissionTicketId,
             ticket => new AdmissionTicketPresentation(
-                ticket.HolderDisplayName,
+                AnonymousRegistrationRetentionPolicy.CanDisclose(ticket.Order, ticket.Pii?.RetentionUntil, utcNow)
+                    ? ticket.Pii?.DisplayName
+                    : null,
                 ticket.TicketTypeName,
                 byTicket[ticket.AdmissionTicketId]
                     .Select(entitlement => new AdmissionTicketEntitlementPresentation(
@@ -102,7 +111,8 @@ public sealed class AdmissionTicketPresentationResolver(ExploreDbContext dbConte
 
     private sealed record TicketFact(
         Guid AdmissionTicketId,
-        string? HolderDisplayName,
+        RegistrationOrder Order,
+        RegistrationParticipantPii? Pii,
         string TicketTypeName);
 
     private sealed record EntitlementFact(

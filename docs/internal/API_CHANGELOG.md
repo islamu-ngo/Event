@@ -5,6 +5,16 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 ## 2026-09-08
 
+- **Event-bound anonymous data access.** Participant/ticket projections and
+  registration exports omit anonymous names and answers after their original
+  retention deadline, including before cleanup. Missing historical bounds do
+  not grant a fresh window. Registration-owned content downloads enforce
+  tenant-qualified lineage and expiry; anonymous exports use mediated content
+  access instead of presigned URLs. Storage HAL omits unavailable download
+  actions without adding a public DTO field or endpoint. The sibling
+  registration-answer-file GET and release responses also redact expired
+  filenames, including after authorization waits, without removing release
+  evidence or changing administrative release authority.
 - **Explicit free guest confirmed cancellation.**
   `POST /api/events/{eventId}/guest-registration-orders/{orderId}/cancellation`
   (`CancelConfirmedGuestRegistration`) accepts the existing capability header and

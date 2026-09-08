@@ -410,6 +410,11 @@ public static class GovernanceSettingKeys
         }
     }
 
+    public static class AnonymousRegistration
+    {
+        public const string RetentionDays = "anonymous_registration.retention_days";
+    }
+
     public static class AnonymousRegistrationChallenge
     {
         public const string TenantPermitsPerMinute = "registration.anonymous_challenge.tenant_per_minute";

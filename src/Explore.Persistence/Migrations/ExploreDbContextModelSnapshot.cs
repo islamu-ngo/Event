@@ -25634,6 +25634,10 @@ namespace Explore.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("add_on_total_minor_snapshot");
 
+                    b.Property<DateTime?>("AnonymousPiiRetentionUntilUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("anonymous_pii_retention_until_utc");
+
                     b.Property<Guid?>("AppliedPromotionCodeIdSnapshot")
                         .HasColumnType("uuid")
                         .HasColumnName("applied_promotion_code_id_snapshot");
@@ -29543,6 +29547,10 @@ namespace Explore.Persistence.Migrations
                     b.Property<Guid?>("QuarantinedBy")
                         .HasColumnType("uuid")
                         .HasColumnName("quarantined_by");
+
+                    b.Property<DateTime?>("RegistrationContentRetentionUntilUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("registration_content_retention_until_utc");
 
                     b.Property<string>("SafeDisplayName")
                         .IsRequired()

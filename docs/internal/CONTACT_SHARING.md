@@ -66,6 +66,14 @@ Do not document legal or privacy guarantees beyond these source-backed behaviors
 
 ## Verified Export Behavior
 
+Anonymous registration names and answers have a separate event-purpose retention
+boundary. Their expiry does not revoke, regrant or rewrite a
+`RegistrationConsentRecord`, `EventContactShareConsentHistory` or audited
+contact-export receipt. A legal hold preserves required storage but does not grant
+continued operational access to expired anonymous names or answers. Generated
+registration CSV is not a consent export and remains subject to its own stored
+content deadline. See [anonymous retention](DOMAIN.md#anonymous-registration-retention).
+
 Exports are generated as browser-download files in CSV or TSV format. Spreadsheet-formula prefixes are neutralized and file-name segments are sanitized. Withdrawn or wrong-purpose consent is excluded by the repository query. The inspected source does not show server-to-server sharing, outbound email fanout, or external marketing-provider synchronization.
 
 ## Admin And User Surfaces

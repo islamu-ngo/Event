@@ -7,6 +7,7 @@ using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Features.RegistrationOrders.Requests.Queries;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Domain.Services.Registration;
 using MediatR;
 
 namespace Explore.Application.Features.RegistrationOrders.Handlers.Queries;
@@ -15,7 +16,8 @@ public sealed class GetRegistrationOrderParticipantsQueryHandler(
     IRegistrationInventoryRepository inventory,
     IEventTicketCatalogRepository catalogs,
     IRegistrationParticipantRepository participants,
-    ITenantContext tenant)
+    ITenantContext tenant,
+    TimeProvider? timeProvider = null)
     : IRequestHandler<GetRegistrationOrderParticipantsQuery, RegistrationOrderParticipantsDto?>
 {
     public async Task<RegistrationOrderParticipantsDto?> Handle(
@@ -41,6 +43,7 @@ public sealed class GetRegistrationOrderParticipantsQueryHandler(
             await participants.GetParticipantsByOrderAsync(order.Id, order.TenantId, cancellationToken);
         IReadOnlyList<RegistrationTicketAssignment> assignmentRows =
             await participants.GetAssignmentsWithParticipantsByOrderAsync(order.Id, order.TenantId, cancellationToken);
+        DateTime utcNow = (timeProvider ?? TimeProvider.System).GetUtcNow().UtcDateTime;
         return new RegistrationOrderParticipantsDto(
             order.Id,
             order.Lines.Select(line =>
@@ -55,14 +58,19 @@ public sealed class GetRegistrationOrderParticipantsQueryHandler(
                     ticketType.ParticipantDataCollectionMode?.MasterCode ?? ModeCode(mode),
                     ticketType.RequiresGuardian);
             }).ToArray(),
-            participantRows.Select(participant => new RegistrationParticipantDto(
-                participant.Id,
-                participant.RegistrationOrderId,
-                participant.ParticipantTypeId,
-                participant.GuardianParticipantId,
-                participant.Pii?.DisplayName,
-                participant.Pii?.Email,
-                participant.Pii?.Phone)).ToArray(),
+            participantRows.Select(participant =>
+            {
+                RegistrationParticipantPii? pii = AnonymousRegistrationRetentionPolicy.CanDisclose(
+                    order, participant.Pii?.RetentionUntil, utcNow) ? participant.Pii : null;
+                return new RegistrationParticipantDto(
+                    participant.Id,
+                    participant.RegistrationOrderId,
+                    participant.ParticipantTypeId,
+                    participant.GuardianParticipantId,
+                    pii?.DisplayName,
+                    pii?.Email,
+                    pii?.Phone);
+            }).ToArray(),
             assignmentRows.Select(assignment => new RegistrationTicketAssignmentDto(
                 assignment.Id,
                 assignment.RegistrationOrderLineId,

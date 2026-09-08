@@ -13,8 +13,10 @@ namespace Explore.Infrastructure.Services.Registration.Providers.SubmissionSinks
 
 public sealed class CsvRegistrationProviderSubmissionSink(
     IFileStorageProviderResolver storageProviderResolver,
-    IStorageObjectRepository storageObjects) : IRegistrationProviderDescriptor, IRegistrationProviderSubmissionSink
+    IStorageObjectRepository storageObjects,
+    TimeProvider? timeProvider = null) : IRegistrationProviderDescriptor, IRegistrationProviderSubmissionSink
 {
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     private const long MaxCsvBytes = 64 * 1024;
 
     public static RegistrationProviderTuple SupportedTuple { get; } = new(
@@ -57,7 +59,15 @@ public sealed class CsvRegistrationProviderSubmissionSink(
             : StorageProviders.Local;
         string objectKey = $"registration-submission-sinks/{request.TenantId:N}/{request.RegistrationSubmissionId:N}.csv";
         await using var stream = new MemoryStream(csv, writable: false);
-        FileStorageWriteResult written = await storageProviderResolver.GetRequired(provider).WriteAsync(
+        IFileStorageProvider storage = storageProviderResolver.GetRequired(provider);
+        if (request.DisclosureUntilUtc is { } deadline && _timeProvider.GetUtcNow().UtcDateTime >= deadline)
+        {
+            throw new RegistrationProviderSubmissionDeliveryException(
+                RegistrationProviderSubmissionDeliveryFailureKind.PermanentBeforeHandoff,
+                "registration_data_retention_expired");
+        }
+
+        FileStorageWriteResult written = await storage.WriteAsync(
             new FileStorageWriteInput(
                 request.TenantId,
                 stream,
@@ -90,7 +100,8 @@ public sealed class CsvRegistrationProviderSubmissionSink(
             LifecycleState = StorageObjectLifecycleStates.Active,
             OwningResourceKind = "registration_submission_sink",
             OwningResourceId = request.RegistrationSubmissionId,
-            CreatedAt = DateTime.UtcNow,
+            RegistrationContentRetentionUntilUtc = request.DisclosureUntilUtc,
+            CreatedAt = _timeProvider.GetUtcNow().UtcDateTime,
             ConcurrencyStamp = Guid.CreateVersion7()
         });
 

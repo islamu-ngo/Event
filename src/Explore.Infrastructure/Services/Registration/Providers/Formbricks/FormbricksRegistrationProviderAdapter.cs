@@ -146,7 +146,7 @@ public sealed class FormbricksRegistrationProviderAdapter(
         };
 
         using JsonDocument document = await SendSubmissionWriteAsync(
-            request.TenantId, request.Connection, payload, cancellationToken);
+            request.TenantId, request.Connection, payload, request.DisclosureUntilUtc, cancellationToken);
 
         try
         {
@@ -166,6 +166,7 @@ public sealed class FormbricksRegistrationProviderAdapter(
         Guid tenantId,
         RegistrationProviderConnection connection,
         object payload,
+        DateTime? disclosureUntilUtc,
         CancellationToken cancellationToken)
     {
         string apiToken;
@@ -185,6 +186,13 @@ public sealed class FormbricksRegistrationProviderAdapter(
         message.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         message.Headers.Add("x-api-key", apiToken);
         message.Content = new StringContent(JsonSerializer.Serialize(payload, JsonOptions), Encoding.UTF8, "application/json");
+        if (disclosureUntilUtc is { } deadline && timeProvider.GetUtcNow().UtcDateTime >= deadline)
+        {
+            throw new RegistrationProviderSubmissionDeliveryException(
+                RegistrationProviderSubmissionDeliveryFailureKind.PermanentBeforeHandoff,
+                "registration_data_retention_expired");
+        }
+
         try
         {
             using HttpResponseMessage response = await httpClient.SendAsync(
@@ -396,7 +404,7 @@ public sealed class FormbricksRegistrationProviderAdapter(
                 request.Connection,
                 request.Tuple,
                 request.AttemptId,
-                request.Answers),
+                request.Answers) { DisclosureUntilUtc = request.DisclosureUntilUtc },
             cancellationToken);
 
         return new RegistrationProviderSubmissionSinkResult(true, request.AttemptId, AutoFinalizable: true);

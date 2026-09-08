@@ -3,6 +3,55 @@
 
 # Operations
 
+## Anonymous Registration Retention
+
+Anonymous names and answers stop being operationally readable at their original
+event-purpose deadline, independently of the physical cleanup schedule. The
+existing bounded `RegistrationRetentionCleanupJob` remains the deletion owner;
+turning Quartz off delays cleanup, not the read-time privacy boundary.
+
+Participant and ticket presentation, answer aggregation, provider export and
+registration-owned downloads enforce the same bound. Export workers exclude
+expired values before decryption and check again after preparatory waits, before
+handoff. Expiry before handoff is terminal and must not be retried as an ambiguous
+provider delivery. Data already lawfully transferred cannot be retracted by this
+local policy.
+
+Generated CSV metadata retains its included-content deadline. Application reads
+resolve current tenant-qualified submission/order lineage and deny expired or
+missing authority, including after source answers are deleted. Physical storage
+deletion requires separate proof that no legal hold applies; consent and export
+audit evidence remain governed independently.
+
+The sibling registration-answer-file GET and release responses apply the same
+filename bound, including after HAL authorization waits. Quarantine/release
+authority and immutable release evidence remain separate from filename access.
+
+Queued admission and recovery contacts retain their included deadline in
+authenticated metadata around the existing encrypted intent material. A source
+PII row disappearing cannot remove that deadline. Handlers check before
+decryption and after database waits; channels carry the bound through SMTP
+configuration, connection and authentication to the first send. Pre-handoff
+expiry is `RetentionExpired`, never a receipt-bearing success or uncertain send.
+Admission dispatch treats it as unrecoverable; recovery retains its existing
+bounded retry/dead-letter lifecycle, with every replay denied before decryption.
+Retained ciphertext and audit evidence are not erased by this decision.
+
+Version 1 remains the current unbounded nonanonymous contact format; version 2
+binds a finite contact deadline or the selected account-contact identity to its
+Data Protection purpose. Account fallback uses the existing current verified
+recipient resolver and does not extend anonymous registration-data retention.
+Changing, deleting or unverifying that current account contact cannot revive an
+earlier queued recipient. Work whose external send already began retains its
+existing accepted/uncertain handling.
+
+Apply the generated `AnonymousRegistrationRetention` primary-context migrations
+before this behavior. They add nullable order and storage-content deadlines, with
+no inferred historical backfill or Identity changes. Historical guest PII without
+an original bound is unavailable; changing the current event schedule cannot
+restore it. Prefer a verified forward correction over removing privacy metadata
+to reopen access. Existing user-erasure authority and backup obligations remain.
+
 ## Instance Bootstrap Lifecycle
 
 Startup runs in one order, in Split and Standalone alike: migrations and

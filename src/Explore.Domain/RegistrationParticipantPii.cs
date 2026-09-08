@@ -18,7 +18,8 @@ public sealed class RegistrationParticipantPii : ITenantEntity, IAuditableEntity
         string? email,
         string? phone,
         int retentionPolicyId,
-        DateTime createdAt)
+        DateTime createdAt,
+        DateTime? anonymousUpperBoundUtc)
     {
         RegistrationParticipantId = registrationParticipantId;
         TenantId = tenantId;
@@ -26,7 +27,7 @@ public sealed class RegistrationParticipantPii : ITenantEntity, IAuditableEntity
         Email = Normalize(email);
         NormalizedEmail = Email?.ToUpperInvariant();
         Phone = Normalize(phone);
-        RetentionUntil = RegistrationRetentionDeadline.Resolve(retentionPolicyId, createdAt);
+        RetentionUntil = RegistrationRetentionDeadline.Resolve(retentionPolicyId, createdAt, anonymousUpperBoundUtc);
         CreatedAt = createdAt;
     }
 
@@ -70,23 +71,25 @@ public sealed class RegistrationParticipantPii : ITenantEntity, IAuditableEntity
         string? email,
         string? phone,
         int retentionPolicyId,
-        DateTime createdAt)
+        DateTime createdAt,
+        DateTime? anonymousUpperBoundUtc = null)
     {
         if (registrationParticipantId == Guid.Empty || tenantId == Guid.Empty)
         {
             throw new ArgumentException("Participant and tenant identifiers are required.");
         }
 
-        return new RegistrationParticipantPii(registrationParticipantId, tenantId, displayName, email, phone, retentionPolicyId, createdAt);
+        return new RegistrationParticipantPii(registrationParticipantId, tenantId, displayName, email, phone, retentionPolicyId, createdAt, anonymousUpperBoundUtc);
     }
 
-    public void Update(string? displayName, string? email, string? phone, int retentionPolicyId, DateTime updatedAt)
+    public void Update(string? displayName, string? email, string? phone, int retentionPolicyId, DateTime updatedAt,
+        DateTime? anonymousUpperBoundUtc = null)
     {
         DisplayName = Normalize(displayName);
         Email = Normalize(email);
         NormalizedEmail = Email?.ToUpperInvariant();
         Phone = Normalize(phone);
-        RetentionUntil = RegistrationRetentionDeadline.Resolve(retentionPolicyId, updatedAt);
+        RetentionUntil = RegistrationRetentionDeadline.ResolveUpdate(retentionPolicyId, updatedAt, RetentionUntil, anonymousUpperBoundUtc);
     }
 
     public void Update(string? displayName, string? email, string? phone) =>

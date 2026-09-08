@@ -57,6 +57,7 @@ public static class SettingRegistry
         all.AddRange(LocalizationSettingDefinitions.All);
         all.AddRange(PublicExperienceSettingDefinitions.All);
         all.AddRange(AnonymousRegistrationChallengeSettingDefinitions.All);
+        all.AddRange(AnonymousRegistrationRetentionSettingDefinitions.All);
 
         DefinitionsByKey = all.ToFrozenDictionary(d => d.Key);
         ByCategory = all

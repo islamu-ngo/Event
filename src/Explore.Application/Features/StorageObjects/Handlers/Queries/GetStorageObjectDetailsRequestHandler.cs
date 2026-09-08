@@ -14,16 +14,22 @@ public class GetStorageObjectDetailsRequestHandler : IRequestHandler<GetStorageO
 {
     private readonly IStorageObjectRepository _storageObjectRepository;
     private readonly IMapper _mapper;
+    private readonly TimeProvider _timeProvider;
 
-    public GetStorageObjectDetailsRequestHandler(IStorageObjectRepository storageObjectRepository, IMapper mapper)
+    public GetStorageObjectDetailsRequestHandler(IStorageObjectRepository storageObjectRepository, IMapper mapper, TimeProvider timeProvider)
     {
         _storageObjectRepository = storageObjectRepository;
         _mapper = mapper;
+        _timeProvider = timeProvider;
     }
 
     public async Task<StorageObjectDto?> Handle(GetStorageObjectDetailsRequest request, CancellationToken cancellationToken)
     {
         var storageObject = await _storageObjectRepository.GetById(request.Id);
-        return _mapper.Map<StorageObjectDto>(storageObject);
+        if (storageObject is null) return null;
+        var eligibility = await StorageObjectContentEligibility.ResolveAsync(
+            storageObject, _storageObjectRepository, _timeProvider, cancellationToken);
+        var dto = _mapper.Map<StorageObjectDto>(storageObject) with { ContentEligibility = eligibility };
+        return dto.ForDisclosureAt(_timeProvider.GetUtcNow().UtcDateTime);
     }
 }

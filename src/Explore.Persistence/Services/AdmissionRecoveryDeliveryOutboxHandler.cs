@@ -39,6 +39,16 @@ public sealed class AdmissionRecoveryDeliveryOutboxHandler(
             throw new InvalidOperationException("Recovery delivery intent is not recoverable for handoff.");
         }
 
+        if (intent.Purpose != AdmissionRecoveryPurpose.TicketRecovery.ToString())
+            throw new InvalidOperationException("Recovery delivery purpose is invalid.");
+        RegistrationOrder? order = await (
+            from ticket in dbContext.AdmissionTickets.AsNoTracking()
+            join owner in dbContext.RegistrationOrders.AsNoTracking()
+                on new { ticket.TenantId, Id = ticket.RegistrationOrderId } equals new { owner.TenantId, owner.Id }
+            where ticket.TenantId == intent.TenantId && ticket.Id == intent.AdmissionTicketId
+            select owner).SingleOrDefaultAsync(cancellationToken);
+        AdmissionContactDeliveryPayload payload = AdmissionContactDeliveryPayload.Read(intent.ProtectedMaterial, intent.ProtectionVersion);
+        payload.RequireDisclosure(order, timeProvider.GetUtcNow().UtcDateTime);
         AdmissionRecoveryDeliveryEnvelope envelope = envelopeProtector.Unprotect(
             intent.ProtectedMaterial,
             intent.ProtectionVersion);
@@ -49,6 +59,7 @@ public sealed class AdmissionRecoveryDeliveryOutboxHandler(
 
         intent.MarkRouted(timeProvider.GetUtcNow().UtcDateTime);
         await dbContext.SaveChangesAsync(CancellationToken.None);
+        payload.RequireDisclosure(order, timeProvider.GetUtcNow().UtcDateTime);
         AdmissionRecoveryDirectDeliveryResult delivered = await deliveryChannel.DeliverAsync(
             new AdmissionRecoveryDirectDeliveryRequest(
                 intent.TenantId,
@@ -56,8 +67,13 @@ public sealed class AdmissionRecoveryDeliveryOutboxHandler(
                 intent.AdmissionTicketId,
                 intent.RecoveryRequestId,
                 envelope.RecipientAddress,
-                envelope.Capability),
+                envelope.Capability)
+            {
+                DisclosureUntilUtc = payload.DisclosureUntilUtc
+            },
             cancellationToken);
+        if (delivered.Outcome == AdmissionRecoveryDirectDeliveryOutcome.RetentionExpired)
+            throw new AdmissionContactRetentionExpiredException();
         if (delivered.Outcome != AdmissionRecoveryDirectDeliveryOutcome.Accepted ||
             string.IsNullOrWhiteSpace(delivered.ReceiptId))
         {

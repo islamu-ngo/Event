@@ -1,6 +1,12 @@
 // ABOUTME: Creates one order and its capacity holds under a serializable transaction with retry-stable identities.
 // ABOUTME: Reserves capacity before PII, converts unavailable capacity to a waitlist, and performs no external I/O.
 
+using System.Globalization;
+using System.Text.Json;
+using Explore.Application.Settings;
+using Explore.Domain.Constants;
+using Explore.Domain.Services.Registration;
+using Explore.Domain.Settings.Definitions;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Scheduling;
@@ -30,7 +36,9 @@ public sealed class CreateOrderWithHoldCommandHandler(
     ILogger<CreateOrderWithHoldCommandHandler> logger,
     IUnitOfWork unitOfWork,
     ISettingMutationLock mutationLock,
-    IVisitorAccessCapabilityResolver visitorCapabilities) :
+    IVisitorAccessCapabilityResolver visitorCapabilities,
+    ISystemSettingRepository systemSettings,
+    ITenantSettingRepository tenantSettings) :
     IRequestHandler<CreateRegistrationOrderWithHoldCommand, BaseCommandResponse<Guid>>,
     IRegistrationOrderStarter
 {
@@ -84,7 +92,7 @@ public sealed class CreateOrderWithHoldCommandHandler(
         try
         {
             BaseCommandResponse<Guid> response = await mutationLock.ExecuteOrderedGroupsAsync(
-                [VisitorAccessCapabilityResolver.AuthoritySettingKeys],
+                [VisitorAccessCapabilityResolver.AuthoritySettingKeys.Append(GovernanceSettingKeys.AnonymousRegistration.RetentionDays).ToArray()],
                 outerToken => unitOfWork.ExecuteSerializableAsync(async token =>
             {
                 earliestHoldExpiry = null;
@@ -222,7 +230,21 @@ public sealed class CreateOrderWithHoldCommandHandler(
                     return IncompatiblePolicy(request.EventId);
                 }
 
-                // Pool row fences and catalog reads may wait. A historical proof never starts new effects.
+                DateTime? anonymousRetentionUntil = null;
+                if (authority is not null)
+                {
+                    int? retentionDays = await ReadRetentionDaysAsync(token);
+                    if (retentionDays is null)
+                        return BaseCommandResponse.Failure<Guid>("anonymous_registration_retention_setting_invalid",
+                            "Anonymous registration retention is unavailable.", id: request.EventId);
+                    anonymousRetentionUntil = AnonymousRegistrationRetentionPolicy.ResolveInitialDeadline(
+                        eventTarget.LastSessionEndUtc, retentionDays.Value);
+                    if (anonymousRetentionUntil <= timeProvider.GetUtcNow().UtcDateTime)
+                        return BaseCommandResponse.Failure<Guid>("anonymous_registration_retention_expired",
+                            "Anonymous registration data retention has expired.", id: request.EventId);
+                }
+
+                // Pool row fences, catalog and settings reads may wait. Historical proof never starts new effects.
                 if (authority is not null && !authority.IsFresh(timeProvider.GetUtcNow()))
                 {
                     return ChallengeExpired(request.EventId);
@@ -246,7 +268,8 @@ public sealed class CreateOrderWithHoldCommandHandler(
                     request.GuestAccessTokenHash,
                     catalog.CurrencyCode,
                     createdAt,
-                    expiresAt);
+                    expiresAt,
+                    anonymousRetentionUntil);
 
                 if (request.GuestAccessTokenHash is not null &&
                     !order.TryEstablishGuestStatusPromise(eventTarget.LastSessionEndUtc, timeProvider.GetUtcNow().UtcDateTime))
@@ -529,6 +552,28 @@ public sealed class CreateOrderWithHoldCommandHandler(
         string.IsNullOrWhiteSpace(verifiedContactNormalizedEmail)
             ? null
             : verifiedContactNormalizedEmail.Trim().ToUpperInvariant();
+
+    private async Task<int?> ReadRetentionDaysAsync(CancellationToken cancellationToken)
+    {
+        var definition = AnonymousRegistrationRetentionSettingDefinitions.RetentionDays;
+        var instance = await systemSettings.GetByKey(definition.Key, cancellationToken);
+        var tenantOverride = await tenantSettings.GetByTenantAndKey(tenant.TenantId, definition.Key, cancellationToken);
+        Dictionary<string, SystemSetting> instanceValues = [];
+        Dictionary<string, TenantSetting> tenantValues = [];
+        if (instance is not null) instanceValues.Add(definition.Key, instance);
+        if (tenantOverride is not null) tenantValues.Add(definition.Key, tenantOverride);
+        string raw = HierarchicalSettingMerge.Resolve(definition.Key, instanceValues, tenantValues)!.Value;
+        try
+        {
+            string? value = JsonSerializer.Deserialize<string>(raw);
+            return value is not null && definition.AllowedValues!.Contains(value)
+                ? int.Parse(value, CultureInfo.InvariantCulture) : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
 
     private static bool IsIdentityAccessAllowed(
         int? identityAccessModeId,

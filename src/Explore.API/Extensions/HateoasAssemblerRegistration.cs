@@ -217,7 +217,8 @@ public static class HateoasAssemblerRegistration
         services.AddHalResource<ParticipantReadinessDto, ParticipantReadinessLinkPolicy, ParticipantReadinessCollectionLinkPolicy>();
         services.AddHalResource<TicketTransferDto, TicketTransferLinkPolicy, TicketTransferCollectionLinkPolicy>();
         services.AddHalResource<FairReturnWaitlistDto, FairReturnWaitlistLinkPolicy, FairReturnWaitlistCollectionLinkPolicy>();
-        services.AddHalResource<RegistrationAnswerFileDto, RegistrationAnswerFileLinkPolicy, RegistrationAnswerFileCollectionLinkPolicy>();
+        services.AddHalResourceWithAssembler<RegistrationAnswerFileDto, RegistrationAnswerFileLinkPolicy,
+            RegistrationAnswerFileCollectionLinkPolicy, RegistrationAnswerFileResourceAssembler>();
 
         // EventSessionAgendaItem
         services.AddHalResourceWithAssembler<EventSessionAgendaItemDto, EventSessionAgendaItemListDto, EventSessionAgendaItemDetailLinkPolicy, EventSessionAgendaItemCollectionLinkPolicy, EventSessionAgendaItemResourceAssembler>();

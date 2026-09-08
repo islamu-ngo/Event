@@ -12,5 +12,7 @@ public enum SmtpDeliveryOutcome
     /// <summary>No send began, or the server explicitly rejected delivery with a temporary failure.</summary>
     TransientFailure,
     /// <summary>Authentication, configuration, or permanent rejection requires correction.</summary>
-    ConfigurationFailure
+    ConfigurationFailure,
+    /// <summary>The included contact expired before SMTP send began; no acceptance is possible.</summary>
+    RetentionExpired
 }

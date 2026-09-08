@@ -1,10 +1,19 @@
 // ABOUTME: Detailed storage object DTO with provider-neutral metadata for local-first file access.
 // ABOUTME: Exposes safe display and lifecycle fields while keeping provider paths internal.
 
+using System.Text.Json.Serialization;
+
 namespace Explore.Application.DTOs.StorageObject;
 
 public sealed record StorageObjectDto
 {
+    [JsonIgnore]
+    public StorageObjectContentEligibility ContentEligibility { get; init; } = StorageObjectContentEligibility.Unrestricted;
+
+    public StorageObjectDto ForDisclosureAt(DateTime utcNow) => ContentEligibility.CanReadAt(utcNow)
+        ? this
+        : this with { FullName = string.Empty, SafeDisplayName = string.Empty, Uri = string.Empty };
+
     public Guid Id { get; init; }
     public int FileTypeId { get; init; }
     public string? FileTypeFullName { get; init; }

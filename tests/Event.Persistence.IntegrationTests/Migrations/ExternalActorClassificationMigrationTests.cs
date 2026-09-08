@@ -2,7 +2,9 @@
 // ABOUTME: Proves legacy BOT classification cannot be reintroduced for an Actor owned by ExternalActorSubject.
 
 using Event.Persistence.IntegrationTests.Fixtures;
+using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using TUnit.Assertions.Enums;
 
 namespace Event.Persistence.IntegrationTests.Migrations;
 
@@ -21,9 +23,9 @@ public sealed class ExternalActorClassificationMigrationTests(PostgreSqlContaine
         await Assert.That(await ScalarAsync(
             "SELECT COUNT(*) FROM pg_constraint WHERE conname = 'ck_actors_external_type_matches_owner'"))
             .IsEqualTo(1L);
-        await Assert.That(await ScalarAsync(
-            "SELECT COUNT(*) FROM \"__EFMigrationsHistory\""))
-            .IsEqualTo(1L);
+        await using var context = fixture.CreateDbContext();
+        await Assert.That(await context.Database.GetAppliedMigrationsAsync())
+            .IsEquivalentTo(context.Database.GetMigrations(), CollectionOrdering.Matching);
     }
 
     [Test]

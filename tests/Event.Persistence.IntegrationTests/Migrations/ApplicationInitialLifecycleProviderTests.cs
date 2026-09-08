@@ -48,7 +48,8 @@ public sealed class SqliteApplicationInitialLifecycleTests
         PrimaryDatabaseProviderComposition.ConfigureApplication(options, databaseOptions);
         await using var context = new ExploreDbContext(options.Options);
         IMigrator migrator = context.GetService<IMigrator>();
-        string migration = context.Database.GetMigrations().Single();
+        string migration = context.Database.GetMigrations()
+            .Single(id => id.EndsWith("_Init", StringComparison.Ordinal));
 
         await migrator.MigrateAsync(migration);
         await Assert.That(await context.Database.GetAppliedMigrationsAsync())

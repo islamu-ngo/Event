@@ -63,8 +63,11 @@ public sealed class PostgresModelConstraintApplierTests
         }
 
         var appliedMigrations = (await context.Database.GetAppliedMigrationsAsync()).ToArray();
-        await Assert.That(appliedMigrations).HasSingleItem();
+        await Assert.That(appliedMigrations.Where(id => id.EndsWith("_Init", StringComparison.Ordinal)))
+            .HasSingleItem();
         await Assert.That(appliedMigrations[0]).EndsWith("_Init");
+        await Assert.That(appliedMigrations).IsEquivalentTo(
+            context.Database.GetMigrations(), TUnit.Assertions.Enums.CollectionOrdering.Matching);
 
         await PostgresModelConstraintApplier.ApplyAsync(context);
 

@@ -18,6 +18,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using TUnit.Assertions.Enums;
 
 namespace Event.Persistence.IntegrationTests.Migrations;
 
@@ -36,7 +37,8 @@ public sealed class GeneratedInitMigrationBehaviorTests(
         string[] exploreMigrations = MigrationIds(explore);
         string[] dataProtectionMigrations = MigrationIds(dataProtection);
         string[] authorityMigrations = MigrationIds(authority);
-        await Assert.That(exploreMigrations).HasSingleItem();
+        await Assert.That(exploreMigrations.Where(id => id.EndsWith("_Init", StringComparison.Ordinal)))
+            .HasSingleItem();
         await Assert.That(dataProtectionMigrations).HasSingleItem();
         await Assert.That(authorityMigrations).HasSingleItem();
         await Assert.That(exploreMigrations[0]).EndsWith("_Init");
@@ -82,9 +84,12 @@ public sealed class GeneratedInitMigrationBehaviorTests(
         {
             await using ExploreDbContext context = CreateExploreContext();
             IMigrator migrator = context.GetService<IMigrator>();
-            string migrationId = MigrationIds(context)[^1];
+            string[] migrations = MigrationIds(context);
+            string migrationId = migrations[^1];
 
             await migrator.MigrateAsync(migrationId);
+            await Assert.That(await context.Database.GetAppliedMigrationsAsync())
+                .IsEquivalentTo(migrations, CollectionOrdering.Matching);
             await PostgresModelConstraintApplier.ApplyAsync(context);
             await LookupTableSeeder.SeedAsync(context);
 
@@ -173,7 +178,10 @@ public sealed class GeneratedInitMigrationBehaviorTests(
                 """)).IsEqualTo(1);
 
             await migrator.MigrateAsync(Migration.InitialDatabase);
+            await Assert.That(await context.Database.GetAppliedMigrationsAsync()).IsEmpty();
             await migrator.MigrateAsync(migrationId);
+            await Assert.That(await context.Database.GetAppliedMigrationsAsync())
+                .IsEquivalentTo(migrations, CollectionOrdering.Matching);
             await PostgresModelConstraintApplier.ApplyAsync(context);
             context.ChangeTracker.Clear();
             await LookupTableSeeder.SeedAsync(context);
@@ -432,7 +440,8 @@ public sealed class GeneratedInitMigrationBehaviorTests(
     private static Migration InitMigration(DbContext context)
     {
         IMigrationsAssembly assembly = context.GetService<IMigrationsAssembly>();
-        KeyValuePair<string, System.Reflection.TypeInfo> item = assembly.Migrations.Single();
+        KeyValuePair<string, System.Reflection.TypeInfo> item = assembly.Migrations
+            .Single(entry => entry.Key.EndsWith("_Init", StringComparison.Ordinal));
         return assembly.CreateMigration(item.Value, context.Database.ProviderName!);
     }
 

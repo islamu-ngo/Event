@@ -45,7 +45,8 @@ public sealed class LocationAddressGovernanceMigrationTests(PostgreSqlContainerF
         await using ExploreDbContext context = CreateModelContext(provider);
         string[] migrations = context.Database.GetMigrations().ToArray();
 
-        await Assert.That(migrations).HasSingleItem();
+        await Assert.That(migrations.Where(id => id.EndsWith("_Init", StringComparison.Ordinal)))
+            .HasSingleItem();
         await Assert.That(migrations[0]).EndsWith("_Init");
         await Assert.That(HasPendingModelChanges(context)).IsFalse();
     }
@@ -60,7 +61,8 @@ public sealed class LocationAddressGovernanceMigrationTests(PostgreSqlContainerF
     {
         await using ExploreDbContext context = CreateModelContext(provider);
         IMigrationsAssembly migrations = context.GetService<IMigrationsAssembly>();
-        string migrationId = context.Database.GetMigrations().Single();
+        string migrationId = context.Database.GetMigrations()
+            .Single(id => id.EndsWith("_Init", StringComparison.Ordinal));
         Migration init = migrations.CreateMigration(
             migrations.Migrations[migrationId],
             context.Database.ProviderName);
@@ -198,12 +200,12 @@ public sealed class LocationAddressGovernanceMigrationTests(PostgreSqlContainerF
         try
         {
             await using ExploreDbContext context = CreateApplicationContext(database);
-            string migration = context.Database.GetMigrations().Single();
-            await context.GetService<IMigrator>().MigrateAsync(migration);
+            string[] migrations = context.Database.GetMigrations().ToArray();
+            await context.Database.MigrateAsync();
             await LookupTableSeeder.SeedAsync(context);
 
             await Assert.That(await context.Database.GetAppliedMigrationsAsync())
-                .IsEquivalentTo([migration], CollectionOrdering.Matching);
+                .IsEquivalentTo(migrations, CollectionOrdering.Matching);
             await Assert.That(await ReadLookupAsync(context, "ie_location_address_sources"))
                 .IsEquivalentTo(["1:UNKNOWN_LEGACY", "2:MANUAL", "3:PROVIDER_SELECTION"], CollectionOrdering.Matching);
             await Assert.That(await ReadLookupAsync(context, "ie_location_address_visibilities"))

@@ -6,6 +6,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
@@ -361,11 +362,8 @@ public sealed class LocalCredentialLifecycleTests
             var settings = new SystemSettingRepository(dbContext: application,
                 mutationLock: new RelationalSettingMutationLock(dbContext: application,
                     unitOfWork: new EfCoreUnitOfWork(application)));
-            await settings.UpsertAsync(new SystemSetting
-            {
-                Id = Guid.CreateVersion7(), SettingKey = GovernanceSettingKeys.Email.DeliveryEnabled,
-                Value = "false", ValueType = SettingValueType.Boolean, CreatedAt = DateTime.UtcNow
-            }, CancellationToken);
+            await EmailDispatchSqliteFixture.SetEmailSettingAsync(application,
+                GovernanceSettingKeys.Email.DeliveryEnabled, "false", cancellationToken: CancellationToken);
             _manager = scoped.GetRequiredService<UserManager<LocalIdentityUser>>();
             string password = $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(24))}";
             string email = $"lifecycle-{Guid.CreateVersion7():N}@example.test";

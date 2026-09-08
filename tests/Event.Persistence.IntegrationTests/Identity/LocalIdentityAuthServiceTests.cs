@@ -3,6 +3,7 @@
 
 using System.Security.Cryptography;
 using System.IdentityModel.Tokens.Jwt;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
@@ -201,7 +202,7 @@ public sealed class LocalIdentityAuthServiceTests
     {
         await using TestFixture fixture = await CreateSignedFixtureAsync();
         LocalAuthRequestDto login = await fixture.SeedUserAsync(emailConfirmed: false);
-        await fixture.SetInstanceIntentAsync(rawValue);
+        await fixture.SeedMalformedInstanceIntentAsync(rawValue);
 
         LocalAuthResponseDto result = await fixture.Service.AuthenticateAsync(login, fixture.CancellationToken);
 
@@ -412,15 +413,19 @@ public sealed class LocalIdentityAuthServiceTests
             return new LocalAuthRequestDto(Identifier: user.Email!, Password: password);
         }
 
-        internal Task<string?> SetInstanceIntentAsync(string value) => _systemSettings.UpsertAsync(new SystemSetting
+        internal Task SetInstanceIntentAsync(string value) => EmailDispatchSqliteFixture.SetEmailSettingAsync(
+            Context, GovernanceSettingKeys.Email.DeliveryEnabled, value, cancellationToken: CancellationToken);
+
+        internal async Task SeedMalformedInstanceIntentAsync(string value)
         {
-            Id = Guid.CreateVersion7(),
-            SettingKey = GovernanceSettingKeys.Email.DeliveryEnabled,
-            Value = value,
-            ValueType = SettingValueType.Boolean,
-            IsLocked = false,
-            CreatedAt = Now.UtcDateTime
-        }, cancellationToken: CancellationToken);
+            // Corrupt persisted state deliberately: the validating writer must never accept these values.
+            Context.SystemSettings.Add(new SystemSetting
+            {
+                Id = Guid.CreateVersion7(), SettingKey = GovernanceSettingKeys.Email.DeliveryEnabled,
+                Value = value, ValueType = SettingValueType.Boolean, CreatedAt = Now.UtcDateTime
+            });
+            await Context.SaveChangesAsync(CancellationToken);
+        }
 
         internal async Task SeedDisabledTenantOverrideAsync()
         {
@@ -432,13 +437,13 @@ public sealed class LocalIdentityAuthServiceTests
                 TenantStatusId = status.Id, TenantStatus = status, CreatedAt = Now.UtcDateTime
             };
             Context.TenantContext = new FixedTenantContext(tenant.Id);
-            Context.TenantSettingOverrides.Add(new TenantSetting
-            {
-                Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
-                SettingKey = GovernanceSettingKeys.Email.DeliveryEnabled, Value = "false",
-                IsLocked = false, CreatedAt = Now.UtcDateTime
-            });
+            Context.Tenants.Add(tenant);
             await Context.SaveChangesAsync(CancellationToken);
+            await EmailDispatchSqliteFixture.SetEmailSettingAsync(Context,
+                GovernanceSettingKeys.TenantDelegation.LockSmtp, "false", cancellationToken: CancellationToken);
+            await EmailDispatchSqliteFixture.SetEmailSettingAsync(Context,
+                GovernanceSettingKeys.Email.DeliveryEnabled, "false", tenantId: tenant.Id,
+                cancellationToken: CancellationToken);
         }
 
         public async ValueTask DisposeAsync()

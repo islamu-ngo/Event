@@ -12,7 +12,7 @@ internal sealed class AnonymousChallengeTenantQuotaConfiguration : IEntityTypeCo
 {
     public void Configure(EntityTypeBuilder<AnonymousChallengeTenantQuota> builder)
     {
-        builder.ToTable("anonymous_challenge_tenant_quotas", table =>
+        builder.ToTable(table =>
         {
             table.HasCheckConstraint("ck_anon_challenge_tenant_count", "issued >= 0 AND issued <= 10000");
             table.HasCheckConstraint("ck_anon_challenge_tenant_minute", "window_minute >= 0");
@@ -27,7 +27,7 @@ internal sealed class AnonymousChallengeEventQuotaConfiguration : IEntityTypeCon
 {
     public void Configure(EntityTypeBuilder<AnonymousChallengeEventQuota> builder)
     {
-        builder.ToTable("anonymous_challenge_event_quotas", table =>
+        builder.ToTable(table =>
         {
             table.HasCheckConstraint("ck_anon_challenge_event_count", "issued >= 0 AND issued <= 10000");
             table.HasCheckConstraint("ck_anon_challenge_event_minute", "window_minute >= 0");

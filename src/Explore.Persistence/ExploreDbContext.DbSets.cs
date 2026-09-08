@@ -12,6 +12,7 @@ using Explore.Domain.Views;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Persistence.Entities;
 using Explore.Persistence.Identity;
+using Explore.Persistence.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using StorageObject = Explore.Domain.StorageObject;
@@ -75,6 +76,7 @@ public partial class ExploreDbContext
     public DbSet<UserExternalLogin> UserExternalLogins { get; set; }
     public DbSet<LocalIdentityUser> LocalIdentityUsers { get; set; }
     public DbSet<LocalIdentityRole> LocalIdentityRoles { get; set; }
+    public DbSet<LocalIdentityLifecycleOperation> LocalIdentityLifecycleOperations { get; set; }
     public DbSet<IdentityUserRole<Guid>> IdentityUserRoles { get; set; }
     public DbSet<IdentityUserClaim<Guid>> IdentityUserClaims { get; set; }
     public DbSet<IdentityRoleClaim<Guid>> IdentityRoleClaims { get; set; }
@@ -146,6 +148,8 @@ public partial class ExploreDbContext
     // ===== Events =====
     public DbSet<Event> Events { get; set; }
     public DbSet<EventParticipationConfiguration> EventParticipationConfigurations { get; set; }
+    internal DbSet<AnonymousChallengeTenantQuota> AnonymousChallengeTenantQuotas => Set<AnonymousChallengeTenantQuota>();
+    internal DbSet<AnonymousChallengeEventQuota> AnonymousChallengeEventQuotas => Set<AnonymousChallengeEventQuota>();
     public DbSet<ParticipationRequirementAttachment> ParticipationRequirementAttachments { get; set; }
     public DbSet<EventPublicAction> EventPublicActions { get; set; }
     public DbSet<EventOrganizerClaim> EventOrganizerClaims { get; set; }

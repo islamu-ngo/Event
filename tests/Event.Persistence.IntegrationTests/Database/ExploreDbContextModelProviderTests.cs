@@ -5,7 +5,11 @@ using System.Text.RegularExpressions;
 using System.Security.Cryptography;
 using Explore.Persistence;
 using Explore.Persistence.Database;
+using Explore.Persistence.Identity;
+using Explore.Persistence.Models;
 using Explore.Persistence.Schema;
+using Explore.Secrets.Database;
+using Microsoft.Extensions.Configuration;
 using Explore.Persistence.ValueGenerators;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -320,6 +324,110 @@ public sealed class ExploreDbContextModelProviderTests
                 RelationalConstraintDescriptorResolver.ExclusionConstraint<Explore.Domain.EventSession>(context))
                 .IsNotEmpty();
         }
+    }
+
+    [Test]
+    [Arguments(PrimaryDatabaseProvider.PostgreSql)]
+    [Arguments(PrimaryDatabaseProvider.Sqlite)]
+    [Arguments(PrimaryDatabaseProvider.SqlServer)]
+    [Arguments(PrimaryDatabaseProvider.MariaDb)]
+    [Arguments(PrimaryDatabaseProvider.MySql)]
+    public async Task PrivateTablesHaveCanonicalDbSetOwners(PrimaryDatabaseProvider provider)
+    {
+        var violations = new List<string>();
+        foreach (bool external in new[] { false, true })
+        foreach (string? schema in new string?[] { null, "operator_private" })
+        {
+            using DbContext context = CreatePrivateTableContext(provider, external, schema);
+            IModel model = context.GetService<IDesignTimeModel>().Model;
+            var sets = context.GetService<IDbSetFinder>().FindSets(context.GetType());
+            (Type Type, string Set, string Table)[] expected = external
+                ? [(typeof(LocalIdentityLifecycleOperation), "LocalIdentityLifecycleOperations", "local_identity_lifecycle_operations")]
+                : [
+                    (typeof(AnonymousChallengeTenantQuota), "AnonymousChallengeTenantQuotas", "anonymous_challenge_tenant_quotas"),
+                    (typeof(AnonymousChallengeEventQuota), "AnonymousChallengeEventQuotas", "anonymous_challenge_event_quotas"),
+                    (typeof(LocalIdentityLifecycleOperation), "LocalIdentityLifecycleOperations", "local_identity_lifecycle_operations")
+                ];
+            bool usesSchema = provider is PrimaryDatabaseProvider.PostgreSql or PrimaryDatabaseProvider.SqlServer;
+            foreach (var mapping in expected)
+            {
+                if (sets.Count(set => set.Type == mapping.Type && set.Name == mapping.Set) != 1)
+                    violations.Add($"{provider}/{context.GetType().Name}: missing canonical DbSet {mapping.Set}");
+                IEntityType entity = model.FindEntityType(mapping.Type)!;
+                await Assert.That(entity.GetTableName()).IsEqualTo(usesSchema ? mapping.Table : "ie_" + mapping.Table);
+                await Assert.That(entity.GetSchema()).IsEqualTo(usesSchema
+                    ? schema ?? (external ? "islamu_identity" : "islamu_event") : null);
+            }
+            if (external)
+            {
+                await Assert.That(model.FindEntityType(typeof(AnonymousChallengeTenantQuota))).IsNull();
+                await Assert.That(model.FindEntityType(typeof(AnonymousChallengeEventQuota))).IsNull();
+            }
+        }
+        await Assert.That(violations).IsEmpty();
+    }
+
+    [Test]
+    [Arguments(PrimaryDatabaseProvider.PostgreSql)]
+    [Arguments(PrimaryDatabaseProvider.Sqlite)]
+    [Arguments(PrimaryDatabaseProvider.SqlServer)]
+    [Arguments(PrimaryDatabaseProvider.MariaDb)]
+    [Arguments(PrimaryDatabaseProvider.MySql)]
+    public async Task PrivateTableModelsMatchExistingSnapshots(PrimaryDatabaseProvider provider)
+    {
+        foreach (bool external in new[] { false, true })
+        {
+            using DbContext context = CreatePrivateTableContext(provider, external);
+            string ddl = context.Database.GenerateCreateScript();
+            Console.WriteLine($"Schema fingerprint {provider}/{context.GetType().Name}: " +
+                Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(ddl))));
+            await Assert.That(context.Database.HasPendingModelChanges()).IsFalse();
+        }
+    }
+
+    private static DbContext CreatePrivateTableContext(
+        PrimaryDatabaseProvider provider, bool external, string? schema = null)
+    {
+        var database = new PrimaryDatabaseConnectionOptions
+        {
+            Role = PrimaryDatabaseRole.Runtime,
+            Provider = provider,
+            Host = provider == PrimaryDatabaseProvider.Sqlite ? null : "localhost",
+            Database = provider == PrimaryDatabaseProvider.Sqlite
+                ? Path.Combine(Path.GetTempPath(), $"private-table-model-{Guid.NewGuid():N}.db") : "model",
+            Schema = schema ?? (external ? "islamu_identity" : "islamu_event"),
+            Username = provider == PrimaryDatabaseProvider.Sqlite ? null : "model",
+            Password = provider == PrimaryDatabaseProvider.Sqlite ? null : TestPassword(),
+            ServerFlavor = provider switch
+            {
+                PrimaryDatabaseProvider.MariaDb => PrimaryDatabaseServerFlavor.MariaDb,
+                PrimaryDatabaseProvider.MySql => PrimaryDatabaseServerFlavor.MySql,
+                _ => null
+            },
+            ServerVersion = provider switch
+            {
+                PrimaryDatabaseProvider.MariaDb => new Version(11, 4),
+                PrimaryDatabaseProvider.MySql => new Version(8, 4),
+                _ => null
+            }
+        };
+        if (!external)
+        {
+            var options = new DbContextOptionsBuilder<ExploreDbContext>();
+            PrimaryDatabaseProviderComposition.ConfigureApplication(options, database);
+            return new ExploreDbContext(options.Options);
+        }
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["IdentityDatabase:Topology"] = "external",
+            ["IdentityDatabase:Provider"] = provider.ToString(),
+            ["IdentityDatabase:ConnectionString"] = PrimaryDatabaseConfiguration.BuildConnectionString(database).ConnectionString,
+            ["IdentityDatabase:Schema"] = database.Schema,
+            ["IdentityDatabase:ServerVersion"] = database.ServerVersion?.ToString()
+        }).Build();
+        var identityOptions = new DbContextOptionsBuilder<ExternalIdentityDbContext>();
+        IdentityDatabaseProviderComposition.Configure(identityOptions, configuration, PrimaryDatabaseRole.Runtime);
+        return new ExternalIdentityDbContext(identityOptions.Options);
     }
 
     [Test]

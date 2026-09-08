@@ -27,7 +27,7 @@ public sealed class LocalIdentityLifecycleOperationConfiguration : IEntityTypeCo
         builder.HasOne<LocalIdentityUser>().WithMany().HasForeignKey(operation => operation.LocalSubjectId)
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(operation => new { operation.LocalSubjectId, operation.Purpose, operation.ExpiresAt });
-        builder.ToTable("local_identity_lifecycle_operations", table =>
+        builder.ToTable(table =>
         {
             table.HasCheckConstraint("ck_local_lifecycle_purpose", "purpose BETWEEN 1 AND 3");
             table.HasCheckConstraint("ck_local_lifecycle_delivery_state", "delivery_state BETWEEN 0 AND 3 AND delivery_attempt_count BETWEEN 0 AND 3");

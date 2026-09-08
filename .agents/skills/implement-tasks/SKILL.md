@@ -23,7 +23,7 @@ priority: high
      - Active branch: `feat/<task-name>`
      - Task folder: `.worktrees/<task-name>/dev/active/<task-name>/`
      - Execution context: all shell commands set `Cwd: .worktrees/<task-name>`; all file edits target `.worktrees/<task-name>/...`
-     - **Action**: Do NOT recreate worktree or run `mv`. Skip setup steps and resume directly inside the existing worktree.
+     - **Action**: Do NOT recreate worktree or run `mv`. Skip setup steps and resume directly inside the existing worktree. If `AGENTS.local.md` exists in the repository root and is missing in `.worktrees/<task-name>`, copy it: `[ -f AGENTS.local.md ] && [ ! -f .worktrees/<task-name>/AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task-name>/`.
    - **Case B: In-Tree / Develop In-Flight (`dev/active/<task-name>`)**:
      If `dev/active/<task-name>` exists in the repository root and work is already in-progress (e.g. checked items `[x]` in `tasks.md`, existing commits, or user explicitly requested running directly on `develop` or current branch):
      - Active branch: current branch (e.g. `develop` or current feature branch)
@@ -37,8 +37,10 @@ priority: high
        git fetch origin develop
        git worktree add -b feat/<task-name> .worktrees/<task-name> origin/develop
        mkdir -p .worktrees/<task-name>/dev/active && mv dev/active/<task-name> .worktrees/<task-name>/dev/active/
+       [ -f AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task-name>/
        ```
      - Moving preserves strict single-source-of-truth, eliminates split-brain checklists, and ensures clean garbage collection on worktree removal.
+     - **Copy `AGENTS.local.md` (Never Move)**: If `AGENTS.local.md` exists in the repository root, copy it into `.worktrees/<task-name>/AGENTS.local.md`. It must be **copied (never moved)** so that local developer overrides and environment constraints remain in effect inside the isolated worktree while preserving the root configuration for subsequent sessions or tasks. (Because `AGENTS.local.md` is gitignored, it will not be staged or committed).
 3. **Resume Protocol & Working Memory Discipline**:
    When instructed to `resume <task>`, or when auto-detecting an in-flight plan:
    - **Holistic Orientation (Read Once per Session)**: On session start or cold resume, read `*-context.md` (`## Quick Resume`, current milestone, blockers), `*-tasks.md` (identify active phase and unchecked `[ ]` tasks), and read `*-plan.md` to establish the holistic mental model (system architecture, cross-cutting invariants, and downstream phase contracts). Never implement blind to future phase dependencies.
@@ -110,7 +112,8 @@ priority: high
    Resolve target task directory and execution context (Worktree vs In-Tree):
    - Check if .worktrees/<task> exists (or git worktree list):
      -> FOUND: Topology = Worktree. Set Cwd = .worktrees/<task>, PlanPath = .worktrees/<task>/dev/active/<task>/.
-        Skip worktree creation and plan mv.
+        Skip worktree creation and plan mv. If AGENTS.local.md exists in root and is missing in worktree, copy it:
+        [ -f AGENTS.local.md ] && [ ! -f .worktrees/<task>/AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task>/
      -> NOT FOUND:
         - If dev/active/<task> exists and (resuming OR user mandated in-tree):
           Topology = In-Tree. Set Cwd = repo root, PlanPath = dev/active/<task>/.
@@ -119,6 +122,7 @@ priority: high
           git fetch origin develop
           git worktree add -b feat/<task> .worktrees/<task> origin/develop
           mkdir -p .worktrees/<task>/dev/active && mv dev/active/<task> .worktrees/<task>/dev/active/
+          [ -f AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task>/
           Set Cwd = .worktrees/<task>, PlanPath = .worktrees/<task>/dev/active/<task>/.
 
 2. Context Load & Holistic Orientation:

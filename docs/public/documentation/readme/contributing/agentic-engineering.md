@@ -64,11 +64,12 @@ Before coding begins, the plan undergoes a simulated Senior CTO review:
 Once approved, implementation execution begins in complete isolation:
 1. **Root-Scoped Worktree:** A dedicated Git worktree is spawned under `.worktrees/<task-name>` branched from `origin/develop`.
 2. **Plan Transfer (`plan mv`):** The `dev/active/<task>` directory is moved into the worktree, guaranteeing a single source of truth.
-3. **TDD Cadence:** 
+3. **Local Overrides Mirroring:** If `AGENTS.local.md` exists in the repository root, it is copied (not moved) into the worktree to propagate machine overrides while remaining in the root.
+4. **TDD Cadence:**
    * **Red:** Compilable stubs + failing invariant test.
    * **Green:** Production code to satisfy invariants.
    * **Sliced Verification:** Fast execution of targeted test classes via TUnit (`--treenode-filter`).
-4. **Semantic Phase Commit:** Staged with `git add -A` within the clean worktree and committed using the planned semantic Conventional Commit contract.
+5. **Semantic Phase Commit:** Staged with `git add -A` within the clean worktree and committed using the planned semantic Conventional Commit contract.
 
 ### Stage 5: Pre-PR Rebase Gate & Governed Pull Request
 Before submitting the contribution:

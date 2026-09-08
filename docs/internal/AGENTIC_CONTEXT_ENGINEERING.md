@@ -27,12 +27,8 @@ This system enforces six core design tenets:
 2. **Zero-Turn Structural Injection**: When graph tooling is available, pre-flight blast-radius slices reduce manual traversal by injecting callers, callees, impacted flows, and tests on Turn 1.
 3. **Behavior-Bound Test-First Invariants**: Requirements are written as observable system behavior (RFC 2119 + `WHEN`/`THEN` Scenarios) and mapped directly to failing Red tests at pre-agreed public seams *before* production code is touched.
 4. **Portable Root Contract With A Scoped Twin Pair**: `AGENTS.md` is the portable authority. Reciprocal path-rule twins currently cover only `.agents/rules` and `.omo/rules`; Claude, Cursor, Copilot, Gemini, and other harness adapters remain separate drift-prone integration surfaces.
-<<<<<<< HEAD
-5. **Phase-Atomic Native Git Delivery**: Planning pre-authors a self-sufficient phase packet containing exact commit metadata, wholly owned paths, inspection/staging/path-limited commit commands, and post-commit verification. Parallel contributors use separate branches/worktrees, while every verified phase closes with literal commit paths and leaves unrelated work untouched.
+5. **Phase-Atomic Declarative Git Delivery**: Planning pre-authors a self-sufficient phase packet containing exact commit metadata, wholly owned paths, inspection/staging/path-limited commit commands, and post-commit verification. Parallel contributors use dedicated task branches (`feat/<task-name>`) or isolated worktrees (`.worktrees/<task-name>`), while every verified phase closes atomically with literal commit paths without recording commit hashes in markdown (the Git commit log is the single source of truth).
 6. **Self-Contained Human Interaction & Zero Plan-Opening UX**: Prompts, feedback requests, milestone reports, and approval inquiries must be completely self-contained. The active implementation plan (`dev/active/<task>/`) is internal machine working memory, not the developer console. Agents must never force developers to open plan files to understand bare IDs (e.g. *"P04/P06 with P03 gates open"*); all decisions must be presented as inline, actionable Decision Briefs.
-=======
-5. **Phase-Atomic Declarative Git Delivery**: Execution runs on dedicated task branches (`feat/<task-name>`). Planning pre-authors declarative Conventional Commit contracts in `tasks.md`. Phases close atomically by staging owned paths and committing directly via Git without recording commit hashes in markdown (the Git commit log is the single source of truth).
->>>>>>> origin/develop
 
 ```mermaid
 flowchart TB
@@ -157,7 +153,7 @@ flowchart TD
 
     subgraph S3["Session 3: The Implementer"]
         M3["Model Tier: High Reasoning\nSkill: implement-tasks\nEnvironment: Fresh Clean Session + Isolated Worktree"]
-        A3["• Verifies Section 0 review approval\n• Executes plan mv into .worktrees/<task>\n• Red -> Green -> Refactor test-first loops\n• Closes phases with planned Conventional Commits\n• Knowledge graduation & worktree teardown"]
+        A3["• Verifies Section 0 review approval\n• Executes plan mv into .worktrees/<task>\n• Copies AGENTS.local.md (never moved)\n• Red -> Green -> Refactor test-first loops\n• Closes phases with planned Conventional Commits\n• Knowledge graduation & worktree teardown"]
     end
 
     S1 -->|Pristine Triad| S2
@@ -172,6 +168,7 @@ flowchart TD
    - **Planning (Session 1)**: Use the highest available reasoning model (`xhigh` / high reasoning effort) to maximize cross-module foresight, architectural synthesis, and contract precision.
    - **Review (Session 2)**: Use equal or higher reasoning effort (`xhigh` for Tiers 0–1 Sovereign/Security; `high` for Tiers 2–4). A reviewer must match or exceed the author's reasoning power to spot subtle concurrency races, transaction boundary leaks, and tenant isolation gaps.
    - **Implementation (Session 3)**: Use high reasoning models (`high`) optimized for fast, accurate code generation, precision typing, and test-first execution loops.
+4. **Hermetic Worktree Environment & Local Overrides Mirroring (`AGENTS.local.md`)**: When the implementing agent initializes an isolated worktree (`.worktrees/<task-name>`), it moves the plan triad (`plan mv`) to guarantee a single source of truth, and inspects for uncommitted local developer overrides (`AGENTS.local.md`). If present, `AGENTS.local.md` is **copied (never moved)** into the worktree root. This ensures gitignored machine settings (such as dedicated scratch mounts, environment flags, and local paths) remain active during execution without polluting git or stripping the root repository of its developer configuration.
 
 ---
 
@@ -607,6 +604,7 @@ git diff --check -- .agents/ docs/ dev/
 > - ❌ **NO Hand-Editing EF Migrations**: Migrations are generated artifacts (`dotnet ef migrations add`). Never manually edit migration files or model snapshots.
 > - ❌ **NO UI Authorization Inspection**: Blazor client affordances must be gated strictly by inspecting HAL `_links` presence, never by local role/claim checking.
 > - ❌ **NO Cryptic Shorthand or Plan-Opening Overhead**: Agents must never prompt the developer with bare phase/task IDs or gates (e.g., *"Proceed with P04/P06 while keeping P03 gates open?"*). All prompts and reports must be self-contained Decision Briefs so the developer never has to open `dev/active/<task>/...` to understand a question or decision.
+> - ❌ **NO Moving of `AGENTS.local.md`**: When establishing an isolated worktree, `AGENTS.local.md` must be copied, never moved. The root machine configuration must remain intact across multiple worktrees and tasks.
 > - ❌ **NO Yak-Shaving Unrelated Test Rot**: Never derail feature tasks to fix pre-existing failures in unrelated test suites. Isolate on clean base, log under `*-context.md` / `dev/backlog/`, and quarantine.
 
 ---

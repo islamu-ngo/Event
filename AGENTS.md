@@ -197,7 +197,7 @@ Whenever an agent prompts for approval, requests architectural direction, report
 
 ## Local Configuration Overrides
 
-If an `AGENTS.local.md` file exists in the repository root, inspect and follow all instructions, environment overrides, and system-specific constraints defined in it. Treat rules in `AGENTS.local.md` as overriding or extending the guidelines in this document.
+If an `AGENTS.local.md` file exists in the repository root, inspect and follow all instructions, environment overrides, and system-specific constraints defined in it. Treat rules in `AGENTS.local.md` as overriding or extending the guidelines in this document. When an isolated worktree is spawned (e.g. via `implement-tasks`), `AGENTS.local.md` is copied into the worktree root (never moved), ensuring local environment constraints remain active across isolated executions without git tracking.
 
 ---
 

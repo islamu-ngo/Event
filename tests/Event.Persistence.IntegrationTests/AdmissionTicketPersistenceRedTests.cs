@@ -1603,6 +1603,7 @@ public sealed class AdmissionTicketPersistencePostgreSqlRedTests(PostgreSqlConta
         };
         var user = new User
         {
+            EmailVerified = true,
             Pii = new UserPii
             {
                 Email = $"admission-{suffix}-{Guid.CreateVersion7():N}@example.test",

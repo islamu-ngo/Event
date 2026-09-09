@@ -79,14 +79,16 @@ jobs:
           changed_files="$(git diff --name-only "$base_sha" "$GITHUB_SHA" || true)"
 
           if [ -z "$changed_files" ]; then
-            echo "run-tests=true" >> "$GITHUB_OUTPUT"
-            echo "run-app-tests=true" >> "$GITHUB_OUTPUT"
-            echo "run-domain-tests=true" >> "$GITHUB_OUTPUT"
-            echo "run-architecture-tests=true" >> "$GITHUB_OUTPUT"
-            echo "run-setup-tests=true" >> "$GITHUB_OUTPUT"
-            echo "run-infrastructure-tests=true" >> "$GITHUB_OUTPUT"
-            echo "run-blazor-tests=true" >> "$GITHUB_OUTPUT"
-            echo "run-secrets-tests=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "run-tests=true"
+              echo "run-app-tests=true"
+              echo "run-domain-tests=true"
+              echo "run-architecture-tests=true"
+              echo "run-setup-tests=true"
+              echo "run-infrastructure-tests=true"
+              echo "run-blazor-tests=true"
+              echo "run-secrets-tests=true"
+            } >> "$GITHUB_OUTPUT"
             {
               echo "## Build & Test Change Detection"
               echo
@@ -105,14 +107,16 @@ jobs:
           done <<< "$changed_files"
 
           if [ -z "$relevant_files" ]; then
-            echo "run-tests=false" >> "$GITHUB_OUTPUT"
-            echo "run-app-tests=false" >> "$GITHUB_OUTPUT"
-            echo "run-domain-tests=false" >> "$GITHUB_OUTPUT"
-            echo "run-architecture-tests=false" >> "$GITHUB_OUTPUT"
-            echo "run-setup-tests=false" >> "$GITHUB_OUTPUT"
-            echo "run-infrastructure-tests=false" >> "$GITHUB_OUTPUT"
-            echo "run-blazor-tests=false" >> "$GITHUB_OUTPUT"
-            echo "run-secrets-tests=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "run-tests=false"
+              echo "run-app-tests=false"
+              echo "run-domain-tests=false"
+              echo "run-architecture-tests=false"
+              echo "run-setup-tests=false"
+              echo "run-infrastructure-tests=false"
+              echo "run-blazor-tests=false"
+              echo "run-secrets-tests=false"
+            } >> "$GITHUB_OUTPUT"
             {
               echo "## Build & Test Change Detection"
               echo
@@ -221,13 +225,15 @@ jobs:
             done <<< "$relevant_files"
           fi
 
-          echo "run-app-tests=$run_app" >> "$GITHUB_OUTPUT"
-          echo "run-domain-tests=$run_domain" >> "$GITHUB_OUTPUT"
-          echo "run-architecture-tests=$run_arch" >> "$GITHUB_OUTPUT"
-          echo "run-setup-tests=$run_setup" >> "$GITHUB_OUTPUT"
-          echo "run-infrastructure-tests=$run_infra" >> "$GITHUB_OUTPUT"
-          echo "run-blazor-tests=$run_blazor" >> "$GITHUB_OUTPUT"
-          echo "run-secrets-tests=$run_secrets" >> "$GITHUB_OUTPUT"
+          {
+            echo "run-app-tests=$run_app"
+            echo "run-domain-tests=$run_domain"
+            echo "run-architecture-tests=$run_arch"
+            echo "run-setup-tests=$run_setup"
+            echo "run-infrastructure-tests=$run_infra"
+            echo "run-blazor-tests=$run_blazor"
+            echo "run-secrets-tests=$run_secrets"
+          } >> "$GITHUB_OUTPUT"
 
           {
             echo "## Build & Test Subsystem Routing"

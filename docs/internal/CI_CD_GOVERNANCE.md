@@ -295,6 +295,11 @@ Provider-specific root directories such as `.forgejo/`, `.woodpecker/`, or `.tan
 
 If future `zizmor` findings must be temporarily accepted, document each exception with owner, date, rule ID, affected workflow, compensating control, and removal condition before weakening the workflow.
 
+Local actionlint verification must have `shellcheck` on PATH to cover embedded
+Bash; without it, a successful run only establishes workflow/expression validity.
+Keep related step outputs in one redirected block so the same shell checks pass
+locally and on GitHub-hosted runners.
+
 ### Workflow Cache Poisoning Policy
 
 Fork pull requests and untrusted contribution events must not write caches that are later consumed by trusted deployment, release, or publish workflows. `Workflow Security` enforces this with `.ci/scripts/validate-workflow-cache-policy.cs`.

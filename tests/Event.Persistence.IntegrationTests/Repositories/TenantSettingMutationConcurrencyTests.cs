@@ -6,7 +6,6 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Settings;
-using Explore.Domain.Settings.Definitions;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -20,7 +19,7 @@ namespace Event.Persistence.IntegrationTests.Repositories;
 [NotInParallel("PersistenceDb")]
 public sealed class TenantSettingMutationConcurrencyTests(PostgreSqlContainerFixture fixture)
 {
-    private static readonly string SettingKey = PublicExperienceSettingDefinitions.EventCatalogLabel.Key;
+    private const string SettingKey = GovernanceSettingKeys.Branding.DisplayName;
     private readonly Guid _actorId = Guid.NewGuid();
 
     [Test]

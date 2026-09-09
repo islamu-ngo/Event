@@ -1,0 +1,28 @@
+Change-Id: CHG-01M23M9ZVV8T7SE4H0NNRQ62NR
+Title: "Preserve registration artifact ownership and retention authority"
+Type: fix
+Scope: privacy
+Summary: "Reject generic ownership changes for registration artifacts and enforce persisted content deadlines independently of the current order classification."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/ADMISSION_AND_REGISTRATION.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Registration artifact ownership cannot be replaced through generic metadata updates, and persisted deadlines remain authoritative before and after provider open.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/email-optional-participation.md
+    Disposition: documented
+    Detail: Storage metadata edits cannot change registration provenance or extend the artifact access window.

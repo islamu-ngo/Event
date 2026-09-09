@@ -3,6 +3,9 @@ using System.Security.Cryptography;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.DTOs.StorageObject;
+using Explore.Application.Features.StorageObjects.Requests.Commands;
+using Explore.Application.Features.StorageObjects.Handlers.Commands;
+using Explore.Application.Responses;
 using Explore.Application.Features.StorageObjects.Requests.Queries;
 using Explore.Application.Models.Storage;
 using Explore.Application.Services;
@@ -141,11 +144,207 @@ public sealed class AnonymousRetentionReadBoundaryTests
     }
 
     [Test]
-    public async Task ProviderOpenCrossingExpiryDisposesAlreadyOpenedStream()
+    public async Task ExpiredAnonymousCsvCannotBeDisclosedOrLoseCleanupLineageThroughMetadataReparenting()
     {
         var clock = new Clock();
         await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync(services => services.AddSingleton<TimeProvider>(clock));
-        var scope = await SeedReadScopeAsync(fixture, legalHold: true);
+        var source = await SeedReadScopeAsync(fixture, legalHold: false);
+        var target = await SeedReadScopeAsync(fixture, legalHold: false, anonymous: false);
+        try
+        {
+            clock.Now = new DateTimeOffset(source.Deadline);
+            var update = await fixture.ExecuteAsync<UpdateStorageObjectCommand, BaseCommandResponse<Guid>>(new()
+            {
+                StorageObjectId = source.Storage.Id,
+                StorageObjectDto = new()
+                {
+                    Metadata = new() { FullName = "reparented.csv" },
+                    Ownership = new()
+                    {
+                        OwningResourceKind = source.Storage.OwningResourceKind,
+                        OwningResourceId = target.Storage.OwningResourceId
+                    }
+                }
+            });
+            fixture.Context.ChangeTracker.Clear();
+
+            var opened = await fixture.Services.GetRequiredService<IStorageObjectContentReader>()
+                .OpenAsync(source.Storage.Id, false, CancellationToken.None);
+            if (opened is not null) await opened.Content.DisposeAsync();
+            await Assert.That(opened).IsNull();
+            var persisted = await fixture.Services.GetRequiredService<IStorageObjectRepository>().GetById(source.Storage.Id);
+            await Assert.That(persisted!.OwningResourceId).IsEqualTo(source.Storage.OwningResourceId);
+            await Assert.That(persisted.OwningResourceKind).IsEqualTo(source.Storage.OwningResourceKind);
+            await Assert.That(persisted.RegistrationContentRetentionUntilUtc).IsEqualTo(source.Deadline);
+            await Assert.That(persisted.FullName).IsEqualTo("private.csv");
+            await Assert.That(update.IsSuccess).IsFalse();
+
+            await fixture.Services.GetRequiredService<IRegistrationRetentionCleanupRepository>()
+                .CleanupTenantAsync(fixture.TenantId, source.Deadline, 10, CancellationToken.None);
+            fixture.Context.ChangeTracker.Clear();
+            persisted = await fixture.Services.GetRequiredService<IStorageObjectRepository>().GetById(source.Storage.Id);
+            await Assert.That(persisted!.LifecycleState).IsEqualTo(StorageObjectLifecycleStates.DeleteRequested);
+        }
+        finally
+        {
+            await DeleteStorageAsync(fixture, source.Storage);
+            await DeleteStorageAsync(fixture, target.Storage);
+        }
+    }
+
+    [Test]
+    [Arguments(-1, true)]
+    [Arguments(0, false)]
+    [Arguments(1, false)]
+    public async Task PersistedCsvDeadlineRemainsAuthoritativeWithNonanonymousOrder(long ticks, bool allowed)
+    {
+        var clock = new Clock();
+        await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync(services => services.AddSingleton<TimeProvider>(clock));
+        var scope = await SeedReadScopeAsync(fixture, legalHold: false, anonymous: false);
+        try
+        {
+            // Independently exercise the persisted artifact bound, not the order's anonymous policy.
+            clock.Now = new DateTimeOffset(scope.Deadline.AddTicks(ticks));
+            var opened = await fixture.Services.GetRequiredService<IStorageObjectContentReader>()
+                .OpenAsync(scope.Storage.Id, false, CancellationToken.None);
+            if (opened is not null)
+            {
+                using var reader = new StreamReader(opened.Content);
+                await Assert.That(await reader.ReadToEndAsync()).IsEqualTo("private answer");
+            }
+            await Assert.That(opened is not null).IsEqualTo(allowed);
+        }
+        finally { await DeleteStorageAsync(fixture, scope.Storage); }
+    }
+
+    [Test]
+    [Arguments("clear")]
+    [Arguments("kind")]
+    [Arguments("actor")]
+    [Arguments("deadline-only")]
+    [Arguments("kind-only")]
+    public async Task GenericOwnershipUpdatesCannotEraseRegistrationProvenance(string scenario)
+    {
+        await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync();
+        var scope = await SeedReadScopeAsync(fixture, legalHold: false);
+        try
+        {
+            if (scenario == "deadline-only")
+                await fixture.Context.StorageObjects.Where(item => item.Id == scope.Storage.Id).ExecuteUpdateAsync(setters => setters
+                    .SetProperty(item => item.OwningResourceKind, (string?)null)
+                    .SetProperty(item => item.OwningResourceId, (Guid?)null));
+            if (scenario == "kind-only")
+                await fixture.Context.StorageObjects.Where(item => item.Id == scope.Storage.Id).ExecuteUpdateAsync(setters => setters
+                    .SetProperty(item => item.RegistrationContentRetentionUntilUtc, (DateTime?)null));
+            fixture.Context.ChangeTracker.Clear();
+            var repository = fixture.Services.GetRequiredService<IStorageObjectRepository>();
+            var before = await repository.GetById(scope.Storage.Id);
+            string? originalKind = before!.OwningResourceKind;
+            Guid? originalId = before.OwningResourceId;
+            var response = await fixture.ExecuteAsync<UpdateStorageObjectCommand, BaseCommandResponse<Guid>>(new()
+            {
+                StorageObjectId = scope.Storage.Id,
+                StorageObjectDto = new()
+                {
+                    Ownership = scenario is "clear" or "kind-only" ? new() : new()
+                    {
+                        OwningResourceKind = scenario == "actor" ? originalKind : "event",
+                        OwningResourceId = originalId ?? scope.EventId,
+                        ActorId = scenario == "actor" ? fixture.ActorId : null
+                    }
+                }
+            });
+            fixture.Context.ChangeTracker.Clear();
+            var after = await repository.GetById(scope.Storage.Id);
+            await Assert.That(after!.OwningResourceKind).IsEqualTo(originalKind);
+            await Assert.That(after.OwningResourceId).IsEqualTo(originalId);
+            await Assert.That(after.ActorId).IsNull();
+            await Assert.That(response.IsSuccess).IsFalse();
+        }
+        finally { await DeleteStorageAsync(fixture, scope.Storage); }
+    }
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task OrdinaryMetadataUpdatesAndUnchangedRegistrationOwnershipRemainFunctional(bool registrationOwned)
+    {
+        var clock = new Clock();
+        await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync(services => services.AddSingleton<TimeProvider>(clock));
+        var scope = await SeedReadScopeAsync(fixture, legalHold: false);
+        try
+        {
+            if (!registrationOwned)
+                await fixture.Context.StorageObjects.Where(item => item.Id == scope.Storage.Id).ExecuteUpdateAsync(setters => setters
+                    .SetProperty(item => item.OwningResourceKind, "event")
+                    .SetProperty(item => item.OwningResourceId, scope.EventId)
+                    .SetProperty(item => item.RegistrationContentRetentionUntilUtc, (DateTime?)null));
+            fixture.Context.ChangeTracker.Clear();
+            Guid targetId = registrationOwned ? scope.Storage.OwningResourceId!.Value : Guid.CreateVersion7();
+            var response = await fixture.ExecuteAsync<UpdateStorageObjectCommand, BaseCommandResponse<Guid>>(new()
+            {
+                StorageObjectId = scope.Storage.Id,
+                StorageObjectDto = new()
+                {
+                    Metadata = new() { FullName = "renamed.csv" },
+                    Access = new() { Purpose = StorageObjectPurposes.Attachment, Visibility = StorageObjectVisibilities.AuthenticatedTenant },
+                    Ownership = new()
+                    {
+                        OwningResourceKind = registrationOwned ? scope.Storage.OwningResourceKind : "event",
+                        OwningResourceId = targetId,
+                        ActorId = registrationOwned ? null : fixture.ActorId
+                    }
+                }
+            });
+            fixture.Context.ChangeTracker.Clear();
+            var persisted = await fixture.Services.GetRequiredService<IStorageObjectRepository>().GetById(scope.Storage.Id);
+            await Assert.That(persisted!.OwningResourceId).IsEqualTo(targetId);
+            await Assert.That(persisted.ActorId).IsEqualTo(registrationOwned ? (Guid?)null : fixture.ActorId);
+            await Assert.That(persisted.Purpose).IsEqualTo(StorageObjectPurposes.Attachment);
+            await Assert.That(persisted.RegistrationContentRetentionUntilUtc).IsEqualTo(registrationOwned ? scope.Deadline : (DateTime?)null);
+            var opened = await fixture.Services.GetRequiredService<IStorageObjectContentReader>()
+                .OpenAsync(scope.Storage.Id, false, CancellationToken.None);
+            await Assert.That(opened).IsNotNull();
+            using var reader = new StreamReader(opened!.Content);
+            await Assert.That(await reader.ReadToEndAsync()).IsEqualTo("private answer");
+            await Assert.That(opened.SafeDisplayName).IsEqualTo("renamed.csv");
+            await Assert.That(response.IsSuccess).IsTrue();
+        }
+        finally { await DeleteStorageAsync(fixture, scope.Storage); }
+    }
+
+    [Test]
+    public async Task ForeignTenantCannotUpdateTrackedRegistrationArtifact()
+    {
+        await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync();
+        var scope = await SeedReadScopeAsync(fixture, legalHold: false);
+        try
+        {
+            var repository = fixture.Services.GetRequiredService<IStorageObjectRepository>();
+            var storage = await repository.GetById(scope.Storage.Id);
+            var handler = new UpdateStorageObjectCommandHandler(repository,
+                fixture.Services.GetRequiredService<IActorRepository>(), new TenantScope(Guid.CreateVersion7()));
+            var response = await handler.Handle(new()
+            {
+                StorageObjectId = scope.Storage.Id,
+                StorageObjectDto = new() { Metadata = new() { FullName = "foreign.csv" } }
+            }, CancellationToken.None);
+            await Assert.That(storage!.FullName).IsEqualTo("private.csv");
+            fixture.Context.ChangeTracker.Clear();
+            await Assert.That((await repository.GetById(scope.Storage.Id))!.FullName).IsEqualTo("private.csv");
+            await Assert.That(response.IsSuccess).IsFalse();
+        }
+        finally { await DeleteStorageAsync(fixture, scope.Storage); }
+    }
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task ProviderOpenCrossingExpiryDisposesAlreadyOpenedStream(bool anonymous)
+    {
+        var clock = new Clock();
+        await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync(services => services.AddSingleton<TimeProvider>(clock));
+        var scope = await SeedReadScopeAsync(fixture, legalHold: true, anonymous: anonymous);
         var provider = new OpenBarrier(fixture.Services.GetRequiredService<IFileStorageProviderResolver>().GetRequired(StorageProviders.Local));
         var reader = new StorageObjectContentReader(fixture.Services.GetRequiredService<IStorageObjectRepository>(), provider,
             fixture.Services.GetRequiredService<ICurrentUserService>(), fixture.Services.GetRequiredService<ILogger<StorageObjectContentReader>>(),
@@ -245,7 +444,7 @@ public sealed class AnonymousRetentionReadBoundaryTests
     [Test]
     [Arguments(false)]
     [Arguments(true)]
-    public async Task ReleasedAnswerFileUsesSubmissionOrderBoundEvenWithoutLegacyOwnershipMetadata(bool legacyOwnership)
+    public async Task ReleasedAnswerFilePreservesSubmissionOrderAuthorityAcrossMetadataUpdates(bool legacyOwnership)
     {
         var clock = new Clock();
         await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync(services => services.AddSingleton<TimeProvider>(clock));
@@ -268,6 +467,15 @@ public sealed class AnonymousRetentionReadBoundaryTests
             fixture.Context.AddRange(file, release);
             await fixture.Context.SaveChangesAsync();
             fixture.Context.ChangeTracker.Clear();
+            var update = await fixture.ExecuteAsync<UpdateStorageObjectCommand, BaseCommandResponse<Guid>>(new()
+            {
+                StorageObjectId = scope.Storage.Id,
+                StorageObjectDto = new()
+                {
+                    Ownership = new() { OwningResourceKind = "event", OwningResourceId = scope.EventId }
+                }
+            });
+            fixture.Context.ChangeTracker.Clear();
             clock.Now = new DateTimeOffset(scope.Deadline.AddTicks(-1));
             var reader = fixture.Services.GetRequiredService<IStorageObjectContentReader>();
             var content = await reader.OpenAsync(scope.Storage.Id, false, CancellationToken.None);
@@ -279,6 +487,10 @@ public sealed class AnonymousRetentionReadBoundaryTests
             await Assert.That(await reader.OpenAsync(scope.Storage.Id, false, CancellationToken.None)).IsNull();
             await Assert.That(await fixture.Context.RegistrationAnswerFiles.CountAsync()).IsEqualTo(1);
             await Assert.That(await fixture.Context.RegistrationAnswerFileReleases.CountAsync()).IsEqualTo(1);
+            var persisted = await fixture.Services.GetRequiredService<IStorageObjectRepository>().GetById(scope.Storage.Id);
+            await Assert.That(persisted!.OwningResourceKind).IsEqualTo(scope.Storage.OwningResourceKind);
+            await Assert.That(persisted.OwningResourceId).IsEqualTo(scope.Storage.OwningResourceId);
+            await Assert.That(update.IsSuccess).IsFalse();
         }
         finally { await DeleteStorageAsync(fixture, scope.Storage); }
     }
@@ -392,10 +604,10 @@ public sealed class AnonymousRetentionReadBoundaryTests
 
     private sealed record TenantScope(Guid TenantId) : ITenantContext;
 
-    private static async Task<ReadScope> SeedReadScopeAsync(EventVisitorCapabilitySqliteFixture fixture, bool legalHold)
+    private static async Task<ReadScope> SeedReadScopeAsync(EventVisitorCapabilitySqliteFixture fixture, bool legalHold, bool anonymous = true)
     {
         DateTime deadline = Now.AddDays(1);
-        var order = await SeedHistoricalOrderAsync(fixture, deadline);
+        var order = await SeedHistoricalOrderAsync(fixture, deadline, anonymous);
         int retentionPolicy = (int)(legalHold ? RegistrationRetentionPolicyEnum.LegalHold : RegistrationRetentionPolicyEnum.StandardOperational);
         order.SetPii(RegistrationOrderPii.CreateFromVerifiedContact(order.Id, fixture.TenantId, "Held attendee", "held@example.test",
             null, null, "held@example.test", retentionPolicy, Now));
@@ -535,16 +747,17 @@ public sealed class AnonymousRetentionReadBoundaryTests
         public Task<FileStorageProviderStatus> TestAsync(CancellationToken token, bool testWritePermissions = false) => inner.TestAsync(token, testWritePermissions);
     }
 
-    private static async Task<RegistrationOrder> SeedHistoricalOrderAsync(EventVisitorCapabilitySqliteFixture fixture, DateTime? deadline = null)
+    private static async Task<RegistrationOrder> SeedHistoricalOrderAsync(EventVisitorCapabilitySqliteFixture fixture, DateTime? deadline = null, bool anonymous = true)
     {
         var target = await fixture.SeedEventAsync(published: true);
         var catalog = await fixture.SeedTicketAsync(target.Id);
         var token = fixture.Services.GetRequiredService<IGuestCapabilityTokenService>().Issue();
-        var order = RegistrationOrder.Create(fixture.TenantId, target.Id, null, null, BookingPartyTypeEnum.Individual,
+        var order = RegistrationOrder.Create(fixture.TenantId, target.Id, anonymous ? null : fixture.UserId, null, BookingPartyTypeEnum.Individual,
             catalog.CatalogId, RegistrationParticipationSnapshot.Create(Guid.CreateVersion7(),
                 (int)ParticipationHandlingModeEnum.PlatformManaged, (int)AdvanceRegistrationObligationEnum.Required,
-                (int)IdentityAccessModeEnum.GuestAllowed, GuestRecoveryPolicyEnum.EmailOptional),
-            null, token.Hash, "USD", Now, Now.AddHours(1), deadline);
+                (int)(anonymous ? IdentityAccessModeEnum.GuestAllowed : IdentityAccessModeEnum.AccountRequired),
+                anonymous ? GuestRecoveryPolicyEnum.EmailOptional : null),
+            null, anonymous ? token.Hash : null, "USD", Now, Now.AddHours(1), anonymous ? deadline : null);
         fixture.Context.Add(order);
         await fixture.Context.SaveChangesAsync();
         return order;

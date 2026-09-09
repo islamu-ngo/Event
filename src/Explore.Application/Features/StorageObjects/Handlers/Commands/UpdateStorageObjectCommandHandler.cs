@@ -58,6 +58,18 @@ public class UpdateStorageObjectCommandHandler : IRequestHandler<UpdateStorageOb
                 "Storage object update failed.");
         }
 
+        if (request.StorageObjectDto.Ownership is { } ownership &&
+            (ownership.OwningResourceKind != entity.OwningResourceKind ||
+             ownership.OwningResourceId != entity.OwningResourceId ||
+             ownership.ActorId != entity.ActorId) &&
+            StorageObjectContentReader.IsRegistrationOwned(entity,
+                await _storageObjectRepository.GetRegistrationAnswerFileAsync(entity.Id, entity.TenantId, cancellationToken)))
+        {
+            return BaseCommandResponse.Validation<Guid>(
+                ["Registration artifact ownership cannot be modified."],
+                "Storage object update failed.");
+        }
+
         ApplyUpdate(entity, request.StorageObjectDto);
         await _storageObjectRepository.Update(entity);
 

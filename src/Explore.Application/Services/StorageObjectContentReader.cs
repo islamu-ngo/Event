@@ -170,6 +170,8 @@ public sealed class StorageObjectContentReader : IStorageObjectContentReader
         StorageObject storageObject, RegistrationAnswerFile? answerFile, RegistrationOrder? order,
         bool registrationOwned, DateTime utcNow)
     {
+        if (storageObject.RegistrationContentRetentionUntilUtc is { } deadline && utcNow >= deadline)
+            return false;
         if (!registrationOwned) return true;
         if (order is null || answerFile is { IsDeleted: true } ||
             answerFile is not null && !answerFile.IsReleased)

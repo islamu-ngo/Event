@@ -380,6 +380,20 @@ Connectivity loss is a denial of admission validation, not permission to validat
 
 See [Operations](OPERATIONS.md#admission-check-in-operations-phase-21) for incident response, export-safe audit, alerts, and rollback evidence.
 
+### Registration Artifact Retention Authority
+
+Generic storage updates cannot change the resource kind, resource identifier or
+actor ownership of registration-owned artifacts. Ownership includes a recorded
+registration-content deadline, a registration storage kind or linked answer-file
+evidence. Ordinary metadata changes do not remove that provenance.
+
+`StorageObjectContentReader` enforces a persisted artifact deadline independently
+of whether the linked order is currently classified as anonymous. The existing
+pre-open and post-open disclosure checks both enforce it; an already-opened
+stream is disposed if the deadline passes while the provider is opening it.
+Released answer files retain their submission/order authority, and cleanup keeps
+the original export lineage.
+
 ### Anonymous Cancellation And Committed Attendance
 
 `AnonymousCancellationService` retains the shared order, event, assignment,

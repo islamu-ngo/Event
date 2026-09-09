@@ -100,6 +100,9 @@ is unavailable rather than receiving a new retention window.
 Registration exports stored by Event obey the same access boundary. An external
 provider or a person who already downloaded data may retain their own copy;
 Event's expiry does not prove deletion of those copies.
+Storage metadata edits cannot move a registration artifact to another owner or
+clear its registration provenance. A recorded artifact deadline still applies
+if the associated order is no longer classified as anonymous.
 An internal queued email is not an external delivery: an expired registration
 contact cannot be decrypted and newly sent just because it was queued earlier.
 Already-started external delivery retains its existing outcome; expiry does not

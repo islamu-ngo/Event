@@ -1809,6 +1809,11 @@ Status-endpoint protection is enforced twice: authorization middleware challenge
 
 Three independent operator surfaces exist over the same scheduler; all are disabled by default.
 
+`InstanceSchedulerSection` handles generated-client read errors (including HTTP
+429 and 503) by clearing stale overview/job data and displaying a retry message.
+Manual Refresh reloads the overview and job list without issuing a scheduler
+mutation. Existing rate limits and HAL control authorization remain authoritative.
+
 - **Status endpoint** — one read-only JSON document for scripted checks. No UI.
 - **Administration API and admin UI** (`Scheduler:Quartz:AdminApiEnabled`) — the portable surface, available in both
   split and standalone topologies. It is a normal versioned HAL controller under `/api/admin/scheduler`, authorized as

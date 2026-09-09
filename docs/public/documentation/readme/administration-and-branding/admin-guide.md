@@ -64,6 +64,13 @@ a newly created account may be on a later page rather than page one.
 If refreshing account details fails, further resets remain unavailable until a
 refresh succeeds; the current password handover stays visible.
 
+### Background Scheduler
+
+When enabled, **Background Scheduler** in Instance Settings shows the current
+scheduler and job state. If a read is rate-limited or temporarily unavailable,
+the section shows an error instead of stale job controls. Wait for the service
+to recover, then select **Refresh**; refreshing does not run, pause or resume jobs.
+
 ### Tenant Lifecycle Management
 - **Create Tenant**: Provision a new community tenant with a unique slug and primary administrator.
 - **Tenant States**:

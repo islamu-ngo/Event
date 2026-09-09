@@ -413,6 +413,14 @@ compiler/PDB identity during the audited rebuild. The audit logs `dotnet --info`
 and still compares exact package bytes; deployed application runtime selection
 is unchanged.
 
+Setup-dotnet also installs the newest LTS runtime. Before compilation, the job
+retains the Core runtime requested by the installed SDK's `dotnet.runtimeconfig.json`
+and moves extra Core runtime directories into a separate runner-temporary holding
+directory. It validates that the root is the job-owned `audited-dotnet` directory;
+system .NET and host/fxr are untouched. `dotnet --list-runtimes` records the
+available framework rather than confusing the native host version with the
+compiler runtime. This follows the documented [runtime installation layout](https://learn.microsoft.com/en-us/dotnet/core/install/remove-runtime-sdk-versions#scripted-or-manual).
+
 ISLAMU Event is licensed under AGPL-3.0-or-later, and the ISLAMU CLA grants the ISLAMU project steward broad inbound rights for contributor work. That inbound CLA does not override third-party dependency licenses, so CI must keep runtime, build, and test dependency license risk explicit before alternative-license, commercial, nonprofit, public-sector, procurement-restricted, hosted-service, or special social-impact distribution is offered.
 
 `Build & Test` runs `.ci/scripts/validate-dependency-license-policy.cs` after locked restore and the NuGet vulnerability audit. The validator scans product `packages.lock.json` files, reads restored NuGet package metadata from the local package cache, rejects denied or unknown license metadata unless a package-specific exception is encoded in the policy script, and guards future product npm or container OS package dependency surfaces until dedicated license scanning exists for those ecosystems.

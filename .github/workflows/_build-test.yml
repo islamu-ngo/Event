@@ -89,6 +89,24 @@ jobs:
           cache: true
           cache-dependency-path: '**/packages.lock.json'
 
+      - name: Keep the SDK-Bundled Compiler Runtime
+        if: ${{ inputs.run-fast-tests }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(realpath "$DOTNET_ROOT")" = "$(realpath "$RUNNER_TEMP")/audited-dotnet"
+          sdk_version="$(jq -er '.sdk.version' global.json)"
+          runtime_version="$(jq -er '.runtimeOptions.framework.version' "$DOTNET_ROOT/sdk/$sdk_version/dotnet.runtimeconfig.json")"
+          runtime_root="$DOTNET_ROOT/shared/Microsoft.NETCore.App"
+          test -d "$runtime_root/$runtime_version"
+          holding="$(mktemp -d "$RUNNER_TEMP/audited-extra-runtimes.XXXXXX")"
+          for runtime_path in "$runtime_root"/*; do
+            if [ "$runtime_path" != "$runtime_root/$runtime_version" ]; then
+              mv -- "$runtime_path" "$holding/"
+            fi
+          done
+          dotnet --list-runtimes
+
       - name: Restore
         if: ${{ inputs.run-fast-tests }}
         run: dotnet restore --locked-mode

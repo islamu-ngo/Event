@@ -4,6 +4,8 @@ using Explore.Blazor.Extensions;
 using Explore.Blazor.Services;
 using Event.Web.BffHosting.Security;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -204,6 +206,12 @@ public sealed class BffOpaqueIdentityPartitionBaselineTests
         Microsoft.AspNetCore.TestHost.WebHostBuilderExtensions.UseTestServer(builder.WebHost);
         builder.Services.AddRouting();
         builder.Services.AddLogging();
+        builder.Services.AddDataProtection().UseEphemeralDataProtectionProvider();
+        builder.Services.AddAntiforgery(options =>
+        {
+            options.HeaderName = "X-CSRF";
+            options.Cookie.Name = "test-antiforgery";
+        });
         builder.Services.AddRateLimiter(options => options.AddPolicy(
             RateLimitingExtensions.SetupSecretPolicy,
             _ => RateLimitPartition.GetNoLimiter<string>("baseline")));
@@ -226,8 +234,12 @@ public sealed class BffOpaqueIdentityPartitionBaselineTests
         app.UseRateLimiter();
         app.MapSetupSecretEndpoints();
         await app.StartAsync();
-        return new TestBffApp(app,
-            Microsoft.AspNetCore.TestHost.HostBuilderTestServerExtensions.GetTestClient(app), sessions, secret);
+        var client = Microsoft.AspNetCore.TestHost.HostBuilderTestServerExtensions.GetTestClient(app);
+        var csrfContext = new Microsoft.AspNetCore.Http.DefaultHttpContext { RequestServices = app.Services, User = principal };
+        var tokens = app.Services.GetRequiredService<IAntiforgery>().GetAndStoreTokens(csrfContext);
+        client.DefaultRequestHeaders.Add("X-CSRF", tokens.RequestToken);
+        client.DefaultRequestHeaders.Add("Cookie", $"test-antiforgery={tokens.CookieToken}");
+        return new TestBffApp(app, client, sessions, secret);
     }
 
     private sealed class TestBffApp(

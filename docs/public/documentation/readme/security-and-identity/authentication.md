@@ -39,6 +39,10 @@ external destinations and literal control characters are not accepted. Normal
 local query parameters remain supported. This restriction concerns the return
 into the application, not the authorized redirect to an identity provider.
 
+Challenge and signout diagnostics omit supplied provider selectors and request
+or return URLs. For support, share the reported error code and correlation ID
+rather than complete authentication links or query strings.
+
 ### Local Identity
 
 Local Identity provides username/password or email/password sign-in without an external identity container. Passwords are hashed by ASP.NET Core Identity and failed attempts use bounded lockout. Public self-registration is closed: the former API and BFF registration routes have been removed, with no replacement public signup endpoint.

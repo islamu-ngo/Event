@@ -384,6 +384,7 @@ OIDC and BFF challenge failures must expose only safe diagnostic handles:
 - Browser redirects use `challengeError=1`, a normalized `errorCode`, and a correlation ID.
 - Browser redirects must not include `errorDetail`, raw exception messages, provider response bodies, client IDs, client-secret length, client-secret prefix, tokens, or secret-derived metadata.
 - Production-path logs use structured error codes, correlation IDs, failure categories, and boolean presence flags where needed. They must not log raw provider error bodies, raw exception text from identity-provider callbacks, client-secret prefixes, client-secret lengths, tokens, or refresh-token grant payloads.
+- Challenge and signout entry logs omit caller-supplied provider selectors and complete request/return URLs. Structured placeholders do not sanitize control characters or remove sensitive query values; safe routing does not make a return URL safe to log.
 - Development-only diagnostics such as `/auth/debug` remain a local troubleshooting surface and must never include secret values.
 
 Use `ISafeAuthDiagnosticsPolicy` for BFF auth challenge and OIDC remote-failure redirects so user-facing errors stay generic while operators can correlate failures through logs and traces.

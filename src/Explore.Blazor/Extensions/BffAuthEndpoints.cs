@@ -10,7 +10,6 @@ using Explore.Blazor.Services;
 using Explore.Blazor.Services.Auth;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.Options;
 
@@ -100,7 +99,7 @@ public static class BffAuthEndpoints
         var returnUrl = returnUrlService.GetSafeReturnUrl(ctx, logger);
         var provider = ctx.Request.Query["provider"].ToString();
 
-        logger.LogInformation("[AuthEndpoints] Authentication challenge requested for {Provider}", provider);
+        logger.LogInformation("[AuthEndpoints] Authentication challenge requested");
 
         var onboardingAdmission = await ResolveOnboardingAdmissionAsync(ctx, provider, isChallengeEndpoint: true);
         if (!ApplyOnboardingAdmission(ctx, onboardingAdmission, logger, "/auth/challenge"))
@@ -624,9 +623,7 @@ public static class BffAuthEndpoints
         var returnUrlService = ctx.RequestServices.GetRequiredService<IBffReturnUrlService>();
         var returnUrl = returnUrlService.GetSafeReturnUrl(ctx, logger);
 
-        logger.LogInformation(
-            "[AuthEndpoints] /auth/signout hit - Url: {Url} ReturnUrl: {ReturnUrl}",
-            ctx.Request.GetDisplayUrl(), returnUrl);
+        logger.LogInformation("[AuthEndpoints] Signout requested");
 
         var cookieAuthResult = AuthenticateResult.NoResult();
         try

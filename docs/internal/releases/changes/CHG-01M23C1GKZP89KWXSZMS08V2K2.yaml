@@ -1,0 +1,28 @@
+Change-Id: CHG-01M23C1GKZP89KWXSZMS08V2K2
+Title: "Keep authentication navigation inputs out of logs"
+Type: fix
+Scope: privacy
+Summary: "Omit untrusted provider selectors and request or return URLs from BFF challenge and signout diagnostics while retaining authentication and cookie-clearing behavior."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Untrusted authentication navigation values no longer reach formatted or structured challenge and signout diagnostics.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: Support workflows use bounded error codes and correlation identifiers instead of complete authentication links or query strings.

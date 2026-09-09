@@ -482,6 +482,11 @@ Do not promote stress, security, or runtime lanes to required status while a blo
 
 ### OpenAPI Breaking-Change Evidence
 
+Changelog detection reads the changed-path list directly with a Bash here-string.
+Do not pipe a producer into `grep -q` under `pipefail`: early successful matches
+can close a large pipe, turn the producer's SIGPIPE into failure, and incorrectly
+report a missing changelog on large pull requests.
+
 `OpenAPI Contract Guard` blocks stale generated contract artifacts and verifies deterministic second-run regeneration for `schemas/openapi_islamu-event.json`, `docs/internal/API_CONTRACT_INVENTORY.md`, and `src/Explore.Blazor.Client/Clients/EventApiTagClients.g.cs`.
 
 The inventory generator is an independent executable. Solution restore supplies

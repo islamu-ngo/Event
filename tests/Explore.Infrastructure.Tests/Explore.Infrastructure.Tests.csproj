@@ -1,5 +1,3 @@
-<!-- ABOUTME: Infrastructure behavior and external-provider integration tests. -->
-<!-- ABOUTME: Shares source fixtures across test projects while preserving production dependency boundaries. -->
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- The provider-neutral parity corpus is declared once and linked into every lane that evaluates it,

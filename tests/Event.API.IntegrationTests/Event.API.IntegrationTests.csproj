@@ -1,5 +1,3 @@
-<!-- ABOUTME: API integration and HTTP contract tests for the Event platform. -->
-<!-- ABOUTME: Links shared provider and settings fixtures without referencing other test assemblies. -->
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- The provider-neutral parity corpus is declared once and linked into every lane that evaluates it,

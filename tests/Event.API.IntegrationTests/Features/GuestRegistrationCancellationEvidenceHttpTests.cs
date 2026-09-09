@@ -74,7 +74,8 @@ public sealed partial class GuestRegistrationStatusHttpTests
         {
             scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(PlatformDefaults.DefaultTenantId);
             var cached = JsonSerializer.Deserialize<GuestRegistrationStatusDto>(before.RootElement,
-                JsonSerializerOptions.Web)! with { CanCancelRegistration = true };
+                JsonSerializerOptions.Web)! with
+            { CanCancelRegistration = true };
             var context = new DefaultHttpContext { RequestServices = scope.ServiceProvider };
             context.Request.Scheme = host.Client.BaseAddress!.Scheme;
             context.Request.Host = new HostString(host.Client.BaseAddress.Authority);

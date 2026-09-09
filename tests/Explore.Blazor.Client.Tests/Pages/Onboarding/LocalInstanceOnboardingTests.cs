@@ -138,8 +138,12 @@ public sealed class LocalInstanceOnboardingTests
             var path = request.RequestUri!.AbsolutePath.ToLowerInvariant();
             if (path == "/api/instanceonboarding/status") return Json(new
             {
-                isCompleted = false, provider = "Local", state = "InteractivePending", isAuthenticated = true,
-                selectedDeploymentMode = "SingleTenant", pendingOperationId = PendingOperationId,
+                isCompleted = false,
+                provider = "Local",
+                state = "InteractivePending",
+                isAuthenticated = true,
+                selectedDeploymentMode = "SingleTenant",
+                pendingOperationId = PendingOperationId,
                 _links = AllowCompletion ? new Dictionary<string, object> { ["complete-local"] = new { href = "/api/instanceonboarding/complete-local", method = "POST" } } : []
             });
             if (path == "/api/system/onboarding-status") return Json(new { requiresOnboarding = true, deploymentMode = "SingleTenant" });

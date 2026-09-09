@@ -217,8 +217,10 @@ public sealed class EmailDeliveryOperatorParkTests
 
     private static ParkEmailDispatchCommand Request(Scenario scenario) => new()
     {
-        TenantId = scenario.Dispatch.TenantId, OutboxId = scenario.Dispatch.OutboxId,
-        ChangedBy = scenario.UserId, Reason = "Review before delivery"
+        TenantId = scenario.Dispatch.TenantId,
+        OutboxId = scenario.Dispatch.OutboxId,
+        ChangedBy = scenario.UserId,
+        Reason = "Review before delivery"
     };
 
     private static async Task<EmailDispatchOutbox> ReadAsync(ExploreDbContext context, Scenario scenario) =>

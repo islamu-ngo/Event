@@ -87,8 +87,12 @@ public sealed class BffLocalSetupFlowTests
             using JsonDocument body = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(CancellationToken));
             await Assert.That(body.RootElement.GetProperty("pendingOperationId").GetGuid()).IsEqualTo(fixture.PendingOperationId);
         }
-        var completion = new { operationId = fixture.PendingOperationId, username = "local-operator",
-            temporaryPassword = $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(24))}" };
+        var completion = new
+        {
+            operationId = fixture.PendingOperationId,
+            username = "local-operator",
+            temporaryPassword = $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(24))}"
+        };
         using HttpResponseMessage denied = await fixture.Browser.PostAsJsonAsync("/api/instanceonboarding/complete-local", completion, CancellationToken);
         await Assert.That(denied.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
         await Assert.That(fixture.Completed).IsFalse();
@@ -140,8 +144,15 @@ public sealed class BffLocalSetupFlowTests
                 return Results.Json(new { valid = body.RootElement.GetProperty("secret").GetString() == Secret });
             });
             _upstream.MapGet("/api/instanceonboarding/status", (HttpContext context) =>
-                Results.Json(new { isCompleted = Completed, provider = "Local", state = Completed ? "Completed" : "InteractivePending",
-                    mode = "Interactive", generation = 1, pendingOperationId = context.Request.Headers["X-Setup-Secret"] == Secret ? PendingOperationId : (Guid?)null }));
+                Results.Json(new
+                {
+                    isCompleted = Completed,
+                    provider = "Local",
+                    state = Completed ? "Completed" : "InteractivePending",
+                    mode = "Interactive",
+                    generation = 1,
+                    pendingOperationId = context.Request.Headers["X-Setup-Secret"] == Secret ? PendingOperationId : (Guid?)null
+                }));
             _upstream.MapPost("/api/instanceonboarding/complete-local", async (HttpContext context) =>
             {
                 if (context.Request.Headers["X-Setup-Secret"] != Secret) return Results.Unauthorized();
@@ -165,7 +176,7 @@ public sealed class BffLocalSetupFlowTests
                 });
             });
             Browser = _factory.CreateClient(new WebApplicationFactoryClientOptions
-                { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false, HandleCookies = true });
+            { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false, HandleCookies = true });
         }
         internal async Task<string> CsrfAsync()
         {

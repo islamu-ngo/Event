@@ -118,7 +118,7 @@ public sealed class VisitorAccessCapabilityResolver(
                         destinations.Add(new(provider.Provider, destination.AbsoluteUri));
                     }
                     break;
-                // Local is operator-only; unknown authorities cannot create public capabilities.
+                    // Local is operator-only; unknown authorities cannot create public capabilities.
             }
         }
 

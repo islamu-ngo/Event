@@ -375,7 +375,8 @@ public sealed class SmtpConfigResolverTests
 
         await fixture.InstanceSmtp.ApplySettingsAsync(new InstanceSmtpSettingsDto
         {
-            Host = "smtp.updated-instance.test", FromAddress = "events@updated-instance.test"
+            Host = "smtp.updated-instance.test",
+            FromAddress = "events@updated-instance.test"
         });
         fixture.Settings.InvalidateCache(SettingScope.Instance);
 

@@ -53,10 +53,10 @@ internal sealed class LocalIdentityLifecycleDeliveryStore(
         // Receipt authority, unlike public token authority, remains repairable after link expiry.
         // Superseded native stamps cannot apply an older profile snapshot or starve current receipts.
         var rows = await (from operation in identityDbContext.Set<LocalIdentityLifecycleOperation>().AsNoTracking()
-            join user in identityDbContext.Set<LocalIdentityUser>().AsNoTracking() on operation.LocalSubjectId equals user.Id
-            where operation.ConsumedAt != null && operation.SynchronizedAt == null && operation.ResultSecurityStamp == user.SecurityStamp
-            orderby operation.ConsumedAt, operation.Id
-            select operation).Take(maximumCount).ToListAsync(cancellationToken);
+                          join user in identityDbContext.Set<LocalIdentityUser>().AsNoTracking() on operation.LocalSubjectId equals user.Id
+                          where operation.ConsumedAt != null && operation.SynchronizedAt == null && operation.ResultSecurityStamp == user.SecurityStamp
+                          orderby operation.ConsumedAt, operation.Id
+                          select operation).Take(maximumCount).ToListAsync(cancellationToken);
         return rows.Select(row => row.Pointer()).ToArray();
     }
 
@@ -75,7 +75,8 @@ internal sealed class LocalIdentityLifecycleDeliveryStore(
                 row => row.ProcessorCode == EmailDispatchOutboxRepository.SmtpProcessorCode, cancellationToken)
                 ?? new EmailDispatchProcessorState
                 {
-                    Id = Guid.CreateVersion7(), ProcessorCode = EmailDispatchOutboxRepository.SmtpProcessorCode,
+                    Id = Guid.CreateVersion7(),
+                    ProcessorCode = EmailDispatchOutboxRepository.SmtpProcessorCode,
                     UpdatedAt = now
                 };
             try

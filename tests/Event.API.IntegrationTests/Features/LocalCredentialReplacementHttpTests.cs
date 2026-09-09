@@ -88,8 +88,12 @@ public sealed class LocalCredentialReplacementHttpTests
             Role role = await seed.Set<Role>().SingleAsync(candidate => candidate.MasterCode == "platform.admin", CancellationToken);
             seed.PlatformUserRoles.Add(new PlatformUserRole
             {
-                Id = Guid.CreateVersion7(), UserId = administratorId, User = null!,
-                RoleId = role.Id, Role = role, GrantedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                UserId = administratorId,
+                User = null!,
+                RoleId = role.Id,
+                Role = role,
+                GrantedAt = DateTime.UtcNow
             });
             await seed.SaveChangesAsync(CancellationToken);
             await Assert.That(await seed.UserExternalLogins.AnyAsync(login => login.UserId == administratorId, CancellationToken)).IsFalse();
@@ -276,8 +280,11 @@ public sealed class LocalCredentialReplacementHttpTests
             if (policy is null)
                 mutation.SystemSettings.Add(new SystemSetting
                 {
-                    Id = Guid.CreateVersion7(), SettingKey = GovernanceSettingKeys.Email.DeliveryEnabled,
-                    Value = "false", ValueType = SettingValueType.Boolean, CreatedAt = DateTime.UtcNow
+                    Id = Guid.CreateVersion7(),
+                    SettingKey = GovernanceSettingKeys.Email.DeliveryEnabled,
+                    Value = "false",
+                    ValueType = SettingValueType.Boolean,
+                    CreatedAt = DateTime.UtcNow
                 });
             else policy.Value = "false";
             await mutation.SaveChangesAsync(CancellationToken);
@@ -639,20 +646,30 @@ public sealed class LocalCredentialReplacementHttpTests
         {
             var user = new User
             {
-                Id = receipt.LocalSubjectId, EmailVerified = true, CreatedAt = DateTime.UtcNow,
+                Id = receipt.LocalSubjectId,
+                EmailVerified = true,
+                CreatedAt = DateTime.UtcNow,
                 Pii = new UserPii { Email = email, FirstName = "Private", LastName = "Replacement" }
             };
             bind.Actors.Add(new Actor
             {
-                Id = receipt.PersonalActorId, UserId = user.Id, User = user,
-                ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-                Pii = new ActorPii { DisplayName = "Private Replacement" }, CreatedAt = DateTime.UtcNow
+                Id = receipt.PersonalActorId,
+                UserId = user.Id,
+                User = user,
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
+                Pii = new ActorPii { DisplayName = "Private Replacement" },
+                CreatedAt = DateTime.UtcNow
             });
             bind.UserExternalLogins.Add(new UserExternalLogin
             {
-                Id = receipt.ExternalLoginId, UserId = user.Id, User = user,
-                AuthenticationProviderId = (int)AuthenticationProviderKind.Local, AuthenticationProvider = null!,
-                ProviderKey = user.Id.ToString("D"), CreatedAt = DateTime.UtcNow
+                Id = receipt.ExternalLoginId,
+                UserId = user.Id,
+                User = user,
+                AuthenticationProviderId = (int)AuthenticationProviderKind.Local,
+                AuthenticationProvider = null!,
+                ProviderKey = user.Id.ToString("D"),
+                CreatedAt = DateTime.UtcNow
             });
             await bind.SaveChangesAsync(CancellationToken);
         }

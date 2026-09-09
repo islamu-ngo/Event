@@ -151,9 +151,18 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
             string category, int displayOrder, string description, CancellationToken token)
         {
             if (suppliedKeys is null || suppliedKeys.Contains(key))
-                writes.Add(new SystemSetting { SettingKey = key, Value = value, ValueType = valueType,
-                    IsLocked = isLocked, Category = category, DisplayOrder = displayOrder, Description = description,
-                    CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
+                writes.Add(new SystemSetting
+                {
+                    SettingKey = key,
+                    Value = value,
+                    ValueType = valueType,
+                    IsLocked = isLocked,
+                    Category = category,
+                    DisplayOrder = displayOrder,
+                    Description = description,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                });
             return Task.CompletedTask;
         }
         AuthenticationProviderKind primaryProvider =

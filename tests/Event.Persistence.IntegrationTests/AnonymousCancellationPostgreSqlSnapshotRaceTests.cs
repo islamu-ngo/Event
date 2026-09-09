@@ -86,9 +86,14 @@ public sealed class AnonymousCancellationPostgreSqlSnapshotRaceTests(PostgreSqlC
         Explore.Domain.Event target = await fixture.SeedEventAsync(published: true);
         fixture.Context.EventSessions.Add(new EventSession(EventSessionStatusEnum.Published)
         {
-            Id = Guid.CreateVersion7(), EventId = target.Id, Event = null!, TenantId = fixture.TenantId,
-            Tenant = null!, RegistrationModeId = (int)RegistrationModeEnum.Open,
-            StartTime = target.FirstSessionStartUtc, EndTime = target.LastSessionEndUtc
+            Id = Guid.CreateVersion7(),
+            EventId = target.Id,
+            Event = null!,
+            TenantId = fixture.TenantId,
+            Tenant = null!,
+            RegistrationModeId = (int)RegistrationModeEnum.Open,
+            StartTime = target.FirstSessionStartUtc,
+            EndTime = target.LastSessionEndUtc
         });
         await fixture.Context.SaveChangesAsync();
 

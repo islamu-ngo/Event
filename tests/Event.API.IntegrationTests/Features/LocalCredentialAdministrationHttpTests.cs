@@ -102,16 +102,27 @@ public sealed class LocalCredentialAdministrationHttpTests
             {
                 var member = new TenantUser
                 {
-                    Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                    UserId = fixture.AdministratorId, User = null!, StatusId = (int)TenantUserStatusEnum.Active,
-                    JoinedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow
+                    Id = Guid.CreateVersion7(),
+                    TenantId = PlatformDefaults.DefaultTenantId,
+                    Tenant = null!,
+                    UserId = fixture.AdministratorId,
+                    User = null!,
+                    StatusId = (int)TenantUserStatusEnum.Active,
+                    JoinedAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow
                 };
                 database.TenantUserRoleGrants.Add(new TenantUserRoleGrant
                 {
-                    Id = Guid.CreateVersion7(), TenantId = member.TenantId, Tenant = null!,
-                    TenantUserId = member.Id, TenantUser = member, RoleId = (int)RoleEnum.TenantAdmin,
-                    Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant,
-                    GrantedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow
+                    Id = Guid.CreateVersion7(),
+                    TenantId = member.TenantId,
+                    Tenant = null!,
+                    TenantUserId = member.Id,
+                    TenantUser = member,
+                    RoleId = (int)RoleEnum.TenantAdmin,
+                    Role = null!,
+                    RoleScopeId = (int)RoleScopeEnum.Tenant,
+                    GrantedAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow
                 });
                 await database.SaveChangesAsync(CancellationToken);
             }
@@ -169,14 +180,22 @@ public sealed class LocalCredentialAdministrationHttpTests
             // Deliberately invalid same-subject data in the non-authoritative store must not govern API reads or reset.
             application.LocalIdentityUsers.Add(new LocalIdentityUser
             {
-                Id = subjectId, UserName = email, NormalizedUserName = email.ToUpperInvariant(),
-                Email = email, NormalizedEmail = email.ToUpperInvariant(), FirstName = "Wrong store", LastName = "Decoy",
-                EmailConfirmed = false, CreatedAt = DateTime.UtcNow
+                Id = subjectId,
+                UserName = email,
+                NormalizedUserName = email.ToUpperInvariant(),
+                Email = email,
+                NormalizedEmail = email.ToUpperInvariant(),
+                FirstName = "Wrong store",
+                LastName = "Decoy",
+                EmailConfirmed = false,
+                CreatedAt = DateTime.UtcNow
             });
             application.Set<IdentityUserToken<Guid>>().Add(new IdentityUserToken<Guid>
             {
-                UserId = subjectId, LoginProvider = LocalCredentialStateMetadata.TokenLoginProvider,
-                Name = LocalCredentialStateMetadata.TokenName, Value = "{"
+                UserId = subjectId,
+                LoginProvider = LocalCredentialStateMetadata.TokenLoginProvider,
+                Name = LocalCredentialStateMetadata.TokenName,
+                Value = "{"
             });
             await application.SaveChangesAsync(CancellationToken);
         }
@@ -243,15 +262,27 @@ public sealed class LocalCredentialAdministrationHttpTests
             await database.PlatformUserRoles.Where(grant => grant.UserId == fixture.AdministratorId).ExecuteDeleteAsync(CancellationToken);
             var member = new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                UserId = fixture.AdministratorId, User = null!, StatusId = (int)TenantUserStatusEnum.Active,
-                JoinedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                UserId = fixture.AdministratorId,
+                User = null!,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                JoinedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
             };
             database.TenantUserRoleGrants.Add(new TenantUserRoleGrant
             {
-                Id = Guid.CreateVersion7(), TenantId = member.TenantId, Tenant = null!,
-                TenantUserId = member.Id, TenantUser = member, RoleId = (int)RoleEnum.TenantAdmin, Role = null!,
-                RoleScopeId = (int)RoleScopeEnum.Tenant, GrantedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                TenantId = member.TenantId,
+                Tenant = null!,
+                TenantUserId = member.Id,
+                TenantUser = member,
+                RoleId = (int)RoleEnum.TenantAdmin,
+                Role = null!,
+                RoleScopeId = (int)RoleScopeEnum.Tenant,
+                GrantedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
             });
             await database.SaveChangesAsync(CancellationToken);
         }
@@ -320,21 +351,32 @@ public sealed class LocalCredentialAdministrationHttpTests
         Guid externalId = Guid.CreateVersion7();
         await using (ExploreDbContext database = fixture.Factory.CreateDatabase())
         {
-            var user = new User { Id = externalId, EmailVerified = true, CreatedAt = DateTime.UtcNow,
-                Pii = new UserPii { Email = "external@example.test", FirstName = "External", LastName = "Owner" } };
+            var user = new User
+            {
+                Id = externalId,
+                EmailVerified = true,
+                CreatedAt = DateTime.UtcNow,
+                Pii = new UserPii { Email = "external@example.test", FirstName = "External", LastName = "Owner" }
+            };
             database.UserExternalLogins.Add(new UserExternalLogin
             {
-                Id = Guid.CreateVersion7(), UserId = user.Id, User = user,
-                AuthenticationProviderId = (int)AuthenticationProviderKind.Keycloak, AuthenticationProvider = null!,
-                ProviderKey = Guid.CreateVersion7().ToString("D"), CreatedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                UserId = user.Id,
+                User = user,
+                AuthenticationProviderId = (int)AuthenticationProviderKind.Keycloak,
+                AuthenticationProvider = null!,
+                ProviderKey = Guid.CreateVersion7().ToString("D"),
+                CreatedAt = DateTime.UtcNow
             });
             await database.SaveChangesAsync(CancellationToken);
         }
         string before = await fixture.SnapshotAsync();
         using HttpResponseMessage denied = await fixture.SendAsAdministratorAsync(HttpMethod.Post, ResetPath(externalId), new
         {
-            operationId = Guid.CreateVersion7(), expectedCurrentOperationId = Guid.CreateVersion7(),
-            expectedCurrentOperationConcurrencyStamp = Guid.CreateVersion7(), reason = "Exact provider boundary"
+            operationId = Guid.CreateVersion7(),
+            expectedCurrentOperationId = Guid.CreateVersion7(),
+            expectedCurrentOperationConcurrencyStamp = Guid.CreateVersion7(),
+            reason = "Exact provider boundary"
         });
         await Assert.That(denied.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
         await fixture.AssertUnchangedAsync(before);
@@ -377,7 +419,9 @@ public sealed class LocalCredentialAdministrationHttpTests
         {
             database.Users.Add(new User
             {
-                Id = pending.Receipt!.ApplicationUserId, EmailVerified = false, CreatedAt = DateTime.UtcNow,
+                Id = pending.Receipt!.ApplicationUserId,
+                EmailVerified = false,
+                CreatedAt = DateTime.UtcNow,
                 Pii = new UserPii { Email = "conflict@example.test", FirstName = "Different", LastName = "Owner" }
             });
             await database.SaveChangesAsync(CancellationToken);
@@ -500,7 +544,10 @@ public sealed class LocalCredentialAdministrationHttpTests
     private static string StatusPath(Guid operationId) => $"{OperationsPath}/{operationId:D}";
     private static object CreateBody(Guid operationId) => new
     {
-        operationId, email = $"created-{operationId:N}@example.test", firstName = "Created", lastName = "Owner"
+        operationId,
+        email = $"created-{operationId:N}@example.test",
+        firstName = "Created",
+        lastName = "Owner"
     };
     private static string NewPassword() => $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(24))}";
     private static JsonElement Receipt(JsonElement status) => status.GetProperty("receipt");
@@ -551,8 +598,12 @@ public sealed class LocalCredentialAdministrationHttpTests
                     Role role = await database.Set<Role>().SingleAsync(row => row.MasterCode == "platform.admin", CancellationToken);
                     database.PlatformUserRoles.Add(new PlatformUserRole
                     {
-                        Id = Guid.CreateVersion7(), UserId = fixture.AdministratorId, User = null!,
-                        RoleId = role.Id, Role = role, GrantedAt = DateTime.UtcNow
+                        Id = Guid.CreateVersion7(),
+                        UserId = fixture.AdministratorId,
+                        User = null!,
+                        RoleId = role.Id,
+                        Role = role,
+                        GrantedAt = DateTime.UtcNow
                     });
                     await database.SaveChangesAsync(CancellationToken);
                 }
@@ -617,8 +668,13 @@ public sealed class LocalCredentialAdministrationHttpTests
                 && token.Name == LocalCredentialStateMetadata.TokenName).Select(token => token.Value).SingleAsync(CancellationToken))!;
             var state = JsonSerializer.Deserialize<LocalCredentialStateMetadata>(value, JsonOptions)!;
             LocalIdentityCredentialOperation current = await OperationAsync(state.OperationId);
-            return new { operationId, expectedCurrentOperationId = current.Id,
-                expectedCurrentOperationConcurrencyStamp = current.ConcurrencyStamp, reason = "Supervised HTTP reset" };
+            return new
+            {
+                operationId,
+                expectedCurrentOperationId = current.Id,
+                expectedCurrentOperationConcurrencyStamp = current.ConcurrencyStamp,
+                reason = "Supervised HTTP reset"
+            };
         }
         internal async Task<LocalCredentialCreateResult> CreatePendingAsync()
         {

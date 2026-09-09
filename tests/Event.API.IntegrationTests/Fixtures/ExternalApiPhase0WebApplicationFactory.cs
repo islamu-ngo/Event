@@ -219,11 +219,11 @@ public sealed class ExternalApiPhase0WebApplicationFactory : WebApplicationFacto
             if (SetupSecretProviderOverride is not null)
             {
                 services.RemoveAll<ISetupSecretProvider>();
-            if (AuthProviderConfigurationServiceOverride is not null)
-            {
-                services.RemoveAll<IAuthProviderConfigurationService>();
-                services.AddSingleton(AuthProviderConfigurationServiceOverride);
-            }
+                if (AuthProviderConfigurationServiceOverride is not null)
+                {
+                    services.RemoveAll<IAuthProviderConfigurationService>();
+                    services.AddSingleton(AuthProviderConfigurationServiceOverride);
+                }
 
                 services.AddSingleton(SetupSecretProviderOverride);
             }

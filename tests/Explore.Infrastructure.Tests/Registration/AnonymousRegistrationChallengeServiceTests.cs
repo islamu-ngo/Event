@@ -218,8 +218,11 @@ public sealed class AnonymousRegistrationChallengeServiceTests
         await Assert.That(authority.Matches(intended with { Lines = [lines[0] with { ChosenUnitPriceMinor = 500 }] })).IsFalse();
         var create = new CreateRegistrationOrderWithHoldCommand
         {
-            EventId = intended.EventId, TicketCatalogVersionId = intended.TicketCatalogVersionId,
-            BookingPartyType = intended.BookingPartyType, Lines = lines, GuestAccessTokenHash = authority.GuestAccessTokenHash
+            EventId = intended.EventId,
+            TicketCatalogVersionId = intended.TicketCatalogVersionId,
+            BookingPartyType = intended.BookingPartyType,
+            Lines = lines,
+            GuestAccessTokenHash = authority.GuestAccessTokenHash
         };
         await Assert.That(authority.Matches(create)).IsTrue();
         await Assert.That(authority.Matches(create with { AccountUserId = Guid.CreateVersion7() })).IsFalse();

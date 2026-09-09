@@ -151,22 +151,37 @@ public sealed class EmailDeliverySourceRevisionTests
             var seeded = await SeedProcessingDispatchAsync(context, "source-revision");
             var principal = new ServicePrincipal
             {
-                Id = Guid.CreateVersion7(), Code = $"source-revision-{Guid.CreateVersion7():N}",
-                DisplayName = "Source revision worker", ConcurrencyStamp = Guid.CreateVersion7()
+                Id = Guid.CreateVersion7(),
+                Code = $"source-revision-{Guid.CreateVersion7():N}",
+                DisplayName = "Source revision worker",
+                ConcurrencyStamp = Guid.CreateVersion7()
             };
             var actor = new Actor
             {
-                Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.Bot, ActorType = null!,
-                ServicePrincipalId = principal.Id, ServicePrincipal = principal,
-                Pii = new ActorPii { DisplayName = "Source revision worker" }, ConcurrencyStamp = Guid.CreateVersion7()
+                Id = Guid.CreateVersion7(),
+                ActorTypeId = (int)ActorTypeEnum.Bot,
+                ActorType = null!,
+                ServicePrincipalId = principal.Id,
+                ServicePrincipal = principal,
+                Pii = new ActorPii { DisplayName = "Source revision worker" },
+                ConcurrencyStamp = Guid.CreateVersion7()
             };
             var @event = new Explore.Domain.Event(EventStatusEnum.Published)
             {
-                Id = Guid.CreateVersion7(), TenantId = seeded.TenantId, Tenant = null!,
-                Title = "Revision event", EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-                ActorId = actor.Id, Actor = actor, OrganizerActorId = actor.Id,
-                VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!, EventStatus = null!,
-                EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, ConcurrencyStamp = Guid.CreateVersion7()
+                Id = Guid.CreateVersion7(),
+                TenantId = seeded.TenantId,
+                Tenant = null!,
+                Title = "Revision event",
+                EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
+                ActorId = actor.Id,
+                Actor = actor,
+                OrganizerActorId = actor.Id,
+                VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+                VisibilityType = null!,
+                EventStatus = null!,
+                EventFormatId = (int)EventFormatEnum.Local,
+                EventFormat = null!,
+                ConcurrencyStamp = Guid.CreateVersion7()
             };
             context.AddRange(actor, @event);
             await context.SaveChangesAsync();

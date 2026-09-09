@@ -154,8 +154,11 @@ public sealed class TenantPlanEmailMutationTests
                 var mutationLock = new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context));
                 await new SystemSettingRepository(context, mutationLock).UpsertAsync(new SystemSetting
                 {
-                    Id = Guid.CreateVersion7(), SettingKey = GovernanceSettingKeys.Storage.DefaultTenantQuotaBytes,
-                    Value = "1024", ValueType = SettingValueType.Long, CreatedAt = DateTime.UtcNow
+                    Id = Guid.CreateVersion7(),
+                    SettingKey = GovernanceSettingKeys.Storage.DefaultTenantQuotaBytes,
+                    Value = "1024",
+                    ValueType = SettingValueType.Long,
+                    CreatedAt = DateTime.UtcNow
                 });
             }
 
@@ -259,18 +262,31 @@ public sealed class TenantPlanEmailMutationTests
         var now = DateTime.UtcNow;
         var tenant = new Tenant
         {
-            Id = Guid.CreateVersion7(), FullName = "Tenant plan SMTP", Slug = $"plan-{Guid.CreateVersion7():N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!, CreatedAt = now
+            Id = Guid.CreateVersion7(),
+            FullName = "Tenant plan SMTP",
+            Slug = $"plan-{Guid.CreateVersion7():N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!,
+            CreatedAt = now
         };
         var plan = new TenantPlan
         {
-            Id = Guid.CreateVersion7(), Key = $"smtp-{Guid.CreateVersion7():N}", DisplayName = "SMTP plan", CreatedAt = now
+            Id = Guid.CreateVersion7(),
+            Key = $"smtp-{Guid.CreateVersion7():N}",
+            DisplayName = "SMTP plan",
+            CreatedAt = now
         };
         var version = new TenantPlanVersion
         {
-            Id = Guid.CreateVersion7(), TenantPlan = plan, TenantPlanId = plan.Id, VersionNumber = 1,
-            TenantPlanStatusId = (int)TenantPlanStatusEnum.Published, CurrencyCode = "EUR", BillingPeriod = "monthly",
-            IsActiveForProvisioning = true, CreatedAt = now,
+            Id = Guid.CreateVersion7(),
+            TenantPlan = plan,
+            TenantPlanId = plan.Id,
+            VersionNumber = 1,
+            TenantPlanStatusId = (int)TenantPlanStatusEnum.Published,
+            CurrencyCode = "EUR",
+            BillingPeriod = "monthly",
+            IsActiveForProvisioning = true,
+            CreatedAt = now,
             Settings =
             [
                 new() { Id = Guid.CreateVersion7(), SettingKey = GovernanceSettingKeys.Email.SmtpHost,
@@ -283,35 +299,50 @@ public sealed class TenantPlanEmailMutationTests
         {
             version.Settings.Add(new TenantPlanVersionSetting
             {
-                Id = Guid.CreateVersion7(), SettingKey = GovernanceSettingKeys.AiAssistant.Enabled,
-                JsonValue = "true", CreatedAt = now
+                Id = Guid.CreateVersion7(),
+                SettingKey = GovernanceSettingKeys.AiAssistant.Enabled,
+                JsonValue = "true",
+                CreatedAt = now
             });
             if (unsafePublication)
                 version.Settings.Add(new TenantPlanVersionSetting
                 {
-                    Id = Guid.CreateVersion7(), SettingKey = EventReportingIntakeSettingDefinitions.IntakeEnabled.Key,
-                    JsonValue = "false", CreatedAt = now
+                    Id = Guid.CreateVersion7(),
+                    SettingKey = EventReportingIntakeSettingDefinitions.IntakeEnabled.Key,
+                    JsonValue = "false",
+                    CreatedAt = now
                 });
             version.Settings.Add(new TenantPlanVersionSetting
             {
-                Id = Guid.CreateVersion7(), SettingKey = EventSettingDefinitions.RequireApproval.Key,
-                JsonValue = unsafePublication ? "false" : "true", CreatedAt = now
+                Id = Guid.CreateVersion7(),
+                SettingKey = EventSettingDefinitions.RequireApproval.Key,
+                JsonValue = unsafePublication ? "false" : "true",
+                CreatedAt = now
             });
         }
         if (storageQuota.HasValue)
         {
             version.Quotas.Add(new TenantPlanVersionQuota
             {
-                Id = Guid.CreateVersion7(), QuotaKey = TenantPlanQuotaKeys.StorageBytes,
-                Limit = storageQuota.Value, CreatedAt = now
+                Id = Guid.CreateVersion7(),
+                QuotaKey = TenantPlanQuotaKeys.StorageBytes,
+                Limit = storageQuota.Value,
+                CreatedAt = now
             });
         }
         var assignment = await new TenantPlanRepository(context).CreateAssignmentAsync(new TenantPlanAssignment
         {
-            Id = Guid.CreateVersion7(), Tenant = tenant, TenantId = tenant.Id, TenantPlan = plan, TenantPlanId = plan.Id,
-            TenantPlanVersion = version, TenantPlanVersionId = version.Id,
+            Id = Guid.CreateVersion7(),
+            Tenant = tenant,
+            TenantId = tenant.Id,
+            TenantPlan = plan,
+            TenantPlanId = plan.Id,
+            TenantPlanVersion = version,
+            TenantPlanVersionId = version.Id,
             TenantPlanAssignmentStatusId = (int)TenantPlanAssignmentStatusEnum.Active,
-            AssignedByUserId = actorId, AssignedAt = now, CreatedAt = now
+            AssignedByUserId = actorId,
+            AssignedAt = now,
+            CreatedAt = now
         });
         return new(TenantId: tenant.Id, AssignmentId: assignment.Id, ActorId: actorId);
     }

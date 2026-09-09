@@ -208,12 +208,24 @@ public sealed class RegistrationAnswerFileRetentionHateoasTests
         Guid storageId = Guid.CreateVersion7();
         var storage = new StorageObject
         {
-            Id = storageId, TenantId = tenant.TenantId, Tenant = null!, FileTypeId = (int)FileTypeEnum.Document,
-            FileType = null!, Uri = $"/api/storageobject/{storageId}/content", ObjectKey = $"tenants/{tenant.TenantId:N}/{storageId:N}.pdf",
-            Provider = StorageProviders.Local, FullName = FileName, SafeDisplayName = FileName,
-            Extension = "pdf", ContentType = "application/pdf", Size = 16,
-            Visibility = StorageObjectVisibilities.AuthenticatedTenant, Purpose = StorageObjectPurposes.Document,
-            LifecycleState = StorageObjectLifecycleStates.Active, CreatedBy = tenant.UserId, CreatedAt = created,
+            Id = storageId,
+            TenantId = tenant.TenantId,
+            Tenant = null!,
+            FileTypeId = (int)FileTypeEnum.Document,
+            FileType = null!,
+            Uri = $"/api/storageobject/{storageId}/content",
+            ObjectKey = $"tenants/{tenant.TenantId:N}/{storageId:N}.pdf",
+            Provider = StorageProviders.Local,
+            FullName = FileName,
+            SafeDisplayName = FileName,
+            Extension = "pdf",
+            ContentType = "application/pdf",
+            Size = 16,
+            Visibility = StorageObjectVisibilities.AuthenticatedTenant,
+            Purpose = StorageObjectPurposes.Document,
+            LifecycleState = StorageObjectLifecycleStates.Active,
+            CreatedBy = tenant.UserId,
+            CreatedAt = created,
             ConcurrencyStamp = Guid.CreateVersion7()
         };
         var form = RegistrationForm.Create(tenant.TenantId, eventId, "native", "retention", "Retention", created);

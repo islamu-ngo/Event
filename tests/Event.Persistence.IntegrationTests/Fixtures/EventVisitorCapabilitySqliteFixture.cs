@@ -54,7 +54,8 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
         await EmailDispatchSqliteFixture.CreateDatabaseAsync(fixture._path);
         return await CreateAsync(fixture, new Dictionary<string, string?>
         {
-            ["Database:Provider"] = "Sqlite", ["Database:Database"] = fixture._path,
+            ["Database:Provider"] = "Sqlite",
+            ["Database:Database"] = fixture._path,
         }, configureServices);
     }
 
@@ -87,7 +88,8 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(databaseConfiguration).Build();
         var services = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
         {
-            DisableDefaults = true, EnvironmentName = Environments.Production
+            DisableDefaults = true,
+            EnvironmentName = Environments.Production
         }).Services;
         services.AddSingleton<IConfiguration>(configuration);
         services.AddLogging();
@@ -133,25 +135,38 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
         var now = DateTime.UtcNow;
         fixture.Context.Tenants.Add(new Tenant
         {
-            Id = fixture.TenantId, FullName = "Visitor authority", Slug = $"visitor-{fixture.TenantId:N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = fixture.TenantId,
+            FullName = "Visitor authority",
+            Slug = $"visitor-{fixture.TenantId:N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         });
         fixture.Context.Users.Add(new User
         {
-            Id = fixture.UserId, Pii = new UserPii { Email = string.Empty, FirstName = "Visitor", LastName = "Operator" },
+            Id = fixture.UserId,
+            Pii = new UserPii { Email = string.Empty, FirstName = "Visitor", LastName = "Operator" },
             CreatedAt = now
         });
         fixture.Context.Actors.Add(new Actor
         {
-            Id = fixture.ActorId, ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-            UserId = fixture.UserId, Pii = new ActorPii { DisplayName = "Visitor operator" }, CreatedAt = now
+            Id = fixture.ActorId,
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            UserId = fixture.UserId,
+            Pii = new ActorPii { DisplayName = "Visitor operator" },
+            CreatedAt = now
         });
         fixture.Context.TenantUsers.Add(new TenantUser
         {
-            Id = Guid.CreateVersion7(), TenantId = fixture.TenantId, Tenant = null!,
-            UserId = fixture.UserId, User = null!, ActorId = fixture.ActorId,
+            Id = Guid.CreateVersion7(),
+            TenantId = fixture.TenantId,
+            Tenant = null!,
+            UserId = fixture.UserId,
+            User = null!,
+            ActorId = fixture.ActorId,
             StatusId = (int)TenantUserStatusEnum.Active,
-            JoinedAt = now, CreatedAt = now
+            JoinedAt = now,
+            CreatedAt = now
         });
         await fixture.Context.SaveChangesAsync();
         fixture.Context.ChangeTracker.Clear();
@@ -166,12 +181,21 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
     {
         var entity = new Explore.Domain.Event(published ? EventStatusEnum.Published : EventStatusEnum.Draft)
         {
-            Id = Guid.CreateVersion7(), Title = "Visitor gate event", TenantId = TenantId, Tenant = null!,
-            ActorId = ActorId, Actor = null!, OrganizerActorId = ActorId,
+            Id = Guid.CreateVersion7(),
+            Title = "Visitor gate event",
+            TenantId = TenantId,
+            Tenant = null!,
+            ActorId = ActorId,
+            Actor = null!,
+            OrganizerActorId = ActorId,
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-            EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!,
-            SessionCount = 1, FirstSessionStartUtc = new DateTimeOffset(2027, 1, 1, 12, 0, 0, TimeSpan.Zero),
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            VisibilityType = null!,
+            EventFormatId = (int)EventFormatEnum.Local,
+            EventFormat = null!,
+            EventStatus = null!,
+            SessionCount = 1,
+            FirstSessionStartUtc = new DateTimeOffset(2027, 1, 1, 12, 0, 0, TimeSpan.Zero),
             LastSessionEndUtc = new DateTimeOffset(2027, 1, 1, 14, 0, 0, TimeSpan.Zero),
             CreatedAt = DateTime.UtcNow
         };

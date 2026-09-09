@@ -62,8 +62,12 @@ public sealed class OnboardingSupportContactTests
             {
                 "/api/instanceonboarding/status" => new
                 {
-                    isCompleted = false, provider = "Local", state = "InteractivePending", isAuthenticated = true,
-                    selectedDeploymentMode = "SingleTenant", pendingOperationId = _pendingOperationId,
+                    isCompleted = false,
+                    provider = "Local",
+                    state = "InteractivePending",
+                    isAuthenticated = true,
+                    selectedDeploymentMode = "SingleTenant",
+                    pendingOperationId = _pendingOperationId,
                     _links = new Dictionary<string, object>
                     {
                         ["complete-local"] = new { href = "/api/instanceonboarding/complete-local", method = "POST" }
@@ -74,7 +78,9 @@ public sealed class OnboardingSupportContactTests
                 "/api/instance/settings/auth-provider/status" or "/api/instance/settings/authz-provider/status" => new { configured = true },
                 "/api/system/onboarding-preflight" => new
                 {
-                    isReadyToLaunch = true, blockingChecks = Array.Empty<object>(), warningChecks = Array.Empty<object>()
+                    isReadyToLaunch = true,
+                    blockingChecks = Array.Empty<object>(),
+                    warningChecks = Array.Empty<object>()
                 },
                 _ => throw new InvalidOperationException("Unexpected request in support-contact readback.")
             };

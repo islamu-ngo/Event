@@ -94,8 +94,12 @@ public sealed class EmailDeliveryDisableHttpTests
             {
                 Configuration = OptionalUpdate<InstanceSmtpConfigurationWriteDto>.Set(new()
                 {
-                    Host = "smtp.private.test", Port = 587, Security = "StartTls",
-                    FromAddress = "events@private.test", FromName = "Changed sender", TimeoutSeconds = 30
+                    Host = "smtp.private.test",
+                    Port = 587,
+                    Security = "StartTls",
+                    FromAddress = "events@private.test",
+                    FromName = "Changed sender",
+                    TimeoutSeconds = 30
                 })
             });
             await AssertStatusAsync(updated, HttpStatusCode.OK);
@@ -162,8 +166,10 @@ public sealed class EmailDeliveryDisableHttpTests
         using var preview = await ReadAsync(previewResponse);
         using (var scopeInjection = await client.PostAsJsonAsync(TenantPath + "/disable", new
         {
-            tenantId = Guid.CreateVersion7(), expectedRevision = preview.RootElement.GetProperty("expectedRevision").GetInt64(),
-            confirmationToken = preview.RootElement.GetProperty("confirmationToken").GetString(), acknowledgement = Acknowledgement
+            tenantId = Guid.CreateVersion7(),
+            expectedRevision = preview.RootElement.GetProperty("expectedRevision").GetInt64(),
+            confirmationToken = preview.RootElement.GetProperty("confirmationToken").GetString(),
+            acknowledgement = Acknowledgement
         }))
             await AssertStatusAsync(scopeInjection, HttpStatusCode.BadRequest);
         using (var crossScope = await client.PostAsJsonAsync(InstancePath + "/disable", Confirmation(preview.RootElement, Acknowledgement)))
@@ -225,7 +231,9 @@ public sealed class EmailDeliveryDisableHttpTests
             await AssertPrivateAsync(preview);
             using var disable = await client.PostAsJsonAsync(path + "/disable", new
             {
-                expectedRevision = 0, confirmationToken = "untrusted", acknowledgement = Acknowledgement
+                expectedRevision = 0,
+                confirmationToken = "untrusted",
+                acknowledgement = Acknowledgement
             });
             await AssertStatusAsync(disable, HttpStatusCode.Forbidden);
         }
@@ -248,8 +256,12 @@ public sealed class EmailDeliveryDisableHttpTests
             {
                 database.PlatformUserRoles.Add(new PlatformUserRole
                 {
-                    Id = Guid.CreateVersion7(), UserId = actor, User = null!, RoleId = (int)RoleEnum.Admin,
-                    Role = null!, GrantedAt = DateTime.UtcNow
+                    Id = Guid.CreateVersion7(),
+                    UserId = actor,
+                    User = null!,
+                    RoleId = (int)RoleEnum.Admin,
+                    Role = null!,
+                    GrantedAt = DateTime.UtcNow
                 });
             }
             else if (authority != "none")
@@ -260,21 +272,37 @@ public sealed class EmailDeliveryDisableHttpTests
                     tenantId = Guid.CreateVersion7();
                     database.Tenants.Add(new Tenant
                     {
-                        Id = tenantId, FullName = "Other tenant", Slug = "other-tenant",
-                        TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!, CreatedAt = DateTime.UtcNow
+                        Id = tenantId,
+                        FullName = "Other tenant",
+                        Slug = "other-tenant",
+                        TenantStatusId = (int)TenantStatusEnum.Active,
+                        TenantStatus = null!,
+                        CreatedAt = DateTime.UtcNow
                     });
                 }
                 var membership = new TenantUser
                 {
-                    Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
-                    UserId = actor, User = null!, StatusId = (int)TenantUserStatusEnum.Active,
-                    JoinedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow
+                    Id = Guid.CreateVersion7(),
+                    TenantId = tenantId,
+                    Tenant = null!,
+                    UserId = actor,
+                    User = null!,
+                    StatusId = (int)TenantUserStatusEnum.Active,
+                    JoinedAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow
                 };
                 database.TenantUserRoleGrants.Add(new TenantUserRoleGrant
                 {
-                    Id = Guid.CreateVersion7(), TenantId = membership.TenantId, Tenant = null!, TenantUserId = membership.Id,
-                    TenantUser = membership, RoleId = (int)RoleEnum.TenantAdmin, Role = null!,
-                    RoleScopeId = (int)RoleScopeEnum.Tenant, GrantedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow
+                    Id = Guid.CreateVersion7(),
+                    TenantId = membership.TenantId,
+                    Tenant = null!,
+                    TenantUserId = membership.Id,
+                    TenantUser = membership,
+                    RoleId = (int)RoleEnum.TenantAdmin,
+                    Role = null!,
+                    RoleScopeId = (int)RoleScopeEnum.Tenant,
+                    GrantedAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow
                 });
             }
             await database.SaveChangesAsync();
@@ -289,7 +317,8 @@ public sealed class EmailDeliveryDisableHttpTests
     private static object Confirmation(JsonElement preview, string? acknowledgement) => new
     {
         expectedRevision = preview.GetProperty("expectedRevision").GetInt64(),
-        confirmationToken = preview.GetProperty("confirmationToken").GetString(), acknowledgement
+        confirmationToken = preview.GetProperty("confirmationToken").GetString(),
+        acknowledgement
     };
 
     private static string Link(JsonElement resource, string relation) => resource.GetProperty("_links").GetProperty(relation).GetProperty("href").GetString()!;

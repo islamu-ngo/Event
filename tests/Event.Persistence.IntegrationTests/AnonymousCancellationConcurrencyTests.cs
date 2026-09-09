@@ -250,7 +250,8 @@ public sealed partial class AnonymousCancellationConcurrencyTests
             case "foreign-event": command = command with { EventId = Guid.CreateVersion7() }; break;
             case "foreign-order": command = command with { OrderId = Guid.CreateVersion7() }; break;
             case "expired": clock.Now = new(2027, 1, 31, 14, 0, 0, TimeSpan.Zero); break;
-            case "unconfirmed": await fixture.Context.RegistrationOrders.ExecuteUpdateAsync(setters => setters
+            case "unconfirmed":
+                await fixture.Context.RegistrationOrders.ExecuteUpdateAsync(setters => setters
                 .SetProperty(value => value.ConfirmedAt, (DateTime?)null)
                 .SetProperty(value => value.RegistrationOrderStatusId, (int)RegistrationOrderStatusEnum.ReadyForCheckout)); break;
             case "account": await fixture.Context.RegistrationOrders.ExecuteUpdateAsync(setters => setters.SetProperty(value => value.AccountUserId, fixture.UserId)); break;
@@ -327,8 +328,14 @@ public sealed partial class AnonymousCancellationConcurrencyTests
         }
         fixture.Context.EventSessions.Add(new EventSession(EventSessionStatusEnum.Published)
         {
-            Id = Guid.CreateVersion7(), EventId = target.Id, Event = null!, TenantId = fixture.TenantId, Tenant = null!,
-            RegistrationModeId = (int)RegistrationModeEnum.Open, StartTime = target.FirstSessionStartUtc, EndTime = target.LastSessionEndUtc
+            Id = Guid.CreateVersion7(),
+            EventId = target.Id,
+            Event = null!,
+            TenantId = fixture.TenantId,
+            Tenant = null!,
+            RegistrationModeId = (int)RegistrationModeEnum.Open,
+            StartTime = target.FirstSessionStartUtc,
+            EndTime = target.LastSessionEndUtc
         });
         await fixture.Context.SaveChangesAsync();
         fixture.Context.ChangeTracker.Clear();

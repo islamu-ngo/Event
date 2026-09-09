@@ -33,7 +33,8 @@ public sealed class ManagedTenantLocalAdministratorHttpTests
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false
         });
         LocalAuthRequestDto administratorLogin = await factory.SeedLocalUserAsync(emailConfirmed: true);
         Guid administratorId;
@@ -44,8 +45,12 @@ public sealed class ManagedTenantLocalAdministratorHttpTests
             Role role = await seed.Set<Role>().SingleAsync(candidate => candidate.MasterCode == "platform.admin", Token);
             seed.PlatformUserRoles.Add(new PlatformUserRole
             {
-                Id = Guid.CreateVersion7(), UserId = administratorId, User = null!, RoleId = role.Id,
-                Role = role, GrantedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                UserId = administratorId,
+                User = null!,
+                RoleId = role.Id,
+                Role = role,
+                GrantedAt = DateTime.UtcNow
             });
             await seed.SaveChangesAsync(Token);
         }
@@ -63,7 +68,10 @@ public sealed class ManagedTenantLocalAdministratorHttpTests
         Guid operationId = Guid.CreateVersion7();
         using var issued = await client.PostAsJsonAsync("/api/instance/local-identities", new
         {
-            operationId, email = $"managed-target-{operationId:N}@example.test", firstName = "Managed", lastName = "Target"
+            operationId,
+            email = $"managed-target-{operationId:N}@example.test",
+            firstName = "Managed",
+            lastName = "Target"
         }, Token);
         await Assert.That(issued.StatusCode).IsEqualTo(HttpStatusCode.Created);
         JsonElement target = (await ReadAsync(issued)).GetProperty("operation").GetProperty("receipt");
@@ -77,14 +85,24 @@ public sealed class ManagedTenantLocalAdministratorHttpTests
 
         var body = new ManagedProviderClientProvisioningDto
         {
-            ProviderKey = "native-http-provider", ExternalSystem = "native-http", ExternalCustomerId = operationId.ToString("D"),
-            TenantFullName = "Native HTTP managed tenant", TenantSlug = $"managed-http-{operationId:N}", ActivateTenant = true,
+            ProviderKey = "native-http-provider",
+            ExternalSystem = "native-http",
+            ExternalCustomerId = operationId.ToString("D"),
+            TenantFullName = "Native HTTP managed tenant",
+            TenantSlug = $"managed-http-{operationId:N}",
+            ActivateTenant = true,
             LocalIdentity = new ManagementTenantLocalIdentityDto { LocalSubjectId = subjectId },
             DirectoryOperatorIdentity = new TenantDirectoryOperatorIdentityInputDto
             {
-                PublicName = "HTTP Operator", LegalName = "HTTP Operator ASBL", OperatorKindCode = "registered_organization",
-                JurisdictionCountryCode = "BE", RegistrationIdentifier = "BE 0123.456.789", PublicContactEmail = "contact@example.test",
-                LegalNoticeUrl = "https://example.test/legal", TermsUrl = "https://example.test/terms", PrivacyUrl = "https://example.test/privacy"
+                PublicName = "HTTP Operator",
+                LegalName = "HTTP Operator ASBL",
+                OperatorKindCode = "registered_organization",
+                JurisdictionCountryCode = "BE",
+                RegistrationIdentifier = "BE 0123.456.789",
+                PublicContactEmail = "contact@example.test",
+                LegalNoticeUrl = "https://example.test/legal",
+                TermsUrl = "https://example.test/terms",
+                PrivacyUrl = "https://example.test/privacy"
             }
         };
         JsonObject malformed = JsonSerializer.SerializeToNode(body, JsonOptions)!.AsObject();

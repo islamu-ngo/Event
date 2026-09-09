@@ -183,7 +183,9 @@ public class InstanceOnboardingServiceTests
         string password = $"Aa1!{Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(24))}";
         var completion = new CompleteLocalInstanceOnboardingRequestDto
         {
-            OperationId = Guid.CreateVersion7(), Username = "operator", TemporaryPassword = password,
+            OperationId = Guid.CreateVersion7(),
+            Username = "operator",
+            TemporaryPassword = password,
             Settings = new CompleteInstanceOnboardingRequest()
         };
         bool ordinaryRefresh = false;

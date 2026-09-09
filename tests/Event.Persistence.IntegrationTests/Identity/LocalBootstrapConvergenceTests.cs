@@ -352,11 +352,17 @@ public sealed class LocalBootstrapConvergenceTests
             Configuration,
             InstanceOperatorIdentity.Create(new InstanceOperatorIdentityOptions
             {
-                OperatorId = Subject, PublicName = "Bootstrap Operator", LegalName = "Bootstrap Operator ASBL",
-                OfficialOrigin = "https://example.test", OperatorKindCode = "registered_organization",
-                JurisdictionCountryCode = "BE", RegistrationIdentifier = "BE 0123.456.789",
-                PublicContactEmail = "contact@example.test", WebsiteUrl = "https://example.test",
-                LegalNoticeUrl = "https://example.test/legal", TermsUrl = "https://example.test/terms",
+                OperatorId = Subject,
+                PublicName = "Bootstrap Operator",
+                LegalName = "Bootstrap Operator ASBL",
+                OfficialOrigin = "https://example.test",
+                OperatorKindCode = "registered_organization",
+                JurisdictionCountryCode = "BE",
+                RegistrationIdentifier = "BE 0123.456.789",
+                PublicContactEmail = "contact@example.test",
+                WebsiteUrl = "https://example.test",
+                LegalNoticeUrl = "https://example.test/legal",
+                TermsUrl = "https://example.test/terms",
                 PrivacyUrl = "https://example.test/privacy"
             }), new InstanceBootstrapStateRepository(Application(scope)));
 
@@ -435,11 +441,16 @@ public sealed class LocalBootstrapConvergenceTests
             OriginalPassword = Secrets.Password;
             Configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["INSTANCE_BOOTSTRAP_MODE"] = "ConfiguredAdministrator", ["INSTANCE_BOOTSTRAP_ADMIN_PROVIDER"] = "local",
-                ["INSTANCE_BOOTSTRAP_ADMIN_SUBJECT"] = Subject.ToString("D"), ["INSTANCE_BOOTSTRAP_BINDING_GENERATION"] = "1",
-                ["INSTANCE_BOOTSTRAP_ADMIN_EMAIL"] = "bootstrap@example.test", ["INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME"] = "Initial",
-                ["INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME"] = "Administrator", ["Deployment:Mode"] = "MultiTenant",
-                ["SETUP_SECRET"] = NewPassword(), ["SETUP_SECRET_FILE"] = _applicationPath + ".setup"
+                ["INSTANCE_BOOTSTRAP_MODE"] = "ConfiguredAdministrator",
+                ["INSTANCE_BOOTSTRAP_ADMIN_PROVIDER"] = "local",
+                ["INSTANCE_BOOTSTRAP_ADMIN_SUBJECT"] = Subject.ToString("D"),
+                ["INSTANCE_BOOTSTRAP_BINDING_GENERATION"] = "1",
+                ["INSTANCE_BOOTSTRAP_ADMIN_EMAIL"] = "bootstrap@example.test",
+                ["INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME"] = "Initial",
+                ["INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME"] = "Administrator",
+                ["Deployment:Mode"] = "MultiTenant",
+                ["SETUP_SECRET"] = NewPassword(),
+                ["SETUP_SECRET_FILE"] = _applicationPath + ".setup"
             }).Build();
             var services = new ServiceCollection();
             services.AddLogging();

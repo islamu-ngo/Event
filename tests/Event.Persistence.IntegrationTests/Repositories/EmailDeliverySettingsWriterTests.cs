@@ -271,8 +271,12 @@ public sealed class EmailDeliverySettingsWriterTests
         Guid tenantId = Guid.CreateVersion7();
         context.Tenants.Add(new Tenant
         {
-            Id = tenantId, FullName = "Atomic SMTP tenant", Slug = $"smtp-writer-{tenantId:N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!, CreatedAt = DateTime.UtcNow
+            Id = tenantId,
+            FullName = "Atomic SMTP tenant",
+            Slug = $"smtp-writer-{tenantId:N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!,
+            CreatedAt = DateTime.UtcNow
         });
         await context.SaveChangesAsync();
         var outcome = await writer.ApplyAsync(

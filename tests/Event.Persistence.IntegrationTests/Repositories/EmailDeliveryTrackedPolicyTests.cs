@@ -97,9 +97,12 @@ public sealed class EmailDeliveryTrackedPolicyTests
                 value: "false", actorUserId: actorId);
             var tenant = new Tenant
             {
-                Id = Guid.CreateVersion7(), FullName = "Tracked SMTP policy",
+                Id = Guid.CreateVersion7(),
+                FullName = "Tracked SMTP policy",
                 Slug = $"tracked-{Guid.CreateVersion7():N}",
-                TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!, CreatedAt = DateTime.UtcNow
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!,
+                CreatedAt = DateTime.UtcNow
             };
             contextA.Tenants.Add(tenant);
             await contextA.SaveChangesAsync();
@@ -140,8 +143,11 @@ public sealed class EmailDeliveryTrackedPolicyTests
     {
         var pending = new SystemSetting
         {
-            Id = Guid.CreateVersion7(), SettingKey = GovernanceSettingKeys.AiAssistant.Enabled,
-            Value = "true", ValueType = SettingValueType.Boolean, CreatedAt = DateTime.UtcNow
+            Id = Guid.CreateVersion7(),
+            SettingKey = GovernanceSettingKeys.AiAssistant.Enabled,
+            Value = "true",
+            ValueType = SettingValueType.Boolean,
+            CreatedAt = DateTime.UtcNow
         };
         context.SystemSettings.Add(pending);
         return pending;

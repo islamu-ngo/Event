@@ -36,51 +36,51 @@ public sealed class AdmissionRevocationService(
             return Result(AdmissionRevocationOutcome.InvalidRequest);
         }
 
-            AdmissionRevocationContext? context = await repository.LoadAsync(request, token);
-            if (context is null ||
-                context.TenantId != request.TenantId ||
-                context.RegistrationOrderId != request.RegistrationOrderId)
-            {
-                return Result(AdmissionRevocationOutcome.NotFound);
-            }
+        AdmissionRevocationContext? context = await repository.LoadAsync(request, token);
+        if (context is null ||
+            context.TenantId != request.TenantId ||
+            context.RegistrationOrderId != request.RegistrationOrderId)
+        {
+            return Result(AdmissionRevocationOutcome.NotFound);
+        }
 
-            if (!IsValidAllocationSet(request))
-            {
-                return new AdmissionRevocationResult(
-                    AdmissionRevocationOutcome.InvalidAllocation,
-                    [],
-                    context.Tickets.Select(ticket => ticket.Id).Order().ToArray());
-            }
+        if (!IsValidAllocationSet(request))
+        {
+            return new AdmissionRevocationResult(
+                AdmissionRevocationOutcome.InvalidAllocation,
+                [],
+                context.Tickets.Select(ticket => ticket.Id).Order().ToArray());
+        }
 
-            DateTime appliedAt = timeProvider.GetUtcNow().UtcDateTime;
-            var revoked = new List<Guid>();
-            var preserved = new List<Guid>();
-            foreach (AdmissionTicket ticket in context.Tickets.OrderBy(value => value.Id))
+        DateTime appliedAt = timeProvider.GetUtcNow().UtcDateTime;
+        var revoked = new List<Guid>();
+        var preserved = new List<Guid>();
+        foreach (AdmissionTicket ticket in context.Tickets.OrderBy(value => value.Id))
+        {
+            bool targeted = request.Reason == OrderCancellationReason ||
+                IsFullyRefunded(ticket, request.RefundAllocations, appliedAt);
+            if (targeted)
             {
-                bool targeted = request.Reason == OrderCancellationReason ||
-                    IsFullyRefunded(ticket, request.RefundAllocations, appliedAt);
-                if (targeted)
+                if (request.Reason == OrderCancellationReason &&
+                    !IsTerminal((AdmissionTicketStatusEnum)ticket.AdmissionTicketStatusId))
                 {
-                    if (request.Reason == OrderCancellationReason &&
-                        !IsTerminal((AdmissionTicketStatusEnum)ticket.AdmissionTicketStatusId))
-                    {
-                        ticket.Cancel(appliedAt);
-                    }
-                    revoked.Add(ticket.Id);
+                    ticket.Cancel(appliedAt);
                 }
-                else
-                {
-                    preserved.Add(ticket.Id);
-                }
+                revoked.Add(ticket.Id);
             }
+            else
+            {
+                preserved.Add(ticket.Id);
+            }
+        }
 
-            return await repository.ApplyAsync(
-                new AdmissionRevocationPersistenceRequest(
-                    request.TenantId,
-                    request.RegistrationOrderId,
-                    revoked,
-                    preserved),
-                token);
+        return await repository.ApplyAsync(
+            new AdmissionRevocationPersistenceRequest(
+                request.TenantId,
+                request.RegistrationOrderId,
+                revoked,
+                preserved),
+            token);
     }
 
     private static bool IsValidRequest(AdmissionRevocationRequest? request) =>

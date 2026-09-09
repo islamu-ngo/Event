@@ -193,8 +193,11 @@ public sealed class TenantDelegationMutationTests
         string value, CancellationToken cancellationToken = default) =>
         new SystemSettingRepository(context, mutationLock).UpsertAsync(new SystemSetting
         {
-            Id = Guid.CreateVersion7(), SettingKey = GovernanceSettingKeys.Deployment.Mode, Value = value,
-            ValueType = SettingValueType.String, CreatedAt = DateTime.UtcNow
+            Id = Guid.CreateVersion7(),
+            SettingKey = GovernanceSettingKeys.Deployment.Mode,
+            Value = value,
+            ValueType = SettingValueType.String,
+            CreatedAt = DateTime.UtcNow
         }, cancellationToken);
 
     private static void DeleteDatabase(string databasePath)

@@ -115,14 +115,23 @@ public sealed class EventDirectorySqliteQueryTests
         var otherTenantId = Guid.CreateVersion7();
         fixture.Context.Tenants.Add(new Tenant
         {
-            Id = otherTenantId, FullName = "Other directory", Slug = $"other-{otherTenantId:N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = otherTenantId,
+            FullName = "Other directory",
+            Slug = $"other-{otherTenantId:N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         });
         fixture.Context.TenantUsers.Add(new TenantUser
         {
-            Id = Guid.CreateVersion7(), TenantId = otherTenantId, Tenant = null!,
-            UserId = fixture.UserId, User = null!, ActorId = fixture.ActorId,
-            StatusId = (int)TenantUserStatusEnum.Active, JoinedAt = Now.UtcDateTime, CreatedAt = Now.UtcDateTime
+            Id = Guid.CreateVersion7(),
+            TenantId = otherTenantId,
+            Tenant = null!,
+            UserId = fixture.UserId,
+            User = null!,
+            ActorId = fixture.ActorId,
+            StatusId = (int)TenantUserStatusEnum.Active,
+            JoinedAt = Now.UtcDateTime,
+            CreatedAt = Now.UtcDateTime
         });
         Add("past", Now.AddDays(-2), Now.AddDays(-1));
         Add("ends-before", Now.AddHours(-1), Now.AddTicks(-1));
@@ -145,13 +154,23 @@ public sealed class EventDirectorySqliteQueryTests
             var entity = new Explore.Domain.Event(status)
             {
                 Id = Guid.Parse($"018e4e5c-7f00-7000-8000-{++eventNumber:x12}"),
-                Title = title, PublicCode = title, TenantId = fixture.TenantId, Tenant = null!,
-                ActorId = fixture.ActorId, Actor = null!, OrganizerActorId = fixture.ActorId,
+                Title = title,
+                PublicCode = title,
+                TenantId = fixture.TenantId,
+                Tenant = null!,
+                ActorId = fixture.ActorId,
+                Actor = null!,
+                OrganizerActorId = fixture.ActorId,
                 EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-                VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-                EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!,
-                SessionCount = start.HasValue ? 1 : 0, FirstSessionStartUtc = start,
-                LastSessionStartUtc = start, LastSessionEndUtc = end,
+                VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+                VisibilityType = null!,
+                EventFormatId = (int)EventFormatEnum.Local,
+                EventFormat = null!,
+                EventStatus = null!,
+                SessionCount = start.HasValue ? 1 : 0,
+                FirstSessionStartUtc = start,
+                LastSessionStartUtc = start,
+                LastSessionEndUtc = end,
                 FirstSessionDate = start.HasValue ? DateOnly.FromDateTime(start.Value.DateTime) : null,
                 CreatedAt = Now.UtcDateTime
             };

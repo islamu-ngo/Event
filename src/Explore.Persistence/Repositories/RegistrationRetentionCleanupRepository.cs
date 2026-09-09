@@ -71,39 +71,43 @@ public sealed class RegistrationRetentionCleanupRepository(ExploreDbContext dbCo
     {
         var mappedAnswers = from answer in dbContext.RegistrationAnswers
                 .IgnoreQueryFilters([QueryFilterNames.Tenant])
-            join field in dbContext.RegistrationFormFields.IgnoreQueryFilters([QueryFilterNames.Tenant])
-                on new { answer.TenantId, Id = answer.RegistrationFormFieldId }
-                equals new { field.TenantId, field.Id }
-            join mapping in dbContext.RegistrationProviderFieldMappings.IgnoreQueryFilters([QueryFilterNames.Tenant])
-                on new { field.TenantId, PlatformFieldKey = field.Namespace + "." + field.Key }
-                equals new { mapping.TenantId, mapping.PlatformFieldKey }
-            where answer.TenantId == tenantId && field.IsProviderTransferAllowed && !mapping.IsDeleted
-            select new
-            {
-                answer.Id, answer.RegistrationSubmissionId, answer.RegistrationAttemptId,
-                answer.RegistrationOrderId, mapping.RegistrationProviderBindingId, answer.RetentionUntil,
-                SensitiveRetentionUntil = answer.SensitiveAnswerValue == null
-                    ? (DateTime?)null : answer.SensitiveAnswerValue.RetentionUntil
-            };
+                            join field in dbContext.RegistrationFormFields.IgnoreQueryFilters([QueryFilterNames.Tenant])
+                                on new { answer.TenantId, Id = answer.RegistrationFormFieldId }
+                                equals new { field.TenantId, field.Id }
+                            join mapping in dbContext.RegistrationProviderFieldMappings.IgnoreQueryFilters([QueryFilterNames.Tenant])
+                                on new { field.TenantId, PlatformFieldKey = field.Namespace + "." + field.Key }
+                                equals new { mapping.TenantId, mapping.PlatformFieldKey }
+                            where answer.TenantId == tenantId && field.IsProviderTransferAllowed && !mapping.IsDeleted
+                            select new
+                            {
+                                answer.Id,
+                                answer.RegistrationSubmissionId,
+                                answer.RegistrationAttemptId,
+                                answer.RegistrationOrderId,
+                                mapping.RegistrationProviderBindingId,
+                                answer.RetentionUntil,
+                                SensitiveRetentionUntil = answer.SensitiveAnswerValue == null
+                                    ? (DateTime?)null : answer.SensitiveAnswerValue.RetentionUntil
+                            };
 
         List<RegistrationProviderSubmissionWriteEffect> effects = await (from effect in dbContext.RegistrationProviderSubmissionWriteEffects
                 .IgnoreQueryFilters([QueryFilterNames.Tenant])
-            join order in dbContext.RegistrationOrders.IgnoreQueryFilters([QueryFilterNames.Tenant])
-                on new { effect.TenantId, effect.EventId, Id = effect.RegistrationOrderId }
-                equals new { order.TenantId, order.EventId, order.Id }
-            where effect.TenantId == tenantId && order.AnonymousPiiRetentionUntilUtc != null &&
-                effect.Status == OutboxMessageStatus.Pending && effect.AttemptCount == 0 &&
-                mappedAnswers.Any(answer => answer.RegistrationSubmissionId == effect.RegistrationSubmissionId &&
-                    answer.RegistrationAttemptId == effect.RegistrationAttemptId &&
-                    answer.RegistrationOrderId == effect.RegistrationOrderId &&
-                    answer.RegistrationProviderBindingId == effect.RegistrationProviderBindingId && answerIds.Contains(answer.Id)) &&
-                !mappedAnswers.Any(answer => answer.RegistrationSubmissionId == effect.RegistrationSubmissionId &&
-                    answer.RegistrationAttemptId == effect.RegistrationAttemptId &&
-                    answer.RegistrationOrderId == effect.RegistrationOrderId &&
-                    answer.RegistrationProviderBindingId == effect.RegistrationProviderBindingId &&
-                    (answer.RetentionUntil == null || answer.RetentionUntil > utcNow) &&
-                    (answer.SensitiveRetentionUntil == null || answer.SensitiveRetentionUntil > utcNow))
-            select effect).ToListAsync(cancellationToken);
+                                                                         join order in dbContext.RegistrationOrders.IgnoreQueryFilters([QueryFilterNames.Tenant])
+                                                                             on new { effect.TenantId, effect.EventId, Id = effect.RegistrationOrderId }
+                                                                             equals new { order.TenantId, order.EventId, order.Id }
+                                                                         where effect.TenantId == tenantId && order.AnonymousPiiRetentionUntilUtc != null &&
+                                                                             effect.Status == OutboxMessageStatus.Pending && effect.AttemptCount == 0 &&
+                                                                             mappedAnswers.Any(answer => answer.RegistrationSubmissionId == effect.RegistrationSubmissionId &&
+                                                                                 answer.RegistrationAttemptId == effect.RegistrationAttemptId &&
+                                                                                 answer.RegistrationOrderId == effect.RegistrationOrderId &&
+                                                                                 answer.RegistrationProviderBindingId == effect.RegistrationProviderBindingId && answerIds.Contains(answer.Id)) &&
+                                                                             !mappedAnswers.Any(answer => answer.RegistrationSubmissionId == effect.RegistrationSubmissionId &&
+                                                                                 answer.RegistrationAttemptId == effect.RegistrationAttemptId &&
+                                                                                 answer.RegistrationOrderId == effect.RegistrationOrderId &&
+                                                                                 answer.RegistrationProviderBindingId == effect.RegistrationProviderBindingId &&
+                                                                                 (answer.RetentionUntil == null || answer.RetentionUntil > utcNow) &&
+                                                                                 (answer.SensitiveRetentionUntil == null || answer.SensitiveRetentionUntil > utcNow))
+                                                                         select effect).ToListAsync(cancellationToken);
 
         // Processing or previously attempted work may already have crossed the external boundary.
         // The temporary claim and terminal outcome are persisted in the cleanup transaction.
@@ -127,34 +131,34 @@ public sealed class RegistrationRetentionCleanupRepository(ExploreDbContext dbCo
         // Any held, unknown, missing or draft authority preserves the physical artifact.
         Guid[] storageIds = await (from storage in dbContext.StorageObjects
                 .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])
-            join submission in dbContext.RegistrationSubmissions
-                    .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])
-                on new { storage.TenantId, Id = storage.OwningResourceId }
-                equals new { submission.TenantId, Id = (Guid?)submission.Id }
-            join order in dbContext.RegistrationOrders
-                    .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])
-                on new { submission.TenantId, submission.EventId, Id = submission.RegistrationOrderId }
-                equals new { order.TenantId, order.EventId, order.Id }
-            join version in dbContext.RegistrationFormVersions
-                    .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])
-                on new { submission.TenantId, submission.EventId, submission.RegistrationFormId, Id = submission.RegistrationFormVersionId }
-                equals new { version.TenantId, version.EventId, version.RegistrationFormId, version.Id }
-            where storage.TenantId == tenantId && !storage.IsDeleted &&
-                storage.OwningResourceKind == "registration_submission_sink" &&
-                storage.LifecycleState == StorageObjectLifecycleStates.Active &&
-                storage.RegistrationContentRetentionUntilUtc <= utcNow &&
-                order.AnonymousPiiRetentionUntilUtc != null &&
-                version.PublishedAt != null && version.SchemaHash != null &&
-                dbContext.RegistrationFormFields
-                    .IgnoreQueryFilters(new[] { QueryFilterNames.Tenant, QueryFilterNames.SoftDelete })
-                    .Any(field => field.TenantId == tenantId && field.RegistrationFormVersionId == version.Id) &&
-                !dbContext.RegistrationFormFields
-                    .IgnoreQueryFilters(new[] { QueryFilterNames.Tenant, QueryFilterNames.SoftDelete })
-                    .Any(field => field.TenantId == tenantId && field.RegistrationFormVersionId == version.Id &&
-                        !dbContext.RegistrationRetentionPolicies.Any(policy => policy.Id == field.RetentionPolicyId &&
-                            !policy.IsLegalHold && policy.DurationDays != null))
-            orderby storage.RegistrationContentRetentionUntilUtc, storage.Id
-            select storage.Id).Take(batchSize).ToArrayAsync(cancellationToken);
+                                   join submission in dbContext.RegistrationSubmissions
+                                           .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])
+                                       on new { storage.TenantId, Id = storage.OwningResourceId }
+                                       equals new { submission.TenantId, Id = (Guid?)submission.Id }
+                                   join order in dbContext.RegistrationOrders
+                                           .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])
+                                       on new { submission.TenantId, submission.EventId, Id = submission.RegistrationOrderId }
+                                       equals new { order.TenantId, order.EventId, order.Id }
+                                   join version in dbContext.RegistrationFormVersions
+                                           .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])
+                                       on new { submission.TenantId, submission.EventId, submission.RegistrationFormId, Id = submission.RegistrationFormVersionId }
+                                       equals new { version.TenantId, version.EventId, version.RegistrationFormId, version.Id }
+                                   where storage.TenantId == tenantId && !storage.IsDeleted &&
+                                       storage.OwningResourceKind == "registration_submission_sink" &&
+                                       storage.LifecycleState == StorageObjectLifecycleStates.Active &&
+                                       storage.RegistrationContentRetentionUntilUtc <= utcNow &&
+                                       order.AnonymousPiiRetentionUntilUtc != null &&
+                                       version.PublishedAt != null && version.SchemaHash != null &&
+                                       dbContext.RegistrationFormFields
+                                           .IgnoreQueryFilters(new[] { QueryFilterNames.Tenant, QueryFilterNames.SoftDelete })
+                                           .Any(field => field.TenantId == tenantId && field.RegistrationFormVersionId == version.Id) &&
+                                       !dbContext.RegistrationFormFields
+                                           .IgnoreQueryFilters(new[] { QueryFilterNames.Tenant, QueryFilterNames.SoftDelete })
+                                           .Any(field => field.TenantId == tenantId && field.RegistrationFormVersionId == version.Id &&
+                                               !dbContext.RegistrationRetentionPolicies.Any(policy => policy.Id == field.RetentionPolicyId &&
+                                                   !policy.IsLegalHold && policy.DurationDays != null))
+                                   orderby storage.RegistrationContentRetentionUntilUtc, storage.Id
+                                   select storage.Id).Take(batchSize).ToArrayAsync(cancellationToken);
 
         await dbContext.StorageObjects
             .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])

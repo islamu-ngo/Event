@@ -141,7 +141,8 @@ public sealed class EmailDispatchAdminHateoasTests
     public async Task CapabilityParkedRowsExposePermissionQualifiedOperatorParkCandidate(bool detail)
     {
         var dto = CreateStatus(tenantId: Guid.NewGuid(), outboxId: Guid.NewGuid(), deliveryStatus: EmailDispatchStatus.Parked)
-            with { ParkReason = EmailDispatchParkReason.CapabilityUnavailable };
+            with
+        { ParkReason = EmailDispatchParkReason.CapabilityUnavailable };
 
         var links = detail
             ? new EmailDispatchStatusDetailLinkPolicy().GetLinks(dto, user: null)
@@ -173,7 +174,8 @@ public sealed class EmailDispatchAdminHateoasTests
         EmailDispatchParkReason? parkReason)
     {
         var dto = CreateStatus(tenantId: Guid.NewGuid(), outboxId: Guid.NewGuid(), deliveryStatus: deliveryStatus)
-            with { ParkReason = parkReason };
+            with
+        { ParkReason = parkReason };
 
         var detailLinks = new EmailDispatchStatusDetailLinkPolicy().GetLinks(dto, user: null).ToList();
         var collectionLinks = new EmailDispatchStatusCollectionLinkPolicy().GetItemLinks(dto, user: null).ToList();

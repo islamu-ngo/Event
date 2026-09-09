@@ -62,12 +62,23 @@ public sealed class AnonymousRetentionReadBoundaryTests
         await using var fixture = await EventVisitorCapabilitySqliteFixture.CreateAsync();
         var storage = new StorageObject
         {
-            Id = Guid.CreateVersion7(), TenantId = fixture.TenantId, Tenant = null!,
-            FileTypeId = (int)FileTypeEnum.Document, FileType = null!, Uri = "unused", ObjectKey = "missing.csv",
-            Provider = StorageProviders.Local, FullName = "private.csv", SafeDisplayName = "private.csv",
-            Extension = ".csv", ContentType = "text/csv", Visibility = StorageObjectVisibilities.AuthenticatedTenant,
-            Purpose = StorageObjectPurposes.Document, LifecycleState = StorageObjectLifecycleStates.Active,
-            OwningResourceKind = "registration_submission_sink", OwningResourceId = Guid.CreateVersion7(),
+            Id = Guid.CreateVersion7(),
+            TenantId = fixture.TenantId,
+            Tenant = null!,
+            FileTypeId = (int)FileTypeEnum.Document,
+            FileType = null!,
+            Uri = "unused",
+            ObjectKey = "missing.csv",
+            Provider = StorageProviders.Local,
+            FullName = "private.csv",
+            SafeDisplayName = "private.csv",
+            Extension = ".csv",
+            ContentType = "text/csv",
+            Visibility = StorageObjectVisibilities.AuthenticatedTenant,
+            Purpose = StorageObjectPurposes.Document,
+            LifecycleState = StorageObjectLifecycleStates.Active,
+            OwningResourceKind = "registration_submission_sink",
+            OwningResourceId = Guid.CreateVersion7(),
             ConcurrencyStamp = Guid.CreateVersion7()
         };
         fixture.Context.Add(storage);
@@ -391,8 +402,11 @@ public sealed class AnonymousRetentionReadBoundaryTests
                 Guid foreignTenantId = Guid.CreateVersion7();
                 fixture.Context.Tenants.Add(new Tenant
                 {
-                    Id = foreignTenantId, FullName = "Foreign retention tenant", Slug = $"retention-{foreignTenantId:N}",
-                    TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+                    Id = foreignTenantId,
+                    FullName = "Foreign retention tenant",
+                    Slug = $"retention-{foreignTenantId:N}",
+                    TenantStatusId = (int)TenantStatusEnum.Active,
+                    TenantStatus = null!
                 });
                 await fixture.Context.SaveChangesAsync();
                 await fixture.Context.StorageObjects.Where(item => item.Id == scope.Storage.Id)
@@ -672,12 +686,24 @@ public sealed class AnonymousRetentionReadBoundaryTests
         var effect = RegistrationFinalizationEffect.Create(order, Now);
         var storage = new StorageObject
         {
-            Id = Guid.CreateVersion7(), TenantId = fixture.TenantId, Tenant = null!, FileTypeId = (int)FileTypeEnum.Document,
-            FileType = null!, Uri = "unused", Provider = StorageProviders.Local, FullName = "private.csv", SafeDisplayName = "private.csv",
-            Extension = ".csv", ContentType = "text/csv", Visibility = StorageObjectVisibilities.AuthenticatedTenant,
-            Purpose = StorageObjectPurposes.Document, LifecycleState = StorageObjectLifecycleStates.Active,
-            OwningResourceKind = "registration_submission_sink", OwningResourceId = submission.Id,
-            RegistrationContentRetentionUntilUtc = deadline, ConcurrencyStamp = Guid.CreateVersion7()
+            Id = Guid.CreateVersion7(),
+            TenantId = fixture.TenantId,
+            Tenant = null!,
+            FileTypeId = (int)FileTypeEnum.Document,
+            FileType = null!,
+            Uri = "unused",
+            Provider = StorageProviders.Local,
+            FullName = "private.csv",
+            SafeDisplayName = "private.csv",
+            Extension = ".csv",
+            ContentType = "text/csv",
+            Visibility = StorageObjectVisibilities.AuthenticatedTenant,
+            Purpose = StorageObjectPurposes.Document,
+            LifecycleState = StorageObjectLifecycleStates.Active,
+            OwningResourceKind = "registration_submission_sink",
+            OwningResourceId = submission.Id,
+            RegistrationContentRetentionUntilUtc = deadline,
+            ConcurrencyStamp = Guid.CreateVersion7()
         };
         await using var content = new MemoryStream("private answer"u8.ToArray());
         var written = await fixture.Services.GetRequiredService<IFileStorageProviderResolver>().GetRequired(StorageProviders.Local)

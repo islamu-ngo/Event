@@ -51,7 +51,8 @@ public sealed class EventVisitorCapabilityGateTests
         {
             "configure" => await fixture.ExecuteAsync<ConfigureEventParticipationCommand, BaseCommandResponse<Guid>>(new()
             {
-                EventId = entity.Id, ExpectedConcurrencyStamp = configurationStamp,
+                EventId = entity.Id,
+                ExpectedConcurrencyStamp = configurationStamp,
                 ParticipationConfiguration = participation
             }),
             "draft" => await fixture.ExecuteAsync<UpdateEventDraftCommand, BaseCommandResponse<Guid>>(new()
@@ -59,7 +60,8 @@ public sealed class EventVisitorCapabilityGateTests
                 Id = entity.Id,
                 Draft = new UpdateEventDraftRequestDto
                 {
-                    Title = "Rejected draft update", ExpectedConcurrencyStamp = entity.ConcurrencyStamp,
+                    Title = "Rejected draft update",
+                    ExpectedConcurrencyStamp = entity.ConcurrencyStamp,
                     ExpectedParticipationConfigurationConcurrencyStamp = configurationStamp,
                     ParticipationConfiguration = participation
                 }
@@ -69,8 +71,10 @@ public sealed class EventVisitorCapabilityGateTests
                 TenantId = fixture.TenantId,
                 Request = new ImportEventRequestDto
                 {
-                    Title = "Rejected imported setup", OwnerActorId = fixture.ActorId,
-                    ProvenanceSource = "visitor-test", ProvenanceExternalId = "external-event",
+                    Title = "Rejected imported setup",
+                    OwnerActorId = fixture.ActorId,
+                    ProvenanceSource = "visitor-test",
+                    ProvenanceExternalId = "external-event",
                     ParticipationConfiguration = participation
                 }
             }),
@@ -78,7 +82,8 @@ public sealed class EventVisitorCapabilityGateTests
             {
                 EventDto = new CreateEventDto
                 {
-                    Title = "Rejected created setup", ParticipationConfiguration = participation,
+                    Title = "Rejected created setup",
+                    ParticipationConfiguration = participation,
                     EventStatusId = (int)(command == "create-published" ? EventStatusEnum.Published : EventStatusEnum.Draft),
                     Sessions = [new CreateEventGraphSessionDto
                     {
@@ -89,11 +94,13 @@ public sealed class EventVisitorCapabilityGateTests
             }),
             "publish" => await fixture.ExecuteAsync<PublishEventCommand, BaseCommandResponse<Guid>>(new()
             {
-                Id = entity.Id, Request = new PublishEventRequestDto { ExpectedConcurrencyStamp = entity.ConcurrencyStamp }
+                Id = entity.Id,
+                Request = new PublishEventRequestDto { ExpectedConcurrencyStamp = entity.ConcurrencyStamp }
             }),
             _ => await fixture.ExecuteAsync<ApprovePublishEventCommand, BaseCommandResponse<Guid>>(new()
             {
-                Id = entity.Id, Request = new PublishEventRequestDto { ExpectedConcurrencyStamp = entity.ConcurrencyStamp }
+                Id = entity.Id,
+                Request = new PublishEventRequestDto { ExpectedConcurrencyStamp = entity.ConcurrencyStamp }
             })
         };
 
@@ -138,8 +145,11 @@ public sealed class EventVisitorCapabilityGateTests
                     BookingPartyTypeEnum.Individual, [new(ticket.TicketId, 1, null)]))).Request),
             _ => await fixture.ExecuteAsync<CreateRegistrationOrderWithHoldCommand, BaseCommandResponse<Guid>>(new()
             {
-                EventId = entity.Id, TicketCatalogVersionId = ticket.CatalogId, AccountUserId = fixture.UserId,
-                BookingPartyType = BookingPartyTypeEnum.Individual, Lines = [new(ticket.TicketId, 1, null)]
+                EventId = entity.Id,
+                TicketCatalogVersionId = ticket.CatalogId,
+                AccountUserId = fixture.UserId,
+                BookingPartyType = BookingPartyTypeEnum.Individual,
+                Lines = [new(ticket.TicketId, 1, null)]
             })
         };
         var existing = await StartAsync();
@@ -183,7 +193,8 @@ public sealed class EventVisitorCapabilityGateTests
         await Assert.That(changed.Success).IsTrue();
         var response = await fixture.ExecuteAsync<ConfigureEventParticipationCommand, BaseCommandResponse<Guid>>(new()
         {
-            EventId = entity.Id, ExpectedConcurrencyStamp = entity.ParticipationConfiguration!.ConcurrencyStamp,
+            EventId = entity.Id,
+            ExpectedConcurrencyStamp = entity.ParticipationConfiguration!.ConcurrencyStamp,
             ParticipationConfiguration = new ConfigureEventParticipationDto
             {
                 ParticipationHandlingModeId = (int)mode,
@@ -209,7 +220,8 @@ public sealed class EventVisitorCapabilityGateTests
         var entity = await fixture.SeedEventAsync();
         var response = await fixture.ExecuteAsync<ConfigureEventParticipationCommand, BaseCommandResponse<Guid>>(new()
         {
-            EventId = entity.Id, ExpectedConcurrencyStamp = entity.ParticipationConfiguration!.ConcurrencyStamp,
+            EventId = entity.Id,
+            ExpectedConcurrencyStamp = entity.ParticipationConfiguration!.ConcurrencyStamp,
             ParticipationConfiguration = EventVisitorCapabilitySqliteFixture.Participation()
         });
         await Assert.That(response.FailureCode).IsEqualTo("event_visitor_account_onboarding_required");

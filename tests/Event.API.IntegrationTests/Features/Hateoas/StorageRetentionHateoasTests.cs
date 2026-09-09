@@ -174,12 +174,24 @@ public sealed class StorageRetentionHateoasTests
         Guid id = Guid.CreateVersion7();
         var storage = new StorageObject
         {
-            Id = id, TenantId = tenant.TenantId, Tenant = null!, FileTypeId = (int)FileTypeEnum.Document,
-            FileType = null!, Uri = $"{BaseUrl}/{id}/content", ObjectKey = $"tenants/{tenant.TenantId:N}/{id:N}.csv",
-            Provider = StorageProviders.Local, FullName = "retained.csv", SafeDisplayName = "retained.csv",
-            Extension = "csv", ContentType = "text/csv", Size = 16,
-            Visibility = StorageObjectVisibilities.AuthenticatedTenant, Purpose = StorageObjectPurposes.Document,
-            LifecycleState = StorageObjectLifecycleStates.Active, CreatedBy = tenant.UserId, CreatedAt = created,
+            Id = id,
+            TenantId = tenant.TenantId,
+            Tenant = null!,
+            FileTypeId = (int)FileTypeEnum.Document,
+            FileType = null!,
+            Uri = $"{BaseUrl}/{id}/content",
+            ObjectKey = $"tenants/{tenant.TenantId:N}/{id:N}.csv",
+            Provider = StorageProviders.Local,
+            FullName = "retained.csv",
+            SafeDisplayName = "retained.csv",
+            Extension = "csv",
+            ContentType = "text/csv",
+            Size = 16,
+            Visibility = StorageObjectVisibilities.AuthenticatedTenant,
+            Purpose = StorageObjectPurposes.Document,
+            LifecycleState = StorageObjectLifecycleStates.Active,
+            CreatedBy = tenant.UserId,
+            CreatedAt = created,
             ConcurrencyStamp = Guid.CreateVersion7()
         };
         if (scenario.EndsWith("-answer", StringComparison.Ordinal))

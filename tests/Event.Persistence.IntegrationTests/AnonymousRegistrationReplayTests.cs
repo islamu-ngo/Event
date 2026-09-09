@@ -58,11 +58,16 @@ public sealed class AnonymousRegistrationReplayTests
         var authority = proof.Request.ChallengeAuthority!;
         var claim = await fixture.Services.GetRequiredService<IIdempotencyRepository>().TryClaimAsync(new IdempotencyRecord
         {
-            Id = Guid.CreateVersion7(), TenantId = fixture.TenantId, Key = proof.Binding.IdempotencyKey,
-            RequestMethod = "POST", RequestTarget = $"/api/events/{target.Id}/registration-orders/guest",
-            RequestBodyHash = proof.Binding.CanonicalRequestDigest, PrincipalFingerprint = Guid.CreateVersion7().ToString("N"),
+            Id = Guid.CreateVersion7(),
+            TenantId = fixture.TenantId,
+            Key = proof.Binding.IdempotencyKey,
+            RequestMethod = "POST",
+            RequestTarget = $"/api/events/{target.Id}/registration-orders/guest",
+            RequestBodyHash = proof.Binding.CanonicalRequestDigest,
+            PrincipalFingerprint = Guid.CreateVersion7().ToString("N"),
             StatusCode = IdempotencyRecord.InProgressStatusCode,
-            CreatedAt = DateTime.UtcNow, ExpiresAt = DateTime.UtcNow.AddHours(24)
+            CreatedAt = DateTime.UtcNow,
+            ExpiresAt = DateTime.UtcNow.AddHours(24)
         });
         await Assert.That(claim.IsOwner).IsTrue();
         using var interruptedRequest = new CancellationTokenSource();

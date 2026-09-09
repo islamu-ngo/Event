@@ -376,15 +376,15 @@ public sealed class BffIdentityMigrationAnchorTests
         {
             RequestCount++;
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent(JsonSerializer.Serialize(new AdminAuthorityDto
             {
-                IsInstanceAdmin = true,
-                HasAnyAuthority = true,
-                AdminTenantIds = [],
-                AdminOrganizationIds = [],
-                AdminGroupIds = []
-            }), Encoding.UTF8, "application/json")
+                Content = new StringContent(JsonSerializer.Serialize(new AdminAuthorityDto
+                {
+                    IsInstanceAdmin = true,
+                    HasAnyAuthority = true,
+                    AdminTenantIds = [],
+                    AdminOrganizationIds = [],
+                    AdminGroupIds = []
+                }), Encoding.UTF8, "application/json")
             });
         }
     }

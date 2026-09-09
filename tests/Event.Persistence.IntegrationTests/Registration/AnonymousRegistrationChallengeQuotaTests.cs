@@ -99,13 +99,30 @@ public sealed class AnonymousRegistrationChallengeQuotaTests
         var first = await fixture.SeedEventAsync();
         Guid otherTenant = Guid.CreateVersion7();
         Guid otherEvent = Guid.CreateVersion7();
-        fixture.Context.Tenants.Add(new Tenant { Id = otherTenant, FullName = "Other quota tenant", Slug = $"quota-{otherTenant:N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null! });
-        fixture.Context.Events.Add(new Explore.Domain.Event { Id = otherEvent, TenantId = otherTenant, Tenant = null!,
-            Title = "Other quota event", ActorId = fixture.ActorId, Actor = null!, OrganizerActorId = fixture.ActorId,
+        fixture.Context.Tenants.Add(new Tenant
+        {
+            Id = otherTenant,
+            FullName = "Other quota tenant",
+            Slug = $"quota-{otherTenant:N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
+        });
+        fixture.Context.Events.Add(new Explore.Domain.Event
+        {
+            Id = otherEvent,
+            TenantId = otherTenant,
+            Tenant = null!,
+            Title = "Other quota event",
+            ActorId = fixture.ActorId,
+            Actor = null!,
+            OrganizerActorId = fixture.ActorId,
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-            EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null! });
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            VisibilityType = null!,
+            EventFormatId = (int)EventFormatEnum.Local,
+            EventFormat = null!,
+            EventStatus = null!
+        });
         await fixture.Context.SaveChangesAsync();
         await LimitsAsync(fixture.Context, "1", "1");
         await using var left = Context(fixture, fixture.TenantId);
@@ -160,8 +177,14 @@ public sealed class AnonymousRegistrationChallengeQuotaTests
         await using var context = Context(fixture, fixture.TenantId);
         await Assert.That(await AcquireAsync(context, fixture.TenantId, entity.Id)).IsTrue();
         await LimitsAsync(fixture.Context, "1", "1", locked: true);
-        fixture.Context.TenantSettingOverrides.Add(new TenantSetting { Id = Guid.CreateVersion7(), TenantId = fixture.TenantId,
-            Tenant = null!, SettingKey = GovernanceSettingKeys.AnonymousRegistrationChallenge.TenantPermitsPerMinute, Value = "\"10000\"" });
+        fixture.Context.TenantSettingOverrides.Add(new TenantSetting
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = fixture.TenantId,
+            Tenant = null!,
+            SettingKey = GovernanceSettingKeys.AnonymousRegistrationChallenge.TenantPermitsPerMinute,
+            Value = "\"10000\""
+        });
         await fixture.Context.SaveChangesAsync();
         await Assert.That(await AcquireAsync(context, fixture.TenantId, entity.Id)).IsFalse();
         await Assert.That(SettingRegistry.Get(GovernanceSettingKeys.AnonymousRegistrationChallenge.TenantPermitsPerMinute)!.DefaultValue).IsEqualTo("\"600\"");
@@ -175,10 +198,22 @@ public sealed class AnonymousRegistrationChallengeQuotaTests
     private static async Task LimitsAsync(ExploreDbContext context, string tenantLimit, string eventLimit, bool locked = false)
     {
         context.SystemSettings.AddRange(
-            new SystemSetting { Id = Guid.CreateVersion7(), SettingKey = GovernanceSettingKeys.AnonymousRegistrationChallenge.TenantPermitsPerMinute,
-                Value = $"\"{tenantLimit}\"", ValueType = SettingValueType.String, IsLocked = locked },
-            new SystemSetting { Id = Guid.CreateVersion7(), SettingKey = GovernanceSettingKeys.AnonymousRegistrationChallenge.EventPermitsPerMinute,
-                Value = $"\"{eventLimit}\"", ValueType = SettingValueType.String, IsLocked = locked });
+            new SystemSetting
+            {
+                Id = Guid.CreateVersion7(),
+                SettingKey = GovernanceSettingKeys.AnonymousRegistrationChallenge.TenantPermitsPerMinute,
+                Value = $"\"{tenantLimit}\"",
+                ValueType = SettingValueType.String,
+                IsLocked = locked
+            },
+            new SystemSetting
+            {
+                Id = Guid.CreateVersion7(),
+                SettingKey = GovernanceSettingKeys.AnonymousRegistrationChallenge.EventPermitsPerMinute,
+                Value = $"\"{eventLimit}\"",
+                ValueType = SettingValueType.String,
+                IsLocked = locked
+            });
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
     }

@@ -431,8 +431,15 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
     private static async Task<Guid> AddTenantAsync(ExploreDbContext context)
     {
         Guid id = Guid.CreateVersion7();
-        context.Tenants.Add(new Tenant { Id = id, FullName = "Native disable tenant", Slug = $"native-disable-{id:N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!, CreatedAt = DateTime.UtcNow });
+        context.Tenants.Add(new Tenant
+        {
+            Id = id,
+            FullName = "Native disable tenant",
+            Slug = $"native-disable-{id:N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!,
+            CreatedAt = DateTime.UtcNow
+        });
         await context.SaveChangesAsync();
         return id;
     }
@@ -479,13 +486,36 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
                 scenario._platformGrant = await context.PlatformUserRoles.AsNoTracking().SingleAsync(row => row.UserId == scenario.PlatformActorId);
                 scenario.TenantId = await AddTenantAsync(context);
                 scenario.InheritedTenantId = await AddTenantAsync(context);
-                var user = new User { Id = Guid.CreateVersion7(), CreatedAt = DateTime.UtcNow,
-                    Pii = new UserPii { Email = $"native-disable-{Guid.CreateVersion7():N}@example.test", FirstName = "Tenant", LastName = "Admin" } };
-                var membership = new TenantUser { Id = Guid.CreateVersion7(), TenantId = scenario.TenantId, Tenant = null!,
-                    UserId = user.Id, User = user, StatusId = (int)TenantUserStatusEnum.Active, JoinedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow };
-                context.TenantUserRoleGrants.Add(new TenantUserRoleGrant { Id = Guid.CreateVersion7(), TenantId = scenario.TenantId,
-                    Tenant = null!, TenantUserId = membership.Id, TenantUser = membership, RoleId = (int)RoleEnum.TenantAdmin,
-                    Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant, GrantedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow });
+                var user = new User
+                {
+                    Id = Guid.CreateVersion7(),
+                    CreatedAt = DateTime.UtcNow,
+                    Pii = new UserPii { Email = $"native-disable-{Guid.CreateVersion7():N}@example.test", FirstName = "Tenant", LastName = "Admin" }
+                };
+                var membership = new TenantUser
+                {
+                    Id = Guid.CreateVersion7(),
+                    TenantId = scenario.TenantId,
+                    Tenant = null!,
+                    UserId = user.Id,
+                    User = user,
+                    StatusId = (int)TenantUserStatusEnum.Active,
+                    JoinedAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow
+                };
+                context.TenantUserRoleGrants.Add(new TenantUserRoleGrant
+                {
+                    Id = Guid.CreateVersion7(),
+                    TenantId = scenario.TenantId,
+                    Tenant = null!,
+                    TenantUserId = membership.Id,
+                    TenantUser = membership,
+                    RoleId = (int)RoleEnum.TenantAdmin,
+                    Role = null!,
+                    RoleScopeId = (int)RoleScopeEnum.Tenant,
+                    GrantedAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow
+                });
                 scenario.TenantActorId = user.Id;
                 await context.SaveChangesAsync();
                 await ApplyEmailSettingsAsync(context,
@@ -527,8 +557,15 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
                     .Where(row => row.TenantId == TenantId).ExecuteUpdateAsync(update => update.SetProperty(row => row.RevokedAt, (DateTime?)null));
             else
             {
-                context.PlatformUserRoles.Add(new PlatformUserRole { Id = _platformGrant.Id, UserId = PlatformActorId, User = null!,
-                    RoleId = _platformGrant.RoleId, Role = null!, GrantedAt = _platformGrant.GrantedAt });
+                context.PlatformUserRoles.Add(new PlatformUserRole
+                {
+                    Id = _platformGrant.Id,
+                    UserId = PlatformActorId,
+                    User = null!,
+                    RoleId = _platformGrant.RoleId,
+                    Role = null!,
+                    GrantedAt = _platformGrant.GrantedAt
+                });
                 await context.SaveChangesAsync();
             }
         }

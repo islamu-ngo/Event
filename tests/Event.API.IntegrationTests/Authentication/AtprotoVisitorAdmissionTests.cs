@@ -207,7 +207,8 @@ public sealed class AtprotoVisitorAdmissionTests
         });
         using HttpClient client = configuredHost.CreateClient(new WebApplicationFactoryClientOptions
         {
-            AllowAutoRedirect = false, BaseAddress = new Uri("https://localhost")
+            AllowAutoRedirect = false,
+            BaseAddress = new Uri("https://localhost")
         });
         // Even with public signup enabled, incomplete configured bootstrap admits no unrelated claimant.
         using HttpResponseMessage unrelatedPending = await BootstrapAsync(factory, client, NewDid());
@@ -292,8 +293,11 @@ public sealed class AtprotoVisitorAdmissionTests
         {
             database.SystemSettings.Add(new SystemSetting
             {
-                SettingKey = key, Value = value, ValueType = SettingValueType.String,
-                Category = "Authentication", CreatedAt = DateTime.UtcNow
+                SettingKey = key,
+                Value = value,
+                ValueType = SettingValueType.String,
+                Category = "Authentication",
+                CreatedAt = DateTime.UtcNow
             });
         }
         else setting.Value = value;

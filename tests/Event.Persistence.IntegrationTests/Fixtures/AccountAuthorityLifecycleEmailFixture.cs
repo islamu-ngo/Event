@@ -103,16 +103,24 @@ internal sealed class AccountAuthorityLifecycleEmailFixture : IAsyncDisposable
         };
         var tenant = new Tenant
         {
-            Id = fixture.TenantId, FullName = "Lifecycle fixture", Slug = $"lifecycle-{fixture.TenantId:N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = fixture.TenantId,
+            FullName = "Lifecycle fixture",
+            Slug = $"lifecycle-{fixture.TenantId:N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         };
         fixture.Context.Users.Add(user);
         fixture.Context.Tenants.Add(tenant);
         fixture.Context.TenantUsers.Add(new TenantUser
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
-            UserId = user.Id, User = user, StatusId = (int)TenantUserStatusEnum.Active,
-            JoinedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            UserId = user.Id,
+            User = user,
+            StatusId = (int)TenantUserStatusEnum.Active,
+            JoinedAt = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow
         });
         await fixture.Context.SaveChangesAsync();
         fixture.KeycloakLoginId = await fixture.AddLoginAsync(user.Id,
@@ -129,9 +137,13 @@ internal sealed class AccountAuthorityLifecycleEmailFixture : IAsyncDisposable
     {
         var login = new UserExternalLogin
         {
-            Id = Guid.CreateVersion7(), UserId = userId, User = null!,
-            AuthenticationProviderId = (int)key.ProviderKind, AuthenticationProvider = null!,
-            ProviderKey = key.Value, CreatedAt = DateTime.UtcNow
+            Id = Guid.CreateVersion7(),
+            UserId = userId,
+            User = null!,
+            AuthenticationProviderId = (int)key.ProviderKind,
+            AuthenticationProvider = null!,
+            ProviderKey = key.Value,
+            CreatedAt = DateTime.UtcNow
         };
         Context.UserExternalLogins.Add(login);
         await Context.SaveChangesAsync();

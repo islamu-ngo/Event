@@ -350,9 +350,14 @@ public sealed class GuestRegistrationStatusTests
         await SetEndAsync(fixture, target.Id, EventEnd);
         fixture.Context.EventSessions.Add(new EventSession(EventSessionStatusEnum.Published)
         {
-            Id = Guid.CreateVersion7(), EventId = target.Id, Event = null!, TenantId = fixture.TenantId,
-            Tenant = null!, RegistrationModeId = (int)RegistrationModeEnum.Open,
-            StartTime = EventEnd.AddHours(-2), EndTime = EventEnd
+            Id = Guid.CreateVersion7(),
+            EventId = target.Id,
+            Event = null!,
+            TenantId = fixture.TenantId,
+            Tenant = null!,
+            RegistrationModeId = (int)RegistrationModeEnum.Open,
+            StartTime = EventEnd.AddHours(-2),
+            EndTime = EventEnd
         });
         await fixture.Context.SaveChangesAsync();
         fixture.Context.ChangeTracker.Clear();

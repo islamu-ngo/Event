@@ -345,7 +345,10 @@ public sealed class AnonymousRegistrationChallengeHttpTests
             var host = new NativeHost(await LocalAdmissionWebApplicationFactory.CreateAsync(
                 persistenceInterceptor: barrier, enableRateLimiting: true))
             {
-                _ipLimit = ipLimit, _subnetLimit = subnetLimit, _concurrency = concurrency, _pathBase = pathBase
+                _ipLimit = ipLimit,
+                _subnetLimit = subnetLimit,
+                _concurrency = concurrency,
+                _pathBase = pathBase
             };
             host.Factory = host.CreateReplica();
             host.Client = host.Factory.CreateClient(new() { AllowAutoRedirect = false });
@@ -431,8 +434,12 @@ public sealed class AnonymousRegistrationChallengeHttpTests
             Guid id = Guid.CreateVersion7();
             database.Tenants.Add(new Tenant
             {
-                Id = id, Slug = $"other-{id:N}", FullName = "Other scope", TenantStatusId = (int)TenantStatusEnum.Active,
-                TenantStatus = null!, CreatedAt = Clock.GetUtcNow().UtcDateTime
+                Id = id,
+                Slug = $"other-{id:N}",
+                FullName = "Other scope",
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!,
+                CreatedAt = Clock.GetUtcNow().UtcDateTime
             });
             await database.SaveChangesAsync();
             return id;
@@ -460,19 +467,32 @@ public sealed class AnonymousRegistrationChallengeHttpTests
             Guid userId = (await database.InstanceBootstrapStates.SingleAsync()).CompletedByUserId!.Value;
             var actor = new Actor
             {
-                Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-                UserId = userId, Pii = new ActorPii { DisplayName = "Anonymous event operator" }, CreatedAt = Clock.GetUtcNow().UtcDateTime
+                Id = Guid.CreateVersion7(),
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
+                UserId = userId,
+                Pii = new ActorPii { DisplayName = "Anonymous event operator" },
+                CreatedAt = Clock.GetUtcNow().UtcDateTime
             };
             EventId = Guid.CreateVersion7();
             var target = new Explore.Domain.Event(EventStatusEnum.Published)
             {
-                Id = EventId, Title = "Native anonymous event", TenantId = tenantId, Tenant = null!,
-                ActorId = actor.Id, Actor = actor, OrganizerActorId = actor.Id,
+                Id = EventId,
+                Title = "Native anonymous event",
+                TenantId = tenantId,
+                Tenant = null!,
+                ActorId = actor.Id,
+                Actor = actor,
+                OrganizerActorId = actor.Id,
                 EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-                VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-                EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!,
+                VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+                VisibilityType = null!,
+                EventFormatId = (int)EventFormatEnum.Local,
+                EventFormat = null!,
+                EventStatus = null!,
                 SessionCount = 1,
-                FirstSessionStartUtc = Clock.GetUtcNow().AddDays(30), LastSessionEndUtc = Clock.GetUtcNow().AddDays(31),
+                FirstSessionStartUtc = Clock.GetUtcNow().AddDays(30),
+                LastSessionEndUtc = Clock.GetUtcNow().AddDays(31),
                 CreatedAt = Clock.GetUtcNow().UtcDateTime
             };
             target.ParticipationConfiguration = EventParticipationConfiguration.Create(EventId, tenantId,
@@ -489,9 +509,15 @@ public sealed class AnonymousRegistrationChallengeHttpTests
             catalog.Publish();
             database.AddRange(actor, target, catalog, pool, new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!, UserId = userId, User = null!,
-                ActorId = actor.Id, StatusId = (int)TenantUserStatusEnum.Active,
-                JoinedAt = Clock.GetUtcNow().UtcDateTime, CreatedAt = Clock.GetUtcNow().UtcDateTime
+                Id = Guid.CreateVersion7(),
+                TenantId = tenantId,
+                Tenant = null!,
+                UserId = userId,
+                User = null!,
+                ActorId = actor.Id,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                JoinedAt = Clock.GetUtcNow().UtcDateTime,
+                CreatedAt = Clock.GetUtcNow().UtcDateTime
             });
             await database.SaveChangesAsync();
             Body = JsonSerializer.Serialize(new

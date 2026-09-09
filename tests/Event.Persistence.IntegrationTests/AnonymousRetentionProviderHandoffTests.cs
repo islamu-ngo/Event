@@ -199,7 +199,8 @@ public sealed class AnonymousRetentionProviderHandoffTests
     private static Task SendAsync(string provider, IRegistrationProviderSubmissionSink sink, RegistrationProviderSubmissionSinkRequest request) =>
         provider == "formbricks-write"
             ? ((IRegistrationProviderSubmissionWriter)sink).WriteSubmissionAsync(new(request.TenantId, request.Binding,
-                request.Connection, request.Tuple, request.AttemptId, request.Answers) { DisclosureUntilUtc = request.DisclosureUntilUtc }, CancellationToken.None)
+                request.Connection, request.Tuple, request.AttemptId, request.Answers)
+            { DisclosureUntilUtc = request.DisclosureUntilUtc }, CancellationToken.None)
             : sink.AcceptAsync(request, CancellationToken.None);
 
     private static IRegistrationProviderSubmissionSink Sink(string provider, IServiceProvider services, Transport transport, ISecretResolver secrets)
@@ -236,7 +237,8 @@ public sealed class AnonymousRetentionProviderHandoffTests
             RegistrationProviderCompletionModeEnum.Callback, RegistrationProviderTrustLevelEnum.SelectedFields, null, Deadline.AddDays(-1));
         binding.SetDraftProvisionedSurvey("survey", null);
         return new(tenantId, binding, connection, tuple, Guid.CreateVersion7(), Guid.CreateVersion7(),
-            new Dictionary<string, string> { ["name"] = "included-name" }, null) { DisclosureUntilUtc = deadline };
+            new Dictionary<string, string> { ["name"] = "included-name" }, null)
+        { DisclosureUntilUtc = deadline };
     }
 
     private static SecretResolutionResult Secret(Guid tenantId) => SecretResolutionResult.Resolved(

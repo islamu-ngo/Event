@@ -144,7 +144,10 @@ public partial class LocalAccountsSection : IDisposable
         if (EmailInvalid || FirstNameInvalid || LastNameInvalid) return;
         var request = new CreateLocalIdentityRequestDto
         {
-            OperationId = Guid.CreateVersion7(), Email = _email, FirstName = _firstName, LastName = _lastName
+            OperationId = Guid.CreateVersion7(),
+            Email = _email,
+            FirstName = _firstName,
+            LastName = _lastName
         };
         int generation = BeginIssuance(operationId: request.OperationId, localSubjectId: null);
         try
@@ -174,8 +177,10 @@ public partial class LocalAccountsSection : IDisposable
         }
         var request = new ResetLocalCredentialRequestDto
         {
-            OperationId = Guid.CreateVersion7(), ExpectedCurrentOperationId = previousOperationId,
-            ExpectedCurrentOperationConcurrencyStamp = previousStamp, Reason = _reason
+            OperationId = Guid.CreateVersion7(),
+            ExpectedCurrentOperationId = previousOperationId,
+            ExpectedCurrentOperationConcurrencyStamp = previousStamp,
+            Reason = _reason
         };
         int generation = BeginIssuance(operationId: request.OperationId, localSubjectId: identity.LocalSubjectId);
         try

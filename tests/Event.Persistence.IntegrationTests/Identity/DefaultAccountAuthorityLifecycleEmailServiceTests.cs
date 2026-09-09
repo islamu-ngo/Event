@@ -87,7 +87,8 @@ public sealed class DefaultAccountAuthorityLifecycleEmailServiceTests
         await using var fixture = await AccountAuthorityLifecycleEmailFixture.CreateAsync();
         var otherUser = new User
         {
-            Id = Guid.CreateVersion7(), Pii = new UserPii { Email = string.Empty, FirstName = "Other", LastName = "Account" },
+            Id = Guid.CreateVersion7(),
+            Pii = new UserPii { Email = string.Empty, FirstName = "Other", LastName = "Account" },
             CreatedAt = DateTime.UtcNow
         };
         fixture.Context.Users.Add(otherUser);
@@ -142,12 +143,12 @@ public sealed class DefaultAccountAuthorityLifecycleEmailServiceTests
 
     internal static Task<AccountAuthorityLifecycleEmailResult> InvokeAsync(IAccountAuthorityLifecycleEmailService service,
         AccountAuthorityLifecycleEmailAction action, AccountAuthorityLifecycleEmailRequest request) => action switch
-    {
-        AccountAuthorityLifecycleEmailAction.EmailVerification => service.RequestEmailVerificationAsync(request),
-        AccountAuthorityLifecycleEmailAction.PasswordReset => service.RequestPasswordResetAsync(request),
-        AccountAuthorityLifecycleEmailAction.EmailUpdateVerification => service.RequestEmailUpdateVerificationAsync(request),
-        _ => throw new ArgumentOutOfRangeException(nameof(action))
-    };
+        {
+            AccountAuthorityLifecycleEmailAction.EmailVerification => service.RequestEmailVerificationAsync(request),
+            AccountAuthorityLifecycleEmailAction.PasswordReset => service.RequestPasswordResetAsync(request),
+            AccountAuthorityLifecycleEmailAction.EmailUpdateVerification => service.RequestEmailUpdateVerificationAsync(request),
+            _ => throw new ArgumentOutOfRangeException(nameof(action))
+        };
 
     internal static async Task AssertNoDeliveryAsync(AccountAuthorityLifecycleEmailFixture fixture)
     {

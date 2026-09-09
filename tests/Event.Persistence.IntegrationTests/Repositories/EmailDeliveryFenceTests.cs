@@ -40,8 +40,12 @@ public sealed class EmailDeliveryFenceTests
                 await SetEmailSettingAsync(seed, GovernanceSettingKeys.TenantDelegation.LockSmtp, "false");
                 seed.Tenants.Add(new Tenant
                 {
-                    Id = tenantId, FullName = "Tenant SMTP writer", Slug = $"smtp-{tenantId:N}",
-                    TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!, CreatedAt = DateTime.UtcNow
+                    Id = tenantId,
+                    FullName = "Tenant SMTP writer",
+                    Slug = $"smtp-{tenantId:N}",
+                    TenantStatusId = (int)TenantStatusEnum.Active,
+                    TenantStatus = null!,
+                    CreatedAt = DateTime.UtcNow
                 });
                 await seed.SaveChangesAsync();
                 if (mutation != TenantPolicyMutation.CreateBatch)
@@ -153,8 +157,10 @@ public sealed class EmailDeliveryFenceTests
             {
                 var setting = new SystemSetting
                 {
-                    Id = Guid.CreateVersion7(), SettingKey = settingKey,
-                    Value = "\"smtp.changed.test\"", ValueType = SettingValueType.String,
+                    Id = Guid.CreateVersion7(),
+                    SettingKey = settingKey,
+                    Value = "\"smtp.changed.test\"",
+                    ValueType = SettingValueType.String,
                     CreatedAt = DateTime.UtcNow
                 };
                 if (useExplicitTransactionWrite)

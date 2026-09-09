@@ -248,7 +248,8 @@ public sealed class AnonymousRegistrationBrowserFlowTests
             Context.JSInterop.SetupModule("/js/bff.js").Setup<string>("getCookie", "XSRF-TOKEN").SetResult(Csrf);
             Transport = new RecordingTransport(Clock, new RegistrationCheckoutCompositionDto
             {
-                EventId = EventId, TicketCatalogVersionId = CatalogId,
+                EventId = EventId,
+                TicketCatalogVersionId = CatalogId,
                 TicketTypes = [new RegistrationCheckoutTicketTypeDto { Id = TicketId, Name = "Admission", TicketPricingModeCode = "FREE" }]
             });
             var behavior = new EventApiBehaviorMessageHandler { InnerHandler = Transport };
@@ -275,7 +276,9 @@ public sealed class AnonymousRegistrationBrowserFlowTests
 
         public StartRegistrationOrderRequest Request() => new()
         {
-            TicketCatalogVersionId = CatalogId, BookingPartyType = 1, PlatformContributionBasisPoints = 25,
+            TicketCatalogVersionId = CatalogId,
+            BookingPartyType = 1,
+            PlatformContributionBasisPoints = 25,
             Lines = [new RegistrationOrderLineSelection { TicketTypeId = TicketId, Quantity = 2, ChosenUnitPriceMinor = 300 }]
         };
         public void Dispose() { _http.Dispose(); _pipeline.Dispose(); Context.Dispose(); }
@@ -332,10 +335,13 @@ public sealed class AnonymousRegistrationBrowserFlowTests
             if (request.Method == HttpMethod.Get) return Json(HttpStatusCode.OK, composition);
             var captured = new Captured
             {
-                Body = await request.Content!.ReadAsStringAsync(cancellationToken), Key = Header(request, "Idempotency-Key"),
-                Challenge = Header(request, "X-Registration-Challenge"), Proof = Header(request, "X-Registration-Proof"),
+                Body = await request.Content!.ReadAsStringAsync(cancellationToken),
+                Key = Header(request, "Idempotency-Key"),
+                Challenge = Header(request, "X-Registration-Challenge"),
+                Proof = Header(request, "X-Registration-Proof"),
                 ProofCount = request.Headers.TryGetValues("X-Registration-Proof", out var proofs) ? proofs.Count() : 0,
-                Capability = Header(request, "X-Registration-Order-Capability"), AttemptCapability = Header(request, "X-Registration-Attempt-Capability"),
+                Capability = Header(request, "X-Registration-Order-Capability"),
+                AttemptCapability = Header(request, "X-Registration-Attempt-Capability"),
                 Csrf = Header(request, "X-CSRF-TOKEN")
             };
             if (request.RequestUri!.AbsolutePath.EndsWith("/guest-registration-challenges", StringComparison.Ordinal))

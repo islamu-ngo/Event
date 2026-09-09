@@ -73,7 +73,8 @@ internal sealed class LocalIdentityLifecycleHttpFixture : IAsyncDisposable
             });
             fixture.Client = fixture.Host.CreateClient(new WebApplicationFactoryClientOptions
             {
-                BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false
+                BaseAddress = new Uri("https://localhost"),
+                AllowAutoRedirect = false
             });
             await using var scope = fixture.Host.Services.CreateAsyncScope();
             await using DbContext identity = fixture.Native.CreateIdentityDatabase();

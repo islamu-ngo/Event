@@ -114,7 +114,8 @@ public sealed class DrainRegistrationProviderSubmissionWriteEffectsCommandHandle
                     claim.RegistrationAttemptId,
                     claim.RegistrationSubmissionId,
                     answers,
-                    null) { DisclosureUntilUtc = disclosureUntilUtc },
+                    null)
+                { DisclosureUntilUtc = disclosureUntilUtc },
                 cancellationToken);
             if (result.Accepted)
             {

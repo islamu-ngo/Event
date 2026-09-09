@@ -401,7 +401,8 @@ public sealed class FormbricksRegistrationProviderAdapter(
                 request.Connection,
                 request.Tuple,
                 request.AttemptId,
-                request.Answers) { DisclosureUntilUtc = request.DisclosureUntilUtc },
+                request.Answers)
+            { DisclosureUntilUtc = request.DisclosureUntilUtc },
             cancellationToken);
 
         return new RegistrationProviderSubmissionSinkResult(true, request.AttemptId, AutoFinalizable: true);

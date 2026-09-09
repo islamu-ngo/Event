@@ -21,9 +21,13 @@ public sealed class LocalAccountRecoveryTests
     private static string Secret() => Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
     private static LocalEmailConfirmationRequestDto Pointer(int purpose = 3) => new()
     {
-        OperationId = Guid.CreateVersion7(), LocalSubjectId = Guid.CreateVersion7(), PersonalActorId = Guid.CreateVersion7(),
-        ExternalLoginId = Guid.CreateVersion7(), Generation = Guid.CreateVersion7(),
-        Purpose = purpose, Token = Secret()
+        OperationId = Guid.CreateVersion7(),
+        LocalSubjectId = Guid.CreateVersion7(),
+        PersonalActorId = Guid.CreateVersion7(),
+        ExternalLoginId = Guid.CreateVersion7(),
+        Generation = Guid.CreateVersion7(),
+        Purpose = purpose,
+        Token = Secret()
     };
 
     [Test]

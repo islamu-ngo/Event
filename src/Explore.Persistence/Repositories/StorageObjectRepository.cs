@@ -211,12 +211,12 @@ public class StorageObjectRepository : GenericRepository<StorageObject, Guid>, I
 
         Guid? fileEventId = answerFile?.EventId;
         return await (from submission in _dbContext.RegistrationSubmissions.AsNoTracking()
-            join order in _dbContext.RegistrationOrders.AsNoTracking()
-                on new { submission.TenantId, submission.EventId, Id = submission.RegistrationOrderId }
-                equals new { order.TenantId, order.EventId, order.Id }
-            where submission.TenantId == storageObject.TenantId && submission.Id == submissionId &&
-                (fileEventId == null || submission.EventId == fileEventId)
-            select order).SingleOrDefaultAsync(cancellationToken);
+                      join order in _dbContext.RegistrationOrders.AsNoTracking()
+                          on new { submission.TenantId, submission.EventId, Id = submission.RegistrationOrderId }
+                          equals new { order.TenantId, order.EventId, order.Id }
+                      where submission.TenantId == storageObject.TenantId && submission.Id == submissionId &&
+                          (fileEventId == null || submission.EventId == fileEventId)
+                      select order).SingleOrDefaultAsync(cancellationToken);
     }
 
     private IQueryable<StorageObject> BaseReconciliationQuery()

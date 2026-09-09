@@ -527,9 +527,11 @@ public sealed class LocalCredentialFirstUseTests
                 case SessionMutation.MalformedVerificationPolicy:
                     application.SystemSettings.Add(new SystemSetting
                     {
-                        Id = Guid.CreateVersion7(), SettingKey = GovernanceSettingKeys.Email.DeliveryEnabled,
+                        Id = Guid.CreateVersion7(),
+                        SettingKey = GovernanceSettingKeys.Email.DeliveryEnabled,
                         Value = mutation == SessionMutation.MalformedVerificationPolicy ? "not-a-boolean" : "true",
-                        ValueType = SettingValueType.Boolean, CreatedAt = fixture.Clock.GetUtcNow().UtcDateTime
+                        ValueType = SettingValueType.Boolean,
+                        CreatedAt = fixture.Clock.GetUtcNow().UtcDateTime
                     });
                     await application.SaveChangesAsync(fixture.CancellationToken);
                     break;
@@ -701,10 +703,16 @@ public sealed class LocalCredentialFirstUseTests
 
         internal TokenValidationParameters ValidationParameters(string audience) => new()
         {
-            ValidateIssuerSigningKey = true, IssuerSigningKey = new SymmetricSecurityKey(_signingKey),
-            ValidateIssuer = true, ValidIssuer = LocalIdentityOptions.Issuer,
-            ValidateAudience = true, ValidAudience = audience, ValidateLifetime = true,
-            RequireExpirationTime = true, RequireSignedTokens = true, ClockSkew = TimeSpan.Zero,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(_signingKey),
+            ValidateIssuer = true,
+            ValidIssuer = LocalIdentityOptions.Issuer,
+            ValidateAudience = true,
+            ValidAudience = audience,
+            ValidateLifetime = true,
+            RequireExpirationTime = true,
+            RequireSignedTokens = true,
+            ClockSkew = TimeSpan.Zero,
             ValidAlgorithms = [SecurityAlgorithms.HmacSha256]
         };
 
@@ -858,7 +866,9 @@ public sealed class LocalCredentialFirstUseTests
                 var application = seed.ServiceProvider.GetRequiredService<ExploreDbContext>();
                 application.Users.Add(new User
                 {
-                    Id = initiatorId, EmailVerified = true, CreatedAt = Clock.GetUtcNow().UtcDateTime,
+                    Id = initiatorId,
+                    EmailVerified = true,
+                    CreatedAt = Clock.GetUtcNow().UtcDateTime,
                     Pii = new UserPii { Email = $"initiator-{initiatorId:N}@example.test", FirstName = "Instance", LastName = "Administrator" }
                 });
                 await application.SaveChangesAsync(CancellationToken);
@@ -878,19 +888,30 @@ public sealed class LocalCredentialFirstUseTests
                 var application = bind.ServiceProvider.GetRequiredService<ExploreDbContext>();
                 var user = new User
                 {
-                    Id = Receipt.LocalSubjectId, EmailVerified = true, CreatedAt = Clock.GetUtcNow().UtcDateTime,
+                    Id = Receipt.LocalSubjectId,
+                    EmailVerified = true,
+                    CreatedAt = Clock.GetUtcNow().UtcDateTime,
                     Pii = new UserPii { Email = _email, FirstName = "Credential", LastName = "Owner" }
                 };
                 application.Actors.Add(new Actor
                 {
-                    Id = Receipt.PersonalActorId, UserId = user.Id, User = user, ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-                    Pii = new ActorPii { DisplayName = "Credential Owner" }, CreatedAt = Clock.GetUtcNow().UtcDateTime
+                    Id = Receipt.PersonalActorId,
+                    UserId = user.Id,
+                    User = user,
+                    ActorTypeId = (int)ActorTypeEnum.User,
+                    ActorType = null!,
+                    Pii = new ActorPii { DisplayName = "Credential Owner" },
+                    CreatedAt = Clock.GetUtcNow().UtcDateTime
                 });
                 application.UserExternalLogins.Add(new UserExternalLogin
                 {
-                    Id = Receipt.ExternalLoginId, UserId = user.Id, User = user,
-                    AuthenticationProviderId = (int)AuthenticationProviderKind.Local, AuthenticationProvider = null!,
-                    ProviderKey = user.Id.ToString("D"), CreatedAt = Clock.GetUtcNow().UtcDateTime
+                    Id = Receipt.ExternalLoginId,
+                    UserId = user.Id,
+                    User = user,
+                    AuthenticationProviderId = (int)AuthenticationProviderKind.Local,
+                    AuthenticationProvider = null!,
+                    ProviderKey = user.Id.ToString("D"),
+                    CreatedAt = Clock.GetUtcNow().UtcDateTime
                 });
                 await application.SaveChangesAsync(CancellationToken);
             }

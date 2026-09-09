@@ -153,7 +153,8 @@ public sealed class LocalAuthenticationContractTests
     {
         var request = new CompleteLocalInstanceOnboardingRequestDto
         {
-            OperationId = Guid.CreateVersion7(), Username = $"operator-{Guid.CreateVersion7():N}",
+            OperationId = Guid.CreateVersion7(),
+            Username = $"operator-{Guid.CreateVersion7():N}",
             TemporaryPassword = $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(32))}",
             Settings = new CompleteInstanceOnboardingRequest
             {

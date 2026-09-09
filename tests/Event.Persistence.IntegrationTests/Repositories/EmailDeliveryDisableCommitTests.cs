@@ -329,19 +329,33 @@ public sealed class EmailDeliveryDisableCommitTests
         DateTime now = DateTime.UtcNow;
         var user = new User
         {
-            Id = Guid.CreateVersion7(), CreatedAt = now,
+            Id = Guid.CreateVersion7(),
+            CreatedAt = now,
             Pii = new UserPii { Email = $"disable-admin-{Guid.CreateVersion7():N}@example.test", FirstName = "Tenant", LastName = "Admin" }
         };
         var membership = new TenantUser
         {
-            Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!, UserId = user.Id, User = user,
-            StatusId = (int)TenantUserStatusEnum.Active, JoinedAt = now, CreatedAt = now
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            Tenant = null!,
+            UserId = user.Id,
+            User = user,
+            StatusId = (int)TenantUserStatusEnum.Active,
+            JoinedAt = now,
+            CreatedAt = now
         };
         context.TenantUserRoleGrants.Add(new TenantUserRoleGrant
         {
-            Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!, TenantUserId = membership.Id,
-            TenantUser = membership, RoleId = (int)RoleEnum.TenantAdmin, Role = null!,
-            RoleScopeId = (int)RoleScopeEnum.Tenant, GrantedAt = now, CreatedAt = now
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            Tenant = null!,
+            TenantUserId = membership.Id,
+            TenantUser = membership,
+            RoleId = (int)RoleEnum.TenantAdmin,
+            Role = null!,
+            RoleScopeId = (int)RoleScopeEnum.Tenant,
+            GrantedAt = now,
+            CreatedAt = now
         });
         await context.SaveChangesAsync();
         await ApplyEmailSettingsAsync(context,
@@ -383,8 +397,12 @@ public sealed class EmailDeliveryDisableCommitTests
         Guid id = Guid.CreateVersion7();
         context.Tenants.Add(new Tenant
         {
-            Id = id, FullName = "Confirmed disable tenant", Slug = $"disable-{id:N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!, CreatedAt = DateTime.UtcNow
+            Id = id,
+            FullName = "Confirmed disable tenant",
+            Slug = $"disable-{id:N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!,
+            CreatedAt = DateTime.UtcNow
         });
         await context.SaveChangesAsync();
         return id;
@@ -411,15 +429,45 @@ public sealed class EmailDeliveryDisableCommitTests
     {
         // Compare detached scalar projections, excluding only the intended value and policy/audit mutation fields.
         var system = await context.SystemSettings.AsNoTracking().OrderBy(row => row.SettingKey)
-            .Select(row => new { row.Id, row.SettingKey, Value = row.SettingKey == GovernanceSettingKeys.Email.DeliveryEnabled ? null : row.Value,
-                row.IsLocked, row.CreatedAt, row.CreatedBy, row.Category, row.Description, row.DisplayOrder, row.AllowedValues, row.SettingValueTypeId }).ToArrayAsync();
+            .Select(row => new
+            {
+                row.Id,
+                row.SettingKey,
+                Value = row.SettingKey == GovernanceSettingKeys.Email.DeliveryEnabled ? null : row.Value,
+                row.IsLocked,
+                row.CreatedAt,
+                row.CreatedBy,
+                row.Category,
+                row.Description,
+                row.DisplayOrder,
+                row.AllowedValues,
+                row.SettingValueTypeId
+            }).ToArrayAsync();
         var tenants = await context.TenantSettingOverrides
             .IgnoreTenantFilter(TenantFilterBypassReasons.EmailDeliveryPolicyReconciliation).AsNoTracking().OrderBy(row => row.Id)
-            .Select(row => new { row.Id, row.TenantId, row.SettingKey, Value = row.SettingKey == GovernanceSettingKeys.Email.DeliveryEnabled ? null : row.Value,
-                row.IsLocked, row.CreatedAt, row.CreatedBy }).ToArrayAsync();
+            .Select(row => new
+            {
+                row.Id,
+                row.TenantId,
+                row.SettingKey,
+                Value = row.SettingKey == GovernanceSettingKeys.Email.DeliveryEnabled ? null : row.Value,
+                row.IsLocked,
+                row.CreatedAt,
+                row.CreatedBy
+            }).ToArrayAsync();
         var processor = await context.EmailDispatchProcessorStates.AsNoTracking().OrderBy(row => row.Id)
-            .Select(row => new { row.Id, row.IsPaused, row.PauseReason, row.PausedAt, row.PausedBy,
-                row.GlobalSmtpRateLimitPerMinuteOverride, row.OptionalRemindersDeferred, row.SmtpAvailableTokens, row.SmtpRefillAt }).ToArrayAsync();
+            .Select(row => new
+            {
+                row.Id,
+                row.IsPaused,
+                row.PauseReason,
+                row.PausedAt,
+                row.PausedBy,
+                row.GlobalSmtpRateLimitPerMinuteOverride,
+                row.OptionalRemindersDeferred,
+                row.SmtpAvailableTokens,
+                row.SmtpRefillAt
+            }).ToArrayAsync();
         var controls = await context.EmailDispatchTenantControls
             .IgnoreTenantFilter(TenantFilterBypassReasons.EmailDeliveryPolicyReconciliation).AsNoTracking().OrderBy(row => row.Id)
             .Select(row => new { row.Id, row.TenantId, row.IsPaused, row.PauseReason, row.PausedAt, row.PausedBy, row.SmtpAvailableTokens, row.SmtpRefillAt }).ToArrayAsync();

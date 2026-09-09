@@ -338,34 +338,34 @@ public sealed class ExploreDbContextModelProviderTests
     {
         var violations = new List<string>();
         foreach (bool external in new[] { false, true })
-        foreach (string? schema in new string?[] { null, "operator_private" })
-        {
-            using DbContext context = CreatePrivateTableContext(provider, external, schema);
-            IModel model = context.GetService<IDesignTimeModel>().Model;
-            var sets = context.GetService<IDbSetFinder>().FindSets(context.GetType());
-            (Type Type, string Set, string Table)[] expected = external
-                ? [(typeof(LocalIdentityLifecycleOperation), "LocalIdentityLifecycleOperations", "local_identity_lifecycle_operations")]
-                : [
-                    (typeof(AnonymousChallengeTenantQuota), "AnonymousChallengeTenantQuotas", "anonymous_challenge_tenant_quotas"),
+            foreach (string? schema in new string?[] { null, "operator_private" })
+            {
+                using DbContext context = CreatePrivateTableContext(provider, external, schema);
+                IModel model = context.GetService<IDesignTimeModel>().Model;
+                var sets = context.GetService<IDbSetFinder>().FindSets(context.GetType());
+                (Type Type, string Set, string Table)[] expected = external
+                    ? [(typeof(LocalIdentityLifecycleOperation), "LocalIdentityLifecycleOperations", "local_identity_lifecycle_operations")]
+                    : [
+                        (typeof(AnonymousChallengeTenantQuota), "AnonymousChallengeTenantQuotas", "anonymous_challenge_tenant_quotas"),
                     (typeof(AnonymousChallengeEventQuota), "AnonymousChallengeEventQuotas", "anonymous_challenge_event_quotas"),
                     (typeof(LocalIdentityLifecycleOperation), "LocalIdentityLifecycleOperations", "local_identity_lifecycle_operations")
-                ];
-            bool usesSchema = provider is PrimaryDatabaseProvider.PostgreSql or PrimaryDatabaseProvider.SqlServer;
-            foreach (var mapping in expected)
-            {
-                if (sets.Count(set => set.Type == mapping.Type && set.Name == mapping.Set) != 1)
-                    violations.Add($"{provider}/{context.GetType().Name}: missing canonical DbSet {mapping.Set}");
-                IEntityType entity = model.FindEntityType(mapping.Type)!;
-                await Assert.That(entity.GetTableName()).IsEqualTo(usesSchema ? mapping.Table : "ie_" + mapping.Table);
-                await Assert.That(entity.GetSchema()).IsEqualTo(usesSchema
-                    ? schema ?? (external ? "islamu_identity" : "islamu_event") : null);
+                    ];
+                bool usesSchema = provider is PrimaryDatabaseProvider.PostgreSql or PrimaryDatabaseProvider.SqlServer;
+                foreach (var mapping in expected)
+                {
+                    if (sets.Count(set => set.Type == mapping.Type && set.Name == mapping.Set) != 1)
+                        violations.Add($"{provider}/{context.GetType().Name}: missing canonical DbSet {mapping.Set}");
+                    IEntityType entity = model.FindEntityType(mapping.Type)!;
+                    await Assert.That(entity.GetTableName()).IsEqualTo(usesSchema ? mapping.Table : "ie_" + mapping.Table);
+                    await Assert.That(entity.GetSchema()).IsEqualTo(usesSchema
+                        ? schema ?? (external ? "islamu_identity" : "islamu_event") : null);
+                }
+                if (external)
+                {
+                    await Assert.That(model.FindEntityType(typeof(AnonymousChallengeTenantQuota))).IsNull();
+                    await Assert.That(model.FindEntityType(typeof(AnonymousChallengeEventQuota))).IsNull();
+                }
             }
-            if (external)
-            {
-                await Assert.That(model.FindEntityType(typeof(AnonymousChallengeTenantQuota))).IsNull();
-                await Assert.That(model.FindEntityType(typeof(AnonymousChallengeEventQuota))).IsNull();
-            }
-        }
         await Assert.That(violations).IsEmpty();
     }
 

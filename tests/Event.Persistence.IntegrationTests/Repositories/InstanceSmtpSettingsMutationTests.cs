@@ -129,9 +129,13 @@ public sealed class InstanceSmtpSettingsMutationTests
     private static InstanceSmtpConfigurationWriteDto Configuration(string name, int port, string security, int timeout, bool skipCertificateValidation) =>
         new()
         {
-            Host = $"smtp.{name}.test", Port = port, Security = security,
-            FromAddress = $"events@{name}.test", FromName = name,
-            TimeoutSeconds = timeout, SkipCertificateValidation = skipCertificateValidation
+            Host = $"smtp.{name}.test",
+            Port = port,
+            Security = security,
+            FromAddress = $"events@{name}.test",
+            FromName = name,
+            TimeoutSeconds = timeout,
+            SkipCertificateValidation = skipCertificateValidation
         };
 
     private static UpdateInstanceSmtpSettingsCommandHandler CreateHandler(InstanceSettingsCommandFixture fixture) =>

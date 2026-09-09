@@ -29,8 +29,10 @@ public sealed class CreateLocalIdentityCommandHandler(
         var validation = await new CreateLocalIdentityRequestDtoValidator().ValidateAsync(
             new CreateLocalIdentityRequestDto
             {
-                OperationId = request.OperationId, Email = request.Email,
-                FirstName = request.FirstName, LastName = request.LastName
+                OperationId = request.OperationId,
+                Email = request.Email,
+                FirstName = request.FirstName,
+                LastName = request.LastName
             }, cancellationToken).ConfigureAwait(false);
         if (!validation.IsValid)
         {

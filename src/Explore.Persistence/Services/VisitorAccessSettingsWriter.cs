@@ -81,8 +81,16 @@ public sealed class VisitorAccessSettingsWriter(
                 }
                 string? oldValue = row?.Value;
                 bool created = row is null;
-                row ??= new TenantSetting { Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!,
-                    SettingKey = mutation.Key, Value = definition.DefaultValue, CreatedAt = now, CreatedBy = actorUserId };
+                row ??= new TenantSetting
+                {
+                    Id = Guid.CreateVersion7(),
+                    TenantId = tenantId,
+                    Tenant = null!,
+                    SettingKey = mutation.Key,
+                    Value = definition.DefaultValue,
+                    CreatedAt = now,
+                    CreatedBy = actorUserId
+                };
                 if (mutation.Kind == VisitorAccessSettingMutationKind.Remove)
                     tenantRows.Remove((tenantId, mutation.Key));
                 else
@@ -108,9 +116,17 @@ public sealed class VisitorAccessSettingsWriter(
                     return Rejected("setting_not_found");
                 string? oldValue = row?.Value;
                 bool created = row is null;
-                row ??= new SystemSetting { Id = Guid.CreateVersion7(), SettingKey = mutation.Key,
-                    Value = definition.DefaultValue, ValueType = definition.ValueType, Category = definition.Category,
-                    Description = definition.Description, CreatedAt = now, CreatedBy = actorUserId };
+                row ??= new SystemSetting
+                {
+                    Id = Guid.CreateVersion7(),
+                    SettingKey = mutation.Key,
+                    Value = definition.DefaultValue,
+                    ValueType = definition.ValueType,
+                    Category = definition.Category,
+                    Description = definition.Description,
+                    CreatedAt = now,
+                    CreatedBy = actorUserId
+                };
                 if (mutation.Kind == VisitorAccessSettingMutationKind.Remove)
                     systems.Remove(mutation.Key);
                 else

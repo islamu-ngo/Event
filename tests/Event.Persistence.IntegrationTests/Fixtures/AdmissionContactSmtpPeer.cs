@@ -24,8 +24,10 @@ internal sealed class AdmissionContactSmtpPeer(string scenario, Action expire) :
         run = RunAsync();
         return new SmtpConfiguration
         {
-            Host = "127.0.0.1", Port = ((IPEndPoint)listener.LocalEndpoint).Port,
-            FromAddress = "sender@example.test", Security = SmtpSecurityMode.None,
+            Host = "127.0.0.1",
+            Port = ((IPEndPoint)listener.LocalEndpoint).Port,
+            FromAddress = "sender@example.test",
+            Security = SmtpSecurityMode.None,
             Username = scenario == "smtp-auth" ? Convert.ToHexString(RandomNumberGenerator.GetBytes(16)) : null,
             Password = scenario == "smtp-auth" ? Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)) : null
         };

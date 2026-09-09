@@ -1149,13 +1149,18 @@ public class InstanceOnboardingControllerTests
             return;
         }
 
-        dbContext.UserExternalLogins.Add(new UserExternalLogin { Id = Guid.CreateVersion7(),
-        UserId = userId,
-        User = null!,
-        AuthenticationProviderId = (int)provider.ParseAuthenticationProviderKind(), AuthenticationProvider = null!, ProviderKey = providerKey,
-        ProviderDisplayName = provider,
-        CreatedAt = DateTime.UtcNow,
-        CreatedBy = userId });
+        dbContext.UserExternalLogins.Add(new UserExternalLogin
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = userId,
+            User = null!,
+            AuthenticationProviderId = (int)provider.ParseAuthenticationProviderKind(),
+            AuthenticationProvider = null!,
+            ProviderKey = providerKey,
+            ProviderDisplayName = provider,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        });
 
         await dbContext.SaveChangesAsync();
     }
@@ -1171,15 +1176,19 @@ public class InstanceOnboardingControllerTests
             return;
         }
 
-        dbContext.Users.Add(new User { Id = userId, CreatedAt = DateTime.UtcNow,
-        CreatedBy = userId,
-        Pii = new UserPii
+        dbContext.Users.Add(new User
         {
-            UserId = userId,
-            Email = $"{userId:N}@integration.test",
-            FirstName = "Instance",
-            LastName = "Admin"
-        } });
+            Id = userId,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId,
+            Pii = new UserPii
+            {
+                UserId = userId,
+                Email = $"{userId:N}@integration.test",
+                FirstName = "Instance",
+                LastName = "Admin"
+            }
+        });
 
         await dbContext.SaveChangesAsync();
         await EnsureUserExternalLoginAsync(factory, userId, "keycloak", userId.ToString());

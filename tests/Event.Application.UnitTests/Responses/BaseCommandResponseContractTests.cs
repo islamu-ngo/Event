@@ -1148,28 +1148,28 @@ public sealed class BaseCommandResponseContractTests
     private static RegistrationPaymentDto CreatePayment(
         RegistrationRefundDto refund,
         RegistrationMaterialChangeChoiceDto choice) => new()
-    {
-        Id = ResultId,
-        RegistrationOrderId = RelatedId,
-        StatusCode = "CAPTURED",
-        StatusName = "Captured",
-        HostedRedirectAvailable = false,
-        RetryAvailable = true,
-        FailureCode = null,
-        CreatedAt = FixtureUtc,
-        LastUpdatedAt = FixtureUtc.AddMinutes(5),
-        ExpiresAt = FixtureUtc.AddHours(1),
-        RefundedAmountMinor = 125,
-        RefundPendingAmountMinor = 0,
-        Refunds = [refund],
-        Disputes = [],
-        MaterialChangeChoices = [choice],
-        BuyerRefundRequestAvailable = true,
-        OrganizerRefundAvailable = true,
-        CapturedAmountMinor = 1_000,
-        CurrencyCode = "EUR",
-        CurrencyMinorUnitDigits = 2,
-    };
+        {
+            Id = ResultId,
+            RegistrationOrderId = RelatedId,
+            StatusCode = "CAPTURED",
+            StatusName = "Captured",
+            HostedRedirectAvailable = false,
+            RetryAvailable = true,
+            FailureCode = null,
+            CreatedAt = FixtureUtc,
+            LastUpdatedAt = FixtureUtc.AddMinutes(5),
+            ExpiresAt = FixtureUtc.AddHours(1),
+            RefundedAmountMinor = 125,
+            RefundPendingAmountMinor = 0,
+            Refunds = [refund],
+            Disputes = [],
+            MaterialChangeChoices = [choice],
+            BuyerRefundRequestAvailable = true,
+            OrganizerRefundAvailable = true,
+            CapturedAmountMinor = 1_000,
+            CurrencyCode = "EUR",
+            CurrencyMinorUnitDigits = 2,
+        };
 
     private static SupportAccessSessionDto CreateSession() => new()
     {

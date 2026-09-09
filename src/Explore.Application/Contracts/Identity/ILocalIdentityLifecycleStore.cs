@@ -121,8 +121,10 @@ public sealed record LocalIdentityLifecycleSynchronization
 {
     public LocalIdentityLifecycleSynchronization(LocalIdentityLifecyclePointer operation, string? email, bool emailVerified,
         string firstName, string lastName, DateTimeOffset consumedAtUtc, bool synchronized)
-    { Operation = operation; Email = email; EmailVerified = emailVerified; FirstName = firstName;
-        LastName = lastName; ConsumedAtUtc = consumedAtUtc; Synchronized = synchronized; }
+    {
+        Operation = operation; Email = email; EmailVerified = emailVerified; FirstName = firstName;
+        LastName = lastName; ConsumedAtUtc = consumedAtUtc; Synchronized = synchronized;
+    }
     public LocalIdentityLifecyclePointer Operation { get; }
     public Guid ApplicationUserId => Operation.LocalSubjectId;
     public string? Email { get; }

@@ -54,7 +54,8 @@ public sealed class EmailOptionalStandaloneTests
             // result is the production purpose-limited first-use challenge, even without email.
             using var login = await client.PostAsJsonAsync("/api/auth/local/login", new
             {
-                identifier = deployment.Subject.ToString("D"), password = deployment.InitialPassword
+                identifier = deployment.Subject.ToString("D"),
+                password = deployment.InitialPassword
             });
             await AssertStatusAsync(login, HttpStatusCode.OK);
             JsonElement challenge = await BodyAsync(login);
@@ -88,8 +89,12 @@ public sealed class EmailOptionalStandaloneTests
                 DeliveryEnabled = OptionalUpdate<bool>.Set(true),
                 Configuration = OptionalUpdate<InstanceSmtpConfigurationWriteDto>.Set(new()
                 {
-                    Host = "smtp.example.test", Port = 587, Security = "StartTls",
-                    FromAddress = "events@example.test", FromName = "Events", TimeoutSeconds = 30
+                    Host = "smtp.example.test",
+                    Port = 587,
+                    Security = "StartTls",
+                    FromAddress = "events@example.test",
+                    FromName = "Events",
+                    TimeoutSeconds = 30
                 })
             }))
                 await AssertStatusAsync(enabled, HttpStatusCode.OK);
@@ -155,7 +160,8 @@ public sealed class EmailOptionalStandaloneTests
                 .DataProtectionKeys.CountAsync()).IsEqualTo(keyCount);
             using var oldPassword = await client.PostAsJsonAsync("/api/auth/local/login", new
             {
-                identifier = deployment.Subject.ToString("D"), password = deployment.InitialPassword
+                identifier = deployment.Subject.ToString("D"),
+                password = deployment.InitialPassword
             });
             await AssertStatusAsync(oldPassword, HttpStatusCode.Unauthorized);
         }
@@ -193,8 +199,12 @@ public sealed class EmailOptionalStandaloneTests
             var services = scope.ServiceProvider;
             await services.GetRequiredService<IInstanceSmtpSettingService>().ApplySettingsAsync(new InstanceSmtpSettingsDto
             {
-                Host = "smtp.example.test", Port = 587, Security = "StartTls",
-                FromAddress = "sender@example.test", FromName = "Sender", TimeoutSeconds = 30
+                Host = "smtp.example.test",
+                Port = 587,
+                Security = "StartTls",
+                FromAddress = "sender@example.test",
+                FromName = "Sender",
+                TimeoutSeconds = 30
             }, enableDelivery: true);
             // The Local setup-secret surface intentionally does not authorize general profile/SMTP
             // HTTP routes. Exercise the real command here, without inventing new provider authority.
@@ -333,7 +343,10 @@ public sealed class EmailOptionalStandaloneTests
         {
             Profile = new SelfHostOnboardingProfileDto
             {
-                SiteName = "Public directory", SupportEmail = contact, Locale = "en", TimeZone = "UTC"
+                SiteName = "Public directory",
+                SupportEmail = contact,
+                Locale = "en",
+                TimeZone = "UTC"
             }
         });
         await Assert.That(saved.IsSuccess).IsTrue();
@@ -346,8 +359,13 @@ public sealed class EmailOptionalStandaloneTests
         var smtp = await services.GetRequiredService<IInstanceSmtpSettingService>().ReadSettingsAsync();
         await Assert.That(smtp).IsEqualTo(new InstanceSmtpSettingsDto
         {
-            DeliveryEnabled = true, Host = "smtp.example.test", Port = 587, Security = "StartTls",
-            FromAddress = "sender@example.test", FromName = "Sender", TimeoutSeconds = 30,
+            DeliveryEnabled = true,
+            Host = "smtp.example.test",
+            Port = 587,
+            Security = "StartTls",
+            FromAddress = "sender@example.test",
+            FromName = "Sender",
+            TimeoutSeconds = 30,
             SkipCertificateValidation = false
         });
     }

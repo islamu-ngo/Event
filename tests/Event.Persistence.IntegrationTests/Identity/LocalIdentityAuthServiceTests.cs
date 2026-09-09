@@ -376,20 +376,30 @@ public sealed class LocalIdentityAuthServiceTests
             LocalCredentialOperationReceipt receipt = created.Receipt!;
             var applicationUser = new User
             {
-                Id = receipt.LocalSubjectId, EmailVerified = true, CreatedAt = Now.UtcDateTime,
+                Id = receipt.LocalSubjectId,
+                EmailVerified = true,
+                CreatedAt = Now.UtcDateTime,
                 Pii = new UserPii { Email = "local@example.test", FirstName = "Local", LastName = "User" }
             };
             Context.Actors.Add(new Actor
             {
-                Id = receipt.PersonalActorId, UserId = applicationUser.Id, User = applicationUser,
-                ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-                Pii = new ActorPii { DisplayName = "Local User" }, CreatedAt = Now.UtcDateTime
+                Id = receipt.PersonalActorId,
+                UserId = applicationUser.Id,
+                User = applicationUser,
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
+                Pii = new ActorPii { DisplayName = "Local User" },
+                CreatedAt = Now.UtcDateTime
             });
             Context.UserExternalLogins.Add(new UserExternalLogin
             {
-                Id = receipt.ExternalLoginId, UserId = applicationUser.Id, User = applicationUser,
-                AuthenticationProviderId = (int)AuthenticationProviderKind.Local, AuthenticationProvider = null!,
-                ProviderKey = applicationUser.Id.ToString("D"), CreatedAt = Now.UtcDateTime
+                Id = receipt.ExternalLoginId,
+                UserId = applicationUser.Id,
+                User = applicationUser,
+                AuthenticationProviderId = (int)AuthenticationProviderKind.Local,
+                AuthenticationProvider = null!,
+                ProviderKey = applicationUser.Id.ToString("D"),
+                CreatedAt = Now.UtcDateTime
             });
             await Context.SaveChangesAsync(CancellationToken);
             LocalCredentialProvisioningSnapshot pending = (await credentials.ReadProvisioningAsync(receipt.OperationId, CancellationToken))!;
@@ -421,8 +431,11 @@ public sealed class LocalIdentityAuthServiceTests
             // Corrupt persisted state deliberately: the validating writer must never accept these values.
             Context.SystemSettings.Add(new SystemSetting
             {
-                Id = Guid.CreateVersion7(), SettingKey = GovernanceSettingKeys.Email.DeliveryEnabled,
-                Value = value, ValueType = SettingValueType.Boolean, CreatedAt = Now.UtcDateTime
+                Id = Guid.CreateVersion7(),
+                SettingKey = GovernanceSettingKeys.Email.DeliveryEnabled,
+                Value = value,
+                ValueType = SettingValueType.Boolean,
+                CreatedAt = Now.UtcDateTime
             });
             await Context.SaveChangesAsync(CancellationToken);
         }
@@ -433,8 +446,12 @@ public sealed class LocalIdentityAuthServiceTests
                 row => row.Id == (int)TenantStatusEnum.Active, CancellationToken);
             var tenant = new Tenant
             {
-                Id = Guid.CreateVersion7(), FullName = "Local policy tenant", Slug = "local-policy",
-                TenantStatusId = status.Id, TenantStatus = status, CreatedAt = Now.UtcDateTime
+                Id = Guid.CreateVersion7(),
+                FullName = "Local policy tenant",
+                Slug = "local-policy",
+                TenantStatusId = status.Id,
+                TenantStatus = status,
+                CreatedAt = Now.UtcDateTime
             };
             Context.TenantContext = new FixedTenantContext(tenant.Id);
             Context.Tenants.Add(tenant);

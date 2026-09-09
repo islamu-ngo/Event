@@ -429,16 +429,22 @@ public sealed class LocalCredentialCreationTests
             {
                 Id = InitiatorId,
                 Pii = new UserPii { Email = $"initiator-{InitiatorId:N}@example.test", FirstName = "Instance", LastName = "Operator" },
-                EmailVerified = true, CreatedAt = DateTime.UtcNow
+                EmailVerified = true,
+                CreatedAt = DateTime.UtcNow
             });
             application.Set<SettingValueTypeLookup>().Add(new SettingValueTypeLookup
             {
-                Id = (int)SettingValueType.Boolean, MasterCode = "BOOLEAN", FullName = "Boolean"
+                Id = (int)SettingValueType.Boolean,
+                MasterCode = "BOOLEAN",
+                FullName = "Boolean"
             });
             application.SystemSettings.Add(new SystemSetting
             {
-                Id = Guid.CreateVersion7(), SettingKey = GovernanceSettingKeys.Email.DeliveryEnabled,
-                Value = "false", ValueType = SettingValueType.Boolean, CreatedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                SettingKey = GovernanceSettingKeys.Email.DeliveryEnabled,
+                Value = "false",
+                ValueType = SettingValueType.Boolean,
+                CreatedAt = DateTime.UtcNow
             });
             await application.SaveChangesAsync(CancellationToken);
         }

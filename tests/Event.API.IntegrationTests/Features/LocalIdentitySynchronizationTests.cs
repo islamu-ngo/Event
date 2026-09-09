@@ -432,7 +432,10 @@ public sealed class LocalIdentitySynchronizationTests
         await Assert.That(await ReadProfileAsync(factory, target.UserId)).IsEqualTo(original);
         await Assert.That(await ReadCountsAsync(factory)).IsEqualTo(before with
         {
-            Users = before.Users + 1, Actors = before.Actors + 1, Logins = before.Logins + 1, PlatformRoles = before.PlatformRoles + 1
+            Users = before.Users + 1,
+            Actors = before.Actors + 1,
+            Logins = before.Logins + 1,
+            PlatformRoles = before.PlatformRoles + 1
         });
     }
 
@@ -609,15 +612,23 @@ public sealed class LocalIdentitySynchronizationTests
         };
         var actor = new Actor
         {
-            Id = Guid.CreateVersion7(), UserId = userId, User = user,
-            ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-            Pii = new ActorPii { DisplayName = "Original Profile" }, CreatedAt = DateTime.UtcNow
+            Id = Guid.CreateVersion7(),
+            UserId = userId,
+            User = user,
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            Pii = new ActorPii { DisplayName = "Original Profile" },
+            CreatedAt = DateTime.UtcNow
         };
         var login = new UserExternalLogin
         {
-            Id = Guid.CreateVersion7(), UserId = userId, User = user,
-            AuthenticationProviderId = (int)accountKey.ProviderKind, AuthenticationProvider = null!,
-            ProviderKey = accountKey.Value, CreatedAt = DateTime.UtcNow
+            Id = Guid.CreateVersion7(),
+            UserId = userId,
+            User = user,
+            AuthenticationProviderId = (int)accountKey.ProviderKind,
+            AuthenticationProvider = null!,
+            ProviderKey = accountKey.Value,
+            CreatedAt = DateTime.UtcNow
         };
         database.AddRange(user, actor, login);
         await database.SaveChangesAsync(CancellationToken);
@@ -630,9 +641,13 @@ public sealed class LocalIdentitySynchronizationTests
         await using ExploreDbContext database = factory.CreateDatabase();
         database.UserExternalLogins.Add(new UserExternalLogin
         {
-            Id = Guid.CreateVersion7(), UserId = userId, User = null!,
-            AuthenticationProviderId = (int)accountKey.ProviderKind, AuthenticationProvider = null!,
-            ProviderKey = accountKey.Value, CreatedAt = DateTime.UtcNow
+            Id = Guid.CreateVersion7(),
+            UserId = userId,
+            User = null!,
+            AuthenticationProviderId = (int)accountKey.ProviderKind,
+            AuthenticationProvider = null!,
+            ProviderKey = accountKey.Value,
+            CreatedAt = DateTime.UtcNow
         });
         await database.SaveChangesAsync(CancellationToken);
     }

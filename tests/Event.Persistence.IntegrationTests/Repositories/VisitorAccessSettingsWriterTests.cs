@@ -57,15 +57,29 @@ public sealed class VisitorAccessSettingsWriterTests
         Guid otherTenantId = Guid.CreateVersion7();
         await using (var context = EmailDispatchSqliteFixture.CreateContext(fixture.DatabasePath))
         {
-            var tenant = new Tenant { Id = otherTenantId, FullName = "Inherited visitor scope", Slug = $"inherited-{otherTenantId:N}",
-                TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null! };
+            var tenant = new Tenant
+            {
+                Id = otherTenantId,
+                FullName = "Inherited visitor scope",
+                Slug = $"inherited-{otherTenantId:N}",
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!
+            };
             var entity = new Explore.Domain.Event
             {
-                Id = Guid.CreateVersion7(), Title = "Other tenant registration", TenantId = otherTenantId, Tenant = tenant,
-                ActorId = fixture.ActorId, Actor = null!, OrganizerActorId = fixture.ActorId,
+                Id = Guid.CreateVersion7(),
+                Title = "Other tenant registration",
+                TenantId = otherTenantId,
+                Tenant = tenant,
+                ActorId = fixture.ActorId,
+                Actor = null!,
+                OrganizerActorId = fixture.ActorId,
                 EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-                VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-                EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!
+                VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+                VisibilityType = null!,
+                EventFormatId = (int)EventFormatEnum.Local,
+                EventFormat = null!,
+                EventStatus = null!
             };
             entity.ParticipationConfiguration = EventParticipationConfiguration.Create(entity.Id, otherTenantId,
                 (int)ParticipationHandlingModeEnum.PlatformManaged, (int)AdvanceRegistrationObligationEnum.Required,
@@ -155,7 +169,8 @@ public sealed class VisitorAccessSettingsWriterTests
         {
             var result = await fixture.ExecuteAsync<UpdateSettingBatchCommand, BatchUpdateResponseDto>(new()
             {
-                Category = SettingRegistry.Get(ModeKey)!.Category, Scope = SettingScope.Instance,
+                Category = SettingRegistry.Get(ModeKey)!.Category,
+                Scope = SettingScope.Instance,
                 Mode = BatchUpdateMode.Strict,
                 Values = new Dictionary<string, string>
                 {
@@ -172,7 +187,7 @@ public sealed class VisitorAccessSettingsWriterTests
         {
             BaseCommandResponse<Guid> result = surface == "scalar"
                 ? await fixture.ExecuteAsync<UpdateSettingCommand, BaseCommandResponse<Guid>>(new()
-                    { Key = ModeKey, Value = "AnonymousOnly", Scope = SettingScope.Instance })
+                { Key = ModeKey, Value = "AnonymousOnly", Scope = SettingScope.Instance })
                 : await fixture.ExecuteAsync<SetControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>>(
                     new(fixture.TenantId, ModeKey, "AnonymousOnly"));
             await Assert.That(result.FailureCode).IsEqualTo(Conflict);
@@ -202,11 +217,11 @@ public sealed class VisitorAccessSettingsWriterTests
         BaseCommandResponse<Guid> result = operation switch
         {
             "reset" => await fixture.ExecuteAsync<ResetSettingCommand, BaseCommandResponse<Guid>>(new()
-                { Key = ModeKey, Scope = SettingScope.Tenant }),
+            { Key = ModeKey, Scope = SettingScope.Tenant }),
             "lock" => await fixture.ExecuteAsync<LockSettingCommand, BaseCommandResponse<Guid>>(new()
-                { Key = ModeKey, Scope = SettingScope.Instance }),
+            { Key = ModeKey, Scope = SettingScope.Instance }),
             _ => await fixture.ExecuteAsync<UnlockSettingCommand, BaseCommandResponse<Guid>>(new()
-                { Key = ModeKey, Scope = SettingScope.Instance })
+            { Key = ModeKey, Scope = SettingScope.Instance })
         };
         await Assert.That(result.FailureCode).IsEqualTo(Conflict);
         await Assert.That((await fixture.Services.GetRequiredService<IVisitorAccessCapabilityResolver>()
@@ -329,7 +344,8 @@ public sealed class VisitorAccessSettingsWriterTests
         await ProviderService(fixture).ApplyConfigurationAsync(new()
         {
             PrimaryProviderId = (int)AuthenticationProviderKind.Atproto,
-            AtprotoLoginEnabled = false, AtprotoPublicUrl = "https://events.example.test"
+            AtprotoLoginEnabled = false,
+            AtprotoPublicUrl = "https://events.example.test"
         });
         await Assert.That((await fixture.Services.GetRequiredService<ISystemSettingRepository>()
             .GetByKey(GovernanceSettingKeys.Authentication.AtprotoLoginEnabled))!.Value).IsEqualTo("true");
@@ -343,7 +359,7 @@ public sealed class VisitorAccessSettingsWriterTests
         var service = ProviderService(fixture);
         AuthProviderConfigurationDto previous = await service.ReadConfigurationAsync();
         await Assert.ThrowsAsync<Explore.Application.Exceptions.ConcurrencyConflictException>(() => service.ApplyConfigurationAsync(previous with
-            { GoogleSsoEnabled = false, KeycloakAuthority = "https://uncommitted.example.test" }));
+        { GoogleSsoEnabled = false, KeycloakAuthority = "https://uncommitted.example.test" }));
         await Assert.That(await fixture.Services.GetRequiredService<ISystemSettingRepository>()
             .GetByKey(GovernanceSettingKeys.Authentication.KeycloakAuthority)).IsNull();
         await service.ApplyConfigurationAsync(new() { KeycloakAuthority = "https://configured.example.test" },
@@ -366,19 +382,32 @@ public sealed class VisitorAccessSettingsWriterTests
         var plan = new TenantPlan { Id = Guid.CreateVersion7(), Key = $"visitor-{Guid.CreateVersion7():N}", DisplayName = "Visitor plan", CreatedAt = now };
         var version = new TenantPlanVersion
         {
-            Id = Guid.CreateVersion7(), TenantPlan = plan, TenantPlanId = plan.Id, VersionNumber = 1,
-            TenantPlanStatusId = (int)TenantPlanStatusEnum.Published, CurrencyCode = "EUR", BillingPeriod = "monthly",
-            IsActiveForProvisioning = true, CreatedAt = now,
+            Id = Guid.CreateVersion7(),
+            TenantPlan = plan,
+            TenantPlanId = plan.Id,
+            VersionNumber = 1,
+            TenantPlanStatusId = (int)TenantPlanStatusEnum.Published,
+            CurrencyCode = "EUR",
+            BillingPeriod = "monthly",
+            IsActiveForProvisioning = true,
+            CreatedAt = now,
             Settings = [new() { Id = Guid.CreateVersion7(), SettingKey = ModeKey, JsonValue = "\"AnonymousOnly\"", CreatedAt = now },
                 new() { Id = Guid.CreateVersion7(), SettingKey = GovernanceSettingKeys.PublicExperience.EventCatalogLabel,
                     JsonValue = "\"Uncommitted plan label\"", CreatedAt = now }]
         };
         var assignment = await repository.CreateAssignmentAsync(new TenantPlanAssignment
         {
-            Id = Guid.CreateVersion7(), TenantId = fixture.TenantId, Tenant = null!, TenantPlan = plan, TenantPlanId = plan.Id,
-            TenantPlanVersion = version, TenantPlanVersionId = version.Id,
+            Id = Guid.CreateVersion7(),
+            TenantId = fixture.TenantId,
+            Tenant = null!,
+            TenantPlan = plan,
+            TenantPlanId = plan.Id,
+            TenantPlanVersion = version,
+            TenantPlanVersionId = version.Id,
             TenantPlanAssignmentStatusId = (int)TenantPlanAssignmentStatusEnum.Active,
-            AssignedByUserId = fixture.UserId, AssignedAt = now, CreatedAt = now
+            AssignedByUserId = fixture.UserId,
+            AssignedAt = now,
+            CreatedAt = now
         });
         var result = await fixture.ExecuteAsync<ApplyControlPlaneTenantPlanAssignmentCommand, BaseCommandResponse<Guid>>(
             new(fixture.TenantId, assignment.Id, fixture.UserId));
@@ -420,9 +449,14 @@ public sealed class VisitorAccessSettingsWriterTests
             commands.VisitorSettings);
         await Assert.ThrowsAsync<RejectedStorageWriteException>(() => handler.Handle(new()
         {
-            Category = SettingRegistry.Get(ModeKey)!.Category, Scope = SettingScope.Instance, Mode = BatchUpdateMode.Strict,
-            Values = new Dictionary<string, string> { [ModeKey] = "AnonymousOnly",
-                [GovernanceSettingKeys.PublicExperience.EventCatalogLabel] = "Rejected label" }
+            Category = SettingRegistry.Get(ModeKey)!.Category,
+            Scope = SettingScope.Instance,
+            Mode = BatchUpdateMode.Strict,
+            Values = new Dictionary<string, string>
+            {
+                [ModeKey] = "AnonymousOnly",
+                [GovernanceSettingKeys.PublicExperience.EventCatalogLabel] = "Rejected label"
+            }
         }, CancellationToken.None));
         var systems = fixture.Services.GetRequiredService<ISystemSettingRepository>();
         await Assert.That(await systems.GetByKey(ModeKey)).IsNull();
@@ -483,15 +517,25 @@ public sealed class VisitorAccessSettingsWriterTests
         var role = await fixture.Context.Roles.SingleAsync(role => role.MasterCode == "platform.admin");
         await fixture.Services.GetRequiredService<IPlatformUserRoleRepository>().Create(new PlatformUserRole
         {
-            Id = Guid.CreateVersion7(), UserId = fixture.UserId, User = null!, RoleId = role.Id, Role = role,
+            Id = Guid.CreateVersion7(),
+            UserId = fixture.UserId,
+            User = null!,
+            RoleId = role.Id,
+            Role = role,
             GrantedAt = DateTime.UtcNow
         });
         Guid tenantUserId = await fixture.Context.TenantUsers.Where(user => user.UserId == fixture.UserId)
             .Select(user => user.Id).SingleAsync();
         await fixture.Services.GetRequiredService<ITenantUserRoleGrantRepository>().Create(new TenantUserRoleGrant
         {
-            Id = Guid.CreateVersion7(), TenantId = fixture.TenantId, Tenant = null!, TenantUserId = tenantUserId,
-            TenantUser = null!, RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant,
+            Id = Guid.CreateVersion7(),
+            TenantId = fixture.TenantId,
+            Tenant = null!,
+            TenantUserId = tenantUserId,
+            TenantUser = null!,
+            RoleId = (int)RoleEnum.TenantAdmin,
+            Role = null!,
+            RoleScopeId = (int)RoleScopeEnum.Tenant,
             GrantedAt = DateTime.UtcNow
         });
     }

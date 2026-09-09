@@ -132,23 +132,23 @@ public static class EventApiJsonSerializerSettings
             ref Utf8JsonReader reader,
             Type typeToConvert,
             JsonSerializerOptions options) => reader.GetString() switch
-        {
-            "target.read" => SetupEnrollmentScope.Target_read,
-            "secret_binding.readiness" => SetupEnrollmentScope.Secret_binding_readiness,
-            "secret_binding.write" => SetupEnrollmentScope.Secret_binding_write,
-            _ => throw new JsonException("Invalid Setup enrollment scope.")
-        };
+            {
+                "target.read" => SetupEnrollmentScope.Target_read,
+                "secret_binding.readiness" => SetupEnrollmentScope.Secret_binding_readiness,
+                "secret_binding.write" => SetupEnrollmentScope.Secret_binding_write,
+                _ => throw new JsonException("Invalid Setup enrollment scope.")
+            };
 
         public override void Write(
             Utf8JsonWriter writer,
             SetupEnrollmentScope value,
             JsonSerializerOptions options) => writer.WriteStringValue(value switch
-        {
-            SetupEnrollmentScope.Target_read => "target.read",
-            SetupEnrollmentScope.Secret_binding_readiness => "secret_binding.readiness",
-            SetupEnrollmentScope.Secret_binding_write => "secret_binding.write",
-            _ => throw new JsonException("Invalid Setup enrollment scope.")
-        });
+            {
+                SetupEnrollmentScope.Target_read => "target.read",
+                SetupEnrollmentScope.Secret_binding_readiness => "secret_binding.readiness",
+                SetupEnrollmentScope.Secret_binding_write => "secret_binding.write",
+                _ => throw new JsonException("Invalid Setup enrollment scope.")
+            });
     }
 }
 

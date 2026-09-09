@@ -69,7 +69,9 @@ public sealed class InstanceAdminSettingsLayoutTests : IDisposable
         _instanceOnboardingService.GetDeploymentModeAsync().Returns(new DeploymentModeDto { Mode = mode });
         _instanceOnboardingService.GetStatusAsync().Returns(new InstanceOnboardingStatusDto
         {
-            IsCompleted = true, IsAuthenticated = true, IsCurrentUserInstanceAdmin = true,
+            IsCompleted = true,
+            IsAuthenticated = true,
+            IsCurrentUserInstanceAdmin = true,
             SelectedDeploymentMode = mode.ToString()
         });
         var cut = RenderInstanceAdminSettingsLayout();

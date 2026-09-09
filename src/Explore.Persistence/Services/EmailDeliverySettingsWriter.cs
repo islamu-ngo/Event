@@ -112,8 +112,13 @@ public sealed class EmailDeliverySettingsWriter(
                 bool created = setting is null;
                 setting ??= new TenantSetting
                 {
-                    Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!, SettingKey = mutation.Key,
-                    Value = definition.DefaultValue, CreatedAt = now, CreatedBy = actorUserId
+                    Id = Guid.CreateVersion7(),
+                    TenantId = tenantId,
+                    Tenant = null!,
+                    SettingKey = mutation.Key,
+                    Value = definition.DefaultValue,
+                    CreatedAt = now,
+                    CreatedBy = actorUserId
                 };
                 if (mutation.Kind == EmailDeliverySettingMutationKind.Remove)
                     settings.Remove(mutation.Key);
@@ -144,10 +149,15 @@ public sealed class EmailDeliverySettingsWriter(
                 bool created = setting is null;
                 setting ??= new SystemSetting
                 {
-                    Id = Guid.CreateVersion7(), SettingKey = mutation.Key, Value = definition.DefaultValue,
-                    ValueType = definition.ValueType, Category = definition.Category, Description = definition.Description,
+                    Id = Guid.CreateVersion7(),
+                    SettingKey = mutation.Key,
+                    Value = definition.DefaultValue,
+                    ValueType = definition.ValueType,
+                    Category = definition.Category,
+                    Description = definition.Description,
                     AllowedValues = definition.AllowedValues is null ? null : JsonSerializer.Serialize(definition.AllowedValues),
-                    CreatedAt = now, CreatedBy = actorUserId
+                    CreatedAt = now,
+                    CreatedBy = actorUserId
                 };
                 if (mutation.Kind == EmailDeliverySettingMutationKind.Remove)
                     systemSettings.Remove(mutation.Key);

@@ -53,7 +53,9 @@ public sealed class SmtpDeliveryOutcomeTests
 
         var result = await service.SendAsync(new EmailMessage
         {
-            To = "recipient@example.test", Subject = "Controlled SMTP outcome", PlainTextBody = "Body"
+            To = "recipient@example.test",
+            Subject = "Controlled SMTP outcome",
+            PlainTextBody = "Body"
         }, timeout.Token);
 
         await Assert.That(result.Outcome).IsEqualTo(expected);

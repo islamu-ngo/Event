@@ -475,18 +475,29 @@ public sealed class EmailDeliveryGraphRevisionTests
         DateTime now = DateTime.UtcNow;
         var tenant = new Tenant
         {
-            Id = Guid.CreateVersion7(), FullName = "Graph revision tenant", Slug = $"graph-{Guid.CreateVersion7():N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            Id = Guid.CreateVersion7(),
+            FullName = "Graph revision tenant",
+            Slug = $"graph-{Guid.CreateVersion7():N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         };
         var user = new User
         {
-            Id = Guid.CreateVersion7(), EmailVerified = true, CreatedAt = now,
+            Id = Guid.CreateVersion7(),
+            EmailVerified = true,
+            CreatedAt = now,
             Pii = new UserPii { Email = $"graph-{Guid.CreateVersion7():N}@example.test", FirstName = "Graph", LastName = "Recipient" }
         };
         context.TenantUsers.Add(new TenantUser
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant, UserId = user.Id, User = user,
-            StatusId = (int)TenantUserStatusEnum.Active, JoinedAt = now, CreatedAt = now
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            UserId = user.Id,
+            User = user,
+            StatusId = (int)TenantUserStatusEnum.Active,
+            JoinedAt = now,
+            CreatedAt = now
         });
         await context.SaveChangesAsync();
         return new(TenantId: tenant.Id, UserId: user.Id, Email: user.Email!);
@@ -499,12 +510,18 @@ public sealed class EmailDeliveryGraphRevisionTests
         string template = occurrence?.TemplateKey ?? "registration.confirmed";
         var email = new EmailDispatchOutbox
         {
-            Id = Guid.CreateVersion7(), TenantId = authority.TenantId, RecipientUserId = authority.UserId,
-            RecipientAddressSource = RecipientAddressSource.TenantUserVerifiedEmail, RecipientEmail = authority.Email,
+            Id = Guid.CreateVersion7(),
+            TenantId = authority.TenantId,
+            RecipientUserId = authority.UserId,
+            RecipientAddressSource = RecipientAddressSource.TenantUserVerifiedEmail,
+            RecipientEmail = authority.Email,
             Kind = occurrence is null ? EmailDispatchKind.RegistrationConfirmation : EmailDispatchKind.EventUpdated,
             SourceType = occurrence is null ? "notification_intent" : "notification_fanout_occurrence",
-            SourceId = occurrence?.Id ?? intentId, EventId = occurrence?.EventId,
-            Subject = "Graph revision notification", PlainTextBody = "Notification content.", CreatedAt = occurrence?.OccurredAt ?? now
+            SourceId = occurrence?.Id ?? intentId,
+            EventId = occurrence?.EventId,
+            Subject = "Graph revision notification",
+            PlainTextBody = "Notification content.",
+            CreatedAt = occurrence?.OccurredAt ?? now
         };
         return new RecipientNotificationMaterialization(
             IntentId: intentId,
@@ -527,18 +544,35 @@ public sealed class EmailDeliveryGraphRevisionTests
     {
         var intent = new NotificationIntent
         {
-            Id = request.IntentId, TenantId = request.Intent.TenantId!.Value, RecipientUserId = request.Intent.UserId!.Value,
-            CategoryId = (int)NotificationCategoryEnum.RegistrationLifecycle, OwnershipTypeId = (int)NotificationOwnershipTypeEnum.IslamuEvent,
-            RecipientKindId = (int)NotificationRecipientKindEnum.User, StatusId = (int)NotificationIntentStatusEnum.DispatchQueued,
-            TemplateKey = request.Intent.TemplateKey!, DeduplicationKey = request.Intent.DeduplicationKey!, CreatedAt = request.MaterializedAt!.Value
+            Id = request.IntentId,
+            TenantId = request.Intent.TenantId!.Value,
+            RecipientUserId = request.Intent.UserId!.Value,
+            CategoryId = (int)NotificationCategoryEnum.RegistrationLifecycle,
+            OwnershipTypeId = (int)NotificationOwnershipTypeEnum.IslamuEvent,
+            RecipientKindId = (int)NotificationRecipientKindEnum.User,
+            StatusId = (int)NotificationIntentStatusEnum.DispatchQueued,
+            TemplateKey = request.Intent.TemplateKey!,
+            DeduplicationKey = request.Intent.DeduplicationKey!,
+            CreatedAt = request.MaterializedAt!.Value
         };
         var notification = new Notification
         {
-            Id = Guid.CreateVersion7(), TenantId = intent.TenantId, Tenant = null!, UserId = intent.RecipientUserId, User = null!,
-            NotificationIntentId = intent.Id, NotificationIntent = intent, NotificationTypeId = request.InApp!.NotificationTypeId,
-            NotificationType = null!, NotificationScopeId = request.InApp.NotificationScopeId, NotificationScope = null!,
-            NotificationReasonId = request.InApp.NotificationReasonId, Title = request.InApp.Title, Body = request.InApp.Body,
-            DeduplicationKey = $"{intent.DeduplicationKey}:in-app", CreatedAt = intent.CreatedAt
+            Id = Guid.CreateVersion7(),
+            TenantId = intent.TenantId,
+            Tenant = null!,
+            UserId = intent.RecipientUserId,
+            User = null!,
+            NotificationIntentId = intent.Id,
+            NotificationIntent = intent,
+            NotificationTypeId = request.InApp!.NotificationTypeId,
+            NotificationType = null!,
+            NotificationScopeId = request.InApp.NotificationScopeId,
+            NotificationScope = null!,
+            NotificationReasonId = request.InApp.NotificationReasonId,
+            Title = request.InApp.Title,
+            Body = request.InApp.Body,
+            DeduplicationKey = $"{intent.DeduplicationKey}:in-app",
+            CreatedAt = intent.CreatedAt
         };
         var email = request.Email!;
         email.NotificationIntentId = intent.Id;
@@ -548,15 +582,27 @@ public sealed class EmailDeliveryGraphRevisionTests
             bool isEmail = channel == NotificationPreferenceChannelEnum.Email;
             intent.Deliveries.Add(new NotificationDelivery
             {
-                Id = Guid.CreateVersion7(), TenantId = intent.TenantId, NotificationIntentId = intent.Id, NotificationIntent = intent,
-                ChannelId = (int)channel, DeliveryPolicyId = (int)request.DeliveryPolicy, IsRequired = false, PolicyVersion = 1,
-                PreferenceCategoryCode = request.PreferenceCategoryCode, DisclosureLevel = request.DisclosureLevel,
-                TemplateKey = intent.TemplateKey, TemplateVersion = 1,
+                Id = Guid.CreateVersion7(),
+                TenantId = intent.TenantId,
+                NotificationIntentId = intent.Id,
+                NotificationIntent = intent,
+                ChannelId = (int)channel,
+                DeliveryPolicyId = (int)request.DeliveryPolicy,
+                IsRequired = false,
+                PolicyVersion = 1,
+                PreferenceCategoryCode = request.PreferenceCategoryCode,
+                DisclosureLevel = request.DisclosureLevel,
+                TemplateKey = intent.TemplateKey,
+                TemplateVersion = 1,
                 StatusId = (int)(isEmail ? NotificationDeliveryStatusEnum.Queued : NotificationDeliveryStatusEnum.Delivered),
-                NotificationId = isEmail ? null : notification.Id, Notification = isEmail ? null : notification,
-                EmailDispatchOutboxId = isEmail ? email.Id : null, EmailDispatchOutbox = isEmail ? email : null,
+                NotificationId = isEmail ? null : notification.Id,
+                Notification = isEmail ? null : notification,
+                EmailDispatchOutboxId = isEmail ? email.Id : null,
+                EmailDispatchOutbox = isEmail ? email : null,
                 RecipientAddressSource = isEmail ? email.RecipientAddressSource : null,
-                QueuedAt = isEmail ? intent.CreatedAt : null, CompletedAt = isEmail ? null : intent.CreatedAt, CreatedAt = intent.CreatedAt
+                QueuedAt = isEmail ? intent.CreatedAt : null,
+                CompletedAt = isEmail ? null : intent.CreatedAt,
+                CreatedAt = intent.CreatedAt
             });
         }
         return intent;
@@ -566,21 +612,37 @@ public sealed class EmailDeliveryGraphRevisionTests
     {
         var principal = new ServicePrincipal
         {
-            Id = Guid.CreateVersion7(), Code = $"graph-worker-{Guid.CreateVersion7():N}",
-            DisplayName = "Graph fanout worker", ConcurrencyStamp = Guid.CreateVersion7()
+            Id = Guid.CreateVersion7(),
+            Code = $"graph-worker-{Guid.CreateVersion7():N}",
+            DisplayName = "Graph fanout worker",
+            ConcurrencyStamp = Guid.CreateVersion7()
         };
         var actor = new Actor
         {
-            Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.Bot, ActorType = null!,
-            ServicePrincipalId = principal.Id, ServicePrincipal = principal,
-            Pii = new ActorPii { DisplayName = "Graph fanout worker" }, ConcurrencyStamp = Guid.CreateVersion7()
+            Id = Guid.CreateVersion7(),
+            ActorTypeId = (int)ActorTypeEnum.Bot,
+            ActorType = null!,
+            ServicePrincipalId = principal.Id,
+            ServicePrincipal = principal,
+            Pii = new ActorPii { DisplayName = "Graph fanout worker" },
+            ConcurrencyStamp = Guid.CreateVersion7()
         };
         var @event = new Explore.Domain.Event(EventStatusEnum.Published)
         {
-            Id = Guid.CreateVersion7(), TenantId = authority.TenantId, Tenant = null!, Title = "Graph fanout event",
-            EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated, ActorId = actor.Id, Actor = actor,
-            OrganizerActorId = actor.Id, VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-            EventStatus = null!, EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, ConcurrencyStamp = Guid.CreateVersion7()
+            Id = Guid.CreateVersion7(),
+            TenantId = authority.TenantId,
+            Tenant = null!,
+            Title = "Graph fanout event",
+            EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
+            ActorId = actor.Id,
+            Actor = actor,
+            OrganizerActorId = actor.Id,
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            VisibilityType = null!,
+            EventStatus = null!,
+            EventFormatId = (int)EventFormatEnum.Local,
+            EventFormat = null!,
+            ConcurrencyStamp = Guid.CreateVersion7()
         };
         DateTime occurredAt = DateTime.UtcNow;
         var occurrence = NotificationFanoutOccurrence.Create(id: Guid.CreateVersion7(), tenantId: authority.TenantId,

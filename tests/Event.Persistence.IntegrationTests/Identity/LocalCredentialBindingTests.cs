@@ -239,19 +239,28 @@ public sealed class LocalCredentialBindingTests
             {
                 Id = externalUserId,
                 Pii = new UserPii { Email = credential.Email!, FirstName = "External", LastName = "Owner" },
-                EmailVerified = true, CreatedAt = DateTime.UtcNow
+                EmailVerified = true,
+                CreatedAt = DateTime.UtcNow
             };
             application.Actors.Add(new Actor
             {
-                Id = externalActorId, UserId = user.Id, User = user,
-                ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-                Pii = new ActorPii { DisplayName = "External owner" }, CreatedAt = DateTime.UtcNow
+                Id = externalActorId,
+                UserId = user.Id,
+                User = user,
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
+                Pii = new ActorPii { DisplayName = "External owner" },
+                CreatedAt = DateTime.UtcNow
             });
             application.UserExternalLogins.Add(new UserExternalLogin
             {
-                Id = externalLoginId, UserId = user.Id, User = user,
-                AuthenticationProviderId = (int)AuthenticationProviderKind.Keycloak, AuthenticationProvider = null!,
-                ProviderKey = externalKey, CreatedAt = DateTime.UtcNow
+                Id = externalLoginId,
+                UserId = user.Id,
+                User = user,
+                AuthenticationProviderId = (int)AuthenticationProviderKind.Keycloak,
+                AuthenticationProvider = null!,
+                ProviderKey = externalKey,
+                CreatedAt = DateTime.UtcNow
             });
             await application.SaveChangesAsync(fixture.CancellationToken);
         }
@@ -622,19 +631,28 @@ public sealed class LocalCredentialBindingTests
             {
                 Id = Receipt.LocalSubjectId,
                 Pii = new UserPii { Email = credential.Email!, FirstName = credential.FirstName, LastName = credential.LastName },
-                EmailVerified = true, CreatedAt = DateTime.UtcNow
+                EmailVerified = true,
+                CreatedAt = DateTime.UtcNow
             };
             application.Actors.Add(new Actor
             {
-                Id = Receipt.PersonalActorId, UserId = user.Id, User = user,
-                ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-                Pii = new ActorPii { DisplayName = "Local credential owner" }, CreatedAt = DateTime.UtcNow
+                Id = Receipt.PersonalActorId,
+                UserId = user.Id,
+                User = user,
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
+                Pii = new ActorPii { DisplayName = "Local credential owner" },
+                CreatedAt = DateTime.UtcNow
             });
             application.UserExternalLogins.Add(new UserExternalLogin
             {
-                Id = Receipt.ExternalLoginId, UserId = user.Id, User = user,
-                AuthenticationProviderId = (int)AuthenticationProviderKind.Local, AuthenticationProvider = null!,
-                ProviderKey = Receipt.LocalSubjectId.ToString("D"), CreatedAt = DateTime.UtcNow
+                Id = Receipt.ExternalLoginId,
+                UserId = user.Id,
+                User = user,
+                AuthenticationProviderId = (int)AuthenticationProviderKind.Local,
+                AuthenticationProvider = null!,
+                ProviderKey = Receipt.LocalSubjectId.ToString("D"),
+                CreatedAt = DateTime.UtcNow
             });
             await application.SaveChangesAsync(CancellationToken);
         }
@@ -654,21 +672,35 @@ public sealed class LocalCredentialBindingTests
             ExploreDbContext application = Application(scope);
             var tenant = new Tenant
             {
-                Id = Guid.CreateVersion7(), FullName = "Binding authority tenant", Slug = $"binding-{Guid.CreateVersion7():N}",
-                TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!, CreatedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                FullName = "Binding authority tenant",
+                Slug = $"binding-{Guid.CreateVersion7():N}",
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!,
+                CreatedAt = DateTime.UtcNow
             };
             var membership = new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
-                UserId = InitiatorId, User = await application.Users.SingleAsync(user => user.Id == InitiatorId, CancellationToken),
-                StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                TenantId = tenant.Id,
+                Tenant = tenant,
+                UserId = InitiatorId,
+                User = await application.Users.SingleAsync(user => user.Id == InitiatorId, CancellationToken),
+                StatusId = (int)TenantUserStatusEnum.Active,
+                CreatedAt = DateTime.UtcNow
             };
             application.TenantUserRoleGrants.Add(new TenantUserRoleGrant
             {
-                Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
-                TenantUserId = membership.Id, TenantUser = membership,
-                RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant,
-                GrantedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                TenantId = tenant.Id,
+                Tenant = tenant,
+                TenantUserId = membership.Id,
+                TenantUser = membership,
+                RoleId = (int)RoleEnum.TenantAdmin,
+                Role = null!,
+                RoleScopeId = (int)RoleScopeEnum.Tenant,
+                GrantedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
             });
             await application.SaveChangesAsync(CancellationToken);
             return tenant.Id;
@@ -696,13 +728,18 @@ public sealed class LocalCredentialBindingTests
                 {
                     Id = InitiatorId,
                     Pii = new UserPii { Email = $"admin-{InitiatorId:N}@example.test", FirstName = "Instance", LastName = "Administrator" },
-                    EmailVerified = true, CreatedAt = DateTime.UtcNow
+                    EmailVerified = true,
+                    CreatedAt = DateTime.UtcNow
                 };
                 Role role = await application.Set<Role>().SingleAsync(row => row.MasterCode == "platform.admin", CancellationToken);
                 application.PlatformUserRoles.Add(new PlatformUserRole
                 {
-                    Id = Guid.CreateVersion7(), UserId = initiator.Id, User = initiator,
-                    RoleId = role.Id, Role = role, GrantedAt = DateTime.UtcNow
+                    Id = Guid.CreateVersion7(),
+                    UserId = initiator.Id,
+                    User = initiator,
+                    RoleId = role.Id,
+                    Role = role,
+                    GrantedAt = DateTime.UtcNow
                 });
                 await application.SaveChangesAsync(CancellationToken);
             }

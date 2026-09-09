@@ -39,7 +39,11 @@ internal sealed class LocalIdentityCredentialStateStore(
             .Skip(skip).Take(request.PageSize)
             .Select(user => new
             {
-                user.Id, user.Email, user.FirstName, user.LastName, user.EmailConfirmed,
+                user.Id,
+                user.Email,
+                user.FirstName,
+                user.LastName,
+                user.EmailConfirmed,
                 TokenValue = identityDbContext.Set<IdentityUserToken<Guid>>()
                     .Where(token => token.UserId == user.Id
                         && token.LoginProvider == LocalCredentialStateMetadata.TokenLoginProvider
@@ -735,9 +739,13 @@ internal sealed class LocalIdentityCredentialStateStore(
 
         var user = new LocalIdentityUser
         {
-            UserName = request.Username, Email = request.Email,
-            FirstName = request.FirstName, LastName = request.LastName, EmailConfirmed = true,
-            LockoutEnabled = true, CreatedAt = timeProvider.GetUtcNow().UtcDateTime
+            UserName = request.Username,
+            Email = request.Email,
+            FirstName = request.FirstName,
+            LastName = request.LastName,
+            EmailConfirmed = true,
+            LockoutEnabled = true,
+            CreatedAt = timeProvider.GetUtcNow().UtcDateTime
         };
         foreach (IUserValidator<LocalIdentityUser> validator in userManager.UserValidators)
         {

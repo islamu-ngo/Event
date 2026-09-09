@@ -489,7 +489,8 @@ public sealed class AtprotoOAuthSecurityGatewayTests
         var refreshLock = new BlockingRefreshLock(released: true);
         AtprotoPdsDeliveryGateway gateway = CreateDeliveryGateway(fixture, refreshLock);
         AtprotoPdsDeliveryRequest request = CreateDeliveryRequest(Guid.CreateVersion7(), Guid.CreateVersion7())
-            with { Did = malformedDid };
+            with
+        { Did = malformedDid };
 
         AtprotoPdsDeliveryResult result = await gateway.DeliverAsync(request, CancellationToken.None);
 

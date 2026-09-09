@@ -29,7 +29,8 @@ public sealed class ResetLocalCredentialCommandHandler(
         var validation = await new ResetLocalCredentialRequestDtoValidator().ValidateAsync(
             new ResetLocalCredentialRequestDto
             {
-                OperationId = request.OperationId, ExpectedCurrentOperationId = request.ExpectedCurrentOperationId,
+                OperationId = request.OperationId,
+                ExpectedCurrentOperationId = request.ExpectedCurrentOperationId,
                 ExpectedCurrentOperationConcurrencyStamp = request.ExpectedCurrentOperationConcurrencyStamp,
                 Reason = request.Reason
             }, cancellationToken).ConfigureAwait(false);

@@ -98,7 +98,7 @@ public static class PlatformIdentityPrincipalExtensions
 
         return identities is
         [
-            { AuthenticationType: { } authenticationType } identity
+        { AuthenticationType: { } authenticationType } identity
         ] && !PurposeBoundAuthenticationSchemes.Contains(authenticationType)
             ? identity
             : null;

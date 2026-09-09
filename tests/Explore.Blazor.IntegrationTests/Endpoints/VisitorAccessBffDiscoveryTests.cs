@@ -66,7 +66,9 @@ public sealed class VisitorAccessBffDiscoveryTests
         {
             builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Authentication:Provider"] = "local", ["Keycloak:Authority"] = null, ["Keycloak:ClientId"] = null
+                ["Authentication:Provider"] = "local",
+                ["Keycloak:Authority"] = null,
+                ["Keycloak:ClientId"] = null
             }));
             builder.ConfigureTestServices(services =>
             {
@@ -90,11 +92,15 @@ public sealed class VisitorAccessBffDiscoveryTests
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
             string body = JsonSerializer.Serialize(new
             {
-                primaryProviderId = 4, primaryProviderCode = "local",
+                primaryProviderId = 4,
+                primaryProviderCode = "local",
                 visitorAccess = new
                 {
-                    mode, allowsNewNativeAllocation = mode != "DirectoryListingOnly", allowsAnonymousParticipation = mode != "DirectoryListingOnly",
-                    allowsAccountRequiredParticipation = signup, allowsExistingAccountLogin = signup,
+                    mode,
+                    allowsNewNativeAllocation = mode != "DirectoryListingOnly",
+                    allowsAnonymousParticipation = mode != "DirectoryListingOnly",
+                    allowsAccountRequiredParticipation = signup,
+                    allowsExistingAccountLogin = signup,
                     signupDestinations = signup ? new[] { new { provider = "Google", url = "https://accounts.example.test/create-account" } } : []
                 },
                 _links = signup

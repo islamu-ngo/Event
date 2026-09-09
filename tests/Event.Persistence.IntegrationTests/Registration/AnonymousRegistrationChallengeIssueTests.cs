@@ -82,13 +82,18 @@ public sealed class AnonymousRegistrationChallengeIssueTests
         var target = await fixture.SeedEventAsync(published: true);
         var instance = new SystemSetting
         {
-            Id = Guid.CreateVersion7(), SettingKey = GovernanceSettingKeys.AnonymousRegistrationChallenge.Difficulty,
-            Value = "\"20\"", ValueType = SettingValueType.String
+            Id = Guid.CreateVersion7(),
+            SettingKey = GovernanceSettingKeys.AnonymousRegistrationChallenge.Difficulty,
+            Value = "\"20\"",
+            ValueType = SettingValueType.String
         };
         var tenant = new TenantSetting
         {
-            Id = Guid.CreateVersion7(), TenantId = fixture.TenantId, Tenant = null!,
-            SettingKey = GovernanceSettingKeys.AnonymousRegistrationChallenge.Difficulty, Value = "\"16\""
+            Id = Guid.CreateVersion7(),
+            TenantId = fixture.TenantId,
+            Tenant = null!,
+            SettingKey = GovernanceSettingKeys.AnonymousRegistrationChallenge.Difficulty,
+            Value = "\"16\""
         };
         fixture.Context.AddRange(instance, tenant);
         await fixture.Context.SaveChangesAsync();
@@ -108,13 +113,19 @@ public sealed class AnonymousRegistrationChallengeIssueTests
         var target = await fixture.SeedEventAsync(published: true);
         var instance = new SystemSetting
         {
-            Id = Guid.CreateVersion7(), SettingKey = GovernanceSettingKeys.AnonymousRegistrationChallenge.Difficulty,
-            Value = "\"18\"", ValueType = SettingValueType.String, IsLocked = true
+            Id = Guid.CreateVersion7(),
+            SettingKey = GovernanceSettingKeys.AnonymousRegistrationChallenge.Difficulty,
+            Value = "\"18\"",
+            ValueType = SettingValueType.String,
+            IsLocked = true
         };
         fixture.Context.AddRange(instance, new TenantSetting
         {
-            Id = Guid.CreateVersion7(), TenantId = fixture.TenantId, Tenant = null!,
-            SettingKey = GovernanceSettingKeys.AnonymousRegistrationChallenge.Difficulty, Value = "\"16\""
+            Id = Guid.CreateVersion7(),
+            TenantId = fixture.TenantId,
+            Tenant = null!,
+            SettingKey = GovernanceSettingKeys.AnonymousRegistrationChallenge.Difficulty,
+            Value = "\"16\""
         });
         await fixture.Context.SaveChangesAsync();
         foreach (string invalid in new[] { "\"15\"", "\"23\"", "\"018\"", "18", "null", "{", "\"invalid\"" })

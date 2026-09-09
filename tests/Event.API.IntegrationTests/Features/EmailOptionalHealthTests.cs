@@ -128,7 +128,8 @@ public sealed class EmailOptionalHealthTests
         await using var database = await SmtpSettingsDatabase.CreateAsync();
         await using var app = await StartAsync(database, new Probe(EmailScenario.Disabled), new EmailDispatchProcessorSettings
         {
-            Enabled = enabled, Mode = mode
+            Enabled = enabled,
+            Mode = mode
         });
         using var client = app.GetTestClient();
 
@@ -145,7 +146,8 @@ public sealed class EmailOptionalHealthTests
         await database.Context.DisposeAsync();
         await using var app = await StartAsync(database, new Probe(EmailScenario.Disabled), new EmailDispatchProcessorSettings
         {
-            Enabled = true, Mode = EmailDispatchProcessorMode.HostedService
+            Enabled = true,
+            Mode = EmailDispatchProcessorMode.HostedService
         });
         using var client = app.GetTestClient();
 

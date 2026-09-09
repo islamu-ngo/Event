@@ -243,9 +243,16 @@ public sealed partial class GuestRegistrationStatusHttpTests
             Guid operatorId = (await database.InstanceBootstrapStates.SingleAsync()).CompletedByUserId!.Value;
             var location = new Location
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                FullName = canary, City = "Brussels", Country = "BE", Timezone = "Europe/Brussels",
-                CreatedAt = host.Clock.GetUtcNow().UtcDateTime, CreatedBy = operatorId, ConcurrencyStamp = Guid.CreateVersion7()
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                FullName = canary,
+                City = "Brussels",
+                Country = "BE",
+                Timezone = "Europe/Brussels",
+                CreatedAt = host.Clock.GetUtcNow().UtcDateTime,
+                CreatedBy = operatorId,
+                ConcurrencyStamp = Guid.CreateVersion7()
             };
             location.ClassifyAsPrivateHome(operatorId);
             location.SetProviderAddress(canary + " STREET", "PRIVATE-POSTCODE",
@@ -382,12 +389,18 @@ public sealed partial class GuestRegistrationStatusHttpTests
             ExploreDbContext database = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
             database.EventSessions.Add(new EventSession(EventSessionStatusEnum.Published)
             {
-                Id = Guid.CreateVersion7(), TenantId = PlatformDefaults.DefaultTenantId, Tenant = null!,
-                EventId = host.EventId, Event = null!, Title = "Public session",
-                StartTime = host.Clock.GetUtcNow().AddDays(30), EndTime = host.Clock.GetUtcNow().AddDays(31),
+                Id = Guid.CreateVersion7(),
+                TenantId = PlatformDefaults.DefaultTenantId,
+                Tenant = null!,
+                EventId = host.EventId,
+                Event = null!,
+                Title = "Public session",
+                StartTime = host.Clock.GetUtcNow().AddDays(30),
+                EndTime = host.Clock.GetUtcNow().AddDays(31),
                 RegistrationModeId = (int)RegistrationModeEnum.Open,
                 EventSessionKindId = (int)EventSessionKindEnum.Talk,
-                CreatedAt = host.Clock.GetUtcNow().UtcDateTime, ConcurrencyStamp = Guid.CreateVersion7()
+                CreatedAt = host.Clock.GetUtcNow().UtcDateTime,
+                ConcurrencyStamp = Guid.CreateVersion7()
             });
             await database.SaveChangesAsync();
         }

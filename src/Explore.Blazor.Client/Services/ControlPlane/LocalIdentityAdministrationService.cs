@@ -47,8 +47,10 @@ public sealed class LocalIdentityAdministrationService(
         }
         var intent = new CreateLocalIdentityRequestDto
         {
-            OperationId = request.OperationId, Email = request.Email,
-            FirstName = request.FirstName, LastName = request.LastName
+            OperationId = request.OperationId,
+            Email = request.Email,
+            FirstName = request.FirstName,
+            LastName = request.LastName
         };
         await RequireDiscoveryAsync(cancellationToken);
         HalResourceOfLocalCredentialIssueDto result = await _client.CreateLocalIdentityAsync(
@@ -79,7 +81,8 @@ public sealed class LocalIdentityAdministrationService(
         }
         var intent = new ResetLocalCredentialRequestDto
         {
-            OperationId = request.OperationId, ExpectedCurrentOperationId = request.ExpectedCurrentOperationId,
+            OperationId = request.OperationId,
+            ExpectedCurrentOperationId = request.ExpectedCurrentOperationId,
             ExpectedCurrentOperationConcurrencyStamp = request.ExpectedCurrentOperationConcurrencyStamp,
             Reason = request.Reason
         };

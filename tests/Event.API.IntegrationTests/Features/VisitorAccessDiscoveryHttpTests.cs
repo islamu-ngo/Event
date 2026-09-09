@@ -190,7 +190,8 @@ public sealed class VisitorAccessDiscoveryHttpTests
                 Configuration = OptionalUpdate<AuthProviderConfigurationWriteDto>.Set(new()
                 {
                     PrimaryProviderId = (int)AuthenticationProviderKind.Local,
-                    GoogleSsoEnabled = false, GoogleClientId = "native-public-client",
+                    GoogleSsoEnabled = false,
+                    GoogleClientId = "native-public-client",
                     GooglePublicOnboardingPolicy = PublicOnboardingPolicy.Allowed,
                     GooglePublicSignupUrl = "https://accounts.example.test/create-account"
                 })
@@ -227,8 +228,15 @@ public sealed class VisitorAccessDiscoveryHttpTests
         database.TenantUsers.Add(membership);
         database.Set<TenantUserRoleGrant>().Add(new TenantUserRoleGrant
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant, TenantUserId = membership.Id, TenantUser = membership,
-            RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant, GrantedAt = DateTime.UtcNow
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            TenantUserId = membership.Id,
+            TenantUser = membership,
+            RoleId = (int)RoleEnum.TenantAdmin,
+            Role = null!,
+            RoleScopeId = (int)RoleScopeEnum.Tenant,
+            GrantedAt = DateTime.UtcNow
         });
         await database.SaveChangesAsync(Token);
         var roles = scope.ServiceProvider.GetRequiredService<RoleManager<LocalIdentityRole>>();
@@ -239,7 +247,8 @@ public sealed class VisitorAccessDiscoveryHttpTests
 
     private static HttpClient CreateClient(LocalAdmissionWebApplicationFactory factory) => factory.CreateClient(new WebApplicationFactoryClientOptions
     {
-        BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false
+        BaseAddress = new Uri("https://localhost"),
+        AllowAutoRedirect = false
     });
 
     private static async Task<JsonDocument> GetEventAsync(HttpClient client, Guid eventId)
@@ -269,9 +278,15 @@ public sealed class VisitorAccessDiscoveryHttpTests
         await using var database = factory.CreateDatabase();
         database.Add(TenantDirectoryOperatorIdentityDocumentDefaults.Create(PlatformDefaults.DefaultTenantId, new TenantDirectoryOperatorIdentitySettings
         {
-            PublicName = "Native public operator", LegalName = "Native public operator ASBL", OperatorKindCode = "registered_organization",
-            JurisdictionCountryCode = "BE", RegistrationIdentifier = "BE 0123.456.789", PublicContactEmail = "operator@example.test",
-            LegalNoticeUrl = "https://example.test/legal", TermsUrl = "https://example.test/terms", PrivacyUrl = "https://example.test/privacy"
+            PublicName = "Native public operator",
+            LegalName = "Native public operator ASBL",
+            OperatorKindCode = "registered_organization",
+            JurisdictionCountryCode = "BE",
+            RegistrationIdentifier = "BE 0123.456.789",
+            PublicContactEmail = "operator@example.test",
+            LegalNoticeUrl = "https://example.test/legal",
+            TermsUrl = "https://example.test/terms",
+            PrivacyUrl = "https://example.test/privacy"
         }));
         await database.SaveChangesAsync(Token);
     }
@@ -285,8 +300,13 @@ public sealed class VisitorAccessDiscoveryHttpTests
         var tenant = await database.Tenants.SingleAsync(Token);
         var actor = await database.Actors.SingleOrDefaultAsync(row => row.UserId == user.Id, Token) ?? new Actor
         {
-            Id = Guid.CreateVersion7(), UserId = user.Id, User = user, ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-            Pii = new ActorPii { DisplayName = "Visitor event organizer" }, CreatedAt = DateTime.UtcNow
+            Id = Guid.CreateVersion7(),
+            UserId = user.Id,
+            User = user,
+            ActorTypeId = (int)ActorTypeEnum.User,
+            ActorType = null!,
+            Pii = new ActorPii { DisplayName = "Visitor event organizer" },
+            CreatedAt = DateTime.UtcNow
         };
         // A distinct organizer membership keeps public eligibility in its real tenant-owned query.
         var existing = await database.TenantUsers.SingleOrDefaultAsync(row => row.UserId == user.Id && row.TenantId == tenant.Id, Token);
@@ -296,9 +316,20 @@ public sealed class VisitorAccessDiscoveryHttpTests
             database.TenantUsers.Add(new TenantUser { Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant, UserId = user.Id, User = user, Actor = actor, ActorId = actor.Id, StatusId = (int)TenantUserStatusEnum.Active, CreatedAt = DateTime.UtcNow });
         var entity = new Explore.Domain.Event
         {
-            Id = Guid.CreateVersion7(), Title = "Native visitor discovery", TenantId = tenant.Id, Tenant = tenant, ActorId = actor.Id, Actor = actor,
-            OrganizerActorId = actor.Id, EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!, EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!, CreatedAt = DateTime.UtcNow
+            Id = Guid.CreateVersion7(),
+            Title = "Native visitor discovery",
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            ActorId = actor.Id,
+            Actor = actor,
+            OrganizerActorId = actor.Id,
+            EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            VisibilityType = null!,
+            EventFormatId = (int)EventFormatEnum.Local,
+            EventFormat = null!,
+            EventStatus = null!,
+            CreatedAt = DateTime.UtcNow
         };
         entity.ParticipationConfiguration = EventParticipationConfiguration.Create(entity.Id, tenant.Id, (int)mode,
             (int)(mode == ParticipationHandlingModeEnum.WalkIn ? AdvanceRegistrationObligationEnum.NotApplicable : AdvanceRegistrationObligationEnum.Required),

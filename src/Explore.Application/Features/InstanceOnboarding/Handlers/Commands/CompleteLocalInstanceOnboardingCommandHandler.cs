@@ -30,10 +30,13 @@ public sealed class CompleteLocalInstanceOnboardingCommandHandler(
 
         var request = command.Request;
         if (request.Settings is null) return Failure("local_bootstrap_settings_invalid");
-        request = request with { Settings = request.Settings with
+        request = request with
         {
-            DeploymentMode = await deployment.GetConfiguredOnboardingModeAsync(cancellationToken)
-        } };
+            Settings = request.Settings with
+            {
+                DeploymentMode = await deployment.GetConfiguredOnboardingModeAsync(cancellationToken)
+            }
+        };
         var validation = await new CompleteLocalInstanceOnboardingRequestDtoValidator().ValidateAsync(request, cancellationToken);
         if (!validation.IsValid) return Failure("local_bootstrap_request_invalid");
         var preflight = await sender.Send(new GetOnboardingPreflightQuery(), cancellationToken);

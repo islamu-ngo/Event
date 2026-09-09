@@ -33,8 +33,12 @@ public sealed class ControlPlaneEmailSettingMutationTests
             Guid tenantId = Guid.CreateVersion7();
             context.Tenants.Add(new Tenant
             {
-                Id = tenantId, FullName = "Control Plane SMTP tenant", Slug = $"smtp-lock-{tenantId:N}",
-                TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!, CreatedAt = DateTime.UtcNow
+                Id = tenantId,
+                FullName = "Control Plane SMTP tenant",
+                Slug = $"smtp-lock-{tenantId:N}",
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!,
+                CreatedAt = DateTime.UtcNow
             });
             await context.SaveChangesAsync();
             using var fixture = new InstanceSettingsCommandFixture(context: context, userId: actorId);

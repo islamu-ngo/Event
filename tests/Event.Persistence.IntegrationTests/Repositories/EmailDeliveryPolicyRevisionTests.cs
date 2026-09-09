@@ -229,8 +229,12 @@ public sealed class EmailDeliveryPolicyRevisionTests
         foreach (var tenantId in tenantIds)
             context.Tenants.Add(new Tenant
             {
-                Id = tenantId, FullName = "Durable policy tenant", Slug = $"revision-{tenantId:N}",
-                TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!, CreatedAt = DateTime.UtcNow
+                Id = tenantId,
+                FullName = "Durable policy tenant",
+                Slug = $"revision-{tenantId:N}",
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!,
+                CreatedAt = DateTime.UtcNow
             });
         await context.SaveChangesAsync();
         await ApplyEmailSettingsAsync(context: context, mutations:

@@ -107,23 +107,34 @@ public sealed class EmailDeliverySuppressionRevisionTests
         processor.IsPaused = false;
         context.EmailDispatchTenantControls.Add(new EmailDispatchTenantControl
         {
-            Id = Guid.CreateVersion7(), TenantId = seeded.TenantId, DeliveryPolicyRevision = 2,
-            OptionalSuppressedThroughRevision = ownCutoff, OptionalSuppressedThroughUtc = ownCutoff.HasValue ? AuditCutoff : null,
-            SmtpAvailableTokens = 5, SmtpRefillAt = refillAt,
+            Id = Guid.CreateVersion7(),
+            TenantId = seeded.TenantId,
+            DeliveryPolicyRevision = 2,
+            OptionalSuppressedThroughRevision = ownCutoff,
+            OptionalSuppressedThroughUtc = ownCutoff.HasValue ? AuditCutoff : null,
+            SmtpAvailableTokens = 5,
+            SmtpRefillAt = refillAt,
             CreatedAt = originalAt
         });
         if (otherTenantHistory)
         {
             var otherTenant = new Tenant
             {
-                Id = Guid.CreateVersion7(), FullName = "Other suppression tenant", Slug = $"cutoff-other-{Guid.CreateVersion7():N}",
-                TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+                Id = Guid.CreateVersion7(),
+                FullName = "Other suppression tenant",
+                Slug = $"cutoff-other-{Guid.CreateVersion7():N}",
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!
             };
             context.Tenants.Add(otherTenant);
             context.EmailDispatchTenantControls.Add(new EmailDispatchTenantControl
             {
-                Id = Guid.CreateVersion7(), TenantId = otherTenant.Id, DeliveryPolicyRevision = 2,
-                OptionalSuppressedThroughRevision = SuppressionRevision, OptionalSuppressedThroughUtc = AuditCutoff, CreatedAt = originalAt
+                Id = Guid.CreateVersion7(),
+                TenantId = otherTenant.Id,
+                DeliveryPolicyRevision = 2,
+                OptionalSuppressedThroughRevision = SuppressionRevision,
+                OptionalSuppressedThroughUtc = AuditCutoff,
+                CreatedAt = originalAt
             });
         }
         await context.SaveChangesAsync();
@@ -135,22 +146,37 @@ public sealed class EmailDeliverySuppressionRevisionTests
     {
         var principal = new ServicePrincipal
         {
-            Id = Guid.CreateVersion7(), Code = $"cutoff-worker-{Guid.CreateVersion7():N}",
-            DisplayName = "Cutoff fanout worker", ConcurrencyStamp = Guid.CreateVersion7()
+            Id = Guid.CreateVersion7(),
+            Code = $"cutoff-worker-{Guid.CreateVersion7():N}",
+            DisplayName = "Cutoff fanout worker",
+            ConcurrencyStamp = Guid.CreateVersion7()
         };
         var actor = new Actor
         {
-            Id = Guid.CreateVersion7(), ActorTypeId = (int)ActorTypeEnum.Bot, ActorType = null!,
-            ServicePrincipalId = principal.Id, ServicePrincipal = principal,
-            Pii = new ActorPii { DisplayName = "Cutoff fanout worker" }, ConcurrencyStamp = Guid.CreateVersion7()
+            Id = Guid.CreateVersion7(),
+            ActorTypeId = (int)ActorTypeEnum.Bot,
+            ActorType = null!,
+            ServicePrincipalId = principal.Id,
+            ServicePrincipal = principal,
+            Pii = new ActorPii { DisplayName = "Cutoff fanout worker" },
+            ConcurrencyStamp = Guid.CreateVersion7()
         };
         var @event = new Explore.Domain.Event(EventStatusEnum.Published)
         {
-            Id = Guid.CreateVersion7(), TenantId = dispatch.TenantId, Tenant = null!, Title = "Suppression cutoff event",
+            Id = Guid.CreateVersion7(),
+            TenantId = dispatch.TenantId,
+            Tenant = null!,
+            Title = "Suppression cutoff event",
             EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-            ActorId = actor.Id, Actor = actor, OrganizerActorId = actor.Id,
-            VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!, EventStatus = null!,
-            EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, ConcurrencyStamp = Guid.CreateVersion7()
+            ActorId = actor.Id,
+            Actor = actor,
+            OrganizerActorId = actor.Id,
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            VisibilityType = null!,
+            EventStatus = null!,
+            EventFormatId = (int)EventFormatEnum.Local,
+            EventFormat = null!,
+            ConcurrencyStamp = Guid.CreateVersion7()
         };
         string template = required
             ? NotificationFanoutOccurrenceCoordinationPolicy.HeavyModerationUnavailableTemplateKey : "event_update";

@@ -275,7 +275,8 @@ public sealed class EmailDeliveryAdminSectionTests
                     if (Enabled) links["disable-preview"] = new HalLink { Href = Prefix + "/disable-preview", Method = "POST" };
                     else links[instanceScope ? "edit" : "enable"] = new HalLink
                     {
-                        Href = instanceScope ? Prefix : "/api/settings/tenant/email.delivery_enabled", Method = instanceScope ? "PATCH" : "PUT"
+                        Href = instanceScope ? Prefix : "/api/settings/tenant/email.delivery_enabled",
+                        Method = instanceScope ? "PATCH" : "PUT"
                     };
                 }
                 return instanceScope
@@ -289,9 +290,12 @@ public sealed class EmailDeliveryAdminSectionTests
                 return Json(new
                 {
                     tenantId = instanceScope ? (Guid?)null : TenantId,
-                    expectedRevision = Revision, isLocked = Locked, canDisable = !Locked,
+                    expectedRevision = Revision,
+                    isLocked = Locked,
+                    canDisable = !Locked,
                     affectedScopes = new[] { new { tenantId = instanceScope ? (Guid?)null : TenantId, revision = Revision } },
-                    confirmationToken = Token, expiresAtUtc = clock.Now.AddMinutes(5),
+                    confirmationToken = Token,
+                    expiresAtUtc = clock.Now.AddMinutes(5),
                     _links = AdvertiseDisable ? new Dictionary<string, HalLink> { ["disable"] = new() { Href = Prefix + "/disable", Method = "POST" } } : []
                 });
             }

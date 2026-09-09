@@ -569,12 +569,12 @@ internal static class HalOpenApiSchemaCatalog
         };
 
     public static IReadOnlyDictionary<Type, Type> DetailResourceEmbeddedTypeMappings
-        { get; } = new Dictionary<Type, Type>
-        {
-            [typeof(Explore.Application.DTOs.Geocoding.AddressSuggestionsResponseDto)] =
+    { get; } = new Dictionary<Type, Type>
+    {
+        [typeof(Explore.Application.DTOs.Geocoding.AddressSuggestionsResponseDto)] =
                 typeof(Explore.Application.Hateoas.HalCollectionEmbedded<
                     Explore.Application.DTOs.Geocoding.AddressSuggestionDto>)
-        };
+    };
 
     public static bool IsCatalogedDetailResourceSchema(string schemaName)
         => DetailResourceMappings.ContainsKey(schemaName);

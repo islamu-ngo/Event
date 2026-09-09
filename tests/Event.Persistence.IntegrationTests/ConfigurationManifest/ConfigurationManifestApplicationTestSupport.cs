@@ -242,9 +242,9 @@ internal static class ConfigurationManifestApplicationTestSupport
                         {
                             [ConfigurationManifestDocumentKeys
                                 .InstancePaidEventPolicy] = new()
-                            {
-                                SchemaVersion = 1,
-                                Payload = Json(
+                                {
+                                    SchemaVersion = 1,
+                                    Payload = Json(
                                     """
                                     {
                                       "isPaymentsEnabled": false,
@@ -258,7 +258,7 @@ internal static class ConfigurationManifestApplicationTestSupport
                                       "farFutureReviewThresholdDays": null
                                     }
                                     """)
-                            }
+                                }
                         }
                         : new Dictionary<
                             string,
@@ -325,8 +325,8 @@ internal static class ConfigurationManifestApplicationTestSupport
                                 forcedExpectedPaidPolicyVersion
                                 ?? current.VersionNumber
                             }
-                        }
-                    };
+                    }
+                };
             }
 
             return new ConfigurationManifestPreflightResult(

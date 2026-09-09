@@ -131,15 +131,19 @@ public sealed class OptionalUpdateHttpBindingTests
         using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
 
-        dbContext.Users.Add(new User { Id = userId, CreatedAt = DateTime.UtcNow,
-        CreatedBy = userId,
-        Pii = new UserPii
+        dbContext.Users.Add(new User
         {
-            UserId = userId,
-            Email = $"{userId:N}@integration.test",
-            FirstName = "Instance",
-            LastName = "Admin"
-        } });
+            Id = userId,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId,
+            Pii = new UserPii
+            {
+                UserId = userId,
+                Email = $"{userId:N}@integration.test",
+                FirstName = "Instance",
+                LastName = "Admin"
+            }
+        });
         var completedAt = DateTime.UtcNow;
         var bootstrap = InstanceBootstrapState.CreateInteractivePending(
             Guid.CreateVersion7(),

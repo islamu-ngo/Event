@@ -376,8 +376,12 @@ public sealed class LocalCredentialLifecycleTests
             {
                 User = new LocalIdentityUser
                 {
-                    UserName = email, Email = email, FirstName = "Local", LastName = "Lifecycle",
-                    EmailConfirmed = false, CreatedAt = DateTime.UtcNow
+                    UserName = email,
+                    Email = email,
+                    FirstName = "Local",
+                    LastName = "Lifecycle",
+                    EmailConfirmed = false,
+                    CreatedAt = DateTime.UtcNow
                 };
                 IdentityResult created = await _manager.CreateAsync(User, password).WaitAsync(CancellationToken);
                 await Assert.That(created.Succeeded).IsTrue();
@@ -410,7 +414,9 @@ public sealed class LocalCredentialLifecycleTests
             DateTimeOffset now = DateTimeOffset.UtcNow;
             var initiator = new User
             {
-                Id = Guid.CreateVersion7(), EmailVerified = true, CreatedAt = now.UtcDateTime,
+                Id = Guid.CreateVersion7(),
+                EmailVerified = true,
+                CreatedAt = now.UtcDateTime,
                 Pii = new UserPii { Email = "initiator@example.test", FirstName = "Instance", LastName = "Operator" }
             };
             Application.Users.Add(initiator);
@@ -427,20 +433,30 @@ public sealed class LocalCredentialLifecycleTests
             _applicationUserId = receipt.LocalSubjectId;
             var applicationUser = new User
             {
-                Id = receipt.LocalSubjectId, EmailVerified = true, CreatedAt = now.UtcDateTime,
+                Id = receipt.LocalSubjectId,
+                EmailVerified = true,
+                CreatedAt = now.UtcDateTime,
                 Pii = new UserPii { Email = email, FirstName = "Local", LastName = "Lifecycle" }
             };
             Application.Actors.Add(new Actor
             {
-                Id = receipt.PersonalActorId, UserId = applicationUser.Id, User = applicationUser,
-                ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-                Pii = new ActorPii { DisplayName = "Local Lifecycle" }, CreatedAt = now.UtcDateTime
+                Id = receipt.PersonalActorId,
+                UserId = applicationUser.Id,
+                User = applicationUser,
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
+                Pii = new ActorPii { DisplayName = "Local Lifecycle" },
+                CreatedAt = now.UtcDateTime
             });
             Application.UserExternalLogins.Add(new UserExternalLogin
             {
-                Id = receipt.ExternalLoginId, UserId = applicationUser.Id, User = applicationUser,
-                AuthenticationProviderId = (int)AuthenticationProviderKind.Local, AuthenticationProvider = null!,
-                ProviderKey = applicationUser.Id.ToString("D"), CreatedAt = now.UtcDateTime
+                Id = receipt.ExternalLoginId,
+                UserId = applicationUser.Id,
+                User = applicationUser,
+                AuthenticationProviderId = (int)AuthenticationProviderKind.Local,
+                AuthenticationProvider = null!,
+                ProviderKey = applicationUser.Id.ToString("D"),
+                CreatedAt = now.UtcDateTime
             });
             await Application.SaveChangesAsync(CancellationToken);
             LocalCredentialProvisioningSnapshot pending = (await credentials.ReadProvisioningAsync(receipt.OperationId, CancellationToken))!;

@@ -32,8 +32,10 @@ public sealed class RegistrationOrderServiceTests : IDisposable
             idempotency_Key: Arg.Any<string>(), body: Arg.Any<StartRegistrationOrderRequest>(),
             cancellationToken: Arg.Any<CancellationToken>()).Returns(new HalResourceOfAnonymousRegistrationChallengeDto
             {
-                ProtectedChallenge = Guid.NewGuid().ToString("N"), ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(2),
-                Difficulty = 18, Version = 1
+                ProtectedChallenge = Guid.NewGuid().ToString("N"),
+                ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(2),
+                Difficulty = 18,
+                Version = 1
             });
         var solver = Substitute.For<IAnonymousRegistrationChallengeSolver>();
         solver.SolveAsync(Arg.Any<HalResourceOfAnonymousRegistrationChallengeDto>(), Arg.Any<Action<int>>(), Arg.Any<CancellationToken>())

@@ -426,8 +426,11 @@ public sealed class GuestRegistrationStatusTests
                 status = await CancellationReply.Task;
                 Cancelled = status == 204;
                 if (Cancelled) CancelMethod = null;
-                return new HttpResponseMessage((HttpStatusCode)status) { RequestMessage = request,
-                    Content = new StringContent(status == 204 ? string.Empty : "{}", Encoding.UTF8, "application/problem+json") };
+                return new HttpResponseMessage((HttpStatusCode)status)
+                {
+                    RequestMessage = request,
+                    Content = new StringContent(status == 204 ? string.Empty : "{}", Encoding.UTF8, "application/problem+json")
+                };
             }
             if (path.EndsWith("/status", StringComparison.Ordinal))
             {
@@ -440,27 +443,48 @@ public sealed class GuestRegistrationStatusTests
                 var links = new Dictionary<string, object> { ["self"] = new { href = path, method = "GET" } };
                 if (Calendar) links["calendar"] = new { href = $"https://api.internal/api/event/{eventId}/calendar", method = "GET" };
                 if (CancelMethod is not null) links["cancel-registration"] = new { href = path.Replace("/status", "/cancellation", StringComparison.Ordinal), method = CancelMethod };
-                body = new { eventId, orderId, eventStatusId = 3, registrationOrderStatusId = Cancelled ? 12 : 9,
-                    confirmedAt = "2026-09-01T12:00:00Z", cancelledAt = Cancelled ? "2026-09-08T12:00:00Z" : (string?)null, lastSessionEndUtc = "2026-09-10T18:00:00Z",
-                    statusAccessUntil = "2026-10-10T18:00:00Z", _links = links };
+                body = new
+                {
+                    eventId,
+                    orderId,
+                    eventStatusId = 3,
+                    registrationOrderStatusId = Cancelled ? 12 : 9,
+                    confirmedAt = "2026-09-01T12:00:00Z",
+                    cancelledAt = Cancelled ? "2026-09-08T12:00:00Z" : (string?)null,
+                    lastSessionEndUtc = "2026-09-10T18:00:00Z",
+                    statusAccessUntil = "2026-10-10T18:00:00Z",
+                    _links = links
+                };
             }
             else if (request.Method == HttpMethod.Post && path.EndsWith("/finalize", StringComparison.Ordinal))
             {
                 Confirmed = true;
                 CheckoutAvailable = false;
-                body = new { order = new { id = orderId, eventId, statusCode = "CONFIRMED" },
-                    _links = new Dictionary<string, object> { ["guest-status"] = new { href = path + "/status", method = "GET" } } };
+                body = new
+                {
+                    order = new { id = orderId, eventId, statusCode = "CONFIRMED" },
+                    _links = new Dictionary<string, object> { ["guest-status"] = new { href = path + "/status", method = "GET" } }
+                };
             }
             else
             {
                 GeneralReads++;
                 status = CheckoutAvailable ? 200 : 404;
-                body = new { id = orderId, eventId, statusCode = "READY_FOR_CHECKOUT", lines = Array.Empty<object>(),
-                    _links = new Dictionary<string, object> { ["finalize"] = new { href = path + "/finalize", method = "POST" } } };
+                body = new
+                {
+                    id = orderId,
+                    eventId,
+                    statusCode = "READY_FOR_CHECKOUT",
+                    lines = Array.Empty<object>(),
+                    _links = new Dictionary<string, object> { ["finalize"] = new { href = path + "/finalize", method = "POST" } }
+                };
             }
-            return new HttpResponseMessage((HttpStatusCode)status) { RequestMessage = request,
+            return new HttpResponseMessage((HttpStatusCode)status)
+            {
+                RequestMessage = request,
                 Content = new StringContent(status == 200 ? JsonSerializer.Serialize(body) : "{}", Encoding.UTF8,
-                    status == 200 ? "application/hal+json" : "application/problem+json") };
+                    status == 200 ? "application/hal+json" : "application/problem+json")
+            };
         }
     }
 }

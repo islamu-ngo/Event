@@ -84,13 +84,16 @@ internal sealed class SmtpSettingsDatabase : IAsyncDisposable, ITenantContext
         var databasePath = Path.Combine(Path.GetTempPath(), $"smtp-settings-{Guid.CreateVersion7():N}.db");
         var connection = new SqliteConnection(new SqliteConnectionStringBuilder
         {
-            DataSource = databasePath, Pooling = false
+            DataSource = databasePath,
+            Pooling = false
         }.ToString());
         await connection.OpenAsync();
         var options = new DbContextOptionsBuilder<ExploreDbContext>();
         PrimaryDatabaseProviderComposition.ConfigureApplication(options, new PrimaryDatabaseConnectionOptions
         {
-            Role = PrimaryDatabaseRole.Runtime, Provider = PrimaryDatabaseProvider.Sqlite, Database = databasePath
+            Role = PrimaryDatabaseRole.Runtime,
+            Provider = PrimaryDatabaseProvider.Sqlite,
+            Database = databasePath
         });
         var context = new ExploreDbContext(options.UseSqlite(connection).UseSnakeCaseNamingConvention().Options);
         await context.Database.EnsureCreatedAsync();
@@ -105,15 +108,21 @@ internal sealed class SmtpSettingsDatabase : IAsyncDisposable, ITenantContext
             new SecretValidationStatus { Id = (int)SecretValidationResult.NotValidated, MasterCode = "NotValidated", FullName = "Not validated" },
             new User
             {
-                Id = fixture.ActorId, CreatedAt = DateTime.UtcNow,
+                Id = fixture.ActorId,
+                CreatedAt = DateTime.UtcNow,
                 Pii = new UserPii { Email = $"smtp-actor-{fixture.ActorId:N}@example.test", FirstName = "SMTP", LastName = "Operator" }
             },
             new Tenant
             {
-                Id = fixture.TenantId, FullName = "SMTP test tenant", Slug = "smtp-test",
+                Id = fixture.TenantId,
+                FullName = "SMTP test tenant",
+                Slug = "smtp-test",
                 TenantStatus = new TenantStatus
                 {
-                    Id = (int)TenantStatusEnum.Active, MasterCode = "Active", FullName = "Active", IsActiveState = true
+                    Id = (int)TenantStatusEnum.Active,
+                    MasterCode = "Active",
+                    FullName = "Active",
+                    IsActiveState = true
                 },
                 CreatedAt = DateTime.UtcNow
             });
@@ -145,8 +154,11 @@ internal sealed class SmtpSettingsDatabase : IAsyncDisposable, ITenantContext
         else
             await _systemSettings.UpsertAsync(new SystemSetting
             {
-                Id = Guid.CreateVersion7(), SettingKey = key, Value = SettingValueSerializer.Serialize(value),
-                ValueType = SettingValueType.String, CreatedAt = DateTime.UtcNow
+                Id = Guid.CreateVersion7(),
+                SettingKey = key,
+                Value = SettingValueSerializer.Serialize(value),
+                ValueType = SettingValueType.String,
+                CreatedAt = DateTime.UtcNow
             });
         Settings.InvalidateCache(SettingScope.Instance);
     }

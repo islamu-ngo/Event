@@ -32,9 +32,12 @@ internal static class LocationUnicodeWriteAtomicityTests
         Tenant tenant = await context.Tenants.SingleAsync(row => row.Id == tenantId);
         context.Set<TenantSetting>().Add(new TenantSetting
         {
-            Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = tenant,
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            Tenant = tenant,
             SettingKey = GovernanceSettingKeys.AddressGovernance.CreationMode,
-            Value = "\"OpenWithModeration\"", CreatedAt = DateTime.UnixEpoch
+            Value = "\"OpenWithModeration\"",
+            CreatedAt = DateTime.UnixEpoch
         });
         await context.SaveChangesAsync();
         var mutationLock = new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context));
@@ -65,8 +68,12 @@ internal static class LocationUnicodeWriteAtomicityTests
         {
             var location = new Location
             {
-                Id = Guid.CreateVersion7(), TenantId = tenantId, FullName = "Original venue",
-                Country = "BE", City = "Brussels", ConcurrencyStamp = Guid.CreateVersion7()
+                Id = Guid.CreateVersion7(),
+                TenantId = tenantId,
+                FullName = "Original venue",
+                Country = "BE",
+                City = "Brussels",
+                ConcurrencyStamp = Guid.CreateVersion7()
             };
             location.SetManualAddress("Original café address", "1000");
             context.Locations.Add(location);
@@ -82,12 +89,20 @@ internal static class LocationUnicodeWriteAtomicityTests
             {
                 token = (await protector.ProtectAsync(new ProtectedAddressSelection
                 {
-                    DisplayName = "Changed provider name", Address = "Invalid\0provider address", Postcode = "2000",
-                    City = "Paris", Country = "FR", Latitude = 48.8, Longitude = 2.3,
-                    Attribution = "Synthetic provider", Provenance = new ProtectedAddressProvenance { Provider = "Photon" }
+                    DisplayName = "Changed provider name",
+                    Address = "Invalid\0provider address",
+                    Postcode = "2000",
+                    City = "Paris",
+                    Country = "FR",
+                    Latitude = 48.8,
+                    Longitude = 2.3,
+                    Attribution = "Synthetic provider",
+                    Provenance = new ProtectedAddressProvenance { Provider = "Photon" }
                 }, new AddressSelectionContext
                 {
-                    TenantId = tenantId, ActorId = actorId, Purpose = AddressSelectionPurpose.UpdateLocation,
+                    TenantId = tenantId,
+                    ActorId = actorId,
+                    Purpose = AddressSelectionPurpose.UpdateLocation,
                     Target = new AddressSelectionTarget { LocationId = location.Id, ExpectedConcurrencyStamp = location.ConcurrencyStamp },
                     ConfigurationFingerprint = protector.ConfigurationFingerprint
                 }, CancellationToken.None)).Value;
@@ -106,7 +121,9 @@ internal static class LocationUnicodeWriteAtomicityTests
 
             var response = await handler.Handle(new UpdateLocationCommand
             {
-                LocationId = location.Id, ExpectedConcurrencyStamp = location.ConcurrencyStamp, UpdateLocationDto = patch
+                LocationId = location.Id,
+                ExpectedConcurrencyStamp = location.ConcurrencyStamp,
+                UpdateLocationDto = patch
             }, CancellationToken.None);
 
             await Assert.That(response.IsSuccess).IsFalse();

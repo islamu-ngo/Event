@@ -83,7 +83,9 @@ public class SetupTests : IDisposable
     {
         _instanceOnboardingService.GetStatusAsync().Returns(new InstanceOnboardingStatusDto
         {
-            IsCompleted = false, Provider = "Local", IsAuthenticated = false
+            IsCompleted = false,
+            Provider = "Local",
+            IsAuthenticated = false
         });
         _instanceOnboardingService.ValidateSecretAsync(Arg.Any<string>()).Returns(new SetupSecretValidationResultDto { Valid = true });
         SetupBffJsModule();

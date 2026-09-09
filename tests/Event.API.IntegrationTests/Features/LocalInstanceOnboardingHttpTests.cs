@@ -195,7 +195,7 @@ public sealed class LocalInstanceOnboardingHttpTests
         }
         await using var restarted = factory.WithWebHostBuilder(_ => { });
         using HttpClient browser = restarted.CreateClient(new WebApplicationFactoryClientOptions
-            { AllowAutoRedirect = false, BaseAddress = new Uri("https://localhost") });
+        { AllowAutoRedirect = false, BaseAddress = new Uri("https://localhost") });
         using JsonDocument anonymous = await StatusAsync(browser);
         await Assert.That(anonymous.RootElement.TryGetProperty("pendingOperationId", out _)).IsFalse();
         browser.DefaultRequestHeaders.Add("X-Setup-Secret", factory.SetupSecret);
@@ -249,8 +249,11 @@ public sealed class LocalInstanceOnboardingHttpTests
         using HttpClient client = CreateClient(factory);
         client.DefaultRequestHeaders.Add("X-Setup-Secret", factory.SetupSecret);
         var valid = Request();
-        var request = valid with { Email = $"private-{Guid.CreateVersion7():N}@example.test",
-            Settings = valid.Settings with { DirectoryOperatorIdentity = null } };
+        var request = valid with
+        {
+            Email = $"private-{Guid.CreateVersion7():N}@example.test",
+            Settings = valid.Settings with { DirectoryOperatorIdentity = null }
+        };
         using HttpResponseMessage response = await client.PostAsJsonAsync(CompletePath, request, CancellationToken);
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
         string body = await response.Content.ReadAsStringAsync(CancellationToken);
@@ -263,15 +266,21 @@ public sealed class LocalInstanceOnboardingHttpTests
 
     private static CompleteLocalInstanceOnboardingRequestDto Request() => new()
     {
-        OperationId = Guid.CreateVersion7(), Username = $"operator-{Guid.CreateVersion7():N}", TemporaryPassword = NewPassword(),
+        OperationId = Guid.CreateVersion7(),
+        Username = $"operator-{Guid.CreateVersion7():N}",
+        TemporaryPassword = NewPassword(),
         Settings = new CompleteInstanceOnboardingRequest
         {
             SiteProfile = new SelfHostOnboardingProfileDto { SiteName = "Native Local Instance" },
             DirectoryOperatorIdentity = new TenantDirectoryOperatorIdentityInputDto
             {
-                PublicName = "Directory Operator", LegalName = "Directory Operator", OperatorKindCode = "registered_organization",
-                JurisdictionCountryCode = "BE", PublicContactEmail = "operator@example.test",
-                LegalNoticeUrl = "https://example.test/legal", PrivacyUrl = "https://example.test/privacy"
+                PublicName = "Directory Operator",
+                LegalName = "Directory Operator",
+                OperatorKindCode = "registered_organization",
+                JurisdictionCountryCode = "BE",
+                PublicContactEmail = "operator@example.test",
+                LegalNoticeUrl = "https://example.test/legal",
+                PrivacyUrl = "https://example.test/privacy"
             }
         }
     };

@@ -40,15 +40,15 @@ public static class EmailDeliverySettingsWriteResultExtensions
 
     public static BaseCommandResponse<Guid> ToCommandResponse(
         this EmailDeliverySettingsWriteResult result, Guid scopeId, string successMessage) => result.Status switch
-    {
-        EmailDeliverySettingsWriteStatus.Applied or EmailDeliverySettingsWriteStatus.NoChange =>
-            BaseCommandResponse.Success(scopeId, successMessage),
-        EmailDeliverySettingsWriteStatus.ConfirmationConflict =>
-            BaseCommandResponse.Conflict(scopeId, result.Status.FailureMessage()),
-        EmailDeliverySettingsWriteStatus.NotFound =>
-            BaseCommandResponse.NotFound<Guid>(result.Status.FailureMessage()),
-        _ => BaseCommandResponse.Validation<Guid>([result.Status.FailureMessage()])
-    };
+        {
+            EmailDeliverySettingsWriteStatus.Applied or EmailDeliverySettingsWriteStatus.NoChange =>
+                BaseCommandResponse.Success(scopeId, successMessage),
+            EmailDeliverySettingsWriteStatus.ConfirmationConflict =>
+                BaseCommandResponse.Conflict(scopeId, result.Status.FailureMessage()),
+            EmailDeliverySettingsWriteStatus.NotFound =>
+                BaseCommandResponse.NotFound<Guid>(result.Status.FailureMessage()),
+            _ => BaseCommandResponse.Validation<Guid>([result.Status.FailureMessage()])
+        };
 
     public static ImmutableArray<SettingChangedNotification> ToNotifications(
         this EmailDeliverySettingsWriteResult result, Guid? actorUserId)

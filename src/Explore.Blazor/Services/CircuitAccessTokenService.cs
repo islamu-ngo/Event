@@ -315,10 +315,16 @@ public class CircuitAccessTokenService : ICircuitAccessTokenService
             _localToken = null;
             _userId = null;
             _sessionId = null;
-            if (originalSubject is { Purpose: EventBffOpaqueIdentityPurpose.CircuitSubject,
-                    Source: EventBffOpaqueIdentitySource.ProviderSubject } subject
-                && originalSession is { Purpose: EventBffOpaqueIdentityPurpose.SessionId,
-                    Source: EventBffOpaqueIdentitySource.SessionId } session
+            if (originalSubject is
+                {
+                    Purpose: EventBffOpaqueIdentityPurpose.CircuitSubject,
+                    Source: EventBffOpaqueIdentitySource.ProviderSubject
+                } subject
+                && originalSession is
+                {
+                    Purpose: EventBffOpaqueIdentityPurpose.SessionId,
+                    Source: EventBffOpaqueIdentitySource.SessionId
+                } session
                 && string.Equals(subject.AuthenticationScheme, session.AuthenticationScheme, StringComparison.Ordinal)
                 && !string.IsNullOrWhiteSpace(subject.AuthenticationScheme)
                 && !string.IsNullOrWhiteSpace(subject.Value)

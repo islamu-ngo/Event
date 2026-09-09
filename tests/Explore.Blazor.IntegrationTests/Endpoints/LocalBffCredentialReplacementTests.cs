@@ -389,7 +389,8 @@ public sealed class LocalBffCredentialReplacementTests
             if (defect != RevokedCookieAuthority.MissingToken)
                 tokens.Add(new AuthenticationToken
                 {
-                    Name = "access_token", Value = defect == RevokedCookieAuthority.OtherUserToken
+                    Name = "access_token",
+                    Value = defect == RevokedCookieAuthority.OtherUserToken
                         ? fixture.Transport.OtherUserAccessToken : fixture.Transport.SameUserExternalAccessToken
                 });
             ticket.Properties.StoreTokens(tokens);
@@ -784,9 +785,11 @@ public sealed class LocalBffCredentialReplacementTests
         }
 
         internal HttpClient CreateClient() => _factory.CreateClient(new WebApplicationFactoryClientOptions
-            {
-                BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false, HandleCookies = true
-            });
+        {
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false,
+            HandleCookies = true
+        });
 
         internal AuthenticationTicket ReadCookieTicket(HttpResponseMessage response)
         {
@@ -871,8 +874,10 @@ public sealed class LocalBffCredentialReplacementTests
             {
                 Content = JsonContent.Create(new
                 {
-                    identifier = $"browser-{Guid.CreateVersion7():N}", password = NewPassword(),
-                    isPersistent = true, returnUrl = "https://untrusted.example.test/redirect"
+                    identifier = $"browser-{Guid.CreateVersion7():N}",
+                    password = NewPassword(),
+                    isPersistent = true,
+                    returnUrl = "https://untrusted.example.test/redirect"
                 })
             };
             request.Headers.Add("X-CSRF-TOKEN", csrf);
@@ -1144,8 +1149,12 @@ public sealed class LocalBffCredentialReplacementTests
                 };
                 var payload = new
                 {
-                    id = userId, email = OmitEmail ? null : $"session-{_userId:N}@example.test", firstName = "Local", lastName = "Browser",
-                    emailVerified = true, _links = new { self = new { href = "/api/user" } }
+                    id = userId,
+                    email = OmitEmail ? null : $"session-{_userId:N}@example.test",
+                    firstName = "Local",
+                    lastName = "Browser",
+                    emailVerified = true,
+                    _links = new { self = new { href = "/api/user" } }
                 };
                 if (CurrentUserResponseDisposed is { } disposed)
                     return new HttpResponseMessage(HttpStatusCode.OK)
@@ -1163,9 +1172,15 @@ public sealed class LocalBffCredentialReplacementTests
                 if (OrdinaryLogin)
                     return Json(new
                     {
-                        success = true, userId = _userId, email = OmitEmail ? null : $"session-{_userId:N}@example.test",
-                        firstName = "Local", lastName = "Browser", emailVerified = true, roles = Array.Empty<string>(),
-                        token = LoginAccessToken ?? AccessToken, expiresAt = DateTimeOffset.UtcNow.AddMinutes(30)
+                        success = true,
+                        userId = _userId,
+                        email = OmitEmail ? null : $"session-{_userId:N}@example.test",
+                        firstName = "Local",
+                        lastName = "Browser",
+                        emailVerified = true,
+                        roles = Array.Empty<string>(),
+                        token = LoginAccessToken ?? AccessToken,
+                        expiresAt = DateTimeOffset.UtcNow.AddMinutes(30)
                     });
                 DateTimeOffset expiry = Malformed switch
                 {
@@ -1179,7 +1194,8 @@ public sealed class LocalBffCredentialReplacementTests
                     failureCode = Malformed == MalformedChallenge.FailureCode ? "invalid_credentials" : string.Empty,
                     token = Malformed == MalformedChallenge.OrdinaryToken ? AccessToken : null,
                     email = Malformed == MalformedChallenge.Profile ? $"profile-{_userId:N}@example.test" : null,
-                    roles = Malformed == MalformedChallenge.Roles ? new[] { "Admin" } : Array.Empty<string>(), emailVerified = false,
+                    roles = Malformed == MalformedChallenge.Roles ? new[] { "Admin" } : Array.Empty<string>(),
+                    emailVerified = false,
                     replacementChallenge = new { token = Malformed == MalformedChallenge.MissingToken ? null : Challenge, expiresAt = expiry }
                 });
             }
@@ -1230,8 +1246,14 @@ public sealed class LocalBffCredentialReplacementTests
                 };
             }
             if (path.EndsWith("/admin-authority", StringComparison.OrdinalIgnoreCase))
-                return Json(new { isInstanceAdmin = InstanceAdmin, hasAnyAuthority = InstanceAdmin,
-                    tenantAdminIds = Array.Empty<Guid>(), organizationAdminIds = Array.Empty<Guid>(), groupAdminIds = Array.Empty<Guid>() });
+                return Json(new
+                {
+                    isInstanceAdmin = InstanceAdmin,
+                    hasAnyAuthority = InstanceAdmin,
+                    tenantAdminIds = Array.Empty<Guid>(),
+                    organizationAdminIds = Array.Empty<Guid>(),
+                    groupAdminIds = Array.Empty<Guid>()
+                });
             if (path.EndsWith("/sync", StringComparison.OrdinalIgnoreCase))
                 return Json(new { isSuccess = true, id = _userId });
             return Json(new { primaryProviderId = 4, atprotoLoginEnabled = false });

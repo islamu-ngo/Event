@@ -43,8 +43,12 @@ public sealed class EmailDeliveryGenericSettingGuardTests
             Guid tenantId = Guid.CreateVersion7();
             context.Tenants.Add(new Tenant
             {
-                Id = tenantId, FullName = "SMTP guard tenant", Slug = $"smtp-guard-{tenantId:N}",
-                TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!, CreatedAt = DateTime.UtcNow
+                Id = tenantId,
+                FullName = "SMTP guard tenant",
+                Slug = $"smtp-guard-{tenantId:N}",
+                TenantStatusId = (int)TenantStatusEnum.Active,
+                TenantStatus = null!,
+                CreatedAt = DateTime.UtcNow
             });
             await context.SaveChangesAsync();
             var unitOfWork = new EfCoreUnitOfWork(context);
@@ -68,8 +72,12 @@ public sealed class EmailDeliveryGenericSettingGuardTests
                 {
                     var system = new SystemSetting
                     {
-                        Id = Guid.CreateVersion7(), SettingKey = GovernanceSettingKeys.Email.DeliveryEnabled,
-                        Value = "false", ValueType = SettingValueType.Boolean, IsLocked = true, CreatedAt = DateTime.UtcNow
+                        Id = Guid.CreateVersion7(),
+                        SettingKey = GovernanceSettingKeys.Email.DeliveryEnabled,
+                        Value = "false",
+                        ValueType = SettingValueType.Boolean,
+                        IsLocked = true,
+                        CreatedAt = DateTime.UtcNow
                     };
                     try
                     {
@@ -135,7 +143,10 @@ public sealed class EmailDeliveryGenericSettingGuardTests
                 await new SystemSettingRepository(context, new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)))
                     .UpsertAsync(new SystemSetting
                     {
-                        Id = Guid.CreateVersion7(), SettingKey = key, Value = "false", ValueType = SettingValueType.Boolean,
+                        Id = Guid.CreateVersion7(),
+                        SettingKey = key,
+                        Value = "false",
+                        ValueType = SettingValueType.Boolean,
                         CreatedAt = DateTime.UtcNow
                     });
             }

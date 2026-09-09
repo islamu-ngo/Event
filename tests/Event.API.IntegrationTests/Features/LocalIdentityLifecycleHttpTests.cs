@@ -36,7 +36,8 @@ public sealed class LocalIdentityLifecycleHttpTests
         await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
         using HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false
         });
         await using ExploreDbContext before = factory.CreateDatabase();
         int users = await before.Users.CountAsync(CancellationToken);
@@ -250,15 +251,19 @@ public sealed class LocalIdentityLifecycleHttpTests
         {
             var external = new User
             {
-                Id = Guid.CreateVersion7(), Pii = new UserPii { Email = externalEmail, FirstName = "External", LastName = "Only" },
+                Id = Guid.CreateVersion7(),
+                Pii = new UserPii { Email = externalEmail, FirstName = "External", LastName = "Only" },
                 EmailVerified = true
             };
             seed.Users.Add(external);
             seed.UserExternalLogins.Add(new UserExternalLogin
             {
-                Id = Guid.CreateVersion7(), UserId = external.Id, User = external,
+                Id = Guid.CreateVersion7(),
+                UserId = external.Id,
+                User = external,
                 AuthenticationProviderId = (int)AuthenticationProviderKind.Google,
-                AuthenticationProvider = null!, ProviderKey = $"https://external.test|{Guid.CreateVersion7():D}"
+                AuthenticationProvider = null!,
+                ProviderKey = $"https://external.test|{Guid.CreateVersion7():D}"
             });
             await seed.SaveChangesAsync(CancellationToken);
         }
@@ -281,7 +286,8 @@ public sealed class LocalIdentityLifecycleHttpTests
         await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync(emailEnabled: false);
         var body = new LocalPasswordChangeRequestDto
         {
-            CurrentPassword = fixture.Login.Password, NewPassword = LocalIdentityLifecycleHttpFixture.NewPassword()
+            CurrentPassword = fixture.Login.Password,
+            NewPassword = LocalIdentityLifecycleHttpFixture.NewPassword()
         };
         using (HttpResponseMessage anonymous = await fixture.Client.PostAsJsonAsync(PasswordPath, body, CancellationToken))
             await Assert.That(anonymous.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
@@ -387,16 +393,25 @@ public sealed class LocalIdentityLifecycleHttpTests
 
     private static LocalEmailConfirmationRequestDto EmailBody(LocalIdentityLifecycleTransport handoff) => new()
     {
-        OperationId = handoff.Operation.OperationId, LocalSubjectId = handoff.Operation.LocalSubjectId,
-        PersonalActorId = handoff.Operation.PersonalActorId, ExternalLoginId = handoff.Operation.ExternalLoginId,
-        Purpose = handoff.Operation.Purpose, Generation = handoff.Operation.Generation, Token = handoff.Token
+        OperationId = handoff.Operation.OperationId,
+        LocalSubjectId = handoff.Operation.LocalSubjectId,
+        PersonalActorId = handoff.Operation.PersonalActorId,
+        ExternalLoginId = handoff.Operation.ExternalLoginId,
+        Purpose = handoff.Operation.Purpose,
+        Generation = handoff.Operation.Generation,
+        Token = handoff.Token
     };
 
     private static LocalPasswordRecoveryCompletionRequestDto RecoveryBody(LocalIdentityLifecycleTransport handoff, string password) => new()
     {
-        OperationId = handoff.Operation.OperationId, LocalSubjectId = handoff.Operation.LocalSubjectId,
-        PersonalActorId = handoff.Operation.PersonalActorId, ExternalLoginId = handoff.Operation.ExternalLoginId,
-        Purpose = handoff.Operation.Purpose, Generation = handoff.Operation.Generation, Token = handoff.Token, NewPassword = password
+        OperationId = handoff.Operation.OperationId,
+        LocalSubjectId = handoff.Operation.LocalSubjectId,
+        PersonalActorId = handoff.Operation.PersonalActorId,
+        ExternalLoginId = handoff.Operation.ExternalLoginId,
+        Purpose = handoff.Operation.Purpose,
+        Generation = handoff.Operation.Generation,
+        Token = handoff.Token,
+        NewPassword = password
     };
 
     private static async Task AssertPrivateEmptyAsync(HttpResponseMessage response, HttpStatusCode expected)

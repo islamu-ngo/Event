@@ -71,14 +71,23 @@ public sealed class LocalIdentityLifecycleHttpTests
         var operation = Guid.CreateVersion7();
         object body = purpose == 3 ? new LocalPasswordRecoveryCompletionRequestDto
         {
-            OperationId = operation, LocalSubjectId = Guid.CreateVersion7(), PersonalActorId = Guid.CreateVersion7(),
-            ExternalLoginId = Guid.CreateVersion7(), Generation = Guid.CreateVersion7(),
-            Purpose = purpose, Token = token, NewPassword = password
+            OperationId = operation,
+            LocalSubjectId = Guid.CreateVersion7(),
+            PersonalActorId = Guid.CreateVersion7(),
+            ExternalLoginId = Guid.CreateVersion7(),
+            Generation = Guid.CreateVersion7(),
+            Purpose = purpose,
+            Token = token,
+            NewPassword = password
         } : new LocalEmailConfirmationRequestDto
         {
-            OperationId = operation, LocalSubjectId = Guid.CreateVersion7(), PersonalActorId = Guid.CreateVersion7(),
-            ExternalLoginId = Guid.CreateVersion7(), Generation = Guid.CreateVersion7(),
-            Purpose = purpose, Token = token
+            OperationId = operation,
+            LocalSubjectId = Guid.CreateVersion7(),
+            PersonalActorId = Guid.CreateVersion7(),
+            ExternalLoginId = Guid.CreateVersion7(),
+            Generation = Guid.CreateVersion7(),
+            Purpose = purpose,
+            Token = token
         };
         using var request = await fixture.RequestAsync(suffix, body);
         using var response = await fixture.Client.SendAsync(request, Cancellation);
@@ -250,8 +259,14 @@ public sealed class LocalIdentityLifecycleHttpTests
             string path = request.RequestUri!.AbsolutePath;
             if (path.Equals("/api/auth/local/login", StringComparison.OrdinalIgnoreCase)) return Json(new
             {
-                success = true, userId = _user, firstName = "Local", lastName = "Browser", emailVerified = false,
-                roles = Array.Empty<string>(), token = AccessToken, expiresAt = DateTimeOffset.UtcNow.AddMinutes(30)
+                success = true,
+                userId = _user,
+                firstName = "Local",
+                lastName = "Browser",
+                emailVerified = false,
+                roles = Array.Empty<string>(),
+                token = AccessToken,
+                expiresAt = DateTimeOffset.UtcNow.AddMinutes(30)
             });
             if (path.Equals("/api/User", StringComparison.OrdinalIgnoreCase)) return Json(new { id = _user, firstName = "Local", lastName = "Browser" });
             if (path.StartsWith("/api/auth/local/", StringComparison.OrdinalIgnoreCase))

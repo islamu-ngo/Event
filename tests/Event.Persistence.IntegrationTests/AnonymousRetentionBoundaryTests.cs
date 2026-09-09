@@ -120,10 +120,21 @@ public sealed class AnonymousRetentionBoundaryTests
         await using var fixture = await WriterFixture.CreateAsync();
         if (days is not null)
         {
-            fixture.Context.SystemSettings.Add(new SystemSetting { Id = Guid.CreateVersion7(),
-                SettingKey = GovernanceSettingKeys.AnonymousRegistration.RetentionDays, Value = "\"2\"", IsLocked = locked });
-            fixture.Context.TenantSettingOverrides.Add(new TenantSetting { Id = Guid.CreateVersion7(), TenantId = fixture.TenantId,
-                Tenant = null!, SettingKey = GovernanceSettingKeys.AnonymousRegistration.RetentionDays, Value = JsonSerializer.Serialize(days) });
+            fixture.Context.SystemSettings.Add(new SystemSetting
+            {
+                Id = Guid.CreateVersion7(),
+                SettingKey = GovernanceSettingKeys.AnonymousRegistration.RetentionDays,
+                Value = "\"2\"",
+                IsLocked = locked
+            });
+            fixture.Context.TenantSettingOverrides.Add(new TenantSetting
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = fixture.TenantId,
+                Tenant = null!,
+                SettingKey = GovernanceSettingKeys.AnonymousRegistration.RetentionDays,
+                Value = JsonSerializer.Serialize(days)
+            });
             await fixture.Context.SaveChangesAsync();
         }
         var target = await fixture.Inner.SeedEventAsync(published: true);
@@ -244,12 +255,21 @@ public sealed class AnonymousRetentionBoundaryTests
         {
             var target = new Explore.Domain.Event(EventStatusEnum.Published)
             {
-                Id = Guid.CreateVersion7(), Title = "Retention event", TenantId = TenantId, Tenant = null!,
-                ActorId = ActorId, Actor = null!, OrganizerActorId = ActorId,
+                Id = Guid.CreateVersion7(),
+                Title = "Retention event",
+                TenantId = TenantId,
+                Tenant = null!,
+                ActorId = ActorId,
+                Actor = null!,
+                OrganizerActorId = ActorId,
                 EventProvenanceTypeId = (int)EventProvenanceTypeEnum.OrganizerCreated,
-                VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!,
-                EventFormatId = (int)EventFormatEnum.Local, EventFormat = null!, EventStatus = null!,
-                SessionCount = 1, FirstSessionStartUtc = new DateTimeOffset(2027, 1, 1, 12, 0, 0, TimeSpan.Zero),
+                VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+                VisibilityType = null!,
+                EventFormatId = (int)EventFormatEnum.Local,
+                EventFormat = null!,
+                EventStatus = null!,
+                SessionCount = 1,
+                FirstSessionStartUtc = new DateTimeOffset(2027, 1, 1, 12, 0, 0, TimeSpan.Zero),
                 LastSessionEndUtc = new DateTimeOffset(2027, 1, 1, 14, 0, 0, TimeSpan.Zero)
             };
             target.ParticipationConfiguration = EventParticipationConfiguration.Create(target.Id, TenantId,

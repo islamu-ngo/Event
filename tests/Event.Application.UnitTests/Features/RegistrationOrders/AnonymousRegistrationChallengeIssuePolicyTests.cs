@@ -67,9 +67,15 @@ public sealed class AnonymousRegistrationChallengeIssuePolicyTests
     {
         var target = new Explore.Domain.Event(status)
         {
-            Id = Guid.CreateVersion7(), TenantId = Guid.CreateVersion7(), Tenant = null!, Title = "Public event",
-            Actor = null!, EventFormat = null!, EventStatus = null!,
-            VisibilityTypeId = (int)VisibilityTypeEnum.Public, VisibilityType = null!
+            Id = Guid.CreateVersion7(),
+            TenantId = Guid.CreateVersion7(),
+            Tenant = null!,
+            Title = "Public event",
+            Actor = null!,
+            EventFormat = null!,
+            EventStatus = null!,
+            VisibilityTypeId = (int)VisibilityTypeEnum.Public,
+            VisibilityType = null!
         };
         target.ParticipationConfiguration = EventParticipationConfiguration.Create(target.Id, target.TenantId,
             (int)ParticipationHandlingModeEnum.PlatformManaged, (int)AdvanceRegistrationObligationEnum.Required,

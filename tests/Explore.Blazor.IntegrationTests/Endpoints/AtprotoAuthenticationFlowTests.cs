@@ -169,7 +169,9 @@ public sealed class AtprotoAuthenticationFlowTests
 
     private static HttpClient CreateClient(WebApplicationFactory<Program> factory) => factory.CreateClient(new()
     {
-        AllowAutoRedirect = false, BaseAddress = new(CanonicalOrigin), HandleCookies = true
+        AllowAutoRedirect = false,
+        BaseAddress = new(CanonicalOrigin),
+        HandleCookies = true
     });
 
     private static async Task<EndpointResponse> ChallengeWithAntiforgeryAsync(WebApplicationFactory<Program> factory, string payload)
@@ -218,10 +220,13 @@ public sealed class AtprotoAuthenticationFlowTests
         using var signing = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         var key = signing.ExportParameters(true);
         string Encode(byte[] value) => Convert.ToBase64String(value).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-        return JsonSerializer.Serialize(new { keys = new[] { new
+        return JsonSerializer.Serialize(new
+        {
+            keys = new[] { new
         {
             kty = "EC", crv = "P-256", x = Encode(key.Q.X!), y = Encode(key.Q.Y!), d = Encode(key.D!), kid = "oauth-active", use = "sig", alg = "ES256", status = "active"
-        } } });
+        } }
+        });
     }
 
     private sealed class RejectedDiscoveryTransport : IAtprotoOAuthTransportFactory, IDnsResolver

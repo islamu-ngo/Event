@@ -306,7 +306,7 @@ public class UpdateSettingBatchCommandHandler
                 {
                     Success = false,
                     Results = validationResults.Select(entry => new SettingUpdateResultDto
-                        { Key = entry.Key, Applied = false, SkipReason = entry.SkipReason ?? visitorResult.FailureCode }).ToList(),
+                    { Key = entry.Key, Applied = false, SkipReason = entry.SkipReason ?? visitorResult.FailureCode }).ToList(),
                     Message = visitorResult.FailureCode
                 };
             appliedVisitorKeys.UnionWith(visitorEntries.Select(entry => entry.Key));
@@ -333,7 +333,7 @@ public class UpdateSettingBatchCommandHandler
                     {
                         Success = false,
                         Results = validationResults.Select(entry => new SettingUpdateResultDto
-                            { Key = entry.Key, Applied = false, SkipReason = entry.SkipReason ?? message }).ToList(),
+                        { Key = entry.Key, Applied = false, SkipReason = entry.SkipReason ?? message }).ToList(),
                         Message = message
                     };
                 for (int index = 0; index < validationResults.Count; index++)

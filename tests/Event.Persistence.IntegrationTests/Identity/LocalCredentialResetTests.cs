@@ -574,7 +574,9 @@ public sealed class LocalCredentialResetTests
                 foreach (Guid userId in new[] { CreatorId, ResetActorId })
                     application.Users.Add(new User
                     {
-                        Id = userId, EmailVerified = true, CreatedAt = Clock.GetUtcNow().UtcDateTime,
+                        Id = userId,
+                        EmailVerified = true,
+                        CreatedAt = Clock.GetUtcNow().UtcDateTime,
                         Pii = new UserPii { Email = $"operator-{userId:N}@example.test", FirstName = "Instance", LastName = "Operator" }
                     });
                 await application.SaveChangesAsync(CancellationToken);
@@ -594,19 +596,30 @@ public sealed class LocalCredentialResetTests
                 var application = bind.ServiceProvider.GetRequiredService<ExploreDbContext>();
                 var user = new User
                 {
-                    Id = OriginalReceipt.LocalSubjectId, EmailVerified = true, CreatedAt = Clock.GetUtcNow().UtcDateTime,
+                    Id = OriginalReceipt.LocalSubjectId,
+                    EmailVerified = true,
+                    CreatedAt = Clock.GetUtcNow().UtcDateTime,
                     Pii = new UserPii { Email = email, FirstName = "Credential", LastName = "Owner" }
                 };
                 application.Actors.Add(new Actor
                 {
-                    Id = OriginalReceipt.PersonalActorId, UserId = user.Id, User = user, ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-                    Pii = new ActorPii { DisplayName = "Credential Owner" }, CreatedAt = Clock.GetUtcNow().UtcDateTime
+                    Id = OriginalReceipt.PersonalActorId,
+                    UserId = user.Id,
+                    User = user,
+                    ActorTypeId = (int)ActorTypeEnum.User,
+                    ActorType = null!,
+                    Pii = new ActorPii { DisplayName = "Credential Owner" },
+                    CreatedAt = Clock.GetUtcNow().UtcDateTime
                 });
                 application.UserExternalLogins.Add(new UserExternalLogin
                 {
-                    Id = OriginalReceipt.ExternalLoginId, UserId = user.Id, User = user,
-                    AuthenticationProviderId = (int)AuthenticationProviderKind.Local, AuthenticationProvider = null!,
-                    ProviderKey = user.Id.ToString("D"), CreatedAt = Clock.GetUtcNow().UtcDateTime
+                    Id = OriginalReceipt.ExternalLoginId,
+                    UserId = user.Id,
+                    User = user,
+                    AuthenticationProviderId = (int)AuthenticationProviderKind.Local,
+                    AuthenticationProvider = null!,
+                    ProviderKey = user.Id.ToString("D"),
+                    CreatedAt = Clock.GetUtcNow().UtcDateTime
                 });
                 await application.SaveChangesAsync(CancellationToken);
             }

@@ -246,63 +246,104 @@ public sealed class EmailDeliveryInvitationAuthorityTests
         DateTime now = DateTime.UtcNow;
         var tenant = new Tenant
         {
-            Id = Guid.CreateVersion7(), FullName = "Invitation authority tenant",
+            Id = Guid.CreateVersion7(),
+            FullName = "Invitation authority tenant",
             Slug = $"invitation-{Guid.CreateVersion7():N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!
         };
         var recipient = new User
         {
-            Id = Guid.CreateVersion7(), EmailVerified = true, CreatedAt = now,
+            Id = Guid.CreateVersion7(),
+            EmailVerified = true,
+            CreatedAt = now,
             Pii = new UserPii { Email = $"recipient-{Guid.CreateVersion7():N}@example.test", FirstName = "Invited", LastName = "Admin" }
         };
         var recipientMembership = new TenantUser
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant.Id, Tenant = tenant,
-            UserId = recipient.Id, User = recipient, StatusId = (int)TenantUserStatusEnum.Active,
-            JoinedAt = now, CreatedAt = now
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            UserId = recipient.Id,
+            User = recipient,
+            StatusId = (int)TenantUserStatusEnum.Active,
+            JoinedAt = now,
+            CreatedAt = now
         };
         var intent = new NotificationIntent
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant.Id,
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
             CategoryId = (int)NotificationCategoryEnum.RegistrationLifecycle,
             OwnershipTypeId = (int)NotificationOwnershipTypeEnum.IslamuEvent,
             RecipientKindId = (int)NotificationRecipientKindEnum.User,
             StatusId = (int)NotificationIntentStatusEnum.DispatchQueued,
-            TemplateKey = "tenant.administrator.invitation", DeduplicationKey = $"invitation:{Guid.CreateVersion7():N}",
-            RecipientUserId = recipient.Id, RecipientTenantUser = recipientMembership, CreatedAt = now
+            TemplateKey = "tenant.administrator.invitation",
+            DeduplicationKey = $"invitation:{Guid.CreateVersion7():N}",
+            RecipientUserId = recipient.Id,
+            RecipientTenantUser = recipientMembership,
+            CreatedAt = now
         };
         var operation = new ManagedTenantProvisioningOperation
         {
-            Id = Guid.CreateVersion7(), ManagedInstanceId = Guid.CreateVersion7(),
+            Id = Guid.CreateVersion7(),
+            ManagedInstanceId = Guid.CreateVersion7(),
             ExternalRequestId = $"request-{Guid.CreateVersion7():N}",
             ExternalCustomerReference = $"customer-{Guid.CreateVersion7():N}",
-            RequestHash = new string('a', 64), TenantSlug = "invitation-authority",
-            CurrentOutboxMessageId = Guid.CreateVersion7(), Status = ManagedTenantProvisioningStatus.Succeeded,
-            TenantId = tenant.Id, TenantAdministratorUserId = recipient.Id,
-            CompletedAt = now, CreatedAt = now
+            RequestHash = new string('a', 64),
+            TenantSlug = "invitation-authority",
+            CurrentOutboxMessageId = Guid.CreateVersion7(),
+            Status = ManagedTenantProvisioningStatus.Succeeded,
+            TenantId = tenant.Id,
+            TenantAdministratorUserId = recipient.Id,
+            CompletedAt = now,
+            CreatedAt = now
         };
         Guid leaseToken = Guid.CreateVersion7();
         var outbox = new EmailDispatchOutbox
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant.Id, PublishEventId = Guid.CreateVersion7(),
-            Kind = EmailDispatchKind.TenantAdministratorInvitation, SourceType = "managed_tenant_provisioning",
-            SourceId = operation.Id, ManagedTenantProvisioningOperationId = operation.Id,
-            NotificationIntentId = intent.Id, NotificationIntent = intent,
-            RecipientUserId = recipient.Id, RecipientTenantUser = recipientMembership,
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            PublishEventId = Guid.CreateVersion7(),
+            Kind = EmailDispatchKind.TenantAdministratorInvitation,
+            SourceType = "managed_tenant_provisioning",
+            SourceId = operation.Id,
+            ManagedTenantProvisioningOperationId = operation.Id,
+            NotificationIntentId = intent.Id,
+            NotificationIntent = intent,
+            RecipientUserId = recipient.Id,
+            RecipientTenantUser = recipientMembership,
             RecipientAddressSource = RecipientAddressSource.ManagedTenantAdministratorInvitation,
-            RecipientEmail = invitationDestination, Subject = "Tenant administrator invitation", PlainTextBody = "Invitation ready.",
-            Status = EmailDispatchStatus.Processing, AttemptCount = 0, MaxAttempts = 5,
-            ProcessingStartedAt = now, ProcessingLeaseToken = leaseToken, CreatedAt = now, UpdatedAt = now
+            RecipientEmail = invitationDestination,
+            Subject = "Tenant administrator invitation",
+            PlainTextBody = "Invitation ready.",
+            Status = EmailDispatchStatus.Processing,
+            AttemptCount = 0,
+            MaxAttempts = 5,
+            ProcessingStartedAt = now,
+            ProcessingLeaseToken = leaseToken,
+            CreatedAt = now,
+            UpdatedAt = now
         };
         var delivery = new NotificationDelivery
         {
-            Id = Guid.CreateVersion7(), TenantId = tenant.Id, NotificationIntentId = intent.Id, NotificationIntent = intent,
+            Id = Guid.CreateVersion7(),
+            TenantId = tenant.Id,
+            NotificationIntentId = intent.Id,
+            NotificationIntent = intent,
             ChannelId = (int)NotificationPreferenceChannelEnum.Email,
             DeliveryPolicyId = (int)NotificationDeliveryPolicyEnum.TenantAdministrationRequired,
-            IsRequired = true, PolicyVersion = 1, RecipientAddressSource = RecipientAddressSource.ManagedTenantAdministratorInvitation,
-            DisclosureLevel = "standard", TemplateKey = intent.TemplateKey, TemplateVersion = 1,
-            EmailDispatchOutboxId = outbox.Id, EmailDispatchOutbox = outbox,
-            StatusId = (int)NotificationDeliveryStatusEnum.Queued, QueuedAt = now, CreatedAt = now
+            IsRequired = true,
+            PolicyVersion = 1,
+            RecipientAddressSource = RecipientAddressSource.ManagedTenantAdministratorInvitation,
+            DisclosureLevel = "standard",
+            TemplateKey = intent.TemplateKey,
+            TemplateVersion = 1,
+            EmailDispatchOutboxId = outbox.Id,
+            EmailDispatchOutbox = outbox,
+            StatusId = (int)NotificationDeliveryStatusEnum.Queued,
+            QueuedAt = now,
+            CreatedAt = now
         };
         context.Tenants.Add(tenant);
         context.Users.Add(recipient);
@@ -319,9 +360,11 @@ public sealed class EmailDeliveryInvitationAuthorityTests
             {
                 var otherTenant = new Tenant
                 {
-                    Id = Guid.CreateVersion7(), FullName = "Unrelated invitation tenant",
+                    Id = Guid.CreateVersion7(),
+                    FullName = "Unrelated invitation tenant",
                     Slug = $"other-invitation-{Guid.CreateVersion7():N}",
-                    TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!
+                    TenantStatusId = (int)TenantStatusEnum.Active,
+                    TenantStatus = null!
                 };
                 context.Tenants.Add(otherTenant);
                 tenantId = otherTenant.Id;
@@ -330,15 +373,23 @@ public sealed class EmailDeliveryInvitationAuthorityTests
             {
                 user = new User
                 {
-                    Id = Guid.CreateVersion7(), EmailVerified = true, CreatedAt = now,
+                    Id = Guid.CreateVersion7(),
+                    EmailVerified = true,
+                    CreatedAt = now,
                     Pii = new UserPii { Email = $"other-admin-{Guid.CreateVersion7():N}@example.test", FirstName = "Other", LastName = "Admin" }
                 };
                 context.Users.Add(user);
             }
             membership = new TenantUser
             {
-                Id = Guid.CreateVersion7(), TenantId = tenantId, Tenant = null!, UserId = user.Id, User = user,
-                StatusId = (int)TenantUserStatusEnum.Active, JoinedAt = now, CreatedAt = now
+                Id = Guid.CreateVersion7(),
+                TenantId = tenantId,
+                Tenant = null!,
+                UserId = user.Id,
+                User = user,
+                StatusId = (int)TenantUserStatusEnum.Active,
+                JoinedAt = now,
+                CreatedAt = now
             };
             context.TenantUsers.Add(membership);
         }
@@ -348,10 +399,16 @@ public sealed class EmailDeliveryInvitationAuthorityTests
         {
             grant = new TenantUserRoleGrant
             {
-                Id = Guid.CreateVersion7(), TenantId = membership.TenantId, Tenant = null!,
-                TenantUserId = membership.Id, TenantUser = membership,
+                Id = Guid.CreateVersion7(),
+                TenantId = membership.TenantId,
+                Tenant = null!,
+                TenantUserId = membership.Id,
+                TenantUser = membership,
                 RoleId = (int)(scenario == GrantScenario.Moderator ? RoleEnum.TenantModerator : RoleEnum.TenantAdmin),
-                Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant, GrantedAt = now, CreatedAt = now
+                Role = null!,
+                RoleScopeId = (int)RoleScopeEnum.Tenant,
+                GrantedAt = now,
+                CreatedAt = now
             };
             context.TenantUserRoleGrants.Add(grant);
         }

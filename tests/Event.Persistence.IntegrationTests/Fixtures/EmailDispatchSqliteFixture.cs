@@ -75,7 +75,8 @@ internal static class EmailDispatchSqliteFixture
                 actor = Guid.CreateVersion7();
                 context.Users.Add(new User
                 {
-                    Id = actor, CreatedAt = DateTime.UtcNow,
+                    Id = actor,
+                    CreatedAt = DateTime.UtcNow,
                     Pii = new UserPii { Email = $"email-fixture-actor-{actor:N}@example.test", FirstName = "Email", LastName = "Operator" }
                 });
                 await context.SaveChangesAsync(token);

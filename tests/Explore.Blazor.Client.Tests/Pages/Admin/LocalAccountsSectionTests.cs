@@ -210,7 +210,9 @@ public sealed class LocalAccountsSectionTests
             .Returns(call => "Localized " + (call.ArgAt<string?>(1) ?? call.ArgAt<string>(0)));
         fixture.Transport.Override = (_, _) => Task.FromResult(LocalIdentityUiTransport.Json(new
         {
-            status = 409, title = "Conflict", detail = privateDetail
+            status = 409,
+            title = "Conflict",
+            detail = privateDetail
         }, HttpStatusCode.Conflict));
         var cut = fixture.Render();
         await OpenCreateAsync(cut);

@@ -229,8 +229,12 @@ public sealed class EmailDeliveryDisableImpactTests
         Guid id = Guid.CreateVersion7();
         context.Tenants.Add(new Tenant
         {
-            Id = id, FullName = "Email impact tenant", Slug = $"impact-{id:N}",
-            TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null!, CreatedAt = DateTime.UtcNow
+            Id = id,
+            FullName = "Email impact tenant",
+            Slug = $"impact-{id:N}",
+            TenantStatusId = (int)TenantStatusEnum.Active,
+            TenantStatus = null!,
+            CreatedAt = DateTime.UtcNow
         });
         await context.SaveChangesAsync();
         return id;

@@ -47,12 +47,12 @@ public sealed class RegistrationAnswerAnalyticsRepository(ExploreDbContext dbCon
 
         Guid[] fieldIds = fields.Select(field => field.Id).ToArray();
         var candidates = await (from answer in dbContext.RegistrationAnswers.AsNoTracking()
-            join order in dbContext.RegistrationOrders.AsNoTracking()
-                on new { answer.TenantId, answer.EventId, Id = answer.RegistrationOrderId }
-                equals new { order.TenantId, order.EventId, order.Id }
-            where answer.TenantId == tenantId && fieldIds.Contains(answer.RegistrationFormFieldId) &&
-                answer.SensitiveAnswerValueId == null
-            select new { answer.Id, answer.RegistrationFormFieldId, answer.RetentionUntil, Order = order })
+                                join order in dbContext.RegistrationOrders.AsNoTracking()
+                                    on new { answer.TenantId, answer.EventId, Id = answer.RegistrationOrderId }
+                                    equals new { order.TenantId, order.EventId, order.Id }
+                                where answer.TenantId == tenantId && fieldIds.Contains(answer.RegistrationFormFieldId) &&
+                                    answer.SensitiveAnswerValueId == null
+                                select new { answer.Id, answer.RegistrationFormFieldId, answer.RetentionUntil, Order = order })
             .ToArrayAsync(cancellationToken);
         DateTime utcNow = (timeProvider ?? TimeProvider.System).GetUtcNow().UtcDateTime;
         var eligible = candidates.Where(candidate => AnonymousRegistrationRetentionPolicy.CanDisclose(

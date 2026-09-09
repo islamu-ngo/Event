@@ -91,10 +91,13 @@ internal static class EmailDeliveryPolicyRevisionTracker
 
         var created = new EmailDispatchProcessorState
         {
-            Id = Guid.CreateVersion7(), ProcessorCode = EmailDispatchOutboxRepository.SmtpProcessorCode,
-            DeliveryPolicyRevision = revision, OptionalSuppressedThroughUtc = cutoff,
+            Id = Guid.CreateVersion7(),
+            ProcessorCode = EmailDispatchOutboxRepository.SmtpProcessorCode,
+            DeliveryPolicyRevision = revision,
+            OptionalSuppressedThroughUtc = cutoff,
             OptionalSuppressedThroughRevision = cutoffRevision,
-            UpdatedAt = now, UpdatedBy = actorId
+            UpdatedAt = now,
+            UpdatedBy = actorId
         };
         context.EmailDispatchProcessorStates.Add(created);
         await context.SaveChangesAsync(cancellationToken);
@@ -115,8 +118,10 @@ internal static class EmailDeliveryPolicyRevisionTracker
             var existing = await controls.AsNoTracking()
                 .Select(control => new
                 {
-                    control.TenantId, control.DeliveryPolicyRevision,
-                    control.OptionalSuppressedThroughRevision, control.OptionalSuppressedThroughUtc
+                    control.TenantId,
+                    control.DeliveryPolicyRevision,
+                    control.OptionalSuppressedThroughRevision,
+                    control.OptionalSuppressedThroughUtc
                 })
                 .ToDictionaryAsync(control => control.TenantId, cancellationToken);
             Guid[] firstTouches = tenantIds.Where(tenantId => !baselines.Tenants.ContainsKey(tenantId)).ToArray();
@@ -187,7 +192,8 @@ internal static class EmailDeliveryPolicyRevisionTracker
             var created = tenantIds.Where(tenantId => !existing.ContainsKey(tenantId))
                 .Select(tenantId => new EmailDispatchTenantControl
                 {
-                    Id = Guid.CreateVersion7(), TenantId = tenantId,
+                    Id = Guid.CreateVersion7(),
+                    TenantId = tenantId,
                     DeliveryPolicyRevision = checked(baselines.Tenants[tenantId].Revision + 1),
                     OptionalSuppressedThroughUtc = ResolveCutoff(baselines.Tenants[tenantId], suppressionByTenant[tenantId], now),
                     OptionalSuppressedThroughRevision = suppressionByTenant[tenantId] switch
@@ -196,7 +202,10 @@ internal static class EmailDeliveryPolicyRevisionTracker
                         SuppressionBoundary.CurrentRevision => checked(baselines.Tenants[tenantId].Revision + 1),
                         _ => baselines.Tenants[tenantId].SuppressedThroughRevision
                     },
-                    CreatedAt = now, CreatedBy = actorId, UpdatedAt = now, UpdatedBy = actorId
+                    CreatedAt = now,
+                    CreatedBy = actorId,
+                    UpdatedAt = now,
+                    UpdatedBy = actorId
                 }).ToArray();
             if (created.Length == 0)
                 continue;

@@ -217,7 +217,7 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
         internal GrantWriteFault GrantFault { get; } = new();
         internal Guid ManagedInstanceId { get; } = Guid.CreateVersion7();
         private readonly IOptions<ManagedControlPlaneOptions> _managedOptions = Options.Create(new ManagedControlPlaneOptions
-            { Enabled = true, MaximumTenantCount = 10 });
+        { Enabled = true, MaximumTenantCount = 10 });
 
         internal static async Task<Fixture> CreateAsync(IdentityDatabaseTopology topology)
         {
@@ -233,7 +233,7 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
         internal LocalIdentityCredentialStateStore Store(AsyncServiceScope scope) => new(Identity(scope), Application(scope),
             scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), TimeProvider.System);
         internal AdminContext Admin(AsyncServiceScope scope) => new(new HttpContextAccessor
-            { HttpContext = PrincipalContext(_currentUserId) },
+        { HttpContext = PrincipalContext(_currentUserId) },
             new PlatformUserRoleRepository(Application(scope)), new TenantUserRoleGrantRepository(Application(scope)),
             new OrganizationMemberRepository(Application(scope)), new GroupMemberRepository(Application(scope)),
             new UserExternalLoginRepository(Application(scope)), scope.ServiceProvider.GetRequiredService<IMemoryCache>(),
@@ -249,8 +249,11 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
             """);
 
         internal void SignIn(Guid userId) => _currentUserId = userId;
-        private static DefaultHttpContext PrincipalContext(Guid userId) => new() { User = new ClaimsPrincipal(new ClaimsIdentity(
-            [new Claim(ClaimTypes.NameIdentifier, userId.ToString("D"))], "test")) };
+        private static DefaultHttpContext PrincipalContext(Guid userId) => new()
+        {
+            User = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ClaimTypes.NameIdentifier, userId.ToString("D"))], "test"))
+        };
 
         internal ManagedTenantProvisioningPreflight Preflight(AsyncServiceScope scope)
         {
@@ -330,8 +333,15 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
             var user = await Identity(scope).Set<LocalIdentityUser>().AsNoTracking().SingleAsync(Token);
             var token = await Identity(scope).Set<IdentityUserToken<Guid>>().AsNoTracking().SingleAsync(Token);
             var summary = (await Store(scope).ListAsync(new LocalIdentityListRequest(1, 10), Token)).Items.Single();
-            return JsonSerializer.Serialize(new { user.PasswordHash, user.SecurityStamp, user.ConcurrencyStamp,
-                token.Value, summary.CurrentOperationId, summary.CurrentOperationConcurrencyStamp });
+            return JsonSerializer.Serialize(new
+            {
+                user.PasswordHash,
+                user.SecurityStamp,
+                user.ConcurrencyStamp,
+                token.Value,
+                summary.CurrentOperationId,
+                summary.CurrentOperationConcurrencyStamp
+            });
         }
 
         internal async Task AssertNoTenantAsync()
@@ -363,11 +373,22 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
             var app = Application(scope);
             await app.Set<PlatformUserRole>().Where(role => role.UserId == Administrator).ExecuteDeleteAsync(Token);
             Guid successor = Guid.CreateVersion7();
-            await new UserRepository(app).Create(new User { Id = successor,
-                Pii = new UserPii { Email = string.Empty, FirstName = "Successor", LastName = "Administrator" }, CreatedAt = DateTime.UtcNow });
+            await new UserRepository(app).Create(new User
+            {
+                Id = successor,
+                Pii = new UserPii { Email = string.Empty, FirstName = "Successor", LastName = "Administrator" },
+                CreatedAt = DateTime.UtcNow
+            });
             Role platformAdmin = (await new RoleRepository(app).GetByMasterCodeAsync("platform.admin"))!;
-            await new PlatformUserRoleRepository(app).Create(new PlatformUserRole { Id = Guid.CreateVersion7(),
-                UserId = successor, User = null!, Role = null!, RoleId = platformAdmin.Id, GrantedAt = DateTime.UtcNow });
+            await new PlatformUserRoleRepository(app).Create(new PlatformUserRole
+            {
+                Id = Guid.CreateVersion7(),
+                UserId = successor,
+                User = null!,
+                Role = null!,
+                RoleId = platformAdmin.Id,
+                GrantedAt = DateTime.UtcNow
+            });
             SignIn(successor);
         }
 
@@ -397,20 +418,43 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
             await using (var seed = Provider.CreateAsyncScope())
             {
                 var app = Application(seed);
-                await new UserRepository(app).Create(new User { Id = Administrator,
-                    Pii = new UserPii { Email = string.Empty, FirstName = "Current", LastName = "Administrator" }, CreatedAt = DateTime.UtcNow });
+                await new UserRepository(app).Create(new User
+                {
+                    Id = Administrator,
+                    Pii = new UserPii { Email = string.Empty, FirstName = "Current", LastName = "Administrator" },
+                    CreatedAt = DateTime.UtcNow
+                });
                 Role platformAdmin = (await new RoleRepository(app).GetByMasterCodeAsync("platform.admin"))!;
-                await new PlatformUserRoleRepository(app).Create(new PlatformUserRole { Id = Guid.CreateVersion7(),
-                    UserId = Administrator, User = null!, Role = null!, RoleId = platformAdmin.Id, GrantedAt = DateTime.UtcNow });
+                await new PlatformUserRoleRepository(app).Create(new PlatformUserRole
+                {
+                    Id = Guid.CreateVersion7(),
+                    UserId = Administrator,
+                    User = null!,
+                    Role = null!,
+                    RoleId = platformAdmin.Id,
+                    GrantedAt = DateTime.UtcNow
+                });
                 var bootstrap = InstanceBootstrapState.CreateInteractivePending(Guid.CreateVersion7(), DeploymentMode.MultiTenant, DateTime.UtcNow);
                 bootstrap.CompleteInteractive(Administrator, DateTime.UtcNow);
                 await new InstanceBootstrapStateRepository(app).Create(bootstrap);
-                var plan = await new TenantPlanRepository(app).Create(new TenantPlan { Id = Guid.CreateVersion7(), Key = "managed",
-                    DisplayName = "Managed", CreatedAt = DateTime.UtcNow });
-                await new TenantPlanRepository(app).CreateVersionAsync(new TenantPlanVersion {
-                    Id = Guid.Parse("018e4e5c-7f00-7000-8000-000000000002"), TenantPlanId = plan.Id, VersionNumber = 1,
-                    TenantPlanStatusId = (int)TenantPlanStatusEnum.Published, IsActiveForProvisioning = true,
-                    CurrencyCode = "EUR", BillingPeriod = "monthly", CreatedAt = DateTime.UtcNow }, Token);
+                var plan = await new TenantPlanRepository(app).Create(new TenantPlan
+                {
+                    Id = Guid.CreateVersion7(),
+                    Key = "managed",
+                    DisplayName = "Managed",
+                    CreatedAt = DateTime.UtcNow
+                });
+                await new TenantPlanRepository(app).CreateVersionAsync(new TenantPlanVersion
+                {
+                    Id = Guid.Parse("018e4e5c-7f00-7000-8000-000000000002"),
+                    TenantPlanId = plan.Id,
+                    VersionNumber = 1,
+                    TenantPlanStatusId = (int)TenantPlanStatusEnum.Published,
+                    IsActiveForProvisioning = true,
+                    CurrencyCode = "EUR",
+                    BillingPeriod = "monthly",
+                    CreatedAt = DateTime.UtcNow
+                }, Token);
             }
             await using (var create = Provider.CreateAsyncScope())
             {
@@ -421,14 +465,31 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
             }
             await using var reconcile = Provider.CreateAsyncScope();
             var application = Application(reconcile);
-            await new UserRepository(application).Create(new User { Id = Receipt.LocalSubjectId,
-                Pii = new UserPii { Email = string.Empty, FirstName = "Local", LastName = "Administrator" }, CreatedAt = DateTime.UtcNow });
-            await new ActorRepository(application).Create(new Actor { Id = Receipt.PersonalActorId,
-                UserId = Receipt.LocalSubjectId, ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!,
-                Pii = new ActorPii { DisplayName = "Local Administrator" }, CreatedAt = DateTime.UtcNow });
-            await new UserExternalLoginRepository(application).Create(new UserExternalLogin { Id = Receipt.ExternalLoginId,
-                UserId = Receipt.LocalSubjectId, User = null!, AuthenticationProviderId = (int)AuthenticationProviderKind.Local,
-                AuthenticationProvider = null!, ProviderKey = Receipt.LocalSubjectId.ToString("D"), CreatedAt = DateTime.UtcNow });
+            await new UserRepository(application).Create(new User
+            {
+                Id = Receipt.LocalSubjectId,
+                Pii = new UserPii { Email = string.Empty, FirstName = "Local", LastName = "Administrator" },
+                CreatedAt = DateTime.UtcNow
+            });
+            await new ActorRepository(application).Create(new Actor
+            {
+                Id = Receipt.PersonalActorId,
+                UserId = Receipt.LocalSubjectId,
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
+                Pii = new ActorPii { DisplayName = "Local Administrator" },
+                CreatedAt = DateTime.UtcNow
+            });
+            await new UserExternalLoginRepository(application).Create(new UserExternalLogin
+            {
+                Id = Receipt.ExternalLoginId,
+                UserId = Receipt.LocalSubjectId,
+                User = null!,
+                AuthenticationProviderId = (int)AuthenticationProviderKind.Local,
+                AuthenticationProvider = null!,
+                ProviderKey = Receipt.LocalSubjectId.ToString("D"),
+                CreatedAt = DateTime.UtcNow
+            });
             application.ChangeTracker.Clear();
             var operation = await Store(reconcile).ReadOperationAsync(Receipt.OperationId, Token);
             await Assert.That(await Store(reconcile).ActivateChangeRequiredAsync(new LocalCredentialActivationRequest(
@@ -441,16 +502,27 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
                 SecretScope.Instance, null, "CONTROL_PLANE_REGISTRATION_CREDENTIALS");
             app.SecretBindings.Add(binding);
             await app.SaveChangesAsync(Token);
-            var registration = new ManagedControlPlaneRegistration {
-                Id = Guid.CreateVersion7(), ManagedInstanceId = ManagedInstanceId, EventInstanceId = Guid.CreateVersion7(),
-                ControlPlaneEndpoint = "https://control.example.test", ManagementApiVersion = ManagedControlPlaneContract.ManagementApiVersion,
-                EventVersion = "test", DeploymentMode = DeploymentMode.MultiTenant, Status = ManagedControlPlaneRegistrationStatus.Registered,
-                RegisteredAt = DateTime.UtcNow, RequestHash = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),
-                EventToControlPlaneKeyId = Guid.CreateVersion7().ToString("N"), ControlPlaneToEventKeyId = Guid.CreateVersion7().ToString("N"),
+            var registration = new ManagedControlPlaneRegistration
+            {
+                Id = Guid.CreateVersion7(),
+                ManagedInstanceId = ManagedInstanceId,
+                EventInstanceId = Guid.CreateVersion7(),
+                ControlPlaneEndpoint = "https://control.example.test",
+                ManagementApiVersion = ManagedControlPlaneContract.ManagementApiVersion,
+                EventVersion = "test",
+                DeploymentMode = DeploymentMode.MultiTenant,
+                Status = ManagedControlPlaneRegistrationStatus.Registered,
+                RegisteredAt = DateTime.UtcNow,
+                RequestHash = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),
+                EventToControlPlaneKeyId = Guid.CreateVersion7().ToString("N"),
+                ControlPlaneToEventKeyId = Guid.CreateVersion7().ToString("N"),
                 EventToControlPlaneSecretHash = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),
                 ControlPlaneToEventSecretHash = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),
-                CredentialSecretBindingId = binding.Id, EventToControlPlaneCredentialExpiresAt = DateTime.UtcNow.AddDays(1),
-                ControlPlaneToEventCredentialExpiresAt = DateTime.UtcNow.AddDays(1), CreatedAt = DateTime.UtcNow };
+                CredentialSecretBindingId = binding.Id,
+                EventToControlPlaneCredentialExpiresAt = DateTime.UtcNow.AddDays(1),
+                ControlPlaneToEventCredentialExpiresAt = DateTime.UtcNow.AddDays(1),
+                CreatedAt = DateTime.UtcNow
+            };
             // Existing registration and queued operation are prerequisites for worker linkage.
             // Their pre-existing SQLite xmin creation/generation defect is outside this slice.
             // Supply an initial version without changing EF's concurrency metadata or update predicates.

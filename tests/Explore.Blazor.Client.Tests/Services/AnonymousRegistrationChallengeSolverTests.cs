@@ -29,7 +29,10 @@ public sealed class AnonymousRegistrationChallengeSolverTests
         var cleanup = worker.SetupVoid("cancel", _ => { cleanupEntered.TrySetResult(); return true; });
         var challenge = new HalResourceOfAnonymousRegistrationChallengeDto
         {
-            ProtectedChallenge = Guid.NewGuid().ToString("N"), ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(2), Difficulty = 18, Version = 1
+            ProtectedChallenge = Guid.NewGuid().ToString("N"),
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(2),
+            Difficulty = 18,
+            Version = 1
         };
         var progress = new List<int>();
         var operation = new AnonymousRegistrationChallengeSolver(context.JSInterop.JSRuntime)

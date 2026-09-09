@@ -35,14 +35,18 @@ public sealed class LocalIdentityAdministrationServiceTests
         LocalIdentityAdministrationService service = transport.CreateService(http);
         var identity = new HalResourceOfLocalIdentitySummary
         {
-            LocalSubjectId = transport.SubjectA, CurrentOperationId = transport.OperationA,
-            CurrentOperationConcurrencyStamp = transport.StampA, CredentialState = LocalCredentialState.Ready,
+            LocalSubjectId = transport.SubjectA,
+            CurrentOperationId = transport.OperationA,
+            CurrentOperationConcurrencyStamp = transport.StampA,
+            CredentialState = LocalCredentialState.Ready,
             _links = new Dictionary<string, HalLink> { ["issue-temporary-credential"] = new() { Href = transport.ResetPath(transport.SubjectA) } }
         };
         var request = new ResetLocalCredentialRequestDto
         {
-            OperationId = Guid.CreateVersion7(), ExpectedCurrentOperationId = transport.OperationB,
-            ExpectedCurrentOperationConcurrencyStamp = transport.StampB, Reason = "Exact predecessor"
+            OperationId = Guid.CreateVersion7(),
+            ExpectedCurrentOperationId = transport.OperationB,
+            ExpectedCurrentOperationConcurrencyStamp = transport.StampB,
+            Reason = "Exact predecessor"
         };
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.ResetAsync(identity, request, CancellationToken));
@@ -86,7 +90,9 @@ public sealed class LocalIdentityAdministrationServiceTests
         Guid subjectId = Guid.CreateVersion7();
         string json = JsonSerializer.Serialize(new
         {
-            pageNumber = 1, pageSize = 20, totalCount = 1,
+            pageNumber = 1,
+            pageSize = 20,
+            totalCount = 1,
             _links = new Dictionary<string, object>(),
             _embedded = new
             {
@@ -128,13 +134,24 @@ public sealed class LocalIdentityAdministrationServiceTests
         {
             receipt = new
             {
-                operationId, kind = "Create", stage = "Superseded", initiatingApplicationUserId = actorId,
-                localSubjectId = subjectId, applicationUserId = subjectId, personalActorId = Guid.CreateVersion7(),
-                externalLoginId = Guid.CreateVersion7(), createdAt = now
+                operationId,
+                kind = "Create",
+                stage = "Superseded",
+                initiatingApplicationUserId = actorId,
+                localSubjectId = subjectId,
+                applicationUserId = subjectId,
+                personalActorId = Guid.CreateVersion7(),
+                externalLoginId = Guid.CreateVersion7(),
+                createdAt = now
             },
-            operationConcurrencyStamp = Guid.CreateVersion7(), verifiedByApplicationUserId = actorId,
-            verifiedAt = now, updatedAt = now, isCurrent = false, credentialState = (string?)null,
-            resetAudit = (object?)null, _links = new Dictionary<string, object>()
+            operationConcurrencyStamp = Guid.CreateVersion7(),
+            verifiedByApplicationUserId = actorId,
+            verifiedAt = now,
+            updatedAt = now,
+            isCurrent = false,
+            credentialState = (string?)null,
+            resetAudit = (object?)null,
+            _links = new Dictionary<string, object>()
         });
         using var handler = new JsonResponseHandler(json);
         using var http = new HttpClient(handler) { BaseAddress = new Uri("https://bff.example.test/") };
@@ -233,12 +250,19 @@ internal sealed class LocalIdentityUiTransport : HttpMessageHandler
                 System.Globalization.CultureInfo.InvariantCulture);
             return Json(new
             {
-                pageNumber = page, pageSize = 20, totalCount = (PageCount - 1) * 20 + (IncludeSubjectB ? 2 : 1),
-                totalPages = PageCount, hasNext = page < PageCount, hasPrevious = page > 1,
+                pageNumber = page,
+                pageSize = 20,
+                totalCount = (PageCount - 1) * 20 + (IncludeSubjectB ? 2 : 1),
+                totalPages = PageCount,
+                hasNext = page < PageCount,
+                hasPrevious = page > 1,
                 _links = ActionLinks ? Links("create-local-identity", IdentitiesPath) : new Dictionary<string, object>(),
-                _embedded = new { items = IncludeSubjectB
+                _embedded = new
+                {
+                    items = IncludeSubjectB
                     ? new[] { Row(SubjectA, OperationA, StampA, "Account A"), Row(SubjectB, OperationB, StampB, "Account B") }
-                    : new[] { Row(SubjectA, OperationA, StampA, "Account A") } }
+                    : new[] { Row(SubjectA, OperationA, StampA, "Account A") }
+                }
             });
         }
         throw new InvalidOperationException("Unexpected Local administration transport operation.");
@@ -246,8 +270,13 @@ internal sealed class LocalIdentityUiTransport : HttpMessageHandler
 
     private object Row(Guid subjectId, Guid operationId, Guid stamp, string firstName) => new
     {
-        localSubjectId = subjectId, email = $"{subjectId:N}@example.test", firstName, lastName = "Owner",
-        emailVerified = true, credentialState = (subjectId == SubjectA ? StateA : LocalCredentialState.Ready).ToString(), currentOperationId = operationId,
+        localSubjectId = subjectId,
+        email = $"{subjectId:N}@example.test",
+        firstName,
+        lastName = "Owner",
+        emailVerified = true,
+        credentialState = (subjectId == SubjectA ? StateA : LocalCredentialState.Ready).ToString(),
+        currentOperationId = operationId,
         currentOperationConcurrencyStamp = stamp,
         _links = ActionLinks ? Links("issue-temporary-credential", ResetPath(subjectId)) : new Dictionary<string, object>()
     };
@@ -255,18 +284,30 @@ internal sealed class LocalIdentityUiTransport : HttpMessageHandler
     {
         receipt = new
         {
-            operationId, kind = "Create", stage = state == LocalCredentialState.ProvisioningPending ? "ProvisioningPending" : "ChangeRequired",
-            initiatingApplicationUserId = SubjectA, localSubjectId = subjectId, applicationUserId = subjectId,
-            personalActorId = Guid.CreateVersion7(), externalLoginId = Guid.CreateVersion7(), createdAt = DateTimeOffset.UtcNow
+            operationId,
+            kind = "Create",
+            stage = state == LocalCredentialState.ProvisioningPending ? "ProvisioningPending" : "ChangeRequired",
+            initiatingApplicationUserId = SubjectA,
+            localSubjectId = subjectId,
+            applicationUserId = subjectId,
+            personalActorId = Guid.CreateVersion7(),
+            externalLoginId = Guid.CreateVersion7(),
+            createdAt = DateTimeOffset.UtcNow
         },
-        operationConcurrencyStamp = subjectId == SubjectA ? StampA : StampB, verifiedByApplicationUserId = SubjectA,
-        verifiedAt = DateTimeOffset.UtcNow, updatedAt = (DateTimeOffset?)null, isCurrent = true,
-        credentialState = state.ToString(), resetAudit = (object?)null,
+        operationConcurrencyStamp = subjectId == SubjectA ? StampA : StampB,
+        verifiedByApplicationUserId = SubjectA,
+        verifiedAt = DateTimeOffset.UtcNow,
+        updatedAt = (DateTimeOffset?)null,
+        isCurrent = true,
+        credentialState = state.ToString(),
+        resetAudit = (object?)null,
         _links = reconcile ? Links("reconcile", StatusPath(operationId) + "/reconcile") : new Dictionary<string, object>()
     };
     internal HttpResponseMessage Issue(Guid operationId, Guid subjectId, string password, HttpStatusCode statusCode = HttpStatusCode.OK) => Json(new
     {
-        outcome = "Issued", operation = Status(operationId, subjectId, LocalCredentialState.ChangeRequired, reconcile: false), temporaryPassword = password,
+        outcome = "Issued",
+        operation = Status(operationId, subjectId, LocalCredentialState.ChangeRequired, reconcile: false),
+        temporaryPassword = password,
         _links = Links("self", StatusPath(operationId))
     }, statusCode);
     internal static HttpResponseMessage Json(object value, HttpStatusCode statusCode = HttpStatusCode.OK) => new(statusCode)

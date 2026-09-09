@@ -406,6 +406,13 @@ before scratch cleanup; upstream source, PDBs and build logs are not retained
 there. A mismatch still fails with the original comparison status. Investigate
 the changed build input before regenerating any approved package or hash.
 
+Build & Test installs the SDK selected by `global.json` into an isolated runner
+temporary directory through setup-dotnet's `DOTNET_INSTALL_DIR`, with a matching
+`DOTNET_ROOT`. This prevents newer preinstalled runtime patches from changing
+compiler/PDB identity during the audited rebuild. The audit logs `dotnet --info`
+and still compares exact package bytes; deployed application runtime selection
+is unchanged.
+
 ISLAMU Event is licensed under AGPL-3.0-or-later, and the ISLAMU CLA grants the ISLAMU project steward broad inbound rights for contributor work. That inbound CLA does not override third-party dependency licenses, so CI must keep runtime, build, and test dependency license risk explicit before alternative-license, commercial, nonprofit, public-sector, procurement-restricted, hosted-service, or special social-impact distribution is offered.
 
 `Build & Test` runs `.ci/scripts/validate-dependency-license-policy.cs` after locked restore and the NuGet vulnerability audit. The validator scans product `packages.lock.json` files, reads restored NuGet package metadata from the local package cache, rejects denied or unknown license metadata unless a package-specific exception is encoded in the policy script, and guards future product npm or container OS package dependency surfaces until dedicated license scanning exists for those ecosystems.

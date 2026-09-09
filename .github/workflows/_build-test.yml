@@ -54,6 +54,8 @@ jobs:
     timeout-minutes: 30
     env:
       DOTNET_CONFIGURATION: ${{ inputs.configuration }}
+      DOTNET_INSTALL_DIR: ${{ runner.temp }}/audited-dotnet
+      DOTNET_ROOT: ${{ runner.temp }}/audited-dotnet
 
     steps:
       - name: No-Op for Non-Code Changes
@@ -129,7 +131,9 @@ jobs:
         if: ${{ inputs.run-fast-tests && inputs.run-setup-tests }}
         env:
           RestorePackagesWithLockFile: "false"
-        run: bash eng/release/dependencies/terminal-gui/BuildTerminalGuiPackage.sh --check
+        run: |
+          dotnet --info
+          bash eng/release/dependencies/terminal-gui/BuildTerminalGuiPackage.sh --check
 
       - name: Linting Check
         if: ${{ inputs.run-fast-tests }}

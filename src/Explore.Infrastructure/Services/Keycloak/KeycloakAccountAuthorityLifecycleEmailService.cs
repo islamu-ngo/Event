@@ -121,11 +121,9 @@ public sealed class KeycloakAccountAuthorityLifecycleEmailService(
             if (!response.IsSuccessStatusCode)
             {
                 logger.LogWarning(
-                    "Keycloak lifecycle email request failed with status {StatusCode} for action {Action}. Tenant: {TenantId}, UserId: {UserId}",
+                    "Keycloak lifecycle email request failed with status {StatusCode} for action {Action}.",
                     (int?)response.StatusCode,
-                    action,
-                    request.TenantId,
-                    request.UserId);
+                    action);
 
                 return CreateProviderFailure(action, orchestration, "keycloak_lifecycle_email_failed");
             }

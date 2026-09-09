@@ -1,0 +1,28 @@
+Change-Id: CHG-01M23CYABGMVQSDT8KX07V80W5
+Title: "Keep account identifiers out of lifecycle email diagnostics"
+Type: fix
+Scope: privacy
+Summary: "Retain bounded Keycloak action and HTTP status diagnostics without logging tenant or user identifiers, credentials, email addresses or provider response bodies."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Keycloak lifecycle provider-failure warnings omit tenant and user identifiers while retaining bounded status and action without changing provider authority or delegation records.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: Account-specific investigation uses authorized operation results and delegation records rather than identity-bearing operational warnings.

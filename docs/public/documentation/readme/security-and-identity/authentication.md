@@ -200,6 +200,10 @@ for the selectors and optional profile fields.
 
 Set `AUTHENTICATION_PROVIDER=keycloak` and provide the documented `KEYCLOAK_*` authority and confidential BFF client settings.
 
+Lifecycle-email failure logs report the action and HTTP status without account
+identifiers, credentials or provider response bodies. Use authorized operation
+results and delegation records when investigating a particular account.
+
 * Production operators must ensure:
   * Proper TLS termination and reverse-proxy header forwarding (`X-Forwarded-Proto: https`).
   * Explicit registration of valid redirect URIs in the Keycloak Admin Console (see [Troubleshooting Redirect Errors](../configuration-and-operations/troubleshooting-and-health.md#recipe-1-keycloak-invalid-parameter-redirect_uri-or-infinite-login-loop)).

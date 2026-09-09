@@ -395,6 +395,7 @@ Keycloak-backed identity lifecycle email is account-authority owned. ISLAMU Even
 
 - Email verification, password reset, email update verification, MFA, and other Keycloak required-action emails must not be routed through `EmailDispatchOutbox`, `IEmailService`, RabbitMQ, the Quartz scheduler, or product unsubscribe flows.
 - Local results, logs, telemetry, and delegation audit rows may include only safe status, action, account-authority kind, local intent/delegation ids, HTTP status code, and normalized reason codes.
+- General provider-failure warnings retain only HTTP status and the lifecycle action. Tenant/user associations stay in authorized operation and delegation records, not operational log fields; this does not introduce a second audit store or change record retention.
 - They must not include Keycloak admin tokens, provider secrets, raw Keycloak response bodies, action tokens, rendered email subjects or bodies, theme output, SMTP passwords, or secret-derived metadata.
 - Keycloak email theme customization changes Keycloak-owned templates only. It does not make ISLAMU Event the sender or decision owner for identity lifecycle messages.
 - Sharing SMTP infrastructure with a self-hosted Keycloak realm is delivery plumbing only. The credential email decision and provider-side delivery state remain with Keycloak.

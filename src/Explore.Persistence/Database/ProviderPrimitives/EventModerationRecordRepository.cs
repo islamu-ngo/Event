@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
 
+/// <summary>Reads scoped moderation history with provider-specific instant ordering.</summary>
 public class EventModerationRecordRepository : GenericRepository<EventModerationRecord, Guid>, IEventModerationRecordRepository
 {
     private readonly ExploreDbContext _dbContext;
@@ -31,9 +32,19 @@ public class EventModerationRecordRepository : GenericRepository<EventModeration
         Guid eventId,
         CancellationToken cancellationToken)
     {
-        return await _dbContext.EventModerationRecords
+        IQueryable<EventModerationRecord> query = _dbContext.EventModerationRecords
             .AsNoTracking()
-            .Where(record => record.TenantId == tenantId && record.EventId == eventId)
+            .Where(record => record.TenantId == tenantId && record.EventId == eventId);
+        if (_dbContext.Database.IsSqlite())
+        {
+            // SQLite cannot order DateTimeOffset values; compare instants after the scoped read.
+            return (await query.ToListAsync(cancellationToken))
+                .OrderByDescending(record => record.CreatedAt)
+                .ThenByDescending(record => record.Id)
+                .ToArray();
+        }
+
+        return await query
             .OrderByDescending(record => record.CreatedAt)
             .ThenByDescending(record => record.Id)
             .ToListAsync(cancellationToken);
@@ -44,6 +55,11 @@ public class EventModerationRecordRepository : GenericRepository<EventModeration
         Guid eventId,
         CancellationToken cancellationToken)
     {
+        if (_dbContext.Database.IsSqlite())
+        {
+            return (await GetByEventAsync(tenantId, eventId, cancellationToken)).FirstOrDefault();
+        }
+
         return await _dbContext.EventModerationRecords
             .AsNoTracking()
             .Where(record => record.TenantId == tenantId && record.EventId == eventId)

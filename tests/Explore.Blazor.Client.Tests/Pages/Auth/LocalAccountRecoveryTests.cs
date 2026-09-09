@@ -1,12 +1,23 @@
 
 using System.Security.Cryptography;
+using System.Net;
+using System.Net.Http.Json;
 using AngleSharp.Html.Dom;
 using Explore.Blazor.Client.Pages.Auth;
+using Explore.Blazor.Client.Services;
 
 namespace Explore.Blazor.Client.Tests.Pages.Auth;
 
 public sealed class LocalAccountRecoveryTests
 {
+    private static BlazorTestContext CreateContext()
+    {
+        var context = new BlazorTestContext();
+        context.AddMockService<IUserClient>();
+        context.Services.AddScoped<IUserService, UserService>();
+        return context;
+    }
+
     private static string Secret() => Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
     private static LocalEmailConfirmationRequestDto Pointer(int purpose = 3) => new()
     {
@@ -18,7 +29,7 @@ public sealed class LocalAccountRecoveryTests
     [Test]
     public async Task RecoveryConsumeIsExplicitAndClearsRenderedPasswordsBeforeTheReply()
     {
-        using var context = new BlazorTestContext();
+        using var context = CreateContext();
         var pointer = Pointer();
         var module = context.JSInterop.SetupModule("/js/local-account-recovery.js");
         module.Setup<LocalEmailConfirmationRequestDto?>("takeLocalAccountCapability").SetResult(pointer);
@@ -72,7 +83,7 @@ public sealed class LocalAccountRecoveryTests
     [Arguments(503)]
     public async Task FailedTokensHaveNoRepeatMutationOrRetainedForm(int status)
     {
-        using var context = new BlazorTestContext();
+        using var context = CreateContext();
         var module = context.JSInterop.SetupModule("/js/local-account-recovery.js");
         module.Setup<LocalEmailConfirmationRequestDto?>("takeLocalAccountCapability").SetResult(Pointer(1));
         module.Setup<int>("submitLocalAccountRequest", _ => true).SetResult(status);
@@ -86,7 +97,7 @@ public sealed class LocalAccountRecoveryTests
     [Test]
     public async Task AReplyAfterCancellationCannotNavigateOrRestoreCredentials()
     {
-        using var context = new BlazorTestContext();
+        using var context = CreateContext();
         var module = context.JSInterop.SetupModule("/js/local-account-recovery.js");
         module.Setup<LocalEmailConfirmationRequestDto?>("takeLocalAccountCapability").SetResult(Pointer(1));
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -107,7 +118,7 @@ public sealed class LocalAccountRecoveryTests
     [Test]
     public async Task RoutePurposeMismatchCannotSubmitOrFallBackToDiscovery()
     {
-        using var context = new BlazorTestContext();
+        using var context = CreateContext();
         var module = context.JSInterop.SetupModule("/js/local-account-recovery.js");
         module.Setup<LocalEmailConfirmationRequestDto?>("takeLocalAccountCapability").SetResult(Pointer(3));
         context.Services.GetRequiredService<BunitNavigationManager>().NavigateTo("/auth/local-account-recovery?mode=verify-email");
@@ -121,14 +132,15 @@ public sealed class LocalAccountRecoveryTests
     [Arguments(true)]
     public async Task CurrentPasswordFormUsesOnlyCurrentUserHalAction(bool allowed)
     {
-        using var context = new BlazorTestContext();
+        using var context = CreateContext();
+        using var handler = new CurrentUserHandler(allowed);
+        using var http = new HttpClient(handler) { BaseAddress = new Uri("https://api.example.test/") };
+        context.Services.AddSingleton<IUserClient>(new UserClient(http));
         var module = context.JSInterop.SetupModule("/js/local-account-recovery.js");
         module.Setup<LocalEmailConfirmationRequestDto?>("takeLocalAccountCapability").SetResult(null);
         var bff = context.JSInterop.SetupModule("/js/bff.js");
-        bff.Setup<HalResourceOfUserDto>("fetchJson", "/api/User").SetResult(new HalResourceOfUserDto
-        {
-            _links = allowed ? new Dictionary<string, HalLink> { ["change-password"] = new() { Href = "/api/auth/local/password" } } : []
-        });
+        bff.Setup<HalResourceOfUserDto>("fetchJson", "/api/User")
+            .SetException(new Microsoft.JSInterop.JSException("Direct cookie-only API access is unauthorized."));
         context.Services.GetRequiredService<BunitNavigationManager>().NavigateTo("/auth/local-account-recovery?mode=change-password");
         LocalPasswordChangeRequestDto? captured = null;
         module.Setup<int>("submitLocalAccountRequest", invocation =>
@@ -153,7 +165,7 @@ public sealed class LocalAccountRecoveryTests
     [Arguments("recover-password")]
     public async Task PublicRequestRequiresDiscoveryLinkAndReturnsNonenumeratingStatus(string mode)
     {
-        using var context = new BlazorTestContext();
+        using var context = CreateContext();
         var module = context.JSInterop.SetupModule("/js/local-account-recovery.js");
         module.Setup<LocalEmailConfirmationRequestDto?>("takeLocalAccountCapability").SetResult(null);
         context.JSInterop.SetupModule("/js/bff.js")
@@ -167,5 +179,23 @@ public sealed class LocalAccountRecoveryTests
         await cut.Find("form").SubmitAsync();
         await Assert.That(cut.FindAll("[role=status]").Count).IsEqualTo(1);
         await Assert.That(cut.FindAll("input, form").Count).IsEqualTo(0);
+    }
+    private sealed class CurrentUserHandler(bool allowed) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.Method != HttpMethod.Get || request.RequestUri!.AbsolutePath != "/api/user")
+                throw new InvalidOperationException("Unexpected current-user transport request.");
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new HalResourceOfUserDto
+                {
+                    _links = allowed
+                        ? new Dictionary<string, HalLink> { ["change-password"] = new() { Href = "/api/auth/local/password" } }
+                        : []
+                })
+            });
+        }
     }
 }

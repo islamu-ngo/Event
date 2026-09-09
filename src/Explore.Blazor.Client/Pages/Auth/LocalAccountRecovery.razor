@@ -5,6 +5,7 @@
 @using Microsoft.JSInterop
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
+@inject IUserService UserService
 @rendermode InteractiveServer
 @implements IAsyncDisposable
 
@@ -129,7 +130,7 @@
                 IDictionary<string, HalLink>? links;
                 if (_mode is "change-email" or "change-password" or "verify-current-email")
                 {
-                    var current = await bff.InvokeAsync<HalResourceOfUserDto>("fetchJson", "/api/User");
+                    var current = await UserService.GetCurrentUserResourceAsync();
                     links = current?._links;
                 }
                 else if (_mode is "verify-email" or "recover-password")
@@ -149,7 +150,8 @@
             }
             finally { await bff.DisposeAsync(); }
         }
-        catch (Exception exception) when (exception is JSException or InvalidOperationException or OperationCanceledException)
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or OperationCanceledException
+            or ApiException or HttpRequestException)
         {
             if (Current(generation)) _error = "Account actions could not be checked. Return to sign in and try again.";
         }

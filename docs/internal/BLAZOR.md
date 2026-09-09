@@ -434,6 +434,13 @@ The broader hierarchical settings cascade belongs in configuration/render-policy
 
 Pages should stay thin. They call scoped services that encapsulate generated-client calls, mapping, and UI-friendly error handling.
 
+`LocalAccountRecovery` resolves authenticated account actions through the injected
+`IUserService.GetCurrentUserResourceAsync` read, which delegates to the registered
+generated client without the profile service's auto-sync behavior. Its InteractiveServer circuit cannot
+use a cookie-only browser fetch to authenticate directly to `/api/user` in
+Standalone. The returned HAL links still exclusively control available actions;
+public discovery and credential submission retain their existing BFF boundaries.
+
 Use URL/query state for filters and pagination whenever it represents navigable state. Use scoped services for cross-component UI state only when URL state is insufficient.
 
 Source-grounded examples:

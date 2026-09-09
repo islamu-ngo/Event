@@ -92,6 +92,11 @@ proposed address. Ordinary password change requires the current password and
 works without SMTP. It is separate from first-use temporary-password replacement.
 Password changes reject an unchanged password and revoke stale Local sessions.
 
+In Standalone, these signed-in account actions use your existing protected
+session. If current account permissions cannot be checked, the form stays
+unavailable; return to sign in and retry rather than submitting credentials to
+an API URL manually.
+
 Email delivery is not guaranteed by an accepted request. Pending work stays
 bounded by its original expiry, and uncertain SMTP acceptance is not automatically
 resent. Restoring email does not revive an expired link. For Local accounts with

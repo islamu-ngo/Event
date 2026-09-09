@@ -15,9 +15,10 @@ export DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
 export DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE=1
 export DOTNET_NOLOGO=1
 
-work_root=$(mktemp -d /tmp/islamu-terminal-gui.XXXXXX)
+temporary_root=${TMPDIR:-/tmp}
+work_root=$(mktemp -d "$temporary_root/islamu-terminal-gui.XXXXXX")
 cleanup() {
-  if [[ $work_root == /tmp/islamu-terminal-gui.* ]]; then
+  if [[ $work_root == "$temporary_root"/islamu-terminal-gui.* ]]; then
     rm -rf -- "$work_root"
   fi
 }

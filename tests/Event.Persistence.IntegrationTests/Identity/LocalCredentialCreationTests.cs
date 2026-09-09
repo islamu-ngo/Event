@@ -1,6 +1,7 @@
 
 using System.Data.Common;
 using System.Security.Cryptography;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Secrets;
@@ -18,6 +19,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -336,6 +338,7 @@ public sealed class LocalCredentialCreationTests
         private readonly string _applicationPath = Path.Combine(Path.GetTempPath(), $"credential-app-{Guid.CreateVersion7():N}.db");
         private readonly string _externalPath = Path.Combine(Path.GetTempPath(), $"credential-identity-{Guid.CreateVersion7():N}.db");
         private readonly CancellationTokenSource _timeout = new(TimeSpan.FromSeconds(30));
+        private readonly MemoryCache _metadataCache = new(new MemoryCacheOptions());
         private ServiceProvider? _provider;
         internal ServiceProvider Provider => _provider!;
         internal Guid InitiatorId { get; } = Guid.CreateVersion7();
@@ -346,6 +349,7 @@ public sealed class LocalCredentialCreationTests
 
         internal static async Task<Fixture> CreateAsync(IdentityDatabaseTopology topology)
         {
+            await LocalIdentitySqliteTemplate.InitializeAsync();
             var fixture = new Fixture { Topology = topology };
             try
             {
@@ -417,13 +421,10 @@ public sealed class LocalCredentialCreationTests
                 identity.AddEntityFrameworkStores<ExploreDbContext>();
             }
             _provider = services.BuildIsolatedServiceProvider();
+            await LocalIdentitySqliteTemplate.CopyAsync(_applicationPath,
+                Topology == IdentityDatabaseTopology.External ? _externalPath : null, seedLookups: false, CancellationToken);
             await using AsyncServiceScope scope = Provider.CreateAsyncScope();
             var application = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
-            await application.Database.EnsureCreatedAsync(CancellationToken);
-            if (Topology == IdentityDatabaseTopology.External)
-            {
-                await Identity(scope).Database.EnsureCreatedAsync(CancellationToken);
-            }
             application.Users.Add(new User
             {
                 Id = InitiatorId,
@@ -444,6 +445,7 @@ public sealed class LocalCredentialCreationTests
 
         private void ConfigureDatabase(DbContextOptionsBuilder options, string path) => options
             .UseSqlite(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString())
+            .UseMemoryCache(_metadataCache)
             .UseSnakeCaseNamingConvention()
             .AddInterceptors(SqliteNamedLockTransactionInterceptor.Instance, RejectPendingSave, LoseCommitResponse);
 
@@ -455,6 +457,7 @@ public sealed class LocalCredentialCreationTests
             }
             finally
             {
+                _metadataCache.Dispose();
                 foreach (string path in new[] { _applicationPath, _externalPath })
                 {
                     File.Delete(path);

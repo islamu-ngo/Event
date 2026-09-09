@@ -13,7 +13,7 @@ using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Services;
 using Explore.Infrastructure.Identity;
-using Explore.Persistence.Seed;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -322,6 +322,7 @@ public sealed class LocalBootstrapConvergenceTests
         private readonly string _applicationPath = Path.Combine(Path.GetTempPath(), $"local-bootstrap-app-{Guid.CreateVersion7():N}.db");
         private readonly string _identityPath = Path.Combine(Path.GetTempPath(), $"local-bootstrap-identity-{Guid.CreateVersion7():N}.db");
         private readonly CancellationTokenSource _timeout = new(TimeSpan.FromSeconds(30));
+        private readonly MemoryCache _metadataCache = new(new MemoryCacheOptions());
         private IdentityDatabaseTopology _topology;
         internal ServiceProvider Provider { get; private set; } = null!;
         internal Guid Subject { get; } = Guid.CreateVersion7();
@@ -336,6 +337,7 @@ public sealed class LocalBootstrapConvergenceTests
 
         internal static async Task<Fixture> CreateAsync(IdentityDatabaseTopology topology)
         {
+            await LocalIdentitySqliteTemplate.InitializeAsync();
             var fixture = new Fixture { _topology = topology };
             try { await fixture.InitializeAsync(); return fixture; }
             catch { await fixture.DisposeAsync(); throw; }
@@ -466,20 +468,19 @@ public sealed class LocalBootstrapConvergenceTests
             }
             else identity.AddEntityFrameworkStores<ExploreDbContext>();
             Provider = services.BuildIsolatedServiceProvider();
-            await using var scope = Provider.CreateAsyncScope();
-            await Application(scope).Database.EnsureCreatedAsync(Token);
-            if (_topology == IdentityDatabaseTopology.External)
-                await scope.ServiceProvider.GetRequiredService<ExternalIdentityDbContext>().Database.EnsureCreatedAsync(Token);
-            await LookupTableSeeder.SeedAsync(Application(scope), Token);
+            await LocalIdentitySqliteTemplate.CopyAsync(_applicationPath,
+                _topology == IdentityDatabaseTopology.External ? _identityPath : null, seedLookups: true, Token);
         }
 
-        private static void Configure(DbContextOptionsBuilder options, string path, CommitFault fault) => options
+        private void Configure(DbContextOptionsBuilder options, string path, CommitFault fault) => options
             .UseSqlite(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString())
+            .UseMemoryCache(_metadataCache)
             .UseSnakeCaseNamingConvention().AddInterceptors(SqliteNamedLockTransactionInterceptor.Instance, fault);
 
         public async ValueTask DisposeAsync()
         {
             if (Provider is not null) await Provider.DisposeAsync();
+            _metadataCache.Dispose();
             foreach (string path in new[] { _applicationPath, _identityPath })
             { File.Delete(path); File.Delete(path + "-wal"); File.Delete(path + "-shm"); }
             _timeout.Dispose();

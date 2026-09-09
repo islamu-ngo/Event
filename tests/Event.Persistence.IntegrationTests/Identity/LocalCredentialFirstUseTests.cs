@@ -18,11 +18,12 @@ using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Repositories;
-using Explore.Persistence.Seed;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -659,6 +660,7 @@ public sealed class LocalCredentialFirstUseTests
         private readonly string _applicationPath = Path.Combine(Path.GetTempPath(), $"first-use-app-{Guid.CreateVersion7():N}.db");
         private readonly string _identityPath = Path.Combine(Path.GetTempPath(), $"first-use-identity-{Guid.CreateVersion7():N}.db");
         private readonly CancellationTokenSource _timeout = new(TimeSpan.FromSeconds(30));
+        private readonly MemoryCache _metadataCache = new(new MemoryCacheOptions());
         private readonly byte[] _signingKey = RandomNumberGenerator.GetBytes(64);
         private ServiceProvider? _provider;
         private IdentityDatabaseTopology _topology;
@@ -677,6 +679,7 @@ public sealed class LocalCredentialFirstUseTests
 
         internal static async Task<Fixture> CreateAsync(IdentityDatabaseTopology topology, IInterceptor? transactionObserver = null)
         {
+            await LocalIdentitySqliteTemplate.InitializeAsync();
             var fixture = new Fixture { _topology = topology, _transactionObserver = transactionObserver };
             try { await fixture.InitializeAsync(); return fixture; }
             catch { await fixture.DisposeAsync(); throw; }
@@ -847,13 +850,12 @@ public sealed class LocalCredentialFirstUseTests
             }
             else identity.AddEntityFrameworkStores<ExploreDbContext>();
             _provider = services.BuildIsolatedServiceProvider();
+            await LocalIdentitySqliteTemplate.CopyAsync(_applicationPath,
+                _topology == IdentityDatabaseTopology.External ? _identityPath : null, seedLookups: true, CancellationToken);
             Guid initiatorId = Guid.CreateVersion7();
             await using (AsyncServiceScope seed = Provider.CreateAsyncScope())
             {
                 var application = seed.ServiceProvider.GetRequiredService<ExploreDbContext>();
-                await application.Database.EnsureCreatedAsync(CancellationToken);
-                if (_topology == IdentityDatabaseTopology.External) await Identity(seed).Database.EnsureCreatedAsync(CancellationToken);
-                await LookupTableSeeder.SeedAsync(application, CancellationToken);
                 application.Users.Add(new User
                 {
                     Id = initiatorId, EmailVerified = true, CreatedAt = Clock.GetUtcNow().UtcDateTime,
@@ -906,6 +908,7 @@ public sealed class LocalCredentialFirstUseTests
 
         private void Configure(DbContextOptionsBuilder options, string path) => options
             .UseSqlite(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString())
+            .UseMemoryCache(_metadataCache)
             .UseSnakeCaseNamingConvention().AddInterceptors(_transactionObserver is null ? [] : new[] { _transactionObserver })
             .AddInterceptors(SqliteNamedLockTransactionInterceptor.Instance, WriteFault, StateReadBarrier);
 
@@ -914,6 +917,7 @@ public sealed class LocalCredentialFirstUseTests
             try { if (_provider is not null) await _provider.DisposeAsync(); }
             finally
             {
+                _metadataCache.Dispose();
                 foreach (string path in new[] { _applicationPath, _identityPath })
                 {
                     File.Delete(path); File.Delete(path + "-wal"); File.Delete(path + "-shm");

@@ -29,7 +29,6 @@ using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Repositories;
-using Explore.Persistence.Seed;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
@@ -207,6 +206,7 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
         private readonly string _applicationPath = Path.Combine(Path.GetTempPath(), $"managed-local-app-{Guid.CreateVersion7():N}.db");
         private readonly string _identityPath = Path.Combine(Path.GetTempPath(), $"managed-local-identity-{Guid.CreateVersion7():N}.db");
         private readonly CancellationTokenSource _timeout = new(TimeSpan.FromSeconds(30));
+        private readonly MemoryCache _metadataCache = new(new MemoryCacheOptions());
         private IdentityDatabaseTopology _topology;
         internal ServiceProvider Provider { get; private set; } = null!;
         internal LocalCredentialOperationReceipt Receipt { get; private set; } = null!;
@@ -221,6 +221,7 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
 
         internal static async Task<Fixture> CreateAsync(IdentityDatabaseTopology topology)
         {
+            await LocalIdentitySqliteTemplate.InitializeAsync();
             var fixture = new Fixture { _topology = topology };
             try { await fixture.InitializeAsync(); return fixture; }
             catch { await fixture.DisposeAsync(); throw; }
@@ -390,13 +391,12 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
             }
             else identity.AddEntityFrameworkStores<ExploreDbContext>();
             Provider = services.BuildIsolatedServiceProvider();
+            await LocalIdentitySqliteTemplate.CopyAsync(_applicationPath,
+                _topology == IdentityDatabaseTopology.External ? _identityPath : null, seedLookups: true, Token);
             SignIn(Administrator);
             await using (var seed = Provider.CreateAsyncScope())
             {
                 var app = Application(seed);
-                await app.Database.EnsureCreatedAsync(Token);
-                if (_topology == IdentityDatabaseTopology.External) await Identity(seed).Database.EnsureCreatedAsync(Token);
-                await LookupTableSeeder.SeedAsync(app, Token);
                 await new UserRepository(app).Create(new User { Id = Administrator,
                     Pii = new UserPii { Email = string.Empty, FirstName = "Current", LastName = "Administrator" }, CreatedAt = DateTime.UtcNow });
                 Role platformAdmin = (await new RoleRepository(app).GetByMasterCodeAsync("platform.admin"))!;
@@ -483,13 +483,15 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
                 """, Token);
         }
 
-        private static DbContextOptionsBuilder Configure(DbContextOptionsBuilder options, string path) => options
+        private DbContextOptionsBuilder Configure(DbContextOptionsBuilder options, string path) => options
             .UseSqlite(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString())
+            .UseMemoryCache(_metadataCache)
             .UseSnakeCaseNamingConvention().AddInterceptors(SqliteNamedLockTransactionInterceptor.Instance);
 
         public async ValueTask DisposeAsync()
         {
             if (Provider is not null) await Provider.DisposeAsync();
+            _metadataCache.Dispose();
             foreach (string path in new[] { _applicationPath, _identityPath })
             { File.Delete(path); File.Delete(path + "-wal"); File.Delete(path + "-shm"); }
             _timeout.Dispose();

@@ -9,11 +9,12 @@ using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
-using Explore.Persistence.Seed;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.Persistence.IntegrationTests.Identity;
@@ -438,6 +439,7 @@ public sealed class LocalCredentialResetTests
         private readonly string _identityPath = Path.Combine(Path.GetTempPath(), $"reset-identity-{Guid.CreateVersion7():N}.db");
         private readonly CancellationTokenSource _timeout = CancellationTokenSource.CreateLinkedTokenSource(
             TestContext.Current!.Execution.CancellationToken);
+        private readonly MemoryCache _metadataCache = new(new MemoryCacheOptions());
         private ServiceProvider? _provider;
         private IdentityDatabaseTopology _topology;
         internal ServiceProvider Provider => _provider!;
@@ -453,6 +455,7 @@ public sealed class LocalCredentialResetTests
         internal static async Task<Fixture> CreateAsync(IdentityDatabaseTopology topology,
             LocalCredentialState initialState = LocalCredentialState.ChangeRequired)
         {
+            await LocalIdentitySqliteTemplate.InitializeAsync().WaitAsync(TestContext.Current!.Execution.CancellationToken);
             var fixture = new Fixture { _topology = topology };
             fixture._timeout.CancelAfter(TimeSpan.FromSeconds(30));
             try { await fixture.InitializeAsync(initialState); return fixture; }
@@ -563,12 +566,11 @@ public sealed class LocalCredentialResetTests
             }
             else identity.AddEntityFrameworkStores<ExploreDbContext>();
             _provider = services.BuildIsolatedServiceProvider();
+            await LocalIdentitySqliteTemplate.CopyAsync(_applicationPath,
+                _topology == IdentityDatabaseTopology.External ? _identityPath : null, seedLookups: true, CancellationToken);
             await using (AsyncServiceScope seed = Provider.CreateAsyncScope())
             {
                 var application = seed.ServiceProvider.GetRequiredService<ExploreDbContext>();
-                await application.Database.EnsureCreatedAsync(CancellationToken);
-                if (_topology == IdentityDatabaseTopology.External) await Identity(seed).Database.EnsureCreatedAsync(CancellationToken);
-                await LookupTableSeeder.SeedAsync(application, CancellationToken);
                 foreach (Guid userId in new[] { CreatorId, ResetActorId })
                     application.Users.Add(new User
                     {
@@ -625,12 +627,14 @@ public sealed class LocalCredentialResetTests
         }
         private void Configure(DbContextOptionsBuilder options, string path) => options
             .UseSqlite(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString())
+            .UseMemoryCache(_metadataCache)
             .UseSnakeCaseNamingConvention().AddInterceptors(SqliteNamedLockTransactionInterceptor.Instance, WriteFault, CommitFault);
         public async ValueTask DisposeAsync()
         {
             try { if (_provider is not null) await _provider.DisposeAsync(); }
             finally
             {
+                _metadataCache.Dispose();
                 foreach (string path in new[] { _applicationPath, _identityPath })
                 {
                     File.Delete(path); File.Delete(path + "-wal"); File.Delete(path + "-shm");

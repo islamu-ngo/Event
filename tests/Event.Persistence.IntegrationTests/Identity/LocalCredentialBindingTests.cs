@@ -14,7 +14,7 @@ using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Repositories;
-using Explore.Persistence.Seed;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
@@ -451,6 +451,7 @@ public sealed class LocalCredentialBindingTests
         private readonly string _identityPath = Path.Combine(Path.GetTempPath(), $"binding-identity-{Guid.CreateVersion7():N}.db");
         private readonly CancellationTokenSource _timeout = new(TimeSpan.FromSeconds(30));
         private readonly MemoryCache _cache = new(new MemoryCacheOptions());
+        private readonly MemoryCache _metadataCache = new(new MemoryCacheOptions());
         private ServiceProvider? _provider;
         private IdentityDatabaseTopology _topology;
         internal ServiceProvider Provider => _provider!;
@@ -463,6 +464,7 @@ public sealed class LocalCredentialBindingTests
 
         internal static async Task<Fixture> CreateAsync(IdentityDatabaseTopology topology)
         {
+            await LocalIdentitySqliteTemplate.InitializeAsync();
             var fixture = new Fixture { _topology = topology };
             try
             {
@@ -685,13 +687,11 @@ public sealed class LocalCredentialBindingTests
             }
             else identity.AddEntityFrameworkStores<ExploreDbContext>();
             _provider = services.BuildIsolatedServiceProvider();
+            await LocalIdentitySqliteTemplate.CopyAsync(_applicationPath,
+                _topology == IdentityDatabaseTopology.External ? _identityPath : null, seedLookups: true, CancellationToken);
             await using (AsyncServiceScope seed = Provider.CreateAsyncScope())
             {
                 ExploreDbContext application = Application(seed);
-                await application.Database.EnsureCreatedAsync(CancellationToken);
-                if (_topology == IdentityDatabaseTopology.External)
-                    await Identity(seed).Database.EnsureCreatedAsync(CancellationToken);
-                await LookupTableSeeder.SeedAsync(application, CancellationToken);
                 var initiator = new User
                 {
                     Id = InitiatorId,
@@ -716,6 +716,7 @@ public sealed class LocalCredentialBindingTests
 
         private void Configure(DbContextOptionsBuilder options, string path) => options
             .UseSqlite(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString())
+            .UseMemoryCache(_metadataCache)
             .UseSnakeCaseNamingConvention().AddInterceptors(
                 SqliteNamedLockTransactionInterceptor.Instance, Faults, ActivationCommitFault, ActivationWriteFault);
 
@@ -728,6 +729,7 @@ public sealed class LocalCredentialBindingTests
             finally
             {
                 _cache.Dispose();
+                _metadataCache.Dispose();
                 foreach (string path in new[] { _applicationPath, _identityPath })
                 {
                     File.Delete(path); File.Delete(path + "-wal"); File.Delete(path + "-shm");

@@ -193,6 +193,39 @@ public sealed class LocalCredentialFirstUseTests
     }
 
     [Test]
+    [Arguments(IdentityDatabaseTopology.Colocated, ReplacementWriteBoundary.AfterFirstWrite)]
+    [Arguments(IdentityDatabaseTopology.Colocated, ReplacementWriteBoundary.AfterSecondWrite)]
+    [Arguments(IdentityDatabaseTopology.Colocated, ReplacementWriteBoundary.AfterThirdWrite)]
+    [Arguments(IdentityDatabaseTopology.External, ReplacementWriteBoundary.AfterFirstWrite)]
+    [Arguments(IdentityDatabaseTopology.External, ReplacementWriteBoundary.AfterSecondWrite)]
+    [Arguments(IdentityDatabaseTopology.External, ReplacementWriteBoundary.AfterThirdWrite)]
+    public async Task AuthorityExpiringDuringReplacementWriteRollsBackAllCredentialAuthority(
+        IdentityDatabaseTopology topology, ReplacementWriteBoundary boundary)
+    {
+        var expiry = new ReplacementWriteExpiry();
+        await using Fixture fixture = await Fixture.CreateAsync(topology, transactionObserver: expiry);
+        Snapshot before = await fixture.ReadAsync();
+        LocalCredentialReplacementAuthority authority = fixture.Authority(before);
+        string replacement = NewPassword();
+        await using AsyncServiceScope request = fixture.Provider.CreateAsyncScope();
+        expiry.Arm(identity: fixture.Identity(request), boundary: boundary, clock: fixture.Clock,
+            expiresAt: authority.ExpiresAtUtc);
+
+        LocalCredentialReplacementOutcome outcome = await fixture.StateStore(request).ReplaceAsync(
+            new LocalCredentialReplacementRequest(authority: authority, newPassword: replacement), fixture.CancellationToken);
+
+        await Assert.That(expiry.Observed).IsTrue();
+        await Assert.That(expiry.WritesObserved).IsEqualTo((int)boundary);
+        await Assert.That(expiry.AffectedRows).IsEqualTo(1);
+        await Assert.That(fixture.Clock.GetUtcNow()).IsEqualTo(authority.ExpiresAtUtc);
+        await Assert.That(outcome).IsEqualTo(LocalCredentialReplacementOutcome.InvalidChallenge);
+        await fixture.AssertUnchangedAsync(before);
+        await fixture.AssertStateAsync(LocalCredentialState.ChangeRequired);
+        await Assert.That(await fixture.PasswordIsValidAsync(fixture.TemporaryPassword)).IsTrue();
+        await Assert.That(await fixture.PasswordIsValidAsync(replacement)).IsFalse();
+    }
+
+    [Test]
     [Arguments(IdentityDatabaseTopology.Colocated)]
     [Arguments(IdentityDatabaseTopology.External)]
     public async Task StaleSecurityStampCannotReplaceTheStillCurrentOperation(IdentityDatabaseTopology topology)
@@ -945,6 +978,43 @@ public sealed class LocalCredentialFirstUseTests
                 clock.Advance(TimeSpan.FromMinutes(6));
             }
             return Task.FromResult(IdentityResult.Success);
+        }
+    }
+
+    private sealed class ReplacementWriteExpiry : DbCommandInterceptor
+    {
+        private DbContext? _identity;
+        private ReplacementWriteBoundary _boundary;
+        private ControlledClock? _clock;
+        private DateTimeOffset _expiresAt;
+        internal bool Observed { get; private set; }
+        internal int AffectedRows { get; private set; }
+        internal int WritesObserved { get; private set; }
+
+        internal void Arm(DbContext identity, ReplacementWriteBoundary boundary, ControlledClock clock, DateTimeOffset expiresAt)
+        {
+            _identity = identity;
+            _boundary = boundary;
+            _clock = clock;
+            _expiresAt = expiresAt;
+        }
+
+        public override ValueTask<int> NonQueryExecutedAsync(DbCommand command, CommandExecutedEventData eventData,
+            int result, CancellationToken cancellationToken = default)
+        {
+            if (ReferenceEquals(eventData.Context, _identity) && _identity?.Database.CurrentTransaction is not null
+                && command.CommandText.TrimStart().StartsWith("UPDATE ", StringComparison.OrdinalIgnoreCase))
+            {
+                WritesObserved++;
+                if (WritesObserved == (int)_boundary)
+                {
+                    _identity = null;
+                    Observed = true;
+                    AffectedRows = result;
+                    _clock!.Advance(_expiresAt - _clock.GetUtcNow());
+                }
+            }
+            return base.NonQueryExecutedAsync(command, eventData, result, cancellationToken);
         }
     }
 

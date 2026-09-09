@@ -157,6 +157,9 @@ replacement returns an empty HTTP 204 response, not a signed-in session; sign in
 again using the new password. Password validation returns HTTP 400 and allows a
 corrected request while the challenge remains valid. Invalid, expired or consumed
 authority returns HTTP 401; a concurrent operation conflict returns HTTP 409.
+If the challenge expires during the database updates, replacement rolls back
+without changing the password. Sign in with the temporary password to obtain
+a fresh challenge rather than retrying the expired one.
 Do not log or persist challenges or password request bodies. Reusing an
 `Idempotency-Key` cannot replay successful replacement.
 

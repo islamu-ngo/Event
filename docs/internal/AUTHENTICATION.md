@@ -336,7 +336,11 @@ Identity Serializable transaction, the store rechecks operation/state/stamp,
 binding and time; rejects the same password; runs native Identity validators
 and hashing; then conditionally updates receipt, state token and password/stamps.
 Every update must affect one row or all writes roll back. Time is checked again
-after validation and hashing before writes. Fixed 12–128-character bounds are
+after validation and hashing before writes, and after the final awaited update
+before commit. Expiry observed at that boundary rolls back the receipt, token,
+password hash and stamps together and returns `InvalidChallenge`; this does not
+claim that the database commit itself cannot cross the deadline.
+Fixed 12–128-character bounds are
 shared with login. Completion returns no token: log in afresh with the privately
 chosen password. Consumed or superseded authority cannot replace it again.
 

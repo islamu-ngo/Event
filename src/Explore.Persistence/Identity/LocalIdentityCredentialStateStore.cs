@@ -513,6 +513,11 @@ internal sealed class LocalIdentityCredentialStateStore(
                 await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
                 return LocalCredentialReplacementOutcome.Conflict;
             }
+            if (!IsReplacementAuthorityCurrent(authority))
+            {
+                await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+                return LocalCredentialReplacementOutcome.InvalidChallenge;
+            }
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             return LocalCredentialReplacementOutcome.Replaced;
         }

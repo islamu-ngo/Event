@@ -398,6 +398,15 @@ ISLAMU Event is licensed under AGPL-3.0-or-later, and the ISLAMU CLA grants the 
 
 `Build & Test` runs `.ci/scripts/validate-dependency-license-policy.cs` after locked restore and the NuGet vulnerability audit. The validator scans product `packages.lock.json` files, reads restored NuGet package metadata from the local package cache, rejects denied or unknown license metadata unless a package-specific exception is encoded in the policy script, and guards future product npm or container OS package dependency surfaces until dedicated license scanning exists for those ecosystems.
 
+Restore coverage also includes the standalone dependency probes under
+`eng/setup-assistant/probes/` and the approved Terminal.Gui closure probe under
+`eng/release/dependencies/terminal-gui/probe/`. These lockfiles are audited but
+their projects are not part of solution restore. The reusable workflow restores
+them explicitly in locked mode before auditing; it must not depend on an older
+package version already being present in a warm cache. Missing metadata remains
+a blocking error, and restoring an approved graph does not authorize changing
+its frozen dependency approval.
+
 Reviewed license identifiers currently allowed by policy are `Apache-2.0`, `BSD-2-Clause`, `BSD-3-Clause`, `CC0-1.0`, `ISC`, `MIT`, `MPL-2.0`, `PostgreSQL`, `Unicode-DFS-2016`, `Unlicense`, and `Zlib`. Strong reciprocal, copyleft, source-available, and business-source families such as AGPL, GPL, LGPL, BUSL, Commons Clause, RPL, and SSPL are denied unless an explicit temporary exception is recorded in `.ci/scripts/validate-dependency-license-policy.cs`.
 
 Current visible exceptions are intentional debt, not blanket approvals:

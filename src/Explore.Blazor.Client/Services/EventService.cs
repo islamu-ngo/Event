@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Helpers;
 using Explore.Blazor.Client.Models;
@@ -701,7 +702,10 @@ public partial class EventService : IEventService
                 Success = false,
                 Message = ex.Result?.Detail ?? ex.Result?.Title ?? "Participation configuration is invalid.",
                 Errors = ex.Result?.Errors?.SelectMany(error => error.Value).ToList() ?? [],
-                FailureCode = "participation_configuration_validation_failed"
+                FailureCode = ex.Result?.AdditionalProperties.TryGetValue("code", out var code) == true &&
+                    code is JsonElement { ValueKind: JsonValueKind.String } value
+                    ? value.GetString()
+                    : "participation_configuration_validation_failed"
             };
         }
         catch (ApiException<ProblemDetails> ex) when (ex.StatusCode == 409)

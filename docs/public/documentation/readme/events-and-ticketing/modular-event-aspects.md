@@ -63,6 +63,9 @@ AccountRequired choice is not silently converted to anonymous registration.
 Before disabling the last eligible onboarding path or tightening visitor mode,
 explicitly amend affected AccountRequired event configurations, including drafts;
 otherwise the settings change returns a conflict.
+If visitor policy changes while Studio has an unsaved draft, a rejected save
+refreshes the current capability. An AccountRequired choice that is no longer
+available becomes disabled; the draft is not silently converted to guest access.
 
 Operator login, listing information, walk-in handling and external registration
 remain separate from native allocation. A restrictive visitor setting does not

@@ -380,6 +380,16 @@ Connectivity loss is a denial of admission validation, not permission to validat
 
 See [Operations](OPERATIONS.md#admission-check-in-operations-phase-21) for incident response, export-safe audit, alerts, and rollback evidence.
 
+### Studio Visitor-Policy Refresh
+
+Participation validation failures retain the API's machine-consumed `code`
+extension through the generated client and `EventService`. A visitor-policy
+rejection reaches `ParticipationConfigurationEditor` unchanged, allowing its
+existing reload callback to fetch current canonical capabilities. The editor
+then disables unavailable AccountRequired choices rather than inferring
+permission from its stale draft. Generic validation failures without a string
+code retain the existing fallback.
+
 ### Registration Artifact Retention Authority
 
 Generic storage updates cannot change the resource kind, resource identifier or

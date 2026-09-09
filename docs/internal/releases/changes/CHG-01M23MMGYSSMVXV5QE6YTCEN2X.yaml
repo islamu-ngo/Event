@@ -1,0 +1,26 @@
+Change-Id: CHG-01M23MMGYSSMVXV5QE6YTCEN2X
+Title: "Refresh Studio capability after visitor-policy rejection"
+Type: fix
+Scope: events
+Summary: "Preserve the API validation failure code through the real event service so Studio reloads current visitor capabilities after a stale participation save."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/modular-event-aspects.md
+    Disposition: documented
+    Detail: A stale Studio participation save rejected by current visitor policy refreshes canonical capability and disables unavailable account-required choices.

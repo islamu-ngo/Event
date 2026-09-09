@@ -1,3 +1,6 @@
+using System.Net;
+using System.Text;
+using System.Text.Json;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.Client.Contracts.Services.Accessibility;
 using Explore.Blazor.Client.Pages.Studio;
@@ -147,6 +150,85 @@ public sealed class ParticipationConfigurationEditorTests : IDisposable
         await Assert.That(alert.TextContent).Contains("Refresh the event and try again");
         await Assert.That(reloadRequested).IsTrue();
         await _announcer.Received(1).AnnounceAssertiveAsync("Participation configuration changed since it was loaded.");
+    }
+
+    [Test]
+    public async Task VisitorPolicyRejectionThroughGeneratedClientReloadsCanonicalCapability()
+    {
+        using var context = new BlazorTestContext();
+        var configuration = CreateConfiguration(4, 2, 2, 1);
+        Guid eventId = configuration.EventId!.Value;
+        var deniedCapability = AccountRequiredAllowed() with
+        {
+            AllowsAccountRequiredParticipation = false,
+            SignupDestinations = []
+        };
+        var canonicalEvent = ComponentDataBuilder.EventDto.Generate() with
+        {
+            Id = eventId,
+            VisitorAccess = deniedCapability
+        };
+        using var handler = new ChangedVisitorPolicyHandler(eventId, JsonSerializer.Serialize(canonicalEvent));
+        using var http = new HttpClient(handler) { BaseAddress = new Uri("https://app.example.test/") };
+        var service = new EventService(
+            new EventClient(http),
+            Substitute.For<IEventLifecycleClient>(),
+            Substitute.For<IEventManagementReadClient>(),
+            new EventParticipationClient(http),
+            Substitute.For<IEventPublicActionClient>(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<EventService>.Instance);
+        context.Services.AddSingleton<IEventService>(service);
+        EventDto? reloaded = null;
+        var cut = context.RenderMudComponent<ParticipationConfigurationEditor>(parameters => parameters
+            .Add(component => component.EventId, eventId)
+            .Add(component => component.Configuration, configuration)
+            .Add(component => component.VisitorAccess, AccountRequiredAllowed())
+            .Add(component => component.OnReloadRequested, EventCallback.Factory.Create(this, async () =>
+            {
+                reloaded = await service.GetEventByIdAsync(eventId);
+            })));
+
+        await cut.InvokeAsync(() => Select(cut, "Identity access").Instance.ValueChanged.InvokeAsync(1));
+        await cut.Find("button[data-testid='save-participation-configuration']").ClickAsync(new MouseEventArgs());
+
+        await Assert.That(handler.SavedIdentityMode).IsEqualTo(1);
+        await Assert.That(reloaded).IsNotNull();
+        await Assert.That(reloaded!.VisitorAccess!.AllowsAccountRequiredParticipation).IsFalse();
+        cut.Render(parameters => parameters.Add(component => component.VisitorAccess, reloaded.VisitorAccess));
+        await Assert.That(Select(cut, "Identity access").FindComponents<MudSelectItem<int?>>()
+            .Single(item => item.Instance.Value == 1).Instance.Disabled).IsTrue();
+        await Assert.That(cut.Find("button[data-testid='save-participation-configuration']").HasAttribute("disabled")).IsTrue();
+    }
+
+    private sealed class ChangedVisitorPolicyHandler(Guid eventId, string canonicalEvent) : HttpMessageHandler
+    {
+        public int? SavedIdentityMode { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.Method == HttpMethod.Patch &&
+                request.RequestUri!.AbsolutePath == $"/api/events/{eventId:D}/participation")
+            {
+                using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken));
+                SavedIdentityMode = body.RootElement.GetProperty("identityAccessModeId").GetInt32();
+                return new(HttpStatusCode.BadRequest)
+                {
+                    Content = new StringContent(
+                        """{"status":400,"code":"event_visitor_account_onboarding_required","errors":{"participationConfiguration":["Public account onboarding is unavailable."]}}""",
+                        Encoding.UTF8, "application/problem+json")
+                };
+            }
+            if (request.Method == HttpMethod.Get &&
+                request.RequestUri!.AbsolutePath == $"/api/event/{eventId:D}")
+            {
+                return new(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(canonicalEvent, Encoding.UTF8, "application/hal+json")
+                };
+            }
+            throw new InvalidOperationException("Unexpected request at the participation policy boundary.");
+        }
     }
 
     private IRenderedComponent<ParticipationConfigurationEditor> RenderEditor(

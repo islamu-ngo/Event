@@ -468,7 +468,13 @@ Do not promote stress, security, or runtime lanes to required status while a blo
 
 ### OpenAPI Breaking-Change Evidence
 
-`OpenAPI Contract Guard` blocks stale generated contract artifacts and verifies deterministic second-run regeneration for `schemas/openapi_islamu-event.json`, `docs/API_CONTRACT_INVENTORY.md`, and `Explore.Blazor.Client/Clients/EventApiClient.g.cs`.
+`OpenAPI Contract Guard` blocks stale generated contract artifacts and verifies deterministic second-run regeneration for `schemas/openapi_islamu-event.json`, `docs/internal/API_CONTRACT_INVENTORY.md`, and `src/Explore.Blazor.Client/Clients/EventApiTagClients.g.cs`.
+
+The inventory generator is an independent executable. Solution restore supplies
+its dependencies, but building the API or its integration tests does not build
+the inventory project. The guard therefore builds that project explicitly in
+Release before invoking it with `--no-build`, preserving the locked-restore
+boundary and making clean-runner execution independent of local build outputs.
 
 The guard also runs `.ci/scripts/validate-api-contract-skip-inventory.cs` against [API_CONTRACT_TEST_DEBT.md](API_CONTRACT_TEST_DEBT.md). Any skipped integration test whose code skip reason includes `Category: API contract` must be listed in that inventory with a source file, owner, and removal condition. This keeps deferred route-name/HATEOAS contract enforcement visible while the owning `api-contract-stabilization` work finishes.
 

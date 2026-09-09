@@ -115,6 +115,10 @@ jobs:
         if: steps.changes.outputs.relevant == 'true'
         run: dotnet run --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/*/OpenApiDocument_*" --minimum-expected-tests 5 --no-progress --report-trx --report-trx-filename openapi-invariants.trx
 
+      - name: Build API Contract Inventory
+        if: steps.changes.outputs.relevant == 'true'
+        run: dotnet build eng/tools/Explore.ApiContractInventory/Explore.ApiContractInventory.csproj --configuration Release --no-restore --verbosity minimal
+
       - name: Regenerate API Contract Inventory
         if: steps.changes.outputs.relevant == 'true'
         run: dotnet run --project eng/tools/Explore.ApiContractInventory/Explore.ApiContractInventory.csproj --configuration Release --no-build

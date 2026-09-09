@@ -3,6 +3,7 @@ using CarpaNet.OAuth.Storage;
 using Explore.Blazor.Services.Auth;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http.Extensions;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.Options;
 
 namespace Explore.Blazor.Authentication;
@@ -211,10 +212,7 @@ public sealed class AtprotoAuthenticationHandler(
     private static bool IsSafeReturnPath(string value) =>
         value.Length is > 0 and <= 2048
         && value[0] == '/'
-        && !value.StartsWith("//", StringComparison.Ordinal)
-        && !value.StartsWith("/\\", StringComparison.Ordinal)
-        && !value.Contains('\r')
-        && !value.Contains('\n');
+        && RedirectHttpResult.IsLocalUrl(value);
 
     private static bool IsValidCanonicalActorTarget(Guid? canonicalActorId, Guid? expectedConcurrencyStamp) =>
         canonicalActorId.HasValue == expectedConcurrencyStamp.HasValue

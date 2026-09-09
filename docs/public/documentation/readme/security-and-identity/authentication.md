@@ -33,6 +33,12 @@ The browser communicates strictly with `Explore.Blazor` over HTTPS regardless of
 * The API validates Local and Keycloak tokens with isolated bearer schemes. A token signed or issued for one authority cannot authenticate through the other.
 * Direct Google sign-in and Google sign-in brokered by Keycloak use separate provider account namespaces. A brokered login remains bound to the Keycloak issuer and subject; a provider hint does not turn it into a direct Google account. Keep the configured issuer stable when diagnosing account-linking failures.
 
+After authentication or signout, the application returns only to a local path
+beginning with `/`. Invalid return destinations fall back to the home page;
+external destinations and literal control characters are not accepted. Normal
+local query parameters remain supported. This restriction concerns the return
+into the application, not the authorized redirect to an identity provider.
+
 ### Local Identity
 
 Local Identity provides username/password or email/password sign-in without an external identity container. Passwords are hashed by ASP.NET Core Identity and failed attempts use bounded lockout. Public self-registration is closed: the former API and BFF registration routes have been removed, with no replacement public signup endpoint.

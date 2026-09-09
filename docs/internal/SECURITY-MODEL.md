@@ -370,6 +370,15 @@ Evidence API and HAL representations expose bounded document display metadata, r
 
 ## Auth Diagnostic Safety
 
+Application return destinations are rooted local paths validated with ASP.NET
+Core `RedirectHttpResult.IsLocalUrl`, not prefix checks or relative-URI parsing
+alone. Query-based returns, Local login responses and posted ATProto return paths
+reject control-character and external-destination tricks. Endpoint normalization
+uses `/` for invalid input; the ATProto handler independently rejects an unsafe
+path before issuing browser proof or starting discovery. Its existing 2048-character
+limit remains. Normal local queries and fragments are preserved. Rejected return
+values are not diagnostic data and must not be logged.
+
 OIDC and BFF challenge failures must expose only safe diagnostic handles:
 
 - Browser redirects use `challengeError=1`, a normalized `errorCode`, and a correlation ID.

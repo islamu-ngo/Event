@@ -8,6 +8,7 @@ using Explore.Blazor.Constants;
 using Explore.Blazor.IntegrationTests.Fixtures;
 using Explore.Blazor.Services;
 using Explore.Blazor.Services.Auth;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -84,6 +85,51 @@ public sealed class AtprotoAuthenticationFlowTests
             await Assert.That(response.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
             await Assert.That(response.Location).IsNull();
         }
+    }
+
+    [Test]
+    [Arguments("/\t/evil.example")]
+    [Arguments("/\u001b/evil.example")]
+    [Arguments("/\0/evil.example")]
+    [Arguments("/\u007f/evil.example")]
+    public async Task UnsafeReturnPathDoesNotCreateBrowserProof(string returnPath)
+    {
+        await using var factory = CreateFactory();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var context = CreateHandlerContext(scope.ServiceProvider);
+        var provider = scope.ServiceProvider.GetRequiredService<IAuthenticationHandlerProvider>();
+        var handler = (AtprotoAuthenticationHandler)(await provider.GetHandlerAsync(
+            context, AuthSchemeNames.Atproto))!;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            handler.CreateAuthorizationUrlAsync("alice.example", returnPath, "person", CancellationToken.None));
+
+        await Assert.That(context.Response.Headers.ContainsKey("Set-Cookie")).IsFalse();
+    }
+
+    [Test]
+    public async Task ValidReturnPathCreatesBrowserProofBeforeDiscoveryFailure()
+    {
+        await using var factory = CreateFactory();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var context = CreateHandlerContext(scope.ServiceProvider);
+        var provider = scope.ServiceProvider.GetRequiredService<IAuthenticationHandlerProvider>();
+        var handler = (AtprotoAuthenticationHandler)(await provider.GetHandlerAsync(
+            context, AuthSchemeNames.Atproto))!;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            handler.CreateAuthorizationUrlAsync("alice.example", "/dashboard", "person", CancellationToken.None));
+
+        await Assert.That(context.Response.Headers.ContainsKey("Set-Cookie")).IsTrue();
+    }
+
+    private static DefaultHttpContext CreateHandlerContext(IServiceProvider services)
+    {
+        var context = new DefaultHttpContext { RequestServices = services };
+        context.Request.Scheme = "https";
+        context.Request.Host = new HostString("events.example.com");
+        context.Request.Path = "/auth/atproto/challenge";
+        return context;
     }
 
     private static WebApplicationFactory<Program> CreateFactory(bool bypassAntiforgery = false,

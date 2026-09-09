@@ -11,6 +11,7 @@ using Explore.Blazor.Services.Auth;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http.Extensions;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.Options;
 
 namespace Explore.Blazor.Extensions;
@@ -508,10 +509,7 @@ public static class BffAuthEndpoints
         !string.IsNullOrWhiteSpace(value)
         && value.Length <= 2048
         && value.StartsWith('/')
-        && !value.StartsWith("//", StringComparison.Ordinal)
-        && !value.StartsWith("/\\", StringComparison.Ordinal)
-        && !value.Contains('\r')
-        && !value.Contains('\n')
+        && RedirectHttpResult.IsLocalUrl(value)
             ? value
             : "/";
 
@@ -931,8 +929,8 @@ public static class BffAuthEndpoints
     private static string ResolveLocalReturnUrl(string? returnUrl)
     {
         if (string.IsNullOrWhiteSpace(returnUrl)
-            || !Uri.TryCreate(returnUrl, UriKind.Relative, out _)
-            || returnUrl.StartsWith("//", StringComparison.Ordinal))
+            || !returnUrl.StartsWith('/')
+            || !RedirectHttpResult.IsLocalUrl(returnUrl))
         {
             return "/";
         }

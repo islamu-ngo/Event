@@ -143,6 +143,31 @@ public sealed class LocalBffAuthenticationFlowTests : IAsyncDisposable
     }
 
     [Test]
+    [Arguments("/\t/evil.example", "/")]
+    [Arguments("/\\evil.example", "/")]
+    [Arguments("//evil.example", "/")]
+    [Arguments("/dashboard?tab=one\ntwo", "/")]
+    [Arguments("~/dashboard", "/")]
+    [Arguments("dashboard", "/")]
+    [Arguments("/dashboard?tab=profile&next=/settings", "/dashboard?tab=profile&next=/settings")]
+    public async Task LoginNormalizesReturnDestinations(string returnUrl, string expectedReturnUrl)
+    {
+        string antiforgeryToken = await IssueAntiforgeryCookieAsync();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/bff/auth/local/login")
+        {
+            Content = JsonContent.Create(CreateLoginRequest(returnUrl))
+        };
+        request.Headers.Add("X-CSRF-TOKEN", antiforgeryToken);
+
+        using var response = await _client.SendAsync(request);
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        await Assert.That(document.RootElement.GetProperty("redirectUrl").GetString())
+            .IsEqualTo(expectedReturnUrl);
+    }
+
+    [Test]
     [Arguments("email_verification_required", 401, true)]
     [Arguments("untrusted_provider_detail", 401, false)]
     [Arguments("email_verification_required", 403, false)]
@@ -223,12 +248,12 @@ public sealed class LocalBffAuthenticationFlowTests : IAsyncDisposable
         return Uri.UnescapeDataString(rawValue);
     }
 
-    private static LocalBffLoginRequest CreateLoginRequest() =>
+    private static LocalBffLoginRequest CreateLoginRequest(string returnUrl = "/dashboard") =>
         new()
         {
             Identifier = "admin@example.test",
             Password = $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(16))}",
-            ReturnUrl = "/dashboard"
+            ReturnUrl = returnUrl
         };
 
     private static string CreateAccessToken()

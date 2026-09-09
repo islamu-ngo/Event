@@ -108,7 +108,10 @@ public sealed class BffLoggingPrivacyMigrationAnchorTests
     }
 
     [Test]
-    public async Task TokenCircuitHandlerLogsNoRawOpaqueSubjectSessionTokenOrCookie()
+    [Arguments(true)]
+    [Arguments(false)]
+    [NotInParallel]
+    public async Task TokenCircuitHandlerLogsNoRawOpaqueSubjectSessionTokenOrCookie(bool hasSession)
     {
         using var capture = new DualLogCapture(typeof(TokenCircuitHandler).FullName!);
         var subject = Guid.CreateVersion7().ToString("D");
@@ -134,18 +137,20 @@ public sealed class BffLoggingPrivacyMigrationAnchorTests
                     NullLogger<BffAdminClaimsTransformation>.Instance));
             });
         });
-        string authHeader = EncodeTestClaims([
-            new TestAuthHandler.TestClaimDto("sub", subject),
-            new TestAuthHandler.TestClaimDto("sid", session)
-        ]);
+        var claims = new List<Claim> { new("sub", subject) };
+        if (hasSession)
+        {
+            claims.Add(new Claim("sid", session));
+        }
+        string authHeader = EncodeTestClaims(claims
+            .Select(claim => new TestAuthHandler.TestClaimDto(claim.Type, claim.Value))
+            .ToArray());
 
         await OpenRealCircuitAsync(factory, authHeader, cookie);
         Circuit circuit = await circuitCapture.Opened.Task.WaitAsync(TimeSpan.FromSeconds(10));
         var context = new DefaultHttpContext
         {
-            User = new ClaimsPrincipal(new ClaimsIdentity([
-                new Claim("sub", subject), new Claim("sid", session)
-            ], "Cookies"))
+            User = new ClaimsPrincipal(new ClaimsIdentity(claims, "Cookies"))
         };
         context.Items["AccessToken"] = token;
         context.Request.Headers.Cookie = cookie;
@@ -168,6 +173,15 @@ public sealed class BffLoggingPrivacyMigrationAnchorTests
         await handler.OnCircuitOpenedAsync(circuit, CancellationToken.None);
 
         await AssertPrivateAndBoundedAsync(capture, [subject, session, token, cookie, circuit.Id]);
+        foreach (var entries in new[] { capture.MicrosoftEntries, capture.SerilogEntries })
+        {
+            var presenceValues = entries
+                .Where(entry => entry.Properties.ContainsKey("SessionPresent"))
+                .Select(entry => entry.Properties["SessionPresent"])
+                .ToArray();
+            await Assert.That(presenceValues.Length).IsGreaterThan(0);
+            await Assert.That(presenceValues.All(value => value == hasSession.ToString())).IsTrue();
+        }
     }
 
 

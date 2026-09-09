@@ -197,10 +197,16 @@ public sealed class SmtpDeliveryOutcomeTests
 
         public async ValueTask DisposeAsync()
         {
-            _stop.Cancel();
-            _listener.Stop();
-            await _run;
-            _stop.Dispose();
+            await _stop.CancelAsync();
+            try
+            {
+                await _run;
+            }
+            finally
+            {
+                _listener.Stop();
+                _stop.Dispose();
+            }
         }
     }
 }

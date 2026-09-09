@@ -399,6 +399,13 @@ The one approved advisory suppression is deliberately exact and remains visible 
 
 ### Dependency License Policy
 
+The audited Terminal.Gui rebuild gate retains its rebuilt package, assembly
+hashes and `dotnet --info` under `artifacts/dependencies/terminal-gui` when byte
+comparison fails. The normal CI evidence upload collects these diagnostics
+before scratch cleanup; upstream source, PDBs and build logs are not retained
+there. A mismatch still fails with the original comparison status. Investigate
+the changed build input before regenerating any approved package or hash.
+
 ISLAMU Event is licensed under AGPL-3.0-or-later, and the ISLAMU CLA grants the ISLAMU project steward broad inbound rights for contributor work. That inbound CLA does not override third-party dependency licenses, so CI must keep runtime, build, and test dependency license risk explicit before alternative-license, commercial, nonprofit, public-sector, procurement-restricted, hosted-service, or special social-impact distribution is offered.
 
 `Build & Test` runs `.ci/scripts/validate-dependency-license-policy.cs` after locked restore and the NuGet vulnerability audit. The validator scans product `packages.lock.json` files, reads restored NuGet package metadata from the local package cache, rejects denied or unknown license metadata unless a package-specific exception is encoded in the policy script, and guards future product npm or container OS package dependency surfaces until dedicated license scanning exists for those ecosystems.

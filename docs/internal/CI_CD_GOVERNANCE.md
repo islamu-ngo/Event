@@ -316,6 +316,13 @@ The workflow redacts findings, retains SARIF/text output in `secret-scanning-evi
 
 ### NuGet Locked Restore Policy
 
+Local .NET tools are a separate restore boundary from project packages. Workflows
+that build the generated Blazor client, directly or through API integration-test
+references, must run `dotnet tool restore` before the build. This restores the
+versions pinned in `dotnet-tools.json`; a warm developer cache is not evidence
+that a clean CI runner can invoke NSwag. Security change detection applies the
+same condition to package restore, tool restore, build and test execution.
+
 GitHub Actions restore steps and deployable Docker build stages use `dotnet restore --locked-mode`. All tracked project files have committed `packages.lock.json` files, and `Directory.Build.props` enables `RestorePackagesWithLockFile` plus CI-only `RestoreLockedMode` for `GITHUB_ACTIONS`.
 
 Package input changes must commit the matching lock-file changes in the same PR. Regenerate lock files with normal restore or `dotnet restore --force-evaluate`; never hand-edit `packages.lock.json`.

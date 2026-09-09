@@ -2312,3 +2312,48 @@ roundtrips must also include the feature tail rather than stopping at Init.
 - [x] Stays in journal only (native generation observation)
 
 ---
+
+[2026-09-09 Europe/Brussels] — Detached participants can be reinserted at outbox save
+
+**Context**: PR #40 cancellation regression setup exposed a failure while
+finalizing a free order with an already-persisted assigned participant. The
+failure occurred before the cancellation seam.
+
+**Symptom / Observation**: SQLite reported `UNIQUE constraint failed:
+ie_registration_participants.tenant_id, ie_registration_participants.registration_order_id,
+ie_registration_participants.id` from `OutboxRepository.Create`. A two-case
+native experiment on untouched product base `425e4b48343690094637dda860304f3bfb04a5cd`
+passed the unassigned control and failed the assigned case. A subscribed EF
+tracking event confirmed `existingParticipantMarkedAdded=True`.
+
+**Root Cause**: Assignment reads return detached participants. The admission
+materializer retains that participant as a navigation on a new EventRegistration.
+Adding the admission graph marks the existing participant Added; the outbox
+repository's shared-context SaveChanges then attempts the duplicate insertion.
+The outbox is the flush boundary, not the origin of the duplicated entity.
+
+**Resolution**: Classified as inherited and quarantined outside PR #40 repairs;
+no product workaround or test suppression was applied. The detached base
+worktree retains the two-case reproduction in EventSessionRepositorySqliteTests.
+Its restore/build passed; the expected diagnostic run ended with one pass and
+one failure, not a green verification claim. Future repair should attach only
+the intended new graph and preserve existing participant identity.
+
+**Why This Matters for Future Work**: A SaveChanges failure names the entity
+being flushed, which may have been attached through another repository's
+navigation graph. Reproduce graph state through the real lifecycle and outbox,
+and compare an unassigned control before attributing the issue to new callers.
+
+**References**:
+- `src/Explore.Application/Services/Registration/RegistrationOrderLifecycleService.cs:620`
+- `src/Explore.Application/Services/Registration/RegistrationOrderLifecycleService.Participants.cs:37`
+- `src/Explore.Application/Services/Registration/RegistrationAdmissionMaterializer.cs:39`
+- `src/Explore.Persistence/Repositories/RegistrationInventoryRepository.cs:541`
+- `src/Explore.Persistence/Repositories/OutboxRepository.cs:25`
+- `.omo/evidence/pr40-finalization-provenance.md`
+- PR: `https://github.com/islamu-ngo/Event/pull/40`
+
+**Promotion Consideration**:
+- [x] Stays in journal only (inherited defect awaiting a separate repair)
+
+---

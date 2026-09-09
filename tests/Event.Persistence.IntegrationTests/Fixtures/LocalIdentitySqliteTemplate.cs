@@ -10,7 +10,7 @@ namespace Event.Persistence.IntegrationTests.Fixtures;
 
 /// <summary>
 /// Caches only closed SQLite database images for the Identity tests' default-schema,
-/// snake-case models. Every fixture receives private writable files, never a shared connection.
+/// snake-case models. Every fixture receives a private writable database, never a shared connection.
 /// </summary>
 internal static class LocalIdentitySqliteTemplate
 {
@@ -27,6 +27,29 @@ internal static class LocalIdentitySqliteTemplate
             seedLookups ? images.SeededApplication : images.EmptyApplication, cancellationToken);
         if (identityPath is not null)
             await File.WriteAllBytesAsync(identityPath, images.ExternalIdentity, cancellationToken);
+    }
+
+    internal static async Task CopySeededApplicationToAsync(
+        SqliteConnection destination, CancellationToken cancellationToken)
+    {
+        DatabaseImages images = await Images.Value.WaitAsync(cancellationToken);
+        string path = Path.Combine(Path.GetTempPath(), $"identity-memory-copy-{Guid.CreateVersion7():N}.db");
+        try
+        {
+            await File.WriteAllBytesAsync(path, images.SeededApplication, cancellationToken);
+            await using var source = new SqliteConnection(new SqliteConnectionStringBuilder
+            {
+                DataSource = path,
+                Mode = SqliteOpenMode.ReadOnly,
+                Pooling = false
+            }.ToString());
+            await source.OpenAsync(cancellationToken);
+            source.BackupDatabase(destination);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     private static async Task<DatabaseImages> CreateImagesAsync()

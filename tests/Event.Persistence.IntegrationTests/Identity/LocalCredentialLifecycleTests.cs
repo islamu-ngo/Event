@@ -19,7 +19,6 @@ using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
 using Explore.Persistence.Repositories;
-using Explore.Persistence.Seed;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -27,6 +26,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using NSubstitute;
@@ -252,6 +252,7 @@ public sealed class LocalCredentialLifecycleTests
         private readonly SqliteConnection _applicationConnection = new(
             new SqliteConnectionStringBuilder { DataSource = ":memory:" }.ToString());
         private readonly CancellationTokenSource _timeout = new(TimeSpan.FromSeconds(30));
+        private readonly MemoryCache _metadataCache = new(new MemoryCacheOptions());
         private Guid _operationId = Guid.CreateVersion7();
         private Guid _applicationUserId = Guid.CreateVersion7();
         private readonly StateReadCancellationInterceptor _readCancellation = new();
@@ -280,6 +281,7 @@ public sealed class LocalCredentialLifecycleTests
 
         private static async Task<Fixture> CreateAsync(IdentityDatabaseTopology topology, CredentialSetup setup)
         {
+            await LocalIdentitySqliteTemplate.InitializeAsync();
             var fixture = new Fixture();
             try
             {
@@ -322,10 +324,12 @@ public sealed class LocalCredentialLifecycleTests
         private async Task InitializeAsync(IdentityDatabaseTopology topology, CredentialSetup setup)
         {
             await _applicationConnection.OpenAsync(CancellationToken);
+            await LocalIdentitySqliteTemplate.CopySeededApplicationToAsync(_applicationConnection, CancellationToken);
             var services = new ServiceCollection();
             services.AddLogging();
             services.AddDbContext<ExploreDbContext>(options => options.UseSqlite(_applicationConnection)
-                .UseSnakeCaseNamingConvention().AddInterceptors(SqliteNamedLockTransactionInterceptor.Instance, _readCancellation));
+                .UseSnakeCaseNamingConvention().UseMemoryCache(_metadataCache)
+                .AddInterceptors(SqliteNamedLockTransactionInterceptor.Instance, _readCancellation));
             IdentityBuilder builder = services.AddIdentityCore<LocalIdentityUser>(options =>
             {
                 options.User.RequireUniqueEmail = true;
@@ -337,7 +341,8 @@ public sealed class LocalCredentialLifecycleTests
                     new SqliteConnectionStringBuilder { DataSource = ":memory:" }.ToString());
                 await _externalConnection.OpenAsync(CancellationToken);
                 services.AddDbContext<ExternalIdentityDbContext>(options => options.UseSqlite(_externalConnection)
-                    .UseSnakeCaseNamingConvention().AddInterceptors(SqliteNamedLockTransactionInterceptor.Instance, _readCancellation));
+                    .UseSnakeCaseNamingConvention().UseMemoryCache(_metadataCache)
+                    .AddInterceptors(SqliteNamedLockTransactionInterceptor.Instance, _readCancellation));
                 builder.AddEntityFrameworkStores<ExternalIdentityDbContext>();
             }
             else
@@ -349,14 +354,12 @@ public sealed class LocalCredentialLifecycleTests
             IServiceProvider scoped = _scope.Value.ServiceProvider;
             var application = scoped.GetRequiredService<ExploreDbContext>();
             Application = application;
-            await application.Database.EnsureCreatedAsync(CancellationToken);
             Identity = topology == IdentityDatabaseTopology.External
                 ? scoped.GetRequiredService<ExternalIdentityDbContext>() : application;
             if (topology == IdentityDatabaseTopology.External)
             {
                 await Identity.Database.EnsureCreatedAsync(CancellationToken);
             }
-            await LookupTableSeeder.SeedAsync(application, CancellationToken);
             var settings = new SystemSettingRepository(dbContext: application,
                 mutationLock: new RelationalSettingMutationLock(dbContext: application,
                     unitOfWork: new EfCoreUnitOfWork(application)));
@@ -470,6 +473,7 @@ public sealed class LocalCredentialLifecycleTests
             {
                 if (_externalConnection is not null) await _externalConnection.DisposeAsync();
                 await _applicationConnection.DisposeAsync();
+                _metadataCache.Dispose();
                 _timeout.Dispose();
             }
         }

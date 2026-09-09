@@ -295,29 +295,47 @@ I am deeply grateful to all our amazing contributors.
 
 Support ISLAMU Event's ongoing development, infrastructure, and open-source mission by becoming a financial sponsor.
 
+> ℹ️ **Recognition Policy:** Active tiers display ongoing monthly recurring sponsors. One-time contributions and sponsors who have stopped their monthly support are recognized under **Old Sponsors**.
+
 ### 🥇 Gold Sponsors
 
 *No active Gold sponsors yet.*
 
-[👉 Become a Gold Sponsor →][contact-email]
+* **Monthly Support (€250+/mo):** [👉 Support Monthly via Stripe][stripe-monthly-link]
+
+#### Old Sponsors
+
+* **One-Time Contribution:** [👉 Donate Once via Stripe][stripe-oneoff-link]
 
 ### 🥈 Silver Sponsors
 
 *No active Silver sponsors yet.*
 
-[👉 Become a Silver Sponsor →][contact-email]
+* **Monthly Support (€100+/mo):** [👉 Support Monthly via Stripe][stripe-monthly-link]
+
+#### Old Sponsors
+
+* **One-Time Contribution:** [👉 Donate Once via Stripe][stripe-oneoff-link]
 
 ### 🥉 Bronze Sponsors
 
 *No active Bronze sponsors yet.*
 
-[👉 Become a Bronze Sponsor →][contact-email]
+* **Monthly Support (€25+/mo):** [👉 Support Monthly via Stripe][stripe-monthly-link]
+
+#### Old Sponsors
+
+* **One-Time Contribution:** [👉 Donate Once via Stripe][stripe-oneoff-link]
 
 ### ☕ Community Sponsors
 
 *No active Community sponsors yet.*
 
-[![Donate via Stripe][stripe-shield]][stripe-donation-link] &nbsp; [👉 Become a Community Sponsor →][stripe-donation-link]
+* **Monthly Support (€5+/mo):** [👉 Support Monthly via Stripe][stripe-monthly-link]
+
+#### Old Sponsors
+
+* **One-Time Contribution:** [👉 Donate Once via Stripe][stripe-oneoff-link]
 
 ## 🤝 In-Kind Supporters
 
@@ -469,7 +487,9 @@ The AGPL-3.0-or-later license and any alternative license offered by ISLAMU appl
 [mangadex-link]: https://mangadex.org/
 [hi.events-link]: https://hi.events/
 [gitbook-link]: https://www.gitbook.com/
-[stripe-donation-link]: https://donate.stripe.com/14A6oIesc0Oc2KYg35aR200
+[stripe-monthly-link]: https://donate.stripe.com/bJeeVeesc9kIdpCbMPaR201
+[stripe-oneoff-link]: https://donate.stripe.com/14A6oIesc0Oc2KYg35aR200
+[stripe-donation-link]: https://donate.stripe.com/bJeeVeesc9kIdpCbMPaR201
 
 [ivsd-github-repo-link]: https://github.com/islamu-ngo/Islamic-Value-Sensitive-Design
 

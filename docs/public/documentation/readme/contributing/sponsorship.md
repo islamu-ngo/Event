@@ -30,11 +30,10 @@ Running and maintaining a production-grade, multi-tenant open-source event platf
 
 ### 1. Community Supporters (Individuals)
 
-If ISLAMU Event brings value to you, your local masjid, non-profit, or community organization, you can support ongoing maintenance with a one-time or recurring donation via Stripe:
+If ISLAMU Event brings value to you, your local masjid, non-profit, or community organization, you can support ongoing maintenance with a monthly recurring subscription or a one-time donation via Stripe:
 
-[![Donate via Stripe](https://img.shields.io/badge/Donate-Stripe-635BFF?style=for-the-badge&logo=stripe&logoColor=white)](https://donate.stripe.com/14A6oIesc0Oc2KYg35aR200)
-
-👉 **[Donate directly via Stripe Checkout](https://donate.stripe.com/14A6oIesc0Oc2KYg35aR200)**
+* **Monthly Support (€5+/mo):** [👉 Support Monthly via Stripe](https://donate.stripe.com/bJeeVeesc9kIdpCbMPaR201)
+* **One-Time Contribution:** [👉 Donate Once via Stripe](https://donate.stripe.com/14A6oIesc0Oc2KYg35aR200)
 
 *Every contribution directly covers server costs and helps ensure the platform remains actively developed and maintained.*
 
@@ -61,6 +60,55 @@ We deeply appreciate technology organizations that support open-source developme
 * **[GitBook](https://www.gitbook.com):** Generously provides their **Community Plan** to host and power this official documentation portal.
 
 If your organization offers developer tools, hosting, or security scanning services and would like to support ISLAMU Event as an in-kind supporter, please reach out to **[contact@openislamu.org](mailto:contact@openislamu.org)**.
+
+---
+
+## 💖 Sponsors & Backers
+
+{% hint style="info" %}
+**Recognition Policy:**
+Active tiers display ongoing monthly recurring sponsors. One-time contributions and sponsors who have stopped their monthly support are recognized under **Old Sponsors**.
+{% endhint %}
+
+### 🥇 Gold Sponsors
+
+*No active Gold sponsors yet.*
+
+* **Monthly Support (€250+/mo):** [👉 Support Monthly via Stripe](https://donate.stripe.com/bJeeVeesc9kIdpCbMPaR201)
+
+#### Old Sponsors
+
+* **One-Time Contribution:** [👉 Donate Once via Stripe](https://donate.stripe.com/14A6oIesc0Oc2KYg35aR200)
+
+### 🥈 Silver Sponsors
+
+*No active Silver sponsors yet.*
+
+* **Monthly Support (€100+/mo):** [👉 Support Monthly via Stripe](https://donate.stripe.com/bJeeVeesc9kIdpCbMPaR201)
+
+#### Old Sponsors
+
+* **One-Time Contribution:** [👉 Donate Once via Stripe](https://donate.stripe.com/14A6oIesc0Oc2KYg35aR200)
+
+### 🥉 Bronze Sponsors
+
+*No active Bronze sponsors yet.*
+
+* **Monthly Support (€25+/mo):** [👉 Support Monthly via Stripe](https://donate.stripe.com/bJeeVeesc9kIdpCbMPaR201)
+
+#### Old Sponsors
+
+* **One-Time Contribution:** [👉 Donate Once via Stripe](https://donate.stripe.com/14A6oIesc0Oc2KYg35aR200)
+
+### ☕ Community Sponsors
+
+*No active Community sponsors yet.*
+
+* **Monthly Support (€5+/mo):** [👉 Support Monthly via Stripe](https://donate.stripe.com/bJeeVeesc9kIdpCbMPaR201)
+
+#### Old Sponsors
+
+* **One-Time Contribution:** [👉 Donate Once via Stripe](https://donate.stripe.com/14A6oIesc0Oc2KYg35aR200)
 
 ---
 

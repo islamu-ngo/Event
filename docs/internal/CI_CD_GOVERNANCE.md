@@ -485,6 +485,10 @@ the inventory project. The guard therefore builds that project explicitly in
 Release before invoking it with `--no-build`, preserving the locked-restore
 boundary and making clean-runner execution independent of local build outputs.
 
+The drift step creates its evidence directory before writing the diff and
+copying generated contracts. It must not rely on the later breaking-change
+report step to create that directory.
+
 The guard also runs `.ci/scripts/validate-api-contract-skip-inventory.cs` against [API_CONTRACT_TEST_DEBT.md](API_CONTRACT_TEST_DEBT.md). Any skipped integration test whose code skip reason includes `Category: API contract` must be listed in that inventory with a source file, owner, and removal condition. This keeps deferred route-name/HATEOAS contract enforcement visible while the owning `api-contract-stabilization` work finishes.
 
 Intentional breaking API changes must also update [API_CHANGELOG.md](API_CHANGELOG.md#breaking-change-evidence) in the same pull request. The changelog entry must identify the affected route, operation, schema, or generated client method; explain old and new behavior; identify affected clients or operator workflows; provide migration guidance or a compatibility window; name the release or target milestone; and link retained `openapi-contract-guard` evidence when available.

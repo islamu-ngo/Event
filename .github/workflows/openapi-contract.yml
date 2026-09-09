@@ -132,6 +132,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p artifacts/openapi-contract
           inventory_path="docs/API_CONTRACT_INVENTORY.md"
           if [ -f "docs/internal/API_CONTRACT_INVENTORY.md" ]; then
             inventory_path="docs/internal/API_CONTRACT_INVENTORY.md"

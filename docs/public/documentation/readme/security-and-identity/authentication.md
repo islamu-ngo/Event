@@ -62,6 +62,9 @@ When instance email delivery is enabled, Local sign-in requires the stored Local
 
 Event's delivery setting does not control Keycloak or AT Protocol verification, password recovery, or sign-in. Lifecycle actions follow the account's actual linked provider, not the instance's default provider. Local enrollment remains an administrator or setup operation; recovery never creates an account.
 
+The first-run Local wizard applies the standard English locale and UTC timezone
+defaults when no profile override is supplied, just as external-provider setup does.
+
 #### Local verification and recovery
 
 Use the verification, recovery or password-change action offered by the server in

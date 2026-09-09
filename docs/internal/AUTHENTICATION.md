@@ -200,6 +200,10 @@ temporary password, optional email/profile fields and the existing nonsecret
 settings contract. It cannot select the subject, grant, provider or session
 authority. Generic idempotency body/response storage is suppressed and responses
 are private/no-store.
+The wizard snapshots the site profile through the same normalization path for
+Local and external-provider completion. Empty locale/timezone fields receive
+the established `en`/`UTC` defaults; Local completion does not send the mutable
+editing model directly or omit fields required by the server contract.
 
 The core commits its selected-store receipt, application linkage, administrator
 grants and bootstrap finality before activating ChangeRequired credentials.

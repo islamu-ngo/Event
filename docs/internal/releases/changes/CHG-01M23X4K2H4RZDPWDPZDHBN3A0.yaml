@@ -1,0 +1,26 @@
+Change-Id: CHG-01M23X4K2H4RZDPWDPZDHBN3A0
+Title: "Apply complete profile defaults to Local instance setup"
+Type: fix
+Scope: onboarding
+Summary: "Use the same normalized profile snapshot for Local and external-provider completion so the Local wizard sends required locale and timezone values without credential email or SMTP."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: Local setup applies the established locale and timezone defaults and can complete without credential email or SMTP configuration.

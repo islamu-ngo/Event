@@ -799,15 +799,7 @@
             {
                 DeploymentMode = IsSingleTenantMode ? DeploymentMode.SingleTenant : DeploymentMode.MultiTenant,
                 AdministrationAccessMode = "Embedded",
-                SiteProfile = new SelfHostOnboardingProfileDto
-                {
-                    SiteName = _siteProfile.SiteName?.Trim(),
-                    SupportEmail = NormalizeOptional(_siteProfile.SupportEmail),
-                    CanonicalUrl = NormalizeOptional(_siteProfile.CanonicalUrl),
-                    Locale = string.IsNullOrWhiteSpace(_siteProfile.Locale) ? "en" : _siteProfile.Locale.Trim(),
-                    TimeZone = string.IsNullOrWhiteSpace(_siteProfile.TimeZone) ? "UTC" : _siteProfile.TimeZone.Trim(),
-                    Purpose = NormalizeOptional(_siteProfile.Purpose)
-                },
+                SiteProfile = CreateCompletionProfile(),
                 InstanceName = _siteProfile.SiteName?.Trim(),
                 DirectoryOperatorIdentity = IsSingleTenantMode ? _directoryOperator : null
             };
@@ -887,6 +879,16 @@
         }
     }
 
+    private SelfHostOnboardingProfileDto CreateCompletionProfile() => new()
+    {
+        SiteName = _siteProfile.SiteName?.Trim(),
+        SupportEmail = NormalizeOptional(_siteProfile.SupportEmail),
+        CanonicalUrl = NormalizeOptional(_siteProfile.CanonicalUrl),
+        Locale = string.IsNullOrWhiteSpace(_siteProfile.Locale) ? "en" : _siteProfile.Locale.Trim(),
+        TimeZone = string.IsNullOrWhiteSpace(_siteProfile.TimeZone) ? "UTC" : _siteProfile.TimeZone.Trim(),
+        Purpose = NormalizeOptional(_siteProfile.Purpose)
+    };
+
     private async Task CompleteLocalSetupAsync()
     {
         _submitState.Start();
@@ -901,7 +903,7 @@
                 Settings = new CompleteInstanceOnboardingRequest
                 {
                     DeploymentMode = IsSingleTenantMode ? DeploymentMode.SingleTenant : DeploymentMode.MultiTenant,
-                    SiteProfile = _siteProfile,
+                    SiteProfile = CreateCompletionProfile(),
                     DirectoryOperatorIdentity = IsSingleTenantMode ? _directoryOperator : null,
                     AdministrationAccessMode = "Embedded", InstanceName = _siteProfile.SiteName?.Trim()
                 }

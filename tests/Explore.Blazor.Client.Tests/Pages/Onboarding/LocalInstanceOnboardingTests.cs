@@ -35,6 +35,8 @@ public sealed class LocalInstanceOnboardingTests
         var request = fixture.Transport.Submitted!;
         await Assert.That(request.OperationId).IsEqualTo(fixture.Transport.PendingOperationId);
         await Assert.That(request.Email).IsNull();
+        await Assert.That(request.Settings!.SiteProfile!.Locale).IsEqualTo("en");
+        await Assert.That(request.Settings.SiteProfile.TimeZone).IsEqualTo("UTC");
         await Assert.That(request.Settings!.DirectoryOperatorIdentity!.PublicContactEmail).IsEqualTo("directory@example.test");
         await Assert.That(request.Username).IsEqualTo("instance-operator");
         await Assert.That(fixture.Transport.OrdinarySessionWork).IsFalse();

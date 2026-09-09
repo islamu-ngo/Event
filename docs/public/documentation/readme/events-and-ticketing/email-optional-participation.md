@@ -107,6 +107,11 @@ An internal queued email is not an external delivery: an expired registration
 contact cannot be decrypted and newly sent just because it was queued earlier.
 Already-started external delivery retains its existing outcome; expiry does not
 retract a message already handed to the provider.
+For an external registration submission that has never been attempted, cleanup
+records a permanent retention-expired outcome before deleting its last eligible
+mapped answers. Running cleanup before the delivery worker does not turn that
+known expiry into an ambiguous empty submission. Previously attempted or
+uncertain deliveries retain their existing reconciliation process.
 
 ## Public Calendar Export
 

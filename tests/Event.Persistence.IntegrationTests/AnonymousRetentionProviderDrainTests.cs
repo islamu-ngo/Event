@@ -93,18 +93,170 @@ public sealed class AnonymousRetentionProviderDrainTests
     }
 
     [Test]
-    public async Task ExpiredMappedAnswersArePermanentNotAmbiguous()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ExpiredMappedAnswersArePermanentNotAmbiguous(bool cleanupBeforeDrain)
     {
         await using var harness = await Harness.CreateAsync(Now);
         var graph = await harness.SeedAsync(Now.AddDays(1), anonymous: true);
         await harness.AddAnswerAsync(graph, "name", Now);
         harness.Context.ChangeTracker.Clear();
-        await harness.DrainAsync();
+        if (cleanupBeforeDrain)
+        {
+            var cleanup = await harness.CleanupAsync();
+            await Assert.That(cleanup.AnswersDeleted).IsEqualTo(1);
+            await Assert.That(cleanup.SensitiveValuesDeleted).IsEqualTo(1);
+            await Assert.That(await harness.Context.RegistrationAnswers.CountAsync()).IsEqualTo(0);
+            await Assert.That(await harness.Context.RegistrationSensitiveAnswerValues.CountAsync()).IsEqualTo(0);
+        }
+
+        await Assert.That(await harness.DrainAsync()).IsEqualTo(0);
 
         var effect = await harness.Context.RegistrationProviderSubmissionWriteEffects.AsNoTracking().SingleAsync();
         await Assert.That(effect.FailureCode).IsEqualTo("registration_data_retention_expired");
+        await Assert.That(effect.Status).IsEqualTo(OutboxMessageStatus.DeadLettered);
+        await Assert.That(effect.DeadLetteredAt).IsEqualTo(Now);
         await Assert.That(effect.ParkedAt).IsNull();
         await Assert.That(harness.Protector.UnprotectCalls).IsEqualTo(0);
+        await Assert.That(harness.StorageCalls).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task CleanupPreservesDeliveryOfRemainingLiveMappedAnswers()
+    {
+        await using var harness = await Harness.CreateAsync(Now);
+        var graph = await harness.SeedAsync(Now.AddDays(1), anonymous: true);
+        await harness.AddAnswerAsync(graph, "expired", Now);
+        await harness.AddAnswerAsync(graph, "included", Now.AddHours(1));
+        harness.Context.ChangeTracker.Clear();
+
+        await Assert.That((await harness.CleanupAsync()).AnswersDeleted).IsEqualTo(1);
+        await Assert.That(await harness.DrainAsync()).IsEqualTo(1);
+        await Assert.That(harness.Protector.UnprotectCalls).IsEqualTo(1);
+        await Assert.That(harness.Csv).Contains("private-included");
+        await Assert.That(harness.Csv).DoesNotContain("private-expired");
+    }
+
+    [Test]
+    [Arguments("unmapped", true)]
+    [Arguments("blocked", false)]
+    public async Task CleanupDoesNotInventExpiryEvidenceForMissingMappedAnswers(string key, bool transferable)
+    {
+        await using var harness = await Harness.CreateAsync(Now);
+        var graph = await harness.SeedAsync(Now.AddDays(1), anonymous: true);
+        await harness.AddAnswerAsync(graph, "name", Now.AddHours(1));
+        await harness.AddAnswerAsync(graph, key, Now, transferable);
+        harness.Context.ChangeTracker.Clear();
+        await harness.Context.RegistrationAnswers.Where(answer => answer.RetentionUntil > Now).ExecuteDeleteAsync();
+
+        await Assert.That((await harness.CleanupAsync()).AnswersDeleted).IsEqualTo(1);
+        await harness.DrainAsync();
+
+        var effect = await harness.Context.RegistrationProviderSubmissionWriteEffects.AsNoTracking().SingleAsync();
+        await Assert.That(effect.FailureCode).IsEqualTo("provider_submission_mapped_answers_empty");
+        await Assert.That(effect.ParkedAt).IsEqualTo(Now);
+        await Assert.That(effect.DeadLetteredAt).IsNull();
+        await Assert.That(harness.StorageCalls).IsEqualTo(0);
+    }
+
+    [Test]
+    [Arguments("processing")]
+    [Arguments("expired-claim")]
+    [Arguments("retry")]
+    [Arguments("completed")]
+    [Arguments("parked")]
+    public async Task CleanupNeverSettlesPreviouslyClaimedWork(string state)
+    {
+        await using var harness = await Harness.CreateAsync(Now);
+        var graph = await harness.SeedAsync(Now.AddDays(1), anonymous: true);
+        await harness.AddAnswerAsync(graph, "name", Now);
+        harness.Context.ChangeTracker.Clear();
+        var repository = new RegistrationProviderSubmissionWriteEffectRepository(harness.Context);
+        DateTime claimedAt = Now.AddMinutes(-2);
+        var claim = (await repository.ClaimDueAsync("in-flight", 1, claimedAt,
+            TimeSpan.FromMinutes(state == "expired-claim" ? 1 : 3), CancellationToken.None)).Single();
+        if (state == "retry")
+        {
+            await repository.RetryAsync(claim, "provider_unavailable", Now.AddMinutes(1), Now, CancellationToken.None);
+        }
+        else if (state == "completed")
+        {
+            await repository.CompleteAsync(claim, Now, CancellationToken.None);
+        }
+        else if (state == "parked")
+        {
+            await repository.ParkAmbiguousAsync(claim, "provider_handoff_uncertain", Now, CancellationToken.None);
+        }
+        var before = await harness.Context.RegistrationProviderSubmissionWriteEffects.AsNoTracking().SingleAsync();
+        harness.Context.ChangeTracker.Clear();
+
+        await Assert.That((await harness.CleanupAsync()).AnswersDeleted).IsEqualTo(1);
+
+        var after = await harness.Context.RegistrationProviderSubmissionWriteEffects.AsNoTracking().SingleAsync();
+        await Assert.That(after.Status).IsEqualTo(before.Status);
+        await Assert.That(after.FailureCode).IsEqualTo(before.FailureCode);
+        await Assert.That(after.DeadLetteredAt).IsEqualTo(before.DeadLetteredAt);
+        await Assert.That(after.ParkedAt).IsEqualTo(before.ParkedAt);
+        await Assert.That(after.ProcessingLeaseToken).IsEqualTo(before.ProcessingLeaseToken);
+        await Assert.That(after.ProcessingFence).IsEqualTo(before.ProcessingFence);
+        await Assert.That(after.AttemptCount).IsEqualTo(before.AttemptCount);
+        await Assert.That(after.NextAttemptAt).IsEqualTo(before.NextAttemptAt);
+    }
+
+    [Test]
+    public async Task CleanupDuringProviderHandoffPreservesTheAmbiguousOutcome()
+    {
+        await using var harness = await Harness.CreateAsync(Now);
+        var graph = await harness.SeedAsync(Now.AddDays(1), anonymous: true);
+        await harness.AddAnswerAsync(graph, "name", Now.AddTicks(1));
+        harness.Context.ChangeTracker.Clear();
+        var handedOff = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseProvider = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task<int> draining = harness.DrainAsync(async () =>
+        {
+            handedOff.SetResult();
+            await releaseProvider.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            throw new RegistrationProviderSubmissionDeliveryException(
+                RegistrationProviderSubmissionDeliveryFailureKind.AmbiguousAfterHandoff, "provider_handoff_uncertain");
+        });
+
+        try
+        {
+            await handedOff.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            harness.SetUtcNow(Now.AddTicks(1));
+            await Assert.That((await harness.CleanupAsync()).AnswersDeleted).IsEqualTo(1);
+            var inFlight = await harness.Context.RegistrationProviderSubmissionWriteEffects.AsNoTracking().SingleAsync();
+            await Assert.That(inFlight.Status).IsEqualTo(OutboxMessageStatus.Processing);
+            await Assert.That(inFlight.DeadLetteredAt).IsNull();
+        }
+        finally
+        {
+            releaseProvider.TrySetResult();
+            await draining.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+
+        var effect = await harness.Context.RegistrationProviderSubmissionWriteEffects.AsNoTracking().SingleAsync();
+        await Assert.That(effect.FailureCode).IsEqualTo("provider_handoff_uncertain");
+        await Assert.That(effect.ParkedAt).IsEqualTo(Now.AddTicks(1));
+        await Assert.That(effect.DeadLetteredAt).IsNull();
+        await Assert.That(harness.StorageCalls).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task CleanupDoesNotClassifyNonanonymousExpiryAsPermanent()
+    {
+        await using var harness = await Harness.CreateAsync(Now);
+        var graph = await harness.SeedAsync(null, anonymous: false);
+        await harness.AddAnswerAsync(graph, "name", Now);
+        harness.Context.ChangeTracker.Clear();
+
+        await Assert.That((await harness.CleanupAsync()).AnswersDeleted).IsEqualTo(1);
+        await harness.DrainAsync();
+
+        var effect = await harness.Context.RegistrationProviderSubmissionWriteEffects.AsNoTracking().SingleAsync();
+        await Assert.That(effect.FailureCode).IsEqualTo("provider_submission_mapped_answers_empty");
+        await Assert.That(effect.ParkedAt).IsEqualTo(Now);
+        await Assert.That(effect.DeadLetteredAt).IsNull();
     }
 
     [Test]
@@ -222,7 +374,16 @@ public sealed class AnonymousRetentionProviderDrainTests
             await Context.SaveChangesAsync();
         }
 
-        public async Task<int> DrainAsync()
+        public async Task<RegistrationRetentionCleanupResult> CleanupAsync()
+        {
+            await using var scope = fixture.CreateScope();
+            return await scope.ServiceProvider.GetRequiredService<IRegistrationRetentionCleanupRepository>()
+                .CleanupTenantAsync(fixture.TenantId, clock.GetUtcNow().UtcDateTime, 1, CancellationToken.None);
+        }
+
+        public void SetUtcNow(DateTime now) => clock.UtcNow = now;
+
+        public async Task<int> DrainAsync(Func<Task>? afterHandoff = null)
         {
             var storage = Substitute.For<IFileStorageProvider>();
             storage.WriteAsync(Arg.Any<FileStorageWriteInput>(), Arg.Any<CancellationToken>()).Returns(async call =>
@@ -231,6 +392,10 @@ public sealed class AnonymousRetentionProviderDrainTests
                 using var reader = new StreamReader(input.Content, Encoding.UTF8, leaveOpen: true);
                 Csv = await reader.ReadToEndAsync();
                 StorageCalls++;
+                if (afterHandoff is not null)
+                {
+                    await afterHandoff();
+                }
                 return new FileStorageWriteResult(StorageProviders.Local, input.ObjectKey!, input.ExpectedSizeBytes!.Value,
                     input.ContentType, "sha256:retention");
             });
@@ -248,7 +413,8 @@ public sealed class AnonymousRetentionProviderDrainTests
 
     private sealed class Clock(DateTime now) : TimeProvider
     {
-        public override DateTimeOffset GetUtcNow() => new(now);
+        public DateTime UtcNow { get; set; } = now;
+        public override DateTimeOffset GetUtcNow() => new(UtcNow);
     }
 
     private sealed class CountingProtector(IRegistrationSensitiveValueProtector inner) : IRegistrationSensitiveValueProtector

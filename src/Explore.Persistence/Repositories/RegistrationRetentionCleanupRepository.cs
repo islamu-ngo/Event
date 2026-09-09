@@ -1,5 +1,7 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
+using Explore.Domain.Enums;
+using Explore.Persistence.Database;
 using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
 
@@ -23,6 +25,9 @@ public sealed class RegistrationRetentionCleanupRepository(ExploreDbContext dbCo
 
         return await unitOfWork.ExecuteInTransactionAsync(async token =>
         {
+            // Cleanup and worker claims must agree on whether a provider handoff is still possible.
+            await using IAsyncDisposable claimLock = await RelationalNamedLock.AcquireTransactionAsync(
+                dbContext, "registration-provider-submission-write-claim", token);
             await ScheduleExpiredCsvDeletionAsync(tenantId, utcNow, batchSize, token);
             Guid[] answerIds = await dbContext.RegistrationAnswers
                 .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])
@@ -36,6 +41,7 @@ public sealed class RegistrationRetentionCleanupRepository(ExploreDbContext dbCo
                 .Where(answer => answerIds.Contains(answer.Id) && answer.SensitiveAnswerValueId != null)
                 .Select(answer => answer.SensitiveAnswerValueId!.Value)
                 .ToArrayAsync(token);
+            await SettleUnclaimedExpiredProviderWritesAsync(tenantId, utcNow, answerIds, token);
             int answersDeleted = await dbContext.RegistrationAnswers
                 .IgnoreQueryFilters([QueryFilterNames.Tenant, QueryFilterNames.SoftDelete])
                 .Where(answer => answer.TenantId == tenantId && answerIds.Contains(answer.Id))
@@ -58,6 +64,60 @@ public sealed class RegistrationRetentionCleanupRepository(ExploreDbContext dbCo
             return new RegistrationRetentionCleanupResult(
                 answersDeleted, sensitiveValuesDeleted, orderPiiDeleted, participantPiiDeleted);
         }, cancellationToken);
+    }
+
+    private async Task SettleUnclaimedExpiredProviderWritesAsync(
+        Guid tenantId, DateTime utcNow, Guid[] answerIds, CancellationToken cancellationToken)
+    {
+        var mappedAnswers = from answer in dbContext.RegistrationAnswers
+                .IgnoreQueryFilters([QueryFilterNames.Tenant])
+            join field in dbContext.RegistrationFormFields.IgnoreQueryFilters([QueryFilterNames.Tenant])
+                on new { answer.TenantId, Id = answer.RegistrationFormFieldId }
+                equals new { field.TenantId, field.Id }
+            join mapping in dbContext.RegistrationProviderFieldMappings.IgnoreQueryFilters([QueryFilterNames.Tenant])
+                on new { field.TenantId, PlatformFieldKey = field.Namespace + "." + field.Key }
+                equals new { mapping.TenantId, mapping.PlatformFieldKey }
+            where answer.TenantId == tenantId && field.IsProviderTransferAllowed && !mapping.IsDeleted
+            select new
+            {
+                answer.Id, answer.RegistrationSubmissionId, answer.RegistrationAttemptId,
+                answer.RegistrationOrderId, mapping.RegistrationProviderBindingId, answer.RetentionUntil,
+                SensitiveRetentionUntil = answer.SensitiveAnswerValue == null
+                    ? (DateTime?)null : answer.SensitiveAnswerValue.RetentionUntil
+            };
+
+        List<RegistrationProviderSubmissionWriteEffect> effects = await (from effect in dbContext.RegistrationProviderSubmissionWriteEffects
+                .IgnoreQueryFilters([QueryFilterNames.Tenant])
+            join order in dbContext.RegistrationOrders.IgnoreQueryFilters([QueryFilterNames.Tenant])
+                on new { effect.TenantId, effect.EventId, Id = effect.RegistrationOrderId }
+                equals new { order.TenantId, order.EventId, order.Id }
+            where effect.TenantId == tenantId && order.AnonymousPiiRetentionUntilUtc != null &&
+                effect.Status == OutboxMessageStatus.Pending && effect.AttemptCount == 0 &&
+                mappedAnswers.Any(answer => answer.RegistrationSubmissionId == effect.RegistrationSubmissionId &&
+                    answer.RegistrationAttemptId == effect.RegistrationAttemptId &&
+                    answer.RegistrationOrderId == effect.RegistrationOrderId &&
+                    answer.RegistrationProviderBindingId == effect.RegistrationProviderBindingId && answerIds.Contains(answer.Id)) &&
+                !mappedAnswers.Any(answer => answer.RegistrationSubmissionId == effect.RegistrationSubmissionId &&
+                    answer.RegistrationAttemptId == effect.RegistrationAttemptId &&
+                    answer.RegistrationOrderId == effect.RegistrationOrderId &&
+                    answer.RegistrationProviderBindingId == effect.RegistrationProviderBindingId &&
+                    (answer.RetentionUntil == null || answer.RetentionUntil > utcNow) &&
+                    (answer.SensitiveRetentionUntil == null || answer.SensitiveRetentionUntil > utcNow))
+            select effect).ToListAsync(cancellationToken);
+
+        // Processing or previously attempted work may already have crossed the external boundary.
+        // The temporary claim and terminal outcome are persisted in the cleanup transaction.
+        foreach (RegistrationProviderSubmissionWriteEffect effect in effects)
+        {
+            Guid leaseToken = Guid.CreateVersion7();
+            effect.Claim("registration-retention-cleanup", leaseToken, utcNow.AddMinutes(1), utcNow);
+            effect.DeadLetter(leaseToken, effect.ProcessingFence, "registration_data_retention_expired", utcNow);
+        }
+
+        if (effects.Count > 0)
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
     }
 
     private async Task ScheduleExpiredCsvDeletionAsync(

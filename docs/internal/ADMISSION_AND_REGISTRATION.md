@@ -394,6 +394,16 @@ stream is disposed if the deadline passes while the provider is opening it.
 Released answer files retain their submission/order authority, and cleanup keeps
 the original export lineage.
 
+Retention cleanup acquires the provider-submission worker's transaction-owned
+claim lock before deleting answers. If a Pending effect has never been claimed,
+its mapped expired answers are selected for deletion and no transferable live
+mapped answer remains, cleanup uses the existing claim/dead-letter transitions
+to record `registration_data_retention_expired` in the same transaction. No
+intermediate claim escapes that commit. Missing or unmapped answers alone are
+not expiry evidence. Processing, previously attempted, completed and parked work
+retain their existing outcome because an external handoff may already have
+occurred.
+
 ### Anonymous Cancellation And Committed Attendance
 
 `AnonymousCancellationService` retains the shared order, event, assignment,

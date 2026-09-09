@@ -66,6 +66,9 @@ releases consumed capacity in one transaction. Repeating the same successful
 operation does not release places twice. Opening or refreshing the status page
 does not cancel anything. If the server reports a conflict, use the refreshed
 status rather than assuming cancellation succeeded.
+An earlier expired reservation does not prevent cancellation after successful
+capacity recovery and free confirmation. Cancellation releases the replacement
+allocation and preserves the expired reservation's audit history.
 
 The existing finite private-status window still applies. An unconfirmed order
 does not gain post-confirmation cancellation authority from its checkout link.

@@ -86,12 +86,12 @@ public sealed class AnonymousCancellationRepository(
     public async Task<IReadOnlyList<Guid>> ReleaseConsumedInCurrentTransactionAsync(
         AnonymousCancellationContext context, DateTime releasedAt, CancellationToken cancellationToken)
     {
-        Guid[] poolIds = context.Holds.Select(hold => hold.CapacityPoolId).Distinct().Order().ToArray();
+        Guid[] poolIds = context.ConsumedHolds.Select(hold => hold.CapacityPoolId).Distinct().Order().ToArray();
         var pools = await inventory.GetPoolsForUpdateAsync(poolIds, context.Order.EventId, context.Order.TenantId, cancellationToken);
         if (!pools.Select(pool => pool.Id).Order().SequenceEqual(poolIds))
             throw new InvalidOperationException("Cancellation capacity pools must match the exact order holds.");
         var released = new List<Guid>();
-        foreach (var hold in context.Holds.OrderBy(value => value.Id))
+        foreach (var hold in context.ConsumedHolds.OrderBy(value => value.Id))
         {
             Guid expectedStamp = hold.ConcurrencyStamp;
             if (!hold.TryReleaseConsumedForAnonymousCancellation(context.Order, releasedAt))

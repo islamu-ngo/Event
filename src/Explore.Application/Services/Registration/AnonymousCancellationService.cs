@@ -50,7 +50,7 @@ public sealed class AnonymousCancellationService(
 
                 // Retain pool fences before any mutation, then sample authority after the last
                 // potentially blocking fence. Release only reacquires fences already owned here.
-                await inventory.GetPoolsForUpdateAsync(context.Holds.Select(hold => hold.CapacityPoolId).ToArray(),
+                await inventory.GetPoolsForUpdateAsync(context.ConsumedHolds.Select(hold => hold.CapacityPoolId).ToArray(),
                     eventId, tenant.TenantId, token);
                 RequireLive(authority.Deadline);
                 DateTime cancelledAt = timeProvider.GetUtcNow().UtcDateTime;
@@ -65,7 +65,7 @@ public sealed class AnonymousCancellationService(
                     throw new InvalidOperationException("Cancellation revocation must cover the exact locked ticket lineage.");
                 RequireLive(authority.Deadline);
                 var released = await repository.ReleaseConsumedInCurrentTransactionAsync(context, cancelledAt, token);
-                if (!released.Order().SequenceEqual(context.Holds.Select(hold => hold.Id).Order()))
+                if (!released.Order().SequenceEqual(context.ConsumedHolds.Select(hold => hold.Id).Order()))
                     throw new InvalidOperationException("Cancellation release must cover the exact consumed inventory identities.");
                 RequireLive(authority.Deadline);
                 return AnonymousCancellationOutcome.Cancelled;

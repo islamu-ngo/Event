@@ -1,5 +1,6 @@
 
 using System.Data.Common;
+using System.Security.Cryptography;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Admissions;
@@ -69,6 +70,59 @@ public sealed partial class AnonymousCancellationConcurrencyTests
         await Assert.That((await CancelAsync(fixture, command)).IsSuccess).IsTrue();
         await Assert.That(await fixture.Services.GetRequiredService<IRegistrationInventoryRepository>()
             .GetAllocatedQuantityAsync(before.CapacityPoolId, fixture.TenantId, CancellationToken.None)).IsEqualTo(10);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task RecoveredConfirmedOrderPreservesExpiredHistoryAcrossCancellation(bool deleteExpiredHistory)
+    {
+        var clock = new Clock();
+        await using var fixture = await CreateAsync(clock);
+        var command = await ConfirmAsync(fixture, clock, recoverBeforeConfirmation: true);
+        var holds = await fixture.Context.RegistrationInventoryHolds.AsNoTracking().ToArrayAsync();
+        await Assert.That(holds.Length).IsEqualTo(2);
+        var expired = holds.Single(hold =>
+            hold.RegistrationInventoryHoldStatusId == (int)RegistrationInventoryHoldStatusEnum.Expired);
+        var consumed = holds.Single(hold =>
+            hold.RegistrationInventoryHoldStatusId == (int)RegistrationInventoryHoldStatusEnum.Consumed);
+        await Assert.That(expired.ConsumedAt).IsNull();
+        await Assert.That(consumed.IsCapacityAllocated).IsTrue();
+        if (deleteExpiredHistory)
+        {
+            await fixture.Context.RegistrationInventoryHolds.Where(hold => hold.Id == expired.Id)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(hold => hold.IsDeleted, true));
+        }
+
+        await Assert.That(await EligibleAsync(fixture, command)).IsEqualTo(!deleteExpiredHistory);
+        var result = await CancelAsync(fixture, command);
+        var after = await fixture.Context.RegistrationInventoryHolds.IncludeDeleted().AsNoTracking().ToArrayAsync();
+        var retained = after.Single(hold => hold.Id == expired.Id);
+        var allocation = after.Single(hold => hold.Id == consumed.Id);
+        await Assert.That(retained.RegistrationInventoryHoldStatusId).IsEqualTo(expired.RegistrationInventoryHoldStatusId);
+        await Assert.That(retained.ConcurrencyStamp).IsEqualTo(expired.ConcurrencyStamp);
+        await Assert.That(retained.ReleasedAt).IsEqualTo(expired.ReleasedAt);
+        await Assert.That(retained.ConsumedAt).IsNull();
+        await Assert.That(allocation.IsCapacityAllocated).IsEqualTo(deleteExpiredHistory);
+        if (deleteExpiredHistory)
+        {
+            await Assert.That(result.FailureCode).IsEqualTo("guest_registration_cancellation_ineligible");
+            await Assert.That(allocation.ConcurrencyStamp).IsEqualTo(consumed.ConcurrencyStamp);
+        }
+        else
+        {
+            await Assert.That(result.IsSuccess).IsTrue();
+            var order = await fixture.Context.RegistrationOrders.AsNoTracking().SingleAsync();
+            await Assert.That(allocation.ReleasedAt).IsEqualTo(order.CancelledAt);
+            await Assert.That(allocation.ConsumedAt).IsEqualTo(consumed.ConsumedAt);
+            await Assert.That(await fixture.Services.GetRequiredService<IRegistrationInventoryRepository>()
+                .GetAllocatedQuantityAsync(consumed.CapacityPoolId, fixture.TenantId, CancellationToken.None)).IsEqualTo(0);
+            clock.Now = clock.Now.AddMinutes(1);
+            await Assert.That((await CancelAsync(fixture, command)).IsSuccess).IsTrue();
+            var replay = await fixture.Context.RegistrationInventoryHolds.AsNoTracking()
+                .SingleAsync(hold => hold.Id == consumed.Id);
+            await Assert.That(replay.ConcurrencyStamp).IsEqualTo(allocation.ConcurrencyStamp);
+        }
     }
 
     [Test]
@@ -253,13 +307,13 @@ public sealed partial class AnonymousCancellationConcurrencyTests
             // Only the external key source is substituted; production HMAC, issuance, readiness and DB remain real.
             var secrets = Substitute.For<ISecretResolver>();
             secrets.ResolveQualifiedAsync(Arg.Any<string>(), Arg.Any<SecretScope>(), Arg.Any<Guid?>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-                .Returns(SecretResolutionResult.Resolved(new("test", Convert.ToBase64String(new byte[32]),
+                .Returns(SecretResolutionResult.Resolved(new("test", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
                     SecretSourceType.EnvironmentVariable, SecretScope.Instance, null, clock.Now)));
             services.AddSingleton<IAdmissionCredentialDigestService>(new AdmissionCredentialDigestService(secrets, Options.Create(new AdmissionCredentialOptions())));
         });
 
     private static async Task<CancelConfirmedGuestRegistrationCommand> ConfirmAsync(EventVisitorCapabilitySqliteFixture fixture, Clock clock,
-        Guid? existingEventId = null, bool capabilityProfile = false)
+        Guid? existingEventId = null, bool capabilityProfile = false, bool recoverBeforeConfirmation = false)
     {
         var target = existingEventId.HasValue
             ? await fixture.Context.Events.AsNoTracking().SingleAsync(value => value.Id == existingEventId)
@@ -307,23 +361,30 @@ public sealed partial class AnonymousCancellationConcurrencyTests
         var order = await fixture.Context.RegistrationOrders.Include(value => value.Lines).SingleAsync(value => value.Id == created.Id);
         // Native issuance currently requires a delivery address. Its presence is not anonymous authority.
         order.SetPii(RegistrationOrderPii.Create(order.Id, fixture.TenantId, null, "guest@example.test", null, null));
-        var participant = RegistrationParticipant.Create(Guid.CreateVersion7(), fixture.TenantId, order.Id, fixture.UserId, ParticipantTypeEnum.Adult, null);
-        order.AddParticipant(participant);
-        var assignment = RegistrationTicketAssignment.CreateAssigned(Guid.CreateVersion7(), order.Lines.Single().Id, 1, participant, clock.Now.UtcDateTime);
-        order.AddAssignment(order.Lines.Single(), assignment, participant);
-        fixture.Context.RegistrationFinalizationEffects.Add(RegistrationFinalizationEffect.Create(order, clock.Now.UtcDateTime));
-        await fixture.Context.SaveChangesAsync();
-        var readiness = fixture.Services.GetRequiredService<IParticipantAdmissionEligibilityRepository>();
-        await fixture.Services.GetRequiredService<IUnitOfWork>().ExecuteInTransactionAsync(async token =>
+        if (!recoverBeforeConfirmation)
         {
-            await readiness.EnsureForAssignmentsAsync(fixture.TenantId, target.Id, order.Id, [assignment.Id], clock.Now.UtcDateTime, token);
-            var completion = await readiness.LoadCompletionForUpdateAsync(fixture.TenantId, target.Id, order.Id, assignment.Id,
-                participant.Id, fixture.UserId, token);
-            await Assert.That(completion!.RequirementsComplete).IsTrue();
-            completion.Eligibility.RecordSubjectCompletion(completion.Participant, fixture.UserId, completion.SubjectConsentRecordId,
-                clock.Now.UtcDateTime, Guid.CreateVersion7());
-            await readiness.ApplyDecisionAsync(completion.Eligibility, token);
-        });
+            var participant = RegistrationParticipant.Create(Guid.CreateVersion7(), fixture.TenantId, order.Id, fixture.UserId, ParticipantTypeEnum.Adult, null);
+            order.AddParticipant(participant);
+            var assignment = RegistrationTicketAssignment.CreateAssigned(Guid.CreateVersion7(), order.Lines.Single().Id, 1, participant, clock.Now.UtcDateTime);
+            order.AddAssignment(order.Lines.Single(), assignment, participant);
+            fixture.Context.RegistrationFinalizationEffects.Add(RegistrationFinalizationEffect.Create(order, clock.Now.UtcDateTime));
+            await fixture.Context.SaveChangesAsync();
+            var readiness = fixture.Services.GetRequiredService<IParticipantAdmissionEligibilityRepository>();
+            await fixture.Services.GetRequiredService<IUnitOfWork>().ExecuteInTransactionAsync(async token =>
+            {
+                await readiness.EnsureForAssignmentsAsync(fixture.TenantId, target.Id, order.Id, [assignment.Id], clock.Now.UtcDateTime, token);
+                var completion = await readiness.LoadCompletionForUpdateAsync(fixture.TenantId, target.Id, order.Id, assignment.Id,
+                    participant.Id, fixture.UserId, token);
+                await Assert.That(completion!.RequirementsComplete).IsTrue();
+                completion.Eligibility.RecordSubjectCompletion(completion.Participant, fixture.UserId, completion.SubjectConsentRecordId,
+                    clock.Now.UtcDateTime, Guid.CreateVersion7());
+                await readiness.ApplyDecisionAsync(completion.Eligibility, token);
+            });
+        }
+        else
+        {
+            await fixture.Context.SaveChangesAsync();
+        }
         fixture.Context.ChangeTracker.Clear();
         // Seed the confirmed boundary through Domain transitions and native inventory, not a readiness stub.
         var inventory = fixture.Services.GetRequiredService<IRegistrationInventoryRepository>();
@@ -332,11 +393,28 @@ public sealed partial class AnonymousCancellationConcurrencyTests
             var current = (await inventory.GetOrderForUpdateWithLinesAsync(order.Id, fixture.TenantId, token))!;
             current.TransitionTo(RegistrationOrderStatusEnum.AwaitingRequirements, clock.Now.UtcDateTime);
             current.TransitionTo(RegistrationOrderStatusEnum.ReadyForCheckout, clock.Now.UtcDateTime);
-            await Assert.That(await inventory.TryConsumeActiveHoldsForOrderAsync(order.Id, fixture.TenantId, clock.Now.UtcDateTime, token)).IsEqualTo(1);
-            current.TransitionTo(RegistrationOrderStatusEnum.Confirmed, clock.Now.UtcDateTime);
+            if (!recoverBeforeConfirmation)
+            {
+                await Assert.That(await inventory.TryConsumeActiveHoldsForOrderAsync(order.Id, fixture.TenantId, clock.Now.UtcDateTime, token)).IsEqualTo(1);
+                current.TransitionTo(RegistrationOrderStatusEnum.Confirmed, clock.Now.UtcDateTime);
+            }
             await inventory.SaveChangesAsync(token);
         });
         fixture.Context.ChangeTracker.Clear();
+        if (recoverBeforeConfirmation)
+        {
+            var originalHold = (await inventory.GetHoldsByOrderAsync(order.Id, fixture.TenantId, CancellationToken.None)).Single();
+            clock.Now = new DateTimeOffset(originalHold.ExpiresAt, TimeSpan.Zero);
+            await Assert.That(await inventory.TryExpireDueHoldAsync(originalHold.Id, clock.Now.UtcDateTime, CancellationToken.None)).IsTrue();
+            fixture.Context.ChangeTracker.Clear();
+            var lifecycle = fixture.Services.GetRequiredService<IRegistrationOrderLifecycleService>();
+            await Assert.That((await lifecycle.RecoverExpiredHoldAsync(order.Id, fixture.TenantId, CancellationToken.None)).IsSuccess).IsTrue();
+            fixture.Context.ChangeTracker.Clear();
+            await Assert.That((await lifecycle.FinalizeFreeAsync(order.Id, fixture.TenantId, CancellationToken.None)).IsSuccess).IsTrue();
+            fixture.Context.ChangeTracker.Clear();
+            await Assert.That((await fixture.Context.RegistrationOrders.AsNoTracking().SingleAsync(value => value.Id == order.Id))
+                .RegistrationOrderStatusId).IsEqualTo((int)RegistrationOrderStatusEnum.Confirmed);
+        }
         if (!existingEventId.HasValue)
         {
             var admissionTarget = AdmissionTarget.Create(Guid.CreateVersion7(), fixture.TenantId, target.Id, AdmissionTargetTypeEnum.Event, null, null);

@@ -397,6 +397,16 @@ rejects guest cancellation. The real PostgreSQL regression commits check-in
 before cancellation's first assignment fence and verifies rejection without
 releasing capacity; no sleep or polling determines the interleaving.
 
+Hold recovery leaves an Expired audit row and creates a replacement allocation.
+`AnonymousCancellationContext` retains and validates that history, while its
+`ConsumedHolds` projection fixes the identities eligible for release. The
+projection remains stable after those entities transition to Released, so the
+service can still compare the exact returned release identities. Expired rows
+are never released again or deleted by cancellation. Deleted lineage and
+nonempty hold history without a consumed allocation remain ineligible.
+Completed replay validates the cancellation timestamp without changing stamps
+or releasing capacity twice.
+
 ## 7. Related Documentation & ADRs
 
 * [ADR-017: Event Participation Authority Model](adr/ADR-017-event-participation-authority-model.md)

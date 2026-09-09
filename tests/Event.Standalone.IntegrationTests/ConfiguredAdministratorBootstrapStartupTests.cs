@@ -380,6 +380,9 @@ public sealed class ConfiguredAdministratorBootstrapStartupTests
 
     private sealed class UnitOfWorkProbe(StartupTimeline timeline) : IUnitOfWork
     {
+        public Task<T> ExecuteReadCommittedAsync<T>(
+            Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) => operation(ct);
+
         public Task ExecuteInTransactionAsync(
             Func<CancellationToken, Task> operation,
             CancellationToken ct = default) => operation(ct);

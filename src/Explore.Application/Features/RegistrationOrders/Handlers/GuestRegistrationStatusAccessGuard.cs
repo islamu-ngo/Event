@@ -12,7 +12,7 @@ internal static class GuestRegistrationStatusAccessGuard
         tenantId != Guid.Empty && eventId != Guid.Empty && orderId != Guid.Empty && token is { Length: 43 } &&
         token.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_');
 
-    // The caller owns a serializable transaction. Both reads are fresh, tenant-filtered entities;
+    // The caller owns a transaction retaining the order and event row fences. Both reads are tenant-filtered entities;
     // neither tracked order graphs nor a second read through the general checkout guard are authority.
     internal static async Task<(RegistrationOrder Order, Event Event, DateTime Deadline)?> GetAsync(
         IGuestRegistrationCapabilityRepository guestRegistrations,

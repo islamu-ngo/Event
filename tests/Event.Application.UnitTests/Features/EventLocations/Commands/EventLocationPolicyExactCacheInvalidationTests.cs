@@ -109,6 +109,9 @@ public sealed class EventLocationPolicyExactCacheInvalidationTests
 
     private sealed class PassThroughUnitOfWork : IUnitOfWork
     {
+        public Task<T> ExecuteReadCommittedAsync<T>(
+            Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) => operation(ct);
+
         public Task ExecuteInTransactionAsync(
             Func<CancellationToken, Task> operation,
             CancellationToken ct = default) => operation(ct);
@@ -124,6 +127,9 @@ public sealed class EventLocationPolicyExactCacheInvalidationTests
 
     private sealed class PostCommitCancellingUnitOfWork(CancellationTokenSource cancellation) : IUnitOfWork
     {
+        public Task<T> ExecuteReadCommittedAsync<T>(
+            Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) => ExecuteInTransactionAsync(operation, ct);
+
         public async Task ExecuteInTransactionAsync(
             Func<CancellationToken, Task> operation,
             CancellationToken ct = default)

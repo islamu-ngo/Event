@@ -22,6 +22,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
+using Npgsql;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -32,6 +33,7 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
     private readonly string _path = Path.Combine(Path.GetTempPath(), $"event-visitor-{Guid.CreateVersion7():N}.db");
     private ServiceProvider _provider = null!;
     private IServiceCollection _services = null!;
+    private bool _deleteSqliteFiles = true;
     private AsyncServiceScope _scope;
     public Guid TenantId { get; } = Guid.CreateVersion7();
     internal Guid UserId { get; } = Guid.CreateVersion7();
@@ -50,12 +52,39 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
     {
         var fixture = new EventVisitorCapabilitySqliteFixture();
         await EmailDispatchSqliteFixture.CreateDatabaseAsync(fixture._path);
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        return await CreateAsync(fixture, new Dictionary<string, string?>
         {
             ["Database:Provider"] = "Sqlite", ["Database:Database"] = fixture._path,
-            ["Authentication:Provider"] = "Local",
-            ["SecretProvider:Provider"] = "Environment"
-        }).Build();
+        }, configureServices);
+    }
+
+    internal static Task<EventVisitorCapabilitySqliteFixture> CreatePostgreSqlAsync(
+        string connectionString,
+        Action<IServiceCollection>? configureServices = null)
+    {
+        var connection = new NpgsqlConnectionStringBuilder(connectionString);
+        var fixture = new EventVisitorCapabilitySqliteFixture { _deleteSqliteFiles = false };
+        return CreateAsync(fixture, new Dictionary<string, string?>
+        {
+            ["Database:Provider"] = "PostgreSql",
+            ["Database:Host"] = connection.Host,
+            ["Database:Port"] = connection.Port.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["Database:Database"] = connection.Database,
+            ["Database:Schema"] = connection.SearchPath,
+            ["Database:Username"] = connection.Username,
+            ["Database:Password"] = connection.Password,
+            ["Database:TlsMode"] = "Disabled",
+        }, configureServices);
+    }
+
+    private static async Task<EventVisitorCapabilitySqliteFixture> CreateAsync(
+        EventVisitorCapabilitySqliteFixture fixture,
+        Dictionary<string, string?> databaseConfiguration,
+        Action<IServiceCollection>? configureServices)
+    {
+        databaseConfiguration["Authentication:Provider"] = "Local";
+        databaseConfiguration["SecretProvider:Provider"] = "Environment";
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(databaseConfiguration).Build();
         var services = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
         {
             DisableDefaults = true, EnvironmentName = Environments.Production
@@ -235,11 +264,14 @@ internal sealed class EventVisitorCapabilitySqliteFixture : IAsyncDisposable, IT
     {
         await _scope.DisposeAsync();
         await _provider.DisposeAsync();
-        using var connection = new SqliteConnection($"Data Source={_path}");
-        SqliteConnection.ClearPool(connection);
-        File.Delete(_path);
-        File.Delete(_path + "-wal");
-        File.Delete(_path + "-shm");
+        if (_deleteSqliteFiles)
+        {
+            using var connection = new SqliteConnection($"Data Source={_path}");
+            SqliteConnection.ClearPool(connection);
+            File.Delete(_path);
+            File.Delete(_path + "-wal");
+            File.Delete(_path + "-shm");
+        }
         if (Directory.Exists(_path + "-keys")) Directory.Delete(_path + "-keys", recursive: true);
     }
 }

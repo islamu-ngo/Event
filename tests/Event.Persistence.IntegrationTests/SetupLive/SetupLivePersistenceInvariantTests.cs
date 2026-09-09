@@ -1230,6 +1230,10 @@ public sealed class SetupLivePersistenceInvariantTests(
     {
         private int _invocations;
 
+        public Task<T> ExecuteReadCommittedAsync<T>(
+            Func<CancellationToken, Task<T>> operation,
+            CancellationToken ct = default) => inner.ExecuteReadCommittedAsync(operation, ct);
+
         public Task ExecuteInTransactionAsync(
             Func<CancellationToken, Task> operation,
             CancellationToken ct = default) =>

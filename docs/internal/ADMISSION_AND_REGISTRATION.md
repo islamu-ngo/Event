@@ -380,6 +380,23 @@ Connectivity loss is a denial of admission validation, not permission to validat
 
 See [Operations](OPERATIONS.md#admission-check-in-operations-phase-21) for incident response, export-safe audit, alerts, and rollback evidence.
 
+### Anonymous Cancellation And Committed Attendance
+
+`AnonymousCancellationService` retains the shared order, event, assignment,
+ticket, target and capacity-pool fences through its transaction. Its explicit
+`IUnitOfWork.ExecuteReadCommittedAsync` boundary ensures attendance reads after
+lock acquisition observe check-ins committed while earlier fences were pending.
+PostgreSQL Serializable snapshots cannot provide that freshness merely by
+acquiring `FOR UPDATE` locks later in the transaction. MySQL also receives
+explicit Read Committed rather than relying on its default Repeatable Read.
+SQLite retains Serializable writer exclusion.
+
+Order cancellation, admission revocation and exact consumed-capacity release
+remain atomic. Any recorded attendance, including subsequently undone entry,
+rejects guest cancellation. The real PostgreSQL regression commits check-in
+before cancellation's first assignment fence and verifies rejection without
+releasing capacity; no sleep or polling determines the interleaving.
+
 ## 7. Related Documentation & ADRs
 
 * [ADR-017: Event Participation Authority Model](adr/ADR-017-event-participation-authority-model.md)

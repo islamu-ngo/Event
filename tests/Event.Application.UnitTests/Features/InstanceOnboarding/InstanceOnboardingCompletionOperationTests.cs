@@ -575,6 +575,9 @@ internal sealed class OnboardingCompletionScenario
         public Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) =>
             throw new NotSupportedException();
 
+        public Task<T> ExecuteReadCommittedAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) =>
+            ExecuteSerializableAsync(operation, ct);
+
         public async Task<T> ExecuteSerializableAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default)
         {
             InstanceBootstrapState bootstrap = Clone(owner.Bootstrap);

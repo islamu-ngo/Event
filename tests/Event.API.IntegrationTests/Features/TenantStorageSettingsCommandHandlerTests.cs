@@ -324,5 +324,10 @@ public sealed class TenantStorageSettingsCommandHandlerTests
             Func<CancellationToken, Task<T>> operation,
             CancellationToken ct = default)
             => throw new NotSupportedException();
+
+        public Task<T> ExecuteReadCommittedAsync<T>(
+            Func<CancellationToken, Task<T>> operation,
+            CancellationToken ct = default)
+            => throw new NotSupportedException();
     }
 }

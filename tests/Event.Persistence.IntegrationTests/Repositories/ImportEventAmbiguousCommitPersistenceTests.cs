@@ -132,6 +132,9 @@ public sealed class ImportEventAmbiguousCommitPersistenceTests(PostgreSqlContain
 
         public Task<T> ExecuteSerializableAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) =>
             ExecuteInTransactionAsync(operation, ct);
+
+        public Task<T> ExecuteReadCommittedAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) =>
+            ExecuteInTransactionAsync(operation, ct);
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider

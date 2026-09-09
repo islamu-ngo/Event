@@ -58,6 +58,8 @@ history and no relevant check-in history. A zero displayed balance alone is not
 proof that an order is free. Paid/refunded orders, account-owned registrations,
 staff corrections and unsupported states retain their existing processes.
 A recorded check-in prevents this guest cancellation even if it was later undone.
+If check-in and cancellation overlap, the server checks committed admission
+history rather than relying on the status page's earlier eligibility result.
 
 Successful cancellation changes the order, revokes its eligible admission and
 releases consumed capacity in one transaction. Repeating the same successful

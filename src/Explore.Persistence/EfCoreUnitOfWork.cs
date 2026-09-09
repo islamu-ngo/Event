@@ -61,6 +61,12 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
         CancellationToken ct = default) =>
         ExecuteBootstrapConflictRetryAsync(() => ExecuteCoreAsync(operation, IsolationLevel.Serializable, ct), ct);
 
+    public Task<T> ExecuteReadCommittedAsync<T>(
+        Func<CancellationToken, Task<T>> operation,
+        CancellationToken ct = default) =>
+        ExecuteCoreAsync(operation,
+            _dbContext.Database.IsSqlite() ? IsolationLevel.Serializable : IsolationLevel.ReadCommitted, ct);
+
     internal static async Task<T> ExecuteBootstrapConflictRetryAsync<T>(
         Func<Task<T>> operation, CancellationToken ct)
     {

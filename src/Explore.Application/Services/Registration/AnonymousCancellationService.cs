@@ -29,7 +29,9 @@ public sealed class AnonymousCancellationService(
         try
         {
             DateTime deadline = default;
-            var result = await unitOfWork.ExecuteSerializableAsync(async token =>
+            // The shared order/event/admission fences serialize mutations. Reads after those
+            // fences must see attendance committed while earlier lock acquisition was pending.
+            var result = await unitOfWork.ExecuteReadCommittedAsync(async token =>
             {
                 var authorized = await GuestRegistrationStatusAccessGuard.GetAsync(
                     guestRegistrations, events, capabilities, tenant.TenantId, eventId, orderId,

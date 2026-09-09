@@ -264,6 +264,9 @@ internal sealed class AdmissionTrackingUnitOfWork(AdmissionTestScenario scenario
     public Task<T> ExecuteSerializableAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) =>
         Execute(operation, ct);
 
+    public Task<T> ExecuteReadCommittedAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) =>
+        Execute(operation, ct);
+
     private async Task<T> Execute<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken)
     {
         InTransaction = true;

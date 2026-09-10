@@ -18,7 +18,7 @@ public sealed class AnalyticsNavigationLoggingPrivacyTests
         "/events/%0D%0Aforged")]
     [Arguments("/events/%0d%0aforged?token=" + QuerySentinel + "#" + FragmentSentinel,
         "/events/%0d%0aforged")]
-    public async Task Navigation_WhenJavaScriptPageViewFails_LogsOnlyEscapedPath(
+    public async Task Navigation_WhenJavaScriptPageViewFails_LogsOnlyFailureMetadata(
         string location, string expectedPath)
     {
         await using var context = new BlazorTestContext();
@@ -40,7 +40,7 @@ public sealed class AnalyticsNavigationLoggingPrivacyTests
 
         var module = context.JSInterop.SetupModule("/js/analytics-bridge.js");
         module.SetupVoid("initAnalytics", _ => true).SetVoidResult();
-        var failure = new JSException("pageview-boundary-unavailable");
+        var failure = new JSException(QuerySentinel + "\r\n" + FragmentSentinel);
         // Match any path: neither normalization nor logging is implemented by the test double.
         module.SetupVoid("trackPageView", _ => true).SetException(failure);
         var navigation = context.Services.GetRequiredService<BunitNavigationManager>();
@@ -48,11 +48,11 @@ public sealed class AnalyticsNavigationLoggingPrivacyTests
         // Subscribe before each trigger. Logging is the exact source-to-sink completion signal.
         var initialLog = logger.ReadAsync();
         var cut = context.Render<AnalyticsInitializer>();
-        await AssertLogAsync(await initialLog, "/", failure);
+        await AssertLogAsync(await initialLog);
 
         var navigationLog = logger.ReadAsync();
         await cut.InvokeAsync(() => navigation.NavigateTo(location)).WaitAsync(Timeout);
-        await AssertLogAsync(await navigationLog, expectedPath, failure);
+        await AssertLogAsync(await navigationLog);
 
         await Assert.That(module.Invocations["initAnalytics"].Count).IsEqualTo(1);
         var pageViews = module.Invocations["trackPageView"];
@@ -64,16 +64,47 @@ public sealed class AnalyticsNavigationLoggingPrivacyTests
         await Assert.That(properties["page_referrer"]).IsEqualTo("/");
     }
 
-    private static async Task AssertLogAsync(LogEntry entry, string expectedPath, JSException failure)
+    [Test]
+    [Arguments("initAnalytics", "initialization")]
+    [Arguments("trackEvent", "track")]
+    [Arguments("identifyUser", "identify")]
+    [Arguments("trackPageView", "page view")]
+    [Arguments("optInCapturing", "opt-in")]
+    [Arguments("optOutCapturing", "opt-out")]
+    public async Task JavaScriptFailures_DoNotExposeInputsOrExceptionPayloads(string operation, string expectedOperation)
+    {
+        await using var context = new BlazorTestContext();
+        var logger = new PageViewLogger();
+        var module = context.JSInterop.SetupModule("/js/analytics-bridge.js");
+        module.SetupVoid(operation, _ => true)
+            .SetException(new JSException(QuerySentinel + "\r\n" + FragmentSentinel));
+        await using var interop = new AnalyticsInterop(context.JSInterop.JSRuntime, logger);
+        Task<LogEntry> logged = logger.ReadAsync();
+
+        await (operation switch
+        {
+            "initAnalytics" => interop.InitAsync(QuerySentinel, true, "pseudonymous", "direct", false, null, null),
+            "trackEvent" => interop.TrackAsync(QuerySentinel),
+            "identifyUser" => interop.IdentifyAsync(QuerySentinel),
+            "trackPageView" => interop.PageViewAsync(QuerySentinel),
+            "optInCapturing" => interop.OptInCapturingAsync(),
+            "optOutCapturing" => interop.OptOutCapturingAsync(),
+            _ => throw new ArgumentOutOfRangeException(nameof(operation))
+        });
+
+        await AssertLogAsync(await logged, expectedOperation);
+    }
+
+    private static async Task AssertLogAsync(LogEntry entry, string expectedOperation = "page view")
     {
         await Assert.That(entry.Level).IsEqualTo(LogLevel.Warning);
-        await Assert.That(ReferenceEquals(entry.Exception, failure)).IsTrue();
-        await Assert.That(entry.State.Single(pair => pair.Key == "PagePath").Value)
-            .IsEqualTo(expectedPath);
-        await Assert.That(entry.Formatted.Contains(expectedPath, StringComparison.Ordinal)).IsTrue();
+        await Assert.That(entry.Exception).IsNull();
+        await Assert.That(entry.Formatted).Contains($"Analytics bridge {expectedOperation} failed");
+        await Assert.That(entry.State.Single(pair => pair.Key == "ExceptionType").Value)
+            .IsEqualTo(nameof(JSException));
+        await Assert.That(entry.State.Any(pair => pair.Key is "PagePath" or "DistinctId" or "EventName")).IsFalse();
 
         // Inspect both the provider-facing formatted message and every structured field.
-        // Exact PagePath equality above also rejects decoding, truncation, or dropped logging.
         foreach (var text in entry.State.Select(pair => pair.Value?.ToString() ?? string.Empty)
                      .Prepend(entry.Formatted))
         {

@@ -36,7 +36,7 @@ public class AnalyticsInterop : IAnalyticsInterop, IAsyncDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Analytics bridge initialization failed");
+            _logger.LogWarning("Analytics bridge initialization failed: {ExceptionType}", ex.GetType().Name);
         }
     }
 
@@ -49,7 +49,7 @@ public class AnalyticsInterop : IAnalyticsInterop, IAsyncDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Analytics bridge track failed for event {EventName}", eventName);
+            _logger.LogWarning("Analytics bridge track failed: {ExceptionType}", ex.GetType().Name);
         }
     }
 
@@ -62,7 +62,7 @@ public class AnalyticsInterop : IAnalyticsInterop, IAsyncDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Analytics bridge identify failed for {DistinctId}", distinctId);
+            _logger.LogWarning("Analytics bridge identify failed: {ExceptionType}", ex.GetType().Name);
         }
     }
 
@@ -75,7 +75,7 @@ public class AnalyticsInterop : IAnalyticsInterop, IAsyncDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Analytics bridge page view failed for {PagePath}", pagePath);
+            _logger.LogWarning("Analytics bridge page view failed: {ExceptionType}", ex.GetType().Name);
         }
     }
 
@@ -88,7 +88,7 @@ public class AnalyticsInterop : IAnalyticsInterop, IAsyncDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Analytics bridge opt-in failed");
+            _logger.LogWarning("Analytics bridge opt-in failed: {ExceptionType}", ex.GetType().Name);
         }
     }
 
@@ -101,7 +101,7 @@ public class AnalyticsInterop : IAnalyticsInterop, IAsyncDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Analytics bridge opt-out failed");
+            _logger.LogWarning("Analytics bridge opt-out failed: {ExceptionType}", ex.GetType().Name);
         }
     }
 

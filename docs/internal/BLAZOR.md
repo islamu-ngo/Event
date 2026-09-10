@@ -248,6 +248,14 @@ AT Protocol authentication uses a custom authentication handler (`AtprotoAuthent
 4. **Session Persistence & Identity Resolution**: `ApiBackedOAuthStateStore` and `AtprotoTenantSessionHandoffStore` share the private `ApiBackedAtprotoTransientStore`; the BFF has no database reference or alternate transient cache. `ApiBackedOAuthSessionStore` retains durable OAuth-session ownership, and `AtprotoIdentityCache` remains discovery-only.
 5. **Browser Correlation**: `AtprotoBrowserProof` protects one fixed-expiry, host-only HTTPS cookie and derives an independent HMAC binding per flow. State/handoff adapters validate recovered origin, tenant and browser binding before candidate-bound consumption. Cross-origin canonical callbacks issue only opaque handoffs; the destination issues the first-party session cookie after proof validation. Proof is checked again immediately before cookie sign-in.
 
+## Analytics Diagnostic Boundary
+
+Analytics interop failures use operation-specific warning templates and the
+exception type only. `AnalyticsInterop` never attaches JavaScript exceptions or
+logs event names, distinct identifiers, navigation paths, traits, or bootstrap
+arguments. Analytics forwarding and consent behavior are unchanged; diagnostic
+redaction applies at the shared interop boundary, including direct callers.
+
 ## Auth Diagnostic Boundary
 
 Authentication challenge and OIDC callback failures are intentionally safe by default:

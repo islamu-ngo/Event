@@ -45,6 +45,11 @@ graph LR
 
 ## Common Issues & Recovery Recipes
 
+Analytics bridge warnings identify the failed operation and exception type, but
+intentionally omit page paths, user identifiers, event payloads and raw browser
+exception text. Use the operation to check analytics configuration and consent;
+do not add sensitive payloads to shared support logs to diagnose a failed call.
+
 ### Recipe 1: Keycloak "Invalid Parameter: redirect_uri" or Infinite Login Loop
 
 #### Why this happens

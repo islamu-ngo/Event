@@ -1,0 +1,28 @@
+Change-Id: CHG-01M25KK1592VVGMDW6XZNJH3NV
+Title: "Keep email retention failure diagnostics free of provider data"
+Type: fix
+Scope: privacy
+Summary: "Report cleanup failures by exception type without attaching raw provider exception content."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Per-tenant cleanup warnings exclude exception messages and recipient or provider details while preserving failure counts.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/communications-and-notifications/email-smtp.md
+    Disposition: documented
+    Detail: Cleanup warnings expose exception type only; delivery and retry guarantees remain unchanged.

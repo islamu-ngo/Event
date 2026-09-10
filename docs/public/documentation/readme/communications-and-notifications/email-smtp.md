@@ -85,6 +85,11 @@ outcome is not proof that nothing was sent: use authorized reconciliation with
 provider evidence, not blind replay. Do not put addresses, message content,
 credentials or raw provider errors in support logs.
 
+Retention cleanup reports aggregate success/failure counts. A per-tenant cleanup
+warning includes the exception type, not recipient information or raw provider
+details. Investigate database availability and the cleanup configuration when
+failures recur; a failed cleanup is not permission to resend an email.
+
 ---
 
 ## 3. Optional Private Mailpit Capture

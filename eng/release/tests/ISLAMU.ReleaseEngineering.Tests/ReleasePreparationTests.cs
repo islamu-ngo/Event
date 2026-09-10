@@ -127,7 +127,7 @@ public sealed class ReleasePreparationTests
     }
 
     [Test]
-    public async Task PrepareRejectsReorderedOtherwiseExactRangeBeforeRendering()
+    public async Task PrepareRejectsNoncanonicalEvidenceOrderingBeforeRendering()
     {
         if (OperatingSystem.IsWindows())
         {
@@ -143,15 +143,48 @@ public sealed class ReleasePreparationTests
                 secondOid[..12], secondOid, null, "fix", "registration", "Second change", "Second change", false, false, null)).ToArray(),
             Evidence = current.Evidence with
             {
-                Objects = current.Evidence.Objects.Append(new ReleaseContextObject(secondOid[..12], secondOid)).ToArray(),
+                Objects = current.Evidence.Objects
+                    .Where(value => value.Oid != new string('c', 40))
+                    .Append(new ReleaseContextObject(secondOid[..12], secondOid))
+                    .Append(new ReleaseContextObject(new string('c', 12), new string('c', 40))).ToArray(),
             },
         };
         ReleaseContextValidationResult context = fixture.AsValidationResult(ordered);
 
-        ReleasePreparationResult result = fixture.Prepare(context: context, rangeOids: [secondOid, new string('c', 40)]);
+        ReleasePreparationResult result = fixture.Prepare(context: context, rangeOids: [new string('c', 40), secondOid]);
 
         await Assert.That(result.Diagnostic).IsEqualTo("prepare_range_context_mismatch");
         await Assert.That(File.Exists(fixture.NotesPath)).IsFalse();
+    }
+
+    [Test]
+    public async Task PreparePreservesChronologicalRangeIndependentOfCanonicalEvidenceOrder()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var fixture = new PreparationFixture();
+        string secondOid = new('d', 40);
+        ReleaseContext current = fixture.Context.Context!;
+        ReleaseContext canonical = current with
+        {
+            Changes = current.Changes.Append(new ReleaseContextChange(
+                secondOid[..12], secondOid, null, "fix", "registration", "Second change", "Second change", false, false, null)).ToArray(),
+            Evidence = current.Evidence with
+            {
+                Objects = current.Evidence.Objects.Append(new ReleaseContextObject(secondOid[..12], secondOid)).ToArray(),
+            },
+        };
+        ReleaseContextValidationResult context = fixture.AsValidationResult(canonical);
+
+        ReleasePreparationResult result = fixture.Prepare(context: context, rangeOids: [secondOid, new string('c', 40)]);
+
+        await Assert.That(result.IsValid).IsTrue().Because(result.Diagnostic ?? "chronological range");
+        await Assert.That(File.ReadAllText(fixture.NotesPath)).Contains(
+            "## Complete Commit Range\n\n- `dddddddddddd`\n- `cccccccccccc`\n");
+        await Assert.That(fixture.AsValidationResult(context.Context!).Json).IsEqualTo(context.Json);
     }
 
     [Test]

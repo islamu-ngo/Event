@@ -172,7 +172,7 @@ public static class CandidateCommand
                 return Reject(output, "candidate_object_format_mismatch");
             }
 
-            string[] renderedRange = ContextRangeOids(context.Context);
+            string[] renderedRange = commitsThroughB[..^1].Select(commit => commit.Oid).ToArray();
             byte[] recomputedNotes = ComposeNotesInTemporaryDirectory(releaseDirectory, input, context, summaryBytes, renderedRange, trusted.Bundle, platform, timeout);
             if (!committedNotes.AsSpan().SequenceEqual(recomputedNotes))
             {
@@ -378,20 +378,6 @@ public static class CandidateCommand
                 return new ReleaseCommit(entry[..separator], entry[(separator + 1)..].TrimEnd('\n'));
             })
             .ToArray();
-    }
-
-    private static string[] ContextRangeOids(ReleaseContext context)
-    {
-        HashSet<string> currentChangeOids = context.Changes.Select(change => change.Oid).ToHashSet(StringComparer.Ordinal);
-        HashSet<string> backportOriginalOnly = context.Changes
-            .Select(change => change.BackportOf)
-            .OfType<string>()
-            .Where(oid => !currentChangeOids.Contains(oid))
-            .ToHashSet(StringComparer.Ordinal);
-        return context.Evidence.Objects.Select(value => value.Oid).Where(oid =>
-            !string.Equals(oid, context.Evidence.BaseStableOid, StringComparison.Ordinal) &&
-            !string.Equals(oid, context.Evidence.PreviousPublishedOid, StringComparison.Ordinal) &&
-            !backportOriginalOnly.Contains(oid)).ToArray();
     }
 
     private static bool HasExactTerminalSkip(string message)

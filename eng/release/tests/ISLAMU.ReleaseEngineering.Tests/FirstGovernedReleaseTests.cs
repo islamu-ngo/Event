@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using ISLAMU.ReleaseEngineering;
 
@@ -61,12 +62,15 @@ public sealed class FirstGovernedReleaseTests
     [Category("Runtime")]
     public async Task CategorizedReleaseVerifiesAfterBranchDeletion()
     {
+        Skip.Unless(OperatingSystem.IsLinux() && RuntimeInformation.ProcessArchitecture == Architecture.X64,
+            "The governed-release fixture requires the pinned Linux x64 renderer.");
+
         using var fixture = GovernedReleaseFixture.CreateCategorizedFirstGovernedRelease();
         string version = GovernedReleaseFixture.FirstGovernedReleaseVersion;
         string directory = Path.Combine(fixture.RepositoryPath, "docs", "internal", "releases", version);
-        byte[] notesBytes = File.ReadAllBytes(Path.Combine(directory, "release-notes.md"));
+        byte[] notesBytes = await File.ReadAllBytesAsync(Path.Combine(directory, "release-notes.md"));
         string notes = System.Text.Encoding.UTF8.GetString(notesBytes);
-        using JsonDocument context = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(directory, "release-context.v1.json")));
+        using JsonDocument context = JsonDocument.Parse(await File.ReadAllBytesAsync(Path.Combine(directory, "release-context.v1.json")));
         JsonElement[] changes = context.RootElement.GetProperty("changes").EnumerateArray().ToArray();
 
         await Assert.That(changes.Length).IsEqualTo(5);
@@ -96,9 +100,9 @@ public sealed class FirstGovernedReleaseTests
             .IsEqualTo(string.Join('\n', expectedPrimary));
 
         ReleaseInputValidationResult input = ReleaseInputPolicy.Validate(
-            File.ReadAllText(Path.Combine(directory, "release.yaml")),
-            Directory.EnumerateFiles(Path.Combine(fixture.RepositoryPath, "docs", "internal", "releases", "changes"), "*.yaml")
-                .Order(StringComparer.Ordinal).Select(File.ReadAllText).ToArray(),
+            await File.ReadAllTextAsync(Path.Combine(directory, "release.yaml")),
+            await Task.WhenAll(Directory.EnumerateFiles(Path.Combine(fixture.RepositoryPath, "docs", "internal", "releases", "changes"), "*.yaml")
+                .Order(StringComparer.Ordinal).Select(path => File.ReadAllTextAsync(path))),
             []);
         await Assert.That(input.IsValid).IsTrue();
         PublicChangeFragment upgrade = input.Fragments.Single(fragment => fragment.ChangeId == "CHG-2026-0002");
@@ -127,8 +131,8 @@ public sealed class FirstGovernedReleaseTests
         (int tagCode, string tagOutput) = fixture.VerifyTag(version, fixture.B, fixture.FirstTagObject);
         await Assert.That(candidateCode).IsEqualTo(Program.Success).Because(candidateOutput);
         await Assert.That(tagCode).IsEqualTo(Program.Success).Because(tagOutput);
-        byte[] candidateBytes = File.ReadAllBytes(Path.Combine(directory, "release-candidate.v1.json"));
-        byte[] evidenceBytes = File.ReadAllBytes(Path.Combine(directory, "release-evidence.v1.json"));
+        byte[] candidateBytes = await File.ReadAllBytesAsync(Path.Combine(directory, "release-candidate.v1.json"));
+        byte[] evidenceBytes = await File.ReadAllBytesAsync(Path.Combine(directory, "release-evidence.v1.json"));
         using JsonDocument candidate = JsonDocument.Parse(candidateBytes);
         using JsonDocument finalEvidence = JsonDocument.Parse(evidenceBytes);
         await Assert.That(fixture.BranchRefs()).IsEqualTo(string.Empty);
@@ -145,8 +149,8 @@ public sealed class FirstGovernedReleaseTests
         (int repeatedTagCode, string repeatedTagOutput) = fixture.VerifyTag(version, fixture.B, fixture.FirstTagObject);
         await Assert.That(repeatedCandidateCode).IsEqualTo(Program.Success).Because(repeatedCandidateOutput);
         await Assert.That(repeatedTagCode).IsEqualTo(Program.Success).Because(repeatedTagOutput);
-        await Assert.That(File.ReadAllBytes(Path.Combine(directory, "release-candidate.v1.json"))).IsEquivalentTo(candidateBytes);
-        await Assert.That(File.ReadAllBytes(Path.Combine(directory, "release-evidence.v1.json"))).IsEquivalentTo(evidenceBytes);
+        await Assert.That(await File.ReadAllBytesAsync(Path.Combine(directory, "release-candidate.v1.json"))).IsEquivalentTo(candidateBytes);
+        await Assert.That(await File.ReadAllBytesAsync(Path.Combine(directory, "release-evidence.v1.json"))).IsEquivalentTo(evidenceBytes);
 
         string clone = fixture.CreateTagOnlyClone($"v{version}");
         (int cloneCandidateCode, string cloneCandidateOutput) = fixture.VerifyCandidate(version, fixture.B, clone);
@@ -155,9 +159,9 @@ public sealed class FirstGovernedReleaseTests
         await Assert.That(cloneTagCode).IsEqualTo(Program.Success).Because(cloneTagOutput);
         await Assert.That(fixture.BranchRefs(clone)).IsEqualTo(string.Empty);
         string cloneDirectory = Path.Combine(clone, "docs", "internal", "releases", version);
-        await Assert.That(File.ReadAllBytes(Path.Combine(cloneDirectory, "release-notes.md"))).IsEquivalentTo(notesBytes);
-        await Assert.That(File.ReadAllBytes(Path.Combine(cloneDirectory, "release-candidate.v1.json"))).IsEquivalentTo(candidateBytes);
-        await Assert.That(File.ReadAllBytes(Path.Combine(cloneDirectory, "release-evidence.v1.json"))).IsEquivalentTo(evidenceBytes);
+        await Assert.That(await File.ReadAllBytesAsync(Path.Combine(cloneDirectory, "release-notes.md"))).IsEquivalentTo(notesBytes);
+        await Assert.That(await File.ReadAllBytesAsync(Path.Combine(cloneDirectory, "release-candidate.v1.json"))).IsEquivalentTo(candidateBytes);
+        await Assert.That(await File.ReadAllBytesAsync(Path.Combine(cloneDirectory, "release-evidence.v1.json"))).IsEquivalentTo(evidenceBytes);
     }
 
     [Test]

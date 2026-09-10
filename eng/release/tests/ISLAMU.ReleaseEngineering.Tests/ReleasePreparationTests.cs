@@ -182,7 +182,7 @@ public sealed class ReleasePreparationTests
         ReleasePreparationResult result = fixture.Prepare(context: context, rangeOids: [secondOid, new string('c', 40)]);
 
         await Assert.That(result.IsValid).IsTrue().Because(result.Diagnostic ?? "chronological range");
-        await Assert.That(File.ReadAllText(fixture.NotesPath)).Contains(
+        await Assert.That(await File.ReadAllTextAsync(fixture.NotesPath)).Contains(
             "## Complete Commit Range\n\n- `dddddddddddd`\n- `cccccccccccc`\n");
         await Assert.That(fixture.AsValidationResult(context.Context!).Json).IsEqualTo(context.Json);
     }

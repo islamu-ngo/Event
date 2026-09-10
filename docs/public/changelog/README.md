@@ -8,7 +8,7 @@ icon: clock-rotate-left
 ISLAMU Event is in major version zero and the current API version is `0.1`. This page summarizes adopter-visible mainline themes and the release discipline operators must apply. It does not invent a stable-version history that the repository has not published.
 
 {% hint style="warning" %}
-Pin exact tags and image digests. Review the repository release checklist and `docs/API_CHANGELOG.md` before upgrading. Back up and prove restore procedures before applying migrations or changing provider configuration.
+Pin exact tags and image digests. Review the repository [release checklist](https://github.com/islamu-ngo/Event/blob/develop/docs/internal/RELEASE_CHECKLIST.md) and [API changelog](https://github.com/islamu-ngo/Event/blob/develop/docs/internal/API_CHANGELOG.md) before upgrading. Back up and prove restore procedures before applying migrations or changing provider configuration.
 {% endhint %}
 
 ## Current release model
@@ -16,6 +16,14 @@ Pin exact tags and image digests. Review the repository release checklist and `d
 Releases currently use manual Semantic Versioning tags and manually authored GitHub Releases. The repository also contains an approved design for a governed release engine, trust roots, signed bundles, and automated evidence, but that system is prospective and is not an active production release authority.
 
 A trustworthy release record should identify the tag, preparation commit, image digests, supported deployment modes, schema/configuration/secret changes, migration order, operator verification, rollback or forward-recovery path, security impact, and documentation impact.
+
+## Reading governed release notes
+
+Governed notes present a maintainer summary, categorized changes, applicable impact evidence, and the complete technical commit range. Within the categorized list, Breaking Changes come first, including breaking bug fixes. Features, Bug Fixes, Performance, and Other Improvements follow only when they contain changes. Each change appears once in that list; evidence references and the complete range may refer to it again.
+
+Before upgrading, read the impact evidence as well as the category headings. It records applicable migration order, configuration changes, security and API impact, and operator actions. A missing category is not a safe-upgrade guarantee. Use the release-specific instructions for backup, restore, or forward recovery rather than assuming that a previous binary can run against a changed database.
+
+These categories do not activate signing or publication. The single dated, newest-first release history and automated GitBook delivery remain a required follow-up. A public page is a mutable view, not the signed release record: verify its tag and canonical notes hash against retained release evidence. A publication failure or page discrepancy does not change the signed release, and a correction must not replace historical signed notes.
 
 ## Current mainline themes
 
@@ -65,4 +73,4 @@ The API supports media-type, query, and header version negotiation while keeping
 
 ## Canonical detail
 
-The repository's `docs/API_CHANGELOG.md` is the detailed pre-v1 contract history. The release checklist is the current operator/releaser authority. Prospective release-policy documents must not be read as proof that automated signing, approval, or promotion is active.
+The repository's [API changelog](https://github.com/islamu-ngo/Event/blob/develop/docs/internal/API_CHANGELOG.md) is the detailed pre-v1 contract history. The [release checklist](https://github.com/islamu-ngo/Event/blob/develop/docs/internal/RELEASE_CHECKLIST.md) is the current operator/releaser authority. These mainline references describe current guidance; use the exact tag's retained documents when checking a particular release. Prospective release-policy documents must not be read as proof that automated signing, approval, or promotion is active.

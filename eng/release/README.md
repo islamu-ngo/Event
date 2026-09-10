@@ -28,6 +28,30 @@ section for review, and prints `commit_footer: Change-Id: <Change-Id>`. Use
 `allocate-change-id --target develop` only when another tool owns fragment
 creation.
 
+## Categorized canonical notes
+
+`GitCliffRenderer` groups validated presentation records without changing the
+canonical release context, version policy, visibility, backport identity, or
+complete commit range. Breaking changes precede Features, Bug Fixes,
+Performance, and Other Improvements; breaking fixes belong only to the first
+category. Context order is preserved within each category, and empty categories
+are omitted. Fixed headings appear once per group, while each primary entry
+retains its scope, title, and display ID.
+
+`ReleasePreparation` still composes the maintainer summary, rendered details,
+applicable impact evidence, and complete range. An ID repeated in an impact
+reference or the complete range is not a duplicate primary entry. Migration,
+configuration, security, OpenAPI, breaking, and operator evidence remains
+required where applicable. Presentation does not authorize disclosure.
+
+The engine and packaged template must be promoted together through the existing
+trusted-bundle procedure. Never modify an already promoted bundle or regenerate
+signed historical notes with a newer formatter. Candidate verification at exact
+`B` recomposes the notes and rejects different committed bytes with
+`candidate_release_notes_mismatch`. Before `B`, recover differing generated
+files using the [runbook](../../docs/internal/RELEASE_RUNBOOK.md#generated-note-mismatch-recovery);
+after signing, correct forward.
+
 Install local commit checks once:
 
 ```bash
@@ -106,7 +130,7 @@ directory.
 The packaged `cliff.toml` grammar is intentionally strict: comments and blank
 lines, one exact `[changelog]` table, one multiline `body`, `trim = true`, and
 `render_always = true`. The body may reference only `version`, loop over
-`commits`, and print `commit.group`, `commit.message`, and `commit.id`. Dotted,
+`commits`, and print `commit.group`, `commit.scope`, `commit.message`, and `commit.id`. Dotted,
 quoted, spaced, remote/provider/parser/bump/tag/range/processor/exec/URL variants
 fail closed. The renderer invokes the verified binary with `--config`,
 `--from-context`, `--offline`, and `--no-exec` from a temporary non-Git working
@@ -190,3 +214,38 @@ is copied from the canonical final manifest and verified against retained
 `release-candidate.v1.json`, trusted-bundle policy/config/trust/tool files, and the
 explicit environment inputs. Missing, duplicate, stale, tampered, or disagreeing
 final manifests fail before `release-evidence.json` is accepted.
+
+## Tests
+
+The locked-renderer checks are TUnit `[Explicit]` methods. The ordinary suite
+does not run them, even when `ISLAMU_RELEASE_TOOL_BUNDLE` is set. Provision the
+Linux executable using the archive URL, archive SHA-256, executable name, and
+executable SHA-256 in `toolchain.lock.json`, retain its license notices, and
+select each method explicitly. Run these commands sequentially: independent test
+processes share the output directory's synthetic promotion-root file, so TUnit's
+in-process nonparallel grouping cannot protect concurrent invocations.
+
+```bash
+export TMPDIR="$HOME/.cache/agent-tmp"
+export ISLAMU_RELEASE_TOOL_BUNDLE=/absolute/path/to/verified-test-tool-directory
+dotnet build eng/release/tests/ISLAMU.ReleaseEngineering.Tests/ISLAMU.ReleaseEngineering.Tests.csproj --configuration Release --verbosity quiet
+dotnet test --project eng/release/tests/ISLAMU.ReleaseEngineering.Tests/ISLAMU.ReleaseEngineering.Tests.csproj \
+  --configuration Release --no-build \
+  --treenode-filter "/*/*/GitCliffRendererTests/PromotedBinaryRendersTwiceByteIdenticallyOutsideGit" \
+  --minimum-expected-tests 1
+dotnet test --project eng/release/tests/ISLAMU.ReleaseEngineering.Tests/ISLAMU.ReleaseEngineering.Tests.csproj \
+  --configuration Release --no-build \
+  --treenode-filter "/*/*/FirstGovernedReleaseTests/CategorizedReleaseVerifiesAfterBranchDeletion" \
+  --minimum-expected-tests 1
+dotnet test --project eng/release/tests/ISLAMU.ReleaseEngineering.Tests/ISLAMU.ReleaseEngineering.Tests.csproj \
+  --configuration Release --no-build \
+  --treenode-filter "/*/*/ReleaseCandidateVerificationTests/VerifyCandidateRejectsCleanUnsignedBreakingNotesTamper" \
+  --minimum-expected-tests 1
+```
+
+Missing or mismatched executable bytes fail the selected checks. Stub executables
+still cover ordinary policy rejection cases, but are not real-renderer evidence.
+The explicit fixtures use the real pinned renderer and shipped template under
+synthetic promotion roots, receipts, SSH signatures, and dummy release-engine
+bundle bytes. They prove rendering and local Git verification, not production
+bundle promotion, signer approval, provider activation, or GitBook delivery.

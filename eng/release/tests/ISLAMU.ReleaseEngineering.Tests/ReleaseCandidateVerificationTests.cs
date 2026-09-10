@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
 using ISLAMU.ReleaseEngineering;
@@ -70,6 +71,51 @@ public sealed class ReleaseCandidateVerificationTests
         await Assert.That(driftOutput).IsEqualTo("verify_candidate_failed: candidate_generated_artifacts_dirty\n");
         await Assert.That(staleCode).IsEqualTo(Program.ToolchainRejected);
         await Assert.That(staleOutput).IsEqualTo("verify_candidate_failed: candidate_manifest_stale\n");
+    }
+
+    [Test]
+    [Explicit]
+    [Category("Runtime")]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task VerifyCandidateRejectsCleanUnsignedBreakingNotesTamper(bool omitEntry)
+    {
+        Skip.Unless(OperatingSystem.IsLinux() && RuntimeInformation.ProcessArchitecture == Architecture.X64,
+            "The governed-release fixture requires the pinned Linux x64 renderer.");
+
+        using var fixture = GovernedReleaseFixture.CreateCategorizedFirstGovernedRelease();
+        string version = GovernedReleaseFixture.FirstGovernedReleaseVersion;
+        string directory = Path.Combine(fixture.RepositoryPath, "docs", "internal", "releases", version);
+        string notesPath = Path.Combine(directory, "release-notes.md");
+        byte[] contextBytes = await File.ReadAllBytesAsync(Path.Combine(directory, "release-context.v1.json"));
+        using JsonDocument context = JsonDocument.Parse(contextBytes);
+        JsonElement breaking = context.RootElement.GetProperty("changes").EnumerateArray()
+            .Single(change => change.GetProperty("breaking").GetBoolean());
+        await Assert.That(breaking.GetProperty("type").GetString()).IsEqualTo("fix");
+        string notes = await File.ReadAllTextAsync(notesPath);
+        string primaryEntry = notes.Split('\n').Single(line => line.StartsWith("- ", StringComparison.Ordinal) &&
+            line.EndsWith($"({breaking.GetProperty("displayId").GetString()})", StringComparison.Ordinal));
+
+        (int validCode, string validOutput) = fixture.VerifyCandidate(version, fixture.B);
+        await Assert.That(validCode).IsEqualTo(Program.Success).Because(validOutput);
+        string refsBefore = fixture.AllRefs();
+        string tampered = notes.Replace(primaryEntry + "\n", omitEntry ? string.Empty :
+            $"- registration: No token replacement is required ({breaking.GetProperty("displayId").GetString()})\n", StringComparison.Ordinal);
+        string alternativeB = fixture.CreateUnsignedCandidateWithNotes(version, tampered);
+
+        // Exact committed files and footer must pass: only trusted byte recomposition may reject this sibling B.
+        await Assert.That(alternativeB == fixture.B).IsFalse();
+        await Assert.That(fixture.ResolveRef($"{alternativeB}^")).IsEqualTo(fixture.A);
+        await Assert.That(fixture.WorkingTreeStatus()).IsEqualTo(string.Empty);
+        await Assert.That(fixture.AllRefs()).IsEqualTo(refsBefore);
+        await Assert.That(fixture.ResolveTagObject($"v{version}")).IsEqualTo(fixture.FirstTagObject);
+        await Assert.That(await File.ReadAllBytesAsync(Path.Combine(directory, "release-context.v1.json"))).IsEquivalentTo(contextBytes);
+        await Assert.That(await File.ReadAllTextAsync(notesPath)).IsEqualTo(tampered);
+        await Assert.That(File.Exists(Path.Combine(directory, "release-candidate.v1.json"))).IsFalse();
+        (int exitCode, string output) = fixture.VerifyCandidate(version, alternativeB);
+        await Assert.That(exitCode).IsEqualTo(Program.ToolchainRejected).Because(output);
+        await Assert.That(output).IsEqualTo("verify_candidate_failed: candidate_release_notes_mismatch\n");
+        await Assert.That(File.Exists(Path.Combine(directory, "release-candidate.v1.json"))).IsFalse();
     }
 
     [Test]

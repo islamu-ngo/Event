@@ -188,7 +188,7 @@ public static class ReleasePreparation
             request.Context.Context.Changes.Any(change => !request.RangeOids.Contains(change.Oid, StringComparer.Ordinal)) ||
             actualEvidence.Distinct(StringComparer.Ordinal).Count() != actualEvidence.Length ||
             !expectedEvidence.SetEquals(actualEvidence) ||
-            !request.RangeOids.SequenceEqual(canonicalRange, StringComparer.Ordinal))
+            !request.RangeOids.Order(StringComparer.Ordinal).SequenceEqual(canonicalRange, StringComparer.Ordinal))
         {
             diagnostic = "prepare_range_context_mismatch";
             return false;

@@ -24,6 +24,7 @@ internal static class PresentationConfigGrammar
     {
         "version",
         "commit.group",
+        "commit.scope",
         "commit.message",
         "commit.id",
     };
@@ -389,28 +390,39 @@ public static class GitCliffRenderer
 
     private static byte[] CreateRendererContext(ReleaseContext context)
     {
-        RendererCommit[] commits = context.Changes.Select(change => new RendererCommit(
-            change.DisplayId,
-            change.Title,
-            null,
-            [],
-            change.Scope,
-            null,
-            change.Breaking,
-            change.Scope,
-            [],
-            RendererSignature.Empty,
-            RendererSignature.Empty,
-            false,
-            false,
-            RendererCommitStatistics.Empty,
-            null,
-            ProviderCommit.Empty,
-            ProviderCommit.Empty,
-            ProviderCommit.Empty,
-            ProviderCommit.Empty,
-            ProviderCommit.Empty,
-            change.Title)).ToArray();
+        RendererCommit[] commits = context.Changes
+            .GroupBy(change => change.Breaking
+                ? (Order: 0, Heading: "\u26a0\ufe0f Breaking Changes")
+                : change.Type switch
+                {
+                    "feat" => (Order: 1, Heading: "\U0001f680 Features"),
+                    "fix" => (Order: 2, Heading: "\U0001f41b Bug Fixes"),
+                    "perf" => (Order: 3, Heading: "\u26a1 Performance"),
+                    _ => (Order: 4, Heading: "\U0001f527 Other Improvements"),
+                })
+            .OrderBy(group => group.Key.Order)
+            .SelectMany(group => group.Select((change, index) => new RendererCommit(
+                change.DisplayId,
+                change.Title,
+                null,
+                [],
+                index == 0 ? $"\n### {group.Key.Heading}\n\n" : string.Empty,
+                null,
+                change.Breaking,
+                change.Scope,
+                [],
+                RendererSignature.Empty,
+                RendererSignature.Empty,
+                false,
+                false,
+                RendererCommitStatistics.Empty,
+                null,
+                ProviderCommit.Empty,
+                ProviderCommit.Empty,
+                ProviderCommit.Empty,
+                ProviderCommit.Empty,
+                ProviderCommit.Empty,
+                change.Title))).ToArray();
         string commitId = context.Changes.Count == 0 ? context.Evidence.PreviousPublishedOid : context.Changes[^1].Oid;
         var release = new RendererRelease(
             context.Release.Version,

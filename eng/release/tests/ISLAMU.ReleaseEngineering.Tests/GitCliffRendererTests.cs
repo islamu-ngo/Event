@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using ISLAMU.ReleaseEngineering;
 
 namespace ISLAMU.ReleaseEngineering.Tests;
@@ -280,7 +282,8 @@ public sealed class GitCliffRendererTests
             await Assert.That(second.IsValid).IsTrue();
             await Assert.That(second.Markdown).IsEquivalentTo(first.Markdown!);
             await Assert.That(System.Text.Encoding.UTF8.GetString(first.Markdown!)).IsEqualTo(
-                "# Release 1.1.0\n\n- registration: let attendees correct registration details (cccccccccccc)\n");
+                "# Release 1.1.0\n\n### \U0001f680 Features\n\n- registration: let attendees correct registration details (cccccccccccc)\n");
+            await VerifyCategorizedCases(request, context);
             await Assert.That(File.Exists(marker)).IsFalse();
         }
         finally
@@ -293,6 +296,77 @@ public sealed class GitCliffRendererTests
             {
                 Directory.Delete(isolationRoot, recursive: true);
             }
+        }
+    }
+
+    private static async Task VerifyCategorizedCases(GitCliffRenderRequest request, byte[] canonicalContext)
+    {
+        var options = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            WriteIndented = true,
+        };
+        ReleaseContext context = JsonSerializer.Deserialize<ReleaseContext>(canonicalContext, options)!;
+        ReleaseContextChange seed = context.Changes[0];
+        ReleaseContextChange[] changes =
+        [
+            seed with { DisplayId = "999999999999", Oid = new string('9', 40), Type = "docs", Scope = "guides", Title = "keep punctuation: (safe), caf\u00e9" },
+            seed with { DisplayId = "bbbbbbbbbbbb", Oid = new string('b', 40), Type = "fix", Scope = "api", Title = "remove obsolete response shape", Breaking = true },
+            seed with { DisplayId = "cccccccccccc", Oid = new string('c', 40), Type = "feat", Scope = "registration", Title = "first feature in context" },
+            seed with { DisplayId = "aaaaaaaaaaaa", Oid = new string('a', 40), Type = "feat", Scope = "registration", Title = "second feature in context" },
+            seed with { DisplayId = "dddddddddddd", Oid = new string('d', 40), Type = "fix", Scope = "registration", Title = "repair attendee lookup" },
+            seed with { DisplayId = "eeeeeeeeeeee", Oid = new string('e', 40), Type = "perf", Scope = "search", Title = "reduce allocation" },
+            seed with { DisplayId = "ffffffffffff", Oid = new string('f', 40), Type = "fix", Scope = "registration", Title = "backport attendee validation", Backport = true, BackportOf = new string('1', 40) },
+            seed with { DisplayId = "888888888888", Oid = new string('8', 40), Type = "chore", Scope = "release", Title = "refresh contributor tooling" },
+        ];
+        string mixed =
+            "# Release 1.1.0\n\n" +
+            "### \u26a0\ufe0f Breaking Changes\n\n" +
+            "- api: remove obsolete response shape (bbbbbbbbbbbb)\n\n" +
+            "### \U0001f680 Features\n\n" +
+            "- registration: first feature in context (cccccccccccc)\n" +
+            "- registration: second feature in context (aaaaaaaaaaaa)\n\n" +
+            "### \U0001f41b Bug Fixes\n\n" +
+            "- registration: repair attendee lookup (dddddddddddd)\n" +
+            "- registration: backport attendee validation (ffffffffffff)\n\n" +
+            "### \u26a1 Performance\n\n" +
+            "- search: reduce allocation (eeeeeeeeeeee)\n\n" +
+            "### \U0001f527 Other Improvements\n\n" +
+            "- guides: keep punctuation: (safe), caf\u00e9 (999999999999)\n" +
+            "- release: refresh contributor tooling (888888888888)\n";
+        (ReleaseContextChange[] Changes, string Markdown)[] cases =
+        [
+            (changes, mixed),
+            ([changes[1]], "# Release 1.1.0\n\n### \u26a0\ufe0f Breaking Changes\n\n- api: remove obsolete response shape (bbbbbbbbbbbb)\n"),
+            ([changes[4], changes[6]], "# Release 1.1.0\n\n### \U0001f41b Bug Fixes\n\n- registration: repair attendee lookup (dddddddddddd)\n- registration: backport attendee validation (ffffffffffff)\n"),
+            ([], "# Release 1.1.0\n"),
+        ];
+        CultureInfo originalCulture = CultureInfo.CurrentCulture;
+        CultureInfo originalUiCulture = CultureInfo.CurrentUICulture;
+        string? originalTimeZone = Environment.GetEnvironmentVariable("TZ");
+        try
+        {
+            foreach (var scenario in cases)
+            {
+                byte[] canonical = System.Text.Encoding.UTF8.GetBytes(
+                    JsonSerializer.Serialize(context with { Changes = scenario.Changes }, options) + "\n");
+                foreach (string cultureName in new[] { "en-US", "tr-TR" })
+                {
+                    CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(cultureName);
+                    CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo(cultureName);
+                    Environment.SetEnvironmentVariable("TZ", cultureName == "en-US" ? "Pacific/Honolulu" : "Asia/Tokyo");
+                    GitCliffRenderResult rendered = GitCliffRenderer.Render(request with { CanonicalContext = canonical });
+                    await Assert.That(rendered.IsValid).IsTrue().Because(rendered.Diagnostic ?? "categorized render");
+                    await Assert.That(System.Text.Encoding.UTF8.GetString(rendered.Markdown!)).IsEqualTo(scenario.Markdown);
+                }
+            }
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+            CultureInfo.CurrentUICulture = originalUiCulture;
+            Environment.SetEnvironmentVariable("TZ", originalTimeZone);
         }
     }
 

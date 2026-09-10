@@ -176,6 +176,46 @@ An identical rerun is a byte-idempotent success. A different existing generated
 file, path escape, symbolic link, context/range/fragment drift, renderer failure,
 or write failure stops without changing `release.yaml` or `summary.md`.
 
+### Generated-note mismatch recovery
+
+Promote the updated engine and packaged template together; replacing a file
+inside an accepted bundle is not promotion. A formatter change can change
+canonical Markdown bytes even when its canonical release context is identical.
+
+Before committing `B`, preserve reviewed hand-authored `release.yaml` and
+`summary.md`, remove only the uncommitted generated `release-context.v1.json`
+and `release-notes.md` for that version, then rerun preparation with the intended
+promoted bundle. Review the complete regenerated pair before committing.
+Do not bypass differing-file guards, edit generated notes by hand, or remove
+unrelated files. After signing, preserve the historical bytes and correct
+forward through the release addendum/correction procedure.
+
+Candidate verification at exact `B` recomposes the notes and rejects a committed
+difference with `candidate_release_notes_mismatch`; a clean worktree does not
+exempt notes from that check.
+
+### Categorized notes and formatter verification
+
+The notes retain the maintainer summary, categorized primary entries, applicable
+impact evidence, and complete technical range. Categories are Breaking Changes,
+Features, Bug Fixes, Performance, and Other Improvements, in that order, with
+empty categories omitted. Breaking status takes precedence over commit type,
+so a breaking fix appears once under Breaking Changes. Context order within each
+category and release/backport identity remain unchanged. Evidence and
+complete-range references may repeat IDs without repeating the primary entry.
+
+Follow the [explicit renderer checks](../../eng/release/README.md#tests) before
+promoting a formatter change. The tool-bundle variable alone does not select
+TUnit `[Explicit]` methods. Verify both archive and executable against the
+committed lock, retain upstream license notices, and run all exact selectors
+with `--minimum-expected-tests 1`.
+
+These fixtures use real locked renderer bytes with synthetic promotion receipts,
+SSH trust, and dummy engine bundle bytes. Passing them is not production signer
+or bootstrap approval. Applicable breaking, migration, configuration, security,
+OpenAPI, and operator evidence still belongs in the release descriptor and
+fragments; category headings cannot replace it.
+
 ### Candidate verification command
 
 After the reviewed preparation commit `B` is created, run the promoted bundle verifier
@@ -364,6 +404,18 @@ candidate/tag/main verification from current local objects.
   data.
 - Restricted security inputs MUST remain in the embargo lane outside the public
   checkout. If disclosure is not authorized, stop before public generation or tag.
+
+### Public changelog publication prerequisite
+
+The required [publication follow-up](../../dev/backlog/governed-changelog-publication.md)
+is not delivered by categorized notes. It must retain the complete accepted
+publication inventory and reconcile all unacknowledged records after coalesced
+dispatches. A protected acceptance branch is the trust boundary; a separate
+mutable GitBook synchronization branch is only its repairable mirror. Before
+activation, prove mirror repair, stable space identity, and the credential/event
+strategy that actually triggers required checks on generated pull requests.
+Neither successful rendering nor a GitBook view is publication authorization.
+A publication failure cannot rewrite or invalidate a signed release.
 
 ### Publication projection and drift reporting
 

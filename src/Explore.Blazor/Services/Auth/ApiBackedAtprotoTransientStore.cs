@@ -32,7 +32,11 @@ public sealed class ApiBackedAtprotoTransientStore(
         long expiry = expiresAt.ToUnixTimeMilliseconds();
         byte[] body = JsonSerializer.SerializeToUtf8Bytes(new
         {
-            purpose, tokenDigest = digest, tenantId, protectedPayload, expiresAtUnixMilliseconds = expiry
+            purpose,
+            tokenDigest = digest,
+            tenantId,
+            protectedPayload,
+            expiresAtUnixMilliseconds = expiry
         }, JsonOptions);
         var result = await SendAsync("create", purpose, body, HttpStatusCode.Conflict, cancellationToken).ConfigureAwait(false);
         if (result is null) return false;
@@ -61,7 +65,10 @@ public sealed class ApiBackedAtprotoTransientStore(
         ValidateCandidate(candidate, candidate.Purpose, candidate.TokenDigest, candidate.TenantId);
         byte[] body = JsonSerializer.SerializeToUtf8Bytes(new
         {
-            candidateId = candidate.Id, candidate.Purpose, candidate.TokenDigest, expectedTenantId = candidate.TenantId
+            candidateId = candidate.Id,
+            candidate.Purpose,
+            candidate.TokenDigest,
+            expectedTenantId = candidate.TenantId
         }, JsonOptions);
         var result = await SendAsync("consume", candidate.Purpose, body, HttpStatusCode.NotFound, cancellationToken).ConfigureAwait(false);
         if (result is null) return false;

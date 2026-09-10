@@ -134,36 +134,36 @@ internal static class SetupLiveEnumWire
 
     internal static string Format(
         SetupSecretBindingReadinessState value) => value switch
-    {
-        SetupSecretBindingReadinessState.Unconfigured => "unconfigured",
-        SetupSecretBindingReadinessState.Ready => "ready",
-        SetupSecretBindingReadinessState.Unavailable => "unavailable",
-        SetupSecretBindingReadinessState.Unauthorized => "unauthorized",
-        SetupSecretBindingReadinessState.Invalid => "invalid",
-        _ => throw new JsonException("Unknown Setup binding readiness state.")
-    };
+        {
+            SetupSecretBindingReadinessState.Unconfigured => "unconfigured",
+            SetupSecretBindingReadinessState.Ready => "ready",
+            SetupSecretBindingReadinessState.Unavailable => "unavailable",
+            SetupSecretBindingReadinessState.Unauthorized => "unauthorized",
+            SetupSecretBindingReadinessState.Invalid => "invalid",
+            _ => throw new JsonException("Unknown Setup binding readiness state.")
+        };
 
     internal static string Format(
         SetupSecretBindingOperationState value) => value switch
-    {
-        SetupSecretBindingOperationState.Accepted => "accepted",
-        SetupSecretBindingOperationState.Succeeded => "succeeded",
-        SetupSecretBindingOperationState.Failed => "failed",
-        SetupSecretBindingOperationState.Cancelled => "cancelled",
-        _ => throw new JsonException("Unknown Setup binding operation state.")
-    };
+        {
+            SetupSecretBindingOperationState.Accepted => "accepted",
+            SetupSecretBindingOperationState.Succeeded => "succeeded",
+            SetupSecretBindingOperationState.Failed => "failed",
+            SetupSecretBindingOperationState.Cancelled => "cancelled",
+            _ => throw new JsonException("Unknown Setup binding operation state.")
+        };
 
     internal static string Format(
         SetupSecretBindingOperationOutcome value) => value switch
-    {
-        SetupSecretBindingOperationOutcome.Accepted => "accepted",
-        SetupSecretBindingOperationOutcome.Ready => "ready",
-        SetupSecretBindingOperationOutcome.Unavailable => "unavailable",
-        SetupSecretBindingOperationOutcome.Unauthorized => "unauthorized",
-        SetupSecretBindingOperationOutcome.Invalid => "invalid",
-        SetupSecretBindingOperationOutcome.Cancelled => "cancelled",
-        SetupSecretBindingOperationOutcome.UnavailableEnrollment =>
-            "unavailable_enrollment",
-        _ => throw new JsonException("Unknown Setup binding operation outcome.")
-    };
+        {
+            SetupSecretBindingOperationOutcome.Accepted => "accepted",
+            SetupSecretBindingOperationOutcome.Ready => "ready",
+            SetupSecretBindingOperationOutcome.Unavailable => "unavailable",
+            SetupSecretBindingOperationOutcome.Unauthorized => "unauthorized",
+            SetupSecretBindingOperationOutcome.Invalid => "invalid",
+            SetupSecretBindingOperationOutcome.Cancelled => "cancelled",
+            SetupSecretBindingOperationOutcome.UnavailableEnrollment =>
+                "unavailable_enrollment",
+            _ => throw new JsonException("Unknown Setup binding operation outcome.")
+        };
 }

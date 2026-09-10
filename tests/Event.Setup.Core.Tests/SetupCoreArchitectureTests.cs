@@ -222,11 +222,13 @@ public sealed class SetupCoreArchitectureTests
         ArtifactDigest second = ArtifactDigest.Compute("second"u8);
         var baseline = new Dictionary<PortableSectionKey, ArtifactDigest>
         {
-            [b] = first, [a] = first
+            [b] = first,
+            [a] = first
         };
         var candidate = new Dictionary<PortableSectionKey, ArtifactDigest>
         {
-            [c] = second, [b] = second
+            [c] = second,
+            [b] = second
         };
         SetupDiffInput input = new(baseline, candidate);
         SetupCoverageInput coverageInput = new([c, a, b], [b, a]);

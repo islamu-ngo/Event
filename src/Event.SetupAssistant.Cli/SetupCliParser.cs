@@ -7,7 +7,8 @@ internal static class SetupCliParser
         ["catalogue"] = ["list", "show", "describe"],
         ["manifest"] = ["create", "open", "validate", "format", "diff", "coverage", "export"],
         ["tenant-package"] = ["create", "open", "validate", "format", "diff", "coverage", "export"],
-        ["env"] = ["render", "validate"], ["legal"] = ["validate", "preview"],
+        ["env"] = ["render", "validate"],
+        ["legal"] = ["validate", "preview"],
         ["doctor"] = ["doctor"]
     };
     private static readonly HashSet<string> InputOperations = new(["open", "validate", "format", "diff", "coverage", "export", "preview"], StringComparer.Ordinal);

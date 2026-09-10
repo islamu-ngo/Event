@@ -20,7 +20,9 @@ public static class SetupCliCommandSchemaMetadata
         {
             ["invocation"] = ObjectSchema(["commandFamily", "operation", "mode"], new()
             {
-                ["commandFamily"] = Enum(Families), ["operation"] = Enum(Operations), ["mode"] = Enum(["machine"])
+                ["commandFamily"] = Enum(Families),
+                ["operation"] = Enum(Operations),
+                ["mode"] = Enum(["machine"])
             }),
             ["diagnostic"] = ObjectSchema(["code", "path", "severity"], new()
             {
@@ -32,17 +34,21 @@ public static class SetupCliCommandSchemaMetadata
             {
                 ["kind"] = Enum(["catalogue", "configuration-manifest", "tenant-configuration-package", "dotenv-template", "legal-draft", "doctor-report"]),
                 ["mediaType"] = String(1, 128, "^[a-z0-9][a-z0-9.+-]*/[a-z0-9][a-z0-9.+-]*(?:;v=[a-z0-9.-]+)?$"),
-                ["digest"] = String(null, null, "^[0-9a-f]{64}$"), ["sensitivity"] = Enum(["public", "sensitive"]),
-                ["coverage"] = Ref("coverage"), ["readiness"] = Ref("readiness"),
-                ["pathIntent"] = Enum(["none", "input", "output", "stdout"]), ["writeStatus"] = Enum(["none", "planned", "written"])
+                ["digest"] = String(null, null, "^[0-9a-f]{64}$"),
+                ["sensitivity"] = Enum(["public", "sensitive"]),
+                ["coverage"] = Ref("coverage"),
+                ["readiness"] = Ref("readiness"),
+                ["pathIntent"] = Enum(["none", "input", "output", "stdout"]),
+                ["writeStatus"] = Enum(["none", "planned", "written"])
             }),
             ["coverage"] = ObjectSchema(["coveredKeys", "missingKeys"], new()
-                { ["coveredKeys"] = Ref("keyList"), ["missingKeys"] = Ref("keyList") }),
+            { ["coveredKeys"] = Ref("keyList"), ["missingKeys"] = Ref("keyList") }),
             ["readiness"] = ObjectSchema(["state", "missingKeys", "blockedKeys"], new()
-                { ["state"] = Enum(["ready", "incomplete", "blocked"]), ["missingKeys"] = Ref("keyList"), ["blockedKeys"] = Ref("keyList") }),
+            { ["state"] = Enum(["ready", "incomplete", "blocked"]), ["missingKeys"] = Ref("keyList"), ["blockedKeys"] = Ref("keyList") }),
             ["keyList"] = new JsonObject
             {
-                ["type"] = "array", ["maxItems"] = 256,
+                ["type"] = "array",
+                ["maxItems"] = 256,
                 ["items"] = String(1, 128, "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$")
             }
         };
@@ -58,17 +64,21 @@ public static class SetupCliCommandSchemaMetadata
             },
             ["$schema"] = "https://json-schema.org/draft/2020-12/schema",
             ["$id"] = "https://schemas.islamu.org/event/setup-command/v1/schema.json",
-            ["type"] = "object", ["additionalProperties"] = false,
+            ["type"] = "object",
+            ["additionalProperties"] = false,
             ["required"] = Array(["schemaVersion", "invocation", "status", "exitCategory", "exitCode", "dryRun", "diagnostics", "artifacts", "coverage", "readiness"]),
             ["properties"] = new JsonObject
             {
                 ["schemaVersion"] = new JsonObject { ["const"] = "event-setup-command/v1" },
                 ["invocation"] = Ref("invocation"),
-                ["status"] = ExitNames(), ["exitCategory"] = ExitNames(),
+                ["status"] = ExitNames(),
+                ["exitCategory"] = ExitNames(),
                 ["exitCode"] = new JsonObject { ["enum"] = new JsonArray(System.Enum.GetValues<SetupCliExitCode>().Select(value => (JsonNode?)JsonValue.Create((int)value)).ToArray()) },
                 ["dryRun"] = new JsonObject { ["type"] = "boolean" },
-                ["diagnostics"] = BoundedArray("diagnostic", 128), ["artifacts"] = BoundedArray("artifact", 32),
-                ["coverage"] = Ref("coverage"), ["readiness"] = Ref("readiness")
+                ["diagnostics"] = BoundedArray("diagnostic", 128),
+                ["artifacts"] = BoundedArray("artifact", 32),
+                ["coverage"] = Ref("coverage"),
+                ["readiness"] = Ref("readiness")
             },
             ["$defs"] = definitions
         };
@@ -77,7 +87,7 @@ public static class SetupCliCommandSchemaMetadata
     }
 
     private static JsonObject ObjectSchema(IEnumerable<string> required, JsonObject properties) => new()
-        { ["type"] = "object", ["additionalProperties"] = false, ["required"] = Array(required), ["properties"] = properties };
+    { ["type"] = "object", ["additionalProperties"] = false, ["required"] = Array(required), ["properties"] = properties };
     private static JsonObject String(int? minimum, int? maximum, string pattern)
     {
         JsonObject result = new() { ["type"] = "string" };
@@ -89,6 +99,6 @@ public static class SetupCliCommandSchemaMetadata
     private static JsonObject ExitNames() => Enum(System.Enum.GetValues<SetupCliExitCode>().Select(value => value.ToString().ToLowerInvariant()));
     private static JsonObject Ref(string name) => new() { ["$ref"] = "#/$defs/" + name };
     private static JsonObject BoundedArray(string item, int maximum) => new()
-        { ["type"] = "array", ["maxItems"] = maximum, ["items"] = Ref(item) };
+    { ["type"] = "array", ["maxItems"] = maximum, ["items"] = Ref(item) };
     private static JsonArray Array(IEnumerable<string> values) => new(values.Select(value => (JsonNode?)JsonValue.Create(value)).ToArray());
 }

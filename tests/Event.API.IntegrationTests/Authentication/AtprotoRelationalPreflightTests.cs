@@ -40,7 +40,9 @@ public sealed class AtprotoRelationalPreflightTests(AtprotoRelationalLoginFixtur
         }
         using var oversized = await ChallengeAsync(client, cookies, JsonSerializer.Serialize(new
         {
-            handle = "alice.example", classification = "person", padding = new string('x', 2200)
+            handle = "alice.example",
+            classification = "person",
+            padding = new string('x', 2200)
         }));
         await Assert.That(oversized.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
         await Assert.That(oversized.Headers.Location).IsNull();

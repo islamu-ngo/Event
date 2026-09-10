@@ -146,8 +146,14 @@ public sealed class AtprotoTransientStoreControllerTests(AtprotoTransientApiFixt
     }
 
     private byte[] CreateBody(string purpose, string digest, Guid tenant, string payload, int lifetimeSeconds = 60) =>
-        JsonSerializer.SerializeToUtf8Bytes(new { purpose, tokenDigest = digest, tenantId = tenant,
-            protectedPayload = payload, expiresAtUnixMilliseconds = fixture.Clock.GetUtcNow().AddSeconds(lifetimeSeconds).ToUnixTimeMilliseconds() });
+        JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            purpose,
+            tokenDigest = digest,
+            tenantId = tenant,
+            protectedPayload = payload,
+            expiresAtUnixMilliseconds = fixture.Clock.GetUtcNow().AddSeconds(lifetimeSeconds).ToUnixTimeMilliseconds()
+        });
 
     private static byte[] ConsumeBody(Guid id, string purpose, string digest, Guid tenant) =>
         JsonSerializer.SerializeToUtf8Bytes(new { candidateId = id, purpose, tokenDigest = digest, expectedTenantId = tenant });

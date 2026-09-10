@@ -14,13 +14,13 @@ public sealed class TicketTypeEntitlementConfiguration : IEntityTypeConfiguratio
                 "COALESCE(event_session_id, event_day_id, target_event_id)",
                 stored: true);
         builder.HasIndex(entitlement => new
-            {
-                entitlement.TenantId,
-                entitlement.TicketTypeId,
-                entitlement.TargetEventId,
-                entitlement.EntitlementScopeTypeId,
-                entitlement.ScopeId
-            })
+        {
+            entitlement.TenantId,
+            entitlement.TicketTypeId,
+            entitlement.TargetEventId,
+            entitlement.EntitlementScopeTypeId,
+            entitlement.ScopeId
+        })
             .IsUnique();
         builder.HasOne<EventTicketType>().WithMany(ticketType => ticketType.Entitlements)
             .HasForeignKey(entitlement => new { entitlement.TenantId, entitlement.TicketTypeId })

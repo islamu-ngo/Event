@@ -202,15 +202,25 @@ public sealed class SemanticValueSqlitePersistenceTests
 
     private static EventAgendaItem CreateAgendaItem() => new()
     {
-        Id = Guid.CreateVersion7(), EventId = Guid.CreateVersion7(), Event = null!,
-        Title = "Semantic agenda item", TenantId = Guid.CreateVersion7(), Tenant = null!,
-        SortOrder = 1, ConcurrencyStamp = Guid.CreateVersion7()
+        Id = Guid.CreateVersion7(),
+        EventId = Guid.CreateVersion7(),
+        Event = null!,
+        Title = "Semantic agenda item",
+        TenantId = Guid.CreateVersion7(),
+        Tenant = null!,
+        SortOrder = 1,
+        ConcurrencyStamp = Guid.CreateVersion7()
     };
 
     private static EventSession CreateSession(string title) => new()
     {
-        Id = Guid.CreateVersion7(), EventId = Guid.CreateVersion7(), Event = null!, Title = title,
-        TenantId = Guid.CreateVersion7(), Tenant = null!, ConcurrencyStamp = Guid.CreateVersion7()
+        Id = Guid.CreateVersion7(),
+        EventId = Guid.CreateVersion7(),
+        Event = null!,
+        Title = title,
+        TenantId = Guid.CreateVersion7(),
+        Tenant = null!,
+        ConcurrencyStamp = Guid.CreateVersion7()
     };
 
     private static Location CreateLocation(
@@ -248,21 +258,21 @@ public sealed class SemanticValueSqlitePersistenceTests
             case InvariantMutation.NegativeTicketAmount:
             case InvariantMutation.NegativeMinimumTicketAmount:
             case InvariantMutation.NegativeSuggestedTicketAmount:
-            {
-                Guid tenantId = Guid.CreateVersion7();
-                EventTicketCatalogVersion catalog = EventTicketCatalogVersion.Create(tenantId, Guid.CreateVersion7(), "EUR", 1);
-                bool fixedPrice = mutation == InvariantMutation.NegativeTicketAmount;
-                EventTicketType ticket = CreateTicket(
-                    catalog,
-                    "Invariant ticket",
-                    fixedPrice ? TicketPricingModeEnum.Fixed : TicketPricingModeEnum.SlidingScale,
-                    fixedPrice ? Money.Create(100, "EUR") : null,
-                    fixedPrice ? null : Money.Create(50, "EUR"),
-                    fixedPrice ? null : Money.Create(75, "EUR"));
-                catalog.AddTicketType(ticket, null);
-                context.Add(catalog);
-                break;
-            }
+                {
+                    Guid tenantId = Guid.CreateVersion7();
+                    EventTicketCatalogVersion catalog = EventTicketCatalogVersion.Create(tenantId, Guid.CreateVersion7(), "EUR", 1);
+                    bool fixedPrice = mutation == InvariantMutation.NegativeTicketAmount;
+                    EventTicketType ticket = CreateTicket(
+                        catalog,
+                        "Invariant ticket",
+                        fixedPrice ? TicketPricingModeEnum.Fixed : TicketPricingModeEnum.SlidingScale,
+                        fixedPrice ? Money.Create(100, "EUR") : null,
+                        fixedPrice ? null : Money.Create(50, "EUR"),
+                        fixedPrice ? null : Money.Create(75, "EUR"));
+                    catalog.AddTicketType(ticket, null);
+                    context.Add(catalog);
+                    break;
+                }
             case InvariantMutation.PartialCoordinate:
             case InvariantMutation.PartialCoordinateMissingLatitude:
             case InvariantMutation.OutOfRangeCoordinate:

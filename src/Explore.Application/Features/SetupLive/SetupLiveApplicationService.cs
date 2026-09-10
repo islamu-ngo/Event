@@ -983,49 +983,49 @@ public sealed class SetupLiveApplicationService(
         SetupTargetEnrollment enrollment,
         SetupEnrollmentIssuance issuance,
         DateTime observedAt) => new()
-    {
-        EnrollmentId = enrollment.Id,
-        State = enrollment.State switch
         {
-            DomainEnrollmentState.Revoked => WireEnrollmentState.Revoked,
-            DomainEnrollmentState.Expired => WireEnrollmentState.Expired,
-            _ when observedAt >= enrollment.ExpiresAt => WireEnrollmentState.Expired,
-            _ => WireEnrollmentState.Active
-        },
-        Generation = enrollment.Generation,
-        ExpiresAt = new DateTimeOffset(enrollment.ExpiresAt),
-        Scopes = RecoverScopes(enrollment.ScopeDigest),
-        Issuance = issuance
-    };
+            EnrollmentId = enrollment.Id,
+            State = enrollment.State switch
+            {
+                DomainEnrollmentState.Revoked => WireEnrollmentState.Revoked,
+                DomainEnrollmentState.Expired => WireEnrollmentState.Expired,
+                _ when observedAt >= enrollment.ExpiresAt => WireEnrollmentState.Expired,
+                _ => WireEnrollmentState.Active
+            },
+            Generation = enrollment.Generation,
+            ExpiresAt = new DateTimeOffset(enrollment.ExpiresAt),
+            Scopes = RecoverScopes(enrollment.ScopeDigest),
+            Issuance = issuance
+        };
 
     private static SetupSecretBindingOperationData MapOperation(
         SetupSecretBindingOperation operation) => new()
-    {
-        OperationId = operation.Id,
-        State = operation.State switch
         {
-            DomainOperationState.Succeeded => WireOperationState.Succeeded,
-            DomainOperationState.Failed => WireOperationState.Failed,
-            DomainOperationState.Cancelled => WireOperationState.Cancelled,
-            _ => WireOperationState.Accepted
-        },
-        Outcome = operation.Outcome switch
-        {
-            DomainOperationOutcome.Ready => WireOperationOutcome.Ready,
-            DomainOperationOutcome.Unavailable => WireOperationOutcome.Unavailable,
-            DomainOperationOutcome.Unauthorized => WireOperationOutcome.Unauthorized,
-            DomainOperationOutcome.Invalid => WireOperationOutcome.Invalid,
-            DomainOperationOutcome.Cancelled => WireOperationOutcome.Cancelled,
-            DomainOperationOutcome.UnavailableEnrollment =>
-                WireOperationOutcome.UnavailableEnrollment,
-            _ => WireOperationOutcome.Accepted
-        },
-        EnrollmentGeneration = operation.EnrollmentGeneration,
-        CreatedAt = new DateTimeOffset(operation.CreatedAt),
-        SettledAt = operation.SettledAt.HasValue
+            OperationId = operation.Id,
+            State = operation.State switch
+            {
+                DomainOperationState.Succeeded => WireOperationState.Succeeded,
+                DomainOperationState.Failed => WireOperationState.Failed,
+                DomainOperationState.Cancelled => WireOperationState.Cancelled,
+                _ => WireOperationState.Accepted
+            },
+            Outcome = operation.Outcome switch
+            {
+                DomainOperationOutcome.Ready => WireOperationOutcome.Ready,
+                DomainOperationOutcome.Unavailable => WireOperationOutcome.Unavailable,
+                DomainOperationOutcome.Unauthorized => WireOperationOutcome.Unauthorized,
+                DomainOperationOutcome.Invalid => WireOperationOutcome.Invalid,
+                DomainOperationOutcome.Cancelled => WireOperationOutcome.Cancelled,
+                DomainOperationOutcome.UnavailableEnrollment =>
+                    WireOperationOutcome.UnavailableEnrollment,
+                _ => WireOperationOutcome.Accepted
+            },
+            EnrollmentGeneration = operation.EnrollmentGeneration,
+            CreatedAt = new DateTimeOffset(operation.CreatedAt),
+            SettledAt = operation.SettledAt.HasValue
             ? new DateTimeOffset(operation.SettledAt.Value)
             : null
-    };
+        };
 
     private async Task CancelOperationAsync(Guid tenantId, Guid operationKey)
     {
@@ -1049,12 +1049,12 @@ public sealed class SetupLiveApplicationService(
 
     private static DomainOperationOutcome MapFailure(
         SetupSecretBindingWriteOutcome outcome) => outcome switch
-    {
-        SetupSecretBindingWriteOutcome.Unauthorized =>
-            DomainOperationOutcome.Unauthorized,
-        SetupSecretBindingWriteOutcome.Invalid => DomainOperationOutcome.Invalid,
-        _ => DomainOperationOutcome.Unavailable
-    };
+        {
+            SetupSecretBindingWriteOutcome.Unauthorized =>
+                DomainOperationOutcome.Unauthorized,
+            SetupSecretBindingWriteOutcome.Invalid => DomainOperationOutcome.Invalid,
+            _ => DomainOperationOutcome.Unavailable
+        };
 
     private async Task<SetupSecretBindingReadinessState> ReadinessStateAsync(
         SecretBinding? binding,

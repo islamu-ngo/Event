@@ -40,10 +40,10 @@ public sealed class EventAddOnFulfillmentConfiguration :
         builder.HasIndex(fulfillment => new { fulfillment.TenantId, fulfillment.OperationId })
             .IsUnique();
         builder.HasIndex(fulfillment => new
-            {
-                fulfillment.TenantId,
-                fulfillment.RegistrationOrderAddOnLineId,
-            })
+        {
+            fulfillment.TenantId,
+            fulfillment.RegistrationOrderAddOnLineId,
+        })
             .IsUnique();
     }
 }

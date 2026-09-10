@@ -507,7 +507,7 @@ public sealed class SetupLiveAdapterSecurityTests
                 headers,
                 Link(SetupLiveHalRelations.Self)));
             using var client = new HttpClient(handler, disposeHandler: false) { BaseAddress = Target };
-        using var adapter = new SetupLiveAdapter(Target, TenantId, client, TokenProvider(), new ManualTimeProvider(Now));
+            using var adapter = new SetupLiveAdapter(Target, TenantId, client, TokenProvider(), new ManualTimeProvider(Now));
 
             await Assert.ThrowsAsync<SetupLiveContractViolationException>(() =>
                 EnrollAsync(adapter));
@@ -1611,8 +1611,8 @@ public sealed class SetupLiveAdapterSecurityTests
         string capability,
         string canary,
         string providerCanary) => new(HttpStatusCode.NotFound)
-    {
-        Content = new StringContent(
+        {
+            Content = new StringContent(
             JsonSerializer.Serialize(new
             {
                 type = SetupLiveProblemContracts.UnavailableType,
@@ -1622,7 +1622,7 @@ public sealed class SetupLiveAdapterSecurityTests
             }),
             Encoding.UTF8,
             SetupLiveContractMetadata.ErrorMediaType)
-    };
+        };
 
     private static HttpResponseMessage JsonResponse(HttpStatusCode status, object body) => new(status)
     {

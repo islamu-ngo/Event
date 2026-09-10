@@ -55,13 +55,16 @@ public sealed class AtprotoTransientApiFixture : IAsyncInitializer, IAsyncDispos
     {
         ECParameters parameters = key.ExportParameters(true);
         ECParameters retiring = retiringKey.ExportParameters(true);
-        string ring = JsonSerializer.Serialize(new { keys = new[] { new {
+        string ring = JsonSerializer.Serialize(new
+        {
+            keys = new[] { new {
             kty = "EC", crv = "P-256", kid = "transient-test", use = "sig", alg = "ES256", status = "active",
             x = Base64UrlEncoder.Encode(parameters.Q.X!), y = Base64UrlEncoder.Encode(parameters.Q.Y!),
             d = Base64UrlEncoder.Encode(parameters.D!) }, new {
             kty = "EC", crv = "P-256", kid = "transient-retiring", use = "sig", alg = "ES256", status = "retired",
             x = Base64UrlEncoder.Encode(retiring.Q.X!), y = Base64UrlEncoder.Encode(retiring.Q.Y!),
-            d = Base64UrlEncoder.Encode(retiring.D!) } } });
+            d = Base64UrlEncoder.Encode(retiring.D!) } }
+        });
         Secrets.ResolveAsync(Arg.Any<string>(), null, Arg.Any<CancellationToken>()).Returns(call =>
             SecretResolutionResult.Resolved(new ResolvedSecret(call.ArgAt<string>(0),
                 call.ArgAt<string>(0) == SecretDefinitionRegistry.Keys.Atproto.OAuthClientPrivateJwks
@@ -164,10 +167,16 @@ public sealed class AtprotoTransientApiFixture : IAsyncInitializer, IAsyncDispos
         using var bodyDocument = JsonDocument.Parse(body);
         var claims = new Dictionary<string, object>
         {
-            ["iss"] = Issuer, ["aud"] = Audience, ["sub"] = "event-blazor-bff", ["use"] = Use,
-            ["jti"] = Guid.CreateVersion7().ToString("D"), ["iat"] = Clock.GetUtcNow().ToUnixTimeSeconds(),
-            ["exp"] = Clock.GetUtcNow().AddSeconds(30).ToUnixTimeSeconds(), ["method"] = "POST",
-            ["path"] = Prefix + operation, ["operation"] = operation,
+            ["iss"] = Issuer,
+            ["aud"] = Audience,
+            ["sub"] = "event-blazor-bff",
+            ["use"] = Use,
+            ["jti"] = Guid.CreateVersion7().ToString("D"),
+            ["iat"] = Clock.GetUtcNow().ToUnixTimeSeconds(),
+            ["exp"] = Clock.GetUtcNow().AddSeconds(30).ToUnixTimeSeconds(),
+            ["method"] = "POST",
+            ["path"] = Prefix + operation,
+            ["operation"] = operation,
             ["purpose"] = bodyDocument.RootElement.GetProperty("purpose").GetString()!,
             ["body_sha256"] = Convert.ToHexStringLower(SHA256.HashData(body))
         };
@@ -199,8 +208,12 @@ public sealed class AtprotoTransientApiFixture : IAsyncInitializer, IAsyncDispos
         Guid id = Guid.CreateVersion7();
         db.Tenants.Add(new Explore.Domain.Tenant
         {
-            Id = id, FullName = "Transient test tenant", Slug = "transient-" + id.ToString("N"),
-            TenantStatus = status, TenantStatusId = status.Id, CreatedAt = Clock.GetUtcNow().UtcDateTime
+            Id = id,
+            FullName = "Transient test tenant",
+            Slug = "transient-" + id.ToString("N"),
+            TenantStatus = status,
+            TenantStatusId = status.Id,
+            CreatedAt = Clock.GetUtcNow().UtcDateTime
         });
         await db.SaveChangesAsync();
         return id;

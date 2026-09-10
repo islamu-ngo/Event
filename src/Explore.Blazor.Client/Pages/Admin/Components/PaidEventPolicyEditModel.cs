@@ -204,12 +204,12 @@ public sealed class PaidEventPolicyCurrencyRiskLimitEditModel
 
     public static PaidEventPolicyCurrencyRiskLimitEditModel FromDto(
         PaidEventPolicyCurrencyRiskLimitDto dto) => new()
-    {
-        CurrencyCode = dto.CurrencyCode ?? string.Empty,
-        PerEventSalesCeilingMinor = dto.PerEventSalesCeilingMinor,
-        RollingOrganizerSalesCeilingMinor = dto.RollingOrganizerSalesCeilingMinor,
-        HighValueReviewThresholdMinor = dto.HighValueReviewThresholdMinor
-    };
+        {
+            CurrencyCode = dto.CurrencyCode ?? string.Empty,
+            PerEventSalesCeilingMinor = dto.PerEventSalesCeilingMinor,
+            RollingOrganizerSalesCeilingMinor = dto.RollingOrganizerSalesCeilingMinor,
+            HighValueReviewThresholdMinor = dto.HighValueReviewThresholdMinor
+        };
 }
 
 public sealed record PaidEventPolicyValidationResult(bool IsValid, IReadOnlyList<string> Errors);

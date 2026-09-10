@@ -26,20 +26,20 @@ public sealed class TicketPurchasePolicyVersionConfiguration :
             .IsConcurrencyToken()
             .ValueGeneratedNever();
         builder.HasIndex(policy => new
-            {
-                policy.TenantId,
-                policy.EventId,
-                policy.Id,
-            })
+        {
+            policy.TenantId,
+            policy.EventId,
+            policy.Id,
+        })
             .IsUnique();
         builder.HasIndex(policy => new
-            {
-                policy.TenantId,
-                policy.EventId,
-                policy.InstancePolicyVersionId,
-                policy.TenantPolicyVersionId,
-                policy.EventPolicyVersionId,
-            })
+        {
+            policy.TenantId,
+            policy.EventId,
+            policy.InstancePolicyVersionId,
+            policy.TenantPolicyVersionId,
+            policy.EventPolicyVersionId,
+        })
             .IsUnique();
     }
 }
@@ -70,18 +70,18 @@ public sealed class TicketPurchaseAuthorityUsageConfiguration :
             .IsConcurrencyToken()
             .ValueGeneratedNever();
         builder.HasIndex(usage => new
-            {
-                usage.TenantId,
-                usage.EventId,
-                usage.EnforcementKey,
-            })
+        {
+            usage.TenantId,
+            usage.EventId,
+            usage.EnforcementKey,
+        })
             .IsUnique();
         builder.HasAlternateKey(usage => new
-            {
-                usage.TenantId,
-                usage.EventId,
-                usage.Id,
-            });
+        {
+            usage.TenantId,
+            usage.EventId,
+            usage.Id,
+        });
     }
 }
 
@@ -115,17 +115,17 @@ public sealed class TicketPurchaseOperationConfiguration :
             .IsConcurrencyToken()
             .ValueGeneratedNever();
         builder.HasIndex(operation => new
-            {
-                operation.TenantId,
-                operation.KeyHash,
-            })
+        {
+            operation.TenantId,
+            operation.KeyHash,
+        })
             .IsUnique();
         builder.HasIndex(operation => new
-            {
-                operation.TenantId,
-                operation.EventId,
-                operation.OrderId,
-            });
+        {
+            operation.TenantId,
+            operation.EventId,
+            operation.OrderId,
+        });
         builder.HasOne<TicketPurchasePolicyVersion>()
             .WithMany()
             .HasForeignKey(operation => new

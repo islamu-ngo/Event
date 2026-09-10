@@ -58,10 +58,14 @@ internal static class PaidAcceptanceTestFacts
             ProviderCredentialOwner = snapshot.ProviderCredentialOwner,
             ChargeType = snapshot.ChargeType,
             StatementDescriptor = snapshot.StatementDescriptor
-            ,OrganizerPaymentProviderConnectionId = snapshot.OrganizerPaymentProviderConnectionId
-            ,ConnectPlatformId = snapshot.ConnectPlatformId
-            ,ExternalAccountId = snapshot.ExternalAccountId
-            ,MerchantCountryCode = snapshot.MerchantCountryCode
+            ,
+            OrganizerPaymentProviderConnectionId = snapshot.OrganizerPaymentProviderConnectionId
+            ,
+            ConnectPlatformId = snapshot.ConnectPlatformId
+            ,
+            ExternalAccountId = snapshot.ExternalAccountId
+            ,
+            MerchantCountryCode = snapshot.MerchantCountryCode
         },
         TenantDirectoryOperator = new PaidOrderAcceptanceTenantDirectoryOperatorDto
         {

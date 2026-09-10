@@ -78,11 +78,11 @@ public sealed class RegistrationOrderAddOnLineConfiguration :
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(line => new
-            {
-                line.TenantId,
-                line.RegistrationOrderId,
-                line.EventAddOnCatalogItemId,
-            })
+        {
+            line.TenantId,
+            line.RegistrationOrderId,
+            line.EventAddOnCatalogItemId,
+        })
             .IsUnique();
     }
 }

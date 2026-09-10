@@ -11,7 +11,9 @@ public sealed class AtprotoTenantHandoffTests
         await using var factory = new BlazorBffWebApplicationFactory();
         using var client = factory.CreateClient(new()
         {
-            AllowAutoRedirect = false, BaseAddress = new("https://tenant.example.com"), HandleCookies = false
+            AllowAutoRedirect = false,
+            BaseAddress = new("https://tenant.example.com"),
+            HandleCookies = false
         });
         const string supplied = "access_token=browser-secret";
         using var response = await client.GetAsync($"/auth/atproto/handoff?code={Uri.EscapeDataString(supplied)}");

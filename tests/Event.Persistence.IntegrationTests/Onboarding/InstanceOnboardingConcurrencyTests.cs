@@ -226,12 +226,17 @@ public sealed class InstanceOnboardingConcurrencyTests(PostgreSqlContainerFixtur
                     CreatedAt = CompletedAt,
                     ConcurrencyStamp = Guid.CreateVersion7()
                 });
-                write.UserExternalLogins.Add(new UserExternalLogin { Id = loginId,
-                UserId = userId,
-                User = user,
-                AuthenticationProviderId = (int)"keycloak".ParseAuthenticationProviderKind(), AuthenticationProvider = null!, ProviderKey = "rollback-subject",
-                ProviderDisplayName = "keycloak",
-                CreatedAt = CompletedAt });
+                write.UserExternalLogins.Add(new UserExternalLogin
+                {
+                    Id = loginId,
+                    UserId = userId,
+                    User = user,
+                    AuthenticationProviderId = (int)"keycloak".ParseAuthenticationProviderKind(),
+                    AuthenticationProvider = null!,
+                    ProviderKey = "rollback-subject",
+                    ProviderDisplayName = "keycloak",
+                    CreatedAt = CompletedAt
+                });
                 write.PlatformUserRoles.Add(new PlatformUserRole
                 {
                     Id = Guid.CreateVersion7(),

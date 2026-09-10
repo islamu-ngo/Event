@@ -28,10 +28,10 @@ public sealed class TicketTransferPolicyConfiguration :
             value.Id,
         });
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.EventTicketTypeId,
-            })
+        {
+            value.TenantId,
+            value.EventTicketTypeId,
+        })
             .HasDatabaseName(
                 "ux_ticket_transfer_policies_ticket_type")
             .IsUnique();
@@ -103,26 +103,26 @@ public sealed class AdmissionTicketTransferConfiguration :
             value.Id,
         });
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.OpenAdmissionTicketId,
-            })
+        {
+            value.TenantId,
+            value.OpenAdmissionTicketId,
+        })
             .HasDatabaseName(
                 "ux_admission_ticket_transfers_open")
             .IsUnique();
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.OfferOperationKey,
-            })
+        {
+            value.TenantId,
+            value.OfferOperationKey,
+        })
             .HasDatabaseName(
                 "ux_admission_ticket_transfers_operation")
             .IsUnique();
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.CapabilityDigest,
-            })
+        {
+            value.TenantId,
+            value.CapabilityDigest,
+        })
             .HasDatabaseName(
                 "ux_admission_ticket_transfers_capability")
             .IsUnique();
@@ -214,10 +214,10 @@ public sealed class AdmissionTransferDeliveryIntentConfiguration :
             value.Id,
         });
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.AdmissionTicketTransferId,
-            })
+        {
+            value.TenantId,
+            value.AdmissionTicketTransferId,
+        })
             .HasDatabaseName(
                 "ux_admission_transfer_delivery_intents_transfer")
             .IsUnique();

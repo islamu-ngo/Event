@@ -557,14 +557,14 @@ public sealed class CoordinatedSettingMutationRepositoryPersistenceTests(Postgre
                 "false")]
         ];
 
-        foreach (ImmutableArray<PublicationPolicySettingMutation> mutations in invalidTenantBatches)
-        {
-            await Assert.ThrowsAsync<ArgumentException>(() => store.WriteTenantAsync(
-                tenants.RequestedTenantId,
-                mutations,
-                tenants.ActorUserId,
-                OccurredAtUtc,
-                cancellationToken));
+            foreach (ImmutableArray<PublicationPolicySettingMutation> mutations in invalidTenantBatches)
+            {
+                await Assert.ThrowsAsync<ArgumentException>(() => store.WriteTenantAsync(
+                    tenants.RequestedTenantId,
+                    mutations,
+                    tenants.ActorUserId,
+                    OccurredAtUtc,
+                    cancellationToken));
             }
             await Assert.ThrowsAsync<ArgumentException>(() => store.WriteTenantAsync(
                 Guid.Empty,
@@ -599,13 +599,13 @@ public sealed class CoordinatedSettingMutationRepositoryPersistenceTests(Postgre
                 "false",
                 isLocked: false)]
         ];
-        foreach (ImmutableArray<PublicationPolicySettingMutation> mutations in invalidInstanceBatches)
-        {
-            await Assert.ThrowsAsync<ArgumentException>(() => store.WriteInstanceAsync(
-                mutations,
-                tenants.ActorUserId,
-                OccurredAtUtc,
-                cancellationToken));
+            foreach (ImmutableArray<PublicationPolicySettingMutation> mutations in invalidInstanceBatches)
+            {
+                await Assert.ThrowsAsync<ArgumentException>(() => store.WriteInstanceAsync(
+                    mutations,
+                    tenants.ActorUserId,
+                    OccurredAtUtc,
+                    cancellationToken));
             }
 
             await Assert.That(commandObserver.CommandTokens).IsEmpty();

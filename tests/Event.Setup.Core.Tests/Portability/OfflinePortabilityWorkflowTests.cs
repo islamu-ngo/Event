@@ -311,7 +311,7 @@ public sealed class OfflinePortabilityWorkflowTests
             new OfflinePortabilitySectionEdit(new("tenant.legal_documents"),
                 OfflinePortabilitySectionSnapshot.LegalDocuments(
                     new Dictionary<string, ConfigurationManifestLegalDocumentV1Alpha2>
-                        { [draft.DocumentKey] = draft.ToWire() }))).Document!;
+                    { [draft.DocumentKey] = draft.ToWire() }))).Document!;
         OfflinePortabilityResult unresolvedExport = OfflinePortabilityWorkflow.Validate(withLegal);
         await Assert.That(unresolvedExport.Succeeded).IsFalse();
         await Assert.That(unresolvedExport.Document).IsNull();
@@ -360,7 +360,7 @@ public sealed class OfflinePortabilityWorkflowTests
         Spec = new ConfigurationManifestSpecV1Alpha2
         {
             Instance = new ConfigurationManifestInstanceV1Alpha2
-                { Settings = new Dictionary<string, JsonElement>(), Documents = new Dictionary<string, ConfigurationManifestDocumentV1Alpha2>(), LegalDocuments = new Dictionary<string, ConfigurationManifestLegalDocumentV1Alpha2>() },
+            { Settings = new Dictionary<string, JsonElement>(), Documents = new Dictionary<string, ConfigurationManifestDocumentV1Alpha2>(), LegalDocuments = new Dictionary<string, ConfigurationManifestLegalDocumentV1Alpha2>() },
             Tenants = []
         }
     };

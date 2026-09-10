@@ -108,7 +108,8 @@ public sealed class AtprotoTransientBoundaryTests(AtprotoTransientApiFixture fix
         {
             builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["RateLimiting:DisableInTesting"] = "false", ["RateLimiting:AtprotoTransient:PermitLimit"] = "1",
+                ["RateLimiting:DisableInTesting"] = "false",
+                ["RateLimiting:AtprotoTransient:PermitLimit"] = "1",
                 ["RateLimiting:AtprotoTransient:WindowSeconds"] = "3600"
             }));
             builder.ConfigureTestServices(services =>

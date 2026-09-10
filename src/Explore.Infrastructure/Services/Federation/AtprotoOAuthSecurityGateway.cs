@@ -97,8 +97,8 @@ public sealed class AtprotoOAuthSecurityGateway(
         Guid userId,
         CancellationToken cancellationToken)
     {
-                var session = JsonSerializer.Deserialize<OAuthSessionData>(verifiedSession.OAuthSessionPayload.Span, JsonOptions)
-            ?? throw new AtprotoOAuthSessionUnavailableException("invalid_session");
+        var session = JsonSerializer.Deserialize<OAuthSessionData>(verifiedSession.OAuthSessionPayload.Span, JsonOptions)
+    ?? throw new AtprotoOAuthSessionUnavailableException("invalid_session");
         var context = new AtprotoOAuthSessionStoreContext(
             tenantId,
             userId,
@@ -124,12 +124,12 @@ public sealed class AtprotoOAuthSecurityGateway(
         AtprotoPreparedOAuthSession preparedSession,
         CancellationToken cancellationToken)
     {
-                var existing = await tokenRepository.GetAtprotoSessionForUpdateAsync(
-            preparedSession.TenantId,
-            preparedSession.UserId,
-            RepositoryBackedAtprotoSession.Provider,
-            preparedSession.SubjectDid.Value,
-            cancellationToken).ConfigureAwait(false);
+        var existing = await tokenRepository.GetAtprotoSessionForUpdateAsync(
+    preparedSession.TenantId,
+    preparedSession.UserId,
+    RepositoryBackedAtprotoSession.Provider,
+    preparedSession.SubjectDid.Value,
+    cancellationToken).ConfigureAwait(false);
         if (existing is null)
         {
             await tokenRepository.CreateAtprotoSessionAsync(new UserAuthenticationToken

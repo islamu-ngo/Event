@@ -77,11 +77,11 @@ public sealed class ConfigurationManifestOperationConfiguration
             .HasDatabaseName("ix_configuration_manifest_operations_status_completed")
             .IsDescending(false, true);
         builder.HasIndex(operation => new
-            {
-                operation.Status,
-                operation.BootstrapGeneration,
-                operation.CompletedAt
-            })
+        {
+            operation.Status,
+            operation.BootstrapGeneration,
+            operation.CompletedAt
+        })
             .HasDatabaseName(
                 "ix_configuration_manifest_operations_bootstrap_generation_completed")
             .IsDescending(false, true, true);

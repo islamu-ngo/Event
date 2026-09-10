@@ -130,9 +130,9 @@ public sealed class SetupLiveRequestBodyTransformer
                 status.Length == 3 && status[0] == '2'
                     ? SetupLiveContractMetadata.SuccessMediaType
                     : SetupLiveContractMetadata.ErrorMediaType] = new()
-            {
-                Schema = schema
-            };
+                    {
+                        Schema = schema
+                    };
         }
     }
 

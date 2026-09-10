@@ -1150,9 +1150,11 @@ public sealed class AdmissionCheckInHttpHalRedTests(ContractApiFixture fixture)
     {
         internal List<(AdmissionCheckInSaturationKind, AdmissionCheckInTelemetryOutcome)> Observations { get; } = [];
         public void RecordOperation(AdmissionCheckInAction action, AdmissionCheckInAuthorityKind authorityKind,
-            AdmissionTargetTypeEnum? targetType, AdmissionCheckInTelemetryOutcome outcome, double durationMilliseconds) { }
+            AdmissionTargetTypeEnum? targetType, AdmissionCheckInTelemetryOutcome outcome, double durationMilliseconds)
+        { }
         public void RecordBatch(AdmissionCheckInAuthorityKind authorityKind, AdmissionTargetTypeEnum? targetType,
-            int batchSize) { }
+            int batchSize)
+        { }
         public void RecordSaturation(AdmissionCheckInSaturationKind kind, AdmissionCheckInTelemetryOutcome outcome) =>
             Observations.Add((kind, outcome));
         public void RecordBacklog(AdmissionCheckInBacklogKind kind, AdmissionTargetTypeEnum? targetType, long depth) { }

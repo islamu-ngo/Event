@@ -101,11 +101,11 @@ public sealed class ConfigurationImportSessionConfiguration :
             .IsConcurrencyToken()
             .IsRequired();
         builder.HasIndex(session => new
-            {
-                session.TargetAuthorityKey,
-                session.State,
-                session.ExpiresAt
-            })
+        {
+            session.TargetAuthorityKey,
+            session.State,
+            session.ExpiresAt
+        })
             .HasDatabaseName(
                 "ix_configuration_import_sessions_target_state_expiry");
         builder.HasIndex(session => session.ArtifactHandleId)

@@ -227,9 +227,9 @@ public sealed record TenantDirectoryOperatorIdentitySaveResult
 
     public static TenantDirectoryOperatorIdentitySaveResult Failed(
         TenantDirectoryOperatorIdentityAdminMessageCode messageCode) => new()
-    {
-        MessageCode = messageCode
-    };
+        {
+            MessageCode = messageCode
+        };
 
     public static TenantDirectoryOperatorIdentitySaveResult Conflict(
         TenantDirectoryOperatorIdentityAdminModel authoritative) => new()

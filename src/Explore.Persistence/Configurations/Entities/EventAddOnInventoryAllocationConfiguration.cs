@@ -53,11 +53,11 @@ public sealed class EventAddOnInventoryAllocationConfiguration :
         builder.HasIndex(allocation => new { allocation.TenantId, allocation.OperationId })
             .IsUnique();
         builder.HasIndex(allocation => new
-            {
-                allocation.TenantId,
-                allocation.RegistrationOrderAddOnLineId,
-                allocation.ActiveUniquenessSlot,
-            })
+        {
+            allocation.TenantId,
+            allocation.RegistrationOrderAddOnLineId,
+            allocation.ActiveUniquenessSlot,
+        })
             .IsUnique()
             .HasFilter("active_uniqueness_slot IS NOT NULL");
         builder.HasIndex(allocation => new

@@ -84,21 +84,21 @@ public sealed class EnvironmentCatalogue
         EnvironmentActivationExpression expression,
         EnvironmentActivationContext context,
         HashSet<string> featurePath) => expression.Kind switch
-    {
-        EnvironmentActivationKind.Topology => string.Equals(
-            expression.Identifier, context.Topology, StringComparison.Ordinal),
-        EnvironmentActivationKind.Capability => context.HasCapability(expression.Identifier!),
-        EnvironmentActivationKind.Provider => context.HasProvider(expression.Identifier!),
-        EnvironmentActivationKind.All => expression.Operands.All(item => Evaluate(
-            item, context, new HashSet<string>(featurePath, StringComparer.Ordinal))),
-        EnvironmentActivationKind.Any => expression.Operands.Any(item => Evaluate(
-            item, context, new HashSet<string>(featurePath, StringComparer.Ordinal))),
-        EnvironmentActivationKind.Not => !Evaluate(expression.Operands[0], context,
-            new HashSet<string>(featurePath, StringComparer.Ordinal)),
-        EnvironmentActivationKind.Feature when expression.Identifier is not null =>
-            EvaluateFeature(expression.Identifier, context, featurePath),
-        _ => false,
-    };
+        {
+            EnvironmentActivationKind.Topology => string.Equals(
+                expression.Identifier, context.Topology, StringComparison.Ordinal),
+            EnvironmentActivationKind.Capability => context.HasCapability(expression.Identifier!),
+            EnvironmentActivationKind.Provider => context.HasProvider(expression.Identifier!),
+            EnvironmentActivationKind.All => expression.Operands.All(item => Evaluate(
+                item, context, new HashSet<string>(featurePath, StringComparer.Ordinal))),
+            EnvironmentActivationKind.Any => expression.Operands.Any(item => Evaluate(
+                item, context, new HashSet<string>(featurePath, StringComparer.Ordinal))),
+            EnvironmentActivationKind.Not => !Evaluate(expression.Operands[0], context,
+                new HashSet<string>(featurePath, StringComparer.Ordinal)),
+            EnvironmentActivationKind.Feature when expression.Identifier is not null =>
+                EvaluateFeature(expression.Identifier, context, featurePath),
+            _ => false,
+        };
 
     private bool EvaluateFeature(
         string identifier,

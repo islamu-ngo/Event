@@ -40,9 +40,9 @@ public sealed class AdmissionRecoveryPersistenceContractTests
             IProperty property = entity.FindProperty(digestProperty)!;
             await Assert.That(property.ClrType).IsEqualTo(typeof(string));
             await Assert.That(property.GetMaxLength()).IsEqualTo(44);
-             await Assert.That(property.IsFixedLength()).IsTrue();
-             await Assert.That(property.IsNullable).IsFalse();
-         }
+            await Assert.That(property.IsFixedLength()).IsTrue();
+            await Assert.That(property.IsNullable).IsFalse();
+        }
         IIndex digest = FindIndex(
             entity,
             "TenantId",

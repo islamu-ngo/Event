@@ -40,7 +40,7 @@ public sealed class JoinFairReturnWaitlistCommandHandler(
             || access.Entry is not null
             || access.Supply is not null
             || access.Policy is not
-                { IsEnabled: true }
+            { IsEnabled: true }
             || access.PurchaseOperation is null
             || access.Line.Quantity != 1
             || !((await activation
@@ -298,7 +298,7 @@ internal static class FairReturnWaitlistMapping
         userId.HasValue
         && access.Order.AccountUserId == userId
         || access.Order.GuestAccessTokenHash is
-            { } hash
+        { } hash
         && tokens.Matches(
             capabilityToken,
             hash);

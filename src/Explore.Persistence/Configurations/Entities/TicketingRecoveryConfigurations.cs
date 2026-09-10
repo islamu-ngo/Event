@@ -27,16 +27,16 @@ public sealed class TicketingRecoveryCheckpointConfiguration :
         builder.Property(value => value.ConcurrencyStamp)
             .IsConcurrencyToken();
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.RecoveryOperationId,
-            })
+        {
+            value.TenantId,
+            value.RecoveryOperationId,
+        })
             .IsUnique();
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.Status,
-            });
+        {
+            value.TenantId,
+            value.Status,
+        });
     }
 }
 
@@ -51,16 +51,16 @@ public sealed class TicketingRecoveryReissueIntentConfiguration :
         builder.Property(value => value.ConcurrencyStamp)
             .IsConcurrencyToken();
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.RecoveryOperationId,
-                value.AdmissionTicketId,
-            })
+        {
+            value.TenantId,
+            value.RecoveryOperationId,
+            value.AdmissionTicketId,
+        })
             .IsUnique();
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.Status,
-            });
+        {
+            value.TenantId,
+            value.Status,
+        });
     }
 }

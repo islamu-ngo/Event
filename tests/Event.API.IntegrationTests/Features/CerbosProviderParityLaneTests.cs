@@ -162,21 +162,21 @@ public sealed class CerbosProviderParityLaneTests : IDisposable
         string tenantId,
         string[] roles,
         string[] permissions) => new
-    {
-        isInstanceAdmin = false,
-        tenantMemberships = new Dictionary<string, string>(),
-        orgMemberships = new Dictionary<string, string>(),
-        userId = ParityCorpus.UserId.ToString("D"),
-        eventAssignments = new Dictionary<string, object>
         {
-            [ParityCorpus.EventId.ToString("D")] = new
+            isInstanceAdmin = false,
+            tenantMemberships = new Dictionary<string, string>(),
+            orgMemberships = new Dictionary<string, string>(),
+            userId = ParityCorpus.UserId.ToString("D"),
+            eventAssignments = new Dictionary<string, object>
             {
-                tenantId,
-                roles,
-                permissions
+                [ParityCorpus.EventId.ToString("D")] = new
+                {
+                    tenantId,
+                    roles,
+                    permissions
+                }
             }
-        }
-    };
+        };
 
     private static object EventRolePrincipalAttributes(string tenant, string role) => new
     {

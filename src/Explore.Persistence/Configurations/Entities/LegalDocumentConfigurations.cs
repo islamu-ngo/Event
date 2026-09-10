@@ -42,17 +42,17 @@ public sealed class LegalDocumentConfiguration
         builder.Property(document => document.CreatedAt).IsRequired();
 
         builder.HasIndex(document => new
-            {
-                document.AuthorityKey,
-                document.Kind
-            })
+        {
+            document.AuthorityKey,
+            document.Kind
+        })
             .IsUnique();
         builder.HasIndex(document => new
-            {
-                document.TenantId,
-                document.State,
-                document.Kind
-            });
+        {
+            document.TenantId,
+            document.State,
+            document.Kind
+        });
 
         builder.HasMany(document => document.Versions)
             .WithOne(version => version.LegalDocument)
@@ -109,16 +109,16 @@ public sealed class LegalDocumentVersionConfiguration
         builder.Property(version => version.CreatedAt).IsRequired();
 
         builder.HasIndex(version => new
-            {
-                version.LegalDocumentId,
-                version.Version
-            })
+        {
+            version.LegalDocumentId,
+            version.Version
+        })
             .IsUnique();
         builder.HasIndex(version => new
-            {
-                version.State,
-                version.ProposedEffectiveAt
-            });
+        {
+            version.State,
+            version.ProposedEffectiveAt
+        });
 
         builder.HasMany(version => version.Sources)
             .WithOne(source => source.LegalDocumentVersion)
@@ -169,10 +169,10 @@ public sealed class LegalDocumentLocalizedSourceConfiguration
         builder.Property(source => source.PlaceholderCount).IsRequired();
 
         builder.HasIndex(source => new
-            {
-                source.LegalDocumentVersionId,
-                source.LanguageTag
-            })
+        {
+            source.LegalDocumentVersionId,
+            source.LanguageTag
+        })
             .IsUnique();
     }
 }
@@ -215,16 +215,16 @@ public sealed class LegalDocumentPublicationConfiguration
             .HasForeignKey(publication => publication.LegalDocumentVersionId)
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(publication => new
-            {
-                publication.LegalDocumentId,
-                publication.Version,
-                publication.LifecycleState
-            })
+        {
+            publication.LegalDocumentId,
+            publication.Version,
+            publication.LifecycleState
+        })
             .IsUnique();
         builder.HasIndex(publication => new
-            {
-                publication.LegalDocumentId,
-                publication.OccurredAt
-            });
+        {
+            publication.LegalDocumentId,
+            publication.OccurredAt
+        });
     }
 }

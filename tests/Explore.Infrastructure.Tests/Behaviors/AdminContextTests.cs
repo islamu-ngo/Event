@@ -857,11 +857,16 @@ public class AdminContextTests
 
     private static UserExternalLogin NewExternalLogin(Guid userId, string provider, string providerKey)
     {
-        return new UserExternalLogin { Id = Guid.NewGuid(),
-        UserId = userId,
-        User = NewUser(userId, "user@example.com"),
-        AuthenticationProviderId = (int)provider.ParseAuthenticationProviderKind(), AuthenticationProvider = null!, ProviderKey = providerKey,
-        ProviderDisplayName = provider };
+        return new UserExternalLogin
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            User = NewUser(userId, "user@example.com"),
+            AuthenticationProviderId = (int)provider.ParseAuthenticationProviderKind(),
+            AuthenticationProvider = null!,
+            ProviderKey = providerKey,
+            ProviderDisplayName = provider
+        };
     }
 
     private static User NewUser(Guid userId, string email)

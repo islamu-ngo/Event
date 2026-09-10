@@ -429,15 +429,15 @@ public sealed class SetupLiveContractTests
             .Throws<JsonException>();
 
         await Assert.That(() => new SetupTargetEnrollmentData
-            {
-                EnrollmentId = Guid.CreateVersion7(),
-                State = SetupEnrollmentState.Active,
-                Generation = 1,
-                ExpiresAt = new DateTimeOffset(
+        {
+            EnrollmentId = Guid.CreateVersion7(),
+            State = SetupEnrollmentState.Active,
+            Generation = 1,
+            ExpiresAt = new DateTimeOffset(
                     2026, 9, 1, 0, 0, 0, TimeSpan.Zero),
-                Scopes = [(SetupEnrollmentScope)999],
-                Issuance = SetupEnrollmentIssuance.Issued
-            })
+            Scopes = [(SetupEnrollmentScope)999],
+            Issuance = SetupEnrollmentIssuance.Issued
+        })
             .Throws<ArgumentException>();
     }
 

@@ -39,7 +39,7 @@ internal sealed class GovernedReleaseFixture : IDisposable
     private readonly string executablePath;
     private readonly List<string> clonePaths = [];
 
-    private GovernedReleaseFixture(string objectFormat, bool firstGovernedRelease = false)
+    private GovernedReleaseFixture(string objectFormat, bool firstGovernedRelease = false, string? rendererBundle = null, bool categorized = false)
     {
         ObjectFormat = objectFormat;
         IsFirstGovernedRelease = firstGovernedRelease;
@@ -63,7 +63,8 @@ internal sealed class GovernedReleaseFixture : IDisposable
         CreatePromotionAuthority();
         CreateReleaseAuthority();
         WriteWorkspace();
-        WriteBundle();
+        if (categorized) WriteUpgradeFragment();
+        WriteBundle(rendererBundle);
 
         Initial = Commit("fix(events): preserve published event notes");
         if (firstGovernedRelease)
@@ -76,8 +77,19 @@ internal sealed class GovernedReleaseFixture : IDisposable
             (int baselineCode, string baselineOutput) = VerifyBaseline(BaselineTagName, BaselineTargetOid, BaselineTagObject);
             if (baselineCode != Program.Success) throw new InvalidOperationException($"verify_baseline: {baselineOutput}");
 
-            A = Commit("feat(registration): let attendees correct registration details\n\nChange-Id: CHG-2026-0001");
-            B = PrepareAndCommit(FirstGovernedVersion, baseTag: BaselineTagName, baseOid: BaselineTargetOid, releaseDate: "2026-08-24");
+            string feature = Commit("feat(registration): let attendees correct registration details\n\nChange-Id: CHG-2026-0001");
+            if (categorized)
+            {
+                Commit("fix(events): keep event notes readable after publication");
+                Commit("perf(events): reduce event search latency");
+                Commit("docs(events): explain event export recovery");
+                A = Commit("fix(registration)!: reject expired correction tokens\n\nBREAKING CHANGE: Replace legacy correction tokens before restarting registration workers.\nChange-Id: CHG-2026-0002");
+            }
+            else
+            {
+                A = feature;
+            }
+            B = PrepareAndCommit(FirstGovernedVersion, baseTag: BaselineTagName, baseOid: BaselineTargetOid, releaseDate: "2026-08-24", upgradeImpacts: categorized);
             FirstTagObject = CloseRelease(FirstGovernedVersion, B);
             C = string.Empty;
             D = string.Empty;
@@ -126,6 +138,14 @@ internal sealed class GovernedReleaseFixture : IDisposable
 
     /// <summary>Builds the Decision 10 topology: a signed non-SemVer baseline plus one first governed release.</summary>
     public static GovernedReleaseFixture CreateFirstGovernedRelease(string objectFormat = "sha1") => new(objectFormat, firstGovernedRelease: true);
+
+    /// <summary>Uses the repository-locked executable and shipped template before preparing applicable upgrade evidence.</summary>
+    public static GovernedReleaseFixture CreateCategorizedFirstGovernedRelease() => new(
+        "sha1",
+        firstGovernedRelease: true,
+        rendererBundle: Environment.GetEnvironmentVariable("ISLAMU_RELEASE_TOOL_BUNDLE")
+            ?? throw new InvalidOperationException("ISLAMU_RELEASE_TOOL_BUNDLE is required for the real governed release fixture."),
+        categorized: true);
 
     public (int ExitCode, string Output) VerifyBaseline(string baselineRef, string targetOid, string tagObjectId, string? repositoryPath = null) =>
         RunWithEnvironment(writer => BaselineCommand.Run(
@@ -286,13 +306,33 @@ internal sealed class GovernedReleaseFixture : IDisposable
         if (Directory.Exists(Root)) Directory.Delete(Root, recursive: true);
     }
 
-    private string PrepareAndCommit(string version, string baseTag, string baseOid, string releaseDate)
+    /// <summary>Creates a detached unsigned sibling of B; the original signed tag and carrier ref remain untouched.</summary>
+    public string CreateUnsignedCandidateWithNotes(string version, string notes)
+    {
+        DeleteGeneratedManifests(version);
+        string releasePath = $"docs/internal/releases/{version}";
+        Git("switch", "--detach", A);
+        Git("restore", $"--source={B}", "--staged", "--worktree", "--", releasePath);
+        File.WriteAllText(Path.Combine(RepositoryPath, releasePath, "release-notes.md"), notes);
+        Git("add", "--", releasePath);
+        Git("-c", "user.name=Release Test", "-c", "user.email=release@example.invalid", "commit", "--no-gpg-sign", "-m",
+            $"docs(release): prepare {version}\n\nChangelog: skip\nChangelog-Reason: release metadata commit");
+        return Git("rev-parse", "HEAD").Trim();
+    }
+
+    public string WorkingTreeStatus() => Git("status", "--porcelain");
+
+    public string[] RangeOids(string from, string through) =>
+        Git("rev-list", "--reverse", $"{from}..{through}").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+
+    private string PrepareAndCommit(string version, string baseTag, string baseOid, string releaseDate, bool upgradeImpacts = false)
     {
         string releaseDirectory = Path.Combine(RepositoryPath, "docs", "internal", "releases", version);
         Directory.CreateDirectory(releaseDirectory);
+        string upgradeDisposition = upgradeImpacts ? "documented" : "not-applicable";
         File.WriteAllText(
             Path.Combine(releaseDirectory, "release.yaml"),
-            $"Version: {version}\nLine: {LineLabelFor(version)}\nRelease-Date: {releaseDate}\nBase-Stable-Tag: {baseTag}\nPrevious-Published-Tag: {baseTag}\nRelease-Range:\n  Base-Ref: {baseTag}\n  Base-Oid: {baseOid}\n  Previous-Ref: {baseTag}\n  Previous-Oid: {baseOid}\nCompatibility:\n  - {LineLabelFor(version)[..2]}\nImpact-Dispositions:\n  breaking: not-applicable\n  security: not-applicable\n  migration: not-applicable\n  configuration: not-applicable\n  openapi: not-applicable\n  operator: {(version == SecondVersion ? "not-applicable" : "documented")}\n");
+            $"Version: {version}\nLine: {LineLabelFor(version)}\nRelease-Date: {releaseDate}\nBase-Stable-Tag: {baseTag}\nPrevious-Published-Tag: {baseTag}\nRelease-Range:\n  Base-Ref: {baseTag}\n  Base-Oid: {baseOid}\n  Previous-Ref: {baseTag}\n  Previous-Oid: {baseOid}\nCompatibility:\n  - {LineLabelFor(version)[..2]}\nImpact-Dispositions:\n  breaking: {upgradeDisposition}\n  security: {upgradeDisposition}\n  migration: {upgradeDisposition}\n  configuration: {upgradeDisposition}\n  openapi: not-applicable\n  operator: {(version == SecondVersion ? "not-applicable" : "documented")}\n");
         File.WriteAllText(
             Path.Combine(releaseDirectory, "summary.md"),
             version == SecondVersion
@@ -370,7 +410,44 @@ internal sealed class GovernedReleaseFixture : IDisposable
         File.WriteAllText(Path.Combine(RepositoryPath, "eng", "release", "policy", "scope-registry.yaml"), "schemaVersion: 1\npublicScopes:\n  - events\n  - registration\nengineeringScopes:\n  - release\n");
     }
 
-    private void WriteBundle()
+    private void WriteUpgradeFragment()
+    {
+        File.WriteAllText(Path.Combine(RepositoryPath, "docs", "internal", "releases", "changes", "CHG-2026-0002.yaml"), """
+            Change-Id: CHG-2026-0002
+            Title: Expired registration correction tokens are rejected
+            Type: fix
+            Scope: registration
+            Summary: Registration corrections now require a current token.
+            Supersedes: []
+            Impacts:
+              Breaking:
+                Reference: docs/internal/releases/README.md
+                Disposition: documented
+                Detail: Replace legacy correction tokens before restarting registration workers.
+              Security:
+                Reference: docs/internal/SECURITY_OVERVIEW.md
+                Disposition: documented
+                Public-Disclosure: public
+                Detail: Revoke existing correction tokens so expired credentials cannot be reused.
+              Migration:
+                Reference: docs/internal/RELEASE_RUNBOOK.md
+                Disposition: documented
+                Detail: Back up registration data, migrate token expiry, then restart workers; restore the backup before retrying a failed migration.
+              Configuration:
+                Reference: docs/internal/CONFIGURATION.md
+                Disposition: documented
+                Detail: Replace REGISTRATION_TOKEN_TTL with REGISTRATION_CORRECTION_TTL before startup.
+              OpenAPI:
+                Reference: docs/internal/API_CHANGELOG.md
+                Disposition: not-applicable
+              Operator:
+                Reference: docs/internal/RELEASE_RUNBOOK.md
+                Disposition: documented
+                Detail: Verify expired tokens are rejected after workers restart.
+            """ + "\n");
+    }
+
+    private void WriteBundle(string? rendererBundle)
     {
         File.WriteAllText(configPath, "[changelog]\nbody = \"\"\"\n# Release {{ version }}\n{% for commit in commits %}\n- {{ commit.group }}: {{ commit.message }} ({{ commit.id }})\n{% endfor %}\n\"\"\"\ntrim = true\nrender_always = true\n");
 
@@ -393,6 +470,17 @@ internal sealed class GovernedReleaseFixture : IDisposable
               "platforms": [{ "platform": "linux-x64", "executable": "git-cliff", "executableSha256": "{{Digest(executablePath)}}" }]
             }
             """);
+        if (rendererBundle is not null)
+        {
+            string repositoryRoot = RepositoryRoot.Find();
+            File.Copy(Path.Combine(rendererBundle, "git-cliff"), executablePath, overwrite: true);
+            if (!OperatingSystem.IsWindows())
+            {
+                File.SetUnixFileMode(executablePath, UnixFileMode.UserRead | UnixFileMode.UserExecute);
+            }
+            File.Copy(Path.Combine(repositoryRoot, "eng", "release", "cliff.toml"), configPath, overwrite: true);
+            File.Copy(Path.Combine(repositoryRoot, "eng", "release", "toolchain.lock.json"), Path.Combine(bundleRoot, "toolchain.lock.json"), overwrite: true);
+        }
         EnsureFile("trust/release-signing-policy.yaml", "schemaVersion: release-signing-policy.v1\nstatus: fixture-only\nallowedAlgorithms:\n  - ssh-ed25519\nroles:\n  release:\n    tagPattern: v<major>.<minor>.<patch>[-prerelease]\n    tagKind: annotated\n    namespace: git\n    principal: fixture-release-operator\n    algorithm: ssh-ed25519\n    validFrom: 2026-01-01\n    validUntil: 2026-12-31\n  tooling-promotion:\n    principal: fixture-tooling-promoter\n");
         RewriteManifestAndReceipt();
     }
@@ -511,11 +599,22 @@ internal sealed class GovernedReleaseFixture : IDisposable
         }
 
         foreach (string arg in args) process.StartInfo.ArgumentList.Add(arg);
+        var exited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        process.EnableRaisingEvents = true;
+        process.Exited += (_, _) => exited.TrySetResult();
         process.Start();
-        string output = process.StandardOutput.ReadToEnd();
-        string error = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-        return process.ExitCode == 0 ? output : throw new InvalidOperationException($"{executable}_failed:{string.Join(' ', args)}:{error}");
+        Task<string> output = process.StandardOutput.ReadToEndAsync();
+        Task<string> error = process.StandardError.ReadToEndAsync();
+        try
+        {
+            Task.WhenAll(exited.Task, output, error).WaitAsync(CommandTimeout).GetAwaiter().GetResult();
+        }
+        catch (TimeoutException)
+        {
+            if (!process.HasExited) process.Kill(entireProcessTree: true);
+            throw;
+        }
+        return process.ExitCode == 0 ? output.Result : throw new InvalidOperationException($"{executable}_failed:{string.Join(' ', args)}:{error.Result}");
     }
 
     private static string Digest(string path) => Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(path)));

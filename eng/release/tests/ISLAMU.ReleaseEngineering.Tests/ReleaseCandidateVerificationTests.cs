@@ -73,6 +73,48 @@ public sealed class ReleaseCandidateVerificationTests
     }
 
     [Test]
+    [Explicit]
+    [Category("Runtime")]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task VerifyCandidateRejectsCleanUnsignedBreakingNotesTamper(bool omitEntry)
+    {
+        using var fixture = GovernedReleaseFixture.CreateCategorizedFirstGovernedRelease();
+        string version = GovernedReleaseFixture.FirstGovernedReleaseVersion;
+        string directory = Path.Combine(fixture.RepositoryPath, "docs", "internal", "releases", version);
+        string notesPath = Path.Combine(directory, "release-notes.md");
+        byte[] contextBytes = File.ReadAllBytes(Path.Combine(directory, "release-context.v1.json"));
+        using JsonDocument context = JsonDocument.Parse(contextBytes);
+        JsonElement breaking = context.RootElement.GetProperty("changes").EnumerateArray()
+            .Single(change => change.GetProperty("breaking").GetBoolean());
+        await Assert.That(breaking.GetProperty("type").GetString()).IsEqualTo("fix");
+        string notes = File.ReadAllText(notesPath);
+        string primaryEntry = notes.Split('\n').Single(line => line.StartsWith("- ", StringComparison.Ordinal) &&
+            line.EndsWith($"({breaking.GetProperty("displayId").GetString()})", StringComparison.Ordinal));
+
+        (int validCode, string validOutput) = fixture.VerifyCandidate(version, fixture.B);
+        await Assert.That(validCode).IsEqualTo(Program.Success).Because(validOutput);
+        string refsBefore = fixture.AllRefs();
+        string tampered = notes.Replace(primaryEntry + "\n", omitEntry ? string.Empty :
+            $"- registration: No token replacement is required ({breaking.GetProperty("displayId").GetString()})\n", StringComparison.Ordinal);
+        string alternativeB = fixture.CreateUnsignedCandidateWithNotes(version, tampered);
+
+        // Exact committed files and footer must pass: only trusted byte recomposition may reject this sibling B.
+        await Assert.That(alternativeB == fixture.B).IsFalse();
+        await Assert.That(fixture.ResolveRef($"{alternativeB}^")).IsEqualTo(fixture.A);
+        await Assert.That(fixture.WorkingTreeStatus()).IsEqualTo(string.Empty);
+        await Assert.That(fixture.AllRefs()).IsEqualTo(refsBefore);
+        await Assert.That(fixture.ResolveTagObject($"v{version}")).IsEqualTo(fixture.FirstTagObject);
+        await Assert.That(File.ReadAllBytes(Path.Combine(directory, "release-context.v1.json"))).IsEquivalentTo(contextBytes);
+        await Assert.That(File.ReadAllText(notesPath)).IsEqualTo(tampered);
+        await Assert.That(File.Exists(Path.Combine(directory, "release-candidate.v1.json"))).IsFalse();
+        (int exitCode, string output) = fixture.VerifyCandidate(version, alternativeB);
+        await Assert.That(exitCode).IsEqualTo(Program.ToolchainRejected).Because(output);
+        await Assert.That(output).IsEqualTo("verify_candidate_failed: candidate_release_notes_mismatch\n");
+        await Assert.That(File.Exists(Path.Combine(directory, "release-candidate.v1.json"))).IsFalse();
+    }
+
+    [Test]
     public async Task VerifyCandidateSupportsSha256RepositoriesWhenGitSupportsThem()
     {
         if (OperatingSystem.IsWindows()) return;

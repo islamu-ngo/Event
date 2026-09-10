@@ -57,6 +57,110 @@ public sealed class FirstGovernedReleaseTests
     }
 
     [Test]
+    [Explicit]
+    [Category("Runtime")]
+    public async Task CategorizedReleaseVerifiesAfterBranchDeletion()
+    {
+        using var fixture = GovernedReleaseFixture.CreateCategorizedFirstGovernedRelease();
+        string version = GovernedReleaseFixture.FirstGovernedReleaseVersion;
+        string directory = Path.Combine(fixture.RepositoryPath, "docs", "internal", "releases", version);
+        byte[] notesBytes = File.ReadAllBytes(Path.Combine(directory, "release-notes.md"));
+        string notes = System.Text.Encoding.UTF8.GetString(notesBytes);
+        using JsonDocument context = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(directory, "release-context.v1.json")));
+        JsonElement[] changes = context.RootElement.GetProperty("changes").EnumerateArray().ToArray();
+
+        await Assert.That(changes.Length).IsEqualTo(5);
+        await Assert.That(changes.Single(change => change.GetProperty("breaking").GetBoolean()).GetProperty("type").GetString()).IsEqualTo("fix");
+        await Assert.That(context.RootElement.GetProperty("release").GetProperty("minimumBump").GetString()).IsEqualTo("minor");
+
+        string primary = notes.Split("## Release-Visible Details\n", StringSplitOptions.None)[1]
+            .Split("### Impact Summary\n", StringSplitOptions.None)[0];
+        // This assertion is the real-renderer Red gate: preparation and signed closure already succeeded.
+        await Assert.That(primary).Contains("### ⚠️ Breaking Changes");
+        (string Heading, string Type, bool Breaking)[] categories =
+        [
+            ("### ⚠️ Breaking Changes", "fix", true),
+            ("### 🚀 Features", "feat", false),
+            ("### 🐛 Bug Fixes", "fix", false),
+            ("### ⚡ Performance", "perf", false),
+            ("### 🔧 Other Improvements", "docs", false),
+        ];
+        string[] expectedPrimary = categories.SelectMany(category =>
+        {
+            JsonElement change = changes.Single(value =>
+                value.GetProperty("type").GetString() == category.Type &&
+                value.GetProperty("breaking").GetBoolean() == category.Breaking);
+            return new[] { category.Heading, $"- {change.GetProperty("scope").GetString()}: {change.GetProperty("title").GetString()} ({change.GetProperty("displayId").GetString()})" };
+        }).ToArray();
+        await Assert.That(string.Join('\n', primary.Split('\n', StringSplitOptions.RemoveEmptyEntries)))
+            .IsEqualTo(string.Join('\n', expectedPrimary));
+
+        ReleaseInputValidationResult input = ReleaseInputPolicy.Validate(
+            File.ReadAllText(Path.Combine(directory, "release.yaml")),
+            Directory.EnumerateFiles(Path.Combine(fixture.RepositoryPath, "docs", "internal", "releases", "changes"), "*.yaml")
+                .Order(StringComparer.Ordinal).Select(File.ReadAllText).ToArray(),
+            []);
+        await Assert.That(input.IsValid).IsTrue();
+        PublicChangeFragment upgrade = input.Fragments.Single(fragment => fragment.ChangeId == "CHG-2026-0002");
+        foreach ((string impact, string heading) in new[]
+        {
+            ("breaking", "Breaking"), ("security", "Security"), ("migration", "Migration"),
+            ("configuration", "Configuration"), ("operator", "Operator"),
+        })
+        {
+            FragmentImpact evidence = upgrade.Impacts[impact];
+            await Assert.That(input.Descriptor!.ImpactDispositions[impact]).IsEqualTo("documented");
+            await Assert.That(evidence.Disposition).IsEqualTo("documented");
+            await Assert.That(string.IsNullOrWhiteSpace(evidence.Detail)).IsFalse();
+            string section = notes.Split($"#### {heading}\n", StringSplitOptions.None)[1].Split("\n#", StringSplitOptions.None)[0];
+            await Assert.That(section).Contains($"- `{upgrade.ChangeId}` - documented: {CanonicalArtifactPolicy.EscapeUntrustedMarkdown(evidence.Detail!).Text} (Evidence: `{CanonicalArtifactPolicy.EscapeUntrustedMarkdown(evidence.Reference).Text}`)");
+        }
+        string range = notes.Split("## Complete Commit Range\n", StringSplitOptions.None)[1].Trim();
+        await Assert.That(range).IsEqualTo(string.Join('\n',
+            fixture.RangeOids(GovernedReleaseFixture.BaselineRef, fixture.A).Select(oid =>
+                $"- `{changes.Single(change => change.GetProperty("oid").GetString() == oid).GetProperty("displayId").GetString()}`")));
+        await Assert.That(notes).DoesNotContain("release@example.invalid");
+        await Assert.That(notes).DoesNotContain("Release Test");
+
+        fixture.DeleteIntegrationBranch();
+        (int candidateCode, string candidateOutput) = fixture.VerifyCandidate(version, fixture.B);
+        (int tagCode, string tagOutput) = fixture.VerifyTag(version, fixture.B, fixture.FirstTagObject);
+        await Assert.That(candidateCode).IsEqualTo(Program.Success).Because(candidateOutput);
+        await Assert.That(tagCode).IsEqualTo(Program.Success).Because(tagOutput);
+        byte[] candidateBytes = File.ReadAllBytes(Path.Combine(directory, "release-candidate.v1.json"));
+        byte[] evidenceBytes = File.ReadAllBytes(Path.Combine(directory, "release-evidence.v1.json"));
+        using JsonDocument candidate = JsonDocument.Parse(candidateBytes);
+        using JsonDocument finalEvidence = JsonDocument.Parse(evidenceBytes);
+        await Assert.That(fixture.BranchRefs()).IsEqualTo(string.Empty);
+        await Assert.That(candidate.RootElement.GetProperty("candidateOid").GetString()).IsEqualTo(fixture.B);
+        await Assert.That(candidate.RootElement.GetProperty("candidateParentOid").GetString()).IsEqualTo(fixture.A);
+        await Assert.That(candidate.RootElement.GetProperty("releaseNotesSha256").GetString())
+            .IsEqualTo(Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(notesBytes)));
+        await Assert.That(finalEvidence.RootElement.GetProperty("targetOid").GetString()).IsEqualTo(fixture.B);
+        await Assert.That(finalEvidence.RootElement.GetProperty("tagObjectId").GetString()).IsEqualTo(fixture.FirstTagObject);
+        await Assert.That(finalEvidence.RootElement.GetProperty("tagName").GetString()).IsEqualTo($"v{version}");
+        await Assert.That(finalEvidence.RootElement.GetProperty("baseStableTag").GetString()).IsEqualTo(GovernedReleaseFixture.BaselineRef);
+
+        (int repeatedCandidateCode, string repeatedCandidateOutput) = fixture.VerifyCandidate(version, fixture.B);
+        (int repeatedTagCode, string repeatedTagOutput) = fixture.VerifyTag(version, fixture.B, fixture.FirstTagObject);
+        await Assert.That(repeatedCandidateCode).IsEqualTo(Program.Success).Because(repeatedCandidateOutput);
+        await Assert.That(repeatedTagCode).IsEqualTo(Program.Success).Because(repeatedTagOutput);
+        await Assert.That(File.ReadAllBytes(Path.Combine(directory, "release-candidate.v1.json"))).IsEquivalentTo(candidateBytes);
+        await Assert.That(File.ReadAllBytes(Path.Combine(directory, "release-evidence.v1.json"))).IsEquivalentTo(evidenceBytes);
+
+        string clone = fixture.CreateTagOnlyClone($"v{version}");
+        (int cloneCandidateCode, string cloneCandidateOutput) = fixture.VerifyCandidate(version, fixture.B, clone);
+        (int cloneTagCode, string cloneTagOutput) = fixture.VerifyTag(version, fixture.B, fixture.FirstTagObject, clone);
+        await Assert.That(cloneCandidateCode).IsEqualTo(Program.Success).Because(cloneCandidateOutput);
+        await Assert.That(cloneTagCode).IsEqualTo(Program.Success).Because(cloneTagOutput);
+        await Assert.That(fixture.BranchRefs(clone)).IsEqualTo(string.Empty);
+        string cloneDirectory = Path.Combine(clone, "docs", "internal", "releases", version);
+        await Assert.That(File.ReadAllBytes(Path.Combine(cloneDirectory, "release-notes.md"))).IsEquivalentTo(notesBytes);
+        await Assert.That(File.ReadAllBytes(Path.Combine(cloneDirectory, "release-candidate.v1.json"))).IsEquivalentTo(candidateBytes);
+        await Assert.That(File.ReadAllBytes(Path.Combine(cloneDirectory, "release-evidence.v1.json"))).IsEquivalentTo(evidenceBytes);
+    }
+
+    [Test]
     public async Task CandidateBPassesFullAttestationWithNoBranchInputAndTheTagClosesTheRelease()
     {
         if (OperatingSystem.IsWindows()) return;

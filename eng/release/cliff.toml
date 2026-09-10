@@ -1,9 +1,10 @@
 [changelog]
 body = """
 # Release {{ version }}
-{% for commit in commits %}
-- {{ commit.group }}: {{ commit.message }} ({{ commit.id }})
-{% endfor %}
+{% for commit in commits %}\
+{{ commit.group }}\
+- {{ commit.scope }}: {{ commit.message }} ({{ commit.id }})
+{% endfor %}\
 """
 trim = true
 render_always = true

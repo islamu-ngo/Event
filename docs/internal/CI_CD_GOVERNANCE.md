@@ -533,6 +533,22 @@ This is now a missing-evidence gate for breaking OpenAPI changes, not full autom
 
 ## Required vs Advisory Gates
 
+### Generated Migration Duplication
+
+The repository-root `.sonarcloud.properties` lists twelve EF-generated migration
+files under `sonar.cpd.exclusions`. They repeat provider schema operations by
+design. This exception applies only to copy-paste detection: handwritten code,
+security analysis, migration execution and provider-parity checks remain included.
+No duplication threshold is raised. Keep the list explicit; a new entry requires
+review of its generated provenance, not a blanket directory exclusion.
+
+Sonar automatic analysis supports this separate configuration file, not the
+CI scanner's `sonar-project.properties`. Its application to a pending PR must be
+confirmed by that PR's fresh analysis; a local path check is not scanner evidence.
+See [Sonar's automatic-analysis configuration](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/automatic-analysis#additional-analysis-configuration).
+
+### Gate Ownership
+
 | Gate | Required | Advisory / scheduled | Promotion rule |
 |---|---:|---:|---|
 | Release build + fast tests | Yes | No | Required for all code PRs. |

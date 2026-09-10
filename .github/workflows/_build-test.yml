@@ -226,7 +226,7 @@ jobs:
       - name: Blazor Integration Tests
         if: ${{ inputs.run-fast-tests && inputs.run-blazor-tests }}
         id: test_blazor_integration
-        run: dotnet test --project tests/Explore.Blazor.IntegrationTests/Explore.Blazor.IntegrationTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Explore.Blazor.IntegrationTests.trx
+        run: dotnet test --project tests/Explore.Blazor.IntegrationTests/Explore.Blazor.IntegrationTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --maximum-parallel-tests 8 --report-trx --report-trx-filename Explore.Blazor.IntegrationTests.trx
 
       - name: Wire Contract Tests
         if: ${{ inputs.run-fast-tests }}

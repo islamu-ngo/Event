@@ -554,6 +554,7 @@ See [Sonar's automatic-analysis configuration](https://docs.sonarsource.com/sona
 | Release build + fast tests | Yes | No | Required for all code PRs. |
 | Coverage evidence | No | Yes | Artifact-only scheduled/manual Cobertura evidence for stable unit coverage. Keep non-blocking until scope, thresholds, and publication owner are documented. |
 | Infrastructure unit tests | Yes | No | Included in fast CI with `[Category!=Runtime]` so Docker-backed provider tests do not become implicit required checks. |
+| Blazor BFF integration tests | Yes | No | Limit independent test cases to eight concurrent executions with `--maximum-parallel-tests 8`; each can start a full host. Concurrency exercised inside each security test and its deadlines remain unchanged. |
 | Infrastructure email runtime tests | Conditional | Integration callers | `Explore.Infrastructure.Tests` `Email` category runs in the integration job as Mailpit/Testcontainers evidence; promote beyond conditional only after reliability data is tracked. |
 | PostgreSQL-backed integration tests | Conditional | Deploy callers | Required for integration/deploy callers; add a schedule only after reliability and runtime cost are acceptable. |
 | OpenAPI generated-artifact drift | Yes | No | Required after PR2 baseline. |

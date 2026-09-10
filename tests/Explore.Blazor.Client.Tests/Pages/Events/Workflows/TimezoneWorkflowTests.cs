@@ -40,12 +40,14 @@ public class TimezoneWorkflowTests
     public async Task SearchAsync_ReturnsMatches_ByIdAndDisplayName()
     {
         var workflow = new TimezoneWorkflow();
-        var sample = TimeZoneInfo.Local;
-        var searchTerm = sample.Id.Split('/').LastOrDefault() ?? sample.Id;
+        var sample = TimeZoneInfo.GetSystemTimeZones().First();
 
-        var results = (await workflow.SearchAsync(searchTerm)).ToList();
+        foreach (var searchTerm in new[] { sample.Id, sample.DisplayName })
+        {
+            var results = (await workflow.SearchAsync(searchTerm)).ToList();
 
-        await Assert.That(results.Any(timezone => timezone.Id == sample.Id)).IsTrue();
+            await Assert.That(results.Any(timezone => timezone.Id == sample.Id)).IsTrue();
+        }
     }
 
     [Test]

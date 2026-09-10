@@ -9,6 +9,10 @@ public interface IEventParticipationConfigurationRepository
         Guid tenantId,
         CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<EventParticipationConfiguration>> GetAccountRequiredAsync(
+        Guid? tenantId,
+        CancellationToken cancellationToken);
+
     Task UpdateAsync(
         EventParticipationConfiguration configuration,
         CancellationToken cancellationToken);

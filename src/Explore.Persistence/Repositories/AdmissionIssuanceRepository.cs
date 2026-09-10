@@ -1,6 +1,8 @@
 using Explore.Application.Contracts.Admissions;
+using Explore.Application.Notifications;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Domain.Services.Registration;
 using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,7 +10,8 @@ namespace Explore.Persistence.Repositories;
 
 public sealed class AdmissionIssuanceRepository(
     ExploreDbContext dbContext,
-    IParticipantAdmissionReadinessAuthority readiness) :
+    IParticipantAdmissionReadinessAuthority readiness,
+    TimeProvider? timeProvider = null) :
     IAdmissionIssuanceRepository
 {
     public AdmissionIssuanceRepository(
@@ -57,6 +60,14 @@ public sealed class AdmissionIssuanceRepository(
                 order => order.Id,
                 request.RegistrationOrderId,
                 cancellationToken);
+        }
+        // The fence excludes other writers, but a tracking query can still reuse
+        // an order retained before cancellation. Refresh only that authority root.
+        RegistrationOrder? trackedOrder = dbContext.RegistrationOrders.Local.SingleOrDefault(value =>
+            value.TenantId == request.TenantId && value.Id == request.RegistrationOrderId);
+        if (trackedOrder is not null)
+        {
+            await dbContext.Entry(trackedOrder).ReloadAsync(cancellationToken);
         }
         IQueryable<RegistrationOrder> orders = dbContext.RegistrationOrders;
         RegistrationOrder? order = await orders
@@ -147,14 +158,20 @@ public sealed class AdmissionIssuanceRepository(
                         readinessDecision));
             }
         }
-        string? deliveryAddress = order.Pii?.Email;
-        if (string.IsNullOrWhiteSpace(deliveryAddress) && order.AccountUserId.HasValue)
+        bool canDisclose = AnonymousRegistrationRetentionPolicy.CanDisclose(
+            order, order.Pii?.RetentionUntil, (timeProvider ?? TimeProvider.System).GetUtcNow().UtcDateTime);
+        string? deliveryAddress = canDisclose ? order.Pii?.Email : null;
+        Guid? deliveryAccountUserId = null;
+        if (canDisclose && string.IsNullOrWhiteSpace(deliveryAddress) && order.AccountUserId.HasValue)
         {
-            deliveryAddress = await dbContext.UserPii
-                .Where(value => value.UserId == order.AccountUserId.Value)
-                .Select(value => value.Email)
-                .SingleOrDefaultAsync(cancellationToken);
+            User? account = await dbContext.Users.AsNoTracking().Include(value => value.Pii)
+                .SingleOrDefaultAsync(value => value.Id == order.AccountUserId.Value, cancellationToken);
+            deliveryAddress = RecipientEmailAddressResolver.Resolve(account, order.AccountUserId.Value).Email;
+            if (!string.IsNullOrWhiteSpace(deliveryAddress)) deliveryAccountUserId = order.AccountUserId;
         }
+        if (!deliveryAccountUserId.HasValue && !AnonymousRegistrationRetentionPolicy.CanDisclose(
+                order, order.Pii?.RetentionUntil, (timeProvider ?? TimeProvider.System).GetUtcNow().UtcDateTime))
+            deliveryAddress = null;
         return new AdmissionIssuanceContext(
             order.TenantId,
             order.EventId,
@@ -172,7 +189,13 @@ public sealed class AdmissionIssuanceRepository(
             assignments.ToArray(),
             existing,
             deliveryAddress ?? string.Empty,
-            existingDeliveryIntents);
+            existingDeliveryIntents)
+        {
+            DeliveryAccountUserId = deliveryAccountUserId,
+            DeliveryDisclosureUntilUtc = !deliveryAccountUserId.HasValue && !string.IsNullOrWhiteSpace(deliveryAddress)
+                && AnonymousRegistrationRetentionPolicy.GetDisclosureDeadline(order, order.Pii?.RetentionUntil) is { } deadline
+                ? DateTime.SpecifyKind(deadline, DateTimeKind.Utc) : null
+        };
     }
 
     private async Task<HashSet<Guid>> GetFullyRefundedLineIdsAsync(

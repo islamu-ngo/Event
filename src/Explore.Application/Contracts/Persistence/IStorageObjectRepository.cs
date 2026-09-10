@@ -33,4 +33,8 @@ public interface IStorageObjectRepository : IGenericRepository<StorageObject, Gu
     Task<StorageObject?> GetEvidenceDocumentAsync(Guid id, CancellationToken cancellationToken);
     Task<bool> IsRetainedEvidenceAsync(Guid id, CancellationToken cancellationToken);
     Task<bool> IsRegistrationAnswerFileQuarantinedAsync(Guid id, CancellationToken cancellationToken);
+    Task<RegistrationAnswerFile?> GetRegistrationAnswerFileAsync(
+        Guid storageObjectId, Guid tenantId, CancellationToken cancellationToken);
+    Task<RegistrationOrder?> GetRegistrationContentOrderAsync(
+        StorageObject storageObject, RegistrationAnswerFile? answerFile, CancellationToken cancellationToken);
 }

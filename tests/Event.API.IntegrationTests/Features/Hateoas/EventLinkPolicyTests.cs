@@ -961,6 +961,10 @@ public sealed class EventLinkPolicyTests
         {
             Id = eventId,
             TenantId = tenantId,
+            VisitorAccess = Explore.Application.DTOs.PublicExperience.VisitorAccessCapabilityDto.From(
+                Explore.Application.Services.VisitorAccessCapabilityResolver.EvaluateProposedState(new(
+                    VisitorAccessMode.FullRegistrationAndAuth,
+                    [new(AuthenticationProviderKind.Keycloak, true, true, PublicOnboardingPolicy.Allowed, "https://accounts.example.test/register")]))),
             Title = "Program launch",
             ActorId = Guid.NewGuid(),
             ActorDisplayName = "ISLAMU",

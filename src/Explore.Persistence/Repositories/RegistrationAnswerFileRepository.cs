@@ -13,6 +13,15 @@ public sealed class RegistrationAnswerFileRepository(ExploreDbContext dbContext)
         => dbContext.RegistrationAnswerFiles.AsNoTracking()
             .SingleOrDefaultAsync(file => file.TenantId == tenantId && file.Id == id, cancellationToken);
 
+    public Task<RegistrationOrder?> GetOrderAsync(RegistrationAnswerFile file, CancellationToken cancellationToken)
+        => (from submission in dbContext.RegistrationSubmissions.AsNoTracking()
+            join order in dbContext.RegistrationOrders.AsNoTracking()
+                on new { submission.TenantId, submission.EventId, Id = submission.RegistrationOrderId }
+                equals new { order.TenantId, order.EventId, order.Id }
+            where submission.TenantId == file.TenantId && submission.EventId == file.EventId &&
+                submission.Id == file.RegistrationSubmissionId
+            select order).SingleOrDefaultAsync(cancellationToken);
+
     public Task<RegistrationAnswerFileRelease?> GetReleaseAsync(
         Guid tenantId,
         Guid id,

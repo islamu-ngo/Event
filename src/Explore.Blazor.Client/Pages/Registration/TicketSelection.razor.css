@@ -1,3 +1,17 @@
+.ticket-selection__choices {
+    border: 0;
+    padding: 0;
+    margin: 0;
+    min-inline-size: 0;
+}
+
+.ticket-selection__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--isl-space-3);
+    margin-block: var(--isl-space-3);
+}
+
 .ticket-selection__ticket {
     margin-block: var(--isl-space-4);
     padding: var(--isl-space-4);

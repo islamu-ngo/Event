@@ -15,6 +15,15 @@ Non-intuitive patterns, hidden knowledge, and implementation details requiring d
 
 ## 1. Multi-Tenancy Deep Mechanics
 
+### SQLite Moderation History
+
+`EventModerationRecordRepository` in `Database/ProviderPrimitives/` reads only the requested tenant/event history
+before ordering by `CreatedAt` instant and then `Id` descending in memory on
+SQLite. SQLite cannot translate this `DateTimeOffset` ordering even for an empty
+history, so the fallback is also necessary for event details with no moderation.
+Other providers retain SQL ordering and latest-row selection. Named tenant and
+soft-delete filters remain active; no schema conversion or migration is needed.
+
 ### How Tenant Isolation Actually Works
 
 Multi-tenancy is a **middleware-plus-query-filter pipeline**. `ApiTenantResolutionMiddleware` determines request tenant context before data access, and EF Core global query filters enforce that tenant scope in persistence. The flow:
@@ -899,4 +908,3 @@ To ensure clean-room compliance and protect outbound licensing paths (governed b
 - **AutoMapper MIT Freeze**: Pinned to **AutoMapper 14.0.0** (the last MIT-licensed release, explicitly annotated in `Directory.Packages.props` as security-frozen due to CVE-2026-32933) with an optional commercial-license build path (16.1.1).
 - **MediatR Apache Freeze**: Pinned to **MediatR 12.5.0** (the last Apache 2.0-licensed release).
 - **Central Package Management & Lock Files**: All 150 NuGet dependencies are centrally managed in `Directory.Packages.props`. CI workflows execute with `RestoreLockedMode` against `packages.lock.json` to prevent dependency tampering or unauthorized transitive upgrades.
-

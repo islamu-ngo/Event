@@ -160,7 +160,7 @@ public class EndpointClassificationArchitectureTests
         var violations = PublicTransactionalEndpointGovernance.FindViolations(controllerTypes);
 
         await Assert.That(violations).IsEmpty()
-            .Because("PublicTransactional endpoints must be anonymous unsafe writes with the exact public_transactional policy, no API antiforgery metadata, and required POST idempotency; see Phase 3 governance.");
+            .Because("PublicTransactional endpoints require governed anonymous unsafe writes, effective rate limiting, no API antiforgery metadata, and POST keys except the exact reviewed no-replay capability cancellation.");
     }
 
     [Test]
@@ -187,7 +187,8 @@ public class EndpointClassificationArchitectureTests
             foreach (var action in actions)
             {
                 var actionId = $"{controller.Name}.{action.Name}";
-                var isDocumentedException = AnonymousMutatingEndpointExceptions.Contains(actionId);
+                var isDocumentedException = AnonymousMutatingEndpointExceptions.Contains(actionId)
+                    || ReviewedAnonymousEndpointGovernance.IsLocalLifecycle(controller, action);
                 var isPublicTransactional = ResolveEndpointClassification(controller, action)?.Class
                     == EndpointClass.PublicTransactional;
                 var isSetupSecretGated = HasAttribute<SetupSecretRequiredAttribute>(controller)

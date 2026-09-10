@@ -55,17 +55,17 @@ public static class RefundOutboxMessageFactory
         RefundCampaign campaign,
         PaymentAttempt payment,
         DateTime createdAt) => new()
-    {
-        Id = Guid.CreateVersion7(),
-        AggregateType = nameof(PaymentAttempt),
-        AggregateId = payment.Id,
-        EventType = PaymentCancellationRequested,
-        Payload = JsonSerializer.Serialize(new PaymentCancellationProcessPayload(
+        {
+            Id = Guid.CreateVersion7(),
+            AggregateType = nameof(PaymentAttempt),
+            AggregateId = payment.Id,
+            EventType = PaymentCancellationRequested,
+            Payload = JsonSerializer.Serialize(new PaymentCancellationProcessPayload(
             campaign.TenantId, campaign.Id, payment.Id)),
-        Status = OutboxMessageStatus.Pending,
-        CreatedAt = createdAt,
-        MaxRetries = 10
-    };
+            Status = OutboxMessageStatus.Pending,
+            CreatedAt = createdAt,
+            MaxRetries = 10
+        };
 
     public static RefundCampaignProcessPayload ReadCampaign(OutboxMessage message) =>
         JsonSerializer.Deserialize<RefundCampaignProcessPayload>(message.Payload

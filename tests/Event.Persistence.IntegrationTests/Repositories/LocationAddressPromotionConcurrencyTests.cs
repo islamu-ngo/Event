@@ -52,7 +52,7 @@ public sealed class LocationAddressPromotionConcurrencyTests(PostgreSqlContainer
 
         await Assert.That(outcomes.Count(outcome => outcome is null)).IsEqualTo(1);
         await Assert.That(outcomes.Count(outcome => outcome is ConcurrencyConflictException
-            { Code: ConcurrencyConflictException.ConcurrentUpdate })).IsEqualTo(1);
+        { Code: ConcurrencyConflictException.ConcurrentUpdate })).IsEqualTo(1);
 
         await using ExploreDbContext verification = fixture.CreateDbContext();
         Location saved = await verification.Locations

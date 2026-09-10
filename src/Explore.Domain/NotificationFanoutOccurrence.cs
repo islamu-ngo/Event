@@ -18,6 +18,7 @@ public sealed class NotificationFanoutOccurrence : ITenantEntity
     public DateTime OccurredAt { get; private set; }
     public DateTime AudienceCutoffAt { get; private set; }
     public Guid AggregateVersion { get; private set; }
+    public long EmailDeliveryPolicyRevision { get; private set; }
     public string ChangeSetJson { get; private set; } = null!;
     public string SafeBeforeSnapshotJson { get; private set; } = null!;
     public string SafeAfterSnapshotJson { get; private set; } = null!;
@@ -58,11 +59,13 @@ public sealed class NotificationFanoutOccurrence : ITenantEntity
         string sourceType,
         Guid sourceId,
         string coalescingKey,
-        DateTime? coalescingWindowEndsAt)
+        DateTime? coalescingWindowEndsAt,
+        long emailDeliveryPolicyRevision)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(templateVersion);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(deliveryPolicyId);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(policyVersion);
+        ArgumentOutOfRangeException.ThrowIfNegative(emailDeliveryPolicyRevision);
         ArgumentException.ThrowIfNullOrWhiteSpace(changeSetJson);
         ArgumentException.ThrowIfNullOrWhiteSpace(safeBeforeSnapshotJson);
         ArgumentException.ThrowIfNullOrWhiteSpace(safeAfterSnapshotJson);
@@ -85,6 +88,7 @@ public sealed class NotificationFanoutOccurrence : ITenantEntity
             OccurredAt = occurredAt,
             AudienceCutoffAt = audienceCutoffAt,
             AggregateVersion = aggregateVersion,
+            EmailDeliveryPolicyRevision = emailDeliveryPolicyRevision,
             ChangeSetJson = changeSetJson,
             SafeBeforeSnapshotJson = safeBeforeSnapshotJson,
             SafeAfterSnapshotJson = safeAfterSnapshotJson,

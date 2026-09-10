@@ -50,7 +50,7 @@
 @code {
     private List<RouteConfig> _routes = new();
     private static List<Type> RequireAuthenticated() => [typeof(AuthenticatedRouteGuard)];
-    private static List<Type> RequireMultiTenantOnboarding() => [typeof(AuthenticatedRouteGuard), typeof(MultiTenantOnboardingRouteGuard)];
+    private static List<Type> RequireMultiTenantOnboarding() => [typeof(MultiTenantOnboardingRouteGuard)];
     private static List<Type> RequireAdmin() => [typeof(AdminRouteGuard)];
     private static List<Type> RequireMultiTenantAdmin() => [typeof(AdminRouteGuard), typeof(MultiTenantControlPlaneRouteGuard)];
     private static List<Type> RequireTenantAdmin() => [typeof(TenantAdminRouteGuard)];
@@ -66,6 +66,7 @@
             new RouteConfig { Path = "/", Component = typeof(HomeStart), Transition = RouteTransition.Fade, EnableCache = false },
             new RouteConfig { Path = "/events", Component = typeof(EventList), Transition = RouteTransition.Fade },
             new RouteConfig { Path = "/tickets/recovery", Component = typeof(TicketRecovery), Transition = RouteTransition.Fade, EnableCache = false },
+        new RouteConfig { Path = "/registration/guest/events/:eventId/orders/:orderId/status", Component = typeof(GuestRegistrationStatus), Transition = RouteTransition.Fade, EnableCache = false },
         new RouteConfig { Path = "/registration/guest/events/:eventId/orders/:orderId", Component = typeof(GuestOrderRecovery), Transition = RouteTransition.Fade },
         new RouteConfig { Path = "/registration/events/:eventId/tickets", Component = typeof(TicketSelection), Transition = RouteTransition.Fade },
             new RouteConfig { Path = "/actors/:id", Component = typeof(ActorProfile), Transition = RouteTransition.Fade },
@@ -79,6 +80,8 @@
             new RouteConfig { Path = "/onboarding/auth-provider", Component = typeof(AuthProviderConfiguration), Layout = typeof(SetupLayout), Transition = RouteTransition.None, EnableCache = false },
             new RouteConfig { Path = "/onboarding/authz-provider", Component = typeof(AuthorizationProviderConfiguration), Layout = typeof(SetupLayout), Transition = RouteTransition.None, EnableCache = false },
             new RouteConfig { Path = "/login", Component = typeof(LoginRedirect), Transition = RouteTransition.None, EnableCache = false },
+            new RouteConfig { Path = "/auth/local/change-password", Component = typeof(LocalPasswordChange), Transition = RouteTransition.None, EnableCache = false },
+            new RouteConfig { Path = "/auth/local-account-recovery", Component = typeof(LocalAccountRecovery), Transition = RouteTransition.None, EnableCache = false },
             new RouteConfig { Path = "/logout", Component = typeof(LogoutRedirect), Transition = RouteTransition.None, EnableCache = false },
             new RouteConfig
             {
@@ -86,6 +89,7 @@
                 Component = typeof(InstanceOnboarding),
                 Layout = typeof(SetupLayout),
                 Transition = RouteTransition.Fade,
+                EnableCache = false,
                 Guards = RequireMultiTenantOnboarding()
             },
             new RouteConfig

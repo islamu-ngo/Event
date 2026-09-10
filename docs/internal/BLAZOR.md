@@ -248,6 +248,14 @@ AT Protocol authentication uses a custom authentication handler (`AtprotoAuthent
 4. **Session Persistence & Identity Resolution**: `ApiBackedOAuthStateStore` and `AtprotoTenantSessionHandoffStore` share the private `ApiBackedAtprotoTransientStore`; the BFF has no database reference or alternate transient cache. `ApiBackedOAuthSessionStore` retains durable OAuth-session ownership, and `AtprotoIdentityCache` remains discovery-only.
 5. **Browser Correlation**: `AtprotoBrowserProof` protects one fixed-expiry, host-only HTTPS cookie and derives an independent HMAC binding per flow. State/handoff adapters validate recovered origin, tenant and browser binding before candidate-bound consumption. Cross-origin canonical callbacks issue only opaque handoffs; the destination issues the first-party session cookie after proof validation. Proof is checked again immediately before cookie sign-in.
 
+## Analytics Diagnostic Boundary
+
+Analytics interop failures use operation-specific warning templates and the
+exception type only. `AnalyticsInterop` never attaches JavaScript exceptions or
+logs event names, distinct identifiers, navigation paths, traits, or bootstrap
+arguments. Analytics forwarding and consent behavior are unchanged; diagnostic
+redaction applies at the shared interop boundary, including direct callers.
+
 ## Auth Diagnostic Boundary
 
 Authentication challenge and OIDC callback failures are intentionally safe by default:
@@ -434,6 +442,13 @@ The broader hierarchical settings cascade belongs in configuration/render-policy
 
 Pages should stay thin. They call scoped services that encapsulate generated-client calls, mapping, and UI-friendly error handling.
 
+`LocalAccountRecovery` resolves authenticated account actions through the injected
+`IUserService.GetCurrentUserResourceAsync` read, which delegates to the registered
+generated client without the profile service's auto-sync behavior. Its InteractiveServer circuit cannot
+use a cookie-only browser fetch to authenticate directly to `/api/user` in
+Standalone. The returned HAL links still exclusively control available actions;
+public discovery and credential submission retain their existing BFF boundaries.
+
 Use URL/query state for filters and pagination whenever it represents navigable state. Use scoped services for cross-component UI state only when URL state is insufficient.
 
 Source-grounded examples:
@@ -452,6 +467,23 @@ Source-grounded examples:
 | Render & routing decisions | `RuntimeRenderPolicyService`, `StartupRoutingService` |
 
 Keep component lifecycle async and cancellation-aware for long-running loads. UI authorization is for affordance and navigation clarity only; API authorization remains authoritative.
+
+### Local identity administration facade contract
+
+Interface injection remains the default for application services. The approved concrete exception is exactly `Explore.Blazor.Client.Services.ControlPlane.LocalIdentityAdministrationService`, injected only by `InstanceAdminSettingsLayout` and `LocalAccountsSection` in `Explore.Blazor.Client.Pages.Admin.Instance.Components`. This is a generated-client facade, not a framework type, state container, or interop adapter. Other concrete services and additional consumers do not inherit this permission, even if they have the same short name or an identical dependency shape. No additional interface is required for this facade.
+
+- `AddSharedApplicationServices` registers the sealed facade directly once, unkeyed and scoped. Singleton, transient, factory, keyed, or duplicate registrations do not satisfy this contract.
+- Its only retained fields are private readonly references to `ILocalIdentityAdministrationClient` and `IControlPlaneOverviewService`. No other instance or static fields are allowed: credentials, response DTOs, tasks, delegates, collections, or other per-call state must not survive in the facade. It has no state-bearing base class or storage/cache dependency.
+- Each operation uses native server HAL discovery and the generated client. Reset/reconcile require target-bound HAL and typed subject/operation IDs; links do not become arbitrary transport URLs. Results retain their generated shape, exact operation/subject checks, and Issued-versus-Replayed one-time credential rules. Cancellation is checked after awaited issuance before handing any result back to the component.
+- Only the active `LocalAccountsSection` owns transient form and one-time handover state. Dismissal, supersession, cancellation, and disposal clear or invalidate it; a late response cannot populate another interaction or component in the same DI scope. Neither the facade nor shared UI state caches the handover.
+
+`BlazorClientArchitectureTests` Rule 1.04 discovers compiled `[Inject]` properties, including private inherited injections, and recognizes the exact service/consumer types rather than source spellings. Companion tests check the exact two consumers, the real shared registration, and dependency-only field shape. Synthetic probes reject unrelated or same-name types, additional/inherited consumers, wrong lifetimes, hidden registrations, mutable dependencies, and instance/static credential or response retention. `LocalIdentityAdministrationServiceTests`, `LocalAccountsSectionTests`, and `InstanceAdminSettingsLayoutTests` exercise native generated transport, HAL gating, and one-time UI behavior; structural recognition does not replace those behavioral checks.
+
+### Guest registration model and interop ownership
+
+`GuestRegistrationStartPhase` and `GuestRegistrationCancellationOutcome` live in the existing `Explore.Blazor.Client.Models` namespace, outside interface-only `Contracts/Services/I*.cs` files. They remain nominal local UI enums, not generated API DTO mirrors or string-based state. Their declaration order and numeric values are unchanged.
+
+`IAnonymousRegistrationChallengeSolver` remains the service contract. Its scoped implementation is `Services/Interop/AnonymousRegistrationChallengeSolver.cs`, the actual adapter to `./js/anonymous-registration-challenge-interop.js`; no pass-through wrapper is needed. `RegistrationOrderService` owns orchestration and consumes numeric progress through that interface. The adapter keeps its bounded solve lifetime, per-call callback/module/worker ownership, and awaited cancellation cleanup in `finally`, before success or failure escapes. Registration components keep their existing cancellation, uncertain-response recovery, and progress behavior.
 
 ### Actor profiles and organization evidence
 

@@ -33,7 +33,8 @@ public sealed class NotificationFanoutOccurrenceTests
             "event-session",
             eventId,
             "session:update:42",
-            occurredAt.AddMinutes(5));
+            occurredAt.AddMinutes(5),
+            emailDeliveryPolicyRevision: 0);
 
         await Assert.That(occurrence.Id).IsEqualTo(id);
         await Assert.That(occurrence.AggregateVersion).IsEqualTo(aggregateVersion);
@@ -53,7 +54,8 @@ public sealed class NotificationFanoutOccurrenceTests
             Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), null,
             now, now, Guid.CreateVersion7(), "{}", "{}", "{}",
             "event.cancelled", 1, 2, 1, 100, now,
-            "event", Guid.CreateVersion7(), "event:cancelled", null);
+            "event", Guid.CreateVersion7(), "event:cancelled", null,
+            emailDeliveryPolicyRevision: 0);
         string before = occurrence.SafeBeforeSnapshotJson;
         Guid replacementId = Guid.CreateVersion7();
 

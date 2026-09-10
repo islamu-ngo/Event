@@ -11,27 +11,32 @@ using MediatR;
 namespace Explore.Application.Features.RegistrationOrders.Handlers.Commands;
 
 public sealed class StartGuestRegistrationOrderCommandHandler(
-    IRegistrationOrderStarter starter,
-    IGuestCapabilityTokenService capabilities)
+    IRegistrationOrderStarter starter)
     : IRequestHandler<StartGuestRegistrationOrderCommand, GuestRegistrationOrderStartDto>
 {
     public async Task<GuestRegistrationOrderStartDto> Handle(
         StartGuestRegistrationOrderCommand request,
         CancellationToken cancellationToken)
     {
-        GuestCapabilityTokenIssue capability = capabilities.Issue();
+        var authority = request.ChallengeAuthority;
+        if (authority is null || !authority.Matches(request))
+        {
+            return GuestRegistrationOrderStartDto.Failure(BaseCommandResponse.Failure<Guid>(
+                "registration_order_challenge_invalid", "Registration challenge is invalid.", id: request.EventId));
+        }
         BaseCommandResponse<Guid> response = await starter.StartAsync(new CreateRegistrationOrderWithHoldCommand
         {
             EventId = request.EventId,
             TicketCatalogVersionId = request.TicketCatalogVersionId,
             BookingPartyType = request.BookingPartyType,
-            GuestAccessTokenHash = capability.Hash,
+            GuestAccessTokenHash = authority.GuestAccessTokenHash,
+            ChallengeAuthority = authority,
             PlatformContributionBasisPoints = request.PlatformContributionBasisPoints,
             Lines = request.Lines
         }, cancellationToken);
 
         return response.IsSuccess
-            ? GuestRegistrationOrderStartDto.Success(response.Id, response.Message, capability.RawToken)
+            ? GuestRegistrationOrderStartDto.Success(response.Id, response.Message, authority.GuestCapabilityToken)
             : GuestRegistrationOrderStartDto.Failure(response);
     }
 }

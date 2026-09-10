@@ -14,20 +14,27 @@ public sealed class KeycloakTokenClient : IDisposable
     private readonly string _tokenEndpoint;
     private readonly string _clientId;
     private readonly string _clientSecret;
+    private readonly IReadOnlyDictionary<string, string> _userPasswords;
 
-    public KeycloakTokenClient(string keycloakBaseUrl, string realm, string clientId, string clientSecret)
+    public KeycloakTokenClient(
+        string keycloakBaseUrl,
+        string realm,
+        string clientId,
+        string clientSecret,
+        IReadOnlyDictionary<string, string> userPasswords)
     {
         _httpClient = new HttpClient();
         _tokenEndpoint = $"{keycloakBaseUrl}/realms/{realm}/protocol/openid-connect/token";
         _clientId = clientId;
         _clientSecret = clientSecret;
+        _userPasswords = userPasswords;
     }
 
     /// <summary>
     /// Acquires an access token for the specified test user via ROPC grant.
     /// </summary>
     /// <param name="username">Keycloak username (from test realm export).</param>
-    /// <param name="password">Keycloak password (from test realm export).</param>
+    /// <param name="password">Password from the disposable fixture credential authority.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A valid JWT access token string.</returns>
     /// <exception cref="InvalidOperationException">If token acquisition fails.</exception>
@@ -54,10 +61,8 @@ public sealed class KeycloakTokenClient : IDisposable
 
         if (!response.IsSuccessStatusCode)
         {
-            var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new InvalidOperationException(
-                $"Failed to acquire Keycloak token for user '{username}'. " +
-                $"Status: {response.StatusCode}. Body: {errorBody}");
+                $"Failed to acquire Keycloak token. Status: {response.StatusCode}.");
         }
 
         var tokenResponse = await response.Content.ReadFromJsonAsync<TokenResponse>(cancellationToken);
@@ -65,7 +70,7 @@ public sealed class KeycloakTokenClient : IDisposable
         if (string.IsNullOrEmpty(tokenResponse?.AccessToken))
         {
             throw new InvalidOperationException(
-                $"Keycloak token response for user '{username}' contained an empty access_token.");
+                "Keycloak token response contained an empty access_token.");
         }
 
         return tokenResponse.AccessToken;
@@ -75,22 +80,22 @@ public sealed class KeycloakTokenClient : IDisposable
     /// Acquires the default test admin token.
     /// </summary>
     public Task<string> GetAdminTokenAsync(CancellationToken cancellationToken = default)
-        => GetAccessTokenAsync("test-admin", "test-admin-password", cancellationToken: cancellationToken);
+        => GetAccessTokenAsync(username: "test-admin", password: _userPasswords["test-admin"], cancellationToken: cancellationToken);
 
     /// <summary>
     /// Acquires the default test regular user token.
     /// </summary>
     public Task<string> GetUserTokenAsync(CancellationToken cancellationToken = default)
-        => GetAccessTokenAsync("test-user", "test-user-password", cancellationToken: cancellationToken);
+        => GetAccessTokenAsync(username: "test-user", password: _userPasswords["test-user"], cancellationToken: cancellationToken);
 
     public Task<string> GetUserTokenWithOfflineAccessAsync(CancellationToken cancellationToken = default)
-        => GetAccessTokenAsync("test-user", "test-user-password", "openid profile email offline_access", cancellationToken);
+        => GetAccessTokenAsync(username: "test-user", password: _userPasswords["test-user"], scope: "openid profile email offline_access", cancellationToken: cancellationToken);
 
     /// <summary>
     /// Acquires the default test tenant admin token.
     /// </summary>
     public Task<string> GetTenantAdminTokenAsync(CancellationToken cancellationToken = default)
-        => GetAccessTokenAsync("test-tenant-admin", "test-tenant-admin-password", cancellationToken: cancellationToken);
+        => GetAccessTokenAsync(username: "test-tenant-admin", password: _userPasswords["test-tenant-admin"], cancellationToken: cancellationToken);
 
     public void Dispose()
     {

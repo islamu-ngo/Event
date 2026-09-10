@@ -138,14 +138,14 @@ public sealed class EfCorePrivacyErasureAuthorityRepository(
                 throw new Explore.Application.Exceptions.PrivacyErasureSequenceGapException();
             }
             await using (reader)
-            if (await reader.ReadAsync(cancellationToken))
-            {
-                return new PrivacyErasureRetentionEvaluation(
-                    reader.GetInt32(0),
-                    reader.GetInt32(1),
-                    reader.GetInt64(2),
-                    reader.GetInt64(3));
-            }
+                if (await reader.ReadAsync(cancellationToken))
+                {
+                    return new PrivacyErasureRetentionEvaluation(
+                        reader.GetInt32(0),
+                        reader.GetInt32(1),
+                        reader.GetInt64(2),
+                        reader.GetInt64(3));
+                }
 
             throw new InvalidOperationException("The erasure-authority retention evaluation returned no result.");
         }
@@ -177,13 +177,13 @@ public sealed class EfCorePrivacyErasureAuthorityRepository(
                 throw new Explore.Application.Exceptions.PrivacyErasureSequenceGapException();
             }
             await using (reader)
-            if (await reader.ReadAsync(cancellationToken))
-            {
-                return new PrivacyErasureCompactionResult(
-                    reader.GetInt32(0),
-                    reader.GetInt32(1),
-                    new PrivacyErasureAuthorityState(reader.GetInt64(2), reader.GetInt64(3)));
-            }
+                if (await reader.ReadAsync(cancellationToken))
+                {
+                    return new PrivacyErasureCompactionResult(
+                        reader.GetInt32(0),
+                        reader.GetInt32(1),
+                        new PrivacyErasureAuthorityState(reader.GetInt64(2), reader.GetInt64(3)));
+                }
 
             throw new InvalidOperationException("The erasure-authority compaction returned no result.");
         }

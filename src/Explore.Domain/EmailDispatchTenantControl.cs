@@ -9,6 +9,10 @@ public class EmailDispatchTenantControl : ITenantEntity, IAuditableEntity
     public Guid TenantId { get; set; }
     public Tenant Tenant { get; set; } = null!;
 
+    public long DeliveryPolicyRevision { get; set; }
+    public long? OptionalSuppressedThroughRevision { get; set; }
+    public DateTime? OptionalSuppressedThroughUtc { get; set; }
+
     public bool IsPaused { get; set; }
     public string? PauseReason { get; set; }
     public DateTime? PausedAt { get; set; }

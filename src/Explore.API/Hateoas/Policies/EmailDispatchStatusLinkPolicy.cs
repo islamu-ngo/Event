@@ -4,6 +4,7 @@ using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.DTOs.EmailDispatch;
 using Explore.Application.Hateoas;
+using Explore.Domain;
 
 namespace Explore.API.Hateoas.Policies;
 
@@ -12,10 +13,8 @@ namespace Explore.API.Hateoas.Policies;
 /// </summary>
 public sealed class EmailDispatchStatusDetailLinkPolicy : ILinkPolicy<EmailDispatchStatusDto>
 {
-    private readonly EmailDispatchStatusCollectionLinkPolicy _collectionPolicy = new();
-
-    public IEnumerable<LinkDefinition> GetLinks(EmailDispatchStatusDto dto, ClaimsPrincipal? user)
-        => _collectionPolicy.GetItemLinks(dto, user);
+    public IEnumerable<LinkDefinition> GetLinks(EmailDispatchStatusDto dto, ClaimsPrincipal? user) =>
+        EmailDispatchStatusLinkCandidates.Enumerate(dto);
 }
 
 /// <summary>
@@ -23,89 +22,77 @@ public sealed class EmailDispatchStatusDetailLinkPolicy : ILinkPolicy<EmailDispa
 /// </summary>
 public sealed class EmailDispatchStatusCollectionLinkPolicy : ICollectionLinkPolicy<EmailDispatchStatusDto>
 {
-    private static readonly string[] ReplayableStatuses =
-    [
-        "DeadLettered",
-        "Parked",
-        "RetryScheduled"
-    ];
+    public IEnumerable<LinkDefinition> GetItemLinks(EmailDispatchStatusDto dto, ClaimsPrincipal? user) =>
+        EmailDispatchStatusLinkCandidates.Enumerate(dto);
 
-    public IEnumerable<LinkDefinition> GetItemLinks(EmailDispatchStatusDto dto, ClaimsPrincipal? user)
+    public IEnumerable<LinkDefinition> GetCollectionLinks(ClaimsPrincipal? user) => [];
+}
+
+internal static class EmailDispatchStatusLinkCandidates
+{
+    internal static IEnumerable<LinkDefinition> Enumerate(EmailDispatchStatusDto dto)
     {
+        if (dto.ContentRedactedAt is not null)
+        {
+            yield break;
+        }
+
         var routeValues = new { tenantId = dto.TenantId, outboxId = dto.OutboxId };
 
-        if (dto.ContentRedactedAt is null && IsReplayable(dto.DeliveryStatus))
+        if (dto.DeliveryStatus is EmailDispatchStatus.DeadLettered or EmailDispatchStatus.Parked or EmailDispatchStatus.RetryScheduled)
         {
             yield return new LinkDefinition(
-                "replay",
-                RouteNames.ReplayEmailDispatch,
-                routeValues,
-                "POST",
-                "Replay email dispatch",
+                Rel: "replay",
+                RouteName: RouteNames.ReplayEmailDispatch,
+                RouteValues: routeValues,
+                Method: "POST",
+                Title: "Replay email dispatch",
                 RequiresAuth: true)
                 .RequirePermission(AuthorizationActions.EmailDispatches.Replay,
                     ResourceDescriptors.EmailDispatchStatus,
                     dto);
         }
 
-        if (dto.ContentRedactedAt is null && CanPark(dto.DeliveryStatus))
+        if (EmailDispatchOutbox.CanParkForOperator(status: dto.DeliveryStatus, parkReason: dto.ParkReason))
         {
             yield return new LinkDefinition(
-                "park",
-                RouteNames.ParkEmailDispatch,
-                routeValues,
-                "PUT",
-                "Park email dispatch",
+                Rel: "park",
+                RouteName: RouteNames.ParkEmailDispatch,
+                RouteValues: routeValues,
+                Method: "PUT",
+                Title: "Park email dispatch",
                 RequiresAuth: true)
                 .RequirePermission(AuthorizationActions.EmailDispatches.Park,
                     ResourceDescriptors.EmailDispatchStatus,
                     dto);
         }
 
-        if (dto.ContentRedactedAt is null && CanResolve(dto.DeliveryStatus))
+        if (dto.DeliveryStatus is EmailDispatchStatus.DeadLettered or EmailDispatchStatus.Parked or EmailDispatchStatus.Unknown)
         {
             yield return new LinkDefinition(
-                "resolve-without-replay",
-                RouteNames.ResolveEmailDispatchWithoutReplay,
-                routeValues,
-                "POST",
-                "Resolve email dispatch without replay",
+                Rel: "resolve-without-replay",
+                RouteName: RouteNames.ResolveEmailDispatchWithoutReplay,
+                RouteValues: routeValues,
+                Method: "POST",
+                Title: "Resolve email dispatch without replay",
                 RequiresAuth: true)
                 .RequirePermission(AuthorizationActions.EmailDispatches.Resolve,
                     ResourceDescriptors.EmailDispatchStatus,
                     dto);
         }
 
-        if (dto.ContentRedactedAt is null
-            && string.Equals(dto.DeliveryStatus, "Unknown", StringComparison.Ordinal))
+        if (dto.DeliveryStatus is EmailDispatchStatus.Unknown)
         {
             yield return new LinkDefinition(
-                "reconcile",
-                RouteNames.ReconcileUnknownEmailDispatch,
-                routeValues,
-                "POST",
-                "Reconcile unknown email dispatch",
+                Rel: "reconcile",
+                RouteName: RouteNames.ReconcileUnknownEmailDispatch,
+                RouteValues: routeValues,
+                Method: "POST",
+                Title: "Reconcile unknown email dispatch",
                 RequiresAuth: true)
                 .RequirePermission(AuthorizationActions.EmailDispatches.Reconcile,
                     ResourceDescriptors.EmailDispatchStatus,
                     dto);
         }
     }
-
-    public IEnumerable<LinkDefinition> GetCollectionLinks(ClaimsPrincipal? user) => [];
-
-    private static bool IsReplayable(string deliveryStatus)
-        => ReplayableStatuses.Contains(deliveryStatus, StringComparer.Ordinal);
-
-    private static bool CanPark(string deliveryStatus)
-        => !string.Equals(deliveryStatus, "Sent", StringComparison.Ordinal) &&
-           !string.Equals(deliveryStatus, "Skipped", StringComparison.Ordinal) &&
-           !string.Equals(deliveryStatus, "Parked", StringComparison.Ordinal) &&
-           !string.Equals(deliveryStatus, "Processing", StringComparison.Ordinal) &&
-           !string.Equals(deliveryStatus, "Unknown", StringComparison.Ordinal);
-
-    private static bool CanResolve(string deliveryStatus)
-        => string.Equals(deliveryStatus, "DeadLettered", StringComparison.Ordinal)
-           || string.Equals(deliveryStatus, "Parked", StringComparison.Ordinal)
-           || string.Equals(deliveryStatus, "Unknown", StringComparison.Ordinal);
 }

@@ -1,0 +1,27 @@
+Change-Id: CHG-01M243KVZG3HZ2FSS6B6DYW4J8
+Title: "Restore signed-in Local account actions in Standalone"
+Type: fix
+Scope: access
+Summary: "Discover current-user account actions through the authenticated generated client while retaining server-authored HAL permissions."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: documented
+    Detail: The existing authenticated client transport resolves current-user HAL; missing authority and transport errors keep actions unavailable.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: Signed-in account actions work through the protected Standalone session without a direct cookie-only API request.

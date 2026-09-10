@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Explore.Application.DTOs.TenantSettings.Validators;
+using Explore.Domain.ValueObjects;
 using FluentValidation;
 
 namespace Explore.Application.DTOs.Management.Validators;
@@ -20,6 +22,9 @@ public sealed class ManagementTenantProvisioningRequestValidator
             .NotEmpty().MaximumLength(100).Matches("^[a-z0-9]+(?:-[a-z0-9]+)*$");
         RuleFor(request => request.Administrator).NotNull();
         RuleFor(request => request.Plan).NotNull();
+        RuleFor(request => request.DirectoryOperatorIdentity).NotNull()
+            .SetValidator(new TenantDirectoryOperatorIdentityInputDtoValidator(
+                TenantDirectoryOperatorIdentityCapability.Activation)!);
         RuleFor(request => request.ApprovedModules)
             .Cascade(CascadeMode.Stop)
             .NotNull()
@@ -49,14 +54,14 @@ public sealed class ManagementTenantProvisioningRequestValidator
         When(request => request.Administrator is not null, () =>
         {
             RuleFor(request => request.Administrator)
-                .Must(administrator => (administrator.ExternalIdentity is null) != (administrator.Invitation is null))
-                .WithMessage("Administrator must contain exactly one external identity or invitation.");
+                .Must(administrator => (administrator.ExternalIdentity is null) != (administrator.LocalIdentity is null))
+                .WithMessage("Administrator must contain exactly one external identity or Local identity.");
             RuleFor(request => request.Administrator.ExternalIdentity!)
                 .SetValidator(new ExternalIdentityValidator())
                 .When(request => request.Administrator.ExternalIdentity is not null);
-            RuleFor(request => request.Administrator.Invitation!)
-                .SetValidator(new InvitationValidator())
-                .When(request => request.Administrator.Invitation is not null);
+            RuleFor(request => request.Administrator.LocalIdentity!.LocalSubjectId)
+                .NotEmpty()
+                .When(request => request.Administrator.LocalIdentity is not null);
         });
 
         When(request => request.Plan is not null, () =>
@@ -130,17 +135,6 @@ public sealed class ManagementTenantProvisioningRequestValidator
             RuleFor(identity => identity.FirstName).NotEmpty().MaximumLength(100);
             RuleFor(identity => identity.LastName).NotEmpty().MaximumLength(100);
             RuleFor(identity => identity.DisplayName).MaximumLength(200);
-        }
-    }
-
-    private sealed class InvitationValidator : AbstractValidator<ManagementTenantAdministratorInvitationDto>
-    {
-        public InvitationValidator()
-        {
-            RuleFor(invitation => invitation.Email).NotEmpty().MaximumLength(255).EmailAddress();
-            RuleFor(invitation => invitation.FirstName).NotEmpty().MaximumLength(100);
-            RuleFor(invitation => invitation.LastName).NotEmpty().MaximumLength(100);
-            RuleFor(invitation => invitation.DisplayName).MaximumLength(200);
         }
     }
 

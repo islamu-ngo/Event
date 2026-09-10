@@ -6,6 +6,11 @@ namespace Explore.Application.Hateoas;
 /// </summary>
 public static class LinkRelations
 {
+    public const string VisitorSignupPrefix = "signup:";
+    public const string LocalIdentities = "local-identities";
+    public const string CreateLocalIdentity = "create-local-identity";
+    public const string IssueTemporaryCredential = "issue-temporary-credential";
+
     public const string CreateConfigurationImportSession =
         "create-configuration-import-session";
     public const string ExportTenantConfigurationPackage =
@@ -452,6 +457,9 @@ public static class LinkRelations
     public const string StartGuestRegistration = "start-guest-registration";
     public const string SignInToRegister = "sign-in-to-register";
     public const string ClaimRegistrationOrder = "claim-registration-order";
+    public const string GuestStatus = "guest-status";
+    public const string CancelRegistration = "cancel-registration";
+    public const string Calendar = "calendar";
     public const string ViewRegistrationOrders = "view-registration-orders";
     public const string ViewParticipants = "view-participants";
     public const string ViewRegistrationAnalytics = "view-registration-analytics";

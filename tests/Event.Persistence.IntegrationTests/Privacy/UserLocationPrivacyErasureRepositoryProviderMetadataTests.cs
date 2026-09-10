@@ -839,16 +839,16 @@ public sealed class UserLocationPrivacyErasureRepositoryProviderMetadataTests(
         User user,
         string provider,
         string providerKey) => new()
-    {
-        Id = Guid.CreateVersion7(),
-        UserId = user.Id,
-        User = user,
-        AuthenticationProviderId = (int)provider.ParseAuthenticationProviderKind(),
-        AuthenticationProvider = null!,
-        ProviderKey = providerKey,
-        ProviderDisplayName = "Keycloak",
-        CreatedAt = DateTime.UtcNow
-    };
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = user.Id,
+            User = user,
+            AuthenticationProviderId = (int)provider.ParseAuthenticationProviderKind(),
+            AuthenticationProvider = null!,
+            ProviderKey = providerKey,
+            ProviderDisplayName = "Keycloak",
+            CreatedAt = DateTime.UtcNow
+        };
 
     private static WebPushDispatchOutbox CreateWebPushDispatch(
         Tenant tenant,

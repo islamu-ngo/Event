@@ -1,0 +1,34 @@
+# ABOUTME: Records purpose-bound Local account verification, email change and password recovery.
+# ABOUTME: Binds global Identity operation state, native migrations and private browser contracts.
+Change-Id: CHG-01M1SMGJ7B1A7295YHYWNK93VZ
+Title: add purpose-bound Local verification and recovery
+Type: feat
+Scope: access
+Summary: Deliver Local account actions through their own authority with one-use token consumption, truthful SMTP availability, and no takeover of external-provider email.
+Group: email-optional-self-hosting
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: Authentication-provider discovery returns a typed HAL resource; lifecycle ownership follows an exact persisted account link rather than a global provider default.
+  Security:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented
+    Detail: Native purpose, operation, account and stamp binding enforce one-use mutations; public requests do not enumerate accounts and consumption never issues a session.
+  Migration:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented
+    Detail: Native LocalIdentityLifecycle migrations add the separate operation, delivery and synchronization ledger in both primary and external Identity stores.
+  Configuration:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented
+    Detail: Local lifecycle delivery uses instance SMTP and the existing trusted public browser base URL; external-provider lifecycle ownership no longer comes from a global notification default.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: Five named Local lifecycle operations and HAL discovery expose private verification, recovery and ordinary current-password-change contracts.
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: Fixed-expiry private links require explicit completion and fresh login; disabled delivery, uncertain acceptance and missing eligible addresses do not bypass credential authority.

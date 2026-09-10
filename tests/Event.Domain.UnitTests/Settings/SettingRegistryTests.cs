@@ -393,6 +393,7 @@ public class SettingRegistryTests
         await Assert.That(keys).IsEquivalentTo(new[]
         {
             GovernanceSettingKeys.PublicExperience.Mode,
+            GovernanceSettingKeys.PublicExperience.VisitorAccessMode,
             GovernanceSettingKeys.PublicExperience.EventCatalogLabel,
             GovernanceSettingKeys.PublicExperience.PrimaryOrganizationId,
             GovernanceSettingKeys.PublicExperience.HomeBlocks,

@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Features.ControlPlane.Requests.Commands;
 using Explore.Application.Features.Settings.Handlers;
 using Explore.Application.Notifications;
@@ -19,7 +20,9 @@ public sealed class SetControlPlaneTenantSettingCommandHandler(
     IHierarchicalSettingsResolver settingsResolver,
     IMediator mediator,
     IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    IEmailDeliverySettingsWriter emailDeliverySettingsWriter,
+    IVisitorAccessSettingsWriter visitorSettings)
     : IRequestHandler<SetControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> Handle(
@@ -53,6 +56,34 @@ public sealed class SetControlPlaneTenantSettingCommandHandler(
                 request.TenantId,
                 "setting_validation_failed",
                 "The tenant setting value is invalid.");
+        }
+
+        if (VisitorAccessSettingMutationGuard.Handles(request.Key))
+        {
+            var result = await visitorSettings.ApplyAsync(
+                [new(request.TenantId, request.Key, VisitorAccessSettingMutationKind.SetValue, serializedValue)],
+                actorUserId, cancellationToken);
+            return await result.CompleteAsync(settingsResolver, mediator, SettingScope.Tenant, request.TenantId);
+        }
+
+        if (EmailDeliverySettingKeys.Contains(request.Key))
+        {
+            EmailDeliverySettingsWriteResult result = await emailDeliverySettingsWriter.ApplyAsync(
+                [new EmailDeliverySettingMutation(
+                    TenantId: request.TenantId,
+                    Key: request.Key,
+                    Kind: EmailDeliverySettingMutationKind.SetValue,
+                    Value: serializedValue)],
+                actorUserId,
+                cancellationToken);
+            if (result.IsAccepted() && !result.Changes.IsEmpty)
+            {
+                settingsResolver.InvalidateCache(SettingScope.Tenant, request.TenantId);
+                foreach (SettingChangedNotification notification in result.ToNotifications(actorUserId))
+                    await mediator.Publish(notification, CancellationToken.None);
+            }
+
+            return result.ToCommandResponse(request.TenantId, "Tenant setting updated.");
         }
 
         if (PublicationPolicySettingKeys.All.Contains(request.Key, StringComparer.Ordinal))

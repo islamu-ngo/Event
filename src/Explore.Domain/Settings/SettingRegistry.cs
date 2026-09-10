@@ -33,6 +33,7 @@ public static class SettingRegistry
         all.AddRange(WebhookDeliverySettingDefinitions.All);
         all.AddRange(StorageSettingDefinitions.All);
         all.AddRange(SecuritySettingDefinitions.All);
+        all.AddRange(AuthenticationSettingDefinitions.All);
         all.AddRange(SupportAccessSettingDefinitions.All);
         all.AddRange(CerbosSettingDefinitions.All);
         all.AddRange(ReportingSettingDefinitions.All);
@@ -52,6 +53,8 @@ public static class SettingRegistry
         all.AddRange(CustomPropertyQuotaSettingDefinitions.All);
         all.AddRange(LocalizationSettingDefinitions.All);
         all.AddRange(PublicExperienceSettingDefinitions.All);
+        all.AddRange(AnonymousRegistrationChallengeSettingDefinitions.All);
+        all.AddRange(AnonymousRegistrationRetentionSettingDefinitions.All);
 
         DefinitionsByKey = all.ToFrozenDictionary(d => d.Key);
         ByCategory = all

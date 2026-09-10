@@ -4,6 +4,7 @@ using System.Security.Claims;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.DTOs.ControlPlane;
+using Explore.Application.Features.Authentication.Local.Requests.Queries;
 using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 using Explore.Application.Features.ConfigurationManifest.Requests.Commands;
 using Explore.Application.Features.ControlPlane.Requests.Queries;
@@ -65,6 +66,13 @@ public sealed class ControlPlaneOverviewLinkPolicy : ILinkPolicy<ControlPlaneOve
             "GET",
             "Authorization provider status",
             "authorization-provider");
+
+        yield return InstanceSettingLink(
+            LinkRelations.LocalIdentities,
+            RouteNames.ListLocalIdentities,
+            HttpMethods.Get,
+            "Local identities",
+            ListLocalIdentitiesQuery.ResourceKey);
 
         yield return ConfigurationManifestExportLink(
             LinkRelations.ExportConfigurationOverrides,

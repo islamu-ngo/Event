@@ -56,15 +56,26 @@ public sealed class EfCoreUnitOfWork : IUnitOfWork
         return await ExecuteCoreAsync(operation, IsolationLevel.Serializable, ct);
     }
 
-    public async Task<T> ExecuteBootstrapConvergenceAsync<T>(
+    public Task<T> ExecuteBootstrapConvergenceAsync<T>(
         Func<CancellationToken, Task<T>> operation,
-        CancellationToken ct = default)
+        CancellationToken ct = default) =>
+        ExecuteBootstrapConflictRetryAsync(() => ExecuteCoreAsync(operation, IsolationLevel.Serializable, ct), ct);
+
+    public Task<T> ExecuteReadCommittedAsync<T>(
+        Func<CancellationToken, Task<T>> operation,
+        CancellationToken ct = default) =>
+        ExecuteCoreAsync(operation,
+            _dbContext.Database.IsSqlite() ? IsolationLevel.Serializable : IsolationLevel.ReadCommitted, ct);
+
+    internal static async Task<T> ExecuteBootstrapConflictRetryAsync<T>(
+        Func<Task<T>> operation, CancellationToken ct)
     {
         for (int attempt = 1; ; attempt++)
         {
             try
             {
-                return await ExecuteCoreAsync(operation, IsolationLevel.Serializable, ct);
+                ct.ThrowIfCancellationRequested();
+                return await operation();
             }
             catch (Exception exception) when (
                 attempt < BootstrapConvergenceAttemptLimit

@@ -1,6 +1,9 @@
 using Explore.API.Attributes;
+using Explore.API.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services.Registration;
+using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Domain;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
@@ -64,6 +67,12 @@ public sealed class IdempotencyMiddleware
         if (context.GetEndpoint()?.Metadata
                 .GetMetadata<SuppressIdempotencyResponseStorageAttribute>() is not null)
         {
+            if (context.GetEndpoint()?.Metadata.GetMetadata<IRouteNameMetadata>()?.RouteName
+                == RouteNames.CreateAnonymousRegistrationChallenge)
+            {
+                // MVC must leave the original issuance bytes available for intended-start canonicalization.
+                context.Request.EnableBuffering();
+            }
             await _next(context);
             return;
         }
@@ -124,7 +133,30 @@ public sealed class IdempotencyMiddleware
             _streamManager,
             context.RequestAborted);
 
-        var now = DateTime.UtcNow;
+        AnonymousRegistrationChallengeAuthority? challenge = null;
+        GuestRegistrationOrderStartDto? committedGuest = null;
+        bool requiresChallenge = context.GetEndpoint()?.Metadata
+            .GetMetadata<RequireAnonymousRegistrationChallengeAttribute>() is not null;
+        if (requiresChallenge)
+        {
+            challenge = await AnonymousRegistrationChallengeBoundary.AuthenticateAsync(context, requestIdentity, key);
+            if (challenge is null)
+            {
+                return;
+            }
+
+            committedGuest = await AnonymousRegistrationChallengeBoundary.RecoverAsync(context, challenge);
+            if (committedGuest is null && !challenge.IsFresh(
+                    context.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow()))
+            {
+                await AnonymousRegistrationChallengeBoundary.RejectAsync(context);
+                return;
+            }
+        }
+
+        var now = requiresChallenge
+            ? context.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime
+            : DateTime.UtcNow;
         var record = new IdempotencyRecord
         {
             Id = Guid.CreateVersion7(),
@@ -138,7 +170,8 @@ public sealed class IdempotencyMiddleware
             PrincipalFingerprint = requestIdentity.PrincipalFingerprint,
             StatusCode = IdempotencyRecord.InProgressStatusCode,
             CreatedAt = now,
-            ExpiresAt = now.Add(DefaultExpiration)
+            ExpiresAt = challenge is not null && challenge.RecoverUntil.UtcDateTime < now.Add(DefaultExpiration)
+                ? challenge.RecoverUntil.UtcDateTime : now.Add(DefaultExpiration)
         };
 
         IdempotencyClaim claim;
@@ -167,7 +200,26 @@ public sealed class IdempotencyMiddleware
 
             if (claim.Record.StatusCode == IdempotencyRecord.InProgressStatusCode)
             {
+                // A committed exact order is independent of HTTP response-store completion.
+                // This read-only branch never acquires or releases the still-live claim.
+                if (challenge is not null && committedGuest is not null)
+                {
+                    if (await RejectExpiredRecoveryAsync(context, challenge))
+                    {
+                        return;
+                    }
+
+                    await AnonymousRegistrationChallengeBoundary.WriteRecoveryAsync(context, challenge.EventId, committedGuest);
+                    return;
+                }
+
                 await WriteInProgressConflictAsync(context);
+                return;
+            }
+
+            if (challenge is not null && claim.Record.StatusCode is >= 200 and < 300 && committedGuest is null)
+            {
+                await WriteKeyReuseConflictAsync(context);
                 return;
             }
 
@@ -194,6 +246,15 @@ public sealed class IdempotencyMiddleware
                     return;
                 }
 
+                if (challenge is not null && claim.Record.StatusCode is >= 200 and < 300
+                    && (!replay.Headers.TryGetValue("X-Registration-Order-Capability", out string? capability)
+                        || !string.Equals(capability, challenge.GuestCapabilityToken, StringComparison.Ordinal)))
+                {
+                    context.Response.Clear();
+                    await WriteKeyReuseConflictAsync(context);
+                    return;
+                }
+
                 replayBody = replay.Body;
                 foreach (string headerName in replayProtection.ResponseHeaders)
                 {
@@ -206,6 +267,11 @@ public sealed class IdempotencyMiddleware
             else if (replayBody?.StartsWith(ProtectedReplayPrefix, StringComparison.Ordinal) == true)
             {
                 await WritePersistenceFailureAsync(context);
+                return;
+            }
+
+            if (await RejectExpiredRecoveryAsync(context, challenge))
+            {
                 return;
             }
 
@@ -279,9 +345,28 @@ public sealed class IdempotencyMiddleware
             return;
         }
 
+        if (await RejectExpiredRecoveryAsync(context, challenge))
+        {
+            return;
+        }
+
         // Write the captured response to the original stream
         bufferStream.Position = 0;
         await bufferStream.CopyToAsync(originalBodyStream, context.RequestAborted);
+    }
+
+    private static async Task<bool> RejectExpiredRecoveryAsync(
+        HttpContext context, AnonymousRegistrationChallengeAuthority? challenge)
+    {
+        // Reads, unprotection and response persistence must not outlive the original disclosure authority.
+        if (challenge is null || context.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow() < challenge.RecoverUntil)
+        {
+            return false;
+        }
+
+        context.Response.Clear();
+        await AnonymousRegistrationChallengeBoundary.RejectAsync(context);
+        return true;
     }
 
     private string ProtectReplay(

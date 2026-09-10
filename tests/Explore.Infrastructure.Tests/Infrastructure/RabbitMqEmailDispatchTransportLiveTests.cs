@@ -107,7 +107,7 @@ public sealed class RabbitMqEmailDispatchTransportLiveTests(RabbitMqContainerFix
 
         await Assert.That(result.Outcome).IsEqualTo(EmailDispatchPublishOutcome.Returned);
         await Assert.That(result.Succeeded).IsFalse();
-        await Assert.That(result.FailureCategory).IsEqualTo("mandatory_return");
+        await Assert.That(result.FailureCategory).IsEqualTo(EmailDispatchPublishFailure.MandatoryReturn);
     }
 
     [Test]

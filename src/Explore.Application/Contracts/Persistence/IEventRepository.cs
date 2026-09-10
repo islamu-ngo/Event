@@ -17,6 +17,7 @@ public interface IEventRepository : IGenericRepository<Event, Guid>
     Task<bool> IsPubliclyEligibleAsync(Guid tenantId, Guid eventId, CancellationToken cancellationToken);
     Task<Event?> GetScheduleGraphForUpdateAsync(Guid id, CancellationToken cancellationToken);
     Task<Event?> GetAuthorizationTargetByIdAsync(Guid id, CancellationToken cancellationToken);
+    Task<Event?> GetRegistrationStatusEventForUpdateAsync(Guid id, Guid tenantId, CancellationToken cancellationToken);
     Task<IReadOnlyList<Event>> GetAuthorizationTargetsByIdsAsync(
         IReadOnlyCollection<Guid> ids,
         CancellationToken cancellationToken);

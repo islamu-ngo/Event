@@ -837,12 +837,12 @@ public sealed class SetupSecretBindingAuthorityTests
         params string[] canaries)
     {
         foreach (string captured in logs.Snapshot())
-        foreach (string canary in canaries)
-        {
-            if (string.IsNullOrEmpty(canary))
-                continue;
-            await Assert.That(captured).DoesNotContain(canary);
-        }
+            foreach (string canary in canaries)
+            {
+                if (string.IsNullOrEmpty(canary))
+                    continue;
+                await Assert.That(captured).DoesNotContain(canary);
+            }
     }
 
     private sealed class FixedInfisicalClientFactory(IInfisicalClient? client) :

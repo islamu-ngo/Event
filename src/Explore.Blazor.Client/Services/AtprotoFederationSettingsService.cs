@@ -29,7 +29,7 @@ public sealed class AtprotoFederationSettingsService(ISettingsClient apiClient)
             ? apiClient.LockInstanceAtprotoFederationSettingAsync(key, cancellationToken: cancellationToken)
             : apiClient.UnlockInstanceAtprotoFederationSettingAsync(key, cancellationToken: cancellationToken);
 
-    public Task<SettingGroupResponseDto> GetTenantAsync(
+    public Task<HalResourceOfSettingGroupResponseDto> GetTenantAsync(
         CancellationToken cancellationToken = default) =>
         apiClient.GetTenantScopedSettingsAsync(TenantCategory, cancellationToken: cancellationToken);
 

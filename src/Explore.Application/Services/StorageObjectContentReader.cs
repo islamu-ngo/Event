@@ -4,6 +4,7 @@ using Explore.Application.Contracts.Services;
 using Explore.Application.Models.Storage;
 using Explore.Application.Telemetry;
 using Explore.Domain;
+using Explore.Domain.Services.Registration;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Services;
@@ -15,19 +16,22 @@ public sealed class StorageObjectContentReader : IStorageObjectContentReader
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<StorageObjectContentReader> _logger;
     private readonly BusinessMetrics _metrics;
+    private readonly TimeProvider _timeProvider;
 
     public StorageObjectContentReader(
         IStorageObjectRepository storageObjectRepository,
         IFileStorageProviderResolver providerResolver,
         ICurrentUserService currentUserService,
         ILogger<StorageObjectContentReader> logger,
-        BusinessMetrics metrics)
+        BusinessMetrics metrics,
+        TimeProvider? timeProvider = null)
     {
         _storageObjectRepository = storageObjectRepository;
         _providerResolver = providerResolver;
         _currentUserService = currentUserService;
         _logger = logger;
         _metrics = metrics;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public async Task<StorageObjectContentResult?> OpenAsync(
@@ -65,6 +69,19 @@ public sealed class StorageObjectContentReader : IStorageObjectContentReader
             return null;
         }
 
+        RegistrationAnswerFile? answerFile = await _storageObjectRepository.GetRegistrationAnswerFileAsync(
+            storageObject.Id, storageObject.TenantId, cancellationToken);
+        bool registrationOwned = IsRegistrationOwned(storageObject, answerFile);
+        RegistrationOrder? order = registrationOwned
+            ? await _storageObjectRepository.GetRegistrationContentOrderAsync(storageObject, answerFile, cancellationToken)
+            : null;
+        if (!CanDiscloseRegistrationContent(storageObject, answerFile, order, registrationOwned,
+                _timeProvider.GetUtcNow().UtcDateTime))
+        {
+            _metrics.RecordStorageRead(storageObject.Provider, "failed", "registration_data_retention_expired", storageObject.Visibility);
+            return null;
+        }
+
         if (string.IsNullOrWhiteSpace(storageObject.ObjectKey))
         {
             _logger.LogWarning("Storage object {StorageObjectId} has no provider object key.", storageObjectId);
@@ -83,6 +100,14 @@ public sealed class StorageObjectContentReader : IStorageObjectContentReader
             var readResult = await provider.OpenReadAsync(
                 new FileStorageReadInput(storageObject.ObjectKey, storageObject.ContentType),
                 cancellationToken);
+
+            if (!CanDiscloseRegistrationContent(storageObject, answerFile, order, registrationOwned,
+                    _timeProvider.GetUtcNow().UtcDateTime))
+            {
+                await readResult.Content.DisposeAsync();
+                _metrics.RecordStorageRead(storageObject.Provider, "failed", "registration_data_retention_expired", storageObject.Visibility);
+                return null;
+            }
 
             _metrics.RecordStorageRead(
                 storageObject.Provider,
@@ -135,6 +160,28 @@ public sealed class StorageObjectContentReader : IStorageObjectContentReader
 
             return null;
         }
+    }
+
+    internal static bool IsRegistrationOwned(StorageObject storageObject, RegistrationAnswerFile? answerFile) =>
+        answerFile is not null || storageObject.RegistrationContentRetentionUntilUtc is not null ||
+        storageObject.OwningResourceKind is "registration_submission_sink" or RegistrationAnswerFileStorageOwnership.ResourceKind;
+
+    internal static bool CanDiscloseRegistrationContent(
+        StorageObject storageObject, RegistrationAnswerFile? answerFile, RegistrationOrder? order,
+        bool registrationOwned, DateTime utcNow)
+    {
+        if (storageObject.RegistrationContentRetentionUntilUtc is { } deadline && utcNow >= deadline)
+            return false;
+        if (!registrationOwned) return true;
+        if (order is null || answerFile is { IsDeleted: true } ||
+            answerFile is not null && !answerFile.IsReleased)
+            return false;
+        if (AnonymousRegistrationRetentionPolicy.AppliesTo(order) &&
+            storageObject.OwningResourceKind == "registration_submission_sink" &&
+            storageObject.RegistrationContentRetentionUntilUtc is null)
+            return false;
+        return AnonymousRegistrationRetentionPolicy.CanDisclose(
+            order, storageObject.RegistrationContentRetentionUntilUtc, utcNow);
     }
 
     private bool CanRead(StorageObject storageObject, bool publicImagesOnly)

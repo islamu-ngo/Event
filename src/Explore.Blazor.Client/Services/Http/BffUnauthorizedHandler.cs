@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
+using Explore.Blazor.Client.Clients;
 
 namespace Explore.Blazor.Client.Services.Http;
 
@@ -34,12 +35,17 @@ public sealed class BffUnauthorizedHandler : DelegatingHandler
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "BFF handler: request failed for {Method} {Uri}", request.Method, request.RequestUri);
+            if (!EventApiTransportBehavior.IsAnonymousRegistrationIntentRequest(request))
+                _logger.LogError(ex, "BFF handler: request failed for {Method} {Uri}", request.Method, request.RequestUri);
             throw;
         }
 
         if (response.StatusCode == HttpStatusCode.Unauthorized)
         {
+            // A reload would destroy the original proof needed to recover an uncertain guest start.
+            // These two anonymous operations report failure to their owning bounded intent flow.
+            if (EventApiTransportBehavior.IsAnonymousRegistrationIntentRequest(request)) return response;
+
             var path = GetRequestPath(request.RequestUri);
             if (!TryGetCurrentRelativePath(out var currentRelativePath))
             {

@@ -1,6 +1,3 @@
-// ABOUTME: Integration tests for the setup-secret validation flow.
-// ABOUTME: Covers correct/wrong secret validation, tenant-exempt path behavior, and 410 after completion.
-
 using System.Net;
 using System.Net.Http.Json;
 using Event.Api.IntegrationTests.Fixtures;
@@ -22,9 +19,11 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using TUnit.Core;
 
 namespace Event.Api.IntegrationTests.Features;
 
+[NotInParallel]
 public class SetupSecretFlowTests
 {
     private const string BaseUrl = "/api/instanceonboarding";
@@ -243,15 +242,19 @@ public class SetupSecretFlowTests
         var exists = await dbContext.Users.AnyAsync(x => x.Id == userId);
         if (exists) return;
 
-        dbContext.Users.Add(new User { Id = userId, CreatedAt = DateTime.UtcNow,
-        CreatedBy = userId,
-        Pii = new UserPii
+        dbContext.Users.Add(new User
         {
-            UserId = userId,
-            Email = $"{userId:N}@integration.test",
-            FirstName = "Test",
-            LastName = "User"
-        } });
+            Id = userId,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId,
+            Pii = new UserPii
+            {
+                UserId = userId,
+                Email = $"{userId:N}@integration.test",
+                FirstName = "Test",
+                LastName = "User"
+            }
+        });
         dbContext.UserExternalLogins.Add(new UserExternalLogin
         {
             Id = Guid.CreateVersion7(),
@@ -341,8 +344,6 @@ public class SetupSecretFlowTests
     #endregion
 }
 
-// ABOUTME: Isolates onboarding HTTP tests with real SQLite transactions and deployment-injected setup authority.
-// ABOUTME: Keeps the shared registration/auth fixture unchanged and preserves request-scoped tenant filters.
 internal class OnboardingWebApplicationFactory : AuthenticatedWebApplicationFactory
 {
     internal const string Issuer = "https://auth.example.com";

@@ -26,12 +26,12 @@ public sealed class AdmissionTargetConfiguration : IEntityTypeConfiguration<Admi
         builder.HasAlternateKey(target => new { target.TenantId, target.Id });
         builder.HasAlternateKey(target => new { target.TenantId, target.EventId, target.Id });
         builder.HasIndex(target => new
-            {
-                target.TenantId,
-                target.EventId,
-                target.AdmissionTargetTypeId,
-                target.ScopeId
-            })
+        {
+            target.TenantId,
+            target.EventId,
+            target.AdmissionTargetTypeId,
+            target.ScopeId
+        })
             .IsUnique();
         builder.HasOne<Tenant>().WithMany()
             .HasForeignKey(target => target.TenantId)
@@ -109,12 +109,12 @@ public sealed class AdmissionCheckInEventConfiguration : IEntityTypeConfiguratio
             value.Id
         });
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.AdmissionTicketId,
-                value.AdmissionTargetId,
-                value.Sequence
-            })
+        {
+            value.TenantId,
+            value.AdmissionTicketId,
+            value.AdmissionTargetId,
+            value.Sequence
+        })
             .IsUnique();
         builder.HasOne<Tenant>().WithMany()
             .HasForeignKey(value => value.TenantId)
@@ -174,11 +174,11 @@ public sealed class AdmissionScannerCapabilityConfiguration
         builder.HasIndex(capability => new { capability.TenantId, capability.IssueRequestId })
             .IsUnique();
         builder.HasIndex(capability => new
-            {
-                capability.TenantId,
-                capability.LookupKeyVersion,
-                capability.LookupDigest
-            })
+        {
+            capability.TenantId,
+            capability.LookupKeyVersion,
+            capability.LookupDigest
+        })
             .IsUnique();
         builder.HasOne<Tenant>().WithMany()
             .HasForeignKey(capability => capability.TenantId)
@@ -220,11 +220,11 @@ public sealed class AdmissionCheckInStateConfiguration : IEntityTypeConfiguratio
         builder.Property(state => state.ConcurrencyStamp).IsConcurrencyToken();
         builder.HasAlternateKey(state => new { state.TenantId, state.Id });
         builder.HasIndex(state => new
-            {
-                state.TenantId,
-                state.AdmissionTicketId,
-                state.AdmissionTargetId
-            })
+        {
+            state.TenantId,
+            state.AdmissionTicketId,
+            state.AdmissionTargetId
+        })
             .IsUnique();
         builder.HasOne<Tenant>().WithMany()
             .HasForeignKey(state => state.TenantId)

@@ -126,12 +126,12 @@ public sealed class SetupLiveGeneratedContractTests
             .IsEquivalentTo(setupContractNames);
         foreach (PropertyInfo property in setupTypes.SelectMany(type =>
                      type.GetProperties(BindingFlags.Public | BindingFlags.Instance)))
-        foreach (string fragment in forbidden)
-        {
-            await Assert.That(property.Name).DoesNotContain(
-                fragment,
-                StringComparison.OrdinalIgnoreCase);
-        }
+            foreach (string fragment in forbidden)
+            {
+                await Assert.That(property.Name).DoesNotContain(
+                    fragment,
+                    StringComparison.OrdinalIgnoreCase);
+            }
     }
 
     [Test]

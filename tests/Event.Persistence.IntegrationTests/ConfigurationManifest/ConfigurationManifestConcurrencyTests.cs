@@ -523,7 +523,8 @@ public sealed class ConfigurationManifestConcurrencyTests(
         private int _evaluationCount;
 
         public TaskCompletionSource<ConfigurationManifestPreflightResult>
-            FreshEvaluation { get; } = new(
+            FreshEvaluation
+        { get; } = new(
                 TaskCreationOptions.RunContinuationsAsynchronously);
 
         public async Task<ConfigurationManifestPreflightResult> EvaluateAsync(

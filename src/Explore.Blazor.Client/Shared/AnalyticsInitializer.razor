@@ -33,7 +33,7 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender || _initialized)
+        if (!firstRender || _initialized || IsPrivateStatusLocation(NavigationManager.Uri))
         {
             return;
         }
@@ -269,6 +269,7 @@
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
+        if (IsPrivateStatusLocation(e.Location)) return;
         _ = InvokeAsync(async () =>
         {
             try
@@ -311,6 +312,10 @@
         await AnalyticsInterop.PageViewAsync(pagePath, properties);
         _lastTrackedPath = pagePath;
     }
+
+    private static bool IsPrivateStatusLocation(string location) =>
+        Uri.TryCreate(location, UriKind.Absolute, out var uri)
+        && GuestRegistrationOrderCapabilityStore.IsStatusPath(uri.AbsolutePath);
 
     private static string NormalizePagePath(string location)
     {

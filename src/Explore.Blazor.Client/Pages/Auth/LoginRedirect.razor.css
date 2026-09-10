@@ -29,6 +29,26 @@
     width: 100%;
 }
 
+.login-page__visitor-signup {
+    display: grid;
+    gap: var(--isl-space-3);
+    padding-block-start: var(--isl-space-5);
+    border-block-start: 1px solid var(--isl-color-border);
+}
+
+.login-page__visitor-signup-links {
+    display: grid;
+    gap: var(--isl-space-2);
+}
+
+.login-page__visitor-signup-link {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--isl-target-min);
+    width: fit-content;
+    font-weight: 700;
+}
+
 .login-page__provider {
     display: flex;
     flex-direction: column;

@@ -400,20 +400,20 @@ public sealed class DtoMappingSerializationContractTests
         Guid id,
         Guid concurrencyStamp,
         string? websiteUrl = "https://community.example.test") => new()
-    {
-        Id = id,
-        ConcurrencyStamp = concurrencyStamp,
-        FullName = "Community Association",
-        WebsiteUrl = websiteUrl,
-        Email = "hello@example.test",
-        Country = "BE",
-        City = "Brussels",
-        Postcode = "1000",
-        Address = "Main Square 1",
-        ApprovalStatusId = 2,
-        ApprovalStatusFullName = "Approved",
-        TenantId = Guid.Parse("0198e6f8-4ab9-7e27-a772-d4bc29ab6ad4")
-    };
+        {
+            Id = id,
+            ConcurrencyStamp = concurrencyStamp,
+            FullName = "Community Association",
+            WebsiteUrl = websiteUrl,
+            Email = "hello@example.test",
+            Country = "BE",
+            City = "Brussels",
+            Postcode = "1000",
+            Address = "Main Square 1",
+            ApprovalStatusId = 2,
+            ApprovalStatusFullName = "Approved",
+            TenantId = Guid.Parse("0198e6f8-4ab9-7e27-a772-d4bc29ab6ad4")
+        };
 
     private static OrganizationListDto CreateOrganizationListDto(Guid id, Guid concurrencyStamp) => new()
     {

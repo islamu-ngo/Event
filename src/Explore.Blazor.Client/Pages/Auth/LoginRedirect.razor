@@ -13,13 +13,13 @@
 @rendermode InteractiveServer
 @implements IAsyncDisposable
 
-<PageTitle>@LocalPageTitle</PageTitle>
+<PageTitle>Sign in</PageTitle>
 
 <div class="login-page">
 <MudContainer MaxWidth="MaxWidth.Small" Class="login-page__container py-8">
     <MudPaper Class="login-page__card pa-6">
         <MudText Typo="Typo.h4" HtmlTag="h1" Class="login-page__title mb-2">
-            @LocalPageTitle
+            Sign in
         </MudText>
         <MudText Typo="Typo.body2" Color="Color.Secondary" Class="login-page__subtitle mb-4">
             @LoginSubtitle
@@ -76,39 +76,16 @@
                             <EditForm Model="_localCredentials"
                                       OnValidSubmit="SubmitLocalCredentialsAsync"
                                       class="login-page__credentials-panel"
-                                      data-local-login="@(!_isRegistering)">
+                                      data-local-login="true">
                                 <DataAnnotationsValidator />
-                                @if (_isRegistering)
-                                {
-                                    <MudTextField T="string"
-                                                  Label="First name"
-                                                  Variant="Variant.Outlined"
-                                                  Required="true"
-                                                  RequiredError="First name is required"
-                                                  For="@(() => _localCredentials.FirstName)"
-                                                  @bind-Value="_localCredentials.FirstName"
-                                                  Disabled="_isSubmittingLocal"
-                                                  autocomplete="given-name"
-                                                  Class="login-page__credential-input" />
-                                    <MudTextField T="string"
-                                                  Label="Last name"
-                                                  Variant="Variant.Outlined"
-                                                  Required="true"
-                                                  RequiredError="Last name is required"
-                                                  For="@(() => _localCredentials.LastName)"
-                                                  @bind-Value="_localCredentials.LastName"
-                                                  Disabled="_isSubmittingLocal"
-                                                  autocomplete="family-name"
-                                                  Class="login-page__credential-input" />
-                                }
                                 <MudTextField T="string"
-                                              Label="Email address"
-                                              InputType="InputType.Email"
+                                              Label="Username or email"
+                                              InputType="InputType.Text"
                                               Variant="Variant.Outlined"
                                               Required="true"
-                                              RequiredError="Email address is required"
-                                              For="@(() => _localCredentials.Email)"
-                                              @bind-Value="_localCredentials.Email"
+                                              RequiredError="Username or email is required"
+                                              For="@(() => _localCredentials.Identifier)"
+                                              @bind-Value="_localCredentials.Identifier"
                                               Disabled="_isSubmittingLocal"
                                               autocomplete="username"
                                               Class="login-page__credential-input" />
@@ -121,7 +98,7 @@
                                               For="@(() => _localCredentials.Password)"
                                               @bind-Value="_localCredentials.Password"
                                               Disabled="_isSubmittingLocal"
-                                              autocomplete="@(_isRegistering ? "new-password" : "current-password")"
+                                              autocomplete="current-password"
                                               Class="login-page__credential-input" />
                                 <MudCheckBox T="bool"
                                              @bind-Value="_localCredentials.IsPersistent"
@@ -149,17 +126,15 @@
                                            Class="login-page__credential-submit">
                                     @LocalSubmitLabel
                                 </MudButton>
-                                <MudButton Variant="Variant.Text"
-                                           Color="Color.Primary"
-                                           FullWidth="true"
-                                           Disabled="_isSubmittingLocal"
-                                           OnClick="ToggleLocalRegistration"
-                                           data-testid="local-auth-mode-toggle">
-                                    @(_isRegistering
-                                        ? "Back to sign in"
-                                        : "Create an account")
-                                </MudButton>
                             </EditForm>
+                            @if (_lifecycleLinks?.ContainsKey("recover-password") == true)
+                            {
+                                <p><a href="/auth/local-account-recovery?mode=recover-password">Forgot your Local password?</a></p>
+                            }
+                            @if (_lifecycleLinks?.ContainsKey("verify-email") == true)
+                            {
+                                <p><a href="/auth/local-account-recovery?mode=verify-email">Send a verification email</a></p>
+                            }
                         }
                         else if (!IsAtprotoPrimary || !IsAtproto(provider))
                         {
@@ -204,6 +179,32 @@
                     </div>
                 }
             </MudStack>
+
+            @if (VisitorSignupDestinations.Count > 0)
+            {
+                <section class="login-page__visitor-signup"
+                         aria-labelledby="visitor-signup-heading"
+                         data-testid="visitor-signup-destinations">
+                    <div>
+                        <MudText Id="visitor-signup-heading" Typo="Typo.h6" HtmlTag="h2">
+                            New visitor account
+                        </MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            These links are for new visitor access. Operator and existing-account sign-in remains above.
+                        </MudText>
+                    </div>
+                    <div class="login-page__visitor-signup-links">
+                        @foreach (var destination in VisitorSignupDestinations)
+                        {
+                            <a class="login-page__visitor-signup-link"
+                               href="@destination.Url"
+                               data-signup-provider="@GetSignupProviderCode(destination.Provider)">
+                                Continue as a new visitor with @GetSignupProviderDisplayName(destination.Provider)
+                            </a>
+                        }
+                    </div>
+                </section>
+            }
         }
     </MudPaper>
 </MudContainer>
@@ -222,11 +223,19 @@
     private string? _expandedProviderName;
     private string? _localAuthErrorMessage;
     private bool _isSubmittingLocal;
-    private bool _isRegistering;
+    private bool _disposed;
+    private int _localRequestGeneration;
     private string _primaryProvider = string.Empty;
     private IJSObjectReference? _bffModule;
     private readonly LocalCredentialsInput _localCredentials = new();
     private List<BffAuthProviderItem> _providers = [];
+    private VisitorAccessCapabilityDto? _visitorAccess;
+    private Dictionary<string, Explore.Blazor.Client.Clients.HalLink>? _lifecycleLinks;
+
+    private IReadOnlyList<VisitorSignupDestinationDto> VisitorSignupDestinations =>
+        _visitorAccess?.SignupDestinations?
+            .Where(destination => destination.Provider != AuthenticationProviderKind.Local && !string.IsNullOrWhiteSpace(destination.Url))
+            .ToList() ?? [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -248,6 +257,8 @@
             }
 
             var providers = response.Content?.Providers ?? [];
+            _lifecycleLinks = response.Content?._links;
+            _visitorAccess = response.Content?.VisitorAccess;
             _primaryProvider = response.Content?.PrimaryProvider
                 .Trim()
                 .ToLowerInvariant() ?? string.Empty;
@@ -267,6 +278,7 @@
             var hintedAtproto = _providers.FirstOrDefault(IsAtproto);
             if (hintedAtproto is not null
                 && (IsAtprotoPrimary
+                    || string.Equals(_forcedProviderQuery, "atproto", StringComparison.Ordinal)
                     || !string.IsNullOrWhiteSpace(_atprotoHandle)))
             {
                 _expandedProviderName = hintedAtproto.Name;
@@ -359,6 +371,8 @@
 
     private void StartProvider(BffAuthProviderItem provider)
     {
+        _localRequestGeneration++;
+        _localCredentials.Password = string.Empty;
         if (IsAtproto(provider))
         {
             _expandedProviderName = provider.Name;
@@ -402,43 +416,35 @@
 
     private async Task SubmitLocalCredentialsAsync()
     {
-        if (_isSubmittingLocal)
+        if (_disposed || _isSubmittingLocal)
         {
             return;
         }
 
         _isSubmittingLocal = true;
+        int generation = ++_localRequestGeneration;
         _localAuthErrorMessage = null;
         try
         {
             IJSObjectReference module = await GetBffModuleAsync();
-            string endpoint = _isRegistering
-                ? "/bff/auth/local/register"
-                : "/bff/auth/local/login";
-            object request = _isRegistering
-                ? new LocalBffRegistrationRequest(
-                    _localCredentials.Email.Trim(),
-                    _localCredentials.Password,
-                    _localCredentials.FirstName.Trim(),
-                    _localCredentials.LastName.Trim(),
-                    _localCredentials.IsPersistent,
-                    _returnUrl)
-                : new LocalBffLoginRequest(
-                    _localCredentials.Email.Trim(),
-                    _localCredentials.Password,
-                    _localCredentials.IsPersistent,
-                    _returnUrl);
+            var request = new LocalBffLoginRequest(
+                Identifier: _localCredentials.Identifier.Trim(),
+                Password: _localCredentials.Password,
+                IsPersistent: _localCredentials.IsPersistent,
+                ReturnUrl: _returnUrl);
             LocalBffAuthenticationResponse? response =
                 await module.InvokeAsync<LocalBffAuthenticationResponse?>(
                     "authenticateLocal",
-                    endpoint,
+                    "/bff/auth/local/login",
                     request);
-            if (response is null)
+            if (_disposed || generation != _localRequestGeneration) return;
+            if (response is null || !string.IsNullOrEmpty(response.ErrorCode)
+                || string.IsNullOrWhiteSpace(response.RedirectUrl))
             {
                 _localCredentials.Password = string.Empty;
-                _localAuthErrorMessage = _isRegistering
-                    ? "The account could not be created. Check your details and try again."
-                    : "The email or password was not accepted. Check your details and try again.";
+                _localAuthErrorMessage = response?.ErrorCode == "email_verification_required"
+                    ? "Verify your email address before signing in."
+                    : "The username or password was not accepted. Check your details and try again.";
                 return;
             }
 
@@ -450,6 +456,7 @@
         catch (Exception)
         {
             _localCredentials.Password = string.Empty;
+            if (_disposed || generation != _localRequestGeneration) return;
             Logger.LogWarning(
                 "Local Identity sign-in request failed (errorCode=local_login_unavailable)");
             _localAuthErrorMessage =
@@ -457,6 +464,7 @@
         }
         finally
         {
+            _localCredentials.Password = string.Empty;
             _isSubmittingLocal = false;
         }
     }
@@ -468,6 +476,9 @@
 
     public async ValueTask DisposeAsync()
     {
+        _disposed = true;
+        _localRequestGeneration++;
+        _localCredentials.Password = string.Empty;
         if (_bffModule is not null)
         {
             try
@@ -481,32 +492,13 @@
         }
     }
 
-    private void ToggleLocalRegistration()
-    {
-        _isRegistering = !_isRegistering;
-        _localCredentials.IsRegistration = _isRegistering;
-        _localCredentials.Password = string.Empty;
-        _localAuthErrorMessage = null;
-    }
-
-    private string LocalPageTitle =>
-        _isRegistering ? "Create account" : "Sign in";
-
-    private string LoginSubtitle => _isRegistering
-        ? "Create a local account for this instance."
-        : IsAtprotoPrimary
+    private string LoginSubtitle => IsAtprotoPrimary
             ? "Sign in without a local password by authorizing your AT Protocol account."
         : _providers.Count > 1
             ? "Use your local account or choose another available provider."
             : "Sign in with your local account.";
 
-    private string LocalSubmitLabel => _isSubmittingLocal
-        ? _isRegistering
-            ? "Creating account..."
-            : "Signing in..."
-        : _isRegistering
-            ? "Create account"
-            : "Sign in";
+    private string LocalSubmitLabel => _isSubmittingLocal ? "Signing in..." : "Sign in";
 
     // HandleAtprotoKeyUp removed in favor of EditForm submission
 
@@ -554,6 +546,22 @@
                 ? "ATProto"
                 : provider.DisplayName;
     }
+
+    private static string GetSignupProviderCode(AuthenticationProviderKind provider) => provider switch
+    {
+        AuthenticationProviderKind.Keycloak => "keycloak",
+        AuthenticationProviderKind.Atproto => "atproto",
+        AuthenticationProviderKind.Google => "google",
+        _ => "external"
+    };
+
+    private static string GetSignupProviderDisplayName(AuthenticationProviderKind provider) => provider switch
+    {
+        AuthenticationProviderKind.Keycloak => "Keycloak",
+        AuthenticationProviderKind.Atproto => "ATProto",
+        AuthenticationProviderKind.Google => "Google",
+        _ => "an external provider"
+    };
 
     private static string GetProviderIcon(BffAuthProviderItem provider)
     {
@@ -658,45 +666,16 @@
         };
     }
 
-    private sealed class LocalCredentialsInput : IValidatableObject
+    private sealed class LocalCredentialsInput
     {
         [Required]
-        [EmailAddress]
-        public string Email { get; set; } = string.Empty;
+        [StringLength(256)]
+        public string Identifier { get; set; } = string.Empty;
 
         [Required]
         public string Password { get; set; } = string.Empty;
 
-        public string FirstName { get; set; } = string.Empty;
-
-        public string LastName { get; set; } = string.Empty;
-
         public bool IsPersistent { get; set; }
-
-        public bool IsRegistration { get; set; }
-
-        public IEnumerable<ValidationResult> Validate(
-            ValidationContext validationContext)
-        {
-            if (!IsRegistration)
-            {
-                yield break;
-            }
-
-            if (string.IsNullOrWhiteSpace(FirstName))
-            {
-                yield return new ValidationResult(
-                    "First name is required",
-                    [nameof(FirstName)]);
-            }
-
-            if (string.IsNullOrWhiteSpace(LastName))
-            {
-                yield return new ValidationResult(
-                    "Last name is required",
-                    [nameof(LastName)]);
-            }
-        }
     }
 
 }

@@ -174,6 +174,49 @@ public class InstanceOnboardingServiceTests
 
     #endregion
 
+    [Test]
+    [Arguments(HttpStatusCode.OK)]
+    [Arguments(HttpStatusCode.Unauthorized)]
+    [Arguments(HttpStatusCode.ServiceUnavailable)]
+    public async Task LocalCompletionClearsTransientCredentialWithoutOrdinarySessionRefresh(HttpStatusCode status)
+    {
+        string password = $"Aa1!{Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(24))}";
+        var completion = new CompleteLocalInstanceOnboardingRequestDto
+        {
+            OperationId = Guid.CreateVersion7(),
+            Username = "operator",
+            TemporaryPassword = password,
+            Settings = new CompleteInstanceOnboardingRequest()
+        };
+        bool ordinaryRefresh = false;
+        _authHandler = _ =>
+        {
+            ordinaryRefresh = true;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized));
+        };
+        bool correctWireRequest = false;
+        _bffHandler = async request =>
+        {
+            using JsonDocument body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
+            correctWireRequest = request.Method == HttpMethod.Post
+                && request.RequestUri!.AbsolutePath.Equals("/api/instanceonboarding/complete-local", StringComparison.OrdinalIgnoreCase)
+                && body.RootElement.GetProperty("operationId").GetGuid() == completion.OperationId
+                && string.Equals(body.RootElement.GetProperty("temporaryPassword").GetString(), password, StringComparison.Ordinal);
+            return new HttpResponseMessage(status)
+            {
+                Content = System.Net.Http.Json.JsonContent.Create(status == HttpStatusCode.OK
+                    ? (object)new { success = true, id = completion.OperationId }
+                    : new { status = (int)status, detail = password })
+            };
+        };
+        var response = await _service.CompleteLocalAsync(completion);
+        await Assert.That(correctWireRequest).IsTrue();
+        await Assert.That(response.Success).IsEqualTo(status == HttpStatusCode.OK);
+        await Assert.That(completion.TemporaryPassword).IsEqualTo(string.Empty);
+        await Assert.That(ordinaryRefresh).IsFalse();
+        await Assert.That(response.Message?.Contains(password, StringComparison.Ordinal) == true).IsFalse();
+    }
+
     #region CompleteAsync
 
     [Test]
@@ -370,13 +413,14 @@ public class InstanceOnboardingServiceTests
     {
         // Arrange
         Uri? requestUri = null;
-        var expected = new AuthProviderConfigurationDto
+        var expected = new HalResourceOfAuthProviderConfigurationDto
         {
             PrimaryProviderId = KeycloakProviderId,
             KeycloakAuthority = "https://keycloak.example.com/auth/realms/ISLAMU",
             KeycloakClientId = "islamu-event-blazor",
             KeycloakClientSecret = string.Empty,
-            KeycloakDetectedFromEnvironment = true
+            KeycloakDetectedFromEnvironment = true,
+            _links = new Dictionary<string, HalLink> { ["verify-email"] = new() { Href = "/api/auth/local/email-verifications" } }
         };
         SetupBffClient(request =>
         {
@@ -392,6 +436,8 @@ public class InstanceOnboardingServiceTests
         await Assert.That(requestUri!.AbsolutePath).IsEqualTo("/api/instanceonboarding/auth-provider-configuration");
         await Assert.That(result.KeycloakDetectedFromEnvironment).IsTrue();
         await Assert.That(result.KeycloakClientSecret).IsEmpty();
+        var links = (JsonElement)result.AdditionalProperties["_links"];
+        await Assert.That(links.GetProperty("verify-email").GetProperty("href").GetString()).IsEqualTo("/api/auth/local/email-verifications");
     }
 
     [Test]
@@ -442,7 +488,11 @@ public class InstanceOnboardingServiceTests
                 PrimaryProviderId = 4,
                 LockPrimaryProvider = true,
                 AtprotoLoginEnabled = true,
-                AtprotoPublicUrl = "https://events.example.test"
+                AtprotoPublicUrl = "https://events.example.test",
+                KeycloakPublicOnboardingPolicy = PublicOnboardingPolicy.Allowed,
+                KeycloakPublicSignupUrl = "https://identity.example.test/realms/events/registrations",
+                GooglePublicOnboardingPolicy = PublicOnboardingPolicy.Denied,
+                GooglePublicSignupUrl = "https://accounts.example.test/enroll"
             });
         using var document = JsonDocument.Parse(requestBody!);
         JsonElement configuration = document.RootElement
@@ -456,6 +506,14 @@ public class InstanceOnboardingServiceTests
             .IsTrue();
         await Assert.That(configuration.GetProperty("atprotoLoginEnabled").GetBoolean())
             .IsTrue();
+        await Assert.That(configuration.GetProperty("keycloakPublicOnboardingPolicy").GetString())
+            .IsEqualTo("Allowed");
+        await Assert.That(configuration.GetProperty("keycloakPublicSignupUrl").GetString())
+            .IsEqualTo("https://identity.example.test/realms/events/registrations");
+        await Assert.That(configuration.GetProperty("googlePublicOnboardingPolicy").GetString())
+            .IsEqualTo("Denied");
+        await Assert.That(configuration.GetProperty("googlePublicSignupUrl").GetString())
+            .IsEqualTo("https://accounts.example.test/enroll");
     }
 
     #endregion
@@ -874,20 +932,24 @@ public class InstanceOnboardingServiceTests
     #region GetStartupStatusAsync
 
     [Test]
-    public async Task GetStartupStatusAsync_MapsInteractivePending_FromCanonicalStateModeAndGeneration()
+    [Arguments(null)]
+    [Arguments("Local")]
+    [Arguments("Keycloak")]
+    [Arguments("Atproto")]
+    public async Task GetStartupStatusAsync_MapsInteractivePending_FromCanonicalStateModeAndGeneration(string? provider)
     {
         SetupBffClient(CreateJsonResponse(CreateStatusResource(
             isCompleted: false,
             state: "InteractivePending",
             mode: "Interactive",
-            provider: null,
+            provider: provider,
             generation: 3)));
 
         var status = await _service.GetStartupStatusAsync();
 
         await Assert.That(status.Disposition)
             .IsEqualTo(InstanceOnboardingStartupDisposition.InteractivePending);
-        await Assert.That(status.Provider).IsNull();
+        await Assert.That(status.Provider).IsEqualTo(provider);
         await Assert.That(status.Generation).IsEqualTo(3L);
     }
 
@@ -973,7 +1035,7 @@ public class InstanceOnboardingServiceTests
     }
 
     [Test]
-    [Arguments(false, "InteractivePending", "Interactive", "Keycloak")]
+    [Arguments(false, "InteractivePending", "Interactive", "Unknown")]
     [Arguments(false, "ConfiguredAdministratorPending", "ConfiguredAdministrator", null)]
     [Arguments(false, "ConfiguredAdministratorPending", "ConfiguredAdministrator", "keycloak")]
     [Arguments(false, "ConfiguredAdministratorPending", "ConfiguredAdministrator", "Google")]

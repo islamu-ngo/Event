@@ -180,6 +180,45 @@ public class StorageObjectRepository : GenericRepository<StorageObject, Guid>, I
                 cancellationToken);
     }
 
+    public Task<RegistrationAnswerFile?> GetRegistrationAnswerFileAsync(
+        Guid storageObjectId, Guid tenantId, CancellationToken cancellationToken) =>
+        _dbContext.RegistrationAnswerFiles
+            .IgnoreQueryFilters([QueryFilterNames.SoftDelete])
+            .AsNoTracking()
+            .SingleOrDefaultAsync(file => file.TenantId == tenantId && file.StorageObjectId == storageObjectId,
+                cancellationToken);
+
+    public async Task<RegistrationOrder?> GetRegistrationContentOrderAsync(
+        StorageObject storageObject, RegistrationAnswerFile? answerFile, CancellationToken cancellationToken)
+    {
+        Guid? submissionId;
+        if (storageObject.OwningResourceKind == "registration_submission_sink" && answerFile is null)
+        {
+            submissionId = storageObject.OwningResourceId;
+        }
+        else if (answerFile is { IsDeleted: false } &&
+            answerFile.TenantId == storageObject.TenantId && answerFile.StorageObjectId == storageObject.Id &&
+            (storageObject.OwningResourceKind is null && storageObject.OwningResourceId is null ||
+             storageObject.OwningResourceKind == RegistrationAnswerFileStorageOwnership.ResourceKind &&
+             storageObject.OwningResourceId == answerFile.Id))
+        {
+            submissionId = answerFile.RegistrationSubmissionId;
+        }
+        else
+        {
+            return null;
+        }
+
+        Guid? fileEventId = answerFile?.EventId;
+        return await (from submission in _dbContext.RegistrationSubmissions.AsNoTracking()
+                      join order in _dbContext.RegistrationOrders.AsNoTracking()
+                          on new { submission.TenantId, submission.EventId, Id = submission.RegistrationOrderId }
+                          equals new { order.TenantId, order.EventId, order.Id }
+                      where submission.TenantId == storageObject.TenantId && submission.Id == submissionId &&
+                          (fileEventId == null || submission.EventId == fileEventId)
+                      select order).SingleOrDefaultAsync(cancellationToken);
+    }
+
     private IQueryable<StorageObject> BaseReconciliationQuery()
     {
         return _dbContext.StorageObjects

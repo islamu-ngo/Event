@@ -44,7 +44,9 @@ public sealed class CaseInsensitiveRepositoryQueriesSqliteTests
                 MasterCode = "keycloak",
                 FullName = "Keycloak"
             };
-            var login = new UserExternalLogin { Id = Guid.CreateVersion7(),
+            var login = new UserExternalLogin
+            {
+                Id = Guid.CreateVersion7(),
                 UserId = user.Id,
                 User = user,
                 AuthenticationProviderId = provider.Id,

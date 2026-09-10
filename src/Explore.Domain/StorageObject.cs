@@ -23,6 +23,8 @@ public class StorageObject : ITenantEntity, IAuditableEntity, ISoftDeletable, IC
     public required string LifecycleState { get; set; }
     public string? OwningResourceKind { get; set; }
     public Guid? OwningResourceId { get; set; }
+    /// <summary>Operational registration-content expiry, not authority to delete legally held bytes.</summary>
+    public DateTime? RegistrationContentRetentionUntilUtc { get; set; }
     public DateTime? QuarantinedAt { get; set; }
     public Guid? QuarantinedBy { get; set; }
     public string? QuarantineReason { get; set; }

@@ -53,7 +53,7 @@ public sealed class StorageObjectDetailLinkPolicy : ILinkPolicy<StorageObjectDto
                 "Public image content");
         }
 
-        if (CanReadContent(dto))
+        if (CanReadContent(dto) && dto.ContentEligibility.PresignedDownloadAllowed)
         {
             yield return new LinkDefinition(
                 "presigned-download",
@@ -84,7 +84,8 @@ public sealed class StorageObjectDetailLinkPolicy : ILinkPolicy<StorageObjectDto
 
     private static bool CanReadContent(StorageObjectDto dto) =>
         string.Equals(dto.LifecycleState, StorageObjectLifecycleStates.Active, StringComparison.Ordinal)
-        && !dto.IsDeleted;
+        && !dto.IsDeleted
+        && dto.ContentEligibility.ContentAllowed;
 
     private static bool CanReadPublicImage(StorageObjectDto dto) =>
         CanReadContent(dto)
@@ -184,7 +185,8 @@ public sealed class StorageObjectCollectionLinkPolicy : ICollectionLinkPolicy<St
     }
 
     private static bool CanReadContent(StorageObjectListDto dto) =>
-        string.Equals(dto.LifecycleState, StorageObjectLifecycleStates.Active, StringComparison.Ordinal);
+        string.Equals(dto.LifecycleState, StorageObjectLifecycleStates.Active, StringComparison.Ordinal)
+        && dto.ContentEligibility.ContentAllowed;
 
     private static bool CanReadPublicImage(StorageObjectListDto dto) =>
         CanReadContent(dto)

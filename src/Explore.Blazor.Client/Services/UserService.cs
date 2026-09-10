@@ -20,6 +20,9 @@ public interface IUserService
     /// </summary>
     Task<UserDto?> GetCurrentUserAsync();
 
+    /// <summary>Reads current account actions without synchronizing or mutating the account.</summary>
+    Task<HalResourceOfUserDto> GetCurrentUserResourceAsync();
+
     /// <summary>
     /// Gets the current authenticated user's DB-backed admin authority.
     /// </summary>
@@ -59,6 +62,9 @@ public class UserService : IUserService
         _apiClient = apiClient ?? throw new ArgumentNullException(nameof(apiClient));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
+
+    /// <inheritdoc />
+    public Task<HalResourceOfUserDto> GetCurrentUserResourceAsync() => _apiClient.GetCurrentUserAsync();
 
     /// <inheritdoc />
     public async Task<BaseCommandResponseOfGuid?> SyncUserAsync()

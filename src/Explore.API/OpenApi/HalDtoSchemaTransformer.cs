@@ -274,13 +274,14 @@ public class HalDtoSchemaTransformer : IOpenApiDocumentTransformer
 
                 var jsonName = GetJsonPropertyName(prop);
 
-                ReplacePropertyWithReference(document, dtoType.Name, jsonName, propertyType.Name);
+                var isNullable = Nullable.GetUnderlyingType(prop.PropertyType) is not null;
+                ReplacePropertyWithReference(document, dtoType.Name, jsonName, propertyType.Name, isNullable);
 
                 foreach (var halSchemaName in HalOpenApiSchemaCatalog.DetailResourceMappings
                     .Where(mapping => mapping.Value == dtoType)
                     .Select(mapping => mapping.Key))
                 {
-                    ReplacePropertyWithReference(document, halSchemaName, jsonName, propertyType.Name);
+                    ReplacePropertyWithReference(document, halSchemaName, jsonName, propertyType.Name, isNullable);
                 }
             }
         }
@@ -290,7 +291,8 @@ public class HalDtoSchemaTransformer : IOpenApiDocumentTransformer
         OpenApiDocument document,
         string schemaName,
         string propertyName,
-        string targetSchemaName)
+        string targetSchemaName,
+        bool isNullable)
     {
         if (document.Components?.Schemas?.TryGetValue(schemaName, out var schemaI) != true)
             return;
@@ -299,12 +301,21 @@ public class HalDtoSchemaTransformer : IOpenApiDocumentTransformer
             return;
 
         if (!schema.Properties.TryGetValue(propertyName, out var propertySchema)
-            || propertySchema is OpenApiSchemaReference)
+            || (!isNullable && propertySchema is OpenApiSchemaReference))
         {
             return;
         }
 
-        schema.Properties[propertyName] = new OpenApiSchemaReference(targetSchemaName, document);
+        schema.Properties[propertyName] = isNullable
+            ? new OpenApiSchema
+            {
+                OneOf =
+                [
+                    new OpenApiSchema { Type = JsonSchemaType.Null },
+                    new OpenApiSchemaReference(targetSchemaName, document)
+                ]
+            }
+            : new OpenApiSchemaReference(targetSchemaName, document);
     }
 
     private static Type UnwrapNullableType(Type type)

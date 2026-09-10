@@ -83,10 +83,11 @@ public class EventSessionRepository : GenericRepository<EventSession, Guid>, IEv
         Guid eventId,
         CancellationToken cancellationToken)
     {
-        return await BuildPublicSessionQuery()
+        List<EventSession> sessions = await BuildPublicSessionQuery()
             .Where(s => s.EventId == eventId)
-            .OrderBy(s => s.StartTime)
             .ToListAsync(cancellationToken);
+
+        return sessions.OrderBy(s => s.StartTime).ToList();
     }
 
     public async Task<List<EventSession>> GetSessionsByLocation(Guid locationId)

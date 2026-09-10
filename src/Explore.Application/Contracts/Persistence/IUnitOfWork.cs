@@ -22,6 +22,12 @@ public interface IUnitOfWork
     Task<T> ExecuteSerializableAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default);
 
     /// <summary>
+    /// Executes explicitly row-fenced work with fresh committed reads after lock acquisition.
+    /// SQLite retains its serialized writer transaction; snapshot-based providers use Read Committed.
+    /// </summary>
+    Task<T> ExecuteReadCommittedAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default);
+
+    /// <summary>
     /// Executes bootstrap convergence under serializable isolation, retrying the complete transaction only for
     /// provider-recognized serialization, deadlock, unique-key, or busy conflicts.
     /// </summary>

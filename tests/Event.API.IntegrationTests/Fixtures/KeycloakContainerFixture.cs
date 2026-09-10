@@ -1,5 +1,8 @@
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
+using System.Security.Cryptography;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using TUnit.Core.Interfaces;
 
 namespace Event.Api.IntegrationTests.Fixtures;
@@ -19,12 +22,15 @@ public sealed class KeycloakContainerFixture : IAsyncInitializer, IAsyncDisposab
     /// <summary>Client ID with directAccessGrantsEnabled for ROPC token acquisition.</summary>
     public const string TestClientId = "islamu-event-blazor";
 
-    /// <summary>Client secret from the test realm export.</summary>
-    public const string TestClientSecret = "test-blazor-secret";
+    /// <summary>Ephemeral client credential owned by this disposable container.</summary>
+    public string ClientSecret { get; } = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+
+    public string BootstrapAdminPassword { get; } = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(2);
 
     private IContainer _container = null!;
+    private readonly Dictionary<string, string> _userPasswords = new(StringComparer.Ordinal);
 
     /// <summary>
     /// The OIDC authority URL (e.g., <c>http://localhost:{port}/realms/ISLAMU</c>).
@@ -55,15 +61,33 @@ public sealed class KeycloakContainerFixture : IAsyncInitializer, IAsyncDisposab
                 "Ensure ISLAMU-realm.test.json is included as Content with CopyToOutputDirectory=PreserveNewest.");
         }
 
+        JsonObject realm = JsonNode.Parse(await File.ReadAllTextAsync(testRealmPath))!.AsObject();
+        JsonNode client = realm["clients"]!.AsArray()
+            .Single(candidate => candidate!["clientId"]!.GetValue<string>() == TestClientId)!;
+        client["secret"] = ClientSecret;
+        foreach (JsonNode? user in realm["users"]!.AsArray())
+        {
+            string username = user!["username"]!.GetValue<string>();
+            string password = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+            _userPasswords.Add(username, password);
+            user["credentials"] = new JsonArray(new JsonObject
+            {
+                ["type"] = "password",
+                ["value"] = password,
+                ["temporary"] = false
+            });
+        }
+
         _container = new ContainerBuilder()
             .WithImage(KeycloakImage)
             .WithPortBinding(8080, true)
-            .WithResourceMapping(testRealmPath, "/opt/keycloak/data/import/")
+            .WithResourceMapping(JsonSerializer.SerializeToUtf8Bytes(realm),
+                "/opt/keycloak/data/import/ISLAMU-realm.test.json")
             .WithCommand("start-dev", "--import-realm", "--http-port=8080")
             .WithEnvironment("KC_HEALTH_ENABLED", "true")
             .WithEnvironment("KC_HTTP_ENABLED", "true")
             .WithEnvironment("KEYCLOAK_ADMIN", "admin")
-            .WithEnvironment("KEYCLOAK_ADMIN_PASSWORD", "admin")
+            .WithEnvironment("KEYCLOAK_ADMIN_PASSWORD", BootstrapAdminPassword)
             .WithWaitStrategy(Wait.ForUnixContainer()
                 .UntilHttpRequestIsSucceeded(request =>
                     request
@@ -76,9 +100,6 @@ public sealed class KeycloakContainerFixture : IAsyncInitializer, IAsyncDisposab
         using var startupCts = new CancellationTokenSource(StartupTimeout);
         await _container.StartAsync(startupCts.Token);
 
-        // Brief delay to ensure realm import is fully settled after OIDC metadata becomes available
-        await Task.Delay(TimeSpan.FromSeconds(3));
-
         var host = _container.Hostname;
         var port = _container.GetMappedPublicPort(8080);
 
@@ -86,15 +107,19 @@ public sealed class KeycloakContainerFixture : IAsyncInitializer, IAsyncDisposab
         Authority = $"{BaseUrl}/realms/{RealmName}";
         MetadataAddress = $"{Authority}/.well-known/openid-configuration";
 
-        TokenClient = new KeycloakTokenClient(
-            BaseUrl,
-            RealmName,
-            TestClientId,
-            TestClientSecret);
+        TokenClient = CreateTokenClient(ClientSecret);
     }
+
+    public KeycloakTokenClient CreateTokenClient(string clientSecret) => new(
+        keycloakBaseUrl: BaseUrl,
+        realm: RealmName,
+        clientId: TestClientId,
+        clientSecret: clientSecret,
+        userPasswords: _userPasswords);
 
     public async ValueTask DisposeAsync()
     {
+        TokenClient?.Dispose();
         if (_container is not null)
         {
             await _container.DisposeAsync();

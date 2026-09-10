@@ -46,18 +46,56 @@ public sealed class SqliteApplicationInitialLifecycleTests
         await using var context = new ExploreDbContext(options.Options);
         IMigrator migrator = context.GetService<IMigrator>();
         string[] migrations = context.Database.GetMigrations().ToArray();
+        await Assert.That(migrations.Where(id => id.EndsWith("_Init", StringComparison.Ordinal)))
+            .HasSingleItem();
+        await Assert.That(migrations[0]).EndsWith("_Init");
+        await Assert.That(migrations.Length).IsEqualTo(2);
+        string initialMigration = migrations[0];
+        await Assert.That(initialMigration).IsEqualTo(databaseOptions.Provider switch
+        {
+            PrimaryDatabaseProvider.PostgreSql => "20260906223112_Init",
+            PrimaryDatabaseProvider.Sqlite => "20260906223113_Init",
+            PrimaryDatabaseProvider.SqlServer => "20260906223115_Init",
+            PrimaryDatabaseProvider.MySql or PrimaryDatabaseProvider.MariaDb => "20260906223116_Init",
+            _ => throw new ArgumentOutOfRangeException(nameof(databaseOptions))
+        });
         string latestMigration = migrations[^1];
+        await Assert.That(latestMigration).EndsWith("_EmailOptionalSelfHostingIntegration");
+
+        await migrator.MigrateAsync(initialMigration);
+        await Assert.That(await context.Database.GetAppliedMigrationsAsync())
+            .IsEquivalentTo([initialMigration], TUnit.Assertions.Enums.CollectionOrdering.Matching);
+        var populated = await PopulatedIntegrationLifecycleData.SeedAsync(context);
+        await populated.AssertPreservedAsync(context);
 
         await migrator.MigrateAsync(latestMigration);
         await Assert.That(await context.Database.GetAppliedMigrationsAsync())
-            .IsEquivalentTo(migrations);
+            .IsEquivalentTo(migrations, TUnit.Assertions.Enums.CollectionOrdering.Matching);
+        await populated.AssertIntegratedAsync(context);
+
+        await migrator.MigrateAsync(initialMigration);
+        await Assert.That(await context.Database.GetAppliedMigrationsAsync())
+            .IsEquivalentTo([initialMigration], TUnit.Assertions.Enums.CollectionOrdering.Matching);
+        await populated.AssertPreservedAsync(context);
+
+        await migrator.MigrateAsync(latestMigration);
+        await populated.AssertIntegratedAsync(context);
+        await Assert.That(await context.Database.GetAppliedMigrationsAsync())
+            .IsEquivalentTo(migrations, TUnit.Assertions.Enums.CollectionOrdering.Matching);
 
         await migrator.MigrateAsync(Migration.InitialDatabase);
         await Assert.That(await context.Database.GetAppliedMigrationsAsync()).IsEmpty();
 
         await migrator.MigrateAsync(latestMigration);
         await Assert.That(await context.Database.GetAppliedMigrationsAsync())
-            .IsEquivalentTo(migrations);
+            .IsEquivalentTo(migrations, TUnit.Assertions.Enums.CollectionOrdering.Matching);
+        await Assert.That(await context.Tenants.AnyAsync(tenant => tenant.Id == populated.TenantId))
+            .IsFalse();
+
+        // This is deliberately last: a rejected Down need not leave every provider's DDL atomic.
+        await PopulatedIntegrationLifecycleData.AssertLocalBootstrapRollbackRejectedAsync(context, initialMigration);
+        await Assert.That(await context.Database.GetAppliedMigrationsAsync())
+            .IsEquivalentTo(migrations, TUnit.Assertions.Enums.CollectionOrdering.Matching);
     }
 
     internal static async Task AssertDataProtectionLifecycleAsync(

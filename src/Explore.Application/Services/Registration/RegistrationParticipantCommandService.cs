@@ -32,7 +32,6 @@ public sealed class RegistrationParticipantCommandService(
         Guid participantId = Guid.CreateVersion7();
         Guid participantConcurrency = Guid.CreateVersion7();
         Guid orderConcurrency = Guid.CreateVersion7();
-        DateTime now = timeProvider.GetUtcNow().UtcDateTime;
         try
         {
             return await unitOfWork.ExecuteInTransactionAsync(async token =>
@@ -44,8 +43,13 @@ public sealed class RegistrationParticipantCommandService(
                 }
 
                 ParticipantTypeEnum participantType = NormalizeParticipantType(participantTypeId);
+                await EnsureAnonymousCollectionAsync(order, token);
                 RegistrationParticipant? guardian = await GetGuardianAsync(guardianParticipantId, order, token);
                 EnsureParticipantDetails(participantType, details, required: participantType is ParticipantTypeEnum.Child or ParticipantTypeEnum.Dependent);
+                DateTime now = timeProvider.GetUtcNow().UtcDateTime;
+                if (!AnonymousRegistrationRetentionPolicy.CanDisclose(order, null, now))
+                    throw new ArgumentException("Anonymous registration data retention has expired.");
+
                 RegistrationParticipant participant = RegistrationParticipant.Create(
                     participantId, order.TenantId, order.Id, null, participantType, guardian);
                 participant.ConcurrencyStamp = participantConcurrency;
@@ -53,7 +57,7 @@ public sealed class RegistrationParticipantCommandService(
                 {
                     participant.SetPii(RegistrationParticipantPii.Create(
                         participant.Id, order.TenantId, details.DisplayName, details.Email, details.Phone,
-                        (int)RegistrationRetentionPolicyEnum.StandardOperational, DateTime.UtcNow));
+                        (int)RegistrationRetentionPolicyEnum.StandardOperational, now, order.AnonymousPiiRetentionUntilUtc));
                 }
 
                 order.BumpConcurrency(orderConcurrency);
@@ -90,9 +94,14 @@ public sealed class RegistrationParticipantCommandService(
                 {
                     return Missing(participantId);
                 }
+                await EnsureAnonymousCollectionAsync(order, token);
 
                 ParticipantTypeEnum participantType = NormalizeParticipantType(participantTypeId);
                 RegistrationParticipant? guardian = await GetGuardianAsync(guardianParticipantId, order, token);
+                DateTime now = timeProvider.GetUtcNow().UtcDateTime;
+                if (!AnonymousRegistrationRetentionPolicy.CanDisclose(order, participant.Pii?.RetentionUntil, now))
+                    throw new ArgumentException("Anonymous registration data retention has expired.");
+
                 EnsureParticipantDetails(participantType, details, required: participantType is ParticipantTypeEnum.Child or ParticipantTypeEnum.Dependent);
                 participant.Update(participantType, guardian, participantConcurrency);
                 if (participant.Pii is null)
@@ -101,13 +110,13 @@ public sealed class RegistrationParticipantCommandService(
                     {
                         participant.SetPii(RegistrationParticipantPii.Create(
                             participant.Id, order.TenantId, details.DisplayName, details.Email, details.Phone,
-                            (int)RegistrationRetentionPolicyEnum.StandardOperational, DateTime.UtcNow));
+                            (int)RegistrationRetentionPolicyEnum.StandardOperational, now, order.AnonymousPiiRetentionUntilUtc));
                     }
                 }
                 else
                 {
                     participant.Pii.Update(details.DisplayName, details.Email, details.Phone,
-                        (int)RegistrationRetentionPolicyEnum.StandardOperational, DateTime.UtcNow);
+                        (int)RegistrationRetentionPolicyEnum.StandardOperational, now, order.AnonymousPiiRetentionUntilUtc);
                 }
 
                 order.BumpConcurrency(orderConcurrency);
@@ -250,10 +259,15 @@ public sealed class RegistrationParticipantCommandService(
 
                     ParticipantTypeEnum type = NormalizeParticipantType(row.ParticipantTypeId);
                     EnsureParticipantDetails(type, new ParticipantDetailsDto(row.DisplayName, row.Email, row.Phone), required: true);
+                    DateTime piiCreatedAt = timeProvider.GetUtcNow().UtcDateTime;
+                    if (!AnonymousRegistrationRetentionPolicy.CanDisclose(order, null, piiCreatedAt))
+                        throw new ArgumentException("Anonymous registration data retention has expired.");
+
                     RegistrationParticipant participant = RegistrationParticipant.Create(
                         participantIds[index], order.TenantId, order.Id, null, type, null);
                     participant.ConcurrencyStamp = participantConcurrency[index];
-                    participant.SetPii(RegistrationParticipantPii.Create(participant.Id, order.TenantId, row.DisplayName, row.Email, row.Phone));
+                    participant.SetPii(RegistrationParticipantPii.Create(participant.Id, order.TenantId, row.DisplayName, row.Email, row.Phone,
+                        (int)RegistrationRetentionPolicyEnum.StandardOperational, piiCreatedAt, order.AnonymousPiiRetentionUntilUtc));
                     newParticipants.Add(participant);
 
                     RegistrationTicketAssignment? previous = byKey.GetValueOrDefault((line!.Id, row.Ordinal));
@@ -580,6 +594,22 @@ public sealed class RegistrationParticipantCommandService(
         catch (InvalidOperationException exception)
         {
             return Invalid(orderId, exception.Message);
+        }
+    }
+
+    private async Task EnsureAnonymousCollectionAsync(RegistrationOrder order, CancellationToken cancellationToken)
+    {
+        if (!AnonymousRegistrationRetentionPolicy.AppliesTo(order)) return;
+        if (order.AnonymousPiiRetentionUntilUtc is null)
+            throw new ArgumentException("The original anonymous retention bound is unavailable.");
+
+        EventTicketCatalogVersion? catalog = await catalogs.GetOrderCatalogAsync(
+            order.TicketCatalogVersionId, order.EventId, order.TenantId, cancellationToken);
+        if (catalog is null || !order.Lines.Any(line => catalog.TicketTypes.Any(ticket =>
+            ticket.Id == line.TicketTypeId && !ticket.IsDeleted &&
+            ticket.ParticipantDataCollectionModeId != (int)ParticipantDataCollectionModeEnum.None)))
+        {
+            throw new ArgumentException("The pinned ticket collection policy does not collect participant details.");
         }
     }
 

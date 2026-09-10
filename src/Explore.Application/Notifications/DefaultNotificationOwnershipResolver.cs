@@ -26,11 +26,7 @@ public sealed class DefaultNotificationOwnershipResolver : INotificationOwnershi
         var owner = _options.GetOwner(draft.Category);
         var decision = owner switch
         {
-            NotificationOwnership.AccountAuthority => new NotificationOwnershipDecision(
-                draft.Category,
-                owner,
-                AccountAuthorityKind: _options.DefaultAccountAuthorityKind,
-                RequiresLocalAudit: draft.IsIslamuInitiated),
+            NotificationOwnership.AccountAuthority => ResolveAccountAuthority(draft),
             NotificationOwnership.ExternalWorkflowProvider => new NotificationOwnershipDecision(
                 draft.Category,
                 owner,
@@ -44,6 +40,18 @@ public sealed class DefaultNotificationOwnershipResolver : INotificationOwnershi
         };
 
         return Task.FromResult(decision);
+    }
+
+    private static NotificationOwnershipDecision ResolveAccountAuthority(NotificationIntentDraft draft)
+    {
+        var authority = draft.AccountAuthority
+            ?? throw new InvalidOperationException("Identity lifecycle routing requires a resolved linked account authority.");
+        if (authority.UserId != draft.UserId)
+            throw new InvalidOperationException("Identity lifecycle recipient does not own the resolved account authority.");
+
+        return new NotificationOwnershipDecision(draft.Category, NotificationOwnership.AccountAuthority,
+            AccountAuthorityKind: authority.Kind,
+            RequiresLocalAudit: draft.IsIslamuInitiated && authority.Kind != AccountAuthorityKind.LocalIdentity);
     }
 
     private ExternalWorkflowProviderKind ResolveExternalProvider(NotificationCategory category)

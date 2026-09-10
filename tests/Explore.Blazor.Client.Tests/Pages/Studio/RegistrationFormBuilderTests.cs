@@ -268,7 +268,7 @@ public sealed class RegistrationFormBuilderTests : IDisposable
         RegistrationFormSectionDto section = version.Sections.OrderBy(item => item.Ordinal).First();
         RegistrationFormFieldDto[] fields = section.Fields.OrderBy(item => item.Ordinal).ToArray();
         HalResourceOfRegistrationFormVersionDto authoritative = VersionGraph(eventId, form.Id, "DRAFT", includeFields: true);
-        authoritative.Sections = [authoritative.Sections.First() with { Fields = [fields[1], fields[0]] }, ..authoritative.Sections.Skip(1)];
+        authoritative.Sections = [authoritative.Sections.First() with { Fields = [fields[1], fields[0]] }, .. authoritative.Sections.Skip(1)];
         _service.ReorderFieldsAsync(eventId, form.Id, version.Id, section.Id, version.ConcurrencyStamp,
             Arg.Any<IReadOnlyList<Guid>>(), Arg.Any<HalLink>(), Arg.Any<CancellationToken>()).Returns(authoritative);
 
@@ -323,7 +323,7 @@ public sealed class RegistrationFormBuilderTests : IDisposable
         RegistrationFormSectionDto section = version.Sections.OrderBy(item => item.Ordinal).First();
         RegistrationFormFieldDto[] fields = section.Fields.OrderBy(item => item.Ordinal).ToArray();
         HalResourceOfRegistrationFormVersionDto authoritative = VersionGraph(eventId, form.Id, "DRAFT", includeFields: true);
-        authoritative.Sections = [authoritative.Sections.First() with { Fields = [fields[1], fields[0]] }, ..authoritative.Sections.Skip(1)];
+        authoritative.Sections = [authoritative.Sections.First() with { Fields = [fields[1], fields[0]] }, .. authoritative.Sections.Skip(1)];
         _service.ReorderFieldsAsync(eventId, form.Id, version.Id, section.Id, version.ConcurrencyStamp,
             Arg.Any<IReadOnlyList<Guid>>(), Arg.Any<HalLink>(), Arg.Any<CancellationToken>()).Returns(authoritative);
 
@@ -438,9 +438,9 @@ public sealed class RegistrationFormBuilderTests : IDisposable
         RegistrationFormFieldDto field = section.Fields.First();
         RegistrationFormFieldOptionDto option = Option("General", 1, eventId, form.Id, version.Id, section.Id, field.Id);
         field = field with { Options = [option] };
-        section = section with { Fields = [field, ..section.Fields.Skip(1)] };
+        section = section with { Fields = [field, .. section.Fields.Skip(1)] };
         RegistrationFormRuleDto rule = Rule(eventId, form.Id, version.Id, field);
-        version.Sections = [section, ..version.Sections.Skip(1)];
+        version.Sections = [section, .. version.Sections.Skip(1)];
         version.Rules = [rule];
         version._links = Links(
             ("add-section", $"/api/events/{eventId}/registration-forms/{form.Id}/versions/{version.Id}/sections", "POST"),

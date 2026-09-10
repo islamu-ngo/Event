@@ -113,9 +113,15 @@ internal static class AtprotoPublicationPlannerTestFactory
         var logins = Substitute.For<IUserExternalLoginRepository>();
         logins.GetByProviderAndKey(PlatformIdentityPrincipalExtensions.CreateAtprotoAccountKey(
             AtprotoDid.Parse(did)))
-            .Returns(new UserExternalLogin { Id = Guid.CreateVersion7(),
-            UserId = ownerUserId,
-            User = null!, AuthenticationProviderId = (int)RepositoryBackedAtprotoSession.Provider.ParseAuthenticationProviderKind(), AuthenticationProvider = null!, ProviderKey = did });
+            .Returns(new UserExternalLogin
+            {
+                Id = Guid.CreateVersion7(),
+                UserId = ownerUserId,
+                User = null!,
+                AuthenticationProviderId = (int)RepositoryBackedAtprotoSession.Provider.ParseAuthenticationProviderKind(),
+                AuthenticationProvider = null!,
+                ProviderKey = did
+            });
         return new(
             new AtprotoEventGovernanceResolver(settings),
             eventRepository ?? Substitute.For<IEventRepository>(),

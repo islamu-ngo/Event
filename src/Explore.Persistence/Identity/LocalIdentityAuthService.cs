@@ -1,6 +1,10 @@
 using System.Security.Cryptography;
+using System.Text.Json;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Authentication.Local.Models;
+using Explore.Domain.Constants;
 using Microsoft.AspNetCore.Identity;
 
 namespace Explore.Persistence.Identity;
@@ -9,18 +13,21 @@ internal sealed class LocalIdentityAuthService : ILocalIdentityAuthService
 {
     private readonly UserManager<LocalIdentityUser> _userManager;
     private readonly ILocalJwtTokenGenerator _tokenGenerator;
-    private readonly TimeProvider _timeProvider;
+    private readonly ISystemSettingRepository _systemSettings;
+    private readonly LocalIdentityCredentialStateStore _credentialStates;
     private readonly LocalIdentityUser _dummyUser;
     private readonly string _dummyPasswordHash;
 
     public LocalIdentityAuthService(
         UserManager<LocalIdentityUser> userManager,
         ILocalJwtTokenGenerator tokenGenerator,
-        TimeProvider timeProvider)
+        ISystemSettingRepository systemSettings,
+        LocalIdentityCredentialStateStore credentialStates)
     {
         _userManager = userManager;
         _tokenGenerator = tokenGenerator;
-        _timeProvider = timeProvider;
+        _systemSettings = systemSettings;
+        _credentialStates = credentialStates;
         _dummyUser = new LocalIdentityUser();
         _dummyPasswordHash = userManager.PasswordHasher.HashPassword(
             _dummyUser,
@@ -33,10 +40,10 @@ internal sealed class LocalIdentityAuthService : ILocalIdentityAuthService
     {
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
-        string email = NormalizeEmail(request.Email);
-        LocalIdentityUser? user = await _userManager
-            .FindByEmailAsync(email)
-            .ConfigureAwait(false);
+        string identifier = request.Identifier.Trim();
+        LocalIdentityUser? user = identifier.Contains('@', StringComparison.Ordinal)
+            ? await _userManager.FindByEmailAsync(identifier).ConfigureAwait(false)
+            : await _userManager.FindByNameAsync(identifier).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         if (user is null)
         {
@@ -44,12 +51,12 @@ internal sealed class LocalIdentityAuthService : ILocalIdentityAuthService
                 _dummyUser,
                 _dummyPasswordHash,
                 request.Password);
-            return LocalAuthResponseDto.Failed("invalid_credentials");
+            return LocalAuthResponseDto.Failed(failure: LocalAuthFailure.InvalidCredentials);
         }
 
         if (await _userManager.IsLockedOutAsync(user).ConfigureAwait(false))
         {
-            return LocalAuthResponseDto.Failed("account_locked");
+            return LocalAuthResponseDto.Failed(failure: LocalAuthFailure.AccountLocked);
         }
 
         if (!await _userManager.CheckPasswordAsync(user, request.Password).ConfigureAwait(false))
@@ -59,70 +66,119 @@ internal sealed class LocalIdentityAuthService : ILocalIdentityAuthService
                 .ConfigureAwait(false);
             if (!accessFailure.Succeeded)
             {
-                return LocalAuthResponseDto.Failed("authentication_failed");
+                return LocalAuthResponseDto.Failed(failure: LocalAuthFailure.AuthenticationFailed);
             }
 
             return await _userManager.IsLockedOutAsync(user).ConfigureAwait(false)
-                ? LocalAuthResponseDto.Failed("account_locked")
-                : LocalAuthResponseDto.Failed("invalid_credentials");
+                ? LocalAuthResponseDto.Failed(failure: LocalAuthFailure.AccountLocked)
+                : LocalAuthResponseDto.Failed(failure: LocalAuthFailure.InvalidCredentials);
         }
 
+        string? checkedSecurityStamp = user.SecurityStamp;
+        bool checkedEmailVerified = user.EmailConfirmed;
         IdentityResult reset = await _userManager
             .ResetAccessFailedCountAsync(user)
             .ConfigureAwait(false);
         if (!reset.Succeeded)
         {
-            return LocalAuthResponseDto.Failed("authentication_failed");
+            return LocalAuthResponseDto.Failed(failure: LocalAuthFailure.AuthenticationFailed);
         }
 
-        return await CreateAuthenticatedResponseAsync(user, cancellationToken)
+        cancellationToken.ThrowIfCancellationRequested();
+        if (string.IsNullOrWhiteSpace(checkedSecurityStamp))
+        {
+            return LocalAuthResponseDto.Failed(failure: LocalAuthFailure.InvalidCredentials);
+        }
+        try
+        {
+            LocalCredentialStateMetadata? credentialState = await _credentialStates
+                .ReadAsync(localSubjectId: user.Id, expectedSecurityStamp: checkedSecurityStamp,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+            if (credentialState?.State == LocalCredentialState.ChangeRequired)
+            {
+                LocalCredentialReplacementSubject? subject = await _credentialStates.ReadReplacementSubjectAsync(
+                    localSubjectId: user.Id,
+                    expectedSecurityStamp: checkedSecurityStamp,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+                if (subject is null)
+                {
+                    return LocalAuthResponseDto.Failed(failure: LocalAuthFailure.InvalidCredentials);
+                }
+                LocalIssuedReplacementChallenge challenge = await _tokenGenerator
+                    .GenerateReplacementChallengeAsync(subject, cancellationToken).ConfigureAwait(false);
+                return LocalAuthResponseDto.ReplacementRequired(challenge: challenge);
+            }
+            if (credentialState?.State != LocalCredentialState.Ready)
+            {
+                return LocalAuthResponseDto.Failed(failure: LocalAuthFailure.InvalidCredentials);
+            }
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return LocalAuthResponseDto.Failed(failure: LocalAuthFailure.AuthenticationFailed);
+        }
+
+        var authority = new LocalSessionAuthority(
+            localSubjectId: user.Id, securityStamp: checkedSecurityStamp, emailVerified: checkedEmailVerified);
+        (LocalIdentityUser? currentUser, LocalAuthFailure? failure) = await ReadValidatedSessionAsync(
+            authority: authority, cancellationToken: cancellationToken).ConfigureAwait(false);
+        if (failure is { } rejected)
+        {
+            return LocalAuthResponseDto.Failed(failure: rejected);
+        }
+        return await CreateAuthenticatedResponseAsync(
+            user: currentUser!,
+            authority: authority,
+            cancellationToken: cancellationToken)
             .ConfigureAwait(false);
     }
 
-    public async Task<LocalRegistrationResponseDto> RegisterAsync(
-        LocalRegistrationRequestDto request,
+    public async Task<LocalSessionValidationOutcome> ValidateSessionAsync(
+        LocalSessionAuthority authority,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(authority);
         cancellationToken.ThrowIfCancellationRequested();
-        string email = NormalizeEmail(request.Email);
-        DateTime createdAt = _timeProvider.GetUtcNow().UtcDateTime;
-        var user = new LocalIdentityUser
+        var (_, failure) = await ReadValidatedSessionAsync(
+            authority: authority, cancellationToken: cancellationToken).ConfigureAwait(false);
+        return failure switch
         {
-            UserName = email,
-            Email = email,
-            FirstName = request.FirstName.Trim(),
-            LastName = request.LastName.Trim(),
-            EmailConfirmed = false,
-            LockoutEnabled = true,
-            CreatedAt = createdAt
+            null => LocalSessionValidationOutcome.Valid,
+            LocalAuthFailure.AuthenticationFailed => LocalSessionValidationOutcome.Unavailable,
+            _ => LocalSessionValidationOutcome.Invalid
         };
+    }
 
-        IdentityResult creation = await _userManager
-            .CreateAsync(user, request.Password)
-            .ConfigureAwait(false);
-        if (!creation.Succeeded)
-        {
-            return LocalRegistrationResponseDto.Failed("registration_failed");
-        }
-
+    private async Task<(LocalIdentityUser? User, LocalAuthFailure? Failure)> ReadValidatedSessionAsync(
+        LocalSessionAuthority authority,
+        CancellationToken cancellationToken)
+    {
         try
         {
-            LocalAuthResponseDto authentication = await CreateAuthenticatedResponseAsync(
-                user,
-                cancellationToken).ConfigureAwait(false);
-            return LocalRegistrationResponseDto.Registered(authentication);
-        }
-        catch
-        {
-            IdentityResult rollback = await _userManager.DeleteAsync(user).ConfigureAwait(false);
-            if (!rollback.Succeeded)
+            LocalIdentityUser? user = await _credentialStates.ReadReadySessionAsync(authority, cancellationToken)
+                .ConfigureAwait(false);
+            if (user is null)
             {
-                throw new InvalidOperationException(
-                    "Local Identity registration token issuance and credential rollback both failed.");
+                return (User: null, Failure: LocalAuthFailure.InvalidCredentials);
             }
-
-            throw;
+            if (!user.EmailConfirmed)
+            {
+                var intent = await _systemSettings.GetByKey(
+                    GovernanceSettingKeys.Email.DeliveryEnabled, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (intent is not null && JsonSerializer.Deserialize<bool>(intent.Value))
+                {
+                    return (User: null, Failure: LocalAuthFailure.EmailVerificationRequired);
+                }
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            return (User: user, Failure: null);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return (User: null, Failure: LocalAuthFailure.AuthenticationFailed);
         }
     }
 
@@ -153,36 +209,29 @@ internal sealed class LocalIdentityAuthService : ILocalIdentityAuthService
 
     private async Task<LocalAuthResponseDto> CreateAuthenticatedResponseAsync(
         LocalIdentityUser user,
+        LocalSessionAuthority authority,
         CancellationToken cancellationToken)
     {
         string? email = user.Email;
-        if (string.IsNullOrWhiteSpace(email))
-        {
-            return LocalAuthResponseDto.Failed("authentication_failed");
-        }
-
         IList<string> roles = await _userManager.GetRolesAsync(user).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         LocalIssuedToken issued = await _tokenGenerator.GenerateAsync(
             new LocalJwtTokenSubject(
-                user.Id,
-                email,
-                user.FirstName,
-                user.LastName,
-                user.EmailConfirmed,
-                roles),
+                authority: authority,
+                email: email,
+                firstName: user.FirstName,
+                lastName: user.LastName,
+                roles: roles),
             cancellationToken).ConfigureAwait(false);
         return LocalAuthResponseDto.Authenticated(
-            user.Id,
-            email,
-            user.FirstName,
-            user.LastName,
-            user.EmailConfirmed,
-            roles,
-            issued.Token,
-            issued.ExpiresAt);
+            userId: user.Id,
+            email: email,
+            firstName: user.FirstName,
+            lastName: user.LastName,
+            emailVerified: user.EmailConfirmed,
+            roles: roles,
+            token: issued.Token,
+            expiresAt: issued.ExpiresAt);
     }
 
-    private static string NormalizeEmail(string email) =>
-        email.Trim().ToLowerInvariant();
 }

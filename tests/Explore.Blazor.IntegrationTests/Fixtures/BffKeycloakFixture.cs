@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using TUnit.Core.Interfaces;
@@ -15,12 +18,13 @@ public sealed class BffKeycloakFixture : IAsyncInitializer, IAsyncDisposable
 
     public const string RealmName = "ISLAMU";
     public const string TestClientId = "islamu-event-blazor";
-    public const string TestClientSecret = "test-blazor-secret";
 
     private IContainer _container = null!;
 
     public string Authority { get; private set; } = string.Empty;
     public string MetadataAddress { get; private set; } = string.Empty;
+    public string ClientSecret { get; } = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+    public string TestUserPassword { get; } = $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(32))}";
 
     public async Task InitializeAsync()
     {
@@ -34,17 +38,33 @@ public sealed class BffKeycloakFixture : IAsyncInitializer, IAsyncDisposable
                 "Ensure ISLAMU-realm.test.json is included as Content.");
         }
 
+        var realm = JsonNode.Parse(await File.ReadAllTextAsync(testRealmPath))?.AsObject()
+            ?? throw new InvalidDataException("The test realm must be a JSON object.");
+        var client = realm["clients"]!.AsArray().Single(node =>
+            node?["clientId"]?.GetValue<string>() == TestClientId)!;
+        client["secret"] = ClientSecret;
+        var user = realm["users"]!.AsArray().Single(node =>
+            node?["username"]?.GetValue<string>() == "test-user")!;
+        user["credentials"] = new JsonArray(new JsonObject
+        {
+            ["type"] = "password",
+            ["value"] = TestUserPassword,
+            ["temporary"] = false
+        });
+
         _container = new ContainerBuilder()
             .WithImage(KeycloakImage)
             .WithPortBinding(8080, true)
-            .WithResourceMapping(testRealmPath, "/opt/keycloak/data/import/")
+            .WithResourceMapping(
+                JsonSerializer.SerializeToUtf8Bytes(realm),
+                "/opt/keycloak/data/import/ISLAMU-realm.test.json")
             .WithCommand("start-dev", "--import-realm", "--http-port=8080")
             .WithEnvironment("KC_HEALTH_ENABLED", "true")
             .WithEnvironment("KC_HTTP_ENABLED", "true")
             .WithEnvironment("KEYCLOAK_ADMIN", "test-admin")
             .WithEnvironment(
                 "KEYCLOAK_ADMIN_PASSWORD",
-                Guid.CreateVersion7().ToString("N"))
+                Convert.ToHexString(RandomNumberGenerator.GetBytes(32)))
             .WithWaitStrategy(Wait.ForUnixContainer()
                 .UntilHttpRequestIsSucceeded(request =>
                     request

@@ -54,13 +54,17 @@ public sealed class GuardedSettingMutationRepositoryTests(PostgreSqlContainerFix
         var saveObserver = new SaveObserver();
         await using (ExploreDbContext context = fixture.CreateDbContext(saveObserver))
         {
-            var repository = new TenantSettingRepository(context);
+            var repository = new TenantSettingRepository(context,
+                new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
             Func<Task> guardedMutation = mutation switch
             {
                 TenantMutation.Set => () => repository.SetValueAsync(tenantId, GuardedKey, "true"),
-                TenantMutation.Remove => async () => { await repository.RemoveOverrideAsync(tenantId, GuardedKey); },
-                TenantMutation.Lock => async () => { await repository.LockAsync(tenantId, GuardedKey, Guid.NewGuid()); },
-                TenantMutation.Unlock => async () => { await repository.UnlockAsync(tenantId, GuardedKey, Guid.NewGuid()); },
+                TenantMutation.Remove => async () => { await repository.RemoveOverrideAsync(tenantId, GuardedKey); }
+                ,
+                TenantMutation.Lock => async () => { await repository.LockAsync(tenantId, GuardedKey, Guid.NewGuid()); }
+                ,
+                TenantMutation.Unlock => async () => { await repository.UnlockAsync(tenantId, GuardedKey, Guid.NewGuid()); }
+                ,
                 _ => throw new ArgumentOutOfRangeException(nameof(mutation), mutation, null)
             };
 
@@ -100,7 +104,8 @@ public sealed class GuardedSettingMutationRepositoryTests(PostgreSqlContainerFix
         var saveObserver = new SaveObserver();
         await using (ExploreDbContext context = fixture.CreateDbContext(saveObserver))
         {
-            var repository = new TenantSettingRepository(context);
+            var repository = new TenantSettingRepository(context,
+                new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
 
             await Assert.ThrowsAsync<InvalidOperationException>(() => repository.UpsertManyForTenantAsync(
                 tenantId,
@@ -150,8 +155,10 @@ public sealed class GuardedSettingMutationRepositoryTests(PostgreSqlContainerFix
             };
             Func<Task> guardedMutation = mutation switch
             {
-                SystemMutation.Upsert => async () => { await repository.UpsertAsync(candidate); },
-                SystemMutation.UpsertLock => async () => { await repository.UpsertLockAsync(candidate); },
+                SystemMutation.Upsert => async () => { await repository.UpsertAsync(candidate); }
+                ,
+                SystemMutation.UpsertLock => async () => { await repository.UpsertLockAsync(candidate); }
+                ,
                 _ => throw new ArgumentOutOfRangeException(nameof(mutation), mutation, null)
             };
 

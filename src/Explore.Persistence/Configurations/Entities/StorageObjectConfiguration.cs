@@ -24,6 +24,7 @@ public class StorageObjectConfiguration : IEntityTypeConfiguration<StorageObject
         builder.Property(e => e.Purpose).HasMaxLength(100).IsRequired();
         builder.Property(e => e.LifecycleState).HasMaxLength(50).IsRequired();
         builder.Property(e => e.OwningResourceKind).HasMaxLength(100);
+        builder.Property(e => e.RegistrationContentRetentionUntilUtc);
         builder.Property(e => e.QuarantineReason).HasMaxLength(500);
         builder.Property(e => e.ConcurrencyStamp).IsConcurrencyToken();
 

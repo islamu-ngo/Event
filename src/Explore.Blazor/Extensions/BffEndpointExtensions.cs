@@ -14,6 +14,8 @@ public static class BffEndpointExtensions
         app.MapPreferenceEndpoints();
         app.MapStorageEndpoints();
         app.MapSetupSecretEndpoints();
+        app.MapLocalCredentialEndpoints();
+        app.MapLocalIdentityLifecycleEndpoints();
         app.MapSupportAccessEndpoints();
         app.MapRegistrationProviderEmbedEndpoints();
         app.MapRegistrationPaymentEndpoints();

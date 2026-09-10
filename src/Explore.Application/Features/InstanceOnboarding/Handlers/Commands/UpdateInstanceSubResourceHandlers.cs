@@ -297,13 +297,16 @@ public class UpdateTenantDelegationSettingsCommandHandler : IRequestHandler<Upda
     private readonly IInstanceGovernanceSettingService _service;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMediator _mediator;
+    private readonly ISettingMutationLock _mutationLock;
 
-    public UpdateTenantDelegationSettingsCommandHandler(IAdminContext adminContext, IInstanceGovernanceSettingService service, IUnitOfWork unitOfWork, IMediator mediator)
+    public UpdateTenantDelegationSettingsCommandHandler(IAdminContext adminContext, IInstanceGovernanceSettingService service,
+        IUnitOfWork unitOfWork, IMediator mediator, ISettingMutationLock mutationLock)
     {
         _adminContext = adminContext;
         _service = service;
         _unitOfWork = unitOfWork;
         _mediator = mediator;
+        _mutationLock = mutationLock;
     }
 
     public async Task<BaseCommandResponse<Guid>> Handle(UpdateTenantDelegationSettingsCommand request, CancellationToken cancellationToken)
@@ -314,36 +317,45 @@ public class UpdateTenantDelegationSettingsCommandHandler : IRequestHandler<Upda
         if (!request.Patch.HasChanges())
             return Invalid("At least one tenant delegation setting must be provided.");
 
-        var settings = await _service.ReadSettingsAsync();
-        if (request.Patch.AllowTenantSelfServiceRegistration.HasValue)
-            settings.TenantDelegation.AllowTenantSelfServiceRegistration = request.Patch.AllowTenantSelfServiceRegistration.Value;
-        if (request.Patch.AllowTenantWhiteLabeling.HasValue)
-            settings.TenantDelegation.AllowTenantWhiteLabeling = request.Patch.AllowTenantWhiteLabeling.Value;
-        if (request.Patch.DefaultPublicHomePage.HasValue)
-            settings.TenantDelegation.DefaultPublicHomePage = request.Patch.DefaultPublicHomePage.Value ?? string.Empty;
-        if (request.Patch.LockTenantHomePagePreference.HasValue)
-            settings.TenantDelegation.LockTenantHomePagePreference = request.Patch.LockTenantHomePagePreference.Value;
-        if (request.Patch.LockTenantSmtp.HasValue)
-            settings.TenantDelegation.LockTenantSmtp = request.Patch.LockTenantSmtp.Value;
-        if (request.Patch.LockTenantStorage.HasValue)
-            settings.TenantDelegation.LockTenantStorage = request.Patch.LockTenantStorage.Value;
-        if (request.Patch.LockTenantAnalytics.HasValue)
-            settings.TenantDelegation.LockTenantAnalytics = request.Patch.LockTenantAnalytics.Value;
-        if (request.Patch.LockTenantAiAssistant.HasValue)
-            settings.TenantDelegation.LockTenantAiAssistant = request.Patch.LockTenantAiAssistant.Value;
+        Task<IReadOnlyList<SettingChangedNotification>> ApplyPatchAsync(CancellationToken token) =>
+            request.Patch.LockTenantSmtp.HasValue
+                ? _unitOfWork.ExecuteSerializableAsync(ApplyPatchCoreAsync, token)
+                : _unitOfWork.ExecuteInTransactionAsync(ApplyPatchCoreAsync, token);
 
-        IReadOnlyList<SettingChangedNotification> notifications = [];
-        await _unitOfWork.ExecuteInTransactionAsync(async ct =>
+        async Task<IReadOnlyList<SettingChangedNotification>> ApplyPatchCoreAsync(CancellationToken ct)
         {
-            notifications = await _service.ApplyTenantDelegationSettingsPatchAsync(
+            var settings = await _service.ReadSettingsAsync();
+            if (request.Patch.AllowTenantSelfServiceRegistration.HasValue)
+                settings.TenantDelegation.AllowTenantSelfServiceRegistration = request.Patch.AllowTenantSelfServiceRegistration.Value;
+            if (request.Patch.AllowTenantWhiteLabeling.HasValue)
+                settings.TenantDelegation.AllowTenantWhiteLabeling = request.Patch.AllowTenantWhiteLabeling.Value;
+            if (request.Patch.DefaultPublicHomePage.HasValue)
+                settings.TenantDelegation.DefaultPublicHomePage = request.Patch.DefaultPublicHomePage.Value ?? string.Empty;
+            if (request.Patch.LockTenantHomePagePreference.HasValue)
+                settings.TenantDelegation.LockTenantHomePagePreference = request.Patch.LockTenantHomePagePreference.Value;
+            if (request.Patch.LockTenantSmtp.HasValue)
+                settings.TenantDelegation.LockTenantSmtp = request.Patch.LockTenantSmtp.Value;
+            if (request.Patch.LockTenantStorage.HasValue)
+                settings.TenantDelegation.LockTenantStorage = request.Patch.LockTenantStorage.Value;
+            if (request.Patch.LockTenantAnalytics.HasValue)
+                settings.TenantDelegation.LockTenantAnalytics = request.Patch.LockTenantAnalytics.Value;
+            if (request.Patch.LockTenantAiAssistant.HasValue)
+                settings.TenantDelegation.LockTenantAiAssistant = request.Patch.LockTenantAiAssistant.Value;
+
+            return await _service.ApplyTenantDelegationSettingsPatchAsync(
                 settings.DeploymentMode.Mode == DeploymentMode.MultiTenant,
                 request.Patch,
                 settings.TenantDelegation,
                 request.UserId,
                 ct);
-        }, cancellationToken);
+        }
+
+        IReadOnlyList<SettingChangedNotification> notifications = request.Patch.LockTenantSmtp.HasValue
+            ? await _mutationLock.ExecuteOrderedGroupsAsync(
+                [EmailDeliverySettingKeys.All], ApplyPatchAsync, cancellationToken)
+            : await ApplyPatchAsync(cancellationToken);
         foreach (SettingChangedNotification notification in notifications)
-            await _mediator.Publish(notification, cancellationToken);
+            await _mediator.Publish(notification, CancellationToken.None);
         return BaseCommandResponse.Success(Guid.Empty, "Tenant delegation settings updated successfully.");
     }
 

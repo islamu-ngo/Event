@@ -128,8 +128,8 @@ public sealed class TenantPoliciesSectionTests : IDisposable
     [Test]
     public async Task PolicySwitch_WhenApiRejects_ReloadsCategoryAndRestoresConfirmedValue()
     {
-        SettingGroupResponseDto initial = CreatePolicyCategory("Events");
-        SettingGroupResponseDto reloaded = CreatePolicyCategory("Events");
+        HalResourceOfSettingGroupResponseDto initial = CreatePolicyCategory("Events");
+        HalResourceOfSettingGroupResponseDto reloaded = CreatePolicyCategory("Events");
         _tenantOnboardingService.GetTenantSettingsAsync("Events", Arg.Any<CancellationToken>())
             .Returns(initial, reloaded);
         _tenantOnboardingService.UpdateTenantSettingAsync(
@@ -161,7 +161,7 @@ public sealed class TenantPoliciesSectionTests : IDisposable
     public async Task PolicySwitch_WhenTransportFails_ReloadsCategoryAndRestoresConfirmedValue()
     {
         _tenantOnboardingService.GetTenantSettingsAsync("Events", Arg.Any<CancellationToken>())
-            .Returns(CreatePolicyCategory("Events"), (SettingGroupResponseDto?)null);
+            .Returns(CreatePolicyCategory("Events"), (HalResourceOfSettingGroupResponseDto?)null);
         _tenantOnboardingService.UpdateTenantSettingAsync(
                 "events.user_submission_enabled",
                 "true",
@@ -277,7 +277,7 @@ public sealed class TenantPoliciesSectionTests : IDisposable
     public async Task PolicySwitch_WhenMetadataIsLocked_IsDisabledAndShowsReason()
     {
         const string reason = "Locked by instance policy.";
-        SettingGroupResponseDto events = CreatePolicyCategory("Events");
+        HalResourceOfSettingGroupResponseDto events = CreatePolicyCategory("Events");
         EffectiveSettingDto setting = events.Settings.Single(item => item.Key == "events.user_submission_enabled");
         setting.CanEdit = false;
         setting.Reason = reason;
@@ -294,7 +294,7 @@ public sealed class TenantPoliciesSectionTests : IDisposable
     public async Task PolicySwitch_WhenCategoryMetadataIsMissing_FailsClosed()
     {
         _tenantOnboardingService.GetTenantSettingsAsync("Events", Arg.Any<CancellationToken>())
-            .Returns(new SettingGroupResponseDto { Category = "Organizations" });
+            .Returns(new HalResourceOfSettingGroupResponseDto { Category = "Organizations" });
 
         var cut = RenderComponent();
         cut.WaitForState(() => cut.Markup.Contains("Allow users to submit events", StringComparison.Ordinal));
@@ -305,13 +305,10 @@ public sealed class TenantPoliciesSectionTests : IDisposable
     [Test]
     public async Task PolicySwitch_WhenKeyMetadataIsMissing_FailsClosed()
     {
-        SettingGroupResponseDto events = CreatePolicyCategory("Events");
-        events = events with
-        {
-            Settings = events.Settings
-                .Where(setting => setting.Key != "events.user_submission_enabled")
-                .ToList()
-        };
+        HalResourceOfSettingGroupResponseDto events = CreatePolicyCategory("Events");
+        events.Settings = events.Settings
+            .Where(setting => setting.Key != "events.user_submission_enabled")
+            .ToList();
         _tenantOnboardingService.GetTenantSettingsAsync("Events", Arg.Any<CancellationToken>()).Returns(events);
 
         var cut = RenderComponent();
@@ -323,7 +320,7 @@ public sealed class TenantPoliciesSectionTests : IDisposable
     [Test]
     public async Task PolicySwitch_WhenCanEditMetadataIsMissing_FailsClosed()
     {
-        SettingGroupResponseDto events = CreatePolicyCategory("Events");
+        HalResourceOfSettingGroupResponseDto events = CreatePolicyCategory("Events");
         events.Settings.Single(setting => setting.Key == "events.user_submission_enabled").CanEdit = null;
         _tenantOnboardingService.GetTenantSettingsAsync("Events", Arg.Any<CancellationToken>()).Returns(events);
 
@@ -336,7 +333,7 @@ public sealed class TenantPoliciesSectionTests : IDisposable
     [Test]
     public async Task PolicySwitch_WhenBooleanMetadataIsMalformed_FailsClosed()
     {
-        SettingGroupResponseDto events = CreatePolicyCategory("Events");
+        HalResourceOfSettingGroupResponseDto events = CreatePolicyCategory("Events");
         events.Settings.Single(setting => setting.Key == "events.user_submission_enabled").Value = "not-a-boolean";
         _tenantOnboardingService.GetTenantSettingsAsync("Events", Arg.Any<CancellationToken>()).Returns(events);
 
@@ -409,7 +406,7 @@ public sealed class TenantPoliciesSectionTests : IDisposable
     public async Task AtprotoEvents_WhenLoadFails_RendersSafeAccessibleAlert()
     {
         _settingsService.GetTenantAsync(Arg.Any<CancellationToken>())
-            .Returns<Task<SettingGroupResponseDto>>(_ =>
+            .Returns<Task<HalResourceOfSettingGroupResponseDto>>(_ =>
                 throw new HttpRequestException("provider credential canary"));
 
         var cut = RenderComponent();
@@ -428,7 +425,7 @@ public sealed class TenantPoliciesSectionTests : IDisposable
     public async Task AtprotoEvents_WhenApplicationSessionExpired_RequestsApplicationSignIn()
     {
         _settingsService.GetTenantAsync(Arg.Any<CancellationToken>())
-            .Returns<Task<SettingGroupResponseDto>>(_ =>
+            .Returns<Task<HalResourceOfSettingGroupResponseDto>>(_ =>
                 throw new ApiException(
                     "Unauthorized",
                     401,
@@ -661,9 +658,9 @@ public sealed class TenantPoliciesSectionTests : IDisposable
         return status;
     }
 
-    private static SettingGroupResponseDto CreatePolicyCategory(string category) => category switch
+    private static HalResourceOfSettingGroupResponseDto CreatePolicyCategory(string category) => category switch
     {
-        "Events" => new SettingGroupResponseDto
+        "Events" => new HalResourceOfSettingGroupResponseDto
         {
             Category = category,
             Settings =
@@ -675,7 +672,7 @@ public sealed class TenantPoliciesSectionTests : IDisposable
                 EditableBoolean("events.card_click_opens_detail_page")
             ]
         },
-        "Organizations" => new SettingGroupResponseDto
+        "Organizations" => new HalResourceOfSettingGroupResponseDto
         {
             Category = category,
             Settings =
@@ -684,12 +681,12 @@ public sealed class TenantPoliciesSectionTests : IDisposable
                 EditableBoolean("organizations.self_registration_enabled")
             ]
         },
-        "Groups" => new SettingGroupResponseDto
+        "Groups" => new HalResourceOfSettingGroupResponseDto
         {
             Category = category,
             Settings = [EditableBoolean("groups.self_registration_enabled")]
         },
-        _ => new SettingGroupResponseDto { Category = category }
+        _ => new HalResourceOfSettingGroupResponseDto { Category = category }
     };
 
     private static EffectiveSettingDto EditableBoolean(string key) => new()
@@ -701,7 +698,7 @@ public sealed class TenantPoliciesSectionTests : IDisposable
         IsLocked = false
     };
 
-    private static SettingGroupResponseDto CreateSettings(
+    private static HalResourceOfSettingGroupResponseDto CreateSettings(
         bool eventsCanEdit,
         string? reason = null,
         SettingSource source = SettingSource.TenantOverride) =>

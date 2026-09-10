@@ -6,7 +6,10 @@
 @using Explore.Blazor.Client.Constants
 @using Explore.Blazor.Client.Contracts.Services.Scheduling
 @using Explore.Blazor.Client.Contracts.Services.Webhooks
+@using Explore.Blazor.Client.Contracts.ControlPlane
+@using Explore.Blazor.Client.Services.ControlPlane
 @using Explore.Blazor.Client.Pages.User.Components
+@implements IDisposable
 
 @inject IInstanceOnboardingService InstanceOnboardingService
 @inject IUserService UserService
@@ -16,6 +19,8 @@
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
 @inject ISchedulerAdminService SchedulerAdminService
+@inject LocalIdentityAdministrationService LocalIdentityAdministration
+@inject ITranslationService Translations
 
 <div class="settings-layout">
     <MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
@@ -141,6 +146,10 @@
                                                          OnboardingService="InstanceOnboardingService"
                                                          IsSingleTenant="IsSingleTenantMode" />
                         }
+                        else if (_currentSection == "local-accounts" && _localAccountsAvailable)
+                        {
+                            <LocalAccountsSection />
+                        }
                         else if (_currentSection == "modules")
                         {
                             <InstanceModulesSection Model="_modules"
@@ -163,7 +172,8 @@
                             <InstanceSmtpSection Model="_smtpModel" OnboardingService="InstanceOnboardingService"
                                                 IsSingleTenant="IsSingleTenantMode"
                                                 LockForTenants="_delegation.LockTenantSmtp == true"
-                                                SaveLockAsync="SaveSmtpLockAsync" />
+                                                SaveLockAsync="SaveSmtpLockAsync"
+                                                DeliveryChanged="RefreshSmtpAsync" />
                         }
                         else if (_currentSection == "analytics-privacy")
                         {
@@ -346,7 +356,7 @@
 
     // Infrastructure models
     private HalResourceOfInstanceStorageSettingsDto _storageModel = new();
-    private InstanceSmtpSettingsDto _smtpModel = new();
+    private HalResourceOfInstanceSmtpSettingsDto _smtpModel = new();
     private AuthProviderConfigurationDto _authProviderModel = new();
     private AuthorizationProviderConfigurationDto _authorizationProviderModel = new();
     private TenantPolicySettingsDto _tenantModel = new();
@@ -358,6 +368,11 @@
     private bool _isLoading = true;
     private FormSubmitState _submitState = new();
     private bool _canEdit;
+    private bool _localAccountsAvailable;
+    private bool _localAccountsDisposed;
+    private bool _localAccountsLanguageSubscribed;
+    private int _localAccountsDiscoveryGeneration;
+    private readonly CancellationTokenSource _localAccountsLifetime = new();
     private bool _schedulerAvailable;
     private bool _identityReady;
     private bool _canManageTenant;
@@ -390,6 +405,26 @@
             _isLoading = false;
             return;
         }
+
+        if (!_localAccountsLanguageSubscribed)
+        {
+            Translations.OnLanguageChanged += OnLocalAccountsLanguageChanged;
+            _localAccountsLanguageSubscribed = true;
+        }
+        int discoveryGeneration = ++_localAccountsDiscoveryGeneration;
+        _localAccountsAvailable = false;
+        try
+        {
+            var overview = await LocalIdentityAdministration.GetCapabilitiesAsync(_localAccountsLifetime.Token);
+            if (!_localAccountsDisposed && discoveryGeneration == _localAccountsDiscoveryGeneration)
+                _localAccountsAvailable = ControlPlaneHal.HasLink(overview._links, ControlPlaneLinkRelations.LocalIdentities);
+        }
+        catch (Exception)
+        {
+            // Missing or unavailable discovery must not expose an administration entry point.
+        }
+        if (_localAccountsDisposed)
+            return;
 
         // Discovery, not authorization: the resource is served only when this host exposes the scheduler
         // administration API and this caller may read it, so its presence alone decides whether the item appears.
@@ -608,6 +643,8 @@
 
         return response;
     }
+
+    private async Task RefreshSmtpAsync() => _smtpModel = await InstanceOnboardingService.GetSmtpSettingsAsync();
 
     private Task SaveAsync() => SaveAsync(false);
 
@@ -870,6 +907,7 @@
             ]);
 
             AddSchedulerNavItem(navItems);
+            AddLocalAccountsNavItem(navItems);
             return navItems;
         }
 
@@ -899,7 +937,34 @@
         ];
 
         AddSchedulerNavItem(multiTenantNavItems);
+        AddLocalAccountsNavItem(multiTenantNavItems);
         return multiTenantNavItems;
+    }
+
+    private void AddLocalAccountsNavItem(List<NavItem> navItems)
+    {
+        if (!_localAccountsAvailable)
+            return;
+        int authenticationIndex = navItems.FindIndex(item => item.Key == "auth-providers");
+        navItems.Insert(authenticationIndex + 1, new NavItem(
+            Key: "local-accounts", Icon: Icons.Material.Filled.ManageAccounts,
+            Label: Translations.T("instance.localAccounts.heading", "Local accounts")));
+    }
+
+    private void OnLocalAccountsLanguageChanged(string languageCode)
+    {
+        if (!_localAccountsDisposed)
+            _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        if (_localAccountsDisposed)
+            return;
+        _localAccountsDisposed = true;
+        Translations.OnLanguageChanged -= OnLocalAccountsLanguageChanged;
+        _localAccountsLifetime.Cancel();
+        _localAccountsLifetime.Dispose();
     }
 
     /// <summary>

@@ -152,25 +152,26 @@ public sealed class ParticipantReadinessComponentTests : IDisposable
         string statusCode,
         string supportCode,
         params string[] relations) => new()
-    {
-        RegistrationTicketAssignmentId = Guid.CreateVersion7(),
-        StatusCode = statusCode,
-        SupportCode = supportCode,
-        ActiveAdmissionAvailable = false,
-        _links = relations.ToDictionary(
+        {
+            RegistrationTicketAssignmentId = Guid.CreateVersion7(),
+            StatusCode = statusCode,
+            SupportCode = supportCode,
+            ActiveAdmissionAvailable = false,
+            _links = relations.ToDictionary(
             relation => relation,
             relation => new HalLink
             {
                 Href = $"/readiness/{relation}",
                 Method = HttpMethod.Post.Method
             })
-    };
+        };
 
     private sealed class ReadinessServiceFake : IParticipantReadinessService
     {
         public HalResourceOfParticipantReadinessDto? Resource { get; init; }
         public TaskCompletionSource<HalResourceOfParticipantReadinessDto?>?
-            ActionCompletion { get; init; }
+            ActionCompletion
+        { get; init; }
         public TaskCompletionSource? ActionEntered { get; init; }
 
         public Task<HalResourceOfParticipantReadinessDto?> GetAsync(

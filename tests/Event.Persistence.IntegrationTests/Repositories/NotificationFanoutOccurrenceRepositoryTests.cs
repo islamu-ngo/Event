@@ -8,6 +8,7 @@ using Explore.Application.Models.InternalEvents;
 using Explore.Application.Notifications;
 using Explore.Application.Services;
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
@@ -376,14 +377,19 @@ public sealed class NotificationFanoutOccurrenceRepositoryTests(PostgreSqlContai
         context.NotificationFanoutOccurrences.Add(occurrence);
         await context.SaveChangesAsync();
 
-        var repository = new NotificationIntentRepository(context);
         var unitOfWork = new EfCoreUnitOfWork(context);
-        await unitOfWork.ExecuteInTransactionAsync(token =>
-            repository.CreateGraphAsync(CreateIntent(scenario, occurrence.Id, "fanout:first"), token));
+        var mutationLock = new RelationalSettingMutationLock(context, unitOfWork);
+        var repository = new NotificationIntentRepository(context, mutationLock);
+        await mutationLock.ExecuteOrderedGroupsAsync(
+            [[GovernanceSettingKeys.Email.DeliveryEnabled]],
+            outerToken => unitOfWork.ExecuteInTransactionAsync(token =>
+                repository.CreateGraphAsync(CreateIntent(scenario, occurrence.Id, "fanout:first"), token), outerToken));
 
         await Assert.ThrowsAsync<NotificationIntentDeduplicationConflictException>(() =>
-            unitOfWork.ExecuteInTransactionAsync(token =>
-                repository.CreateGraphAsync(CreateIntent(scenario, occurrence.Id, "fanout:second"), token)));
+            mutationLock.ExecuteOrderedGroupsAsync(
+                [[GovernanceSettingKeys.Email.DeliveryEnabled]],
+                outerToken => unitOfWork.ExecuteInTransactionAsync(token =>
+                    repository.CreateGraphAsync(CreateIntent(scenario, occurrence.Id, "fanout:second"), token), outerToken)));
     }
 
     [Test]
@@ -708,14 +714,19 @@ public sealed class NotificationFanoutOccurrenceRepositoryTests(PostgreSqlContai
 
         await using (var heavyContext = fixture.CreateDbContext())
         {
+            var unitOfWork = new EfCoreUnitOfWork(heavyContext);
+            var mutationLock = new RelationalSettingMutationLock(heavyContext, unitOfWork);
             var coordinator = new NotificationFanoutOccurrenceCoordinator(
                 new NotificationFanoutOccurrenceRepository(heavyContext),
                 new NotificationFanoutEmailSuppressionRepository(heavyContext),
                 new OutboxRepository(heavyContext),
-                new NotificationFanoutRecipientTemplateFactory());
-            var unitOfWork = new EfCoreUnitOfWork(heavyContext);
+                new NotificationFanoutRecipientTemplateFactory(),
+                new EmailDispatchOutboxRepository(heavyContext),
+                mutationLock);
             DateTime heavyAt = DateTime.UtcNow;
-            await unitOfWork.ExecuteInTransactionAsync(token => coordinator.CoordinateInCurrentTransactionAsync(
+            await mutationLock.ExecuteOrderedGroupsAsync(
+                [[GovernanceSettingKeys.Email.DeliveryEnabled]],
+                outerToken => unitOfWork.ExecuteInTransactionAsync(token => coordinator.CoordinateInCurrentTransactionAsync(
                 new NotificationFanoutOccurrenceCandidate(
                     Guid.CreateVersion7(),
                     Guid.CreateVersion7(),
@@ -735,7 +746,7 @@ public sealed class NotificationFanoutOccurrenceRepositoryTests(PostgreSqlContai
                     RequestedNotBefore: heavyAt,
                     SourceType: "event_moderation_record",
                     SourceId: Guid.CreateVersion7()),
-                token));
+                token), outerToken));
         }
 
         await using var verificationContext = fixture.CreateDbContext();
@@ -807,15 +818,20 @@ public sealed class NotificationFanoutOccurrenceRepositoryTests(PostgreSqlContai
             NotificationFanoutOccurrenceCandidate candidate)
         {
             await using var context = fixture.CreateDbContext();
+            var unitOfWork = new EfCoreUnitOfWork(context);
+            var mutationLock = new RelationalSettingMutationLock(context, unitOfWork);
             var coordinator = new NotificationFanoutOccurrenceCoordinator(
                 new NotificationFanoutOccurrenceRepository(context),
                 new NotificationFanoutEmailSuppressionRepository(context),
                 new OutboxRepository(context),
-                new NotificationFanoutRecipientTemplateFactory());
-            var unitOfWork = new EfCoreUnitOfWork(context);
+                new NotificationFanoutRecipientTemplateFactory(),
+                new EmailDispatchOutboxRepository(context),
+                mutationLock);
             await release.Task;
-            return await unitOfWork.ExecuteInTransactionAsync(token =>
-                coordinator.CoordinateInCurrentTransactionAsync(candidate, token));
+            return await mutationLock.ExecuteOrderedGroupsAsync(
+                [[GovernanceSettingKeys.Email.DeliveryEnabled]],
+                outerToken => unitOfWork.ExecuteInTransactionAsync(token =>
+                    coordinator.CoordinateInCurrentTransactionAsync(candidate, token), outerToken));
         }
 
         Task<NotificationFanoutOccurrenceCoordinationResult> firstTask = CoordinateAsync(first);
@@ -867,17 +883,22 @@ public sealed class NotificationFanoutOccurrenceRepositoryTests(PostgreSqlContai
         async Task<Exception?> TryCoordinateAsync(NotificationFanoutOccurrenceCandidate candidate)
         {
             await using var context = fixture.CreateDbContext();
+            var unitOfWork = new EfCoreUnitOfWork(context);
+            var mutationLock = new RelationalSettingMutationLock(context, unitOfWork);
             var coordinator = new NotificationFanoutOccurrenceCoordinator(
                 new NotificationFanoutOccurrenceRepository(context),
                 new NotificationFanoutEmailSuppressionRepository(context),
                 new OutboxRepository(context),
-                new NotificationFanoutRecipientTemplateFactory());
-            var unitOfWork = new EfCoreUnitOfWork(context);
+                new NotificationFanoutRecipientTemplateFactory(),
+                new EmailDispatchOutboxRepository(context),
+                mutationLock);
             await release.Task;
             try
             {
-                await unitOfWork.ExecuteInTransactionAsync(token =>
-                    coordinator.CoordinateInCurrentTransactionAsync(candidate, token));
+                await mutationLock.ExecuteOrderedGroupsAsync(
+                    [[GovernanceSettingKeys.Email.DeliveryEnabled]],
+                    outerToken => unitOfWork.ExecuteInTransactionAsync(token =>
+                        coordinator.CoordinateInCurrentTransactionAsync(candidate, token), outerToken));
                 return null;
             }
             catch (Exception exception)
@@ -923,27 +944,37 @@ public sealed class NotificationFanoutOccurrenceRepositoryTests(PostgreSqlContai
 
         await using (var firstContext = fixture.CreateDbContext())
         {
+            var firstUnitOfWork = new EfCoreUnitOfWork(firstContext);
+            var firstMutationLock = new RelationalSettingMutationLock(firstContext, firstUnitOfWork);
             var firstCoordinator = new NotificationFanoutOccurrenceCoordinator(
                 new NotificationFanoutOccurrenceRepository(firstContext),
                 new NotificationFanoutEmailSuppressionRepository(firstContext),
                 new OutboxRepository(firstContext),
-                new NotificationFanoutRecipientTemplateFactory());
-            var firstUnitOfWork = new EfCoreUnitOfWork(firstContext);
-            NotificationFanoutOccurrenceCoordinationResult first = await firstUnitOfWork.ExecuteInTransactionAsync(
-                token => firstCoordinator.CoordinateInCurrentTransactionAsync(candidate, token));
+                new NotificationFanoutRecipientTemplateFactory(),
+                new EmailDispatchOutboxRepository(firstContext),
+                firstMutationLock);
+            NotificationFanoutOccurrenceCoordinationResult first = await firstMutationLock.ExecuteOrderedGroupsAsync(
+                [[GovernanceSettingKeys.Email.DeliveryEnabled]],
+                outerToken => firstUnitOfWork.ExecuteInTransactionAsync(
+                    token => firstCoordinator.CoordinateInCurrentTransactionAsync(candidate, token), outerToken));
             await Assert.That(first.Outcome).IsEqualTo(NotificationFanoutOccurrenceCoordinationOutcome.NewlyActive);
             await Assert.That(first.Occurrence.OccurredAt.Ticks % TimeSpan.TicksPerMicrosecond).IsEqualTo(0);
         }
 
         await using var replayContext = fixture.CreateDbContext();
+        var replayUnitOfWork = new EfCoreUnitOfWork(replayContext);
+        var replayMutationLock = new RelationalSettingMutationLock(replayContext, replayUnitOfWork);
         var replayCoordinator = new NotificationFanoutOccurrenceCoordinator(
             new NotificationFanoutOccurrenceRepository(replayContext),
             new NotificationFanoutEmailSuppressionRepository(replayContext),
             new OutboxRepository(replayContext),
-            new NotificationFanoutRecipientTemplateFactory());
-        var replayUnitOfWork = new EfCoreUnitOfWork(replayContext);
-        NotificationFanoutOccurrenceCoordinationResult replay = await replayUnitOfWork.ExecuteInTransactionAsync(
-            token => replayCoordinator.CoordinateInCurrentTransactionAsync(candidate, token));
+            new NotificationFanoutRecipientTemplateFactory(),
+            new EmailDispatchOutboxRepository(replayContext),
+            replayMutationLock);
+        NotificationFanoutOccurrenceCoordinationResult replay = await replayMutationLock.ExecuteOrderedGroupsAsync(
+            [[GovernanceSettingKeys.Email.DeliveryEnabled]],
+            outerToken => replayUnitOfWork.ExecuteInTransactionAsync(
+                token => replayCoordinator.CoordinateInCurrentTransactionAsync(candidate, token), outerToken));
         int persistedCount = await replayContext.NotificationFanoutOccurrences.CountAsync(value =>
             value.TenantId == candidate.TenantId
             && value.SourceType == candidate.SourceType
@@ -1023,7 +1054,8 @@ public sealed class NotificationFanoutOccurrenceRepositoryTests(PostgreSqlContai
             candidate.SessionId.HasValue
                 ? $"event:{candidate.EventId:N}:session:{candidate.SessionId.Value:N}"
                 : $"event:{candidate.EventId:N}",
-            notBefore);
+            notBefore,
+            emailDeliveryPolicyRevision: 0);
     }
 
     private static NotificationFanoutOccurrenceCandidate WithSessionScope(
@@ -1141,7 +1173,8 @@ public sealed class NotificationFanoutOccurrenceRepositoryTests(PostgreSqlContai
             "event.session.updated", 1,
             (int)NotificationDeliveryPolicyEnum.CriticalEventUpdateOptional, 1,
             30, occurredAt.AddMinutes(5), "event", sourceId ?? eventId,
-            $"event:{eventId:N}:schedule", occurredAt.AddMinutes(5));
+            $"event:{eventId:N}:schedule", occurredAt.AddMinutes(5),
+            emailDeliveryPolicyRevision: 0);
     }
 
     private static async Task<SuppressionGraph> CreateSuppressionGraphAsync(
@@ -1365,7 +1398,8 @@ public sealed class NotificationFanoutOccurrenceRepositoryTests(PostgreSqlContai
         new(
             context,
             new NotificationDeliveryPolicyResolver(),
-            new NotificationPreferenceResolver(context));
+            new NotificationPreferenceResolver(context),
+            new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
 
     private static DateTime AtPostgresPrecision(DateTime value) =>
         new(value.Ticks - value.Ticks % TimeSpan.TicksPerMicrosecond, DateTimeKind.Utc);

@@ -9,6 +9,7 @@ using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Application.Services.Lifecycle;
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Services.Lifecycle;
 using Explore.Domain.Services.Scheduling;
@@ -29,7 +30,8 @@ public sealed class ScheduleEventSessionCommandHandler(
     HybridCache cache,
     NotificationFanoutOccurrenceCoordinator fanoutCoordinator,
     IEventLifecycleScheduler eventLifecycleScheduler,
-    TimeProvider timeProvider) : IRequestHandler<ScheduleEventSessionCommand, BaseCommandResponse<Guid>>
+    TimeProvider timeProvider,
+    ISettingMutationLock mutationLock) : IRequestHandler<ScheduleEventSessionCommand, BaseCommandResponse<Guid>>
 {
     private const string ConcurrencyConflictCode = "event_session_schedule_concurrency_conflict";
     private const string ReadinessFailedCode = "event_session_schedule_readiness_failed";
@@ -84,7 +86,9 @@ public sealed class ScheduleEventSessionCommandHandler(
 
         try
         {
-            commandResult = await unitOfWork.ExecuteSerializableAsync(async token =>
+            commandResult = await mutationLock.ExecuteOrderedGroupsAsync(
+                [[GovernanceSettingKeys.Email.DeliveryEnabled]],
+                policyToken => unitOfWork.ExecuteSerializableAsync(async token =>
             {
                 EventSession? session = await eventSessionRepository.GetById(command.Id);
                 if (session is null)
@@ -242,7 +246,7 @@ public sealed class ScheduleEventSessionCommandHandler(
                     Success(session.Id, "Event session scheduled successfully."),
                     parentEvent.Id,
                     parentEvent.TenantId);
-            }, cancellationToken);
+            }, policyToken), cancellationToken);
         }
         catch (RoomScheduleConflictException ex)
         {

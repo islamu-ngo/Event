@@ -4,6 +4,7 @@ using System.Text;
 using Explore.Application.Configuration;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.LocationPrivacy;
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;
@@ -120,21 +121,23 @@ public static class PersistenceServicesRegistration
             ?? new LocalIdentityOptions();
         IdentityBuilder identityBuilder = services.AddIdentityCore<LocalIdentityUser>(options =>
             {
-                options.User.RequireUniqueEmail = true;
+                options.User.RequireUniqueEmail = false;
                 options.Lockout.AllowedForNewUsers = true;
                 options.Lockout.MaxFailedAccessAttempts = localIdentityOptions.LockoutThreshold;
                 options.Lockout.DefaultLockoutTimeSpan =
                     TimeSpan.FromMinutes(localIdentityOptions.LockoutDurationMinutes);
-                options.Password.RequiredLength = 12;
+                options.Password.RequiredLength = LocalIdentityOptions.MinimumPasswordLength;
                 options.Password.RequiredUniqueChars = 1;
                 options.Password.RequireDigit = false;
                 options.Password.RequireLowercase = false;
                 options.Password.RequireNonAlphanumeric = false;
                 options.Password.RequireUppercase = false;
             })
-            .AddRoles<LocalIdentityRole>();
+            .AddRoles<LocalIdentityRole>()
+            .AddUserValidator<OptionalEmailLocalIdentityUserValidator>();
 
-        if (IdentityDatabaseConfiguration.GetTopology(configuration) == IdentityDatabaseTopology.External)
+        IdentityDatabaseTopology identityTopology = IdentityDatabaseConfiguration.GetTopology(configuration);
+        if (identityTopology == IdentityDatabaseTopology.External)
         {
             services.AddDbContext<ExternalIdentityDbContext>(options =>
                 IdentityDatabaseProviderComposition.Configure(
@@ -147,12 +150,42 @@ public static class PersistenceServicesRegistration
         {
             identityBuilder.AddEntityFrameworkStores<ExploreDbContext>();
         }
-        identityBuilder.AddDefaultTokenProviders();
+        identityBuilder.AddDefaultTokenProviders().AddLocalLifecycleTokenProviders();
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        services.AddScoped(serviceProvider =>
+        {
+            DbContext identityDbContext = identityTopology == IdentityDatabaseTopology.External
+                ? serviceProvider.GetRequiredService<ExternalIdentityDbContext>()
+                : serviceProvider.GetRequiredService<ExploreDbContext>();
+            return new LocalIdentityCredentialStateStore(
+                identityDbContext: identityDbContext,
+                applicationDbContext: serviceProvider.GetRequiredService<ExploreDbContext>(),
+                userManager: serviceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(),
+                timeProvider: serviceProvider.GetRequiredService<TimeProvider>());
+        });
+        services.AddScoped<ILocalIdentityLifecycleStore>(serviceProvider => new LocalIdentityLifecycleStore(
+            identityDbContext: identityTopology == IdentityDatabaseTopology.External
+                ? serviceProvider.GetRequiredService<ExternalIdentityDbContext>()
+                : serviceProvider.GetRequiredService<ExploreDbContext>(),
+            applicationDbContext: serviceProvider.GetRequiredService<ExploreDbContext>(),
+            userManager: serviceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(),
+            timeProvider: serviceProvider.GetRequiredService<TimeProvider>(),
+            credentialStates: serviceProvider.GetRequiredService<LocalIdentityCredentialStateStore>()));
+        services.AddScoped<ILocalIdentityLifecycleDeliveryStore>(serviceProvider => new LocalIdentityLifecycleDeliveryStore(
+            identityDbContext: identityTopology == IdentityDatabaseTopology.External
+                ? serviceProvider.GetRequiredService<ExternalIdentityDbContext>()
+                : serviceProvider.GetRequiredService<ExploreDbContext>(),
+            applicationDbContext: serviceProvider.GetRequiredService<ExploreDbContext>(),
+            credentialStates: serviceProvider.GetRequiredService<LocalIdentityCredentialStateStore>(),
+            timeProvider: serviceProvider.GetRequiredService<TimeProvider>()));
         services.AddScoped<ILocalIdentityAuthService, LocalIdentityAuthService>();
+        services.AddScoped<ILocalCredentialAdministration>(serviceProvider =>
+            serviceProvider.GetRequiredService<LocalIdentityCredentialStateStore>());
 
         // Unit of Work (wraps EF Core transactions)
         services.AddScoped<IUnitOfWork, EfCoreUnitOfWork>();
+        services.AddScoped<Explore.Application.Contracts.Services.Registration.IAnonymousRegistrationChallengeQuota,
+            AnonymousRegistrationChallengeQuota>();
         services.AddScoped<ISettingMutationLock, RelationalSettingMutationLock>();
         services.AddScoped<ICoordinatedSettingMutationStore, CoordinatedSettingMutationRepository>();
         services.AddScoped<IAtprotoSessionRefreshLock, RelationalAtprotoSessionRefreshLock>();
@@ -261,6 +294,7 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IParticipationRequirementAttachmentRepository, ParticipationRequirementAttachmentRepository>();
         services.AddScoped<IEventTicketCatalogRepository, EventTicketCatalogRepository>();
         services.AddScoped<IRegistrationInventoryRepository, RegistrationInventoryRepository>();
+        services.AddScoped<IGuestRegistrationCapabilityRepository, GuestRegistrationCapabilityRepository>();
         services.AddScoped<IEventAddOnRepository, EventAddOnRepository>();
         services.AddScoped<TicketingRecoveryRepository>();
         services.AddScoped<
@@ -305,6 +339,7 @@ public static class PersistenceServicesRegistration
         services.AddScoped<AdmissionScannerCapabilityRepository>();
         services.AddScoped<IAdmissionScannerCapabilityRepository>(provider =>
             provider.GetRequiredService<AdmissionScannerCapabilityRepository>());
+        services.AddScoped<IAnonymousCancellationRepository, AnonymousCancellationRepository>();
         services.AddScoped<AdmissionRevocationRepository>();
         services.AddScoped<IAdmissionRevocationRepository>(provider =>
             provider.GetRequiredService<AdmissionRevocationRepository>());
@@ -544,6 +579,9 @@ public static class PersistenceServicesRegistration
         services.AddScoped<IConfigurationManifestEffectOutboxRepository, OutboxRepository>();
         services.AddScoped<IEmailDispatchOutboxRepository, EmailDispatchOutboxRepository>();
         services.AddScoped<IEmailDispatchEligibilityEvaluator, EmailDispatchEligibilityEvaluator>();
+        services.AddScoped<IEmailDeliveryDisableImpactReader, EmailDeliveryDisableImpactReader>();
+        services.AddScoped<IEmailDeliverySettingsWriter, EmailDeliverySettingsWriter>();
+        services.AddScoped<IVisitorAccessSettingsWriter, VisitorAccessSettingsWriter>();
         services.AddScoped<IWebPushDispatchOutboxRepository, WebPushDispatchOutboxRepository>();
         services.AddScoped<IIntegrationSyncOutboxRepository, IntegrationSyncOutboxRepository>();
         services.AddScoped<IQueueDrainHealthRepository, QueueDrainHealthRepository>();

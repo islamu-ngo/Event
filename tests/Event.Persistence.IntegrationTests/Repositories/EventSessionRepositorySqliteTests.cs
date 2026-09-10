@@ -41,6 +41,32 @@ public sealed class EventSessionRepositorySqliteTests
     }
 
     [Test]
+    public async Task GetPublicSessionsByEvent_OnSqlite_OrdersByAbsoluteStartTime()
+    {
+        await using SqliteConnection connection = new("Data Source=:memory:");
+        await connection.OpenAsync();
+        Guid tenantId = Guid.CreateVersion7();
+        await using ExploreDbContext context = CreateContext(connection, tenantId);
+        await context.Database.EnsureCreatedAsync();
+        await LookupTableSeeder.SeedAsync(context);
+        DomainEvent @event = await SeedEventAsync(context, tenantId, EventStatusEnum.Published);
+        DateTimeOffset earlier = new(2026, 8, 15, 10, 0, 0, TimeSpan.FromHours(2));
+        DateTimeOffset later = new(2026, 8, 15, 9, 0, 0, TimeSpan.Zero);
+        var laterSession = CreateSession(@event, "Later instant", later);
+        var earlierSession = CreateSession(@event, "Earlier instant", earlier);
+        context.EventSessions.AddRange(laterSession, earlierSession);
+        await context.SaveChangesAsync();
+
+        var sessions = await new EventSessionRepository(context)
+            .GetPublicSessionsByEventAsync(@event.Id, CancellationToken.None);
+
+        await Assert.That(sessions.Select(session => session.Id))
+            .IsEquivalentTo([earlierSession.Id, laterSession.Id]);
+        await Assert.That(sessions[0].Id).IsEqualTo(earlierSession.Id);
+        await Assert.That(sessions[1].Id).IsEqualTo(laterSession.Id);
+    }
+
+    [Test]
     public async Task MoveToEventAsync_OnPrefixedSqlite_UsesMappedSessionTable()
     {
         await using SqliteConnection connection = new("Data Source=:memory:");
@@ -228,12 +254,13 @@ public sealed class EventSessionRepositorySqliteTests
             CurrentUserService = new FixedCurrentUser()
         };
 
-    private static async Task<DomainEvent> SeedEventAsync(ExploreDbContext context, Guid tenantId)
+    private static async Task<DomainEvent> SeedEventAsync(
+        ExploreDbContext context, Guid tenantId, EventStatusEnum status = EventStatusEnum.Draft)
     {
         var tenant = new Tenant { Id = tenantId, FullName = "Session SQLite Tenant", Slug = $"session-sqlite-{Guid.NewGuid():N}", TenantStatusId = (int)TenantStatusEnum.Active, TenantStatus = null! };
         var user = new User { Id = Guid.CreateVersion7(), Pii = new UserPii { Email = $"session-sqlite-{Guid.NewGuid():N}@example.test", FirstName = "Session", LastName = "Owner" } };
         var actor = new Actor { Id = Guid.CreateVersion7(), Pii = new ActorPii { DisplayName = "Session SQLite Actor" }, ActorTypeId = (int)ActorTypeEnum.User, ActorType = null!, UserId = user.Id };
-        var @event = new DomainEvent(EventStatusEnum.Draft)
+        var @event = new DomainEvent(status)
         {
             Id = Guid.CreateVersion7(),
             TenantId = tenantId,
@@ -255,6 +282,18 @@ public sealed class EventSessionRepositorySqliteTests
             ConcurrencyStamp = Guid.CreateVersion7()
         };
         context.AddRange(tenant, user, actor, @event);
+        if (status == EventStatusEnum.Published)
+        {
+            context.TenantUsers.Add(new TenantUser
+            {
+                TenantId = tenantId,
+                Tenant = null!,
+                UserId = user.Id,
+                User = null!,
+                ActorId = actor.Id,
+                StatusId = (int)TenantUserStatusEnum.Active
+            });
+        }
         await context.SaveChangesAsync();
         return @event;
     }

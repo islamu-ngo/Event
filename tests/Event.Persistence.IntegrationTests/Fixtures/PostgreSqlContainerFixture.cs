@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Data.Common;
+using System.Security.Cryptography;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Persistence;
 using Explore.Persistence.Database;
@@ -38,7 +39,7 @@ public class PostgreSqlContainerFixture : IAsyncInitializer, IAsyncDisposable
             .WithImage("postgres:18-alpine")
             .WithDatabase("explore_db_test")
             .WithUsername("postgres")
-            .WithPassword("postgres")
+            .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(24)))
             .Build();
     }
 

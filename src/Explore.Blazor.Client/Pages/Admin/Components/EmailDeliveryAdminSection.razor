@@ -1,0 +1,209 @@
+
+@using Explore.Blazor.Client.Services
+@using Explore.Blazor.Client.Contracts.Services.Accessibility
+@implements IDisposable
+@inject IEmailDeliveryAdminService DeliveryService
+@inject IAccessibilityFocusService Focus
+@inject TimeProvider Clock
+@inject ILogger<EmailDeliveryAdminSection> Logger
+
+<section aria-labelledby="@(_id + "-heading")" aria-busy="@_busy.ToString().ToLowerInvariant()">
+    <MudText Typo="Typo.h6" HtmlTag="h2" id="@(_id + "-heading")">Email delivery</MudText>
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" role="alert">@_error</MudAlert>
+    }
+    <MudText role="status" aria-live="polite" aria-atomic="true">
+        @(_busy ? "Updating email delivery status..." : _enabled is null ? "Email delivery status unavailable." : _enabled == true ? "Email delivery enabled." : "Email delivery disabled.")
+    </MudText>
+    @if (_locked)
+    {
+        <MudAlert Severity="Severity.Info">Email delivery is locked by platform policy. The lock is not changed by this section.</MudAlert>
+    }
+    <MudStack Row="true" Spacing="2" Class="my-3">
+        <MudButton id="@(_id + "-refresh")" Variant="Variant.Outlined" OnClick="RefreshAsync" Disabled="_busy">Refresh status</MudButton>
+        @if (CanEnable)
+        {
+            <MudButton data-action="enable-delivery" Variant="Variant.Filled" Color="Color.Primary" OnClick="EnableAsync" Disabled="_busy">Enable email delivery</MudButton>
+        }
+        @if (CanPreview)
+        {
+            <MudButton data-action="preview-disable" Variant="Variant.Outlined" Color="Color.Warning" OnClick="PreviewAsync" Disabled="_busy">Review disable impact</MudButton>
+        }
+    </MudStack>
+    @if (_preview is { } preview)
+    {
+        <div class="email-delivery-confirmation">
+            <dl>
+                <dt>Affected scopes</dt><dd><output data-field="affected-count">@preview.AffectedScopes?.Count</output></dd>
+                <dt>Policy revision</dt><dd><output data-field="revision">@preview.ExpectedRevision</output></dd>
+                <dt>Confirmation expires (UTC)</dt><dd><time datetime="@preview.ExpiresAtUtc?.ToString("O")">@preview.ExpiresAtUtc?.ToString("u")</time></dd>
+            </dl>
+            <MudText id="@(_id + "-impact")">Disabling delivery stops future email handoffs. An already admitted send may finish. External credentials and tenant locks are unchanged.</MudText>
+            @if (EmailDeliveryAdminService.CanConfirm(preview, Clock.GetUtcNow()))
+            {
+                <MudTextField T="string" InputId="@(_id + "-ack")" Label="Type DISABLE EMAIL DELIVERY to confirm"
+                              Value="_acknowledgement" ValueChanged="AcknowledgementChanged" Immediate="true"
+                              Variant="Variant.Outlined" Disabled="_busy" aria-describedby="@(_id + "-impact")" />
+                <MudButton data-action="confirm-disable" Variant="Variant.Filled" Color="Color.Error"
+                           OnClick="DisableAsync" Disabled="@(_busy || _acknowledgement != EmailDeliveryAdminService.Acknowledgement)">Disable email delivery</MudButton>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Warning">This preview cannot authorize disabling delivery. Refresh status and request a new preview.</MudAlert>
+            }
+            <MudButton data-action="cancel-disable" OnClick="CancelPreview" Disabled="_busy">Cancel</MudButton>
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter] public bool InstanceScope { get; set; }
+    [Parameter] public EventCallback Changed { get; set; }
+
+    private readonly string _id = "email-delivery-" + Guid.NewGuid().ToString("N");
+    private readonly CancellationTokenSource _lifetime = new();
+    private HalResourceOfEmailDeliveryDisablePreviewDto? _preview;
+    private IDictionary<string, HalLink>? _links;
+    private bool? _enabled;
+    private bool _locked;
+    private bool _busy;
+    private bool? _loadedScope;
+    private Guid? _tenantId;
+    private bool _reloadPending;
+    private string _acknowledgement = string.Empty;
+    private string? _error;
+    private string? _focusTarget;
+
+    private bool CanPreview => EmailDeliveryAdminService.HasAction(_links, "disable-preview", "POST");
+    private bool CanEnable => _enabled == false && EmailDeliveryAdminService.HasAction(_links,
+        InstanceScope ? "edit" : "enable", InstanceScope ? "PATCH" : "PUT");
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedScope == InstanceScope) return;
+        _loadedScope = InstanceScope;
+        if (_busy)
+        {
+            _reloadPending = true;
+            ClearPreview();
+            _links = null;
+            _enabled = null;
+            return;
+        }
+        await RefreshAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusTarget is not { } target) return;
+        _focusTarget = null;
+        await Focus.FocusByIdAsync(target);
+    }
+
+    private async Task LoadAsync()
+    {
+        _links = null;
+        _enabled = null;
+        _locked = false;
+        _tenantId = null;
+        if (InstanceScope)
+        {
+            var settings = await DeliveryService.GetInstanceAsync(_lifetime.Token);
+            _enabled = settings.DeliveryEnabled;
+            _links = settings._links;
+        }
+        else
+        {
+            var settings = await DeliveryService.GetTenantAsync(_lifetime.Token);
+            _tenantId = settings.TenantId;
+            var enabled = settings.Settings.SingleOrDefault(s => s.Key == EmailDeliveryAdminService.DeliveryEnabledKey);
+            _enabled = bool.TryParse(enabled?.Value, out bool value) ? value : null;
+            _locked = enabled?.IsLocked == true;
+            _links = settings._links;
+        }
+    }
+
+    private Task RefreshAsync() => ExecuteAsync(LoadAsync);
+
+    private Task PreviewAsync() => ExecuteAsync(async () =>
+    {
+        var preview = await DeliveryService.PreviewAsync(InstanceScope, _links, _lifetime.Token);
+        if (InstanceScope != (preview.TenantId is null) || preview.TenantId != _tenantId)
+            throw new InvalidOperationException("The preview scope changed.");
+        _preview = preview;
+        if (EmailDeliveryAdminService.CanConfirm(preview, Clock.GetUtcNow())) _focusTarget = _id + "-ack";
+    });
+
+    private Task EnableAsync() => ExecuteAsync(async () =>
+    {
+        EnsureSuccess(await DeliveryService.EnableAsync(InstanceScope, _links, _lifetime.Token));
+        await LoadAsync();
+        await Changed.InvokeAsync();
+        _focusTarget = _id + "-refresh";
+    });
+
+    private async Task DisableAsync()
+    {
+        if (_busy || _preview is not { } preview) return;
+        string acknowledgement = _acknowledgement;
+        await ExecuteAsync(async () =>
+        {
+            EnsureSuccess(await DeliveryService.DisableAsync(InstanceScope, preview, acknowledgement, _lifetime.Token));
+            await LoadAsync();
+            await Changed.InvokeAsync();
+        });
+        _focusTarget = _id + "-refresh";
+    }
+
+    private async Task ExecuteAsync(Func<Task> action)
+    {
+        if (_busy) return;
+        _busy = true;
+        ClearPreview();
+        _error = null;
+        try { await action(); }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            ClearPreview();
+            _links = null;
+            _enabled = null;
+            Logger.LogWarning("Email delivery administration failed. FailureType={FailureType}", exception.GetType().Name);
+            _error = exception is ApiException { StatusCode: 409 }
+                ? "Email delivery policy changed. Refresh status and review a new disable preview."
+                : "Email delivery action could not be confirmed. Refresh status before trying again.";
+        }
+        finally
+        {
+            _busy = false;
+            if (_reloadPending && !_lifetime.IsCancellationRequested)
+            {
+                _reloadPending = false;
+                await RefreshAsync();
+            }
+        }
+    }
+
+    private void AcknowledgementChanged(string value) => _acknowledgement = value;
+    private void CancelPreview()
+    {
+        ClearPreview();
+        _focusTarget = _id + "-refresh";
+    }
+    private void ClearPreview()
+    {
+        _preview = null;
+        _acknowledgement = string.Empty;
+    }
+    private static void EnsureSuccess(BaseCommandResponseOfGuid response)
+    {
+        if (response.Success != true) throw new InvalidOperationException("Email delivery update was not confirmed.");
+    }
+    public void Dispose()
+    {
+        _lifetime.Cancel();
+        _lifetime.Dispose();
+        ClearPreview();
+    }
+}

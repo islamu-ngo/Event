@@ -1,7 +1,10 @@
 namespace Explore.Application.DTOs.ManagedProviderProvisioning;
 
+using System.Text.Json.Serialization;
+using Explore.Application.DTOs.Management;
 using Explore.Application.DTOs.TenantSettings;
 
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record ManagedProviderClientProvisioningDto
 {
     public required string ProviderKey { get; init; }
@@ -11,6 +14,7 @@ public sealed record ManagedProviderClientProvisioningDto
     public required string TenantSlug { get; init; }
     public bool ActivateTenant { get; init; } = true;
     public TenantDirectoryOperatorIdentityInputDto? DirectoryOperatorIdentity { get; init; }
-    public required ManagedProviderExternalAdminDto ExternalAdmin { get; init; }
+    public ManagedProviderExternalAdminDto? ExternalAdmin { get; init; }
+    public ManagementTenantLocalIdentityDto? LocalIdentity { get; init; }
     public ManagedProviderOrganizerDto? Organizer { get; init; }
 }

@@ -54,7 +54,7 @@ public sealed class ExternalApiPhase0IntegrationTests
     public async Task SecureProbe_WithApiKey_DerivesTenantFromKey()
     {
         var tenantId = Guid.NewGuid();
-        const string rawApiKey = "phase0-live-key";
+        var rawApiKey = ApiKeyHashing.CreateSecret();
 
         await using var factory = new ExternalApiPhase0WebApplicationFactory
         {
@@ -94,7 +94,7 @@ public sealed class ExternalApiPhase0IntegrationTests
         var tenantId = Guid.NewGuid();
         var ownerId = Guid.NewGuid();
         const string keyId = "persisted-alpha";
-        const string secret = "persisted-live-secret";
+        var secret = ApiKeyHashing.CreateSecret();
         var rawApiKey = ApiKeyHashing.FormatPersistedApiKey(keyId, secret);
 
         await using var factory = new ExternalApiPhase0WebApplicationFactory
@@ -135,7 +135,7 @@ public sealed class ExternalApiPhase0IntegrationTests
         var tenantId = Guid.NewGuid();
         var ownerId = Guid.NewGuid();
         const string keyId = "persisted-usage";
-        const string secret = "persisted-usage-secret";
+        var secret = ApiKeyHashing.CreateSecret();
         var rawApiKey = ApiKeyHashing.FormatPersistedApiKey(keyId, secret);
 
         await using var factory = new ExternalApiPhase0WebApplicationFactory
@@ -175,9 +175,9 @@ public sealed class ExternalApiPhase0IntegrationTests
     {
         var tenantId = Guid.NewGuid();
         const string firstKeyId = "persisted-rate-limit-a";
-        const string firstSecret = "persisted-rate-limit-a-secret";
+        var firstSecret = ApiKeyHashing.CreateSecret();
         const string secondKeyId = "persisted-rate-limit-b";
-        const string secondSecret = "persisted-rate-limit-b-secret";
+        var secondSecret = ApiKeyHashing.CreateSecret();
         var firstRawApiKey = ApiKeyHashing.FormatPersistedApiKey(firstKeyId, firstSecret);
         var secondRawApiKey = ApiKeyHashing.FormatPersistedApiKey(secondKeyId, secondSecret);
 
@@ -394,7 +394,7 @@ public sealed class ExternalApiPhase0IntegrationTests
     {
         var userId = Guid.NewGuid();
         var tenantId = Guid.NewGuid();
-        const string rawApiKey = "phase0-mixed-key";
+        var rawApiKey = ApiKeyHashing.CreateSecret();
 
         await using var factory = new ExternalApiPhase0WebApplicationFactory
         {

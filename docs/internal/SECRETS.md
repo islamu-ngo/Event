@@ -10,15 +10,26 @@ authority stops required startup work and never falls back to another source.
 
 ## Instance Onboarding Keys
 
-The seven `INSTANCE_BOOTSTRAP_*` keys follow the same single-authority rule as
+The eight `INSTANCE_BOOTSTRAP_*` keys follow the same single-authority rule as
 every other value here. They come from the deployment environment or from the
 one selected secret authority, never from source defaults, appsettings
 fallbacks, or a second provider. A missing or unreadable key fails startup
 closed.
 
-They select an administrator; they don't authenticate one. The subject, DID,
-issuer pairing, and generation are selectors only. Actual privilege is granted
-only after a real sign-in presents the exact provider claim.
+The subject, DID, issuer pairing and generation are selectors, not authentication
+proof. External identities still require a real sign-in with the exact provider
+claim. Configured Local bootstrap additionally resolves
+`authentication.local.bootstrap_password` from
+`INSTANCE_BOOTSTRAP_LOCAL_PASSWORD` (Infisical `/api`); it is instance-only,
+bootstrap-classified and has no live-rotation path or source default.
+
+That secret creates only the initial temporary credential during incomplete
+setup. The native receipt coordinates Identity creation with application
+linkage, administrator grants and setup completion. Private first-use
+replacement and a fresh login are required before ordinary session authority.
+Completed-state reconciliation does not reread or replay leftover bootstrap
+passwords; use normal credential administration rather than editing this secret
+to reset an established account.
 
 Diagnostics stay value-free. Logs, health output, and support evidence carry
 status and reason codes, never the configured subject, DID, email, profile
@@ -162,6 +173,20 @@ Infisical mode requires URL, project, client ID, client secret, and environment.
 Runtime and migrator processes receive only their role-specific database credentials.
 The checked-in Compose topology is single-replica; a multi-replica split deployment
 must additionally set `Hosting:ReplicaCount` and provide one shared `SETUP_SECRET`.
+
+### SMTP Transport Ownership
+
+Delivery requires explicit `email.delivery_enabled=true` governance; SMTP credentials
+do not enable it. Disabled transports resolve no credentials. Instance-hosted SMTP uses
+instance bindings; tenant-owned hosts use exact tenant bindings through the existing
+binding repository and `ResolveTenantBindingAsync`, never the tenant-to-instance fallback.
+The materialized credential scope is checked again before constructing the transport.
+Username and password must either both be absent (anonymous SMTP) or both be present.
+Authority failures yield degraded capability and do not permit anonymous fallback.
+
+Only bounded state, enabled intent, and ownership scope enter `EmailDeliveryCapability`.
+No extra SMTP credential cache sits above the selected secret authority. The shared
+resolver's documented freshness and coordinated-restart requirements below still apply.
 
 ### Runtime resolution outcomes and bounded freshness
 

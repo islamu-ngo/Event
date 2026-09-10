@@ -350,7 +350,8 @@ public sealed record ConfigurationManifestLegalDocumentV1Alpha2
     public string? ChangeSummary { get; init; }
 
     public ConfigurationManifestLegalTemplateProvenanceV1Alpha2?
-        TemplateProvenance { get; init; }
+        TemplateProvenance
+    { get; init; }
 
     [JsonRequired]
     public IReadOnlyList<string> JurisdictionAssumptions

@@ -27,13 +27,13 @@ public sealed class AdmissionRecoveryDeliveryIntentConfiguration :
         builder.Property(value => value.ConcurrencyStamp).IsConcurrencyToken();
         builder.HasAlternateKey(value => new { value.TenantId, value.Id });
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.RecoveryRequestId,
-                value.AdmissionTicketId,
-                value.Purpose,
-                value.CapabilityVersion
-            })
+        {
+            value.TenantId,
+            value.RecoveryRequestId,
+            value.AdmissionTicketId,
+            value.Purpose,
+            value.CapabilityVersion
+        })
             .IsUnique();
         builder.HasIndex(value => new { value.HandoffCompletedAt, value.RoutedAt, value.CreatedAt });
         builder.HasOne<Tenant>().WithMany()

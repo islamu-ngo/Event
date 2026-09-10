@@ -1,11 +1,16 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Domain.Services.Registration;
 
 namespace Explore.Application.Services.Registration;
 
 public interface IRegistrationOrderTransitionCoordinator
 {
+    Task<bool> PersistAnonymousCancellationAsync(
+        RegistrationOrder order, AnonymousCancellationEvidence evidence, DateTime timestamp,
+        CancellationToken cancellationToken);
+
     Task<bool> PersistAsync(
         Guid orderId,
         Guid tenantId,
@@ -18,6 +23,19 @@ public interface IRegistrationOrderTransitionCoordinator
 public sealed class RegistrationOrderTransitionCoordinator(IRegistrationInventoryRepository inventory)
     : IRegistrationOrderTransitionCoordinator
 {
+    public async Task<bool> PersistAnonymousCancellationAsync(
+        RegistrationOrder order, AnonymousCancellationEvidence evidence, DateTime timestamp,
+        CancellationToken cancellationToken)
+    {
+        if (!order.TryCancelConfirmedAnonymous(evidence, timestamp))
+        {
+            return false;
+        }
+
+        await inventory.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     public async Task<bool> PersistAsync(
         Guid orderId,
         Guid tenantId,

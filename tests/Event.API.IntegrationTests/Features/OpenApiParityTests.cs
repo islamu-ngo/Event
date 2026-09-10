@@ -353,14 +353,14 @@ public sealed class OpenApiParityTests
         if (document.RootElement.TryGetProperty("security", out JsonElement documentSecurity))
             references.UnionWith(GetSecurityRequirementSchemeNames(documentSecurity));
         foreach (JsonProperty path in document.RootElement.GetProperty("paths").EnumerateObject())
-        foreach (JsonProperty operation in path.Value.EnumerateObject())
-        {
-            if (operation.Value.ValueKind == JsonValueKind.Object
-                && operation.Value.TryGetProperty("security", out JsonElement operationSecurity))
+            foreach (JsonProperty operation in path.Value.EnumerateObject())
             {
-                references.UnionWith(GetSecurityRequirementSchemeNames(operationSecurity));
+                if (operation.Value.ValueKind == JsonValueKind.Object
+                    && operation.Value.TryGetProperty("security", out JsonElement operationSecurity))
+                {
+                    references.UnionWith(GetSecurityRequirementSchemeNames(operationSecurity));
+                }
             }
-        }
 
         return references.Where(reference => !definitions.Contains(reference)).ToArray();
     }

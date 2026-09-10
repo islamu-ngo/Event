@@ -32,6 +32,9 @@ public sealed class BffOnboardingStatusProviderTests
 
     [Test]
     [Arguments("InteractivePending", "Interactive", null, BffOnboardingDisposition.InteractivePending)]
+    [Arguments("InteractivePending", "Interactive", "Local", BffOnboardingDisposition.InteractivePending)]
+    [Arguments("InteractivePending", "Interactive", "Keycloak", BffOnboardingDisposition.InteractivePending)]
+    [Arguments("InteractivePending", "Interactive", "Atproto", BffOnboardingDisposition.InteractivePending)]
     [Arguments("ConfiguredAdministratorPending", "ConfiguredAdministrator", "Atproto", BffOnboardingDisposition.ConfiguredAdministratorPending)]
     public async Task GetStatusAsync_ClassifiesCanonicalPendingStates(
         string state,
@@ -74,7 +77,7 @@ public sealed class BffOnboardingStatusProviderTests
     [Test]
     [Arguments(false, "ConfiguredAdministratorPending", "ConfiguredAdministrator", null, 2L)]
     [Arguments(false, "ConfiguredAdministratorPending", "ConfiguredAdministrator", "Google", 2L)]
-    [Arguments(false, "InteractivePending", "Interactive", "Keycloak", 2L)]
+    [Arguments(false, "InteractivePending", "Interactive", "Unknown", 2L)]
     [Arguments(false, "Pending", "Interactive", null, 2L)]
     [Arguments(true, "Completed", "Headless", null, 2L)]
     [Arguments(true, "Completed", "ConfiguredAdministrator", "Google", 2L)]

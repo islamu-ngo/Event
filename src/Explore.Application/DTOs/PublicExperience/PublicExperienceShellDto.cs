@@ -11,6 +11,7 @@ public sealed record PublicExperienceShellDto
     private IReadOnlyList<PublicExperienceCtaDto> _ctas = Array.AsReadOnly(Array.Empty<PublicExperienceCtaDto>());
 
     public int SchemaVersion { get; init; } = 1;
+    public VisitorAccessCapabilityDto? VisitorAccess { get; init; }
     public bool IsAvailable { get; init; }
     public string? UnavailableCode { get; init; }
     public TenantDirectoryOperatorPublicDto? DirectoryOperator { get; init; }

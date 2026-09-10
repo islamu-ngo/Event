@@ -1,17 +1,17 @@
 namespace Explore.Blazor.Client.Models.Requests;
 
 internal sealed record LocalBffLoginRequest(
-    string Email,
+    string Identifier,
     string Password,
     bool IsPersistent,
-    string ReturnUrl);
+    string ReturnUrl)
+{
+    public override string ToString() => nameof(LocalBffLoginRequest);
+}
 
-internal sealed record LocalBffRegistrationRequest(
-    string Email,
-    string Password,
-    string FirstName,
-    string LastName,
-    bool IsPersistent,
-    string ReturnUrl);
+internal sealed record LocalBffAuthenticationResponse(string? RedirectUrl, string? ErrorCode = null);
 
-internal sealed record LocalBffAuthenticationResponse(string RedirectUrl);
+internal sealed record LocalBffCredentialReplacementRequest(string NewPassword)
+{
+    public override string ToString() => nameof(LocalBffCredentialReplacementRequest);
+}

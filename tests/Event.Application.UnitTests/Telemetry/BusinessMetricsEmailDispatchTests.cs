@@ -1,4 +1,7 @@
 using System.Diagnostics.Metrics;
+using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Notifications;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Telemetry;
 using NSubstitute;
 
@@ -8,18 +11,22 @@ namespace ApplicationUnitTests.Telemetry;
 public sealed class BusinessMetricsEmailDispatchTests
 {
     [Test]
-    public async Task RecordEmailDispatchAttemptRecordsExpectedSafeTags()
+    [Arguments(EmailDispatchDrainOutcome.RetryScheduled, "retry_scheduled", "smtp_send_failed")]
+    [Arguments(EmailDispatchDrainOutcome.Parked, "parked", "smtp_configuration_unavailable")]
+    [Arguments(EmailDispatchDrainOutcome.Unknown, "unknown", "smtp_outcome_unknown")]
+    public async Task RecordEmailDispatchAttemptRecordsExpectedSafeTags(
+        EmailDispatchDrainOutcome outcome, string expectedOutcome, string expectedFailureCategory)
     {
         using var metricsCapture = new MetricsCapture();
         using var metrics = CreateMetrics();
 
-        metrics.RecordEmailDispatchAttempt("retry_scheduled", "smtp_send_failed");
+        metrics.RecordEmailDispatchAttempt(outcome);
 
         var measurement = await metricsCapture.SingleAsync("explore.email_dispatch.attempts");
 
         await Assert.That(measurement.Value).IsEqualTo(1);
-        await Assert.That(measurement.Tags["outcome"]?.ToString()).IsEqualTo("retry_scheduled");
-        await Assert.That(measurement.Tags["failure_category"]?.ToString()).IsEqualTo("smtp_send_failed");
+        await Assert.That(measurement.Tags["outcome"]?.ToString()).IsEqualTo(expectedOutcome);
+        await Assert.That(measurement.Tags["failure_category"]?.ToString()).IsEqualTo(expectedFailureCategory);
         await Assert.That(measurement.Tags.Keys).DoesNotContain("tenant_id");
     }
 
@@ -29,7 +36,7 @@ public sealed class BusinessMetricsEmailDispatchTests
         using var metricsCapture = new MetricsCapture();
         using var metrics = CreateMetrics();
 
-        metrics.RecordEmailDispatchAttempt("sent");
+        metrics.RecordEmailDispatchAttempt(EmailDispatchDrainOutcome.Sent);
 
         var measurement = await metricsCapture.SingleAsync("explore.email_dispatch.attempts");
 
@@ -46,18 +53,42 @@ public sealed class BusinessMetricsEmailDispatchTests
     }
 
     [Test]
-    public async Task RecordEmailDispatchRabbitMqConsumeRecordsExpectedSafeTags()
+    [Arguments(EmailDispatchPublishOutcome.Disabled, "disabled")]
+    [Arguments(EmailDispatchPublishOutcome.Confirmed, "confirmed")]
+    [Arguments(EmailDispatchPublishOutcome.Returned, "returned")]
+    [Arguments(EmailDispatchPublishOutcome.Nacked, "nacked")]
+    [Arguments(EmailDispatchPublishOutcome.Failed, "failed")]
+    public async Task RecordEmailDispatchRabbitMqPublishPreservesOutcomeLabels(
+        EmailDispatchPublishOutcome outcome, string expectedLabel)
+    {
+        using var metricsCapture = new MetricsCapture();
+        using var metrics = CreateMetrics();
+        metrics.RecordEmailDispatchRabbitMqPublish(outcome);
+
+        var measurement = await metricsCapture.SingleAsync("explore.email_dispatch.rabbitmq.publishes");
+        await Assert.That(measurement.Tags["outcome"]).IsEqualTo(expectedLabel);
+        await Assert.That(measurement.Tags["failure_category"]).IsEqualTo("none");
+    }
+
+    [Test]
+    [Arguments(EmailDispatchConsumeOutcome.Acked, "acked")]
+    [Arguments(EmailDispatchConsumeOutcome.Rejected, "rejected")]
+    [Arguments(EmailDispatchConsumeOutcome.Nacked, "nacked")]
+    [Arguments(EmailDispatchConsumeOutcome.Replayed, "replayed")]
+    [Arguments(EmailDispatchConsumeOutcome.Parked, "parked")]
+    public async Task RecordEmailDispatchRabbitMqConsumeRecordsExpectedSafeTags(
+        EmailDispatchConsumeOutcome outcome, string expectedLabel)
     {
         using var metricsCapture = new MetricsCapture();
         using var metrics = CreateMetrics();
 
-        metrics.RecordEmailDispatchRabbitMqConsume("acked", "none");
+        metrics.RecordEmailDispatchRabbitMqConsume(outcome, "none");
 
         var measurement = await metricsCapture.SingleAsync("explore.email_dispatch.rabbitmq.consumes");
 
         await Assert.That(measurement.Value).IsEqualTo(1);
         await Assert.That(measurement.Tags.Keys).DoesNotContain("tenant_id");
-        await Assert.That(measurement.Tags["outcome"]?.ToString()).IsEqualTo("acked");
+        await Assert.That(measurement.Tags["outcome"]?.ToString()).IsEqualTo(expectedLabel);
         await Assert.That(measurement.Tags["failure_category"]?.ToString()).IsEqualTo("none");
     }
 
@@ -67,7 +98,7 @@ public sealed class BusinessMetricsEmailDispatchTests
         using var metricsCapture = new MetricsCapture();
         using var metrics = CreateMetrics();
 
-        metrics.RecordEmailDispatchRabbitMqConsume("rejected", "missing_outbox");
+        metrics.RecordEmailDispatchRabbitMqConsume(EmailDispatchConsumeOutcome.Rejected, "missing_outbox");
 
         var measurement = await metricsCapture.SingleAsync("explore.email_dispatch.rabbitmq.consumes");
 
@@ -83,6 +114,25 @@ public sealed class BusinessMetricsEmailDispatchTests
         await Assert.That(measurement.Tags.Keys).DoesNotContain("publish_event_id");
         await Assert.That(measurement.Tags.Keys).DoesNotContain("delivery_tag");
         await Assert.That(measurement.Tags.Keys).DoesNotContain("error");
+    }
+
+    [Test]
+    [Arguments(EmailDispatchEligibilityOutcome.Skipped, "recipient_email_unverified", "skipped", "recipient_email_unverified")]
+    [Arguments(EmailDispatchEligibilityOutcome.RateDeferred, "smtp_rate_deferred", "rate_deferred", "smtp_rate_deferred")]
+    [Arguments((EmailDispatchEligibilityOutcome)int.MaxValue, "unrecognized-provider-detail", "other", "other")]
+    public async Task RecordEmailDispatchOperationalOutcomePreservesBoundedExportedLabels(
+        EmailDispatchEligibilityOutcome outcome, string reason, string expectedOutcome, string expectedReason)
+    {
+        using var metricsCapture = new MetricsCapture();
+        using var metrics = CreateMetrics();
+
+        metrics.RecordEmailDispatchOperationalOutcome(outcome, reason);
+
+        var measurement = await metricsCapture.SingleAsync("explore.email_dispatch.operational_outcomes");
+        await Assert.That(measurement.Value).IsEqualTo(1);
+        await Assert.That(measurement.Tags.Keys).IsEquivalentTo(["outcome", "reason"]);
+        await Assert.That(measurement.Tags["outcome"]).IsEqualTo(expectedOutcome);
+        await Assert.That(measurement.Tags["reason"]).IsEqualTo(expectedReason);
     }
 
     [Test]
@@ -131,10 +181,10 @@ public sealed class BusinessMetricsEmailDispatchTests
     {
         using var metricsCapture = new MetricsCapture();
         using var metrics = CreateMetrics();
-        metrics.RecordEmailDispatchAttempt("recipient@example.test", "raw-provider-error-123");
-        metrics.RecordEmailDispatchOperationalOutcome("skipped", "recipient_email_unverified");
-        metrics.RecordEmailDispatchRabbitMqPublish("tenant-123", "provider-message-456");
-        metrics.RecordEmailDispatchRabbitMqConsume("user-123", "delivery-456");
+        metrics.RecordEmailDispatchAttempt((EmailDispatchDrainOutcome)int.MaxValue);
+        metrics.RecordEmailDispatchOperationalOutcome(EmailDispatchEligibilityOutcome.Skipped, "recipient_email_unverified");
+        metrics.RecordEmailDispatchRabbitMqPublish((EmailDispatchPublishOutcome)int.MaxValue, "provider-message-456");
+        metrics.RecordEmailDispatchRabbitMqConsume((EmailDispatchConsumeOutcome)int.MaxValue, "delivery-456");
 
         var attempt = await metricsCapture.SingleAsync("explore.email_dispatch.attempts");
         var operational = await metricsCapture.SingleAsync("explore.email_dispatch.operational_outcomes");

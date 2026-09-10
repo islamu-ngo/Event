@@ -13,6 +13,7 @@ public interface ICircuitAccessTokenService
     string? AccessToken { get; }
     void SetToken(string? token);
     void ClearToken();
+    void RevokeSession(EventBffOpaqueIdentity? originalSubject, EventBffOpaqueIdentity? originalSession);
 }
 
 public interface ISetupSecretSessionService
@@ -164,6 +165,8 @@ public class CircuitAccessTokenService : ICircuitAccessTokenService
     private string? _localToken;
     private string? _userId;
     private string? _sessionId;
+    private readonly object _tokenSync = new();
+    private bool _revoked;
 
     public CircuitAccessTokenService(
         ICircuitTokenStore tokenStore,
@@ -179,98 +182,157 @@ public class CircuitAccessTokenService : ICircuitAccessTokenService
     {
         get
         {
-            var userId = _userId ?? GetUserIdFromHttpContext();
-            var sessionId = _sessionId ?? GetSessionIdFromHttpContext();
-
-            if (!string.IsNullOrEmpty(userId))
+            lock (_tokenSync)
             {
-                var resolution = _tokenStore.Resolve(userId, sessionId);
-                if (!resolution.Found)
+                if (_revoked)
                 {
-                    resolution = _tokenStore.ResolveByUserId(userId);
+                    return null;
                 }
 
-                if (resolution.Found)
+                var userId = _userId ?? GetUserIdFromHttpContext();
+                var sessionId = _sessionId ?? GetSessionIdFromHttpContext();
+
+                if (!string.IsNullOrEmpty(userId))
                 {
-                    if (!string.IsNullOrEmpty(_localToken) && !string.Equals(_localToken, resolution.Token, StringComparison.Ordinal))
+                    var resolution = _tokenStore.Resolve(userId, sessionId);
+                    if (!resolution.Found)
                     {
-                        _logger.LogInformation(
-                            "[CircuitAccessTokenService] Token resolution completed | Outcome={Outcome} Reason={Reason} Purpose={Purpose}",
-                            "replaced", "stale_local_token", "circuit");
+                        resolution = _tokenStore.ResolveByUserId(userId);
                     }
 
-                    return resolution.Token;
+                    if (resolution.Found)
+                    {
+                        if (!string.IsNullOrEmpty(_localToken) && !string.Equals(_localToken, resolution.Token, StringComparison.Ordinal))
+                        {
+                            _logger.LogInformation(
+                                "[CircuitAccessTokenService] Token resolution completed | Outcome={Outcome} Reason={Reason} Purpose={Purpose}",
+                                "replaced", "stale_local_token", "circuit");
+                        }
+
+                        return resolution.Token;
+                    }
                 }
-            }
 
-            if (!CircuitTokenStore.IsTokenUsable(_localToken))
-            {
-                _localToken = null;
-                return null;
-            }
+                if (!CircuitTokenStore.IsTokenUsable(_localToken))
+                {
+                    _localToken = null;
+                    return null;
+                }
 
-            return _localToken;
+                return _localToken;
+            }
         }
     }
 
     public void SetToken(string? token)
     {
-        if (string.IsNullOrEmpty(token))
+        lock (_tokenSync)
         {
-            ClearToken();
-            return;
-        }
-
-        if (!CircuitTokenStore.IsTokenUsable(token))
-        {
-            _localToken = null;
-            _logger.LogWarning("[CircuitAccessTokenService] SetToken ignored an expired or near-expiry access token");
-            return;
-        }
-
-        _localToken = token;
-
-        // The forwarding handler resolves by the authenticated BFF principal. That id can
-        // differ from the JWT subject after local-user/admin enrichment.
-        var principalUserId = GetUserIdFromHttpContext();
-        var principalSessionId = GetSessionIdFromHttpContext();
-
-        if (!string.IsNullOrEmpty(principalUserId))
-        {
-            _userId = principalUserId;
-            _sessionId = principalSessionId;
-            var result = _tokenStore.Store(principalUserId, principalSessionId, token);
-            if (!result.Accepted)
+            if (_revoked)
             {
-                _logger.LogDebug(
-                    "[CircuitAccessTokenService] Token store rejected token: {RejectionCode}",
-                    result.RejectionCode);
+                return;
             }
-        }
-        else
-        {
-            _logger.LogWarning("[CircuitAccessTokenService] Token store skipped | Outcome={Outcome} Reason={Reason} Purpose={Purpose}", "skipped", "trusted_principal_unavailable", "circuit");
+
+            if (string.IsNullOrEmpty(token))
+            {
+                ClearToken();
+                return;
+            }
+
+            if (!CircuitTokenStore.IsTokenUsable(token))
+            {
+                _localToken = null;
+                _logger.LogWarning("[CircuitAccessTokenService] SetToken ignored an expired or near-expiry access token");
+                return;
+            }
+
+            _localToken = token;
+
+            // The forwarding handler resolves by the authenticated BFF principal. That id can
+            // differ from the JWT subject after local-user/admin enrichment.
+            var principalUserId = GetUserIdFromHttpContext();
+            var principalSessionId = GetSessionIdFromHttpContext();
+
+            if (!string.IsNullOrEmpty(principalUserId))
+            {
+                _userId = principalUserId;
+                _sessionId = principalSessionId;
+                var result = _tokenStore.Store(principalUserId, principalSessionId, token);
+                if (!result.Accepted)
+                {
+                    _logger.LogDebug(
+                        "[CircuitAccessTokenService] Token store rejected token: {RejectionCode}",
+                        result.RejectionCode);
+                }
+            }
+            else
+            {
+                _logger.LogWarning("[CircuitAccessTokenService] Token store skipped | Outcome={Outcome} Reason={Reason} Purpose={Purpose}", "skipped", "trusted_principal_unavailable", "circuit");
+            }
         }
     }
 
     public void ClearToken()
     {
-        var userId = _userId ?? GetUserIdFromHttpContext();
-        var sessionId = _sessionId ?? GetSessionIdFromHttpContext();
-
-        _localToken = null;
-        _userId = null;
-        _sessionId = null;
-
-        if (!string.IsNullOrWhiteSpace(userId))
+        lock (_tokenSync)
         {
-            if (string.IsNullOrWhiteSpace(sessionId))
+            if (_revoked)
             {
-                _tokenStore.ClearUser(userId);
+                return;
             }
-            else
+
+            var userId = _userId ?? GetUserIdFromHttpContext();
+            var sessionId = _sessionId ?? GetSessionIdFromHttpContext();
+
+            _localToken = null;
+            _userId = null;
+            _sessionId = null;
+
+            if (!string.IsNullOrWhiteSpace(userId))
             {
-                _tokenStore.ClearSession(userId, sessionId);
+                if (string.IsNullOrWhiteSpace(sessionId))
+                {
+                    _tokenStore.ClearUser(userId);
+                }
+                else
+                {
+                    _tokenStore.ClearSession(userId, sessionId);
+                }
+            }
+        }
+    }
+
+    public void RevokeSession(EventBffOpaqueIdentity? originalSubject, EventBffOpaqueIdentity? originalSession)
+    {
+        lock (_tokenSync)
+        {
+            if (_revoked)
+            {
+                return;
+            }
+
+            _revoked = true;
+            _localToken = null;
+            _userId = null;
+            _sessionId = null;
+            if (originalSubject is
+                {
+                    Purpose: EventBffOpaqueIdentityPurpose.CircuitSubject,
+                    Source: EventBffOpaqueIdentitySource.ProviderSubject
+                } subject
+                && originalSession is
+                {
+                    Purpose: EventBffOpaqueIdentityPurpose.SessionId,
+                    Source: EventBffOpaqueIdentitySource.SessionId
+                } session
+                && string.Equals(subject.AuthenticationScheme, session.AuthenticationScheme, StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(subject.AuthenticationScheme)
+                && !string.IsNullOrWhiteSpace(subject.Value)
+                && !string.IsNullOrWhiteSpace(session.Value)
+                && !subject.Value.Any(char.IsControl)
+                && !session.Value.Any(char.IsControl))
+            {
+                _tokenStore.ClearSession(subject.PartitionKey, session.PartitionKey);
             }
         }
     }

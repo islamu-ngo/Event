@@ -344,6 +344,8 @@ public sealed class DotenvContractTests
         [
             "INSTANCE_BOOTSTRAP_MODE", "INSTANCE_BOOTSTRAP_ADMIN_PROVIDER",
             "INSTANCE_BOOTSTRAP_ADMIN_SUBJECT", "INSTANCE_BOOTSTRAP_BINDING_GENERATION",
+            "INSTANCE_BOOTSTRAP_ADMIN_EMAIL", "INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME",
+            "INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME",
         ]);
         await Assert.That(atprotoKeys).IsEquivalentTo(
         [
@@ -355,6 +357,30 @@ public sealed class DotenvContractTests
         await Assert.That(interactiveReadiness.State).IsEqualTo(DotenvReadinessState.Ready);
         await Assert.That(keycloakReadiness.State).IsEqualTo(DotenvReadinessState.Ready);
         await Assert.That(atprotoReadiness.State).IsEqualTo(DotenvReadinessState.Ready);
+    }
+
+    [Test]
+    public async Task LocalBootstrapNeedsItsSecretButNotAnEmailAddress()
+    {
+        EnvironmentCatalogue catalogue = CanonicalEnvironmentCatalogue.Catalogue;
+        var context = new EnvironmentActivationContext("standalone", ["identity"], ["configured-administrator", "local"]);
+        DotenvEntry[] selectors =
+        [
+            Public("INSTANCE_BOOTSTRAP_MODE", "ConfiguredAdministrator"),
+            Public("INSTANCE_BOOTSTRAP_ADMIN_PROVIDER", "local"),
+            Sensitive("INSTANCE_BOOTSTRAP_ADMIN_SUBJECT", Guid.CreateVersion7().ToString("D")),
+            Public("INSTANCE_BOOTSTRAP_BINDING_GENERATION", long.MaxValue.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+        ];
+        var missing = DotenvComposer.ComposeWithSecrets(catalogue, context, selectors);
+        await Assert.That(missing.Diagnostics).IsEmpty();
+        await Assert.That(BootstrapOnly(missing.Readiness.Blocked)).IsEquivalentTo(["INSTANCE_BOOTSTRAP_LOCAL_PASSWORD"]);
+        await Assert.That(BootstrapOnly(missing.Readiness.Missing)).IsEmpty();
+        var supplied = DotenvComposer.ComposeWithSecrets(catalogue, context, selectors.Append(
+            Sensitive("INSTANCE_BOOTSTRAP_LOCAL_PASSWORD", Convert.ToHexString(RandomNumberGenerator.GetBytes(32)))));
+        await Assert.That(supplied.Diagnostics).IsEmpty();
+        await Assert.That(BootstrapReadiness(catalogue, context, supplied.Document).State).IsEqualTo(DotenvReadinessState.Ready);
+        await Assert.That(RelevantBootstrapKeys(catalogue, "configured-administrator", "keycloak"))
+            .DoesNotContain("INSTANCE_BOOTSTRAP_LOCAL_PASSWORD");
     }
 
     [Test]
@@ -428,7 +454,7 @@ public sealed class DotenvContractTests
             validKeycloakShape.Append(Sensitive(
                 "INSTANCE_BOOTSTRAP_ADMIN_EMAIL", "email-marker-not-an-address")));
         await Assert.That(inapplicableFallback.Diagnostics.Any(item =>
-            item.Code == "dotenv-input-key-irrelevant"
+            item.Code == "dotenv-input-value-invalid"
             && item.Key == "INSTANCE_BOOTSTRAP_ADMIN_EMAIL")).IsTrue();
         await Assert.That(BootstrapReadiness(
             catalogue, keycloakContext, inapplicableFallback.Document).State).IsEqualTo(DotenvReadinessState.Ready);

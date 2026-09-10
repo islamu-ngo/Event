@@ -10,7 +10,7 @@ using Explore.Blazor.Services;
 using Explore.Blazor.Services.Auth;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Http.Extensions;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.Options;
 
 namespace Explore.Blazor.Extensions;
@@ -64,11 +64,6 @@ public static class BffAuthEndpoints
             .RequireRateLimiting(RateLimitingExtensions.LocalAuthenticationPolicy)
             .ExcludeFromDescription();
 
-        app.MapPost("/bff/auth/local/register", HandleLocalRegistrationAsync)
-            .ValidateAntiforgery()
-            .RequireRateLimiting(RateLimitingExtensions.LocalAuthenticationPolicy)
-            .ExcludeFromDescription();
-
         app.MapPost("/bff/auth/refresh-schemes", HandleRefreshSchemesAsync)
             .ValidateAntiforgery()
             .ExcludeFromDescription();
@@ -104,7 +99,7 @@ public static class BffAuthEndpoints
         var returnUrl = returnUrlService.GetSafeReturnUrl(ctx, logger);
         var provider = ctx.Request.Query["provider"].ToString();
 
-        logger.LogInformation("[AuthEndpoints] Authentication challenge requested for {Provider}", provider);
+        logger.LogInformation("[AuthEndpoints] Authentication challenge requested");
 
         var onboardingAdmission = await ResolveOnboardingAdmissionAsync(ctx, provider, isChallengeEndpoint: true);
         if (!ApplyOnboardingAdmission(ctx, onboardingAdmission, logger, "/auth/challenge"))
@@ -513,10 +508,7 @@ public static class BffAuthEndpoints
         !string.IsNullOrWhiteSpace(value)
         && value.Length <= 2048
         && value.StartsWith('/')
-        && !value.StartsWith("//", StringComparison.Ordinal)
-        && !value.StartsWith("/\\", StringComparison.Ordinal)
-        && !value.Contains('\r')
-        && !value.Contains('\n')
+        && RedirectHttpResult.IsLocalUrl(value)
             ? value
             : "/";
 
@@ -624,15 +616,14 @@ public static class BffAuthEndpoints
     {
         ctx.Response.Headers.CacheControl = "no-store, no-cache";
         ctx.Response.Headers.Pragma = "no-cache";
+        ctx.RequestServices.GetRequiredService<LocalCredentialChallengeCookie>().Delete(ctx);
 
         var logger = ctx.RequestServices.GetRequiredService<ILoggerFactory>()
             .CreateLogger("AuthEndpoints");
         var returnUrlService = ctx.RequestServices.GetRequiredService<IBffReturnUrlService>();
         var returnUrl = returnUrlService.GetSafeReturnUrl(ctx, logger);
 
-        logger.LogInformation(
-            "[AuthEndpoints] /auth/signout hit - Url: {Url} ReturnUrl: {ReturnUrl}",
-            ctx.Request.GetDisplayUrl(), returnUrl);
+        logger.LogInformation("[AuthEndpoints] Signout requested");
 
         var cookieAuthResult = AuthenticateResult.NoResult();
         try
@@ -735,6 +726,9 @@ public static class BffAuthEndpoints
         IDynamicAuthSchemeManager schemeManager,
         CancellationToken cancellationToken)
     {
+        ctx.Response.Headers.CacheControl = "no-store";
+        var challengeCookie = ctx.RequestServices.GetRequiredService<LocalCredentialChallengeCookie>();
+        challengeCookie.Delete(ctx);
         if (!string.Equals(
                 schemeManager.GetActivePrimaryProvider(),
                 "local",
@@ -757,10 +751,44 @@ public static class BffAuthEndpoints
             LocalAuthResponseDto response = await client.LoginLocalIdentityAsync(
                 new LocalAuthRequestDto
                 {
-                    Email = request.Email,
+                    Identifier = request.Identifier,
                     Password = request.Password
                 },
                 cancellationToken: cancellationToken);
+            if (response.ReplacementChallenge is { } challenge)
+            {
+                if (response.Success != false
+                    || !string.IsNullOrEmpty(response.FailureCode)
+                    || response.UserId is not null
+                    || response.Email is not null
+                    || response.FirstName is not null
+                    || response.LastName is not null
+                    || response.EmailVerified == true
+                    || response.Token is not null
+                    || response.ExpiresAt is not null
+                    || response.Roles is { Count: > 0 })
+                {
+                    return LocalAuthenticationFailure(StatusCodes.Status401Unauthorized);
+                }
+
+                await BffLocalCredentialEndpoints.ClearLocalSessionAsync(ctx);
+                var admission = await BffLocalCredentialEndpoints.GetFreshAdmissionAsync(ctx, cancellationToken);
+                if (admission != BffLocalCredentialEndpoints.LocalCredentialAdmission.Allowed)
+                {
+                    return LocalAuthenticationFailure(
+                        admission == BffLocalCredentialEndpoints.LocalCredentialAdmission.Denied
+                            ? StatusCodes.Status409Conflict
+                            : StatusCodes.Status503ServiceUnavailable);
+                }
+
+                if (!challengeCookie.TryIssue(ctx, challenge.Token, challenge.ExpiresAt))
+                {
+                    return LocalAuthenticationFailure(StatusCodes.Status401Unauthorized);
+                }
+
+                return Results.Ok(new { redirectUrl = BffLocalCredentialEndpoints.PasswordChangePath });
+            }
+
             return await CompleteLocalSignInAsync(
                 ctx,
                 response,
@@ -768,59 +796,16 @@ public static class BffAuthEndpoints
                 request.ReturnUrl,
                 initialStatus);
         }
-        catch (ApiException exception)
+        catch (ApiException<ProblemDetails> exception) when (
+            exception.StatusCode == StatusCodes.Status401Unauthorized
+            && exception.Result.AdditionalProperties.TryGetValue("code", out var code)
+            && string.Equals(code?.ToString(), "email_verification_required", StringComparison.Ordinal))
         {
-            return LocalAuthenticationFailure(exception.StatusCode);
-        }
-    }
-
-    private static async Task<IResult> HandleLocalRegistrationAsync(
-        HttpContext ctx,
-        LocalBffRegistrationRequest request,
-        ILocalAuthClient client,
-        IDynamicAuthSchemeManager schemeManager,
-        CancellationToken cancellationToken)
-    {
-        if (!string.Equals(
-                schemeManager.GetActivePrimaryProvider(),
-                "local",
-                StringComparison.Ordinal))
-        {
-            return LocalAuthenticationFailure(
-                StatusCodes.Status409Conflict);
-        }
-
-        var initialStatus = await ctx.RequestServices
-            .GetRequiredService<IBffOnboardingStatusProvider>()
-            .GetStatusAsync(cancellationToken);
-        if (!AllowsLocalAuthentication(initialStatus))
-        {
-            return LocalAuthenticationFailure(StatusCodes.Status409Conflict);
-        }
-
-        try
-        {
-            LocalRegistrationResponseDto response =
-                await client.RegisterLocalIdentityAsync(
-                    new LocalRegistrationRequestDto
-                    {
-                        Email = request.Email,
-                        Password = request.Password,
-                        FirstName = request.FirstName,
-                        LastName = request.LastName
-                    },
-                    cancellationToken: cancellationToken);
-            if (response.Success != true || response.Authentication is null)
-            {
-                return LocalAuthenticationFailure(StatusCodes.Status400BadRequest);
-            }
-
-            return await CompleteLocalSignInAsync(
-                ctx,
-                response.Authentication,
-                request.IsPersistent,
-                request.ReturnUrl,
-                initialStatus);
+            return Results.Problem(
+                title: "Email verification required",
+                detail: "Verify your email address before signing in.",
+                statusCode: StatusCodes.Status401Unauthorized,
+                extensions: new Dictionary<string, object?> { ["code"] = "email_verification_required" });
         }
         catch (ApiException exception)
         {
@@ -850,19 +835,20 @@ public static class BffAuthEndpoints
             new(ClaimTypes.NameIdentifier, userId.ToString("D")),
             new("internal_user_id", userId.ToString("D")),
             new(ClaimTypes.Name, response.Email ?? userId.ToString("D")),
-            new(ClaimTypes.Email, response.Email ?? string.Empty),
             new("given_name", response.FirstName ?? string.Empty),
             new("family_name", response.LastName ?? string.Empty),
             new("email_verified", response.EmailVerified == true ? "true" : "false"),
             new("auth_provider", "local"),
             new("sid", Guid.CreateVersion7().ToString("D"))
         };
+        if (!string.IsNullOrWhiteSpace(response.Email))
+            claims.Add(new Claim(ClaimTypes.Email, response.Email));
         claims.AddRange((response.Roles ?? [])
             .Where(role => !string.IsNullOrWhiteSpace(role))
             .Select(role => new Claim(ClaimTypes.Role, role)));
         var principal = new ClaimsPrincipal(new ClaimsIdentity(
             claims,
-            "LocalIdentity",
+            CookieAuthenticationDefaults.AuthenticationScheme,
             ClaimTypes.Name,
             ClaimTypes.Role));
         string safeReturnUrl = ResolveLocalReturnUrl(returnUrl);
@@ -940,8 +926,8 @@ public static class BffAuthEndpoints
     private static string ResolveLocalReturnUrl(string? returnUrl)
     {
         if (string.IsNullOrWhiteSpace(returnUrl)
-            || !Uri.TryCreate(returnUrl, UriKind.Relative, out _)
-            || returnUrl.StartsWith("//", StringComparison.Ordinal))
+            || !returnUrl.StartsWith('/')
+            || !RedirectHttpResult.IsLocalUrl(returnUrl))
         {
             return "/";
         }
@@ -1076,12 +1062,29 @@ public static class BffAuthEndpoints
                 "[AuthEndpoints] /auth/providers — returning {Count} ready provider(s)",
                 providers.Count);
 
+            IDictionary<string, HalLink>? lifecycleLinks = null;
+            VisitorAccessCapabilityDto? visitorAccess = null;
+            try
+            {
+                var discovery = await ctx.RequestServices.GetRequiredService<IInstanceOnboardingClient>()
+                    .GetInstanceOnboardingAuthProviderConfigurationAsync(cancellationToken: ctx.RequestAborted);
+                lifecycleLinks = discovery?._links;
+                visitorAccess = discovery?.VisitorAccess;
+            }
+            catch (Exception exception) when (exception is ApiException or HttpRequestException
+                || exception is OperationCanceledException && !ctx.RequestAborted.IsCancellationRequested)
+            {
+                logger.LogWarning("Authentication capability discovery is unavailable; no signup or lifecycle actions are advertised.");
+            }
+            ctx.Response.Headers.CacheControl = "no-store, private";
             ctx.Response.ContentType = "application/json";
             await ctx.Response.WriteAsJsonAsync(new
             {
                 primaryProvider,
                 atprotoLoginEnabled,
-                providers
+                providers,
+                visitorAccess,
+                _links = lifecycleLinks
             });
         }
         catch (Exception ex)

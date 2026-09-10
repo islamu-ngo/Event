@@ -12,7 +12,7 @@ public sealed class SmtpHealthCheckRegistrationTests
     private static readonly TimeSpan ExpectedSmtpReadinessTimeout = TimeSpan.FromSeconds(5);
 
     [Test]
-    public async Task SmtpReadinessRegistrationUsesBoundedTimeout()
+    public async Task SmtpReadinessRegistrationUsesBoundedTimeoutAndCoreFailureFallback()
     {
         await using var factory = new CustomWebApplicationFactory();
 

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -55,11 +56,21 @@ public sealed class InstanceOnboardingCompletionOperation(
         CancellationToken cancellationToken) =>
         CompleteAsync(CompletionInput.Configured(command), cancellationToken);
 
+    internal Task<BaseCommandResponse<Guid>> CompleteLocalBootstrapAsync(
+        ConfiguredAdministratorBootstrapBinding? binding,
+        CompleteInstanceOnboardingRequest settings,
+        LocalCredentialProvisioningSnapshot snapshot,
+        CancellationToken cancellationToken) =>
+        CompleteAsync(new CompletionInput(null, null, settings,
+            InstanceOnboardingProfileSettingHelpers.Normalize(settings.SiteProfile, settings.InstanceName),
+            settings.DeploymentMode, DateTime.UtcNow, snapshot.Receipt.OperationId, snapshot.Receipt.ExternalLoginId,
+            snapshot, binding), cancellationToken);
+
     private async Task<BaseCommandResponse<Guid>> CompleteAsync(
         CompletionInput input,
         CancellationToken cancellationToken)
     {
-        if (input.ConfiguredCommand is not null && input.UserId == Guid.Empty)
+        if (input.IsConfigured && input.UserId == Guid.Empty)
         {
             return ConfiguredFailure(
                 "configured_administrator_identity_incomplete",
@@ -69,9 +80,9 @@ public sealed class InstanceOnboardingCompletionOperation(
         PersistenceOutcome outcome;
         try
         {
-            outcome = await unitOfWork.ExecuteSerializableAsync(
-                token => PersistAsync(input, token),
-                cancellationToken);
+            outcome = input.LocalCredential is null
+                ? await unitOfWork.ExecuteSerializableAsync(token => PersistAsync(input, token), cancellationToken)
+                : await unitOfWork.ExecuteBootstrapConvergenceAsync(token => PersistAsync(input, token), cancellationToken);
         }
         catch (TenantDirectoryOperatorIdentityReadinessException exception)
         {
@@ -105,7 +116,7 @@ public sealed class InstanceOnboardingCompletionOperation(
     {
         InstanceBootstrapState? bootstrap =
             await bootstrapRepository.GetCurrentForUpdate(cancellationToken);
-        Admission admission = input.ConfiguredCommand is null
+        Admission admission = !input.IsConfigured
             ? AdmitInteractive(input, bootstrap)
             : await AdmitConfiguredAsync(input, bootstrap, cancellationToken);
 
@@ -121,10 +132,10 @@ public sealed class InstanceOnboardingCompletionOperation(
         ConfiguredAdministratorProfile? administratorProfile =
             admission.Binding?.AdministratorProfile;
         User? user = await userRepository.GetById(input.UserId);
-        if (user is null
+        if (user is null && !input.IsConfigured && input.LocalCredential is null
             && string.IsNullOrWhiteSpace(administratorProfile?.Email ?? input.Email))
         {
-            BaseCommandResponse<Guid> response = input.ConfiguredCommand is null
+            BaseCommandResponse<Guid> response = !input.IsConfigured
                 ? BaseCommandResponse.Validation<Guid>(
                     ["No user found and no email claim available to create one."],
                     "User identity data is required to complete onboarding.")
@@ -132,6 +143,19 @@ public sealed class InstanceOnboardingCompletionOperation(
                     "configured_administrator_identity_incomplete",
                     "Configured administrator identity is not ready.");
             return new(response, false, admission.DeploymentMode, admission.AuditOperation);
+        }
+
+        if (input.LocalCredential is { } local)
+        {
+            Actor? actor = await actorRepository.GetActorByUserId(input.UserId);
+            UserExternalLogin? login = await externalLoginRepository.GetByProviderAndKey(
+                new ProviderAccountKey(AuthenticationProviderKind.Local, input.UserId.ToString("D")));
+            bool exact = user is { IsDeleted: false } && actor is { IsDeleted: false, IsSuspended: false }
+                && actor.Id == local.Receipt.PersonalActorId && actor.ActorTypeId == (int)ActorTypeEnum.User
+                && login?.Id == local.Receipt.ExternalLoginId && login.UserId == input.UserId;
+            if (!exact && (user is not null || actor is not null || login is not null))
+                return new(ConfiguredFailure("local_bootstrap_binding_conflict", "Local bootstrap binding conflicts."),
+                    false, admission.DeploymentMode, admission.AuditOperation);
         }
 
         CompleteInstanceOnboardingRequest settings = admission.Settings!;
@@ -164,7 +188,7 @@ public sealed class InstanceOnboardingCompletionOperation(
             logger.LogInformation("Onboarding: Assigned Tenant Admin role for default tenant");
         }
 
-        if (input.ConfiguredCommand is null)
+        if (!input.IsConfigured)
         {
             if (bootstrap is null)
             {
@@ -193,7 +217,7 @@ public sealed class InstanceOnboardingCompletionOperation(
             await bootstrapRepository.Update(bootstrap);
         }
 
-        string message = input.ConfiguredCommand is null
+        string message = !input.IsConfigured
             ? "Instance onboarding completed successfully."
             : "Configured instance administrator claimed successfully.";
         return new(
@@ -215,6 +239,11 @@ public sealed class InstanceOnboardingCompletionOperation(
                 input.DeploymentMode,
                 "instance_onboarding_complete");
         }
+
+        if (input.LocalCredential is { } local
+            && (bootstrap?.Id != local.Receipt.OperationId || local.Receipt.InitiatingApplicationUserId != bootstrap.Id
+                || local.Receipt.Stage != LocalCredentialOperationStage.ProvisioningPending))
+            return ConfiguredTerminal("local_bootstrap_authority_invalid", "Local bootstrap authority is invalid.");
 
         if (bootstrap is not null
             && (bootstrap.Status != InstanceBootstrapStatus.Pending
@@ -247,14 +276,44 @@ public sealed class InstanceOnboardingCompletionOperation(
                 "Configured administrator claim is unavailable.");
         }
 
-        ClaimConfiguredInstanceAdministratorCommand command = input.ConfiguredCommand!;
+        ProviderAccountKey account = input.LocalBinding?.AccountKey ?? input.ConfiguredCommand!.AuthenticatedAccount;
         ConfiguredAdministratorBootstrapBinding? binding =
-            await provider.GetVerifiedBindingAsync(command.AuthenticatedAccount, cancellationToken);
-        if (binding is null || binding.AccountKey != command.AuthenticatedAccount)
+            await provider.GetVerifiedBindingAsync(account, cancellationToken);
+        if (binding is null || binding.AccountKey != account)
         {
             return ConfiguredTerminal(
                 "configured_administrator_claim_mismatch",
                 "Configured administrator claim did not match.");
+        }
+
+        if (binding.AccountKey.ProviderKind == AuthenticationProviderKind.Local
+            && bootstrap?.Status != InstanceBootstrapStatus.Completed)
+        {
+            LocalCredentialOperationReceipt? receipt = input.LocalCredential?.Receipt;
+            if (receipt is null || receipt.OperationId != bootstrap?.Id
+                || receipt.Kind != LocalCredentialOperationKind.Create
+                || receipt.Stage != LocalCredentialOperationStage.ProvisioningPending
+                || receipt.LocalSubjectId != input.UserId || receipt.InitiatingApplicationUserId != input.UserId
+                || binding.AccountKey.Value != input.UserId.ToString("D") || input.LocalCredential!.EmailVerified != true)
+                return ConfiguredTerminal("local_bootstrap_authority_invalid", "Local bootstrap authority is invalid.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        List<UserExternalLogin> currentLogins = await externalLoginRepository.GetByUser(input.UserId);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (currentLogins.Any(login => login.AuthenticationProviderId == (int)AuthenticationProviderKind.Local))
+        {
+            UserExternalLogin? configuredLogin = await externalLoginRepository.GetByProviderAndKey(
+                account);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (configuredLogin is null || configuredLogin.UserId != input.UserId
+                || configuredLogin.AuthenticationProviderId != (int)account.ProviderKind
+                || !string.Equals(configuredLogin.ProviderKey, account.Value, StringComparison.Ordinal))
+            {
+                return ConfiguredTerminal(
+                    code: "configured_administrator_claim_conflict",
+                    message: "Configured administrator claim requires a current explicit account binding.");
+            }
         }
 
         if (bootstrap?.Status == InstanceBootstrapStatus.Completed)
@@ -284,7 +343,7 @@ public sealed class InstanceOnboardingCompletionOperation(
             || bootstrap.Status != InstanceBootstrapStatus.Pending
             || bootstrap.Mode != InstanceBootstrapMode.ConfiguredAdministrator
             || bootstrap.ProviderKind != binding.AccountKey.ProviderKind
-            || bootstrap.ProviderKind != command.AuthenticatedAccount.ProviderKind
+            || bootstrap.ProviderKind != account.ProviderKind
             || bootstrap.Generation != binding.Generation
             || !string.Equals(
                 bootstrap.SelectorFingerprint,
@@ -346,9 +405,9 @@ public sealed class InstanceOnboardingCompletionOperation(
         ConfiguredAdministratorProfile? administratorProfile,
         Guid? tenantId)
     {
-        string email = (administratorProfile?.Email ?? input.Email!).Trim().ToLowerInvariant();
-        string? suppliedFirstName = administratorProfile?.FirstName ?? input.FirstName;
-        string? suppliedLastName = administratorProfile?.LastName ?? input.LastName;
+        string email = (input.LocalCredential?.Email ?? administratorProfile?.Email ?? input.Email ?? string.Empty).Trim().ToLowerInvariant();
+        string? suppliedFirstName = input.LocalCredential?.FirstName ?? administratorProfile?.FirstName ?? input.FirstName;
+        string? suppliedLastName = input.LocalCredential?.LastName ?? administratorProfile?.LastName ?? input.LastName;
         string firstName = string.IsNullOrWhiteSpace(suppliedFirstName)
             ? "User"
             : suppliedFirstName.Trim();
@@ -360,7 +419,14 @@ public sealed class InstanceOnboardingCompletionOperation(
         string providerKey;
         bool emailVerified;
 
-        if (input.ConfiguredCommand is not null)
+        if (input.LocalCredential is not null)
+        {
+            providerKind = AuthenticationProviderKind.Local;
+            provider = providerKind.ToAuthenticationProviderCode();
+            providerKey = input.UserId.ToString("D");
+            emailVerified = input.LocalCredential.EmailVerified;
+        }
+        else if (input.ConfiguredCommand is not null)
         {
             providerKind = input.ConfiguredCommand.AuthenticatedAccount.ProviderKind;
             provider = providerKind.ToAuthenticationProviderCode();
@@ -396,6 +462,7 @@ public sealed class InstanceOnboardingCompletionOperation(
 
         await actorRepository.Create(new Actor
         {
+            Id = input.LocalCredential?.Receipt.PersonalActorId ?? Guid.CreateVersion7(),
             ActorTypeId = (int)ActorTypeEnum.User,
             ActorType = null!,
             Pii = new ActorPii { DisplayName = $"{firstName} {lastName}".Trim() },
@@ -404,7 +471,7 @@ public sealed class InstanceOnboardingCompletionOperation(
         });
         await externalLoginRepository.Create(new UserExternalLogin
         {
-            Id = input.ExternalLoginId,
+            Id = input.LocalCredential?.Receipt.ExternalLoginId ?? input.ExternalLoginId,
             UserId = user.Id,
             User = user,
             AuthenticationProviderId = (int)providerKind,
@@ -748,9 +815,12 @@ public sealed class InstanceOnboardingCompletionOperation(
         DeploymentMode DeploymentMode,
         DateTime CompletedAt,
         Guid BootstrapId,
-        Guid ExternalLoginId)
+        Guid ExternalLoginId,
+        LocalCredentialProvisioningSnapshot? LocalCredential = null,
+        ConfiguredAdministratorBootstrapBinding? LocalBinding = null)
     {
-        public Guid UserId => InteractiveCommand?.UserId ?? ConfiguredCommand!.UserId;
+        public bool IsConfigured => ConfiguredCommand is not null || LocalBinding is not null;
+        public Guid UserId => LocalCredential?.Receipt.LocalSubjectId ?? InteractiveCommand?.UserId ?? ConfiguredCommand!.UserId;
         public string? Email => InteractiveCommand?.Email ?? ConfiguredCommand?.Email;
         public string? FirstName => InteractiveCommand?.FirstName ?? ConfiguredCommand?.FirstName;
         public string? LastName => InteractiveCommand?.LastName ?? ConfiguredCommand?.LastName;

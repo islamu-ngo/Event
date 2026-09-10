@@ -1,0 +1,28 @@
+Change-Id: CHG-01M23HJE1VW2ZR3WMCQ2CGFX28
+Title: "Reject expired credential replacement before commit"
+Type: fix
+Scope: access
+Summary: "Recheck temporary credential replacement authority after database writes and roll back the password, token and operation changes when its deadline has elapsed."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHENTICATION.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Credential replacement rechecks challenge lifetime after awaited writes and rolls back every selected-store change when expiry is observed before commit.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: An expired replacement attempt leaves the temporary password intact; use a fresh login challenge.

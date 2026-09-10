@@ -127,42 +127,42 @@ internal static class SetupCompositionNormalizer
         switch (element.ValueKind)
         {
             case JsonValueKind.Object:
-            {
-                var entries = new SortedDictionary<string, CompositionNode>(StringComparer.Ordinal);
-                var identities = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                int count = 0;
-                foreach (JsonProperty property in element.EnumerateObject())
                 {
-                    if (checked(++count) > limits.MappingEntries)
-                        throw new SetupCompositionException(SetupCompositionFailureCode.LimitExceeded);
-                    AddKey(entries, identities, property.Name,
-                        FromJson(property.Value, checked(depth + 1), budget, limits, cancellationToken));
+                    var entries = new SortedDictionary<string, CompositionNode>(StringComparer.Ordinal);
+                    var identities = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    int count = 0;
+                    foreach (JsonProperty property in element.EnumerateObject())
+                    {
+                        if (checked(++count) > limits.MappingEntries)
+                            throw new SetupCompositionException(SetupCompositionFailureCode.LimitExceeded);
+                        AddKey(entries, identities, property.Name,
+                            FromJson(property.Value, checked(depth + 1), budget, limits, cancellationToken));
+                    }
+                    return new CompositionMap(entries);
                 }
-                return new CompositionMap(entries);
-            }
             case JsonValueKind.Array:
-            {
-                var entries = new List<CompositionNode>();
-                foreach (JsonElement item in element.EnumerateArray())
                 {
-                    if (checked(entries.Count + 1) > limits.SequenceEntries)
-                        throw new SetupCompositionException(SetupCompositionFailureCode.LimitExceeded);
-                    entries.Add(FromJson(item, checked(depth + 1), budget, limits, cancellationToken));
+                    var entries = new List<CompositionNode>();
+                    foreach (JsonElement item in element.EnumerateArray())
+                    {
+                        if (checked(entries.Count + 1) > limits.SequenceEntries)
+                            throw new SetupCompositionException(SetupCompositionFailureCode.LimitExceeded);
+                        entries.Add(FromJson(item, checked(depth + 1), budget, limits, cancellationToken));
+                    }
+                    return new CompositionSequence(entries.AsReadOnly());
                 }
-                return new CompositionSequence(entries.AsReadOnly());
-            }
             case JsonValueKind.String:
-            {
-                string value = element.GetString()!;
-                budget.Scalar(value);
-                return new CompositionScalar(CompositionScalarKind.String, value);
-            }
+                {
+                    string value = element.GetString()!;
+                    budget.Scalar(value);
+                    return new CompositionScalar(CompositionScalarKind.String, value);
+                }
             case JsonValueKind.Number:
-            {
-                string value = element.GetRawText();
-                budget.Scalar(value);
-                return new CompositionScalar(CompositionScalarKind.JsonNumber, value);
-            }
+                {
+                    string value = element.GetRawText();
+                    budget.Scalar(value);
+                    return new CompositionScalar(CompositionScalarKind.JsonNumber, value);
+                }
             case JsonValueKind.True:
                 budget.Scalar("true");
                 return new CompositionScalar(CompositionScalarKind.Boolean, "true");

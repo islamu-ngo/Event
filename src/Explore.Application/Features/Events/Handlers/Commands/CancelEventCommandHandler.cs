@@ -10,6 +10,7 @@ using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Application.Services.Registration;
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Federation;
 using Explore.Domain.Services.Lifecycle;
@@ -29,7 +30,8 @@ public sealed class CancelEventCommandHandler(
     IEventLifecycleScheduler eventLifecycleScheduler,
     IRefundCampaignRepository refundCampaignRepository,
     IOutboxRepository outboxRepository,
-    TimeProvider timeProvider) : IRequestHandler<CancelEventCommand, BaseCommandResponse<Guid>>
+    TimeProvider timeProvider,
+    ISettingMutationLock mutationLock) : IRequestHandler<CancelEventCommand, BaseCommandResponse<Guid>>
 {
     private const string ConcurrencyConflictCode = "event_cancel_concurrency_conflict";
     private const string TransitionNotAllowedCode = "event_cancel_transition_not_allowed";
@@ -75,7 +77,9 @@ public sealed class CancelEventCommandHandler(
         Guid? tenantIdToInvalidate = null;
         bool mutationAttempted = false;
 
-        BaseCommandResponse<Guid> response = await unitOfWork.ExecuteInTransactionAsync(async token =>
+        BaseCommandResponse<Guid> response = await mutationLock.ExecuteOrderedGroupsAsync(
+            [[GovernanceSettingKeys.Email.DeliveryEnabled]],
+            policyToken => unitOfWork.ExecuteInTransactionAsync(async token =>
         {
             tenantIdToInvalidate = null;
             var attemptEvent = await eventRepository.GetById(request.Id);
@@ -170,7 +174,7 @@ public sealed class CancelEventCommandHandler(
                 token);
             tenantIdToInvalidate = attemptEvent.TenantId;
             return Success(attemptEvent.Id, "Event cancelled successfully.");
-        }, cancellationToken);
+        }, policyToken), cancellationToken);
 
         if (!response.IsSuccess || !tenantIdToInvalidate.HasValue)
         {

@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Infrastructure.Ai;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Instance;
 using Explore.Application.Notifications;
@@ -19,17 +20,20 @@ public class InstanceGovernanceSettingService : IInstanceGovernanceSettingServic
     private readonly SettingUpsertService _upsertService;
     private readonly IModuleCapabilityService _moduleCapabilityService;
     private readonly ILogger<InstanceGovernanceSettingService> _logger;
+    private readonly IEmailDeliverySettingsWriter _emailDeliverySettingsWriter;
 
     public InstanceGovernanceSettingService(
         IHierarchicalSettingsResolver resolver,
         SettingUpsertService upsertService,
         IModuleCapabilityService moduleCapabilityService,
-        ILogger<InstanceGovernanceSettingService> logger)
+        ILogger<InstanceGovernanceSettingService> logger,
+        IEmailDeliverySettingsWriter emailDeliverySettingsWriter)
     {
         _resolver = resolver;
         _upsertService = upsertService;
         _moduleCapabilityService = moduleCapabilityService;
         _logger = logger;
+        _emailDeliverySettingsWriter = emailDeliverySettingsWriter;
     }
 
     public async Task<InstanceGovernanceSettings> ReadSettingsAsync()
@@ -88,6 +92,7 @@ public class InstanceGovernanceSettingService : IInstanceGovernanceSettingServic
             Branding = new BrandingSettingsDto
             {
                 DefaultBrandDisplayName = branding.DisplayName,
+                SupportEmail = branding.SupportEmail,
                 DefaultBrandLogoUrl = branding.LogoUrl ?? string.Empty,
                 DefaultBrandFaviconUrl = branding.FaviconUrl ?? string.Empty,
                 DefaultBrandCustomCssUrl = branding.CustomCssUrl ?? string.Empty,
@@ -167,11 +172,14 @@ public class InstanceGovernanceSettingService : IInstanceGovernanceSettingServic
         var deferredNotifications = new List<SettingChangedNotification>();
         var isMultiTenant = settings.DeploymentMode.Mode == DeploymentMode.MultiTenant;
 
+        deferredNotifications.AddRange(await ApplySmtpDelegationAsync(
+            settings.TenantDelegation.LockTenantSmtp, actorUserId, cancellationToken));
+
         await _upsertService.UpsertValueAsync(GovernanceSettingKeys.Deployment.Mode, SettingValueSerializer.Serialize(settings.DeploymentMode.Mode.ToString()), isLocked: true, actorUserId, cancellationToken: cancellationToken);
 
         settings.TenantDelegation.LockTenantAiAssistant = settings.AiAssistant.LockTenantAiAssistant;
 
-        await ApplyTenantDelegationSettingsInternalAsync(settings.TenantDelegation, isMultiTenant, actorUserId);
+        await ApplyTenantDelegationSettingsInternalAsync(settings.TenantDelegation, isMultiTenant, actorUserId, cancellationToken);
         await ApplyAdminPortalSettingsAsync(settings.AdminPortal, actorUserId);
         await ApplyAiAssistantGovernanceSettingsAsync(settings.AiAssistant, actorUserId);
         await ApplyMcpGovernanceSettingsAsync(settings.Mcp, actorUserId);
@@ -652,8 +660,16 @@ public class InstanceGovernanceSettingService : IInstanceGovernanceSettingServic
         return notifications;
     }
 
-    public async Task ApplyTenantDelegationSettingsAsync(TenantDelegationSettingsDto delegation, Guid? actorUserId)
-        => await ApplyTenantDelegationSettingsInternalAsync(delegation, false, actorUserId);
+    public async Task<IReadOnlyList<SettingChangedNotification>> ApplyTenantDelegationSettingsAsync(
+        TenantDelegationSettingsDto delegation,
+        Guid? actorUserId,
+        CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<SettingChangedNotification> notifications = await ApplySmtpDelegationAsync(
+            delegation.LockTenantSmtp, actorUserId, cancellationToken);
+        await ApplyTenantDelegationSettingsInternalAsync(delegation, false, actorUserId, cancellationToken);
+        return notifications;
+    }
 
     public async Task<IReadOnlyList<SettingChangedNotification>> ApplyTenantDelegationSettingsPatchAsync(
         bool isMultiTenant,
@@ -663,6 +679,12 @@ public class InstanceGovernanceSettingService : IInstanceGovernanceSettingServic
         CancellationToken cancellationToken = default)
     {
         var notifications = new List<SettingChangedNotification>();
+        if (patch.LockTenantSmtp.HasValue)
+        {
+            notifications.AddRange(await ApplySmtpDelegationAsync(
+                delegation.LockTenantSmtp, actorUserId, cancellationToken));
+        }
+
         delegation.DefaultPublicHomePage = NormalizeHomePage(delegation.DefaultPublicHomePage);
 
         if (patch.AllowTenantSelfServiceRegistration.HasValue)
@@ -700,15 +722,6 @@ public class InstanceGovernanceSettingService : IInstanceGovernanceSettingServic
                 delegation.LockTenantHomePagePreference,
                 actorUserId,
                 cancellationToken));
-        }
-
-        if (patch.LockTenantSmtp.HasValue)
-        {
-            notifications.Add((await _upsertService.UpsertValueWithDeferredInvalidationAsync(
-                GovernanceSettingKeys.TenantDelegation.LockSmtp,
-                SettingValueSerializer.Serialize(delegation.LockTenantSmtp),
-                actorUserId,
-                cancellationToken: cancellationToken)).Notification);
         }
 
         if (patch.LockTenantStorage.HasValue)
@@ -1438,43 +1451,61 @@ public class InstanceGovernanceSettingService : IInstanceGovernanceSettingServic
 
     // ── Internal write methods ──────────────────────────────────────
 
-    private async Task ApplyTenantDelegationSettingsInternalAsync(TenantDelegationSettingsDto d, bool isMultiTenant, Guid? actorUserId)
+    private async Task<IReadOnlyList<SettingChangedNotification>> ApplySmtpDelegationAsync(
+        bool lockTenantSmtp,
+        Guid? actorUserId,
+        CancellationToken cancellationToken)
+    {
+        EmailDeliverySettingsWriteResult result = await _emailDeliverySettingsWriter.ApplyAsync(
+            mutations: [new EmailDeliverySettingMutation(
+                TenantId: null,
+                Key: GovernanceSettingKeys.TenantDelegation.LockSmtp,
+                Kind: EmailDeliverySettingMutationKind.SetValue,
+                Value: SettingValueSerializer.Serialize(lockTenantSmtp),
+                IsLocked: false)],
+            actorUserId: actorUserId,
+            cancellationToken: cancellationToken);
+        result.EnsureAccepted();
+        return result.ToNotifications(actorUserId);
+    }
+
+    private async Task ApplyTenantDelegationSettingsInternalAsync(
+        TenantDelegationSettingsDto d,
+        bool isMultiTenant,
+        Guid? actorUserId,
+        CancellationToken cancellationToken)
     {
         d.DefaultPublicHomePage = NormalizeHomePage(d.DefaultPublicHomePage);
 
         await _upsertService.UpsertValueAsync(
             GovernanceSettingKeys.Tenants.SelfServiceRegistration,
-            SettingValueSerializer.Serialize(isMultiTenant && d.AllowTenantSelfServiceRegistration), actorUserId);
+            SettingValueSerializer.Serialize(isMultiTenant && d.AllowTenantSelfServiceRegistration), actorUserId, cancellationToken);
 
         await _upsertService.UpsertValueAsync(
             GovernanceSettingKeys.Tenants.WhiteLabelingEnabled,
-            SettingValueSerializer.Serialize(isMultiTenant && d.AllowTenantWhiteLabeling), actorUserId);
+            SettingValueSerializer.Serialize(isMultiTenant && d.AllowTenantWhiteLabeling), actorUserId, cancellationToken);
 
         await _upsertService.UpsertValueAsync(
             GovernanceSettingKeys.Routing.DefaultPublicHomePage,
             SettingValueSerializer.Serialize(d.DefaultPublicHomePage),
-            isLocked: d.LockTenantHomePagePreference, actorUserId);
+            isLocked: d.LockTenantHomePagePreference, actorUserId, cancellationToken);
 
         await _upsertService.UpsertValueAsync(
             GovernanceSettingKeys.Security.AuthorizationProvider,
             SettingValueSerializer.Serialize(NormalizeAuthorizationProvider(d.AuthorizationProvider)),
-            isLocked: true, actorUserId);
-
-        await _upsertService.UpsertValueAsync(
-            GovernanceSettingKeys.TenantDelegation.LockSmtp,
-            SettingValueSerializer.Serialize(d.LockTenantSmtp), actorUserId);
+            isLocked: true, actorUserId, cancellationToken);
 
         await _upsertService.UpsertValueAsync(
             GovernanceSettingKeys.TenantDelegation.LockStorage,
-            SettingValueSerializer.Serialize(d.LockTenantStorage), actorUserId);
+            SettingValueSerializer.Serialize(d.LockTenantStorage), actorUserId, cancellationToken);
 
         await _upsertService.UpsertValueAsync(
             GovernanceSettingKeys.TenantDelegation.LockAnalytics,
-            SettingValueSerializer.Serialize(d.LockTenantAnalytics), actorUserId);
+            SettingValueSerializer.Serialize(d.LockTenantAnalytics), actorUserId, cancellationToken);
 
         await _upsertService.UpsertValueAsync(
             GovernanceSettingKeys.TenantDelegation.LockAiAssistant,
-            SettingValueSerializer.Serialize(d.LockTenantAiAssistant), actorUserId);
+            SettingValueSerializer.Serialize(d.LockTenantAiAssistant), actorUserId, cancellationToken);
     }
 
     private async Task ApplyLocationPrivacySettingsAsync(

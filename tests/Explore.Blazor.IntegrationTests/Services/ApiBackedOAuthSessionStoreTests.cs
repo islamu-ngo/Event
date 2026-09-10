@@ -166,7 +166,8 @@ public sealed class ApiBackedOAuthSessionStoreTests
                 "oauth-active",
                 "person",
                 canonicalActorId,
-                expectedCanonicalActorConcurrencyStamp) { BrowserBinding = browserBinding },
+                expectedCanonicalActorConcurrencyStamp)
+            { BrowserBinding = browserBinding },
             new("https://issuer.example/")));
         return flow;
     }

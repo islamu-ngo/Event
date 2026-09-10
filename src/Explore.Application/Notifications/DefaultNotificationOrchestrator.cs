@@ -1,6 +1,7 @@
 using Explore.Application.Contracts.Notifications;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
+using Explore.Domain.Constants;
 using DomainAccountAuthorityKind = Explore.Domain.Enums.AccountAuthorityKindEnum;
 using DomainExternalWorkflowProviderKind = Explore.Domain.Enums.ExternalWorkflowProviderKindEnum;
 using DomainNotificationCategory = Explore.Domain.Enums.NotificationCategoryEnum;
@@ -16,7 +17,8 @@ public sealed class DefaultNotificationOrchestrator(
     INotificationOwnershipResolver ownershipResolver,
     INotificationIntentRepository notificationIntentRepository,
     IPrivacyErasureStateRepository privacyErasureStateRepository,
-    IUnitOfWork unitOfWork) : INotificationOrchestrator
+    IUnitOfWork unitOfWork,
+    ISettingMutationLock mutationLock) : INotificationOrchestrator
 {
     public async Task<NotificationOrchestrationResult> EnqueueAsync(
         NotificationIntentDraft draft,
@@ -70,7 +72,9 @@ public sealed class DefaultNotificationOrchestrator(
                 throw new InvalidOperationException($"Unsupported notification ownership '{decision.Ownership}'.");
         }
 
-        return await unitOfWork.ExecuteSerializableAsync(async token =>
+        return await mutationLock.ExecuteOrderedGroupsAsync(
+            [[GovernanceSettingKeys.Email.DeliveryEnabled]],
+            policyToken => unitOfWork.ExecuteSerializableAsync(async token =>
         {
             if (await IsFencedAsync(recipientUserId, token))
             {
@@ -79,7 +83,7 @@ public sealed class DefaultNotificationOrchestrator(
 
             var savedIntent = await notificationIntentRepository.CreateIntentAsync(intent, token);
             return new NotificationOrchestrationResult(savedIntent, decision, delivery, delegation);
-        }, cancellationToken);
+        }, policyToken), cancellationToken);
     }
 
     private async Task<bool> IsFencedAsync(Guid recipientUserId, CancellationToken cancellationToken) =>

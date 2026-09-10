@@ -33,8 +33,13 @@ public sealed class AtprotoBrowserProof(IDataProtectionProvider protection, Time
                 if (value.Length >= 1024) throw InvalidProof();
                 context.Response.Cookies.Append(CookieName, value, new CookieOptions
                 {
-                    Secure = true, HttpOnly = true, SameSite = SameSiteMode.Lax, Path = "/",
-                    MaxAge = Lifetime, Expires = proof.ExpiresAt, IsEssential = true
+                    Secure = true,
+                    HttpOnly = true,
+                    SameSite = SameSiteMode.Lax,
+                    Path = "/",
+                    MaxAge = Lifetime,
+                    Expires = proof.ExpiresAt,
+                    IsEssential = true
                 });
             }
             byte[] flowId = RandomNumberGenerator.GetBytes(32);

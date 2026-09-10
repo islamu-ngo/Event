@@ -85,6 +85,7 @@ public static class ApiHostApplicationExtensions
 
         pipeline.UseHateoas();
         pipeline.UseRouting();
+        pipeline.UseMiddleware<PrivateNoStoreMiddleware>();
         pipeline.UseWhen(context => AtprotoTransientAuthenticationDefaults.IsPrivatePath(context.Request.Path), branch =>
         {
             branch.Use(AtprotoTransientRequestBoundary.GuardAsync);
@@ -100,7 +101,6 @@ public static class ApiHostApplicationExtensions
         pipeline.UseMiddleware<ApiTenantPostAuthenticationMiddleware>();
         pipeline.UseMiddleware<McpRuntimeGateMiddleware>();
         pipeline.UseRequestLocalization();
-        pipeline.UseMiddleware<PrivateNoStoreMiddleware>();
         pipeline.UseWhen(context => !AtprotoTransientAuthenticationDefaults.IsPrivatePath(context.Request.Path),
             branch => branch.UseRateLimiter());
         pipeline.UseAuthorization();

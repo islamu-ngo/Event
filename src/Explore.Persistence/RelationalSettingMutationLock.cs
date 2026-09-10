@@ -1,4 +1,7 @@
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Services;
+using Explore.Domain.Constants;
+using Explore.Domain.Settings.Definitions;
 using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -51,6 +54,32 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
             throw new ArgumentException(
                 "At least one canonical setting key is required.",
                 nameof(canonicalSettingKeys));
+        }
+
+        bool visitorPolicy = RequiresVisitorAccessFence(orderedKeys);
+        if (RequiresEmailDeliveryFence(orderedKeys) || visitorPolicy)
+        {
+            IReadOnlySet<string>? outerKeys = _outerOrderedKeys.Value;
+            if (outerKeys is null)
+            {
+                if (_dbContext.Database.CurrentTransaction is not null)
+                    throw new InvalidOperationException(
+                        "Policy locks must be acquired before the caller-owned transaction begins.");
+
+                // Admission owns this policy lock before opening its transaction. Writers must
+                // use the same order so a database writer cannot block its own lock holder.
+                return ExecuteOrderedGroupsAsync(
+                    [orderedKeys],
+                    token => visitorPolicy
+                        ? _unitOfWork.ExecuteSerializableAsync(
+                            innerToken => ExecuteInsideTransactionAsync(orderedKeys, operation, innerToken), token)
+                        : _unitOfWork.ExecuteInTransactionAsync(
+                            innerToken => ExecuteInsideTransactionAsync(orderedKeys, operation, innerToken), token),
+                    cancellationToken);
+            }
+
+            if (!orderedKeys.All(outerKeys.Contains))
+                throw new InvalidOperationException("Nested policy mutations must declare all policy keys in the outer lock group.");
         }
 
         return _dbContext.Database.CurrentTransaction is not null
@@ -176,15 +205,20 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
     internal static string[] NormalizeCanonicalKeys(
         IEnumerable<string> canonicalSettingKeys)
     {
-        return canonicalSettingKeys
-            .Select(key =>
-            {
-                ArgumentException.ThrowIfNullOrWhiteSpace(key);
-                return key.Trim().ToLowerInvariant();
-            })
+        string[] normalizedKeys = canonicalSettingKeys
+            .Select(NormalizeCanonicalKey)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(key => key, StringComparer.Ordinal)
             .ToArray();
+
+        if (RequiresVisitorAccessFence(normalizedKeys))
+            normalizedKeys = normalizedKeys.Concat(VisitorAccessCapabilityResolver.AuthoritySettingKeys)
+                .Distinct(StringComparer.Ordinal).OrderBy(key => key, StringComparer.Ordinal).ToArray();
+
+        return RequiresEmailDeliveryFence(normalizedKeys)
+            ? [GovernanceSettingKeys.Email.DeliveryEnabled,
+                .. normalizedKeys.Where(key => key != GovernanceSettingKeys.Email.DeliveryEnabled)]
+            : normalizedKeys;
     }
 
     internal static string[] NormalizeOrderedCanonicalKeyGroups(
@@ -204,6 +238,29 @@ public sealed class RelationalSettingMutationLock : ISettingMutationLock
             }
         }
 
+        // Visitor authority is always one complete group, independent of the caller's other groups.
+        if (RequiresVisitorAccessFence(ordered))
+        {
+            ordered.RemoveAll(key => VisitorAccessCapabilityResolver.AuthoritySettingKeys.Contains(key));
+            ordered.InsertRange(0, VisitorAccessCapabilityResolver.AuthoritySettingKeys);
+        }
+
+        if (ordered.Remove(GovernanceSettingKeys.Email.DeliveryEnabled))
+            ordered.Insert(0, GovernanceSettingKeys.Email.DeliveryEnabled);
+
         return ordered.ToArray();
+    }
+
+    internal static bool RequiresVisitorAccessFence(IEnumerable<string> keys) =>
+        keys.Select(NormalizeCanonicalKey).Any(VisitorAccessCapabilityResolver.AuthoritySettingKeys.Contains);
+
+    internal static bool RequiresEmailDeliveryFence(IEnumerable<string> keys) =>
+        keys.Select(NormalizeCanonicalKey).Any(key => key == GovernanceSettingKeys.TenantDelegation.LockSmtp
+            || EmailSettingDefinitions.All.Any(definition => definition.Key == key));
+
+    internal static string NormalizeCanonicalKey(string key)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        return key.Trim().ToLowerInvariant();
     }
 }

@@ -57,7 +57,7 @@ public class NotificationIntentRepositoryTests(PostgreSqlContainerFixture fixtur
         context.TenantUsers.Add(recipient.TenantUser);
         await context.SaveChangesAsync();
 
-        var repository = new NotificationIntentRepository(context);
+        var repository = CreateRepository(context);
         var intent = CreateIntent(tenantA.Id, recipient.User.Id, "registration-approved:shared");
 
         var created = await repository.CreateIntentAsync(intent, CancellationToken.None);
@@ -167,7 +167,7 @@ public class NotificationIntentRepositoryTests(PostgreSqlContainerFixture fixtur
         }
 
         await using var retryContext = fixture.CreateDbContext();
-        var repository = new NotificationIntentRepository(retryContext);
+        var repository = CreateRepository(retryContext);
         NotificationIntent retry = CreateIntent(
             tenantId,
             recipientUserId,
@@ -218,7 +218,7 @@ public class NotificationIntentRepositoryTests(PostgreSqlContainerFixture fixtur
         context.TenantUsers.Add(recipient.TenantUser);
         await context.SaveChangesAsync();
 
-        var repository = new NotificationIntentRepository(context);
+        var repository = CreateRepository(context);
         var intent = await repository.CreateIntentAsync(
             CreateIntent(tenant.Id, recipient.User.Id, "moderation-decision:audit"),
             CancellationToken.None);
@@ -281,7 +281,7 @@ public class NotificationIntentRepositoryTests(PostgreSqlContainerFixture fixtur
         context.TenantUsers.Add(recipient.TenantUser);
         await context.SaveChangesAsync();
 
-        var repository = new NotificationIntentRepository(context);
+        var repository = CreateRepository(context);
         var intent = await repository.CreateIntentAsync(
             CreateIntent(tenant.Id, recipient.User.Id, "identity-lifecycle:authority"),
             CancellationToken.None);
@@ -378,12 +378,16 @@ public class NotificationIntentRepositoryTests(PostgreSqlContainerFixture fixtur
 
     private static DefaultNotificationOrchestrator CreateOrchestrator(
         ExploreDbContext context,
-        INotificationOwnershipResolver ownershipResolver) =>
-        new(
-            ownershipResolver,
-            new NotificationIntentRepository(context),
-            new PrivacyErasureStateRepository(context),
-            new EfCoreUnitOfWork(context));
+        INotificationOwnershipResolver ownershipResolver)
+    {
+        var unitOfWork = new EfCoreUnitOfWork(context);
+        var mutationLock = new RelationalSettingMutationLock(context, unitOfWork);
+        return new(ownershipResolver, new NotificationIntentRepository(context, mutationLock),
+            new PrivacyErasureStateRepository(context), unitOfWork, mutationLock);
+    }
+
+    private static NotificationIntentRepository CreateRepository(ExploreDbContext context) =>
+        new(context, new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
 
     private static NotificationIntentDraft CreateDraft(Guid tenantId, Guid recipientUserId, string deduplicationKey) =>
         new(

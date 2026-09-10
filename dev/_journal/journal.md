@@ -1674,3 +1674,686 @@ uninitializable.
 - [x] Stays in journal only (one-off debugging lesson)
 
 ---
+
+[2026-09-06 Europe/Brussels] — SQLite lock fixtures need transaction interceptors
+
+**Context**: While adding real Local-admission security tests, an existing Identity fixture began using `SystemSettingRepository` and its relational mutation lock.
+
+**Symptom / Observation**: The runner reached its test-execution banner but never produced a result summary. The verified test process remained alive until explicitly terminated. Registering the missing interceptor made the corrected run finish in fourteen seconds with all sixteen results: ten expected policy failures and six passing controls, not a product Green result.
+
+**Root Cause**: `UseSqlite` alone does not install the repository's lock-lifecycle integration. `RelationalNamedLock` tracks SQLite process semaphores against the EF transaction; `SqliteNamedLockTransactionInterceptor` releases them on commit, rollback, failure, or connection cleanup. The fixture omitted that interceptor, so completing a transaction did not release the lock and subsequent settings operations waited indefinitely, including operations using another fixture connection.
+
+**Resolution**: Added the existing interceptor to the manual Identity fixture, used `SqliteConnectionStringBuilder`, and bounded its operations with a cancellation token. New full-host fixtures reuse `PrimaryDatabaseProviderComposition.ConfigureApplication`, which installs the production interceptors. The corrected `dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --treenode-filter "/*/*/*LocalIdentityAuthServiceTests/*"` completed normally; its deliberate admission-policy failures remain Red until implementation. The earlier terminated run supplies no passing-test evidence regardless of its driver's exit code.
+
+**Why This Matters for Future Work**: Extending a database fixture to exercise repositories can introduce transaction-lifecycle dependencies that its earlier direct Identity operations did not need. Reuse production provider composition or explicitly retain its interceptors; separate SQLite databases do not repair a leaked process lock. Require an actual test summary and use bounded verification commands.
+
+**References**:
+- `src/Explore.Persistence/Database/PrimaryDatabaseProviderComposition.cs:31`
+- `src/Explore.Persistence/Database/ProviderPrimitives/RelationalNamedLock.cs:46`
+- `src/Explore.Persistence/Database/ProviderPrimitives/SqliteNamedLockTransactionInterceptor.cs:10`
+- `tests/Event.Persistence.IntegrationTests/Identity/LocalIdentityAuthServiceTests.cs:327`
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/internal/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for a path-scoped rule
+[2026-09-06 Europe/Brussels] — Tenant plan assignment omitted version settings and quotas
+
+**Context**: While fencing SMTP configuration writers in email-optional
+self-hosting P02, real relational tests exercised tenant plan assignment through
+a fresh handler context.
+
+**Symptom / Observation**: Applying a plan reported success without persisting
+its SMTP overrides. A system-locked SMTP field also reported success because the
+handler returned before evaluating the setting. The initial five-case SQLite
+run had four failures and one passing tenant-mismatch check.
+
+**Root Cause**: `TenantPlanRepository.GetAssignmentAsync` includes the assigned
+version but not its `Settings` or `Quotas` collections. The handler treated these
+unloaded, initialized-empty collections as a genuinely empty plan. Tests that
+supply populated navigation objects do not exercise this repository boundary.
+
+**Resolution**: The handler explicitly uses the existing `GetVersionAsync` read,
+which includes both collections, before deriving its mutation keys. SMTP keys
+are acquired before the assignment transaction; other setting locks retain their
+existing transaction ordering. Six real SQLite cases pass, including pure and
+mixed plans, global SMTP lock contention, tenant mismatch, a locked instance
+setting, and a persisted storage quota above the ceiling. Verification:
+`dotnet run --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release -- --treenode-filter "/*/*/*TenantPlanEmailMutationTests/*"`.
+Implementation is uncommitted P02 work, not a completed phase gate.
+
+**Why This Matters for Future Work**: An included parent navigation does not
+establish that its child collections were loaded. Verify state-changing plan
+application against the real repository using a separate context after seeding;
+do not infer an empty plan from an incomplete entity graph.
+
+**References**:
+- `src/Explore.Persistence/Repositories/TenantPlanRepository.cs:37`
+- `src/Explore.Persistence/Repositories/TenantPlanRepository.cs:167`
+- `src/Explore.Application/Features/ControlPlane/Handlers/Commands/ApplyControlPlaneTenantPlanAssignmentCommandHandler.cs:56`
+- `tests/Event.Persistence.IntegrationTests/Repositories/TenantPlanEmailMutationTests.cs`
+- `.agents/skills/dotnet-efcore-guidelines/SKILL.md`
+- PR / commit: pending
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for new `.claude/rules/*.md` entry
+- [ ] Candidate for skill update: `dotnet-efcore-guidelines`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [x] Stays in journal only (one-off debugging lesson)
+
+---
+
+[2026-09-06 Europe/Brussels] — SMTP locks do not refresh EF tracked policy rows
+
+**Context**: While reviewing the email-optional delivery fence, two SQLite
+contexts exercised repeated successful system and tenant settings writes.
+
+**Symptom / Observation**: Context A wrote X, context B committed Y, then A
+requested X again. The final database value remained Y. Lock-only updates could
+similarly leave a setting locked after an unlock request, and returned previous
+values came from A's stale copy. All five initial regression cases failed.
+
+**Root Cause**: Tracking queries reuse an entity already held by the context
+without refreshing its current or original property values. A serializing policy
+lock therefore does not by itself make a reused context authoritative. Assigning
+X to A's existing X may produce no value-column update despite the database now
+containing Y. This behavior is described in [EF tracking documentation](https://learn.microsoft.com/en-us/ef/core/querying/tracking).
+
+**Resolution**: Inside the acquired SMTP policy boundary, detach only the
+requested system setting or the exact tenant's requested SMTP rows before the
+existing query. Re-querying establishes a current baseline. Detachment retains
+the caller's scalar input even when it is the same previously tracked object;
+lock-only writes preserve the database's current non-lock fields. Unrelated
+pending state is not detached or cleared. Five real SQLite cases pass with
+`dotnet run --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release -- --treenode-filter "/*/*/*EmailDeliveryTrackedPolicyTests/*"`.
+This is uncommitted P02 work, not full phase acceptance.
+
+**Why This Matters for Future Work**: Whenever a context survives a completed
+mutation, inspect both transaction ordering and the state of its identity map.
+Do not clear an entire caller-owned tracker or reload a same-instance request
+without protecting its intended input. Test committed results through another
+context, including unrelated pending state and previous-value reporting.
+
+**References**:
+- `src/Explore.Persistence/Repositories/SystemSettingRepository.cs`
+- `src/Explore.Persistence/Repositories/TenantSettingRepository.cs`
+- `src/Explore.Persistence/RelationalSettingMutationLock.cs`
+- `tests/Event.Persistence.IntegrationTests/Repositories/EmailDeliveryTrackedPolicyTests.cs`
+- `.agents/skills/dotnet-efcore-guidelines/SKILL.md`
+- PR / commit: pending
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for new `.claude/rules/*.md` entry
+- [x] Candidate for skill update: `dotnet-efcore-guidelines`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [ ] Stays in journal only (one-off debugging lesson)
+
+---
+
+[2026-09-06 Europe/Brussels] — Login policy must bypass generic idempotency replay
+
+**Context**: Security review of instance-controlled Local sign-in traced the complete HTTP middleware path, beyond the new credential-service policy guard.
+
+**Symptom / Observation**: A native HTTP regression signed in an unverified account while instance delivery intent was false, enabled intent, and repeated the exact credentials and idempotency key. The response was still 200 instead of 401. A separate regression found a durable relational idempotency record for a successful login response. Both failures occurred while the other ten Local HTTP checks passed.
+
+**Root Cause**: Generic `IdempotencyMiddleware` handles completed records before executing the controller or MediatR handler. A correct uncached check inside the credential service therefore cannot govern a middleware replay. The same generic response storage persists token-bearing login responses; browser cache headers alone do not affect that storage.
+
+**Resolution**: Local login reuses `SuppressIdempotencyResponseStorage` and `PrivateNoStore` endpoint metadata, requiring a fresh admission decision and excluding the response from generic persistence/replay. The real middleware and relational-store regressions now pass with the full twelve-case class: `dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --treenode-filter "/*/*/*LocalAdmissionPolicyHttpTests/*"` (12 passed, zero skipped). No new cache or idempotency abstraction was introduced.
+
+**Why This Matters for Future Work**: For credential, one-time-secret, and dynamically authorized endpoints, trace middleware short-circuits as well as handler logic. Response confidentiality and current authorization must hold before replay can occur; HTTP no-store and application-level response-storage suppression are separate controls.
+
+**References**:
+- `src/Explore.API/Controllers/LocalAuthController.cs:26`
+- `src/Explore.API/Middleware/IdempotencyMiddleware.cs:67`
+- `src/Explore.API/Middleware/IdempotencyMiddleware.cs:180`
+- `tests/Event.API.IntegrationTests/Features/LocalAdmissionPolicyHttpTests.cs:190`
+- `docs/internal/AUTHENTICATION.md`
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/internal/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for a path-scoped rule
+- [x] Candidate for skill update: `auth-patterns`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [ ] Stays in journal only (one-off debugging lesson)
+
+---
+
+[2026-09-06 Europe/Brussels] — Fresh roles do not make cached identity links current
+
+**Context**: Administrative Local credential reconciliation checks current database platform roles before creating the application account. Review traced the identity resolution that precedes that role check.
+
+**Symptom / Observation**: A native SQLite regression warmed `AdminContext` with an external login linked to an administrator, removed that exact login through another scope, and retained the user's platform role. Identity resolution still returned the former user and reconciliation passed its authority check. The test failed before the fix and passes in the seventeen-case binding suite.
+
+**Root Cause**: `AdminContext.ResolveUserIdAsync` cached successful provider-account mappings for ten minutes. Its user invalidation removed role-profile keys, not the resolved-identity key. An uncached role query therefore checked a current grant for a stale identity mapping.
+
+**Resolution**: Remove only resolved-identity caching and reuse the existing exact, no-tracking provider-account lookup on each resolution. Keep canonical principal parsing and role-profile caches separate. Verify with `dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --treenode-filter "/*/*/*LocalCredentialBindingTests/*"`. The compiled native suite passed17/17 with zero skips; no general role-cache or concurrent revocation linearizability guarantee is implied.
+
+**Why This Matters for Future Work**: Current authorization requires both a current identity binding and a current grant. Rechecking one cannot compensate for caching the other. Test revocation after warming real caches, not only first-request denial.
+
+**References**:
+- `src/Explore.Infrastructure/Identity/AdminContext.cs:73`
+- `src/Explore.Persistence/Repositories/UserExternalLoginRepository.cs:24`
+- `src/Explore.Application/Features/Authentication/Local/Handlers/Commands/ReconcileLocalCredentialOperationCommandHandler.cs:72`
+- `tests/Event.Persistence.IntegrationTests/Identity/LocalCredentialBindingTests.cs:173`
+- `docs/internal/AUTHENTICATION.md`
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/internal/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for a path-scoped rule
+- [x] Candidate for skill update: `auth-patterns`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [ ] Stays in journal only (one-off debugging lesson)
+
+---
+
+[2026-09-06 Europe/Brussels] — Identity guards belong in the transaction granting authority
+
+**Context**: Local/external account isolation added fresh ownership checks to user synchronization. Configured administrator claims were also traced because they can finish before ordinary synchronization runs.
+
+**Symptom / Observation**: All twenty-five ordinary synchronization cases passed, but two additional native configured-provider tests reproduced existing-account adoption and an administrator claim succeeding after its exact external link was removed. A legitimate exact-link configured claim passed in the same fixture.
+
+**Root Cause**: Synchronization captured a provider link and selected its User ID, then called a configured-claim operation that owned a separate transaction. That operation could grant administrator authority or return completed-replay effects before the ordinary synchronization transaction rechecked ownership. Unlinked claims also accepted a DTO-selected existing User ID.
+
+**Resolution**: Unlinked configured synchronization allocates a fresh server UUID. `InstanceOnboardingCompletionOperation.AdmitConfiguredAsync` verifies current Local ownership and exact provider/account/User binding inside the transaction that can grant authority, before its completed-replay branch. Tests use the real configured provider and startup preparation to establish valid fingerprints, not substituted claim success. The compiled native `LocalIdentitySynchronizationTests` suite passes28/28, and the existing configured-bootstrap suite passes11/11, both with zero skips.
+
+**Why This Matters for Future Work**: A correct preflight or later transaction cannot protect an earlier independently committed write. Trace nested operations and early returns, put the guard in the authority-owning transaction, and test with valid upstream authority so a missing fixture prerequisite cannot conceal the vulnerability.
+
+**References**:
+- `src/Explore.Application/Features/Users/Handlers/Commands/SyncUserCommandHandler.cs:98`
+- `src/Explore.Application/Features/InstanceOnboarding/Services/InstanceOnboardingCompletionOperation.cs:263`
+- `tests/Event.API.IntegrationTests/Features/LocalIdentitySynchronizationTests.cs`
+- `tests/Event.API.IntegrationTests/Features/ConfiguredAdministratorBootstrapTests.cs`
+- `docs/internal/AUTHENTICATION.md`
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/internal/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for a path-scoped rule
+- [x] Candidate for skill update: `auth-patterns`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [ ] Stays in journal only (one-off debugging lesson)
+
+---
+
+[2026-09-06 Europe/Brussels] — A password proof must retain its credential version
+
+**Context**: First-use Local credentials move from ChangeRequired to Ready while replacing the native password hash and security stamps in one selected Identity transaction.
+
+**Symptom / Observation**: Twenty-six native replacement cases passed, but independent review found a missing interleaving. A login verified the temporary password and paused before reading lifecycle state. Another request completed real replacement. The first login then observed Ready and issued an ordinary token from its stale password proof. Deterministic tests reproduced this in both colocated and external Identity layouts.
+
+**Root Cause**: The fresh state read was not bound to the version of the credential used for password verification. The expected-stamp guard existed only inside the ChangeRequired branch, so a concurrent transition to Ready bypassed it. Fresh state alone was insufficient.
+
+**Resolution**: Capture the user security stamp immediately after password verification. Require it in the shared state-read method and read state plus current stamp through one untracked SQL join. Reject an ordinal mismatch before accepting either state; never reload a newer stamp and retain the older password proof. The two race tests failed before the fix; all twenty-eight native first-use cases now pass with zero skips, including actual replacement, independent scopes and the state-query barrier.
+
+**Why This Matters for Future Work**: Authentication evidence and the state authorizing its use must describe the same credential version. This is an initial-admission invariant, separate from revoking already-issued sessions. A passing replacement transaction suite cannot substitute for testing authentication concurrently with that transition.
+
+**References**:
+- `src/Explore.Persistence/Identity/LocalIdentityAuthService.cs`
+- `src/Explore.Persistence/Identity/LocalIdentityCredentialStateStore.cs`
+- `tests/Event.Persistence.IntegrationTests/Identity/LocalCredentialFirstUseTests.cs`
+- `docs/internal/AUTHENTICATION.md`
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/internal/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for a path-scoped rule
+- [x] Candidate for skill update: `auth-patterns`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [ ] Stays in journal only (one-off debugging lesson)
+
+---
+
+[2026-09-06 Europe/Brussels] — Rejected provider identity must not recover authority through GUID fallback
+
+**Context**: The dedicated Local password-replacement HTTP tests included ordinary authenticated user synchronization as a positive control. That exposed Local issuer reconstruction incorrectly using OIDC URL parsing.
+
+**Symptom / Observation**: Correcting Local provider reconstruction made its invalid issuer return null. Independent review then found that administrator resolution and claims transformation interpreted this null as permission to use the raw subject GUID. Two real native tests seeded an administrator without an external binding and reproduced both resolved administrator identity and administrative claim enrichment from an externally classified principal asserting the Local provider name.
+
+**Root Cause**: Provider rejection and provider absence shared the same nullable outcome, while downstream consumers retained a separate platform-GUID fallback. Tightening one parser unintentionally widened authority in those consumers. Testing only the rejected provider projection missed the later fallback.
+
+**Resolution**: The canonical platform-ID reader now validates Local authority before its generic GUID chain, reusing the exact Local issuer and canonical nonempty subject checks. Invalid Local authority returns null terminally; valid Local authority returns only its canonical subject, regardless of alternative name-identifier, session or internal-ID claims. No consumer-specific guards were added. Both native exploit tests failed before the fix; the final 29 HTTP/native-consumer cases and 73 principal cases pass without skips. The dedicated replacement route uses native JWT validation and typed command outcomes, and does not issue a session.
+
+**Why This Matters for Future Work**: A stricter parser is not automatically a stricter authorization flow. Trace every consumer of a rejected identity through all fallback branches, and test with a genuinely privileged victim account and no binding so an empty fixture cannot conceal the issue. This bounded correction preserves non-Local behavior; it is not a general audit of every provider fallback.
+
+**References**:
+- `src/Explore.Application/Authentication/PlatformIdentityPrincipalExtensions.cs`
+- `src/Explore.Infrastructure/Identity/AdminContext.cs`
+- `src/Explore.Infrastructure/Identity/AdminClaimsTransformation.cs`
+- `tests/Event.API.IntegrationTests/Features/LocalCredentialReplacementHttpTests.cs`
+- `tests/Explore.Infrastructure.Tests/Identity/PlatformIdentityPrincipalExtensionsTests.cs`
+- `docs/internal/AUTHENTICATION.md`
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/internal/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for a path-scoped rule
+- [x] Candidate for skill update: `auth-patterns`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [ ] Stays in journal only (one-off debugging lesson)
+
+---
+
+[2026-09-06 Europe/Brussels] — Native cookie and wire controls expose handover defects hidden by substitutes
+
+**Context**: Restricted Local password handover adds a purpose-separated Data Protection cookie and a BFF password-only endpoint without issuing ordinary session authority.
+
+**Symptom / Observation**: The original API transport stub represented no failure as null, while the real API serializes `failureCode` as an empty string. Correcting that stub exposed twenty failed BFF cases. A later positive control unprotected the actual ordinary cookie ticket and found that the trusted circuit-subject reader rejected it, despite native cookie authentication succeeding.
+
+**Root Cause**: The BFF's response predicate did not match the existing serialized API contract. Separately, Local login created a claims identity using the invented `LocalIdentity` authentication-type string, while the shared BFF identity reader accepts only its explicitly trusted cookie/provider schemes. Sending that identity through cookie `SignInAsync` did not change its stored authentication type. The shared test fixture's fake authentication forwarding had concealed the distinction.
+
+**Resolution**: The BFF accepts an empty no-failure code while rejecting nonempty failures and contradictory session payloads. Ordinary Local cookie identities now use `CookieAuthenticationDefaults.AuthenticationScheme`, retaining `auth_provider=local`; no trust list was broadened. New tests restore native cookie authentication, Data Protection, antiforgery, onboarding and generated-client behavior, substituting only downstream HTTP and unrelated resolver configuration. The real cookie ticket supplies circuit-store partition keys; the test proves old-token storage before restricted handover and its removal afterward. All thirty-one BFF cases pass.
+
+**Why This Matters for Future Work**: A cookie header or an authenticated flag is not proof that purpose-specific session readers can use or revoke that identity. Exercise the actual ticket, downstream readers and stored-token partition. External transport substitutes must preserve real success-envelope details, not merely enough fields to satisfy the consuming test. Likewise, rendered accessibility checks must verify unique description targets: sharing a MudBlazor-owned error ID with an external alert created three duplicate IDs, which the strengthened five-case page suite now detects.
+
+**References**:
+- `src/Explore.Blazor/Extensions/BffAuthEndpoints.cs`
+- `src/Explore.Blazor/Extensions/BffLocalCredentialEndpoints.cs`
+- `src/Event.Web.BffHosting/Security/EventBffPrincipalExtensions.cs`
+- `src/Explore.Blazor.Client/Pages/Auth/LocalPasswordChange.razor`
+- `tests/Explore.Blazor.IntegrationTests/Endpoints/LocalBffCredentialReplacementTests.cs`
+- `tests/Explore.Blazor.Client.Tests/Pages/Auth/LocalPasswordChangeTests.cs`
+- `docs/internal/AUTHENTICATION.md`
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/internal/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for a path-scoped rule
+- [x] Candidate for skill update: `blazor-bff-patterns`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [ ] Stays in journal only (one-off debugging lesson)
+
+---
+
+[2026-09-07 Europe/Brussels] — Valid JWTs can restore a revoked verification fact during sync
+
+**Context**: While implementing current Local session admission, the reset regression showed that cryptographic token validity alone did not revoke an old session. Independent review then examined synchronization under disabled instance email delivery.
+
+**Symptom / Observation**: A real verified login token remained accepted after an independent commit set both Identity and application verification to false without changing the security stamp. Calling user synchronization with that token persisted application verification as true again. The strengthened HTTP regression failed with `Expected to be false` / `but found True`, before its separate unauthorized-status assertion.
+
+**Root Cause**: Delivery policy determines whether an unverified account may sign in; it does not prove that an old token's verification claim is still true. Checking the current policy and credential stamp without comparing the claimed verification fact allowed synchronization to treat stale evidence as current authority.
+
+**Resolution**: Nominal `LocalSessionAuthority` owns the original password-checked stamp and verification Boolean once. Login and native Local bearer validation share a fresh Ready/receipt/binding check and require the current Identity verification fact to match the claim, independently of delivery policy. Invalid or unreadable authority fails before claims enrichment and synchronization. Both mismatch directions deny; a freshly issued false-fact token remains valid under disabled delivery, and enabling only delivery invalidates it. The full 32-case HTTP class and 68 native cases pass. Verified command from the task worktree: `dotnet tests/Event.API.IntegrationTests/bin/Release/net10.0/Event.API.IntegrationTests.dll --treenode-filter "/*/*/*LocalCredentialReplacementHttpTests/*" --minimum-expected-tests 32 --progress off --maximum-parallel-tests 1`.
+
+**Why This Matters for Future Work**: A token can be correctly signed yet carry facts that must no longer authorize writes. Test the persisted effect, not merely the response status, and distinguish evidence freshness from policy permission. Admission reads are not a distributed transaction or a fence against later changes; business handlers still need their own transactional checks. Browser cookies and existing interactive circuits require separate invalidation.
+
+**References**:
+- `src/Explore.Application/Contracts/Infrastructure/ILocalIdentityAuthService.cs`
+- `src/Explore.Persistence/Identity/LocalIdentityCredentialStateStore.cs`
+- `src/Explore.Persistence/Identity/LocalIdentityAuthService.cs`
+- `src/Explore.API/Extensions/AuthenticationExtensions.cs`
+- `tests/Event.API.IntegrationTests/Features/LocalCredentialReplacementHttpTests.cs`
+- `tests/Event.Persistence.IntegrationTests/Identity/LocalCredentialFirstUseTests.cs`
+- `docs/internal/AUTHENTICATION.md`
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/internal/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for a path-scoped rule
+- [x] Candidate for skill update: `auth-patterns`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [ ] Stays in journal only (one-off debugging lesson)
+
+---
+
+[2026-09-07 Europe/Brussels] — Circuit revocation needs original authority and lifecycle ordering
+
+**Context**: While extending current Local credential enforcement from API bearers to native BFF cookies and Blazor interactive circuits, real TestServer WebSocket tests exercised initialization, subsequent navigation and same-user concurrent sessions.
+
+**Symptom / Observation**: Clearing token fields did not prevent a stale circuit from obtaining a newer same-user token through fallback storage. Moving the authentication guard before capture then caused all six circuit tests to time out waiting for the opening observer, even though `StartCircuit` had completed. Separate controlled awaits reproduced dispatch after a live provider-marker change and after actual guard disposal.
+
+**Root Cause**: Blazor's initial inbound activity invokes the opening callback through the downstream delegate; requiring an already-captured snapshot on that activity suppresses initialization itself. After opening, the current principal, ambient handshake context and user-level token fallback are not interchangeable with the original session authority. Authentication-state changes and disposal can also occur while authority reads await completion.
+
+**Resolution**: `TokenCircuitHandler` records completed opening explicitly, retains original cookie authority and rechecks the live subject, session and provider markers after the private current-user probe. Its final lifetime check also covers anonymous activities. Revocation publishes native anonymous state; `CircuitAccessTokenService.RevokeSession` irreversibly denies reads/writes in that scope and deletes only the original typed subject/session partition. It never clears every session when that pair is missing. Verified 55 cases with `dotnet tests/Explore.Blazor.IntegrationTests/bin/Release/net10.0/Explore.Blazor.IntegrationTests.dll --treenode-filter "/*/*/*LocalBffCredentialReplacementTests/*" --minimum-expected-tests 55 --progress off --maximum-parallel-tests 1`; the owning token-service 22 and privacy 5 cases also pass.
+
+**Why This Matters for Future Work**: Prove both successful framework initialization and rejected later activity at the real transport boundary. Clearing a cache field is not revocation when another lookup can resurrect authority. Compare live authority after awaits, preserve independently valid sessions, and distinguish a service-disposal test from framework teardown or browser acceptance. These checks do not create a distributed authorization transaction or notify idle tabs immediately.
+
+**References**:
+- `src/Explore.Blazor/Services/TokenCircuitHandler.cs`
+- `src/Explore.Blazor/Services/CircuitAccessTokenService.cs`
+- `src/Explore.Blazor/Services/BffAdminClaimsTransformation.cs`
+- `tests/Explore.Blazor.IntegrationTests/Endpoints/LocalBffCredentialReplacementTests.cs`
+- `tests/Explore.Blazor.IntegrationTests/Services/CircuitAccessTokenServiceTests.cs`
+- `docs/internal/AUTHENTICATION.md`
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/internal/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for a path-scoped rule
+- [x] Candidate for skill update: `blazor-bff-patterns`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [ ] Stays in journal only (one-off debugging lesson)
+
+---
+
+[2026-09-07 Europe/Brussels] — Cached privileged responses can outlive administrator authority
+
+**Context**: Native HTTP tests exercised retry-safe Local credential reconciliation after a persisted instance administrator grant was removed.
+
+**Symptom / Observation**: Repeating a previously successful request with the same idempotency key returned HTTP 200 and operation status instead of HTTP 403. The same bearer still authenticated the current-user endpoint, isolating grant revocation from authentication failure. No new mutation or plaintext password was involved.
+
+**Root Cause**: Generic `IdempotencyMiddleware` replays stored responses before invoking the handler. Its request identity partitions by authenticated scheme and user, not current persisted administrator grants. Consequently the handler's otherwise fresh authority checks never run for a cached response; private/no-store browser headers do not prevent this application-level replay.
+
+**Resolution**: Apply the existing `SuppressIdempotencyResponseStorage` metadata to reconciliation, as already required for create/reset issuance. This bypasses generic lookup and storage while the native operation ledger retains retry safety. The regression first proves an authorized replay preserves the ledger, then proves revoked access returns 403 without operation disclosure. All 35 native administration cases passed with zero skips using `dotnet tests/Event.API.IntegrationTests/bin/Release/net10.0/Event.API.IntegrationTests.dll --treenode-filter "/*/*/*LocalCredentialAdministrationHttpTests/*" --minimum-expected-tests 35 --progress off --maximum-parallel-tests 1`.
+
+**Why This Matters for Future Work**: Idempotency and authorization have different lifetimes. Inspect the entire middleware-to-handler flow when a privileged operation reuses persisted results; absence of a second mutation does not make stale disclosure authorized. Prefer an existing durable operation ledger over cached privileged HTTP responses when current authorization must run on every retry.
+
+**References**:
+- `src/Explore.API/Controllers/LocalIdentityAdministrationController.cs:168`
+- `src/Explore.API/Middleware/IdempotencyMiddleware.cs`
+- `tests/Event.API.IntegrationTests/Features/LocalCredentialAdministrationHttpTests.cs`
+- `docs/internal/AUTHENTICATION.md`
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/internal/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for a path-scoped rule
+- [x] Candidate for skill update: `auth-patterns`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [ ] Stays in journal only (one-off debugging lesson)
+
+---
+
+[2026-09-07 Europe/Brussels] — HAL enum references must retain CLR nullability
+
+**Context**: Connecting Local account administration to the real generated client exposed a contract mismatch not covered by successful API endpoint tests.
+
+**Symptom / Observation**: The API correctly returned `credentialState: null` for missing metadata or a noncurrent operation, but both generated list and operation clients threw `JsonException` instead of preserving unknown state.
+
+**Root Cause**: `HalDtoSchemaTransformer.ReplaceEnumPropertiesWithReferences` unwrapped `Nullable<T>` to identify the enum component, then replaced the property with a bare reference. That discarded nullability on both DTO and flattened HAL wrappers. The generated record transformation was not responsible; NSwag received the wrong schema.
+
+**Resolution**: Pass CLR nullability to the shared reference helper and use the existing native `oneOf` null/reference shape for nullable enum properties, including existing bare references. Nonnullable enum references remain unchanged. Regenerate OpenAPI, inventory and client through native tools. Both original generated-client null cases now pass; generated-record architecture, OpenAPI parity and contract invariants pass 54 additional checks with no skips.
+
+**Why This Matters for Future Work**: Endpoint success and typed enum generation do not prove wire fidelity. Test legitimate null values through the actual generated client, preserve unknown states rather than substituting an enum default, and fix the authoritative schema transformer instead of adding client compatibility code.
+
+**References**:
+- `src/Explore.API/OpenApi/HalDtoSchemaTransformer.cs`
+- `tests/Explore.Blazor.Client.Tests/Services/LocalIdentityAdministrationServiceTests.cs`
+- `tests/Event.API.IntegrationTests/Features/OpenApiParityTests.cs`
+- `tests/Event.API.IntegrationTests/Features/ContractInvariantsTests.cs`
+- `docs/internal/API_CHANGELOG.md`
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/internal/QUICK_REFERENCE.md` (new non-inferable rule)
+- [x] Candidate for a path-scoped rule
+- [ ] Candidate for skill update
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [ ] Stays in journal only (one-off debugging lesson)
+[2026-09-06 Europe/Brussels] — Fanout occurrence time differs from graph creation time
+
+**Context**: While implementing optional-email suppression, traced notification
+source history through deferred recipient graph creation and conflict repair.
+
+**Symptom / Observation**: A fanout event can occur before a delivery-policy
+cutoff while its recipient intent is materialized afterward. Using the intent's
+creation timestamp would admit that older optional notification after re-enable.
+
+**Root Cause**: `NotificationFanoutRecipientTemplateFactory` preserves
+`NotificationFanoutOccurrence.OccurredAt` on its email draft, but
+`RecipientNotificationMaterializer.BuildGraph` assigns the graph's materialization
+time to intent and delivery rows. Repair retains the winning intent while it may
+attach newly constructed child rows. Those timestamps describe different events.
+
+**Resolution**: Final admission uses the linked occurrence's `OccurredAt` only
+after tenant/event/occurrence validation under the existing precedence lock.
+Nonfanout admission uses the persisted winning intent timestamp, not a rebuilt
+child row's creation time. Compare only the exact tenant's suppression history.
+Seven real SQLite cases pass with `dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --treenode-filter "/*/*/*EmailDeliverySuppressionCutoffTests/*"`.
+This is a bounded P02 correction, not proof of cross-clock cutover ordering;
+source policy revisions must establish that ordering before phase acceptance.
+
+**Why This Matters for Future Work**: Never infer business occurrence order from
+a delayed projection's insertion time. Preserve original source identity and
+history across deduplication, repair and coalescing. More timestamp precision
+does not establish ordering between application and database clocks.
+
+**References**:
+- `src/Explore.Application/Notifications/NotificationFanoutRecipientTemplateFactory.cs:370`
+- `src/Explore.Application/Notifications/RecipientNotificationMaterializer.cs:127`
+- `src/Explore.Persistence/Repositories/NotificationIntentRepository.cs:140`
+- `src/Explore.Persistence/Services/EmailDispatchEligibilityEvaluator.cs:107`
+- `tests/Event.Persistence.IntegrationTests/Repositories/EmailDeliverySuppressionCutoffTests.cs`
+- PR / commit: pending
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for new `.claude/rules/*.md` entry
+- [ ] Candidate for skill update: `outbox-pattern`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [x] Stays in journal only (one-off debugging lesson)
+
+---
+
+[2026-09-06 Europe/Brussels] — Source revisions and graph repair have separate delivery authority
+
+**Context**: Continued the email-optional cutover work after the timestamp-only
+checkpoint above, reviewing real SQLite materialization, admission and settlement.
+
+**Symptom / Observation**: Reversed application/database timestamps admitted old
+optional work and suppressed new work. Repair after admission and disable cleared
+a live SMTP lease. Reusing an email materialization request after rollback retained
+the failed attempt's Skipped state even after delivery was enabled.
+
+**Root Cause**: Clock timestamps do not establish policy ordering. A Queued
+notification delivery can already have a Processing outbox, receipt and provider
+handoff attempt. Database rollback restores persisted state, not fields mutated on
+the caller's reusable CLR object.
+
+**Resolution**: Capture the original nonnegative policy revision under the SMTP
+policy lock. Preserve it across source replay, coalescing and graph repair; compare
+it with only the exact tenant's nullable suppression revision. Graph repair applies
+current policy only to genuinely reconstructed email work, leaving existing linked
+outboxes under admission/settlement ownership. Materialization builds a fresh email
+entity from routing/content/identity/schedule fields for each transaction attempt.
+Nine graph and seven deliberately reversed-clock admission cases pass in
+`EmailDeliveryGraphRevisionTests` and `EmailDeliverySuppressionRevisionTests`.
+The latter replaces the historical cutoff test class referenced above.
+
+**Why This Matters for Future Work**: Never treat projection status as proof that
+a provider handoff has not started, and never assume database rollback resets an
+input entity. Preserve durable admission evidence while reconstructing only missing
+work. UTC timestamps remain useful audit metadata, not cross-clock ordering tokens.
+
+**References**:
+- `src/Explore.Domain/Services/EmailDeliveryPolicy.cs`
+- `src/Explore.Application/Notifications/RecipientNotificationMaterializer.cs`
+- `src/Explore.Persistence/Repositories/NotificationIntentRepository.cs`
+- `src/Explore.Persistence/Services/EmailDispatchEligibilityEvaluator.cs`
+- `tests/Event.Persistence.IntegrationTests/Repositories/EmailDeliveryGraphRevisionTests.cs`
+- `tests/Event.Persistence.IntegrationTests/Repositories/EmailDeliverySuppressionRevisionTests.cs`
+- PR / commit: pending; bounded SQLite evidence, not full provider/phase acceptance
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for new `.claude/rules/*.md` entry
+- [ ] Candidate for skill update: `outbox-pattern`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [x] Stays in journal only (bounded implementation lesson)
+
+---
+
+[2026-09-06 Europe/Brussels] — SMTP policy history must describe committed transactions, not individual setting writes
+
+**Context**: Extended optional-email suppression from explicit disablement to
+unavailable durable configuration, and introduced typed capability/operator park
+provenance before implementing automatic recovery.
+
+**Symptom / Observation**: A valid inherited SMTP configuration becomes temporarily
+incomplete while an atomic tenant batch writes its own host before its sender.
+Recording that intermediate state as outage history would suppress valid backlog.
+Advancing a revision for every leaf also gives one logical save multiple revisions
+and can invalidate a graph created between available edits.
+
+**Root Cause**: Existing repository hooks reconciled each setting write in isolation,
+although the caller's UoW commits the whole configuration atomically. Enabled alone
+also failed to represent incomplete-but-enabled capability and its deferred sources.
+
+**Resolution**: The existing tracker retains immutable initial policy/control
+baselines per DbContext transaction and scope, shared by instance and tenant hooks.
+Each scope advances once per transaction. Suppression compares initial/current
+availability and restores original watermarks if temporary invalidity is repaired
+before commit. New transaction IDs discard old baselines, including on retry.
+Real SQLite graph tests cover host/sender batching and enable/materialize/edit;
+metadata tests preserve rollback, scope isolation and nullable zero semantics.
+The shared fixture now configures initial SMTP atomically rather than committing
+two unavailable intermediate states and incorrectly expecting no such history.
+
+**Why This Matters for Future Work**: Derive durable policy history from the same
+atomic boundary that makes the policy visible. Error strings must not authorize
+recovery: typed park provenance distinguishes operator holds from capability waits,
+but expiry, current authorization and uncertain-send fences still need enforcement.
+Runtime secret-provider/network outages are not settings transactions and are not
+automatically represented by these durable configuration revisions.
+
+**References**:
+- `src/Explore.Persistence/Services/EmailDeliveryPolicyRevisionTracker.cs`
+- `src/Explore.Domain/Services/EmailDeliveryPolicy.cs`
+- `src/Explore.Domain/EmailDispatchOutbox.cs`
+- `tests/Event.Persistence.IntegrationTests/Repositories/EmailDeliveryGraphRevisionTests.cs`
+- `tests/Event.Persistence.IntegrationTests/Repositories/EmailDeliveryPolicyRevisionTests.cs`
+- `tests/Event.Persistence.IntegrationTests/Repositories/EmailDeliveryParkReasonTests.cs`
+- PR / commit: pending; SQLite increment only, full recovery/provider gates remain open
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for new `.claude/rules/*.md` entry
+- [ ] Candidate for skill update: `outbox-pattern`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [x] Stays in journal only (transaction-reconciliation lesson)
+
+---
+
+[2026-09-06 Europe/Brussels] — Rechecking cached admin roles is not fresh authority
+
+**Context**: P02 guarded email-disable commands require current administrator
+authority before preview and again before a confirmed mutation.
+
+**Symptom / Observation**: An initial command design called `IAdminContext`
+role methods again after acquiring the SMTP policy lease. That looked like a
+fresh check, but `AdminContext` caches those answers for five sliding minutes.
+An in-memory substitute that immediately reflected revocation would conceal this
+production difference.
+
+**Root Cause**: Repeating a service call does not change its consistency contract.
+DB-derived cached role answers are still cached authority, and local invalidation
+is not proof that every process or an already-waiting request sees revocation.
+
+**Resolution**: The new preview and disable handlers use `AdminContext` only to
+resolve identity. Existing platform-role and current-tenant grant repositories
+check authority before the shared lease and inside the serializable transaction.
+No new authority facade or global cache-policy change was introduced. The focused
+command `dotnet test --project tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj --configuration Release --treenode-filter "/*/*/*EmailDeliveryDisableCommandHandlerTests/*"`
+passes 29/29, including stale cached answers and revocation during lease acquisition.
+Real database commit tests and provider-level revocation ordering remain separate gates.
+
+**Why This Matters for Future Work**: For privileged revocation-sensitive writes,
+inspect the concrete authority dependency, not just its method name. Test doubles
+must not silently strengthen production consistency. Reuse uncached native
+authority reads where the operation requires fresh facts.
+
+**References**:
+- `src/Explore.Infrastructure/Identity/AdminContext.cs`
+- `src/Explore.Application/Features/EmailDispatch/Handlers/Commands/DisableEmailDeliveryCommandHandler.cs`
+- `src/Explore.Application/Features/EmailDispatch/Handlers/Queries/PreviewEmailDeliveryDisableQueryHandler.cs`
+- `tests/Event.Application.UnitTests/Features/EmailDispatch/Commands/EmailDeliveryDisableCommandHandlerTests.cs`
+- PR / commit: pending P02; no full-phase acceptance
+
+**Promotion Consideration**:
+- [ ] Candidate for `docs/QUICK_REFERENCE.md` (new non-inferable rule)
+- [ ] Candidate for new `.claude/rules/*.md` entry
+- [ ] Candidate for skill update: `auth-patterns`
+- [ ] Candidate for ADR / `MAJOR_DECISIONS.md`
+- [x] Stays in journal only (authority-consistency lesson)
+
+---
+
+[2026-09-08 Europe/Brussels] - Email-optional knowledge graduation
+
+The [email-optional domain ledger](domains/email-optional-self-hosting.md) records
+historical SMTP invalidation, checkout/status expiry, consumed-hold cancellation,
+global credential/session, stable-order replay, retention-copy, and native-fixture
+pitfalls with current source anchors. [ADR-029](../../docs/internal/adr/ADR-029-email-optional-self-hosting.md)
+records the implemented authority decisions and public support-contact separation.
+The [tenant-delegation proposal](../backlog/tenant-delegated-local-account-provisioning.md)
+and [field-evaluation backlog](../backlog/anonymous-registration-field-evaluation.md)
+remain outside this revision: delegation is not implemented and study outcomes
+are unmeasured. Setup 22/22, catalogue 20/20, dotenv 19/19, native Compose parsing,
+and the successful API schema build do not close pending native zero-email host,
+restart/restore, or final workstream acceptance. This entry indexes the domain
+findings; it does not supersede earlier evidence or quarantine dispositions.
+
+---
+
+[2026-09-09 Europe/Brussels] - Native EF removal can reconcile only the snapshot
+
+**Context**: Consolidating seven unapplied email-optional application migration
+stages onto retained upstream Init catalogs for four provider assemblies.
+
+**Symptom / Observation**: The first native `dotnet ef migrations remove` in
+each catalog exited successfully but left every migration ID present. Each
+catalog required eight calls to remove its seven tails.
+
+**Root Cause**: The merged snapshot differed from the latest historical
+designer. Native EF first reconciled that snapshot; a successful command exit
+did not establish that the catalog head had been removed.
+
+**Resolution**: Count actual remaining migration IDs after each native call,
+rebuild before the next removal, and stop at the retained Init. Generate the
+integration tail from the settled model rather than editing snapshots. All
+four final catalogs passed generation and ten primary/external Identity
+pending-model checks. The populated lifecycle packet passed 12 cases across
+PostgreSQL, SQLite, SQL Server, MySQL and MariaDB.
+
+**Why This Matters for Future Work**: A fixed successful-call count can leave
+an old tail in place or encourage an unsafe extra removal. Native catalog
+identity, not exit-code counting, defines the removal boundary. Full-head
+roundtrips must also include the feature tail rather than stopping at Init.
+
+**References**:
+- `docs/internal/OPERATIONS.md#development-application-migration-rebaseline`
+- `tests/Event.Persistence.IntegrationTests/Migrations/ApplicationInitialLifecycleProviderTests.cs`
+- `tests/Event.Persistence.IntegrationTests/Migrations/GeneratedInitMigrationBehaviorTests.cs`
+
+**Promotion Consideration**:
+- [ ] Candidate for skill update: `dotnet-efcore-guidelines`
+- [x] Stays in journal only (native generation observation)
+
+---
+
+[2026-09-09 Europe/Brussels] — Detached participants can be reinserted at outbox save
+
+**Context**: PR #40 cancellation regression setup exposed a failure while
+finalizing a free order with an already-persisted assigned participant. The
+failure occurred before the cancellation seam.
+
+**Symptom / Observation**: SQLite reported `UNIQUE constraint failed:
+ie_registration_participants.tenant_id, ie_registration_participants.registration_order_id,
+ie_registration_participants.id` from `OutboxRepository.Create`. A two-case
+native experiment on untouched product base `425e4b48343690094637dda860304f3bfb04a5cd`
+passed the unassigned control and failed the assigned case. A subscribed EF
+tracking event confirmed `existingParticipantMarkedAdded=True`.
+
+**Root Cause**: Assignment reads return detached participants. The admission
+materializer retains that participant as a navigation on a new EventRegistration.
+Adding the admission graph marks the existing participant Added; the outbox
+repository's shared-context SaveChanges then attempts the duplicate insertion.
+The outbox is the flush boundary, not the origin of the duplicated entity.
+
+**Resolution**: Classified as inherited and quarantined outside PR #40 repairs;
+no product workaround or test suppression was applied. The detached base
+worktree retains the two-case reproduction in EventSessionRepositorySqliteTests.
+Its restore/build passed; the expected diagnostic run ended with one pass and
+one failure, not a green verification claim. Future repair should attach only
+the intended new graph and preserve existing participant identity.
+
+**Why This Matters for Future Work**: A SaveChanges failure names the entity
+being flushed, which may have been attached through another repository's
+navigation graph. Reproduce graph state through the real lifecycle and outbox,
+and compare an unassigned control before attributing the issue to new callers.
+
+**References**:
+- `src/Explore.Application/Services/Registration/RegistrationOrderLifecycleService.cs:620`
+- `src/Explore.Application/Services/Registration/RegistrationOrderLifecycleService.Participants.cs:37`
+- `src/Explore.Application/Services/Registration/RegistrationAdmissionMaterializer.cs:39`
+- `src/Explore.Persistence/Repositories/RegistrationInventoryRepository.cs:541`
+- `src/Explore.Persistence/Repositories/OutboxRepository.cs:25`
+- `.omo/evidence/pr40-finalization-provenance.md`
+- PR: `https://github.com/islamu-ngo/Event/pull/40`
+
+**Promotion Consideration**:
+- [x] Stays in journal only (inherited defect awaiting a separate repair)
+
+---

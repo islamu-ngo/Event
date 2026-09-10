@@ -27,6 +27,8 @@ public class UpdateSettingCommandHandler
     private readonly ILocationPrivacyGovernanceMutationService? _locationPrivacyMutations;
     private readonly IPublicationPolicyMutationBoundary _publicationPolicyMutationBoundary;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IEmailDeliverySettingsWriter _emailSettingsWriter;
+    private readonly IVisitorAccessSettingsWriter _visitorSettings;
 
     public UpdateSettingCommandHandler(
         IHierarchicalSettingsResolver resolver,
@@ -38,6 +40,8 @@ public class UpdateSettingCommandHandler
         ILogger<UpdateSettingCommandHandler> logger,
         IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary,
         IUnitOfWork unitOfWork,
+        IEmailDeliverySettingsWriter emailSettingsWriter,
+        IVisitorAccessSettingsWriter visitorSettings,
         ICerbosConfigResolver? cerbosConfigResolver = null,
         ILocationPrivacyGovernanceMutationService? locationPrivacyMutations = null)
     {
@@ -52,6 +56,8 @@ public class UpdateSettingCommandHandler
         _locationPrivacyMutations = locationPrivacyMutations;
         _publicationPolicyMutationBoundary = publicationPolicyMutationBoundary;
         _unitOfWork = unitOfWork;
+        _emailSettingsWriter = emailSettingsWriter;
+        _visitorSettings = visitorSettings;
     }
 
     public async Task<BaseCommandResponse<Guid>> Handle(
@@ -108,6 +114,28 @@ public class UpdateSettingCommandHandler
 
         bool isGuardedPublicationPolicyMutation = request.Scope is SettingScope.Tenant or SettingScope.Instance
             && PublicationPolicySettingKeys.All.Contains(request.Key, StringComparer.Ordinal);
+
+        if (VisitorAccessSettingMutationGuard.Handles(request.Key))
+        {
+            Guid? tenantId = request.Scope == SettingScope.Tenant ? _tenantContext.TenantId : null;
+            var result = await _visitorSettings.ApplyAsync(
+                [new(tenantId, request.Key, VisitorAccessSettingMutationKind.SetValue, serializedValue)],
+                resolvedUserId, cancellationToken);
+            return await result.CompleteAsync(_resolver, _mediator, request.Scope, tenantId ?? Guid.Empty);
+        }
+
+        if (EmailDeliverySettingKeys.Contains(request.Key))
+        {
+            Guid? targetTenantId = request.Scope == SettingScope.Tenant ? _tenantContext.TenantId : null;
+            var result = await _emailSettingsWriter.ApplyAsync(
+                [new EmailDeliverySettingMutation(TenantId: targetTenantId, Key: definition.Key,
+                    Kind: EmailDeliverySettingMutationKind.SetValue, Value: serializedValue)],
+                actorUserId: resolvedUserId, cancellationToken: cancellationToken);
+            if (result.IsAccepted())
+                foreach (var notification in result.ToNotifications(resolvedUserId))
+                    await _mediator.Publish(notification, CancellationToken.None);
+            return result.ToCommandResponse(targetTenantId ?? Guid.Empty, "SMTP setting updated.");
+        }
 
         // Check lock state
         var context = SettingCommandHelper.BuildSettingContext(

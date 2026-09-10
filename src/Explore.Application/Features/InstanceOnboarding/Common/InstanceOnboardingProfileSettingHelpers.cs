@@ -36,17 +36,14 @@ internal static class InstanceOnboardingProfileSettingHelpers
             "Instance brand display name",
             cancellationToken);
 
-        if (!string.IsNullOrWhiteSpace(profile.SupportEmail))
-        {
-            await UpsertAsync(
-                systemSettingRepository,
-                GovernanceSettingKeys.Email.FromAddress,
-                JsonSerializer.Serialize(profile.SupportEmail),
-                "Email",
-                6,
-                "Default sender email address for outbound emails",
-                cancellationToken);
-        }
+        await UpsertAsync(
+            systemSettingRepository,
+            GovernanceSettingKeys.Branding.SupportEmail,
+            JsonSerializer.Serialize(profile.SupportEmail),
+            "Branding",
+            2,
+            "Public support contact for the instance site",
+            cancellationToken);
 
         var canonicalHost = NormalizeCanonicalHost(profile.CanonicalUrl);
         if (!string.IsNullOrWhiteSpace(canonicalHost))

@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Explore.Application.DTOs.Management;
+using Explore.Application.DTOs.ManagedProviderProvisioning;
 using Explore.Domain;
 
 namespace Explore.Application.Features.Management;
@@ -11,13 +12,13 @@ public static class ManagedTenantProvisioningRequestCodec
 {
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
     {
-        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+        AllowDuplicateProperties = false
     };
 
     public static ManagementTenantProvisioningRequestDto Normalize(ManagementTenantProvisioningRequestDto request)
     {
         ManagementTenantExternalIdentityDto? externalIdentity = request.Administrator.ExternalIdentity;
-        ManagementTenantAdministratorInvitationDto? invitation = request.Administrator.Invitation;
 
         return new ManagementTenantProvisioningRequestDto
         {
@@ -40,15 +41,19 @@ public static class ManagedTenantProvisioningRequestCodec
                         DisplayName = NormalizeOptional(externalIdentity.DisplayName),
                         EmailVerified = externalIdentity.EmailVerified
                     },
-                Invitation = invitation is null
-                    ? null
-                    : new ManagementTenantAdministratorInvitationDto
-                    {
-                        Email = invitation.Email.Trim().ToLowerInvariant(),
-                        FirstName = invitation.FirstName.Trim(),
-                        LastName = invitation.LastName.Trim(),
-                        DisplayName = NormalizeOptional(invitation.DisplayName)
-                    }
+                LocalIdentity = request.Administrator.LocalIdentity
+            },
+            DirectoryOperatorIdentity = request.DirectoryOperatorIdentity is null ? null : request.DirectoryOperatorIdentity with
+            {
+                PublicName = NormalizeOptional(request.DirectoryOperatorIdentity.PublicName),
+                LegalName = NormalizeOptional(request.DirectoryOperatorIdentity.LegalName),
+                OperatorKindCode = NormalizeOptional(request.DirectoryOperatorIdentity.OperatorKindCode),
+                JurisdictionCountryCode = NormalizeOptional(request.DirectoryOperatorIdentity.JurisdictionCountryCode),
+                RegistrationIdentifier = NormalizeOptional(request.DirectoryOperatorIdentity.RegistrationIdentifier),
+                PublicContactEmail = NormalizeOptional(request.DirectoryOperatorIdentity.PublicContactEmail),
+                LegalNoticeUrl = NormalizeOptional(request.DirectoryOperatorIdentity.LegalNoticeUrl),
+                TermsUrl = NormalizeOptional(request.DirectoryOperatorIdentity.TermsUrl),
+                PrivacyUrl = NormalizeOptional(request.DirectoryOperatorIdentity.PrivacyUrl)
             },
             Plan = new ManagementTenantPlanDto
             {
@@ -94,6 +99,28 @@ public static class ManagedTenantProvisioningRequestCodec
                 }
         };
     }
+
+    public static ManagedProviderClientProvisioningDto ToProvisioningRequest(ManagementTenantProvisioningRequestDto request) => new()
+    {
+        ProviderKey = "islamu-event-control-plane",
+        ExternalSystem = "control-plane",
+        ExternalCustomerId = request.ExternalCustomerReference,
+        TenantFullName = request.TenantName,
+        TenantSlug = request.TenantSlug,
+        ActivateTenant = true,
+        DirectoryOperatorIdentity = request.DirectoryOperatorIdentity,
+        LocalIdentity = request.Administrator.LocalIdentity,
+        ExternalAdmin = request.Administrator.ExternalIdentity is { } identity ? new ManagedProviderExternalAdminDto
+        {
+            IdentityProvider = identity.IdentityProvider,
+            Subject = identity.Subject,
+            Email = identity.Email,
+            FirstName = identity.FirstName,
+            LastName = identity.LastName,
+            DisplayName = identity.DisplayName,
+            EmailVerified = identity.EmailVerified
+        } : null
+    };
 
     public static string Serialize(ManagementTenantProvisioningRequestDto request) =>
         JsonSerializer.Serialize(request, SerializerOptions);

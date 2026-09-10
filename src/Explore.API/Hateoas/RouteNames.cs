@@ -7,7 +7,17 @@ namespace Explore.API.Hateoas;
 public static class RouteNames
 {
     public const string LoginLocalIdentity = nameof(LoginLocalIdentity);
-    public const string RegisterLocalIdentity = nameof(RegisterLocalIdentity);
+    public const string RequestLocalEmailVerification = nameof(RequestLocalEmailVerification);
+    public const string ConfirmLocalEmail = nameof(ConfirmLocalEmail);
+    public const string RequestLocalPasswordRecovery = nameof(RequestLocalPasswordRecovery);
+    public const string CompleteLocalPasswordRecovery = nameof(CompleteLocalPasswordRecovery);
+    public const string ChangeLocalPassword = nameof(ChangeLocalPassword);
+    public const string CompleteLocalCredentialReplacement = nameof(CompleteLocalCredentialReplacement);
+    public const string ListLocalIdentities = nameof(ListLocalIdentities);
+    public const string CreateLocalIdentity = nameof(CreateLocalIdentity);
+    public const string ResetLocalCredential = nameof(ResetLocalCredential);
+    public const string GetLocalCredentialOperation = nameof(GetLocalCredentialOperation);
+    public const string ReconcileLocalCredentialOperation = nameof(ReconcileLocalCredentialOperation);
     public const string CreateSetupTargetEnrollment = nameof(CreateSetupTargetEnrollment);
     public const string GetSetupTargetEnrollment = nameof(GetSetupTargetEnrollment);
     public const string RevokeSetupTargetEnrollment = nameof(RevokeSetupTargetEnrollment);
@@ -409,8 +419,11 @@ public static class RouteNames
 
     #region Registration Routes
 
+    public const string CreateAnonymousRegistrationChallenge = nameof(CreateAnonymousRegistrationChallenge);
     public const string StartGuestRegistrationOrder = nameof(StartGuestRegistrationOrder);
     public const string GetGuestRegistrationOrder = nameof(GetGuestRegistrationOrder);
+    public const string GetGuestRegistrationStatus = nameof(GetGuestRegistrationStatus);
+    public const string CancelConfirmedGuestRegistration = nameof(CancelConfirmedGuestRegistration);
     public const string GetRegistrationCheckoutComposition = nameof(GetRegistrationCheckoutComposition);
     public const string ContinueGuestRegistrationOrder = nameof(ContinueGuestRegistrationOrder);
     public const string FinalizeGuestRegistrationOrder = nameof(FinalizeGuestRegistrationOrder);
@@ -1150,6 +1163,10 @@ public static class RouteNames
     public const string GetInstanceSmtpSettings = nameof(GetInstanceSmtpSettings);
     public const string UpdateInstanceSmtpSettings = nameof(UpdateInstanceSmtpSettings);
     public const string TestInstanceSmtpConnection = nameof(TestInstanceSmtpConnection);
+    public const string PreviewInstanceSmtpDisable = nameof(PreviewInstanceSmtpDisable);
+    public const string DisableInstanceSmtp = nameof(DisableInstanceSmtp);
+    public const string PreviewTenantSmtpDisable = nameof(PreviewTenantSmtpDisable);
+    public const string DisableTenantSmtp = nameof(DisableTenantSmtp);
     public const string GetInstanceResolverConfiguration = nameof(GetInstanceResolverConfiguration);
     public const string UpdateInstanceResolverConfiguration = nameof(UpdateInstanceResolverConfiguration);
     public const string GetInstanceAnalyticsGovernanceSettings = nameof(GetInstanceAnalyticsGovernanceSettings);
@@ -1182,6 +1199,7 @@ public static class RouteNames
     public const string GetInstanceOnboardingStatus = nameof(GetInstanceOnboardingStatus);
     public const string SaveInstanceOnboardingProfile = nameof(SaveInstanceOnboardingProfile);
     public const string CompleteInstanceOnboarding = nameof(CompleteInstanceOnboarding);
+    public const string CompleteLocalInstanceOnboarding = nameof(CompleteLocalInstanceOnboarding);
     public const string ValidateInstanceSetupSecret = nameof(ValidateInstanceSetupSecret);
     public const string GetInstanceOnboardingAuthProviderConfiguration = nameof(GetInstanceOnboardingAuthProviderConfiguration);
     public const string GetInstanceOnboardingAuthProviderConfigurationInternal = nameof(GetInstanceOnboardingAuthProviderConfigurationInternal);

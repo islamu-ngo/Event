@@ -1,11 +1,13 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Domain.Services.Registration;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
 
-public sealed class RegistrationParticipantRepository(ExploreDbContext dbContext) : IRegistrationParticipantRepository
+public sealed class RegistrationParticipantRepository(ExploreDbContext dbContext, TimeProvider? timeProvider = null)
+    : IRegistrationParticipantRepository
 {
     public Task<RegistrationParticipant?> GetParticipantAsync(
         Guid participantId,
@@ -36,14 +38,29 @@ public sealed class RegistrationParticipantRepository(ExploreDbContext dbContext
     public async Task<IReadOnlyList<RegistrationParticipant>> GetParticipantsByOrderAsync(
         Guid registrationOrderId,
         Guid tenantId,
-        CancellationToken cancellationToken) =>
-        await dbContext.RegistrationParticipants
+        CancellationToken cancellationToken)
+    {
+        var participants = await dbContext.RegistrationParticipants
             .AsNoTracking()
-            .Include(participant => participant.Pii)
+            .Include(participant => participant.RegistrationOrder)
             .Where(participant => participant.RegistrationOrderId == registrationOrderId && participant.TenantId == tenantId)
             .OrderBy(participant => participant.CreatedAt)
             .ThenBy(participant => participant.Id)
             .ToListAsync(cancellationToken);
+        Guid[] participantIds = participants.Select(participant => participant.Id).ToArray();
+        var piiRows = await dbContext.RegistrationParticipantPii.AsNoTracking()
+            .Where(pii => pii.TenantId == tenantId && participantIds.Contains(pii.RegistrationParticipantId))
+            .ToDictionaryAsync(pii => pii.RegistrationParticipantId, cancellationToken);
+        DateTime utcNow = (timeProvider ?? TimeProvider.System).GetUtcNow().UtcDateTime;
+        foreach (RegistrationParticipant participant in participants)
+        {
+            if (participant.RegistrationOrder is { } order &&
+                piiRows.TryGetValue(participant.Id, out RegistrationParticipantPii? pii) &&
+                AnonymousRegistrationRetentionPolicy.CanDisclose(order, pii.RetentionUntil, utcNow))
+                participant.SetPii(pii);
+        }
+        return participants;
+    }
 
     public async Task<IReadOnlyList<RegistrationTicketAssignment>> GetAssignmentsWithParticipantsByOrderAsync(
         Guid registrationOrderId,

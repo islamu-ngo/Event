@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+using Explore.Application.Contracts.Services.Registration;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.Features.RegistrationSubmissions.Commands;
 using Explore.Application.Responses;
@@ -26,7 +28,11 @@ public sealed record StartGuestRegistrationOrderCommand(
     BookingPartyTypeEnum BookingPartyType,
     IReadOnlyList<RegistrationOrderLineSelection> Lines,
     int? PlatformContributionBasisPoints = null)
-    : IRequest<GuestRegistrationOrderStartDto>;
+    : IRequest<GuestRegistrationOrderStartDto>
+{
+    [JsonIgnore]
+    public AnonymousRegistrationChallengeAuthority? ChallengeAuthority { get; init; }
+}
 
 public sealed record StartAuthenticatedRegistrationOrderCommand(
     Guid EventId,

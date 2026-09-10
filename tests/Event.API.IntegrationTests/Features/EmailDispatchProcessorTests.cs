@@ -80,16 +80,11 @@ public sealed class EmailDispatchProcessorTests
         public Task<EmailDispatchDrainResult> ProcessBatchAsync(CancellationToken cancellationToken)
         {
             recorder.Record("batch", settings.Value, cancellationToken);
-            return Task.FromResult(new EmailDispatchDrainResult(
-                PendingCount: settings.Value.BatchSize,
-                ProcessedCount: settings.Value.BatchSize,
-                SentCount: 0,
-                RetryScheduledCount: 0,
-                DeadLetteredCount: 0,
-                UnknownCount: 0,
-                SkippedCount: 0,
-                TenantPausedCount: 0,
-                AlreadyClaimedCount: 0));
+            return Task.FromResult(new EmailDispatchDrainResult
+            {
+                PendingCount = settings.Value.BatchSize,
+                ProcessedCount = settings.Value.BatchSize
+            });
         }
 
         public Task<EmailDispatchRecoveryResult> RecoverStaleProcessingAsync(CancellationToken cancellationToken)

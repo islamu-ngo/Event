@@ -11,6 +11,7 @@ public sealed class ExternalIdentityDbContext(
 {
     public DbSet<LocalIdentityUser> LocalIdentityUsers => Set<LocalIdentityUser>();
     public DbSet<LocalIdentityRole> LocalIdentityRoles => Set<LocalIdentityRole>();
+    public DbSet<LocalIdentityLifecycleOperation> LocalIdentityLifecycleOperations => Set<LocalIdentityLifecycleOperation>();
     public DbSet<IdentityUserRole<Guid>> IdentityUserRoles => Set<IdentityUserRole<Guid>>();
     public DbSet<IdentityUserClaim<Guid>> IdentityUserClaims => Set<IdentityUserClaim<Guid>>();
     public DbSet<IdentityRoleClaim<Guid>> IdentityRoleClaims => Set<IdentityRoleClaim<Guid>>();

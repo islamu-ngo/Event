@@ -10,6 +10,14 @@ public static class BrandingSettingDefinitions
         Description: "Default brand display name shown when tenants do not override branding",
         MaxScope: SettingScope.Tenant);
 
+    public static readonly SettingDefinition SupportEmail = new(
+        Key: "branding.support_email",
+        ValueType: SettingValueType.String,
+        DefaultValue: "null",
+        Category: "Branding",
+        Description: "Public support contact for the instance site, independent of outbound email delivery",
+        MaxScope: SettingScope.Instance);
+
     public static readonly SettingDefinition LogoUrl = new(
         Key: "branding.logo_url",
         ValueType: SettingValueType.String,
@@ -35,5 +43,5 @@ public static class BrandingSettingDefinitions
         MaxScope: SettingScope.Tenant);
 
     public static IReadOnlyList<SettingDefinition> All =>
-        [DisplayName, LogoUrl, FaviconUrl, CustomCssUrl];
+        [DisplayName, SupportEmail, LogoUrl, FaviconUrl, CustomCssUrl];
 }

@@ -22,12 +22,13 @@ public class TenantPublicExperienceAdminServiceTests
     {
         // Arrange
         Guid organizationId = Guid.NewGuid();
-        var response = new SettingGroupResponseDto
+        var response = new HalResourceOfSettingGroupResponseDto
         {
             Category = Category,
             Settings =
             [
                 Setting("public_experience.mode", "OrganizationCentric"),
+                Setting("public_experience.visitor_access_mode", "AnonymousOnly", canEdit: false),
                 Setting("public_experience.event_catalog_label", "Programs"),
                 Setting("public_experience.primary_organization_id", organizationId.ToString("D"), canEdit: false),
                 Setting("public_experience.home_blocks", "{\"schemaVersion\":1,\"blocks\":[{\"id\":\"hero\"}]}"),
@@ -47,7 +48,10 @@ public class TenantPublicExperienceAdminServiceTests
         TenantPublicExperienceAdminModel result = await _service.GetSettingsAsync();
 
         // Assert
+        await Assert.That(result.IsAvailable).IsTrue();
         await Assert.That(result.Mode).IsEqualTo("OrganizationCentric");
+        await Assert.That(result.VisitorAccessMode).IsEqualTo(VisitorAccessMode.AnonymousOnly);
+        await Assert.That(result.CanEditVisitorAccessMode).IsFalse();
         await Assert.That(result.EventCatalogLabel).IsEqualTo("Programs");
         await Assert.That(result.PrimaryOrganizationId).IsEqualTo(organizationId);
         await Assert.That(result.HomeBlocksJson).Contains("hero");
@@ -56,7 +60,7 @@ public class TenantPublicExperienceAdminServiceTests
     }
 
     [Test]
-    public async Task GetSettingsAsync_ReturnsConservativeDefaults_WhenApiThrows()
+    public async Task GetSettingsAsync_ReturnsUnavailableNonWritableState_WhenApiThrows()
     {
         // Arrange
         _apiClient.GetTenantScopedSettingsAsync(
@@ -73,8 +77,18 @@ public class TenantPublicExperienceAdminServiceTests
         await Assert.That(result.Mode).IsEqualTo("DiscoveryCentric");
         await Assert.That(result.EventCatalogLabel).IsEqualTo("Events");
         await Assert.That(result.PrimaryOrganizationId).IsNull();
+        await Assert.That(result.VisitorAccessMode).IsNull();
         await Assert.That(result.HomeBlocksJson).IsEqualTo("{\"schemaVersion\":1,\"blocks\":[]}");
-        await Assert.That(result.CanEditAny).IsTrue();
+        await Assert.That(result.IsAvailable).IsFalse();
+        await Assert.That(result.CanEditAny).IsFalse();
+
+        result.EventCatalogLabel = "Changed without a canonical read";
+        PublicExperienceAdminSaveResult save = await _service.SaveAsync(result);
+
+        await Assert.That(save.Success).IsFalse();
+        await Assert.That(save.CanonicalStateRestored).IsFalse();
+        await _apiClient.DidNotReceiveWithAnyArgs().UpdateTenantSettingsBatchAsync(
+            default!, default!, default, default, default);
     }
 
     [Test]
@@ -88,7 +102,7 @@ public class TenantPublicExperienceAdminServiceTests
                 null,
                 null,
                 Arg.Any<CancellationToken>())
-            .Returns(new SettingGroupResponseDto
+            .Returns(new HalResourceOfSettingGroupResponseDto
             {
                 Category = "Events",
                 Settings =
@@ -105,7 +119,7 @@ public class TenantPublicExperienceAdminServiceTests
                 null,
                 null,
                 Arg.Any<CancellationToken>())
-            .Returns(new SettingGroupResponseDto
+            .Returns(new HalResourceOfSettingGroupResponseDto
             {
                 Category = "Organizations",
                 Settings =
@@ -119,7 +133,7 @@ public class TenantPublicExperienceAdminServiceTests
                 null,
                 null,
                 Arg.Any<CancellationToken>())
-            .Returns(new SettingGroupResponseDto
+            .Returns(new HalResourceOfSettingGroupResponseDto
             {
                 Category = "Groups",
                 Settings =
@@ -132,7 +146,7 @@ public class TenantPublicExperienceAdminServiceTests
                 null,
                 null,
                 Arg.Any<CancellationToken>())
-            .Returns(new SettingGroupResponseDto
+            .Returns(new HalResourceOfSettingGroupResponseDto
             {
                 Category = "AiAssistant",
                 Settings =
@@ -175,12 +189,21 @@ public class TenantPublicExperienceAdminServiceTests
         // Arrange
         var model = new TenantPublicExperienceAdminModel
         {
+            IsAvailable = true,
             Mode = "OrganizationCentric",
+            VisitorAccessMode = VisitorAccessMode.DirectoryListingOnly,
             EventCatalogLabel = "  Programs  ",
             PrimaryOrganizationId = null,
             HomeBlocksJson = " ",
             CtasJson = "{\"schemaVersion\":1,\"ctas\":[{\"id\":\"join\"}]}",
-            EventSectionPresetsJson = "\n{\"schemaVersion\":1,\"presets\":[]}\n"
+            EventSectionPresetsJson = "\n{\"schemaVersion\":1,\"presets\":[]}\n",
+            CanEditMode = true,
+            CanEditVisitorAccessMode = true,
+            CanEditEventCatalogLabel = true,
+            CanEditPrimaryOrganization = true,
+            CanEditHomeBlocks = true,
+            CanEditCtas = true,
+            CanEditEventSectionPresets = true
         };
 
         UpdateSettingBatchDto? captured = null;
@@ -200,6 +223,7 @@ public class TenantPublicExperienceAdminServiceTests
         await Assert.That(captured).IsNotNull();
         await Assert.That(captured!.Mode).IsEqualTo(BatchUpdateMode.Strict);
         await Assert.That(captured.Values["public_experience.mode"]).IsEqualTo("OrganizationCentric");
+        await Assert.That(captured.Values["public_experience.visitor_access_mode"]).IsEqualTo("DirectoryListingOnly");
         await Assert.That(captured.Values["public_experience.event_catalog_label"]).IsEqualTo("Programs");
         await Assert.That(captured.Values["public_experience.primary_organization_id"]).IsEqualTo(string.Empty);
         await Assert.That(captured.Values["public_experience.home_blocks"]).IsEqualTo("{\"schemaVersion\":1,\"blocks\":[]}");
@@ -234,7 +258,12 @@ public class TenantPublicExperienceAdminServiceTests
             .Returns(response);
 
         // Act
-        PublicExperienceAdminSaveResult result = await _service.SaveAsync(new TenantPublicExperienceAdminModel());
+        PublicExperienceAdminSaveResult result = await _service.SaveAsync(new TenantPublicExperienceAdminModel
+        {
+            IsAvailable = true,
+            VisitorAccessMode = VisitorAccessMode.AnonymousOnly,
+            CanEditMode = true
+        });
 
         // Assert
         await Assert.That(result.Success).IsFalse();
@@ -244,13 +273,129 @@ public class TenantPublicExperienceAdminServiceTests
 
 
     [Test]
+    public async Task SaveAsync_WhenPolicyIsRejected_ReloadsCanonicalModeAndLock()
+    {
+        var model = new TenantPublicExperienceAdminModel
+        {
+            IsAvailable = true,
+            VisitorAccessMode = VisitorAccessMode.FullRegistrationAndAuth,
+            CanEditVisitorAccessMode = true
+        };
+        _apiClient.UpdateTenantSettingsBatchAsync(
+                Category,
+                Arg.Any<UpdateSettingBatchDto>(),
+                null,
+                null,
+                Arg.Any<CancellationToken>())
+            .Returns(new BatchUpdateResponseDto
+            {
+                Success = false,
+                Message = "Visitor access conflicts with account-required events."
+            });
+        _apiClient.GetTenantScopedSettingsAsync(
+                Category,
+                null,
+                null,
+                Arg.Any<CancellationToken>())
+            .Returns(new HalResourceOfSettingGroupResponseDto
+            {
+                Category = Category,
+                Settings =
+                [
+                    Setting("public_experience.visitor_access_mode", "AnonymousOnly", canEdit: false)
+                ]
+            });
+
+        PublicExperienceAdminSaveResult result = await _service.SaveAsync(model);
+
+        await Assert.That(result.Success).IsFalse();
+        await Assert.That(result.CanonicalStateRestored).IsTrue();
+        await Assert.That(model.IsAvailable).IsTrue();
+        await Assert.That(model.VisitorAccessMode).IsEqualTo(VisitorAccessMode.AnonymousOnly);
+        await Assert.That(model.CanEditVisitorAccessMode).IsFalse();
+    }
+
+    [Test]
+    public async Task SaveAsync_WhenCanonicalReloadFails_PreservesSelectionAndDisablesFurtherWrites()
+    {
+        var model = new TenantPublicExperienceAdminModel
+        {
+            IsAvailable = true,
+            Mode = "OrganizationCentric",
+            VisitorAccessMode = VisitorAccessMode.DirectoryListingOnly,
+            EventCatalogLabel = "Programs",
+            CanEditMode = true,
+            CanEditVisitorAccessMode = true,
+            CanEditEventCatalogLabel = true
+        };
+        _apiClient.UpdateTenantSettingsBatchAsync(
+                Category,
+                Arg.Any<UpdateSettingBatchDto>(),
+                null,
+                null,
+                Arg.Any<CancellationToken>())
+            .Returns(new BatchUpdateResponseDto { Success = false });
+        _apiClient.GetTenantScopedSettingsAsync(
+                Category,
+                null,
+                null,
+                Arg.Any<CancellationToken>())
+            .ThrowsAsync(new HttpRequestException("canonical reload unavailable"));
+
+        PublicExperienceAdminSaveResult result = await _service.SaveAsync(model);
+
+        await Assert.That(result.Success).IsFalse();
+        await Assert.That(result.CanonicalStateRestored).IsFalse();
+        await Assert.That(model.IsAvailable).IsFalse();
+        await Assert.That(model.Mode).IsEqualTo("OrganizationCentric");
+        await Assert.That(model.VisitorAccessMode).IsEqualTo(VisitorAccessMode.DirectoryListingOnly);
+        await Assert.That(model.EventCatalogLabel).IsEqualTo("Programs");
+        await Assert.That(model.CanEditAny).IsFalse();
+
+        await _service.SaveAsync(model);
+        await _apiClient.Received(1).UpdateTenantSettingsBatchAsync(
+            Category,
+            Arg.Any<UpdateSettingBatchDto>(),
+            null,
+            null,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Test]
+    public async Task GetSettingsAsync_WhenVisitorModeIsMissing_RemainsUnavailableAndCannotSaveDefaults()
+    {
+        _apiClient.GetTenantScopedSettingsAsync(
+                Category,
+                null,
+                null,
+                Arg.Any<CancellationToken>())
+            .Returns(new HalResourceOfSettingGroupResponseDto
+            {
+                Category = Category,
+                Settings = [Setting("public_experience.event_catalog_label", "Programs")]
+            });
+
+        TenantPublicExperienceAdminModel model = await _service.GetSettingsAsync();
+        PublicExperienceAdminSaveResult result = await _service.SaveAsync(model);
+
+        await Assert.That(model.IsAvailable).IsFalse();
+        await Assert.That(model.VisitorAccessMode).IsNull();
+        await Assert.That(model.CanEditAny).IsFalse();
+        await Assert.That(result.Success).IsFalse();
+        await _apiClient.DidNotReceiveWithAnyArgs().UpdateTenantSettingsBatchAsync(
+            default!, default!, default, default, default);
+    }
+
+    [Test]
     public async Task SaveAsync_OmitsLockedFields_WhenSomeSettingsAreNotEditable()
     {
         // Arrange
         Guid organizationId = Guid.NewGuid();
         var model = new TenantPublicExperienceAdminModel
         {
+            IsAvailable = true,
             Mode = "OrganizationCentric",
+            VisitorAccessMode = VisitorAccessMode.AnonymousOnly,
             EventCatalogLabel = "Programs",
             PrimaryOrganizationId = organizationId,
             HomeBlocksJson = """{"schemaVersion":1,"blocks":[{"id":"hero"}]}""",
@@ -294,7 +439,10 @@ public class TenantPublicExperienceAdminServiceTests
         // Arrange
         var model = new TenantPublicExperienceAdminModel
         {
+            IsAvailable = true,
+            VisitorAccessMode = VisitorAccessMode.AnonymousOnly,
             CanEditMode = false,
+            CanEditVisitorAccessMode = false,
             CanEditEventCatalogLabel = false,
             CanEditPrimaryOrganization = false,
             CanEditHomeBlocks = false,

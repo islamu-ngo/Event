@@ -17,7 +17,8 @@ public interface IAuthProviderConfigurationService
     /// Applies auth provider configuration settings to SystemSetting records.
     /// </summary>
     /// <param name="configuration">The auth provider configuration to apply.</param>
-    Task ApplyConfigurationAsync(AuthProviderConfigurationDto configuration);
+    Task ApplyConfigurationAsync(AuthProviderConfigurationDto configuration,
+        IReadOnlySet<string>? suppliedKeys = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Checks whether any auth provider has been configured (at least one enabled).

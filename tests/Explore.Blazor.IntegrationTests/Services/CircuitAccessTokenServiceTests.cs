@@ -16,6 +16,94 @@ public class CircuitAccessTokenServiceTests
         NullLogger<CircuitTokenStore>.Instance);
 
     [Test]
+    public async Task RevokeSessionPermanentlyRejectsStaleCircuitFallbackWhileFreshSessionRemainsUsable()
+    {
+        string userId = Guid.NewGuid().ToString("D");
+        string sessionA = Guid.NewGuid().ToString("D");
+        string sessionB = Guid.NewGuid().ToString("D");
+        string tokenA = CreateJwt(userId, sessionId: sessionA);
+        string tokenB = CreateJwt(userId, sessionId: sessionB);
+        var contextA = CreateHttpContextWithSession(userId, sessionA);
+        var contextB = CreateHttpContextWithSession(userId, sessionB);
+        var accessor = new HttpContextAccessor { HttpContext = contextA };
+        ICircuitAccessTokenService serviceA = new CircuitAccessTokenService(
+            _tokenStore, accessor, NullLogger<CircuitAccessTokenService>.Instance);
+        serviceA.SetToken(tokenA);
+        accessor.HttpContext = contextB;
+        ICircuitAccessTokenService serviceB = new CircuitAccessTokenService(
+            _tokenStore, accessor, NullLogger<CircuitAccessTokenService>.Instance);
+        serviceB.SetToken(tokenB);
+        accessor.HttpContext = contextA;
+        await Assert.That(contextA.User.TryGetCircuitSubject(out var subject)).IsTrue();
+        await Assert.That(contextA.User.TryGetSessionId(out var session)).IsTrue();
+
+        accessor.HttpContext = contextB;
+        serviceA.RevokeSession(originalSubject: subject, originalSession: session);
+        accessor.HttpContext = contextA;
+
+        await Assert.That(_tokenStore.Resolve(subject.PartitionKey, session.PartitionKey).Found).IsFalse();
+        await Assert.That(_tokenStore.ResolveByUserId(subject.PartitionKey).Token == tokenB).IsTrue();
+        await Assert.That(serviceA.AccessToken is null).IsTrue();
+
+        await Assert.That(contextB.User.TryGetCircuitSubject(out var subjectB)).IsTrue();
+        await Assert.That(contextB.User.TryGetSessionId(out var resolvedSessionB)).IsTrue();
+        serviceA.RevokeSession(originalSubject: subjectB, originalSession: resolvedSessionB);
+        await Assert.That(_tokenStore.Resolve(subjectB.PartitionKey, resolvedSessionB.PartitionKey).Token == tokenB).IsTrue();
+
+        serviceA.SetToken(tokenA);
+        await Assert.That(serviceA.AccessToken is null).IsTrue();
+        await Assert.That(_tokenStore.Resolve(subject.PartitionKey, session.PartitionKey).Found).IsFalse();
+        serviceA.ClearToken();
+        serviceA.SetToken(tokenB);
+
+        await Assert.That(serviceA.AccessToken is null).IsTrue();
+        await Assert.That(_tokenStore.Resolve(subject.PartitionKey, session.PartitionKey).Found).IsFalse();
+        await Assert.That(_tokenStore.Resolve(CircuitKey(contextB), SessionKey(contextB)).Token == tokenB).IsTrue();
+        accessor.HttpContext = contextB;
+        ICircuitAccessTokenService freshScopeB = new CircuitAccessTokenService(
+            _tokenStore, accessor, NullLogger<CircuitAccessTokenService>.Instance);
+        await Assert.That(freshScopeB.AccessToken == tokenB).IsTrue();
+        await Assert.That(serviceB.AccessToken == tokenB).IsTrue();
+    }
+
+    [Test]
+    [Arguments(true, true)]
+    [Arguments(true, false)]
+    [Arguments(false, true)]
+    public async Task RevocationWithoutCompleteOriginalIdentityCannotClearAnotherSession(
+        bool missingSubject, bool missingSession)
+    {
+        string userId = Guid.NewGuid().ToString("D");
+        string sessionA = Guid.NewGuid().ToString("D");
+        string sessionB = Guid.NewGuid().ToString("D");
+        string tokenA = CreateJwt(userId, sessionId: sessionA);
+        string tokenB = CreateJwt(userId, sessionId: sessionB);
+        var contextA = CreateHttpContextWithSession(userId, sessionA);
+        var contextB = CreateHttpContextWithSession(userId, sessionB);
+        var accessor = new HttpContextAccessor { HttpContext = contextA };
+        ICircuitAccessTokenService revokedScope = new CircuitAccessTokenService(
+            _tokenStore, accessor, NullLogger<CircuitAccessTokenService>.Instance);
+        revokedScope.SetToken(tokenA);
+        await Assert.That(_tokenStore.Store(CircuitKey(contextB), SessionKey(contextB), tokenB).Accepted).IsTrue();
+        await Assert.That(contextA.User.TryGetCircuitSubject(out var subject)).IsTrue();
+        await Assert.That(contextA.User.TryGetSessionId(out var session)).IsTrue();
+        accessor.HttpContext = contextB;
+
+        revokedScope.RevokeSession(
+            originalSubject: missingSubject ? null : subject,
+            originalSession: missingSession ? null : session);
+        revokedScope.ClearToken();
+        revokedScope.SetToken(tokenB);
+
+        await Assert.That(revokedScope.AccessToken is null).IsTrue();
+        await Assert.That(_tokenStore.Resolve(CircuitKey(contextA), SessionKey(contextA)).Token == tokenA).IsTrue();
+        await Assert.That(_tokenStore.Resolve(CircuitKey(contextB), SessionKey(contextB)).Token == tokenB).IsTrue();
+        ICircuitAccessTokenService freshScopeB = new CircuitAccessTokenService(
+            _tokenStore, accessor, NullLogger<CircuitAccessTokenService>.Instance);
+        await Assert.That(freshScopeB.AccessToken == tokenB).IsTrue();
+    }
+
+    [Test]
     public async Task SetupSecretSessionService_UserActivityExtendsIdleExpiration()
     {
         var timeProvider = new ManualTimeProvider(DateTimeOffset.Parse("2026-07-27T00:00:00Z"));

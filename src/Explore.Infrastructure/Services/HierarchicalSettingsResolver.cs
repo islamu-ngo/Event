@@ -1,6 +1,7 @@
 namespace Explore.Infrastructure.Services;
 
 using System.Text.Json;
+using Explore.Application.Contracts.Persistence;
 using IGroupSettingRepository = Explore.Application.Contracts.Persistence.IGroupSettingRepository;
 using IGroupTenantRepository = Explore.Application.Contracts.Persistence.IGroupTenantRepository;
 using IOrganizationSettingRepository = Explore.Application.Contracts.Persistence.IOrganizationSettingRepository;
@@ -12,11 +13,12 @@ using IHierarchicalSettingsResolver = Explore.Application.Contracts.Infrastructu
 using ISettingGroup = Explore.Application.Contracts.Infrastructure.ISettingGroup;
 using ITenantContext = Explore.Application.Contracts.Infrastructure.ITenantContext;
 using ResolvedSetting = Explore.Application.Contracts.Infrastructure.ResolvedSetting;
-using SettingSource = Explore.Application.Contracts.Infrastructure.SettingSource;
 using Explore.Application.Exceptions;
 using Explore.Application.Settings;
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Settings;
+using Explore.Domain.Settings.Definitions;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
@@ -35,6 +37,7 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
     private readonly IUserPreferenceRepository _userPreferenceRepository;
     private readonly ITenantContext _tenantContext;
     private readonly ISettingMutationLock _mutationLock;
+    private readonly IEmailDeliverySettingsWriter _emailSettingsWriter;
     private readonly IMemoryCache _cache;
     private readonly ILogger<HierarchicalSettingsResolver> _logger;
     private readonly TimeSpan _cacheExpiration = TimeSpan.FromMinutes(5);
@@ -55,7 +58,8 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
         ITenantContext tenantContext,
         ISettingMutationLock mutationLock,
         IMemoryCache cache,
-        ILogger<HierarchicalSettingsResolver> logger)
+        ILogger<HierarchicalSettingsResolver> logger,
+        IEmailDeliverySettingsWriter emailSettingsWriter)
     {
         _systemSettingRepository = systemSettingRepository;
         _tenantSettingRepository = tenantSettingRepository;
@@ -67,6 +71,7 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
         _mutationLock = mutationLock;
         _cache = cache;
         _logger = logger;
+        _emailSettingsWriter = emailSettingsWriter;
     }
 
     public async Task<T?> ResolveAsync<T>(string key, SettingContext context, CancellationToken ct = default)
@@ -92,15 +97,21 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
         if (keyList.Count == 0)
             return [];
 
-        // Load system settings (batch)
-        var systemSettings = await GetSystemSettingsAsync(ct);
+        // SMTP authorization cannot depend on another replica invalidating this process's cache.
+        var requiresAuthoritativePolicy = keyList.Any(key => IsSmtpSetting(key)
+            || key == GovernanceSettingKeys.TenantDelegation.LockSmtp);
+        var systemSettings = requiresAuthoritativePolicy
+            ? await _systemSettingRepository.GetAllSettings(cancellationToken: ct)
+            : await GetSystemSettingsAsync(ct);
         var systemDict = systemSettings.ToDictionary(s => s.SettingKey, s => s);
 
         // Load tenant settings if context has tenant
         Dictionary<string, TenantSetting>? tenantDict = null;
         if (context.TenantId.HasValue)
         {
-            var tenantSettings = await GetTenantSettingsAsync(context.TenantId.Value, ct);
+            var tenantSettings = requiresAuthoritativePolicy
+                ? await _tenantSettingRepository.GetAllForTenant(context.TenantId.Value, ct)
+                : await GetTenantSettingsAsync(context.TenantId.Value, ct);
             tenantDict = tenantSettings.ToDictionary(s => s.SettingKey, s => s);
         }
 
@@ -132,23 +143,11 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
             userDict = userPrefs.ToDictionary(s => s.SettingKey, s => s);
         }
 
-        // Determine deployment mode to bypass system locks for single-tenant
-        systemDict.TryGetValue(Explore.Domain.Constants.GovernanceSettingKeys.Deployment.Mode, out var deploymentModeSetting);
-        var isMultiTenant = false;
-        if (deploymentModeSetting != null)
-        {
-            var value = SettingValueSerializer.DeserializeString(deploymentModeSetting.Value);
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                isMultiTenant = string.Equals(value, "MultiTenant", StringComparison.OrdinalIgnoreCase);
-            }
-        }
-
         // Resolve each key through the full cascade
         var results = new List<ResolvedSetting>(keyList.Count);
         foreach (var key in keyList)
         {
-            var resolved = ResolveSingleKey(key, systemDict, tenantDict, orgDict, groupDict, userDict, isMultiTenant);
+            var resolved = HierarchicalSettingMerge.Resolve(key, systemDict, tenantDict, orgDict, groupDict, userDict);
             if (resolved is not null)
                 results.Add(resolved);
         }
@@ -171,6 +170,14 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
     public async Task SetValueAsync(
         string key, string value, SettingScope scope, Guid scopeId, Guid actorId, CancellationToken ct = default)
     {
+        if (EmailDeliverySettingKeys.Contains(key))
+        {
+            await ApplySmtpMutationAsync(new EmailDeliverySettingMutation(
+                TenantId: scope == SettingScope.Tenant ? scopeId : null, Key: key,
+                Kind: EmailDeliverySettingMutationKind.SetValue, Value: value), scope, actorId, ct);
+            return;
+        }
+
         if (PublicationPolicySettingKeys.All.Contains(key, StringComparer.Ordinal))
         {
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
@@ -200,14 +207,11 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
                 break;
 
             case SettingScope.Tenant:
-                await _mutationLock.ExecuteAsync(
-                    key,
+                await _mutationLock.ExecuteManyAsync(
+                    TenantMutationKeys(key),
                     async token =>
                     {
-                        if (await _systemSettingRepository.IsLocked(key, token))
-                        {
-                            throw new InvalidOperationException($"Setting '{key}' is locked at Instance scope.");
-                        }
+                        await EnsureTenantMutationAllowedAsync(key, token);
 
                         await _tenantSettingRepository.SetValueAsync(scopeId, key, value, token, actorId);
                         return true;
@@ -244,6 +248,14 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
     public async Task RemoveOverrideAsync(
         string key, SettingScope scope, Guid scopeId, Guid actorId, CancellationToken ct = default)
     {
+        if (EmailDeliverySettingKeys.Contains(key))
+        {
+            await ApplySmtpMutationAsync(new EmailDeliverySettingMutation(
+                TenantId: scope == SettingScope.Tenant ? scopeId : null, Key: key,
+                Kind: EmailDeliverySettingMutationKind.Remove), scope, actorId, ct);
+            return;
+        }
+
         if (PublicationPolicySettingKeys.All.Contains(key, StringComparer.Ordinal))
         {
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
@@ -252,14 +264,11 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
         switch (scope)
         {
             case SettingScope.Tenant:
-                await _mutationLock.ExecuteAsync(
-                    key,
+                await _mutationLock.ExecuteManyAsync(
+                    TenantMutationKeys(key),
                     async token =>
                     {
-                        if (await _systemSettingRepository.IsLocked(key, token))
-                        {
-                            throw new SettingSystemLockedException(key);
-                        }
+                        await EnsureTenantMutationAllowedAsync(key, token);
 
                         return await _tenantSettingRepository.RemoveOverrideAsync(scopeId, key, token);
                     },
@@ -296,6 +305,14 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
     public async Task LockAsync(
         string key, SettingScope scope, Guid scopeId, Guid actorId, CancellationToken ct = default)
     {
+        if (EmailDeliverySettingKeys.Contains(key))
+        {
+            await ApplySmtpMutationAsync(new EmailDeliverySettingMutation(
+                TenantId: scope == SettingScope.Tenant ? scopeId : null, Key: key,
+                Kind: EmailDeliverySettingMutationKind.SetLock, IsLocked: true), scope, actorId, ct);
+            return;
+        }
+
         if (PublicationPolicySettingKeys.All.Contains(key, StringComparer.Ordinal))
         {
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
@@ -326,14 +343,11 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
 
             case SettingScope.Tenant:
                 {
-                    bool locked = await _mutationLock.ExecuteAsync(
-                        key,
+                    bool locked = await _mutationLock.ExecuteManyAsync(
+                        TenantMutationKeys(key),
                         async token =>
                         {
-                            if (await _systemSettingRepository.IsLocked(key, token))
-                            {
-                                throw new InvalidOperationException($"Setting '{key}' is locked at Instance scope.");
-                            }
+                            await EnsureTenantMutationAllowedAsync(key, token);
 
                             return await _tenantSettingRepository.LockAsync(scopeId, key, actorId, token);
                         },
@@ -357,6 +371,14 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
     public async Task UnlockAsync(
         string key, SettingScope scope, Guid scopeId, Guid actorId, CancellationToken ct = default)
     {
+        if (EmailDeliverySettingKeys.Contains(key))
+        {
+            await ApplySmtpMutationAsync(new EmailDeliverySettingMutation(
+                TenantId: scope == SettingScope.Tenant ? scopeId : null, Key: key,
+                Kind: EmailDeliverySettingMutationKind.SetLock, IsLocked: false), scope, actorId, ct);
+            return;
+        }
+
         if (PublicationPolicySettingKeys.All.Contains(key, StringComparer.Ordinal))
         {
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
@@ -387,14 +409,11 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
 
             case SettingScope.Tenant:
                 {
-                    bool unlocked = await _mutationLock.ExecuteAsync(
-                        key,
+                    bool unlocked = await _mutationLock.ExecuteManyAsync(
+                        TenantMutationKeys(key),
                         async token =>
                         {
-                            if (await _systemSettingRepository.IsLocked(key, token))
-                            {
-                                throw new InvalidOperationException($"Setting '{key}' is locked at Instance scope.");
-                            }
+                            await EnsureTenantMutationAllowedAsync(key, token);
 
                             return await _tenantSettingRepository.UnlockAsync(scopeId, key, actorId, token);
                         },
@@ -412,6 +431,38 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
             default:
                 throw new NotSupportedException(
                     $"Unlock is only supported at Instance and Tenant scopes, not {scope}.");
+        }
+    }
+
+    private async Task ApplySmtpMutationAsync(
+        EmailDeliverySettingMutation mutation, SettingScope scope, Guid actorId, CancellationToken cancellationToken)
+    {
+        if (scope is not SettingScope.Instance and not SettingScope.Tenant)
+        {
+            new EmailDeliverySettingsWriteResult(Status: EmailDeliverySettingsWriteStatus.InvalidMutation, Changes: [])
+                .EnsureAccepted();
+        }
+        var result = await _emailSettingsWriter.ApplyAsync([mutation], actorId, cancellationToken);
+        result.EnsureAccepted();
+        InvalidateCache(scope, mutation.TenantId);
+    }
+
+    private static bool IsSmtpSetting(string key) =>
+        EmailSettingDefinitions.All.Any(definition => definition.Key == key);
+
+    private static string[] TenantMutationKeys(string key) =>
+        IsSmtpSetting(key) ? [key, GovernanceSettingKeys.TenantDelegation.LockSmtp] : [key];
+
+    private async Task EnsureTenantMutationAllowedAsync(string key, CancellationToken ct)
+    {
+        if (await _systemSettingRepository.IsLocked(key, ct))
+            throw new SettingSystemLockedException(key);
+
+        if (IsSmtpSetting(key))
+        {
+            var delegation = await _systemSettingRepository.GetByKey(GovernanceSettingKeys.TenantDelegation.LockSmtp, ct);
+            if (SettingValueSerializer.DeserializeBool(delegation?.Value, true))
+                throw new SettingSystemLockedException(key);
         }
     }
 
@@ -467,125 +518,6 @@ public class HierarchicalSettingsResolver : IHierarchicalSettingsResolver
 
         _cache.Remove($"{UserCachePrefix}{tenantId}:{userId}");
     }
-
-    private ResolvedSetting? ResolveSingleKey(
-        string key,
-        Dictionary<string, SystemSetting> systemDict,
-        Dictionary<string, TenantSetting>? tenantDict,
-        Dictionary<string, OrganizationSetting>? orgDict,
-        Dictionary<string, GroupSetting>? groupDict,
-        Dictionary<string, UserPreference>? userDict,
-        bool isMultiTenant)
-    {
-        systemDict.TryGetValue(key, out var systemSetting);
-        var definition = SettingRegistry.Get(key);
-
-        if (systemSetting is null && definition is null)
-            return null;
-
-        var effectiveValue = systemSetting?.Value ?? definition?.DefaultValue ?? "";
-        var valueType = systemSetting?.ValueType ?? definition?.ValueType ?? SettingValueType.String;
-        var description = systemSetting?.Description ?? definition?.Description;
-        var category = systemSetting?.Category ?? definition?.Category;
-        var allowedValues = systemSetting?.AllowedValues;
-
-        // Cascade: Instance → Tenant → Organization → Group → User
-        // Lock precedence: Instance locked > Tenant locked > unlocked cascade
-
-        // Instance lock stops ALL overrides — highest precedence.
-        // Honored in both SingleTenant and MultiTenant modes so that explicitly locked
-        // instance settings (e.g. AI provider config seeded via bootstrap worker or saved
-        // via the instance admin UI with LockTenantAiAssistant=true) cannot be shadowed
-        // by stale tenant overrides in single-tenant deployments.
-        var isInstanceLocked = systemSetting?.IsLocked ?? false;
-        if (isInstanceLocked)
-        {
-            return new ResolvedSetting
-            {
-                Key = key,
-                Value = effectiveValue,
-                ValueType = valueType,
-                Source = SettingSource.SystemLocked,
-                IsLocked = true,
-                Description = description,
-                Category = category,
-                AllowedValues = allowedValues
-            };
-        }
-
-        // Tenant override
-        var source = SettingSource.SystemDefault;
-        var isTenantLocked = false;
-        if (AllowsScope(definition, SettingScope.Tenant)
-            && tenantDict is not null
-            && tenantDict.TryGetValue(key, out var tenantOverride))
-        {
-            effectiveValue = tenantOverride.Value;
-            source = SettingSource.TenantOverride;
-            isTenantLocked = tenantOverride.IsLocked;
-        }
-
-        // Tenant lock stops child overrides (org, group, user)
-        // Lower-scope values remain in storage — lock only affects resolution
-        if (isTenantLocked)
-        {
-            return new ResolvedSetting
-            {
-                Key = key,
-                Value = effectiveValue,
-                ValueType = valueType,
-                Source = SettingSource.TenantLocked,
-                IsLocked = true,
-                Description = description,
-                Category = category,
-                AllowedValues = allowedValues
-            };
-        }
-
-        // Organization override (not locked at instance or tenant)
-        if (AllowsScope(definition, SettingScope.Organization)
-            && orgDict is not null
-            && orgDict.TryGetValue(key, out var orgOverride))
-        {
-            effectiveValue = orgOverride.Value;
-            source = SettingSource.OrganizationOverride;
-        }
-
-        // Group override (not locked at instance or tenant)
-        if (AllowsScope(definition, SettingScope.Group)
-            && groupDict is not null
-            && groupDict.TryGetValue(key, out var groupOverride))
-        {
-            effectiveValue = groupOverride.Value;
-            source = SettingSource.GroupOverride;
-        }
-
-        // User preference (not locked at instance or tenant, and definition allows User scope)
-        if (userDict is not null && userDict.TryGetValue(key, out var userPref))
-        {
-            var maxScope = definition?.MaxScope ?? SettingScope.Tenant;
-            if (maxScope >= SettingScope.User)
-            {
-                effectiveValue = userPref.Value;
-                source = SettingSource.UserPreference;
-            }
-        }
-
-        return new ResolvedSetting
-        {
-            Key = key,
-            Value = effectiveValue,
-            ValueType = valueType,
-            Source = source,
-            IsLocked = false,
-            Description = description,
-            Category = category,
-            AllowedValues = allowedValues
-        };
-    }
-
-    private static bool AllowsScope(SettingDefinition? definition, SettingScope scope) =>
-        definition is null || scope >= definition.MinScope && scope <= definition.MaxScope;
 
     private async Task<List<SystemSetting>> GetSystemSettingsAsync(CancellationToken ct)
     {

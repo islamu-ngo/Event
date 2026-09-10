@@ -40,10 +40,11 @@ Use this page when you have a symptom. For planned work, installation, backup, r
 | Symptom | Likely cause | Repair |
 |---|---|---|
 | Startup stops with a bootstrap matrix reason code | Mode missing/unknown, a configured key set under `Interactive`, a required key missing under `ConfiguredAdministrator`, or only one of the two profile names | Fix the environment or secret authority to satisfy one closed matrix exactly, then restart |
-| Provider rejected at startup | `INSTANCE_BOOTSTRAP_ADMIN_PROVIDER` is anything other than `keycloak` or `atproto` | Set the exact lowercase key value |
+| Provider rejected at startup | Configured provider is outside `local`, `keycloak`, `atproto`, or conflicts with the selected authentication matrix | Set the exact supported provider and matching inputs; Local requires its temporary password from the selected secret authority |
 | Generation rejected at startup | Value isn't a positive integer | Set a positive integer |
 | Sign-in succeeds but no privilege is granted | The presented claim isn't the exact configured selector: wrong issuer for `keycloak`, wrong subject, or a non-canonical DID for `atproto` | Compare the configured subject with the provider's issued subject/DID and correct the configuration, not the database |
-| Onboarding sits pending with a healthy instance | Expected. Pending is a healthy state until the configured administrator signs in | Sign in as that administrator |
+| External-provider onboarding sits pending with a healthy instance | Expected until the configured administrator signs in | Sign in as that administrator; provider-owned verification still applies even with Event email disabled |
+| Local bootstrap cannot reach ordinary sign-in | Initial/reset credential is restricted until private replacement | Complete password replacement and sign in afresh; do not enable SMTP or invent a public registration route |
 | Bootstrap reports drift and refuses to proceed | Stored generation is same or lower than a changed selector, meaning the configuration moved without a new generation | Restore the previous configuration or raise `INSTANCE_BOOTSTRAP_BINDING_GENERATION` above the stored one |
 | Configuration changed but nothing happened | Same generation with identical values converges silently | Nothing to repair |
 | Corrected configuration before completion | A strictly higher generation replaces the pending binding | Restart and sign in with the corrected identity |
@@ -479,7 +480,7 @@ The instance control plane exposes warning codes with operator remediation text.
 |---|---|---|
 | `general_outbox_due_backlog_capped` | The general outbox due backlog reached the bounded reporting cap. | Verify the outbox worker is running and inspect due rows before raising the reporting cap. |
 | `general_outbox_failures_present` | General outbox rows are failed or dead-lettered. | Fix the downstream handler or payload issue, then replay from an operator-approved path. |
-| `email_provider_missing` | SMTP is not configured for platform email delivery. | Configure non-secret SMTP policy in instance settings and provision credentials in the selected secret authority. |
+| `email_provider_missing` | SMTP is not configured for optional platform delivery. | Leave delivery disabled if intentional; otherwise use guarded instance SMTP settings and the selected credential authority. Missing mail alone is not a reason to fail core setup. |
 | `email_dispatch_dead_letters` | Email dispatch has dead-lettered rows. | Review dead-lettered dispatch rows, fix provider/configuration failures, and replay only after confirming recipients and payloads. |
 | `email_dispatch_stale_processing` | Email dispatch rows are stuck in processing. | Check the worker lease/heartbeat and restart the worker before replaying stuck rows. |
 | `email_dispatch_due_backlog` | Email dispatch due backlog exceeds the configured threshold. | Scale or restart dispatch processing and check SMTP provider throttling before increasing thresholds. |
@@ -592,11 +593,35 @@ Checks:
 
 ## Email Dispatch Issues
 
-**Symptoms:** Registration confirmation email does not arrive, `email-dispatch` readiness is degraded/unhealthy, or RabbitMQ dispatch/DLQ counts grow.
+**Symptoms:** An expected transactional message does not arrive, SMTP readiness
+degrades, or dispatch backlog grows. No message is expected merely because an
+instance has completed zero-email Local setup.
+
+Source anchors: `src/Explore.API/HealthChecks/SmtpHealthCheck.cs`,
+`src/Explore.Infrastructure/Mail/EmailDeliveryCapabilityResolver.cs`,
+`src/Explore.Application/Services/InstanceSmtpSettingService.cs`,
+`src/Explore.ServiceDefaults/Extensions.cs` and `docker-compose.yml`.
 
 Checks:
-1. For local development, open Mailpit at the Aspire-discovered UI endpoint or Compose default `http://localhost:8025`. Non-isolated Aspire normally uses SMTP `localhost:1025`; isolated Aspire assigns dynamic ports, so run `aspire describe mailpit --apphost Explore.AppHost/Explore.AppHost.csproj --format Json` and verify API `email.smtp_port` matches the current Mailpit SMTP endpoint. Compose uses `mailpit:1025` from API containers.
-2. Check `/health`: `smtp` covers configured SMTP/Mailpit connectivity, `email-dispatch` covers Basic Dispatch trigger readiness, `email-dispatch-retention-cleanup` covers the retention worker posture, and `email-dispatch-rabbitmq` covers optional broker topology only when RabbitMQ mode is enabled. If Mailpit is stopped in FullLocal, API `/health` should return HTTP 503 with `smtp` Unhealthy. The SMTP readiness probe is bounded to five seconds; the 2026-07-04 local proof returned in `5.014s`.
+1. Read persisted delivery intent first. `email.delivery_enabled=false` is the
+   default and returns Healthy `smtp_disabled` without resolving SMTP credentials
+   or probing a server. Saving transport settings, setting environment values or
+   running a manifest cannot bypass the guarded delivery writer. Enable through
+   instance SMTP administration; disable through preview/confirmation. An enabled
+   but incomplete transport returns Degraded `smtp_configuration_unavailable`.
+2. Inspect the individual `/health` entries, not only its HTTP status. A configured
+   transport diagnostic failure returns Degraded `smtp_unavailable`; Healthy and
+   Degraded map to HTTP 200. Required database/security/authority failures remain
+   Unhealthy/HTTP 503 or block startup. `email_capability_unavailable` means a
+   capability-read or unexpected diagnostic exception, not an ordinary mail-server
+   outage. The SMTP registration has a five-second timeout. `email-dispatch`,
+   `email-dispatch-retention-cleanup` and `email-dispatch-rabbitmq` report separate
+   worker concerns; there is no `/health/email` endpoint. For Compose capture,
+   deliberately start `--profile mail`: SMTP is `mailpit:1025` inside the network,
+   never a published host `localhost:1025`; the inbox is `http://127.0.0.1:8025`.
+   Capture is private, persistent in `mailpit_data`, capped at 500 messages and
+   does not deliver externally. Aspire endpoints are separately discovered; do
+   not copy Aspire host ports into Compose settings.
 3. Inspect HAL-gated EmailDispatch admin status before changing rows. Use only emitted `_links`. `Unknown` never exposes generic replay: reconcile it as `Delivered` or `NotDelivered` only with provider evidence, or use `resolve-without-replay` when the outcome cannot be proven and the work must be abandoned. Redacted and `Processing` rows expose no mutation affordances.
 4. Query `email_dispatch_outbox` by status and tenant. `Unknown` rows are inspectable crash-window outcomes; `DeadLettered` rows require operator review; `Skipped` rows are terminal preference/compliance outcomes.
    - For planned lifecycle rows, compare linked `NotificationDelivery` and immutable occurrence/policy versions. Do not replay `ContentRedactedAt`, consent-withdrawn, superseded, tenant-deleted, or post-handoff `Unknown` work until the authorized reconciliation surface says it is replayable.
@@ -607,8 +632,26 @@ Checks:
    - For a compromised tenant sender, pause that tenant immediately with `PUT /api/admin/email-dispatch/tenants/{tenantId}/pause?reason=...`; use the tenant suppression/redaction lifecycle when tenant deletion or compromise requires queued content removal. Do not pause every tenant unless the provider/instance itself is unsafe.
    - Distinguish tenant SMTP failure from instance failure: one tenant failing while others send points to tenant override/governance or tenant pause; all tenants failing plus `smtp` health failure points to instance credentials, DNS/TLS, provider outage, or global pause/rate control.
    - Before changing retention, set `EmailDispatchRetention:DryRun=true`, restart the worker, compare only aggregate eligible counts/cutoff, then restore mutating mode. Dry-run must not be used as proof of message delivery.
-5. In RabbitMQ mode, verify broker connectivity, dispatch/DLX/parking topology, and bounded logs. Broker payloads must contain only pointer fields, never recipient, subject, body, SMTP credentials, provider IDs, or raw errors.
-6. Use `docs/EMAIL_NOTIFICATIONS.md` for focused Mailpit and RabbitMQ verification commands.
+5. Base Compose has no RabbitMQ broker and defaults its dispatch projection off.
+   If deliberately enabled with an external broker, verify connectivity,
+   dispatch/DLX/parking topology and bounded logs. Broker payloads must contain
+   only pointer fields, never recipient, subject, body, SMTP credentials,
+   provider IDs or raw errors.
+6. Use [EMAIL_NOTIFICATIONS.md](EMAIL_NOTIFICATIONS.md) for dispatch internals and
+   the [public SMTP guide](../public/documentation/readme/communications-and-notifications/email-smtp.md)
+   for optional capture and external-receipt verification.
+
+**Restart loses authentication or encrypted state:**
+
+Trace the actual host's key registration rather than creating an undocumented
+filesystem key directory. API Data Protection uses `DataProtectionKeyContext` in
+the primary database. Combined Standalone retains that store when Redis is
+absent; Split Compose's UI uses Redis `islamu-event:data-protection-keys` in
+`redis_data`. Keep the selected Local signing key/secret authority, applicable
+Identity database and uploaded media with coordinated backups. Preserve the
+independent erasure authority across primary rollback and follow its replay
+gates. File persistence alone is not crash/restore proof; see
+[SELF_HOSTING.md](SELF_HOSTING.md#persistent-keys-and-backup-boundaries).
 
 **Coop callback retained but no moderation decision occurs:**
 
@@ -774,8 +817,9 @@ and changed-key codes to locate the reviewed file in operator version control
 or backup; audit intentionally stores no values. After database restore, restore
 the matching manifest and bootstrap/audit state from the same recovery point
 before traffic. If failure evidence cannot be persisted, treat startup as
-failed and restore database availability. The complete state/action matrix is
-in [SELF_HOSTING.md](SELF_HOSTING.md#operator-stateaction-matrix).
+failed and restore database availability. See the
+[persistence and backup boundaries](SELF_HOSTING.md#persistent-keys-and-backup-boundaries)
+for the stores that must survive recovery and the independent erasure-authority rule.
 
 Set `CONFIGURATION_MANIFEST_MODE=Off` and recreate the owning process to
 disable future startup processing. This preserves applied data and audit

@@ -3,6 +3,56 @@
 
 # Operations
 
+## Anonymous Registration Retention
+
+Anonymous names and answers stop being operationally readable at their original
+event-purpose deadline, independently of the physical cleanup schedule. The
+existing bounded `RegistrationRetentionCleanupJob` remains the deletion owner;
+turning Quartz off delays cleanup, not the read-time privacy boundary.
+
+Participant and ticket presentation, answer aggregation, provider export and
+registration-owned downloads enforce the same bound. Export workers exclude
+expired values before decryption and check again after preparatory waits, before
+handoff. Expiry before handoff is terminal and must not be retried as an ambiguous
+provider delivery. Data already lawfully transferred cannot be retracted by this
+local policy.
+
+Generated CSV metadata retains its included-content deadline. Application reads
+resolve current tenant-qualified submission/order lineage and deny expired or
+missing authority, including after source answers are deleted. Physical storage
+deletion requires separate proof that no legal hold applies; consent and export
+audit evidence remain governed independently.
+
+The sibling registration-answer-file GET and release responses apply the same
+filename bound, including after HAL authorization waits. Quarantine/release
+authority and immutable release evidence remain separate from filename access.
+
+Queued admission and recovery contacts retain their included deadline in
+authenticated metadata around the existing encrypted intent material. A source
+PII row disappearing cannot remove that deadline. Handlers check before
+decryption and after database waits; channels carry the bound through SMTP
+configuration, connection and authentication to the first send. Pre-handoff
+expiry is `RetentionExpired`, never a receipt-bearing success or uncertain send.
+Admission dispatch treats it as unrecoverable; recovery retains its existing
+bounded retry/dead-letter lifecycle, with every replay denied before decryption.
+Retained ciphertext and audit evidence are not erased by this decision.
+
+Version 1 remains the current unbounded nonanonymous contact format; version 2
+binds a finite contact deadline or the selected account-contact identity to its
+Data Protection purpose. Account fallback uses the existing current verified
+recipient resolver and does not extend anonymous registration-data retention.
+Changing, deleting or unverifying that current account contact cannot revive an
+earlier queued recipient. Work whose external send already began retains its
+existing accepted/uncertain handling.
+
+Apply the complete primary-context catalog, including the generated
+`EmailOptionalSelfHostingIntegration` tail, before this behavior. Its retention
+delta adds nullable order and storage-content deadlines, with
+no inferred historical backfill or Identity changes. Historical guest PII without
+an original bound is unavailable; changing the current event schedule cannot
+restore it. Prefer a verified forward correction over removing privacy metadata
+to reopen access. Existing user-erasure authority and backup obligations remain.
+
 ## Instance Bootstrap Lifecycle
 
 Startup runs in one order, in Split and Standalone alike: migrations and
@@ -493,8 +543,9 @@ See [WEBHOOKS.md](WEBHOOKS.md) and [INTEGRATIONS.md](INTEGRATIONS.md) for provid
 
 Address governance belongs to the current application initial, not an incremental
 legacy backfill. Four application migration assemblies cover five engines, with
-MySQL and MariaDB sharing their catalog. Each initial represents the complete
-current model; it neither reinterprets older rows nor supplies a version-0 search
+MySQL and MariaDB sharing their catalog. Each initial owns that baseline;
+the complete application catalog also includes the email-optional integration
+tail described below. Neither stage reinterprets older rows or supplies a version-0 search
 compatibility path. Promotion never infers provider/manual provenance, creator,
 organization, address, or coordinates.
 
@@ -996,21 +1047,37 @@ pending model changes. Run the selected provider's `Event.MigrationService`
 twice against the recreated database; the second successful run proves
 idempotency.
 
-Data Protection key persistence is launch-critical for the Blazor BFF. `Explore.Blazor`
-stores authentication cookies, setup-secret cookies, antiforgery state, and other
-protected payloads with ASP.NET Core Data Protection. The BFF configures a stable
-application name and persists the key ring through `DataProtectionKeyContext`, while
-`Event.MigrationService` migrates that dedicated context before the app depends on it.
-If the database and `DataProtectionKeys` rows are preserved, a fresh BFF host can read
-cookie tickets protected by the previous host. If those rows are lost, existing BFF
-auth/setup/antiforgery cookies are intentionally invalid and users must authenticate or
-repeat setup actions again. Treat unexpected mass cookie invalidation after restart as a
-database/key-ring persistence incident before debugging Keycloak or browser storage.
-The Blazor readiness check named `data-protection-keys` queries the same
-`DataProtectionKeyContext` key table. If the table or backing database is
-unreachable, Blazor `/health` returns unhealthy and logs only the bounded
-failure type; health payloads never expose key XML, connection strings, or
-database endpoints.
+ASP.NET Core Data Protection protects BFF authentication/setup cookies,
+antiforgery state and other payloads, but its persistence depends on the host.
+`AddApiHostServices` uses `DataProtectionKeyContext` in the primary database;
+the migration owner applies that context's schema. Combined Standalone retains
+this registration when no Redis cache connection is configured. Its keys live
+in the primary SQLite database, not `/app/data/dataprotection-keys/`.
+
+`AddBffDataProtection` uses application name `islamu-event`. With
+`ConnectionStrings:cache`, it selects Redis key
+`islamu-event:data-protection-keys`; shipped Split Compose supplies this connection
+to the separate UI and persists Redis in `redis_data`. Without Redis the extension
+leaves the existing key-store registration intact. A separate UI host does not
+automatically inherit the API's database registration.
+
+`DataProtectionKeyStoreHealthCheck` reports `store=redis` when a multiplexer is
+available, probes Redis and reports `keyRingPresent`. A reachable Redis with no
+keyring still returns Healthy; this check does not prove recovery of prior keys.
+Without Redis it reports `store=local` and performs a protect/unprotect roundtrip
+through the active provider. That label does not establish filesystem storage or
+restart durability, and the check does not query `DataProtectionKeyContext`.
+Probe exceptions are Unhealthy with bounded failure type, not key material.
+
+Preserve the actual database/Redis key stores, selected signing-secret authority,
+Identity state and media in coordinated backups. Keep retained erasure authority
+outside primary rollback. Lost keys can invalidate protected payloads, while
+preserved keys alone do not guarantee session validity, crash recovery or a
+successful restore. Diagnose unexpected post-restart cookie invalidation against
+the selected store and current identity authority before browser storage. See
+[SELF_HOSTING.md](SELF_HOSTING.md#persistent-keys-and-backup-boundaries) for the
+composition contract and the [public backup runbook](../public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md)
+for operator procedures.
 
 Event/session lifecycle migration notes:
 
@@ -1052,12 +1119,12 @@ Readiness interpretation:
 |---|---|---|---|---|
 | `shutdown` | API, Blazor, Control Plane BFF | Process is accepting traffic | Not used | Graceful shutdown is active; remove from load balancer |
 | `database` | API, Blazor | EF Core can reach the configured primary provider | Not used | Database unavailable or migration/runtime connectivity failed |
-| `data-protection-keys` | Blazor | Persisted ASP.NET Core Data Protection key table is reachable | Not used | BFF key-ring table or backing database is unavailable; existing cookies may fail after restart |
+| `data-protection-keys` | Blazor, Standalone | Redis probe succeeds (inspect `keyRingPresent` separately), or the active non-Redis provider completes protect/unprotect | Not used | Active key-store probe or protect/unprotect fails; this check does not prove prior-key recovery |
 | `distributed-cache` | API, Blazor, Control Plane BFF | Effective cache round-trip works | Configured Redis fell back to in-memory cache | Effective cache round-trip failed |
 | `oidc-discovery` | API, Blazor, Control Plane BFF | OIDC metadata valid, or OIDC is not configured | Not used | Configured OIDC metadata endpoint is unreachable or invalid |
 | `atproto-authentication` | Blazor | AT Protocol login is disabled, or local prerequisites and the signed transient-store create/read/consume probe pass | ATProto is unavailable but explicit Local Identity or Keycloak is primary | ATProto is primary (or primary authority is unknown) and a prerequisite/probe fails |
-| `smtp` | API | SMTP connection/auth succeeds | SMTP is not configured | Configured SMTP is unreachable or authentication fails |
-| `email-dispatch` | API | Selected Basic Dispatch trigger is enabled (`Quartz` scheduler or hosted-service fallback) and outbox counts are below warning thresholds | Dispatch is intentionally disabled, due dispatch backlog crosses threshold, stale `Processing` rows cross threshold, or `DeadLettered` rows cross threshold | `Quartz` mode selected while scheduler is disabled; invalid dispatch/scheduler options fail startup; RabbitMQ is not checked in Basic mode |
+| `smtp` | API | Instance delivery is disabled without a transport probe, or its configured SMTP connection/authentication succeeds | Instance delivery is enabled but its capability is unavailable, or SMTP connection/authentication fails or times out | Required capability/diagnostic resolution throws, or health-check composition fails; the registration retains an `Unhealthy` fallback |
+| `email-dispatch` | API | Worker is intentionally disabled (`Enabled=false` or `Mode=Disabled`), or the selected trigger is enabled and outbox counts are below warning thresholds | `Quartz` mode selected while the scheduler is disabled; operator pause or backlog, stale-processing, unknown, dead-letter, or age thresholds require attention | Outbox/database status cannot be read or health-check composition fails; invalid dispatch/scheduler options still fail startup |
 | `email-dispatch-retention-cleanup` | API | Retention cleanup is enabled in redaction or dry-run mode | Cleanup is intentionally disabled | Invalid retention options fail startup |
 | `email-dispatch-rabbitmq` | API | RabbitMQ Dispatch Mode is disabled, or enabled and topology can be declared | Not used | RabbitMQ mode is enabled but the broker/topology is unreachable or invalid |
 | `queue-drains` | API | Scheduler-owned IntegrationSync, incoming-webhook, bulk-replay, optional provider-publication, and PDS lanes are enabled as configured and below aggregate thresholds | A required lane is disabled or any enabled lane reaches its bounded due, stale, ambiguous, unknown, executing, or dead-letter threshold | The bounded aggregate database query fails |
@@ -1085,8 +1152,9 @@ Operational rules:
 - Point load balancer readiness checks at `/health` and liveness checks at `/alive`.
 - Treat `Degraded` as deployable only when the affected dependency is optional for the deployment mode and the response body clearly identifies the dependency.
 - Treat `Unhealthy` as non-deployable for rolling updates; fix the dependency or intentionally switch the related feature/provider off.
-- Treat `data-protection-keys` unhealthy as a BFF session-continuity blocker. Preserve or restore the `data_protection_keys` table before investigating Keycloak, browser storage, or cookie middleware.
-- SMTP readiness is launch-critical when email is enabled. A 2026-07-04 FullLocal proof stopped Mailpit through `aspire resource mailpit stop` and API `/health` correctly returned HTTP 503 with `smtp` Unhealthy, then returned HTTP 200 Healthy after Mailpit restart. The SMTP readiness registration is bounded to five seconds; the follow-up proof returned HTTP 503 in `5.014s` with `smtp` Unhealthy and recovered to HTTP 200 after Mailpit restart.
+- Treat `data-protection-keys` unhealthy as an active key-store incident. Check the actual host registration: shipped Split UI uses Redis, while default Combined Standalone uses its primary database. Do not restore an invented filesystem keyring or assume Healthy proves the previous keys survived. Preserve independent erasure authority and current credential revocations during recovery.
+- SMTP is optional for core readiness. `SmtpHealthCheck` resolves instance delivery capability with a `null` tenant scope before probing. Disabled delivery is `Healthy` without SMTP network I/O; enabled but unavailable capability is `Degraded`. Configured SMTP connection/authentication failures and network timeouts are also `Degraded`, so `/health` remains HTTP 200 when core checks are healthy. `SmtpEmailService.TestConnectionAsync` explicitly resolves instance transport; it does not probe the ambient tenant's SMTP server.
+- `IEmailConnectionTester` returns ordinary network/authentication outcomes as `EmailResult`. Exceptions escaping capability or diagnostic resolution remain `Unhealthy`, including required authority/database failures; health-check composition failures retain the same fail-closed fallback. The SMTP registration keeps its five-second timeout. Health output uses bounded codes and safe metadata, never transport `Message`, `ErrorMessage`, or exception details. Database, authorization, privacy-authority, and signing-key readiness failures are not weakened by optional email.
 - Instance Cerbos readiness follows authorization fail-closed semantics: if the operator selected `authorization.provider=cerbos`, an unreachable PDP makes `/health` unhealthy rather than silently falling back to local RBAC.
 - Local authorization mode skips Cerbos readiness, so self-hosted/local deployments do not need a Cerbos PDP unless explicitly selected.
 - Basic Email Dispatch Mode skips RabbitMQ readiness entirely. A self-hosted deployment can send registration confirmation email with API + PostgreSQL + configured SMTP only. The default trigger is the Quartz `email-dispatch-drain` job; the hosted service mode is a fallback over the same drain service. The `email-dispatch` readiness payload also reports safe aggregate outbox counts for due dispatch backlog, retry-scheduled rows, stale processing leases, and dead-letter rows.
@@ -1469,12 +1537,46 @@ privacy-erasure authority keep their independent histories and must not be
 reset with the application catalog. All migration and snapshot files are
 generated artifacts and must never be patched by hand.
 
+The email-optional integration retains these initials and adds one natively
+generated `EmailOptionalSelfHostingIntegration` tail to each application catalog.
+It replaces the seven unapplied feature stages for credential operations,
+administrator bootstrap, email controls, Local lifecycle operations, challenge
+quotas, guest status, and anonymous retention. The final model retains all of
+those effects alongside the upstream Unicode and relational ATProto baseline.
+The separate external Identity Init and three feature migrations are unchanged;
+Data Protection and privacy-authority catalogs are not consolidated.
+
+The generated integration heads are PostgreSQL
+`20260908213348_EmailOptionalSelfHostingIntegration`, SQLite
+`20260908213357_EmailOptionalSelfHostingIntegration`, SQL Server
+`20260908213409_EmailOptionalSelfHostingIntegration`, and shared MySQL/MariaDB
+`20260908213419_EmailOptionalSelfHostingIntegration`.
+
+This approved development consolidation removes six intermediate rollback
+destinations. The generated Down boundary is the entire application feature back
+to its retained upstream Init, not selective credential/email/retention rollback.
+It is not a retained-data recovery strategy: it drops receipts, control metadata
+and deadlines, and restoring the old bootstrap provider constraint can fail when
+a Local bootstrap row remains. Use forward correction or a tested matching
+backup/binary recovery while preserving newer independent erasure facts.
+
+Do not rewrite history-table rows to make a database with retired Init or feature
+IDs appear current. Such development stores require an explicitly disposable
+rebuild or the matching recovery procedure. When applying the new tail to a
+retained database already at the supported Init, check for duplicate nonnull
+normalized Local emails before the unique-index transition; the migration does
+not select a winner or deduplicate identities. Existing policy revisions start
+at zero; absent guest/privacy deadlines remain null, with no capability or
+historical PII-window backfill.
+
 Verify a provider change through the generated lifecycle before starting an
 application host:
 
-1. Apply the provider's application initial to an empty database.
-2. Roll back to zero only in the generated development lifecycle lane.
-3. Reapply the initial and run `has-pending-model-changes`.
+1. Apply the provider's complete application catalog to an empty database and
+   require exact ordered equality between available and applied migration IDs.
+2. Run the idempotent application again. Roll back to zero only in the
+   explicitly disposable generated development lifecycle lane.
+3. Reapply the complete catalog and run `has-pending-model-changes`.
 4. Repeat the independent Data Protection lifecycle.
 5. For PostgreSQL retained authority, verify the standalone and co-located
    generated histories independently; SQLite embedded authority has its own
@@ -1485,7 +1587,7 @@ application host:
 If apply, rollback, or pending-model verification fails, preserve the generated
 SQL and provider logs without credentials or parameter values. Fix the entity,
 configuration, provider primitive, or migration generator; then regenerate the
-unapplied development initial. Never repair a generated migration or model
+affected unapplied development migration. Never repair a generated migration or model
 snapshot manually. Recreate only the disposable application database selected
 for the development lane—do not delete Data Protection or retained-authority
 catalogs as collateral recovery.
@@ -1631,6 +1733,43 @@ No additional configuration keys were added for SSE refresh hints in this implem
 
 ### Basic Email Dispatch Operations
 
+#### Delivery policy revocation
+
+SMTP administration uses a read-only impact preview followed by a separately
+authorized disable command. `PreviewEmailDeliveryDisableQueryHandler` resolves
+current persisted administrator grants and reads effective policy through
+`EmailDeliveryDisableImpactReader`. The preview compares the actual instance/tenant
+policy with the proposed disable; independently enabled tenant-owned transports
+are excluded from an instance disable's affected scopes.
+
+`EmailDeliveryDisableTokenService` uses existing ASP.NET Core Data Protection with
+a separate purpose and five-minute lifetime. Its protected digest binds the actor,
+target, revision, lock state and ordered affected-scope revisions; no preview token
+is persisted. `DisableEmailDeliveryCommandHandler` rechecks authority and impact
+under the ordered SMTP mutation lock and serializable unit of work, then delegates
+the confirmed mutation to `IEmailDeliverySettingsWriter`. Setting, revision and
+optional-work suppression commit together; cache notifications follow commit.
+Generic single, batch and reset writes cannot bypass deliberate disable, and
+configuration manifests continue to exclude SMTP policy.
+
+The API publishes `disable-preview` and `disable` HAL relations and private,
+no-store responses. A stale revision, changed impact or invalid confirmation cannot
+mutate policy. Preserve SMTP values, delegation locks, operator pauses and rate
+state when disabling. A handoff admitted before disable commits may still finish;
+the policy fence prevents new admission, not recall of an accepted message.
+Optional historical work stays suppressed after re-enable. Required work resumes
+only from eligible capability parks; operator holds and `Unknown` acceptance
+remain separately controlled. Retired `TenantAdministratorInvitation` rows always
+take the existing transactional skip/redaction path, even after administrator
+authority and SMTP capability return.
+
+The native `EmailDeliveryControl` migrations add primary-store policy/source
+revisions, suppression watermarks and typed park provenance with constraints.
+They do not change external Identity schemas. Apply the generated migration for
+the selected primary provider; never hand-edit migrations or snapshots. Reverting
+these migrations removes fence metadata and is not a queue-replay recovery action.
+Keep application code and its generated schema together during rollback.
+
 Registration confirmation email is handled as a durable side effect:
 
 1. The registration command creates an `EmailDispatchOutbox` row in the same primary-database transaction as registration state.
@@ -1669,6 +1808,11 @@ Status-endpoint protection is enforced twice: authorization middleware challenge
 #### Scheduler administration surfaces
 
 Three independent operator surfaces exist over the same scheduler; all are disabled by default.
+
+`InstanceSchedulerSection` handles generated-client read errors (including HTTP
+429 and 503) by clearing stale overview/job data and displaying a retry message.
+Manual Refresh reloads the overview and job list without issuing a scheduler
+mutation. Existing rate limits and HAL control authorization remain authoritative.
 
 - **Status endpoint** — one read-only JSON document for scripted checks. No UI.
 - **Administration API and admin UI** (`Scheduler:Quartz:AdminApiEnabled`) — the portable surface, available in both
@@ -1830,7 +1974,7 @@ stops.
 
 ### Lifecycle-Email Operations
 
-The selected primary database remains the email delivery ledger. Parent-aware content retention is implemented by the `email-dispatch-retention-cleanup` Quartz job (`EmailDispatchRetentionCleanupJob`): it runs bounded transactional passes, supports dry-run, and records only counts and cutoff timestamps in logs.
+The selected primary database remains the email delivery ledger. Parent-aware content retention is implemented by the `email-dispatch-retention-cleanup` Quartz job (`EmailDispatchRetentionCleanupJob`): it runs bounded transactional passes, supports dry-run, and records only counts and cutoff timestamps in summary logs. Per-tenant failure warnings retain only the exception type, never the exception object or provider message. Failed tenants remain counted, cancellation still propagates, and this diagnostic boundary does not change transaction or retry behavior.
 
 - Sent and skipped content redacts after the configured 180-day default; attempt and receipt free text/provider IDs follow the selected parent in the same transaction.
 - Dead-lettered, `Unknown`, and parked replay material remains until its explicit resolution timestamp, then follows the same retention clock. `ContentRedactedAt` permanently removes replay authority.

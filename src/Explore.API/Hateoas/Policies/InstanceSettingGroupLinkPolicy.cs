@@ -11,6 +11,15 @@ public sealed class AtprotoInstanceSettingGroupLinkPolicy : ILinkPolicy<SettingG
 {
     public IEnumerable<LinkDefinition> GetLinks(SettingGroupResponseDto dto, ClaimsPrincipal? user)
     {
+        if (dto.TenantId.HasValue)
+        {
+            foreach (var link in EmailDeliverySettingsLinkPolicy.TenantLinks(dto))
+                yield return link;
+            yield break;
+        }
+        if (dto.Category != AtprotoFederationSettingDefinitions.Category)
+            yield break;
+
         yield return Link(
             LinkRelations.Self,
             RouteNames.GetInstanceAtprotoFederationSettings,

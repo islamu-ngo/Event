@@ -2,6 +2,7 @@ using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using TUnit.Assertions.Enums;
 
 namespace Event.Persistence.IntegrationTests.Migrations;
 
@@ -21,6 +22,10 @@ public sealed class ExternalActorClassificationMigrationTests(PostgreSqlContaine
             "SELECT COUNT(*) FROM pg_constraint WHERE conname = 'ck_actors_external_type_matches_owner'"))
             .IsEqualTo(1L);
         await using ExploreDbContext context = fixture.CreateDbContext();
+        string[] availableMigrations = context.Database.GetMigrations().ToArray();
+        await Assert.That(availableMigrations[0]).EndsWith("_Init");
+        await Assert.That(await context.Database.GetAppliedMigrationsAsync())
+            .IsEquivalentTo(availableMigrations, CollectionOrdering.Matching);
         long availableMigrationCount = context.Database.GetMigrations().LongCount();
         await Assert.That(await ScalarAsync(
             "SELECT COUNT(*) FROM \"__EFMigrationsHistory\""))

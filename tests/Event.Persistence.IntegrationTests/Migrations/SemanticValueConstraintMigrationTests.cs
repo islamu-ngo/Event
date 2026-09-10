@@ -296,7 +296,7 @@ public sealed class SemanticValueConstraintMigrationTests(
     {
         IMigrationsAssembly assembly = context.GetService<IMigrationsAssembly>();
         KeyValuePair<string, System.Reflection.TypeInfo>[] matches = assembly.Migrations
-            .Where(entry => entry.Key.EndsWith(MigrationSuffix, StringComparison.Ordinal))
+            .Where(entry => entry.Key.EndsWith($"_{MigrationSuffix}", StringComparison.Ordinal))
             .ToArray();
         if (matches.Length != 1)
         {

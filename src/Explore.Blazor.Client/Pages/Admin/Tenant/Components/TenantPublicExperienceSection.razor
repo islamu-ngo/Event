@@ -11,7 +11,7 @@
         <MudText Typo="Typo.h5" Style="font-weight: 700;">Public Experience</MudText>
         <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-1">
             Choose what anonymous visitors see after launch. Discovery keeps the fastest convention-first setup;
-            organization-centric mode emphasizes a selected primary organization after you configure one.
+            organization-centric mode emphasizes a selected primary organization after you configure one. Visitor access is configured separately from this display mode.
         </MudText>
     </div>
 
@@ -25,14 +25,22 @@
     else
     {
         <MudStack Spacing="4" Class="settings-form-section mt-4">
-            @if (!Model.CanEditAny)
+            @if (!Model.IsAvailable)
+            {
+                <MudAlert Severity="Severity.Warning"
+                          Variant="Variant.Outlined"
+                          data-testid="public-experience-settings-unavailable">
+                    Public experience settings could not be loaded. The displayed values are not editable; reload settings before saving.
+                </MudAlert>
+            }
+            else if (!Model.CanEditAny)
             {
                 <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
                     Public experience settings are locked by the platform administrator and cannot be changed here.
                 </MudAlert>
             }
 
-            @if (_organizationLoadFailed)
+            @if (_organizationLoadFailed && Model.IsAvailable)
             {
                 <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true">
                     Organizations could not be loaded. You can still save discovery settings and JSON configuration.
@@ -45,10 +53,23 @@
                                Label="Public experience mode"
                                Variant="Variant.Outlined"
                                @bind-Value="Model.Mode"
-                               Disabled="!Model.CanEditMode"
+                               Disabled="@(!Model.IsAvailable || !Model.CanEditMode)"
                                HelperText="Discovery is the default launch mode. Organization-centric requires a valid primary organization.">
                         <MudSelectItem Value="@("DiscoveryCentric")">Discovery-centric</MudSelectItem>
                         <MudSelectItem Value="@("OrganizationCentric")">Organization-centric</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudSelect T="VisitorAccessMode?"
+                               Label="Visitor access"
+                               Variant="Variant.Outlined"
+                               @bind-Value="Model.VisitorAccessMode"
+                               Disabled="@(!Model.IsAvailable || !Model.CanEditVisitorAccessMode)"
+                               HelperText="Controls new visitor participation and account onboarding. Existing-account and operator sign-in remain separate."
+                               data-testid="visitor-access-mode-select">
+                        <MudSelectItem T="VisitorAccessMode?" Value="VisitorAccessMode.FullRegistrationAndAuth">Registration and authentication</MudSelectItem>
+                        <MudSelectItem T="VisitorAccessMode?" Value="VisitorAccessMode.AnonymousOnly">Anonymous participation only</MudSelectItem>
+                        <MudSelectItem T="VisitorAccessMode?" Value="VisitorAccessMode.DirectoryListingOnly">Directory listing only</MudSelectItem>
                     </MudSelect>
                 </MudItem>
                 <MudItem xs="12" md="6">
@@ -57,7 +78,7 @@
                                   Label="Event catalog label"
                                   Variant="Variant.Outlined"
                                   FullWidth="true"
-                                  ReadOnly="!Model.CanEditEventCatalogLabel"
+                                  ReadOnly="@(!Model.IsAvailable || !Model.CanEditEventCatalogLabel)"
                                   HelperText="For example: Events, Program, Classes, or Gatherings." />
                 </MudItem>
             </MudGrid>
@@ -66,7 +87,7 @@
                        Label="Primary organization"
                        Variant="Variant.Outlined"
                        @bind-Value="Model.PrimaryOrganizationId"
-                       Disabled="!Model.CanEditPrimaryOrganization"
+                       Disabled="@(!Model.IsAvailable || !Model.CanEditPrimaryOrganization)"
                        HelperText="Optional. Required only when using organization-centric public experience.">
                 <MudSelectItem T="Guid?" Value="@((Guid?)null)">No primary organization</MudSelectItem>
                 @foreach (OrganizationListDto organization in _organizations.Where(organization => organization.Id.HasValue))
@@ -77,7 +98,7 @@
                 }
             </MudSelect>
 
-            @if (IsOrganizationCentricWithoutPrimaryOrganization)
+            @if (Model.IsAvailable && IsOrganizationCentricWithoutPrimaryOrganization)
             {
                 <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true">
                     Organization-centric mode needs a primary organization. Without one, the public shell will fall back to a safe non-blocking state.
@@ -92,7 +113,7 @@
                                   Variant="Variant.Outlined"
                                   Lines="8"
                                   FullWidth="true"
-                                  ReadOnly="!Model.CanEditHomeBlocks"
+                                  ReadOnly="@(!Model.IsAvailable || !Model.CanEditHomeBlocks)"
                                   HelperText="Versioned config, for example { schemaVersion: 1, blocks: [] }." />
                     @RenderJsonWarning(Model.HomeBlocksJson, "home blocks")
                 </MudExpansionPanel>
@@ -103,7 +124,7 @@
                                   Variant="Variant.Outlined"
                                   Lines="8"
                                   FullWidth="true"
-                                  ReadOnly="!Model.CanEditCtas"
+                                  ReadOnly="@(!Model.IsAvailable || !Model.CanEditCtas)"
                                   HelperText="Versioned config, for example { schemaVersion: 1, ctas: [] }." />
                     @RenderJsonWarning(Model.CtasJson, "CTAs")
                 </MudExpansionPanel>
@@ -114,7 +135,7 @@
                                   Variant="Variant.Outlined"
                                   Lines="10"
                                   FullWidth="true"
-                                  ReadOnly="!Model.CanEditEventSectionPresets"
+                                  ReadOnly="@(!Model.IsAvailable || !Model.CanEditEventSectionPresets)"
                                   HelperText="Typed preset config powers curated public event sections without storing raw query strings." />
                     @RenderJsonWarning(Model.EventSectionPresetsJson, "event section presets")
                 </MudExpansionPanel>

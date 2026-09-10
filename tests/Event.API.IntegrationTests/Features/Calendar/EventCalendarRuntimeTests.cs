@@ -327,7 +327,7 @@ public sealed class CalendarRouteRuntimeFixture : IAsyncInitializer, IAsyncDispo
         .WithImage("postgres:18-alpine")
         .WithDatabase("calendar_routes")
         .WithUsername("postgres")
-        .WithPassword("postgres")
+        .WithPassword(Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)))
         .Build();
 
     public PostgreSqlApiWebApplicationFactory Factory { get; private set; } = null!;

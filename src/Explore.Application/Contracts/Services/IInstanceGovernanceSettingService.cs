@@ -58,7 +58,10 @@ public interface IInstanceGovernanceSettingService
         Guid? actorUserId,
         CancellationToken cancellationToken = default);
 
-    Task ApplyTenantDelegationSettingsAsync(TenantDelegationSettingsDto delegation, Guid? actorUserId);
+    Task<IReadOnlyList<SettingChangedNotification>> ApplyTenantDelegationSettingsAsync(
+        TenantDelegationSettingsDto delegation,
+        Guid? actorUserId,
+        CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SettingChangedNotification>> ApplyTenantDelegationSettingsPatchAsync(
         bool isMultiTenant,
         PatchTenantDelegationSettingsDto patch,

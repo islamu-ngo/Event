@@ -74,7 +74,8 @@ public sealed class AtprotoOperationalReadinessTests
         });
         using var client = host.CreateClient(new()
         {
-            BaseAddress = new Uri(AtprotoRelationalLoginFixture.CanonicalOrigin), AllowAutoRedirect = false
+            BaseAddress = new Uri(AtprotoRelationalLoginFixture.CanonicalOrigin),
+            AllowAutoRedirect = false
         });
         using var healthy = await client.GetAsync("/health");
         await Assert.That(healthy.StatusCode).IsEqualTo(HttpStatusCode.OK);

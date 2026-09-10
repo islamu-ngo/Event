@@ -4,6 +4,7 @@ using Explore.Application.Models.InternalEvents;
 using Explore.Application.Notifications;
 using Explore.Application.Telemetry;
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Microsoft.Extensions.Logging;
 
@@ -19,7 +20,8 @@ public sealed class EventModerationNotificationFanoutService(
     NotificationFanoutOccurrenceCoordinator fanoutCoordinator,
     IUnitOfWork unitOfWork,
     BusinessMetrics metrics,
-    ILogger<EventModerationNotificationFanoutService> logger) : IEventModerationNotificationFanoutService
+    ILogger<EventModerationNotificationFanoutService> logger,
+    ISettingMutationLock mutationLock) : IEventModerationNotificationFanoutService
 {
     public const string LightFanoutKind = "event-moderated-light";
     public const string HeavyFanoutKind = "event-moderated-heavy";
@@ -209,7 +211,9 @@ public sealed class EventModerationNotificationFanoutService(
 
         Guid occurrenceId = Guid.CreateVersion7();
         Guid pointerOutboxMessageId = Guid.CreateVersion7();
-        NotificationFanoutOccurrenceCoordinationResult result = await unitOfWork.ExecuteInTransactionAsync(
+        NotificationFanoutOccurrenceCoordinationResult result = await mutationLock.ExecuteOrderedGroupsAsync(
+            [[GovernanceSettingKeys.Email.DeliveryEnabled]],
+            policyToken => unitOfWork.ExecuteInTransactionAsync(
             async token =>
             {
                 EventModerationRecord moderationRecord = await moderationRecordRepository.GetByIdAsync(
@@ -255,7 +259,7 @@ public sealed class EventModerationNotificationFanoutService(
                         SourceId: moderationRecord.Id),
                     token);
             },
-            cancellationToken);
+            policyToken), cancellationToken);
 
         metrics.RecordNotificationFanoutRun(
             HeavyFanoutKind,

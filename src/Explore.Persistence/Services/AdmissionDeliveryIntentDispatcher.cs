@@ -70,6 +70,10 @@ public sealed class AdmissionDeliveryIntentDispatcher(
                 ? new AdmissionDeliveryDispatchResult(AdmissionDeliveryOutcome.Delivered)
                 : Pending(AdmissionDeliveryFailure.RouteUnavailable);
         }
+        catch (AdmissionContactRetentionExpiredException)
+        {
+            return new AdmissionDeliveryDispatchResult(AdmissionDeliveryOutcome.Unrecoverable, AdmissionDeliveryFailure.RetentionExpired);
+        }
         catch (OperationCanceledException)
         {
             logger.LogWarning(

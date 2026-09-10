@@ -82,6 +82,10 @@ public sealed class RegistrationOrder : ITenantEntity, IAuditableEntity, ISoftDe
 
     public CapabilityTokenHash? GuestAccessTokenHash { get; private set; }
 
+    public DateTime? GuestStatusAccessUntilUtc { get; private set; }
+
+    public DateTime? AnonymousPiiRetentionUntilUtc { get; private set; }
+
     public string CurrencyCode { get; private set; } = string.Empty;
 
     public DateTime? ExpiresAt { get; private set; }
@@ -158,7 +162,8 @@ public sealed class RegistrationOrder : ITenantEntity, IAuditableEntity, ISoftDe
         CapabilityTokenHash? guestAccessTokenHash,
         string currencyCode,
         DateTime createdAt,
-        DateTime? expiresAt) => Create(
+        DateTime? expiresAt,
+        DateTime? anonymousPiiRetentionUntilUtc = null) => Create(
         Guid.CreateVersion7(),
         tenantId,
         eventId,
@@ -171,7 +176,8 @@ public sealed class RegistrationOrder : ITenantEntity, IAuditableEntity, ISoftDe
         guestAccessTokenHash,
         currencyCode,
         createdAt,
-        expiresAt);
+        expiresAt,
+        anonymousPiiRetentionUntilUtc);
 
     public static RegistrationOrder Create(
         Guid id,
@@ -186,7 +192,8 @@ public sealed class RegistrationOrder : ITenantEntity, IAuditableEntity, ISoftDe
         CapabilityTokenHash? guestAccessTokenHash,
         string currencyCode,
         DateTime createdAt,
-        DateTime? expiresAt)
+        DateTime? expiresAt,
+        DateTime? anonymousPiiRetentionUntilUtc = null)
     {
         if (id == Guid.Empty || tenantId == Guid.Empty || eventId == Guid.Empty || ticketCatalogVersionId == Guid.Empty ||
             accountUserId == Guid.Empty || purchaserActorId == Guid.Empty || registrationWorkflowVersionId == Guid.Empty ||
@@ -203,6 +210,18 @@ public sealed class RegistrationOrder : ITenantEntity, IAuditableEntity, ISoftDe
             throw new ArgumentException("Order expiry must be after creation.", nameof(expiresAt));
         }
 
+        if (anonymousPiiRetentionUntilUtc.HasValue)
+        {
+            EnsureUtc(anonymousPiiRetentionUntilUtc.Value, nameof(anonymousPiiRetentionUntilUtc));
+            if (accountUserId.HasValue || purchaserActorId.HasValue || guestAccessTokenHash is null ||
+                participationSnapshot.ParticipationHandlingModeId != (int)ParticipationHandlingModeEnum.PlatformManaged ||
+                participationSnapshot.IdentityAccessModeId is not ((int)IdentityAccessModeEnum.GuestAllowed) and not ((int)IdentityAccessModeEnum.CapabilityTokenAllowed) ||
+                anonymousPiiRetentionUntilUtc <= normalizedCreatedAt)
+            {
+                throw new ArgumentException("An anonymous retention bound requires a live original guest allocation.", nameof(anonymousPiiRetentionUntilUtc));
+            }
+        }
+
         return new RegistrationOrder(
             id,
             tenantId,
@@ -216,8 +235,37 @@ public sealed class RegistrationOrder : ITenantEntity, IAuditableEntity, ISoftDe
             guestAccessTokenHash,
             CurrencyMetadata.Get(currencyCode).Code,
             normalizedCreatedAt,
-            normalizedExpiresAt);
+            normalizedExpiresAt)
+        {
+            AnonymousPiiRetentionUntilUtc = anonymousPiiRetentionUntilUtc
+        };
     }
+
+    // Allocation establishes the promise before payment is possible. Missing historical promises
+    // are not inferred on reads; only an existing live promise may subsequently be extended.
+    public bool TryEstablishGuestStatusPromise(DateTimeOffset? lastSessionEndUtc, DateTime utcNow)
+    {
+        EnsureUtc(utcNow, nameof(utcNow));
+        if (GuestAccessTokenHash is null || GuestStatusAccessUntilUtc is not null ||
+            RegistrationOrderStatusId != (int)RegistrationOrderStatusEnum.Draft)
+        {
+            return false;
+        }
+
+        DateTime? deadline = GetGuestStatusDeadline(lastSessionEndUtc);
+        if (deadline is null || deadline <= utcNow)
+        {
+            return false;
+        }
+
+        GuestStatusAccessUntilUtc = deadline;
+        return true;
+    }
+
+    public static DateTime? GetGuestStatusDeadline(DateTimeOffset? lastSessionEndUtc) =>
+        lastSessionEndUtc is { } end && end.UtcDateTime <= DateTime.MaxValue.AddDays(-30)
+            ? end.UtcDateTime.AddDays(30)
+            : null;
 
     public void AddLine(RegistrationOrderLine line)
     {
@@ -487,6 +535,21 @@ public sealed class RegistrationOrder : ITenantEntity, IAuditableEntity, ISoftDe
         AppliedPromotionDisplayLabelSnapshot = null;
         ActivePromotionReservationId = null;
         RepriceFromCurrentLines(feePolicy);
+        return true;
+    }
+
+    public bool TryCancelConfirmedAnonymous(AnonymousCancellationEvidence evidence, DateTime timestamp)
+    {
+        DateTime utcTimestamp = EnsureUtc(timestamp, nameof(timestamp));
+        if (!AnonymousCancellationRules.IsEligible(this, evidence) || utcTimestamp < ConfirmedAt)
+        {
+            return false;
+        }
+
+        RegistrationOrderStatusId = (int)RegistrationOrderStatusEnum.Cancelled;
+        CancelledAt = utcTimestamp;
+        UpdatedAt = utcTimestamp;
+        BumpConcurrency(Guid.CreateVersion7());
         return true;
     }
 

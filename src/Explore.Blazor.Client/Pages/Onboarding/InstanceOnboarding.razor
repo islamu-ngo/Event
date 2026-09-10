@@ -1,4 +1,5 @@
 @page "/onboarding/instance"
+@using Explore.Blazor.Client.Components.Common
 @using Explore.Blazor.Client.Contracts.Services.Accessibility
 @using Explore.Blazor.Client.Helpers
 @using Explore.Blazor.Client.Models.Responses
@@ -9,7 +10,7 @@
 @using MudBlazor
 @implements IAsyncDisposable
 @layout SetupLayout
-@attribute [Authorize]
+@attribute [AllowAnonymous]
 @rendermode InteractiveServer
 @inject IInstanceOnboardingService InstanceOnboardingService
 @inject IUserService UserService
@@ -92,7 +93,12 @@
                     </MudAlert>
                 </div>
                 <div class="instance-onboarding__actions">
-                    @if (IsSingleTenantMode)
+                    @if (_localCompleted)
+                    {
+                        <MudAlert Severity="Severity.Info">Sign in with the temporary password, replace it privately, then sign in again. Setup has not created a signed-in session.</MudAlert>
+                        <MudButton Elevation="0" Color="Color.Primary" Variant="Variant.Filled" Href="/login?provider=local">Sign in to replace password</MudButton>
+                    }
+                    else if (IsSingleTenantMode)
                     {
                         <MudButton Elevation="0"
                                    Color="Color.Primary"
@@ -185,6 +191,37 @@
                         <ValidationMessage For="@(() => _siteProfile.Purpose)" />
                     </div>
                 </section>
+
+                @if (IsSingleTenantMode)
+                {
+                    <fieldset class="instance-onboarding__section">
+                        <legend>Directory operator identity</legend>
+                        <MudText Typo="Typo.body2">These public accountability details are separate from the administrator's optional credential email.</MudText>
+                        <AppTextField T="string" Id="operator-public-name" Label="Public name" Required="true" @bind-Value="_directoryOperator.PublicName" Disabled="_submitState.IsSubmitting" />
+                        <AppTextField T="string" Id="operator-legal-name" Label="Legal name" Required="true" @bind-Value="_directoryOperator.LegalName" Disabled="_submitState.IsSubmitting" />
+                        <AppTextField T="string" Id="operator-kind-code" Label="Operator kind code" Required="true" @bind-Value="_directoryOperator.OperatorKindCode" Disabled="_submitState.IsSubmitting" />
+                        <AppTextField T="string" Id="operator-jurisdiction-country-code" Label="Jurisdiction country code" Required="true" MaxLength="2" @bind-Value="_directoryOperator.JurisdictionCountryCode" Disabled="_submitState.IsSubmitting" />
+                        <AppTextField T="string" Id="operator-registration-identifier" Label="Registration identifier (optional)" @bind-Value="_directoryOperator.RegistrationIdentifier" Disabled="_submitState.IsSubmitting" />
+                        <AppTextField T="string" Id="operator-public-contact-email" Label="Public contact email" InputType="InputType.Email" Required="true" @bind-Value="_directoryOperator.PublicContactEmail" Disabled="_submitState.IsSubmitting" />
+                        <AppTextField T="string" Id="operator-legal-notice-url" Label="Legal notice URL" InputType="InputType.Url" Required="true" @bind-Value="_directoryOperator.LegalNoticeUrl" Disabled="_submitState.IsSubmitting" />
+                        <AppTextField T="string" Id="operator-terms-url" Label="Terms URL (optional)" InputType="InputType.Url" @bind-Value="_directoryOperator.TermsUrl" Disabled="_submitState.IsSubmitting" />
+                        <AppTextField T="string" Id="operator-privacy-url" Label="Privacy URL" InputType="InputType.Url" Required="true" @bind-Value="_directoryOperator.PrivacyUrl" Disabled="_submitState.IsSubmitting" />
+                    </fieldset>
+                }
+
+                @if (IsLocalSetup)
+                {
+                    <fieldset class="instance-onboarding__section">
+                        <legend>Initial Local administrator</legend>
+                        <MudText Typo="Typo.body2">No credential email is required. The temporary password must be replaced after setup before administrative access is available.</MudText>
+                        <AppTextField T="string" Label="Username" InputType="InputType.Text" Required="true" MaxLength="256" autocomplete="username" @bind-Value="_localUsername" Disabled="_submitState.IsSubmitting" />
+                        <AppTextField T="string" Label="Temporary password" InputType="InputType.Password" Required="true" MaxLength="128" autocomplete="new-password" @bind-Value="_localPassword" Disabled="_submitState.IsSubmitting" />
+                        <AppTextField T="string" Label="Credential email (optional)" InputType="InputType.Email" MaxLength="256" @bind-Value="_localEmail" Disabled="_submitState.IsSubmitting" />
+                        <AppTextField T="string" Label="First name (optional)" MaxLength="200" @bind-Value="_localFirstName" Disabled="_submitState.IsSubmitting" />
+                        <AppTextField T="string" Label="Last name (optional)" MaxLength="200" @bind-Value="_localLastName" Disabled="_submitState.IsSubmitting" />
+                        <MudButton ButtonType="ButtonType.Button" OnClick="CancelLocalSetup">Cancel Local setup</MudButton>
+                    </fieldset>
+                }
 
                 <section id="launch-readiness" class="instance-onboarding__section" aria-labelledby="launch-readiness-heading">
                     <MudText Typo="Typo.h5" HtmlTag="h2" id="launch-readiness-heading">
@@ -306,6 +343,16 @@
     private readonly object _refreshGate = new();
     private readonly CancellationTokenSource _lifetimeCancellation = new();
     private readonly SelfHostOnboardingProfileDto _siteProfile = new();
+    private readonly TenantDirectoryOperatorIdentityInputDto _directoryOperator = new();
+    private string _localUsername = string.Empty;
+    private string _localPassword = string.Empty;
+    private string? _localEmail;
+    private string? _localFirstName;
+    private string? _localLastName;
+    private Guid _localOperationId = Guid.CreateVersion7();
+    private int _localRequestGeneration;
+    private bool _localCompleted;
+    private bool IsLocalSetup => !_isCompleted && string.Equals(_status?.Provider, "Local", StringComparison.OrdinalIgnoreCase);
     private EditContext _profileEditContext = default!;
     private Task? _refreshTask;
     private string? _deploymentMode;
@@ -430,7 +477,7 @@
         || _authorizationProviderConfigured != true
         || _preflight?.IsReadyToLaunch != true
         || !AllAcknowledgementsChecked
-        || _status?.HasHalLink("complete") != true;
+        || _status?.HasHalLink(IsLocalSetup ? "complete-local" : "complete") != true;
 
     private string DeploymentModeText => IsSingleTenantMode
         ? T("deployment.single", "Single tenant")
@@ -556,22 +603,24 @@
     {
         _profileEditContext = new EditContext(_siteProfile);
 
-        try
-        {
-            await UserService.SyncUserAsync();
-            await UserService.GetCurrentUserAsync();
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "Could not fully hydrate user context during instance onboarding.");
-        }
-
         await RefreshAsync();
+        if (!IsLocalSetup && !_disposed && _status?.HasHalLink("complete") == true)
+        {
+            try
+            {
+                await UserService.SyncUserAsync();
+                await UserService.GetCurrentUserAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Could not fully hydrate user context during instance onboarding.");
+            }
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender || _setupSecretSynced || _disposed)
+        if (!firstRender || IsLocalSetup || _setupSecretSynced || _disposed || _status?.HasHalLink("complete") != true)
         {
             return;
         }
@@ -600,6 +649,11 @@
             return;
         }
 
+        if (_hasLoaded && IsLocalSetup)
+        {
+            _localPassword = string.Empty;
+            _localRequestGeneration++;
+        }
         _isLoading = !_hasLoaded;
         _isRefreshing = true;
         _loadError = null;
@@ -628,8 +682,16 @@
             var systemStatus = await systemStatusTask;
             var branding = await brandingTask;
 
+            bool wasLocal = IsLocalSetup;
             _status = status;
             _isCompleted = status?.IsCompleted == true;
+            if (wasLocal && !IsLocalSetup)
+            {
+                _localPassword = string.Empty;
+                _localRequestGeneration++;
+            }
+            if (IsLocalSetup)
+                _localOperationId = status?.PendingOperationId ?? _localOperationId;
             _deploymentMode = NormalizeDeploymentMode(systemStatus?.DeploymentMode);
             _authProviderConfigured = await authenticationTask;
             _authorizationProviderConfigured = await authorizationTask;
@@ -640,6 +702,7 @@
             {
                 _siteProfile.SiteName = branding.DefaultBrandDisplayName;
             }
+            _siteProfile.SupportEmail = branding?.SupportEmail;
 
             if (status is null
                 || systemStatus is null
@@ -709,9 +772,15 @@
             return;
         }
 
-        if (_status?.HasHalLink("complete") != true)
+        if (_status?.HasHalLink(IsLocalSetup ? "complete-local" : "complete") != true)
         {
             await SetCompletionErrorAsync(T("errors.completion_unavailable", "The server did not expose permission to complete setup. Refresh and try again."));
+            return;
+        }
+
+        if (IsLocalSetup)
+        {
+            await CompleteLocalSetupAsync();
             return;
         }
 
@@ -730,16 +799,9 @@
             {
                 DeploymentMode = IsSingleTenantMode ? DeploymentMode.SingleTenant : DeploymentMode.MultiTenant,
                 AdministrationAccessMode = "Embedded",
-                SiteProfile = new SelfHostOnboardingProfileDto
-                {
-                    SiteName = _siteProfile.SiteName?.Trim(),
-                    SupportEmail = NormalizeOptional(_siteProfile.SupportEmail),
-                    CanonicalUrl = NormalizeOptional(_siteProfile.CanonicalUrl),
-                    Locale = string.IsNullOrWhiteSpace(_siteProfile.Locale) ? "en" : _siteProfile.Locale.Trim(),
-                    TimeZone = string.IsNullOrWhiteSpace(_siteProfile.TimeZone) ? "UTC" : _siteProfile.TimeZone.Trim(),
-                    Purpose = NormalizeOptional(_siteProfile.Purpose)
-                },
-                InstanceName = _siteProfile.SiteName?.Trim()
+                SiteProfile = CreateCompletionProfile(),
+                InstanceName = _siteProfile.SiteName?.Trim(),
+                DirectoryOperatorIdentity = IsSingleTenantMode ? _directoryOperator : null
             };
 
             var preRefreshed = await InstanceOnboardingService.RefreshAuthSessionAsync();
@@ -815,6 +877,68 @@
                 _submitState.Complete();
             }
         }
+    }
+
+    private SelfHostOnboardingProfileDto CreateCompletionProfile() => new()
+    {
+        SiteName = _siteProfile.SiteName?.Trim(),
+        SupportEmail = NormalizeOptional(_siteProfile.SupportEmail),
+        CanonicalUrl = NormalizeOptional(_siteProfile.CanonicalUrl),
+        Locale = string.IsNullOrWhiteSpace(_siteProfile.Locale) ? "en" : _siteProfile.Locale.Trim(),
+        TimeZone = string.IsNullOrWhiteSpace(_siteProfile.TimeZone) ? "UTC" : _siteProfile.TimeZone.Trim(),
+        Purpose = NormalizeOptional(_siteProfile.Purpose)
+    };
+
+    private async Task CompleteLocalSetupAsync()
+    {
+        _submitState.Start();
+        int generation = ++_localRequestGeneration;
+        try
+        {
+            var response = await InstanceOnboardingService.CompleteLocalAsync(new CompleteLocalInstanceOnboardingRequestDto
+            {
+                OperationId = _localOperationId,
+                Username = _localUsername.Trim(), TemporaryPassword = _localPassword,
+                Email = NormalizeOptional(_localEmail), FirstName = NormalizeOptional(_localFirstName), LastName = NormalizeOptional(_localLastName),
+                Settings = new CompleteInstanceOnboardingRequest
+                {
+                    DeploymentMode = IsSingleTenantMode ? DeploymentMode.SingleTenant : DeploymentMode.MultiTenant,
+                    SiteProfile = CreateCompletionProfile(),
+                    DirectoryOperatorIdentity = IsSingleTenantMode ? _directoryOperator : null,
+                    AdministrationAccessMode = "Embedded", InstanceName = _siteProfile.SiteName?.Trim()
+                }
+            }, _lifetimeCancellation.Token);
+            if (_disposed || generation != _localRequestGeneration) return;
+            if (response.Success == true)
+            {
+                _localCompleted = true;
+                _isCompleted = true;
+                await Announcer.AnnouncePoliteAsync(T("local.completed", "Setup is complete. Sign in and replace your temporary password."));
+            }
+            else
+            {
+                await SetCompletionErrorAsync(T("local.failed", "Local setup did not complete. Refresh status and retry with the same account details."));
+            }
+        }
+        catch (OperationCanceledException) when (_lifetimeCancellation.IsCancellationRequested) { }
+        catch (Exception)
+        {
+            Logger.LogWarning("Local setup completion could not be confirmed.");
+            if (!_disposed && generation == _localRequestGeneration)
+                await SetCompletionErrorAsync(T("local.failed", "Local setup did not complete. Refresh status and retry with the same account details."));
+        }
+        finally
+        {
+            _localPassword = string.Empty;
+            if (!_disposed) _submitState.Complete();
+        }
+    }
+
+    private void CancelLocalSetup()
+    {
+        _localRequestGeneration++;
+        _localPassword = string.Empty;
+        Navigation.NavigateTo("/setup", forceLoad: true);
     }
 
     private async Task SynchronizeSetupSecretAsync()
@@ -946,6 +1070,7 @@
 
     private async Task SetCompletionErrorAsync(string message)
     {
+        _localPassword = string.Empty;
         _completionError = message;
         if (!_disposed)
         {
@@ -988,6 +1113,8 @@
         }
 
         _disposed = true;
+        _localRequestGeneration++;
+        _localPassword = string.Empty;
         _lifetimeCancellation.Cancel();
 
         if (_bffModule is not null)

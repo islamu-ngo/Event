@@ -18,5 +18,7 @@ public static class ApiAuthenticationSchemeNames
 
     public const string LocalIdentity = "LocalIdentityBearer";
 
+    public const string LocalCredentialReplacement = "LocalCredentialReplacement";
+
     public const string PrivacyErasureReceipt = "PrivacyErasureReceipt";
 }

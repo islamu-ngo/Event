@@ -30,6 +30,7 @@ internal static class ServiceCollectionExtensions
             options.OperationFilter<OpenApiVersionedContentTypesOperationFilter>();
             options.OperationFilter<ManagedControlPlaneOpenApiSecurityTransformer>();
             options.OperationFilter<PrivacyErasureReceiptOpenApiSecurityTransformer>();
+            options.OperationFilter<LocalCredentialReplacementOpenApiSecurityTransformer>();
             options.OperationFilter<AdmissionScannerOpenApiSecurityTransformer>();
             options.AddSecurityDefinition(
                 ApiAuthenticationSchemeNames.ManagedControlPlane,
@@ -37,6 +38,9 @@ internal static class ServiceCollectionExtensions
             options.AddSecurityDefinition(
                 PrivacyErasureReceiptOpenApiSecurityTransformer.SecuritySchemeName,
                 PrivacyErasureReceiptOpenApiSecurityTransformer.CreateSecurityScheme());
+            options.AddSecurityDefinition(
+                LocalCredentialReplacementOpenApiSecurityTransformer.SecuritySchemeName,
+                LocalCredentialReplacementOpenApiSecurityTransformer.CreateSecurityScheme());
             options.AddSecurityDefinition(
                 ApiAuthenticationSchemeNames.AdmissionScanner,
                 AdmissionScannerOpenApiSecurityTransformer.CreateSecurityScheme());

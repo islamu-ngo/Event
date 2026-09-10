@@ -79,6 +79,15 @@ public static class HttpClientExtensions
             client.Timeout = TimeSpan.FromSeconds(20);
         }).ConfigureApiTransport(environment, profile);
 
+#pragma warning disable EXTEXP0001
+        services.AddHttpClient(BffLocalCredentialEndpoints.HttpClientName, client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(20);
+        }).ConfigureApiTransport(environment, profile, allowAutoRedirect: false)
+          .RemoveAllResilienceHandlers();
+#pragma warning restore EXTEXP0001
+
         var transient = services.AddHttpClient(ApiBackedAtprotoTransientStore.HttpClientName, client =>
         {
             client.BaseAddress = new Uri(apiBaseUrl);
@@ -134,10 +143,11 @@ public static class HttpClientExtensions
     private static IHttpClientBuilder ConfigureApiTransport(
         this IHttpClientBuilder builder,
         IWebHostEnvironment environment,
-        BlazorHostProfile profile) =>
+        BlazorHostProfile profile,
+        bool allowAutoRedirect = true) =>
         profile == BlazorHostProfile.Combined
             ? builder.ConfigurePrimaryHttpMessageHandler<InProcessEventApiHttpMessageHandler>()
-            : builder.ConfigureDevCertBypass(environment);
+            : builder.ConfigureDevCertBypass(environment, allowAutoRedirect);
 
     // Interactive BFF->API calls use a lean custom pipeline: no circuit breaker (same-machine
     // traffic; a shared breaker trips unrelated UI requests after a single slow endpoint), one

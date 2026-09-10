@@ -1,0 +1,284 @@
+@page "/registration/guest/events/{EventId:guid}/orders/{OrderId:guid}/status"
+@using Explore.Blazor.Client.Contracts.Services.Accessibility
+@using Microsoft.JSInterop
+@inject IRegistrationOrderService RegistrationOrderService
+@inject IGuestRegistrationOrderCapabilityStore CapabilityStore
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject IAccessibilityFocusService Focus
+@inject IDialogService DialogService
+@implements IDisposable
+
+<PageTitle>Private registration status</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small">
+<div class="guest-registration-status">
+    <h1>Private registration status</h1>
+    @if (_loading)
+    {
+        <p role="status">Loading registration status...</p>
+    }
+    else if (_status is null)
+    {
+        <p class="guest-registration-status__notice" role="alert">This private registration status is unavailable. Open your saved private link. Missing, invalid, or expired links cannot be recovered here.</p>
+    }
+    else
+    {
+        <section class="guest-registration-status__panel" aria-labelledby="guest-status-facts">
+            <h2 id="guest-status-facts">Registration snapshot</h2>
+            <dl class="guest-registration-status__facts">
+                <div><dt>Registration</dt><dd data-testid="registration-status" data-status-id="@_status.RegistrationOrderStatusId">@OrderStatus</dd></div>
+                <div><dt>Event</dt><dd data-testid="event-status" data-status-id="@_status.EventStatusId">@EventStatus</dd></div>
+                <div><dt>Confirmed</dt><dd>@FormatUtc(_status.ConfirmedAt)</dd></div>
+                @if (_status.CancelledAt is { } cancelledAt)
+                {
+                    <div><dt>Registration cancelled</dt><dd>@FormatUtc(cancelledAt)</dd></div>
+                }
+                <div><dt>Last scheduled session ends</dt><dd>@FormatUtc(_status.LastSessionEndUtc)</dd></div>
+                <div><dt>Private status access until</dt><dd data-testid="status-access-until"><time datetime="@(_status.StatusAccessUntil.ToString("O", System.Globalization.CultureInfo.InvariantCulture))">@FormatUtc(_status.StatusAccessUntil)</time></dd></div>
+            </dl>
+            <p>Event status and registration status are separate facts. Event cancellation alone does not say that this registration was revoked.</p>
+            <AppButton Variant="Variant.Outlined" Disabled="_cancelling" OnClick="RefreshAsync">Refresh status</AppButton>
+            @if (CanCancelRegistration)
+            {
+                <div class="guest-registration-status__cancellation">
+                    <AppButton id="guest-status-cancel" Color="Color.Error" Variant="Variant.Outlined" Disabled="_cancelling" OnClick="CancelRegistrationAsync">Cancel registration</AppButton>
+                </div>
+            }
+        </section>
+
+        <section class="guest-registration-status__panel" aria-labelledby="guest-status-save">
+            <h2 id="guest-status-save">Save your private link</h2>
+            <p>Anyone holding this link can read this registration's status and cancel it when cancellation is available. Keep it private. No email is sent, and there is no identity-based recovery if you lose it.</p>
+            <p>Access is finite and tied to this event, not the checkout reservation. The deadline above is the current access window. This browser session is not a backup: explicitly copy or download the link before leaving.</p>
+            <div class="guest-registration-status__actions">
+                <AppButton Disabled="_saving" OnClick="@(() => SaveAsync(false))">Copy private link</AppButton>
+                <AppButton Variant="Variant.Outlined" Disabled="_saving" OnClick="@(() => SaveAsync(true))">Download private link</AppButton>
+            </div>
+            <p id="guest-status-save-result" role="status" aria-live="polite" tabindex="-1" data-save-result="@_saveOutcome">@_saveResult</p>
+        </section>
+
+        <section class="guest-registration-status__panel" aria-labelledby="guest-status-calendar">
+            <h2 id="guest-status-calendar">Public calendar snapshot</h2>
+            @if (CalendarUrl is { } calendarUrl)
+            {
+                <a href="@calendarUrl" download rel="noreferrer" referrerpolicy="no-referrer" data-enhance-nav="false">Download public calendar (.ics)</a>
+            }
+            else
+            {
+                <p>A public calendar download is not available. Your private registration status remains available above.</p>
+            }
+            <p>A calendar file contains public event details only, never your private link. It is a static snapshot, not a subscription or cancellation alert. Reopen this private link to check for changes. Calendar providers may retain imported details even after the event changes.</p>
+        </section>
+    }
+    <p id="guest-status-cancellation-result" role="status" aria-live="polite" tabindex="-1" data-cancellation-result="@_cancellationOutcome">@_cancellationResult</p>
+</div>
+</MudContainer>
+
+@code {
+    [Parameter] public Guid EventId { get; set; }
+    [Parameter] public Guid OrderId { get; set; }
+    private HalResourceOfGuestRegistrationStatusDto? _status;
+    private GuestRegistrationOrderCapability? _capability;
+    private CancellationTokenSource _loadCancellation = new();
+    private bool _pendingLoad;
+    private bool _loading = true;
+    private bool _saving;
+    private bool _focusResult;
+    private string? _saveResult;
+    private string? _saveOutcome;
+    private bool _disposed;
+    private long _generation;
+    private bool _cancelling;
+    private bool _cancellationPermissionSuspended;
+    private bool _focusCancellationResult;
+    private string? _cancellationResult;
+    private string? _cancellationOutcome;
+
+    private bool CanCancelRegistration => !_cancellationPermissionSuspended
+        && _status?._links?.TryGetValue("cancel-registration", out var link) == true
+        && string.Equals(link.Method, "POST", StringComparison.OrdinalIgnoreCase);
+
+    private string OrderStatus => _status?.RegistrationOrderStatusId switch
+    {
+        9 => "Confirmed", 12 => "Cancelled", _ => "Status unavailable"
+    };
+    private string EventStatus => _status?.EventStatusId switch
+    {
+        1 => "Draft", 2 => "Published", 3 => "Cancelled", 4 => "Completed", 5 => "Archived", 6 => "Moderated", _ => "Status unavailable"
+    };
+    // HAL grants the public exporter only. Never navigate to an arbitrary raw API origin or my-access route.
+    private string? CalendarUrl => _status?._links?.ContainsKey("calendar") == true
+        ? new Uri(new Uri(Navigation.BaseUri), $"api/event/{EventId:D}/calendar").AbsoluteUri : null;
+
+    protected override void OnParametersSet()
+    {
+        _generation++;
+        _cancellationPermissionSuspended = false;
+        _cancellationResult = null;
+        _cancellationOutcome = null;
+        _focusCancellationResult = false;
+        _loadCancellation.Cancel();
+        _loadCancellation.Dispose();
+        _loadCancellation = new();
+        _status = null;
+        _capability = null;
+        _saveResult = null;
+        _saveOutcome = null;
+        _saving = false;
+        _focusResult = false;
+        _loading = true;
+        _pendingLoad = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_pendingLoad)
+        {
+            _pendingLoad = false;
+            var eventId = EventId;
+            var orderId = OrderId;
+            var cancellation = _loadCancellation.Token;
+            try
+            {
+                // This consumes the first-head scrubber's closure, never location.hash or server-rendered state.
+                var captured = await JS.InvokeAsync<string?>("guestRegistrationStatus.take", cancellation, eventId, orderId);
+                if (cancellation.IsCancellationRequested) return;
+                if (captured is not null) CapabilityStore.RestoreBookmark(eventId, orderId, captured);
+                _capability = CapabilityStore.TryGet(eventId, orderId, out var capability) ? capability : null;
+                await LoadAsync(cancellation);
+            }
+            catch (JSException)
+            {
+                if (!cancellation.IsCancellationRequested) { _status = null; _loading = false; }
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { return; }
+            if (!_disposed) StateHasChanged();
+        }
+        if (_focusCancellationResult)
+        {
+            _focusCancellationResult = false;
+            await Focus.FocusAsync("#guest-status-cancellation-result");
+        }
+        if (_focusResult)
+        {
+            _focusResult = false;
+            await Focus.FocusAsync("#guest-status-save-result");
+        }
+    }
+
+    private async Task LoadAsync(CancellationToken cancellation)
+    {
+        var status = _capability is null ? null
+            : await RegistrationOrderService.GetGuestStatusAsync(EventId, OrderId, _capability, cancellation);
+        if (cancellation.IsCancellationRequested || _disposed) return;
+        _status = status;
+        _loading = false;
+    }
+
+    private async Task RefreshAsync()
+    {
+        if (_cancelling || _loading) return;
+        _loading = true;
+        _saveResult = null;
+        var cancellation = _loadCancellation.Token;
+        try
+        {
+            await LoadAsync(cancellation);
+            if (!cancellation.IsCancellationRequested) _cancellationPermissionSuspended = false;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+    }
+
+    private async Task CancelRegistrationAsync()
+    {
+        if (_cancelling || _loading || !CanCancelRegistration || _capability is null) return;
+        // Capture authority and generation before even focus interop can yield. Never retarget a confirmation.
+        var eventId = EventId;
+        var orderId = OrderId;
+        var capability = _capability;
+        var generation = _generation;
+        var cancellation = _loadCancellation.Token;
+        bool IsCurrent() => !_disposed && generation == _generation && !cancellation.IsCancellationRequested;
+        _cancelling = true;
+        _cancellationResult = null;
+        _cancellationOutcome = null;
+        try
+        {
+            await Focus.SaveFocusAsync();
+            if (!IsCurrent()) return;
+            var confirmed = await DialogService.ShowMessageBoxAsync(
+                "Cancel this registration?",
+                "Cancelling releases the reserved places and revokes all admissions belonging to this registration. Those tickets will no longer admit anyone. This cannot be undone here.",
+                yesText: "Cancel registration", cancelText: "Keep registration",
+                options: DialogOptionsFactory.Confirmation());
+            if (!IsCurrent()) return;
+            await Focus.RestoreFocusAsync();
+            if (!IsCurrent() || confirmed != true) return;
+
+            // A submitted or uncertain action cannot reuse a stale permission. Only a fresh read restores it.
+            _cancellationPermissionSuspended = true;
+            _cancellationOutcome = "pending";
+            _cancellationResult = "Submitting cancellation...";
+            StateHasChanged();
+            var outcome = await RegistrationOrderService.CancelConfirmedGuestRegistrationAsync(eventId, orderId, capability, cancellation);
+            if (!IsCurrent()) return;
+            if (outcome is GuestRegistrationCancellationOutcome.Succeeded or GuestRegistrationCancellationOutcome.Conflict)
+            {
+                await LoadAsync(cancellation);
+                if (!IsCurrent()) return;
+                _cancellationPermissionSuspended = false;
+            }
+            _cancellationOutcome = outcome switch
+            {
+                GuestRegistrationCancellationOutcome.Succeeded => "succeeded",
+                GuestRegistrationCancellationOutcome.Conflict => "conflict",
+                _ => "unavailable"
+            };
+            _cancellationResult = outcome switch
+            {
+                GuestRegistrationCancellationOutcome.Succeeded => _status is null
+                    ? "Cancellation was accepted, but the current status could not be loaded. Reopen your saved private link to check."
+                    : "Cancellation was accepted. The registration snapshot now shows the current server status.",
+                GuestRegistrationCancellationOutcome.Conflict => "This registration could not be cancelled because its eligibility changed. Review the current status; no cancellation was assumed.",
+                _ => "Cancellation could not be verified. The private link may be unavailable or expired. Refresh status before deciding whether to try again."
+            };
+            _focusCancellationResult = true;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        finally
+        {
+            // Keep the guard across navigation until the original confirmation/request has finished.
+            _cancelling = false;
+        }
+    }
+
+    private async Task SaveAsync(bool download)
+    {
+        if (_saving || _capability is null || _status is null) return;
+        _saving = true;
+        var cancellation = _loadCancellation.Token;
+        bool saved;
+        try
+        {
+            saved = await JS.InvokeAsync<bool>("guestRegistrationStatus.save", download ? "download" : "copy", EventId, OrderId, _capability.Value);
+        }
+        catch (JSException) { saved = false; }
+        if (_disposed || cancellation.IsCancellationRequested) return;
+        _saving = false;
+        _saveOutcome = saved ? download ? "download-started" : "copied" : "failed";
+        _saveResult = saved
+            ? download ? "Private link download started. Keep the file safe and check that it was saved." : "Private link copied. Store it somewhere safe."
+            : download ? "The private link could not be downloaded. Try copying it instead." : "The private link could not be copied. Try downloading it instead.";
+        _focusResult = true;
+    }
+
+    private static string FormatUtc(DateTimeOffset? value) => value?.UtcDateTime.ToString("yyyy-MM-dd HH:mm 'UTC'", System.Globalization.CultureInfo.InvariantCulture) ?? "Not currently available";
+
+    public void Dispose()
+    {
+        _disposed = true;
+        _loadCancellation.Cancel();
+        _loadCancellation.Dispose();
+    }
+}

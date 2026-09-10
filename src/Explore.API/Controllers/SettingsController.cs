@@ -3,6 +3,12 @@ using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
 using Explore.API.Hateoas;
+using Explore.API.Filters;
+using Explore.API.Models;
+using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.DTOs.EmailDispatch;
+using Explore.Application.Features.EmailDispatch.Requests.Commands;
+using Explore.Application.Features.EmailDispatch.Requests.Queries;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.DTOs.Settings;
 using Explore.Application.Features.Settings.Requests.Commands;
@@ -124,6 +130,7 @@ public class SettingsController : ControllerBase
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> ResetTenantSetting(
         string key, CancellationToken cancellationToken = default)
     {
@@ -154,15 +161,61 @@ public class SettingsController : ControllerBase
         return HandleCommandResponse(response);
     }
 
+    [HttpPost("email-delivery/disable-preview", Name = RouteNames.PreviewTenantSmtpDisable)]
+    [EndpointSummary("Preview Tenant SMTP Disable")]
+    [PrivateNoStore]
+    [SuppressIdempotencyResponseStorage]
+    [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
+    [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
+    [ProducesResponseType(typeof(HalResource<EmailDeliveryDisablePreviewDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<HalResource<EmailDeliveryDisablePreviewDto>>> PreviewEmailDeliveryDisable(
+        [FromServices] ITenantContext tenantContext,
+        [FromServices] IResourceAssembler<EmailDeliveryDisablePreviewDto, EmailDeliveryDisablePreviewDto> assembler,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(new PreviewEmailDeliveryDisableQuery(TenantId: tenantContext.TenantId), cancellationToken);
+        return response.IsSuccess
+            ? Ok(await assembler.ToResource(response.Id!, HttpContext))
+            : this.ToEmailDeliveryDisableProblem(response);
+    }
+
+    [HttpPost("email-delivery/disable", Name = RouteNames.DisableTenantSmtp)]
+    [EndpointSummary("Disable Tenant SMTP")]
+    [PrivateNoStore]
+    [SuppressIdempotencyResponseStorage]
+    [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(BaseCommandResponse<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<BaseCommandResponse<Guid>>> DisableEmailDelivery(
+        [FromBody] EmailDeliveryDisableRequest body,
+        [FromServices] ITenantContext tenantContext, CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(new DisableEmailDeliveryCommand(TenantId: tenantContext.TenantId,
+            ExpectedRevision: body.ExpectedRevision, Acknowledgement: body.Acknowledgement,
+            ConfirmationToken: body.ConfirmationToken), cancellationToken);
+        return response.IsSuccess ? Ok(response) : this.ToEmailDeliveryDisableProblem(response);
+    }
+
     // ── Tenant Scope Endpoints ──────────────────────────────────────────
 
     [HttpGet("tenant/{category}", Name = RouteNames.GetTenantScopedSettings)]
     [EndpointSummary("Get Tenant Settings")]
     [EndpointDescription("Returns effective settings for the given category at tenant scope. Requires tenant administrator.")]
-    [ProducesResponseType(typeof(SettingGroupResponseDto), StatusCodes.Status200OK)]
+    [PrivateNoStore]
+    [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
+    [ProducesResponseType(typeof(HalResource<SettingGroupResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
-    public async Task<ActionResult<SettingGroupResponseDto>> GetTenantSettings(
+    public async Task<ActionResult<HalResource<SettingGroupResponseDto>>> GetTenantSettings(
         string category, CancellationToken cancellationToken = default)
     {
         var result = await _mediator.Send(new ResolveSettingGroupQuery
@@ -171,7 +224,7 @@ public class SettingsController : ControllerBase
             Scope = SettingScope.Tenant
         }, cancellationToken);
 
-        return Ok(result);
+        return Ok(await _instanceSettingGroupAssembler.ToResource(result, HttpContext));
     }
 
     [HttpPut("tenant/{category}", Name = RouteNames.UpdateTenantSettingsBatch)]
@@ -181,6 +234,7 @@ public class SettingsController : ControllerBase
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<BatchUpdateResponseDto>> UpdateTenantSettingsBatch(
         string category,
         [FromBody] UpdateSettingBatchDto body,
@@ -197,6 +251,13 @@ public class SettingsController : ControllerBase
 
         if (!result.Success)
         {
+            if (result.Message == CommandResponseResultMapper.VisitorAccessAccountRequiredConflict
+                || result.Results.Any(item => item.SkipReason == CommandResponseResultMapper.VisitorAccessAccountRequiredConflict))
+            {
+                return this.MapCommandResponse(BaseCommandResponse.Failure<Guid>(
+                    CommandResponseResultMapper.VisitorAccessAccountRequiredConflict));
+            }
+
             return this.ToValidationProblem(
                 SettingsValidationProblem,
                 result.Message ?? "Tenant settings batch update failed.");
@@ -216,6 +277,7 @@ public class SettingsController : ControllerBase
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> UpdateTenantSetting(
         string key,
         [FromBody] UpdateSettingValueDto body,
@@ -244,6 +306,7 @@ public class SettingsController : ControllerBase
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> LockTenantSetting(
         string key, CancellationToken cancellationToken = default)
     {
@@ -263,6 +326,7 @@ public class SettingsController : ControllerBase
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> UnlockTenantSetting(
         string key, CancellationToken cancellationToken = default)
     {
@@ -418,7 +482,9 @@ public class SettingsController : ControllerBase
             return this.ToForbiddenProblem(detail: response.Message);
         }
 
-        return this.ToCommandValidationProblem(response, SettingsValidationProblem);
+        return response.FailureCode == CommandResponseResultMapper.VisitorAccessAccountRequiredConflict
+            ? this.MapCommandResponse(response)
+            : this.ToCommandValidationProblem(response, SettingsValidationProblem);
     }
 
 }

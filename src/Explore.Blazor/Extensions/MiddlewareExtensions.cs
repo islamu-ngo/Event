@@ -173,6 +173,15 @@ public static class MiddlewareExtensions
     {
         var nonce = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         context.Items[ContentSecurityPolicyNonceItemKey] = nonce;
+        // Capture before downstream status-code re-execution can substitute an error-page path.
+        var guestStatusPath = GuestRegistrationOrderCapabilityStore.IsStatusPath(context.Request.Path.Value)
+            || IsGuestStatusTransportPath(context.Request.Path);
+        if (guestStatusPath)
+        {
+            // This surface has route/header authority only. Do not let query input reach SSR
+            // navigation hrefs or proxy URL logging; the early script also erases the browser URL.
+            context.Request.QueryString = QueryString.Empty;
+        }
 
         context.Response.OnStarting(() =>
         {
@@ -191,6 +200,9 @@ public static class MiddlewareExtensions
 
             headers[HeaderNames.XContentTypeOptions] = "nosniff";
             if (IsSensitiveAdmissionPath(context.Request.Path)
+                || guestStatusPath
+                || context.Request.Path.StartsWithSegments(BffLocalIdentityLifecycleEndpoints.LandingPath, StringComparison.OrdinalIgnoreCase)
+                || context.Request.Path.StartsWithSegments(BffLocalIdentityLifecycleEndpoints.Prefix, StringComparison.OrdinalIgnoreCase)
                 || context.Request.Path.StartsWithSegments(
                     "/bff/events")
                 && (context.Request.Path.Value?.Contains(
@@ -225,6 +237,11 @@ public static class MiddlewareExtensions
 
         await next();
     }
+
+    private static bool IsGuestStatusTransportPath(PathString path) =>
+        path.Value?.Contains("/guest-registration-orders/", StringComparison.OrdinalIgnoreCase) == true
+        && (path.Value.TrimEnd('/').EndsWith("/status", StringComparison.OrdinalIgnoreCase)
+            || path.Value.TrimEnd('/').EndsWith("/cancellation", StringComparison.OrdinalIgnoreCase));
 
     private static bool IsSensitiveAdmissionPath(PathString path) =>
         path.StartsWithSegments("/tickets", StringComparison.OrdinalIgnoreCase) ||
@@ -444,6 +461,19 @@ public static class MiddlewareExtensions
         {
             await next();
             return;
+        }
+
+        if (string.Equals(path, "/onboarding/instance", StringComparison.OrdinalIgnoreCase)
+            && HasTrustedSetupSecret(ctx))
+        {
+            var status = await ctx.RequestServices.GetRequiredService<IBffOnboardingStatusProvider>()
+                .GetStatusAsync(ctx.RequestAborted);
+            if (status.Disposition == BffOnboardingDisposition.InteractivePending
+                && string.Equals(status.Provider, "Local", StringComparison.Ordinal))
+            {
+                await next();
+                return;
+            }
         }
 
         var returnUrl = Uri.EscapeDataString(path + ctx.Request.QueryString);

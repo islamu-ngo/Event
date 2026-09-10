@@ -1,3 +1,4 @@
+using System.CodeDom.Compiler;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -235,6 +236,13 @@ public sealed class StandaloneHostGraphTests
         using var publicClient = factory.CreateClient();
         await using var scope = factory.Services.CreateAsyncScope();
 
+        var expectedInterfaces = typeof(IEventTypeClient).Assembly.GetTypes()
+            .Where(type => type.IsInterface
+                && type.Namespace == typeof(IEventTypeClient).Namespace
+                && type.GetCustomAttributes(typeof(GeneratedCodeAttribute), inherit: false)
+                    .OfType<GeneratedCodeAttribute>()
+                    .Any(attribute => attribute.Tool == "NSwag"))
+            .ToArray();
         var registrations = GeneratedEventApiClients.ClientTypes;
         var resolvedClients = registrations
             .Select(pair => scope.ServiceProvider.GetRequiredService(pair.InterfaceType))
@@ -245,6 +253,8 @@ public sealed class StandaloneHostGraphTests
             .GetRequiredService<IHttpClientFactory>()
             .CreateClient(nameof(IEventTypeClient));
 
+        await Assert.That(expectedInterfaces).IsNotEmpty();
+        await Assert.That(registrations.Select(pair => pair.InterfaceType)).IsEquivalentTo(expectedInterfaces);
         await Assert.That(registrations).IsNotEmpty();
         await Assert.That(resolvedClients).Count().IsEqualTo(registrations.Count);
         await Assert.That(resolvedClients.Zip(registrations)

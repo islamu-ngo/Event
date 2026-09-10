@@ -1,0 +1,28 @@
+Change-Id: CHG-01M23B18AFM8D9QET5H0S71PGV
+Title: "Validate authentication return destinations"
+Type: fix
+Scope: access
+Summary: "Reject unsafe application return destinations in BFF query, Local login and ATProto flows without exposing rejected values in diagnostics."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Framework local-URL validation blocks control-character and external return destinations, and ATProto rejects unsafe paths before issuing browser proof.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authentication.md
+    Disposition: documented
+    Detail: Application return destinations must be rooted local paths; invalid endpoint input falls back to the home page without changing identity-provider authorization redirects.

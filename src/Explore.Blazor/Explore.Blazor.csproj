@@ -12,6 +12,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Embed the shipped scrubber so the first head script needs no network request or relative asset resolution. -->
+    <EmbeddedResource Include="..\Explore.Blazor.Client\wwwroot\js\guest-registration-status.js" LogicalName="GuestRegistrationStatusScript" />
     <None Include="..\Explore.Blazor.Client\Pages\Event\Component.razor" Link="Component.razor" />
   </ItemGroup>
 

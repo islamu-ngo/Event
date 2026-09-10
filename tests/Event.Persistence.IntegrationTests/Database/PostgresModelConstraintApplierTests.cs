@@ -56,10 +56,12 @@ public sealed class PostgresModelConstraintApplierTests
             await Assert.That(reader.IsDBNull(2)).IsTrue();
         }
 
-        string[] appliedMigrations = (await context.Database.GetAppliedMigrationsAsync()).ToArray();
-        string[] availableMigrations = context.Database.GetMigrations().ToArray();
-        await Assert.That(appliedMigrations).IsEquivalentTo(availableMigrations);
-        await Assert.That(appliedMigrations.Count(migration => migration.EndsWith("_Init", StringComparison.Ordinal))).IsEqualTo(1);
+        var appliedMigrations = (await context.Database.GetAppliedMigrationsAsync()).ToArray();
+        await Assert.That(appliedMigrations.Where(id => id.EndsWith("_Init", StringComparison.Ordinal)))
+            .HasSingleItem();
+        await Assert.That(appliedMigrations[0]).EndsWith("_Init");
+        await Assert.That(appliedMigrations).IsEquivalentTo(
+            context.Database.GetMigrations(), TUnit.Assertions.Enums.CollectionOrdering.Matching);
 
         await PostgresModelConstraintApplier.ApplyAsync(context);
 

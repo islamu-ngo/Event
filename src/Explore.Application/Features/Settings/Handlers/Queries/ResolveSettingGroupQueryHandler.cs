@@ -2,6 +2,7 @@ namespace Explore.Application.Features.Settings.Handlers.Queries;
 
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Settings;
 using Explore.Application.Features.Settings.Requests.Queries;
 using Explore.Application.Lookups;
@@ -18,6 +19,8 @@ public class ResolveSettingGroupQueryHandler
     private readonly ITenantContext _tenantContext;
     private readonly ICurrentUserService _currentUserService;
     private readonly IAdminContext _adminContext;
+    private readonly IPlatformUserRoleRepository _platformRoles;
+    private readonly ITenantUserRoleGrantRepository _tenantRoles;
     private readonly ILogger<ResolveSettingGroupQueryHandler> _logger;
 
     public ResolveSettingGroupQueryHandler(
@@ -25,12 +28,16 @@ public class ResolveSettingGroupQueryHandler
         ITenantContext tenantContext,
         ICurrentUserService currentUserService,
         IAdminContext adminContext,
-        ILogger<ResolveSettingGroupQueryHandler> logger)
+        ILogger<ResolveSettingGroupQueryHandler> logger,
+        IPlatformUserRoleRepository platformRoles,
+        ITenantUserRoleGrantRepository tenantRoles)
     {
         _resolver = resolver;
         _tenantContext = tenantContext;
         _currentUserService = currentUserService;
         _adminContext = adminContext;
+        _platformRoles = platformRoles;
+        _tenantRoles = tenantRoles;
         _logger = logger;
     }
 
@@ -43,6 +50,7 @@ public class ResolveSettingGroupQueryHandler
             _logger.LogWarning("Setting category '{Category}' not found in registry", request.Category);
             return new SettingGroupResponseDto
             {
+                TenantId = request.Scope == SettingScope.Tenant ? _tenantContext.TenantId : null,
                 Category = request.Category,
                 Settings = []
             };
@@ -64,7 +72,12 @@ public class ResolveSettingGroupQueryHandler
         var keys = definitions.Select(d => d.Key);
         var resolved = await _resolver.ResolveBatchAsync(keys, context, cancellationToken);
 
-        var isAuthorized = await CheckScopeAuthorizationAsync(request.Scope, cancellationToken);
+        // Email affordances must use the same persisted grants as preview/confirmation, not cached admin claims.
+        var isAuthorized = request.Category == "Email" && request.Scope == SettingScope.Tenant
+            ? resolvedUserId is { } actorId && actorId != Guid.Empty
+                && (await _platformRoles.IsUserPlatformAdmin(actorId)
+                    || await _tenantRoles.IsTenantAdminInCurrentTenantAsync(_tenantContext.TenantId, actorId, cancellationToken))
+            : await CheckScopeAuthorizationAsync(request.Scope, cancellationToken);
         var tenantCanOmitVerification = request.Scope == SettingScope.Tenant
             ? await _resolver.ResolveWithMetadataAsync(
                 GovernanceSettingKeys.Organizations.TenantCanOmitVerification,
@@ -102,6 +115,7 @@ public class ResolveSettingGroupQueryHandler
 
         return new SettingGroupResponseDto
         {
+            TenantId = request.Scope == SettingScope.Tenant ? _tenantContext.TenantId : null,
             Category = request.Category,
             Settings = effectiveSettings
         };

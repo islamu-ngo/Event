@@ -41,7 +41,6 @@ public class BlazorBffWebApplicationFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
-        builder.UseSetting("ConnectionStrings:cache", "localhost:6379,abortConnect=false,connectTimeout=100");
         builder.UseSetting("Keycloak:Authority", "https://auth.example.com");
         builder.UseSetting("Keycloak:Realm", "explore");
         builder.UseSetting("Deployment:Mode", "SingleTenant");
@@ -51,7 +50,6 @@ public class BlazorBffWebApplicationFactory : WebApplicationFactory<Program>
         {
             var inMemoryConfig = new Dictionary<string, string?>
             {
-                ["ConnectionStrings:cache"] = "localhost:6379,abortConnect=false,connectTimeout=100",
                 ["Keycloak:Authority"] = "https://auth.example.com",
                 ["Keycloak:Realm"] = "explore",
                 ["Deployment:Mode"] = "SingleTenant",

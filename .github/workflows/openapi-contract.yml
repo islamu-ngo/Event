@@ -115,6 +115,10 @@ jobs:
         if: steps.changes.outputs.relevant == 'true'
         run: dotnet run --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --no-build -- --treenode-filter "/*/*/*/OpenApiDocument_*" --minimum-expected-tests 5 --no-progress --report-trx --report-trx-filename openapi-invariants.trx
 
+      - name: Build API Contract Inventory
+        if: steps.changes.outputs.relevant == 'true'
+        run: dotnet build eng/tools/Explore.ApiContractInventory/Explore.ApiContractInventory.csproj --configuration Release --no-restore --verbosity minimal
+
       - name: Regenerate API Contract Inventory
         if: steps.changes.outputs.relevant == 'true'
         run: dotnet run --project eng/tools/Explore.ApiContractInventory/Explore.ApiContractInventory.csproj --configuration Release --no-build
@@ -128,6 +132,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p artifacts/openapi-contract
           inventory_path="docs/API_CONTRACT_INVENTORY.md"
           if [ -f "docs/internal/API_CONTRACT_INVENTORY.md" ]; then
             inventory_path="docs/internal/API_CONTRACT_INVENTORY.md"
@@ -209,7 +214,7 @@ jobs:
 
           changed_files="$(git diff --name-only "$base_sha" "$GITHUB_SHA" || true)"
           changelog_changed=false
-          if printf '%s\n' "$changed_files" | grep -E -qx 'docs/(internal/)?API_CHANGELOG.md'; then
+          if grep -E -qx 'docs/(internal/)?API_CHANGELOG.md' <<< "$changed_files"; then
             changelog_changed=true
           fi
 
@@ -257,11 +262,11 @@ jobs:
             echo "- Breaking changes detected: \`${breaking_detected}\`"
             echo "- API changelog changed: \`${changelog_changed}\`"
             echo
-            echo "Breaking changes fail PR/push/merge-queue runs unless \`docs/API_CHANGELOG.md\` changes in the same diff. Scheduled and manual runs remain evidence-only."
+            echo "Breaking changes fail PR/push/merge-queue runs unless \`docs/internal/API_CHANGELOG.md\` changes in the same diff. Scheduled and manual runs remain evidence-only."
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [ "$breaking_detected" = "true" ] && [ "$enforce_changelog" = "true" ] && [ "$changelog_changed" != "true" ]; then
-            echo "OpenAPI breaking changes were detected without a docs/API_CHANGELOG.md update." >&2
+            echo "OpenAPI breaking changes were detected without a docs/internal/API_CHANGELOG.md update." >&2
             exit 1
           fi
 

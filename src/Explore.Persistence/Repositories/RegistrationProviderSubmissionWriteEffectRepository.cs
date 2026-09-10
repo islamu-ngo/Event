@@ -84,8 +84,25 @@ public sealed class RegistrationProviderSubmissionWriteEffectRepository(ExploreD
             .Include(value => value.Capabilities)
             .SingleOrDefaultAsync(value => value.TenantId == claim.TenantId && value.Id == claim.RegistrationProviderBindingId, cancellationToken);
         if (attempt is null || submission is null || binding?.Connection is null ||
+            submission.RegistrationAttemptId != attempt.Id ||
+            submission.RegistrationOrderId != attempt.RegistrationOrderId ||
+            submission.EventId != attempt.EventId ||
+            attempt.RegistrationProviderBindingId != binding.Id ||
+            submission.RegistrationProviderBindingId != binding.Id ||
+            attempt.RegistrationFormVersionId != binding.RegistrationFormVersionId ||
+            submission.RegistrationFormVersionId != binding.RegistrationFormVersionId ||
             attempt.ProviderMappingRevisionHash?.Value != binding.PublishedMappingRevisionHash?.Value ||
             submission.ProviderMappingRevisionHash?.Value != binding.PublishedMappingRevisionHash?.Value)
+        {
+            return null;
+        }
+
+        RegistrationOrder? order = await dbContext.RegistrationOrders
+            .AsNoTracking()
+            .IgnoreTenantFilter(TenantFilterBypassReasons.RegistrationProviderSubmissionWriteWorkerCrossTenantQueue)
+            .SingleOrDefaultAsync(value => value.TenantId == claim.TenantId &&
+                value.Id == submission.RegistrationOrderId && value.EventId == submission.EventId, cancellationToken);
+        if (order is null)
         {
             return null;
         }
@@ -94,7 +111,8 @@ public sealed class RegistrationProviderSubmissionWriteEffectRepository(ExploreD
             .AsNoTracking()
             .IgnoreTenantFilter(TenantFilterBypassReasons.RegistrationProviderSubmissionWriteWorkerCrossTenantQueue)
             .Include(value => value.SensitiveAnswerValue)
-            .Where(value => value.TenantId == claim.TenantId && value.RegistrationSubmissionId == claim.RegistrationSubmissionId)
+            .Where(value => value.TenantId == claim.TenantId && value.RegistrationSubmissionId == submission.Id &&
+                value.RegistrationOrderId == order.Id && value.RegistrationAttemptId == attempt.Id)
             .OrderBy(value => value.RegistrationFormFieldId)
             .ThenBy(value => value.Ordinal)
             .ToListAsync(cancellationToken);
@@ -104,7 +122,7 @@ public sealed class RegistrationProviderSubmissionWriteEffectRepository(ExploreD
             .Include(value => value.Options)
             .Where(value => value.TenantId == claim.TenantId && value.RegistrationFormVersionId == submission.RegistrationFormVersionId)
             .ToListAsync(cancellationToken);
-        return new(attempt, submission, binding, answers, fields);
+        return new(order, attempt, submission, binding, answers, fields);
     }
 
     public async Task<bool> CompleteAsync(RegistrationProviderSubmissionWriteClaim claim, DateTime completedAt, CancellationToken cancellationToken) =>

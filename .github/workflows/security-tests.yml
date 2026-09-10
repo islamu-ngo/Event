@@ -123,6 +123,10 @@ jobs:
         if: ${{ steps.changes.outputs.run-tests == 'true' }}
         run: dotnet restore --locked-mode
 
+      - name: Restore .NET Tools
+        if: ${{ steps.changes.outputs.run-tests == 'true' }}
+        run: dotnet tool restore
+
       - name: Build
         if: ${{ steps.changes.outputs.run-tests == 'true' }}
         run: dotnet build tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --no-restore --verbosity minimal -p:RunAnalyzers=false -p:RunAnalyzersDuringBuild=false

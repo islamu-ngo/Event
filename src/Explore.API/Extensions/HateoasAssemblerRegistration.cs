@@ -5,6 +5,8 @@ using Explore.API.Hateoas.Assemblers;
 using Explore.API.Hateoas.Policies;
 using Explore.API.Hateoas.Resources;
 using Explore.Application.Contracts.Hateoas;  // For ILinkPolicy, ICollectionLinkPolicy
+using Explore.Application.Contracts.Identity;
+using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.DTOs.Actor;
 using Explore.Application.DTOs.ActorSubscription;
 using Explore.Application.DTOs.Admissions;
@@ -207,10 +209,13 @@ public static class HateoasAssemblerRegistration
         services.AddHalResourceWithAssembler<OrganizationMemberDto, OrganizationMemberDetailLinkPolicy, OrganizationMemberCollectionLinkPolicy, OrganizationMemberResourceAssembler>();
 
         services.AddHalResource<RegistrationOrderDto, RegistrationOrderLinkPolicy, RegistrationOrderCollectionLinkPolicy>();
+        services.AddHalResourceWithSharedPolicy<GuestRegistrationStatusDto, GuestRegistrationStatusLinkPolicy,
+            GuestRegistrationStatusCollectionLinkPolicy, GuestRegistrationStatusResourceAssembler>();
         services.AddHalResource<ParticipantReadinessDto, ParticipantReadinessLinkPolicy, ParticipantReadinessCollectionLinkPolicy>();
         services.AddHalResource<TicketTransferDto, TicketTransferLinkPolicy, TicketTransferCollectionLinkPolicy>();
         services.AddHalResource<FairReturnWaitlistDto, FairReturnWaitlistLinkPolicy, FairReturnWaitlistCollectionLinkPolicy>();
-        services.AddHalResource<RegistrationAnswerFileDto, RegistrationAnswerFileLinkPolicy, RegistrationAnswerFileCollectionLinkPolicy>();
+        services.AddHalResourceWithAssembler<RegistrationAnswerFileDto, RegistrationAnswerFileLinkPolicy,
+            RegistrationAnswerFileCollectionLinkPolicy, RegistrationAnswerFileResourceAssembler>();
 
         // EventSessionAgendaItem
         services.AddHalResourceWithAssembler<EventSessionAgendaItemDto, EventSessionAgendaItemListDto, EventSessionAgendaItemDetailLinkPolicy, EventSessionAgendaItemCollectionLinkPolicy, EventSessionAgendaItemResourceAssembler>();
@@ -223,6 +228,9 @@ public static class HateoasAssemblerRegistration
         services.AddHalResource<SchedulerAdminJobDto, SchedulerAdminJobLinkPolicy, SchedulerAdminJobCollectionLinkPolicy>();
 
         services.AddHalResource<ControlPlaneOverviewDto, ControlPlaneOverviewLinkPolicy, ControlPlaneOverviewCollectionLinkPolicy>();
+        services.AddHalResource<LocalIdentitySummary, LocalIdentityDetailLinkPolicy, LocalIdentityCollectionLinkPolicy>();
+        services.AddHalResource<LocalCredentialOperationStatus, LocalCredentialOperationDetailLinkPolicy, LocalCredentialOperationCollectionLinkPolicy>();
+        services.AddHalResource<LocalCredentialIssueDto, LocalCredentialIssueDetailLinkPolicy, LocalCredentialIssueCollectionLinkPolicy>();
         services.AddHalResource<ControlPlaneDomainOverviewDto, ControlPlaneDomainLinkPolicy, ControlPlaneDomainCollectionLinkPolicy>();
         services.AddHalResource<ControlPlaneOperationsDto, ControlPlaneOperationsLinkPolicy, ControlPlaneOperationsCollectionLinkPolicy>();
         services.AddHalResource<ControlPlaneDeploymentModeRunbookDto, ControlPlaneDeploymentModeRunbookLinkPolicy, ControlPlaneDeploymentModeRunbookCollectionLinkPolicy>();
@@ -239,6 +247,8 @@ public static class HateoasAssemblerRegistration
         services.AddHalResourceWithAssembler<PaidEventPolicyDto, InstancePaidEventPolicyLinkPolicy, InstancePaidEventPolicyCollectionLinkPolicy, InstancePaidEventPolicyResourceAssembler>();
         services.AddHalResourceWithAssembler<TenantPaidEventPolicyConfigurationDto, TenantPaidEventPolicyConfigurationLinkPolicy, TenantPaidEventPolicyConfigurationCollectionLinkPolicy, TenantPaidEventPolicyConfigurationResourceAssembler>();
         services.AddHalResource<SettingGroupResponseDto, AtprotoInstanceSettingGroupLinkPolicy, AtprotoInstanceSettingGroupCollectionLinkPolicy>();
+        services.AddHalResource<InstanceSmtpSettingsDto, EmailDeliverySettingsLinkPolicy, EmailDeliverySettingsCollectionLinkPolicy>();
+        services.AddHalResource<EmailDeliveryDisablePreviewDto, EmailDeliveryDisablePreviewLinkPolicy, EmailDeliveryDisablePreviewCollectionLinkPolicy>();
         services.AddHalResourceWithAssembler<TenantStorageSettingsDto, TenantStorageSettingsLinkPolicy, TenantStorageSettingsCollectionLinkPolicy, TenantStorageSettingsResourceAssembler>();
         services.AddHalResource<TenantReportingIntakePolicyDto, TenantReportingIntakePolicyLinkPolicy, TenantReportingIntakePolicyCollectionLinkPolicy>();
 

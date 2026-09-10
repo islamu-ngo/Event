@@ -185,6 +185,8 @@ public sealed record AdmissionRecoveryDeliveryEnvelope(
     Guid RecoveryRequestId,
     string Capability)
 {
+    public DateTime? DisclosureUntilUtc { get; init; }
+
     public override string ToString() => "AdmissionRecoveryDeliveryEnvelope(<redacted>)";
 }
 
@@ -211,7 +213,8 @@ public sealed record AdmissionRecoveryDeliveryPointer(
 public enum AdmissionRecoveryDirectDeliveryOutcome
 {
     Accepted,
-    Ambiguous
+    Ambiguous,
+    RetentionExpired
 }
 
 public sealed record AdmissionRecoveryDirectDeliveryRequest(
@@ -222,6 +225,8 @@ public sealed record AdmissionRecoveryDirectDeliveryRequest(
     string RecipientAddress,
     string Capability)
 {
+    public DateTime? DisclosureUntilUtc { get; init; }
+
     public override string ToString() => "AdmissionRecoveryDirectDeliveryRequest(<redacted>)";
 }
 

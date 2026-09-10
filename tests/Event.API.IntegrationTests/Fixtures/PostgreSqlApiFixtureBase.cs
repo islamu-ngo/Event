@@ -1,4 +1,5 @@
 using System.Threading.Channels;
+using System.Security.Cryptography;
 using Explore.Persistence;
 using Explore.Persistence.Seed;
 using Microsoft.AspNetCore.OutputCaching;
@@ -28,7 +29,7 @@ public abstract class PostgreSqlApiFixtureBase : IAsyncInitializer, IAsyncDispos
         _container = new PostgreSqlBuilder("postgres:18-alpine")
             .WithDatabase("explore_db_test")
             .WithUsername("postgres")
-            .WithPassword("postgres")
+            .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(32)))
             .Build();
     }
 

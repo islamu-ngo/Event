@@ -119,6 +119,7 @@ public static class GovernanceSettingKeys
     public static class Branding
     {
         public const string DisplayName = "branding.display_name";
+        public const string SupportEmail = "branding.support_email";
         public const string LogoUrl = "branding.logo_url";
         public const string FaviconUrl = "branding.favicon_url";
         public const string CustomCssUrl = "branding.custom_css_url";
@@ -148,6 +149,7 @@ public static class GovernanceSettingKeys
 
     public static class Email
     {
+        public const string DeliveryEnabled = "email.delivery_enabled";
         public const string SmtpHost = "email.smtp_host";
         public const string SmtpPort = "email.smtp_port";
         public const string SmtpSecurity = "email.smtp_security";
@@ -227,10 +229,14 @@ public static class GovernanceSettingKeys
         public const string PrimaryProviderId = "auth.primary_provider_id";
         public const string KeycloakAuthority = "auth.keycloak_authority";
         public const string KeycloakClientId = "auth.keycloak_client_id";
+        public const string KeycloakPublicOnboardingPolicy = "auth.keycloak_public_onboarding_policy";
+        public const string KeycloakPublicSignupUrl = "auth.keycloak_public_signup_url";
         public const string AtprotoLoginEnabled = "auth.atproto_login_enabled";
         public const string AtprotoPublicUrl = "auth.atproto_public_url";
         public const string GoogleSsoEnabled = "auth.google_sso_enabled";
         public const string GoogleClientId = "auth.google_client_id";
+        public const string GooglePublicOnboardingPolicy = "auth.google_public_onboarding_policy";
+        public const string GooglePublicSignupUrl = "auth.google_public_signup_url";
     }
 
     public static class Federation
@@ -402,9 +408,22 @@ public static class GovernanceSettingKeys
         }
     }
 
+    public static class AnonymousRegistration
+    {
+        public const string RetentionDays = "anonymous_registration.retention_days";
+    }
+
+    public static class AnonymousRegistrationChallenge
+    {
+        public const string TenantPermitsPerMinute = "registration.anonymous_challenge.tenant_per_minute";
+        public const string EventPermitsPerMinute = "registration.anonymous_challenge.event_per_minute";
+        public const string Difficulty = "registration.anonymous_challenge.difficulty";
+    }
+
     public static class PublicExperience
     {
         public const string Mode = "public_experience.mode";
+        public const string VisitorAccessMode = "public_experience.visitor_access_mode";
         public const string EventCatalogLabel = "public_experience.event_catalog_label";
         public const string PrimaryOrganizationId = "public_experience.primary_organization_id";
         public const string HomeBlocks = "public_experience.home_blocks";

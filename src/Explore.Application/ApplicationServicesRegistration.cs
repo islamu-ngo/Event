@@ -232,6 +232,7 @@ public static class ApplicationServicesRegistration
         services.AddScoped<AdmissionIssuanceService>();
         services.AddScoped<IAdmissionIssuanceService>(provider =>
             provider.GetRequiredService<AdmissionIssuanceService>());
+        services.AddScoped<AnonymousCancellationService>();
         services.AddScoped<AdmissionRevocationService>();
         services.AddScoped<IAdmissionRevocationService>(provider =>
             provider.GetRequiredService<AdmissionRevocationService>());
@@ -301,6 +302,8 @@ public static class ApplicationServicesRegistration
         services.AddScoped<IWebhookAuditEventWriter, WebhookAuditEventWriter>();
         services.AddScoped<IWebhookOwnershipScopeResolver, WebhookOwnershipScopeResolver>();
         services.AddScoped<IAuthProviderConfigurationService, AuthProviderConfigurationService>();
+        services.AddScoped<IVisitorAccessProviderReader, VisitorAccessProviderReader>();
+        services.AddScoped<IVisitorAccessCapabilityResolver, VisitorAccessCapabilityResolver>();
         services.AddScoped<IKeycloakIdentityContractContributor, EventKeycloakIdentityContractContributor>();
         services.AddScoped<IAccountAuthorityLifecycleEmailService, DefaultAccountAuthorityLifecycleEmailService>();
         services.AddScoped<IKeycloakRealmDesiredStateBuilder, KeycloakRealmDesiredStateBuilder>();

@@ -1,10 +1,13 @@
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Event.Validators;
 using Explore.Application.Features.EventParticipation.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
+using Explore.Application.Services;
+using Explore.Domain.Enums;
 using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
@@ -13,7 +16,10 @@ namespace Explore.Application.Features.EventParticipation.Handlers.Commands;
 public sealed class ConfigureEventParticipationCommandHandler(
     IEventParticipationConfigurationRepository configurations,
     ITenantContext tenantContext,
-    HybridCache cache)
+    HybridCache cache,
+    IUnitOfWork unitOfWork,
+    ISettingMutationLock mutationLock,
+    IVisitorAccessCapabilityResolver visitorCapabilities)
     : IRequestHandler<ConfigureEventParticipationCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> Handle(
@@ -47,6 +53,24 @@ public sealed class ConfigureEventParticipationCommandHandler(
                 validation.Errors.Select(error => $"{error.PropertyName}: {error.ErrorMessage}"));
         }
 
+        BaseCommandResponse<Guid> response = await mutationLock.ExecuteOrderedGroupsAsync(
+            [VisitorAccessCapabilityResolver.AuthoritySettingKeys],
+            token => unitOfWork.ExecuteSerializableAsync(
+                innerToken => ConfigureAsync(request, innerToken), token),
+            cancellationToken);
+        if (response.IsSuccess)
+        {
+            await cache.RemoveAsync($"event:detail:{request.EventId}", cancellationToken);
+            await cache.RemoveByTagAsync(CacheTags.EventListByTenant(tenantContext.TenantId), cancellationToken);
+        }
+
+        return response;
+    }
+
+    private async Task<BaseCommandResponse<Guid>> ConfigureAsync(
+        ConfigureEventParticipationCommand request,
+        CancellationToken cancellationToken)
+    {
         EventParticipationConfiguration? configuration =
             await configurations.GetByEventAndTenantAsync(
                 request.EventId,
@@ -66,6 +90,14 @@ public sealed class ConfigureEventParticipationCommandHandler(
                 request.EventId,
                 "event_participation_configuration_concurrency_conflict",
                 "The event participation configuration changed since it was loaded. Refresh the event and try again.");
+        }
+
+        var capability = await visitorCapabilities.ResolveAsync(tenantContext.TenantId, cancellationToken);
+        if (request.ParticipationConfiguration.IdentityAccessModeId == (int)IdentityAccessModeEnum.AccountRequired
+            && !capability.AllowsAccountRequiredParticipation)
+        {
+            return Failure(request.EventId, "event_visitor_account_onboarding_required",
+                "Account-required participation requires an allowed public onboarding provider.");
         }
 
         try
@@ -93,8 +125,6 @@ public sealed class ConfigureEventParticipationCommandHandler(
         }
 
         await configurations.UpdateAsync(configuration, cancellationToken);
-        await cache.RemoveAsync($"event:detail:{request.EventId}", cancellationToken);
-        await cache.RemoveByTagAsync(CacheTags.EventListByTenant(tenantContext.TenantId), cancellationToken);
         return BaseCommandResponse.Success(
             request.EventId,
             "Event participation configuration updated.");

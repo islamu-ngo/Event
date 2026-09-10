@@ -41,8 +41,9 @@ public sealed record InstanceS3ConfigurationWriteDto
 
 public sealed record PatchInstanceSmtpSettingsDto
 {
+    public OptionalUpdate<bool> DeliveryEnabled { get; init; } = OptionalUpdate<bool>.Unspecified();
     public OptionalUpdate<InstanceSmtpConfigurationWriteDto> Configuration { get; init; } = OptionalUpdate<InstanceSmtpConfigurationWriteDto>.Unspecified();
-    public bool HasChanges() => Configuration.HasValue;
+    public bool HasChanges() => DeliveryEnabled.HasValue || Configuration.HasValue;
 }
 
 public sealed record InstanceSmtpConfigurationWriteDto
@@ -107,6 +108,10 @@ public sealed record AuthProviderConfigurationWriteDto
     public string GoogleClientSecret { get; init; } = string.Empty;
     public bool LockAtprotoLoginEnabled { get; init; }
     public bool LockGoogleSsoEnabled { get; init; }
+    public global::Explore.Domain.Enums.PublicOnboardingPolicy KeycloakPublicOnboardingPolicy { get; init; }
+    public string KeycloakPublicSignupUrl { get; init; } = string.Empty;
+    public global::Explore.Domain.Enums.PublicOnboardingPolicy GooglePublicOnboardingPolicy { get; init; }
+    public string GooglePublicSignupUrl { get; init; } = string.Empty;
 }
 
 public sealed record PatchAuthorizationProviderConfigurationDto

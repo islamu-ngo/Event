@@ -43,15 +43,15 @@ public sealed class AtprotoTransientProxyTests
         using var client = proxy.GetTestClient();
         string assertion = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
         foreach (string operation in new[] { "create", "read", "consume", "probe" })
-        foreach (string path in new[] { $"/api/auth/atproto/transient/{operation}", $"/API/AUTH/ATPROTO/TRANSIENT/{operation}/" })
-        {
-            using var request = new HttpRequestMessage(HttpMethod.Post, path);
-            request.Headers.Add("X-Atproto-Transient-Assertion", assertion);
-            using var response = await client.SendAsync(request);
-            await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
-            await Assert.That(response.Headers.CacheControl?.NoStore).IsTrue();
-            await Assert.That(reached).IsEqualTo(0);
-        }
+            foreach (string path in new[] { $"/api/auth/atproto/transient/{operation}", $"/API/AUTH/ATPROTO/TRANSIENT/{operation}/" })
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Post, path);
+                request.Headers.Add("X-Atproto-Transient-Assertion", assertion);
+                using var response = await client.SendAsync(request);
+                await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+                await Assert.That(response.Headers.CacheControl?.NoStore).IsTrue();
+                await Assert.That(reached).IsEqualTo(0);
+            }
         using var ordinary = new HttpRequestMessage(HttpMethod.Get, "/api/auth/atproto/transient/read-neighbor");
         ordinary.Headers.Add("X-Atproto-Transient-Assertion", assertion);
         using var forwarded = await client.SendAsync(ordinary);

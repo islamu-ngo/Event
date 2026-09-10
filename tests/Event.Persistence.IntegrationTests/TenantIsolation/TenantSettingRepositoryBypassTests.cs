@@ -4,6 +4,7 @@ using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence;
 using Explore.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using TUnit.Core;
@@ -44,7 +45,8 @@ public class TenantSettingRepositoryBypassTests(PostgreSqlContainerFixture fixtu
             .Select(setting => setting.TenantId)
             .ToListAsync();
 
-        var repository = new TenantSettingRepository(tenantBContext);
+        var repository = new TenantSettingRepository(tenantBContext,
+            new RelationalSettingMutationLock(tenantBContext, new EfCoreUnitOfWork(tenantBContext)));
 
         var tenantAShared = await repository.GetByTenantAndKey(tenantA.Id, sharedKey);
         var missingTenantASetting = await repository.GetByTenantAndKey(tenantA.Id, "tenant.settings.missing");
@@ -119,7 +121,8 @@ public class TenantSettingRepositoryBypassTests(PostgreSqlContainerFixture fixtu
         await seedContext.SaveChangesAsync();
 
         await using var tenantBContext = fixture.CreateTenantFilteredDbContext(new TestTenantContext(tenantB.Id));
-        var repository = new TenantSettingRepository(tenantBContext);
+        var repository = new TenantSettingRepository(tenantBContext,
+            new RelationalSettingMutationLock(tenantBContext, new EfCoreUnitOfWork(tenantBContext)));
 
         var tenantASettings = await repository.GetAllForTenant(tenantA.Id);
 
@@ -144,7 +147,8 @@ public class TenantSettingRepositoryBypassTests(PostgreSqlContainerFixture fixtu
         await seedContext.SaveChangesAsync();
 
         await using var tenantBContext = fixture.CreateTenantFilteredDbContext(new TestTenantContext(tenantB.Id));
-        var repository = new TenantSettingRepository(tenantBContext);
+        var repository = new TenantSettingRepository(tenantBContext,
+            new RelationalSettingMutationLock(tenantBContext, new EfCoreUnitOfWork(tenantBContext)));
 
         List<TenantSetting> settings = await repository.GetByTenantAndKeys(
             tenantA.Id,

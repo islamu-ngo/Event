@@ -65,10 +65,10 @@ public sealed class ConfigurationImportOperationConfiguration :
         builder.Ignore(operation => operation.SelectedSectionKeys);
         builder.Ignore(operation => operation.OmittedSectionKeys);
         builder.HasIndex(operation => new
-            {
-                operation.TargetAuthorityKey,
-                operation.StartedAt
-            });
+        {
+            operation.TargetAuthorityKey,
+            operation.StartedAt
+        });
         builder.HasIndex(operation => operation.SessionId).IsUnique();
         builder.HasIndex(operation => operation.SourceOperationId);
         builder.HasIndex(operation => operation.SnapshotArtifactHandleId).IsUnique();

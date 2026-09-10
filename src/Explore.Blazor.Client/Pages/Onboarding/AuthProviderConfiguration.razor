@@ -99,6 +99,7 @@
                         <MudRadioGroup T="int"
                                        Value="CurrentPrimaryProviderId"
                                        ValueChanged="OnPrimaryProviderChanged"
+                                       Disabled="_submitState.IsSubmitting"
                                        aria-label="Primary authentication provider">
                             <MudRadio T="int"
                                       Value="LocalIdentityProviderId"
@@ -171,7 +172,8 @@
                                         <MudRadio T="KeycloakConfigurationMode" Value="KeycloakConfigurationMode.Manual" Color="Color.Primary" Dense="true">
                                             Use an already configured Keycloak realm
                                         </MudRadio>
-                                        <MudRadio T="KeycloakConfigurationMode" Value="KeycloakConfigurationMode.Bootstrap" Color="Color.Primary" Dense="true">
+                                        <MudRadio T="KeycloakConfigurationMode" Value="KeycloakConfigurationMode.Bootstrap" Color="Color.Primary" Dense="true"
+                                                  data-testid="keycloak-bootstrap-mode">
                                             Let ISLAMU configure Keycloak clients now
                                         </MudRadio>
                                     </MudRadioGroup>
@@ -209,22 +211,26 @@
                                              <MudTextField Variant="Variant.Outlined" T="string"
                                                            Label="Keycloak base URL (Required)"
                                                            @bind-Value="_keycloakBootstrap.KeycloakBaseUrl"
+                                                           data-testid="keycloak-bootstrap-base-url"
                                                            Immediate="true"
                                                            Placeholder="https://keycloak.example.com"
                                                            HelperText="The root Keycloak URL, without /realms/{realm}." />
                                              <MudTextField Variant="Variant.Outlined" T="string"
                                                            Label="Realm (Required)"
                                                            @bind-Value="_keycloakBootstrap.Realm"
+                                                           data-testid="keycloak-bootstrap-realm"
                                                            Immediate="true"
                                                             Placeholder="events" />
                                              <MudTextField Variant="Variant.Outlined" T="string"
                                                            Label="Blazor BFF client ID (Required)"
                                                            @bind-Value="_keycloakBootstrap.BlazorClientId"
+                                                           data-testid="keycloak-bootstrap-client-id"
                                                            Immediate="true"
                                                            Placeholder="islamu-event-blazor" />
                                              <MudTextField Variant="Variant.Outlined" T="string"
                                                            Label="BFF client secret (Required)"
                                                            aria-label="Blazor BFF client secret (required)"
+                                                           data-testid="keycloak-bootstrap-client-secret"
                                                            InputType="InputType.Password"
                                                            @bind-Value="_keycloakBootstrap.BlazorClientSecret"
                                                            Immediate="true"
@@ -243,18 +249,49 @@
                                              <MudTextField Variant="Variant.Outlined" T="string"
                                                            Label="Admin username (Required)"
                                                            aria-label="One-time Keycloak admin username (required)"
+                                                           data-testid="keycloak-bootstrap-admin-username"
                                                            @bind-Value="_keycloakBootstrap.BootstrapAdminUsername"
                                                            Immediate="true"
                                                             HelperText="Used only for this bootstrap request and never stored by the platform." />
                                               <MudTextField Variant="Variant.Outlined" T="string"
                                                             Label="Admin password (Required)"
                                                             aria-label="One-time Keycloak admin password (required)"
+                                                            data-testid="keycloak-bootstrap-admin-password"
                                                             InputType="InputType.Password"
                                                             @bind-Value="_keycloakBootstrap.BootstrapAdminPassword"
                                                             Immediate="true"
                                                             HelperText="Cleared from this form after submit, whether bootstrap succeeds or fails." />
                                         </div>
                                     }
+
+                                    <section class="auth-provider-configuration__visitor-onboarding"
+                                             aria-labelledby="onboarding-keycloak-public-heading">
+                                        <MudText Id="onboarding-keycloak-public-heading" Typo="Typo.subtitle2" HtmlTag="h3">
+                                            Keycloak visitor signup
+                                        </MudText>
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                            Configure new public visitor accounts separately from operator and existing-account sign-in.
+                                        </MudText>
+                                        <MudSelect T="PublicOnboardingPolicy?"
+                                                   Label="Public onboarding policy"
+                                                   @bind-Value="_model.KeycloakPublicOnboardingPolicy"
+                                                   Variant="Variant.Outlined"
+                                                   data-testid="onboarding-keycloak-public-policy">
+                                            <MudSelectItem T="PublicOnboardingPolicy?" Value="@((PublicOnboardingPolicy?)PublicOnboardingUnknown)">Unknown - do not advertise signup</MudSelectItem>
+                                            <MudSelectItem T="PublicOnboardingPolicy?" Value="@((PublicOnboardingPolicy?)PublicOnboardingAllowed)">Allowed</MudSelectItem>
+                                            <MudSelectItem T="PublicOnboardingPolicy?" Value="@((PublicOnboardingPolicy?)PublicOnboardingDenied)">Denied</MudSelectItem>
+                                        </MudSelect>
+                                        @if (_model.KeycloakPublicOnboardingPolicy == PublicOnboardingAllowed)
+                                        {
+                                            <MudTextField T="string"
+                                                          Label="Public signup URL"
+                                                          @bind-Value="_model.KeycloakPublicSignupUrl"
+                                                          Variant="Variant.Outlined"
+                                                          Required="true"
+                                                          HelperText="Use the exact public HTTPS account-registration destination." />
+                                            @PublicSignupUrlWarning(_model.KeycloakPublicSignupUrl)
+                                        }
+                                    </section>
                             </MudStack>
                         </div>
                     </details>
@@ -342,6 +379,35 @@
                                                   InputType="InputType.Password"
                                                   @bind-Value="_model.GoogleClientSecret" />
                                 }
+
+                                <section class="auth-provider-configuration__visitor-onboarding"
+                                         aria-labelledby="onboarding-google-public-heading">
+                                    <MudText Id="onboarding-google-public-heading" Typo="Typo.subtitle2" HtmlTag="h3">
+                                        Google visitor signup
+                                    </MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                        Configure new public visitor accounts separately from operator and existing-account sign-in.
+                                    </MudText>
+                                    <MudSelect T="PublicOnboardingPolicy?"
+                                               Label="Public onboarding policy"
+                                               @bind-Value="_model.GooglePublicOnboardingPolicy"
+                                               Variant="Variant.Outlined"
+                                               data-testid="onboarding-google-public-policy">
+                                        <MudSelectItem T="PublicOnboardingPolicy?" Value="@((PublicOnboardingPolicy?)PublicOnboardingUnknown)">Unknown - do not advertise signup</MudSelectItem>
+                                        <MudSelectItem T="PublicOnboardingPolicy?" Value="@((PublicOnboardingPolicy?)PublicOnboardingAllowed)">Allowed</MudSelectItem>
+                                        <MudSelectItem T="PublicOnboardingPolicy?" Value="@((PublicOnboardingPolicy?)PublicOnboardingDenied)">Denied</MudSelectItem>
+                                    </MudSelect>
+                                    @if (_model.GooglePublicOnboardingPolicy == PublicOnboardingAllowed)
+                                    {
+                                        <MudTextField T="string"
+                                                      Label="Public signup URL"
+                                                      @bind-Value="_model.GooglePublicSignupUrl"
+                                                      Variant="Variant.Outlined"
+                                                      Required="true"
+                                                      HelperText="Use the exact public HTTPS account-registration destination." />
+                                        @PublicSignupUrlWarning(_model.GooglePublicSignupUrl)
+                                    }
+                                </section>
                             </MudStack>
                         </div>
                     </details>
@@ -375,7 +441,8 @@
                     Exit setup
                 </MudButton>
                 <AppButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(!CanSave)"
-                           OnClick="SaveAndContinueAsync">
+                           OnClick="SaveAndContinueAsync"
+                           data-testid="save-auth-provider-configuration">
                     @if (_submitState.IsSubmitting)
                     {
                         <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
@@ -383,7 +450,7 @@
                     }
                     else
                     {
-                        @:Save & Continue to Login
+                        @(CurrentPrimaryProviderId == LocalIdentityProviderId ? "Save & Continue Setup" : "Save & Continue to Login")
                     }
                 </AppButton>
             </div>
@@ -415,6 +482,9 @@
     private const int KeycloakProviderId = 1;
     private const int AtprotoProviderId = 2;
     private const int LocalIdentityProviderId = 4;
+    private const PublicOnboardingPolicy PublicOnboardingUnknown = PublicOnboardingPolicy.Unknown;
+    private const PublicOnboardingPolicy PublicOnboardingAllowed = PublicOnboardingPolicy.Allowed;
+    private const PublicOnboardingPolicy PublicOnboardingDenied = PublicOnboardingPolicy.Denied;
     private AuthProviderConfigurationDto _model = new();
     private KeycloakBootstrapRequestDto _keycloakBootstrap = new();
     private KeycloakConfigurationMode _keycloakConfigurationMode = KeycloakConfigurationMode.Manual;
@@ -466,7 +536,9 @@
         !_submitState.IsSubmitting &&
         (!IsKeycloakPrimary || HasKeycloakCredentials) &&
         (_model.AtprotoLoginEnabled != true || HasAtprotoCredentials) &&
-        (_model.GoogleSsoEnabled != true || HasGoogleCredentials);
+        (_model.GoogleSsoEnabled != true || HasGoogleCredentials) &&
+        HasValidPublicSignupConfiguration(_model.KeycloakPublicOnboardingPolicy, _model.KeycloakPublicSignupUrl) &&
+        HasValidPublicSignupConfiguration(_model.GooglePublicOnboardingPolicy, _model.GooglePublicSignupUrl);
 
     private IReadOnlyList<OnboardingWorkspace.StepDescriptor> WorkspaceSteps
     {
@@ -610,8 +682,8 @@
         try
         {
             response = usingKeycloakBootstrap
-                ? await BootstrapKeycloakWithSecretCleanupAsync()
-            : await InstanceOnboardingService.UpdateAuthProviderConfigurationAsAdminAsync(_model);
+                ? await BootstrapKeycloakAndApplyPublicOnboardingAsync()
+                : await InstanceOnboardingService.UpdateAuthProviderConfigurationAsAdminAsync(_model);
         }
         catch (Exception)
         {
@@ -631,6 +703,10 @@
             if (response.Errors?.Count > 0)
             {
                 _errorMessage += " " + string.Join(" ", response.Errors);
+            }
+            if (IsVisitorPolicyConflict(response.FailureCode))
+            {
+                await ReloadCanonicalAuthProviderConfigurationAsync();
             }
             return;
         }
@@ -665,23 +741,43 @@
         {
             AtprotoProviderId =>
                 $"/login?provider=atproto&returnUrl={Uri.EscapeDataString(returnPath)}",
-            LocalIdentityProviderId =>
-                $"/login?provider=local&returnUrl={Uri.EscapeDataString(returnPath)}",
+            LocalIdentityProviderId => returnPath,
             _ => returnPath
         };
         Navigation.NavigateTo(destination, forceLoad: true);
     }
 
-    private async Task<BaseCommandResponseOfGuid> BootstrapKeycloakWithSecretCleanupAsync()
+    private async Task<BaseCommandResponseOfGuid> BootstrapKeycloakAndApplyPublicOnboardingAsync()
     {
+        PublicOnboardingPolicy? keycloakPolicy = _model.KeycloakPublicOnboardingPolicy;
+        string? keycloakSignupUrl = _model.KeycloakPublicSignupUrl;
+        PublicOnboardingPolicy? googlePolicy = _model.GooglePublicOnboardingPolicy;
+        string? googleSignupUrl = _model.GooglePublicSignupUrl;
+
+        BaseCommandResponseOfGuid bootstrap;
         try
         {
-            return await InstanceOnboardingService.BootstrapKeycloakRealmAsync(_keycloakBootstrap);
+            bootstrap = await InstanceOnboardingService.BootstrapKeycloakRealmAsync(_keycloakBootstrap);
         }
         finally
         {
             ClearKeycloakBootstrapSecrets();
         }
+
+        if (bootstrap.Success != true)
+        {
+            return bootstrap;
+        }
+
+        AuthProviderConfigurationDto canonical = await InstanceOnboardingService.GetAuthProviderConfigurationAsync();
+        canonical.KeycloakPublicOnboardingPolicy = keycloakPolicy;
+        canonical.KeycloakPublicSignupUrl = keycloakSignupUrl;
+        canonical.GooglePublicOnboardingPolicy = googlePolicy;
+        canonical.GooglePublicSignupUrl = googleSignupUrl;
+        canonical.KeycloakClientSecret = string.Empty;
+        canonical.GoogleClientSecret = string.Empty;
+        _model = canonical;
+        return await InstanceOnboardingService.UpdateAuthProviderConfigurationAsAdminAsync(canonical);
     }
 
     private bool ShouldBootstrapKeycloak =>
@@ -781,6 +877,43 @@
         _model.GoogleClientSecret = string.Empty;
         Navigation.NavigateTo("/setup", forceLoad: true);
     }
+
+    private async Task ReloadCanonicalAuthProviderConfigurationAsync()
+    {
+        AuthProviderConfigurationDto canonical = await InstanceOnboardingService.GetAuthProviderConfigurationAsync();
+        canonical.KeycloakClientSecret = string.Empty;
+        canonical.GoogleClientSecret = string.Empty;
+        _model = canonical;
+        _googleSecretAlreadyConfigured = canonical.GoogleSsoEnabled == true;
+        SeedKeycloakBootstrapDefaults();
+    }
+
+    private static bool IsVisitorPolicyConflict(string? failureCode) => failureCode is
+        "visitor_access_account_required_conflict"
+        or "visitor_access_policy_invalid"
+        or "setting_system_locked";
+
+    private static bool HasValidPublicSignupConfiguration(PublicOnboardingPolicy? policy, string? url) =>
+        policy != PublicOnboardingAllowed
+        || Uri.TryCreate(url, UriKind.Absolute, out Uri? parsed)
+            && parsed.Scheme == Uri.UriSchemeHttps
+            && string.IsNullOrEmpty(parsed.UserInfo);
+
+    private static RenderFragment PublicSignupUrlWarning(string? url) => builder =>
+    {
+        if (HasValidPublicSignupConfiguration(PublicOnboardingAllowed, url))
+        {
+            return;
+        }
+
+        builder.OpenComponent<MudAlert>(0);
+        builder.AddAttribute(1, nameof(MudAlert.Severity), Severity.Warning);
+        builder.AddAttribute(2, nameof(MudAlert.Dense), true);
+        builder.AddAttribute(3, nameof(MudAlert.ChildContent),
+            (RenderFragment)(content => content.AddContent(4,
+                "Public signup requires an absolute HTTPS URL without embedded credentials.")));
+        builder.CloseComponent();
+    };
 
     private static bool IsPrivateUrl(string? url)
     {

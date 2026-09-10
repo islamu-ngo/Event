@@ -8,6 +8,10 @@ public sealed class NotificationIntentConfiguration : IEntityTypeConfiguration<N
 {
     public void Configure(EntityTypeBuilder<NotificationIntent> builder)
     {
+        builder.ToTable(table => table.HasCheckConstraint(
+            "ck_notification_intents_email_policy_revision_nonnegative",
+            "email_delivery_policy_revision >= 0"));
+        builder.Property(e => e.EmailDeliveryPolicyRevision).HasDefaultValue(0L);
         builder.Property(e => e.Id).HasDefaultValueSql("uuidv7()");
         builder.Property(e => e.TemplateKey).IsRequired().HasMaxLength(160);
         builder.Property(e => e.DeduplicationKey).IsRequired().HasMaxLength(300);

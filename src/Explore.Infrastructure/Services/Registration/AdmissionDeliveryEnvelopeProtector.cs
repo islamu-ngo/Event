@@ -26,21 +26,32 @@ public sealed class AdmissionDeliveryEnvelopeProtector : IAdmissionDeliveryEnvel
         }
 
         string plaintext = JsonSerializer.Serialize(envelope);
-        return new AdmissionProtectedDeliveryMaterial(_protector.Protect(plaintext), CurrentVersion);
+        if (envelope.DisclosureUntilUtc is null && envelope.AccountUserId is null)
+            return new AdmissionProtectedDeliveryMaterial(_protector.Protect(plaintext), CurrentVersion);
+
+        var payload = new AdmissionContactDeliveryPayload(envelope.DisclosureUntilUtc, string.Empty) { AccountUserId = envelope.AccountUserId };
+        string ciphertext = _protector.CreateProtector(payload.GetProtectionPurpose()).Protect(plaintext);
+        return new AdmissionProtectedDeliveryMaterial(JsonSerializer.Serialize(payload with { Ciphertext = ciphertext }), 2);
     }
 
     public AdmissionCredentialDeliveryEnvelope Unprotect(string ciphertext, int protectionVersion)
     {
-        if (string.IsNullOrWhiteSpace(ciphertext) || protectionVersion != CurrentVersion)
+        if (string.IsNullOrWhiteSpace(ciphertext) || protectionVersion is not (CurrentVersion or 2))
         {
             throw new InvalidOperationException("Admission delivery envelope is unavailable.");
         }
 
         try
         {
-            string plaintext = _protector.Unprotect(ciphertext);
-            return JsonSerializer.Deserialize<AdmissionCredentialDeliveryEnvelope>(plaintext)
+            AdmissionContactDeliveryPayload payload = AdmissionContactDeliveryPayload.Read(ciphertext, protectionVersion);
+            IDataProtector boundProtector = protectionVersion == 2
+                ? _protector.CreateProtector(payload.GetProtectionPurpose()) : _protector;
+            string plaintext = boundProtector.Unprotect(payload.Ciphertext);
+            var envelope = JsonSerializer.Deserialize<AdmissionCredentialDeliveryEnvelope>(plaintext)
                 ?? throw new InvalidOperationException("Admission delivery envelope is unavailable.");
+            if (envelope.DisclosureUntilUtc != payload.DisclosureUntilUtc || envelope.AccountUserId != payload.AccountUserId)
+                throw new InvalidOperationException("Admission delivery envelope bound is invalid.");
+            return envelope;
         }
         catch (Exception exception) when (exception is CryptographicException or JsonException)
         {

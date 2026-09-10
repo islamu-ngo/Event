@@ -13,6 +13,7 @@ public interface IInstanceOnboardingService
     Task<InstanceOnboardingStatusDto?> GetStatusAsync();
     Task<SetupSecretValidationResultDto> ValidateSecretAsync(string secret);
     Task<BaseCommandResponseOfGuid> CompleteAsync(CompleteInstanceOnboardingRequest completion);
+    Task<BaseCommandResponseOfGuid> CompleteLocalAsync(CompleteLocalInstanceOnboardingRequestDto completion, CancellationToken cancellationToken = default);
 
     Task<DeploymentModeDto> GetDeploymentModeAsync();
     Task<ModuleSettingsDto> GetModuleSettingsAsync();
@@ -41,7 +42,7 @@ public interface IInstanceOnboardingService
     Task<BaseCommandResponseOfGuid> UpdateStorageSettingsAsync(HalResourceOfInstanceStorageSettingsDto settings);
     Task<InstanceStorageProviderStatusDto> TestStorageConnectionAsync();
     Task<InstanceStorageUsageDto?> RecalculateStorageUsageAsync();
-    Task<InstanceSmtpSettingsDto> GetSmtpSettingsAsync();
+    Task<HalResourceOfInstanceSmtpSettingsDto> GetSmtpSettingsAsync();
     Task<BaseCommandResponseOfGuid> UpdateSmtpSettingsAsync(InstanceSmtpConfigurationWriteDto settings);
     Task<SmtpConnectionTestResultDto> TestSmtpConnectionAsync();
     Task<int> GetActiveTenantCountAsync();
@@ -170,6 +171,33 @@ public sealed class InstanceOnboardingService(
         }
     }
 
+    public async Task<BaseCommandResponseOfGuid> CompleteLocalAsync(
+        CompleteLocalInstanceOnboardingRequestDto completion, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await onboardingClient.CompleteLocalInstanceOnboardingAsync(completion, cancellationToken: cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (ApiException exception)
+        {
+            logger.LogWarning("Local setup completion failed. StatusCode={StatusCode}", exception.StatusCode);
+            return FailedCommandResponse("Local setup did not complete. Refresh setup status and retry with the same account details.");
+        }
+        catch (HttpRequestException)
+        {
+            logger.LogWarning("Local setup completion transport failed.");
+            return FailedCommandResponse("Local setup could not be confirmed. Refresh setup status before retrying.");
+        }
+        finally
+        {
+            completion.TemporaryPassword = string.Empty;
+        }
+    }
+
     public Task<DeploymentModeDto> GetDeploymentModeAsync() =>
         GetSettingsAsync(ct => presentationClient.GetInstanceDeploymentModeAsync(cancellationToken: ct), () => new());
 
@@ -290,7 +318,7 @@ public sealed class InstanceOnboardingService(
         }
     }
 
-    public Task<InstanceSmtpSettingsDto> GetSmtpSettingsAsync() =>
+    public Task<HalResourceOfInstanceSmtpSettingsDto> GetSmtpSettingsAsync() =>
         GetSettingsAsync(ct => messagingClient.GetInstanceSmtpSettingsAsync(cancellationToken: ct), () => new());
 
     public Task<BaseCommandResponseOfGuid> UpdateSmtpSettingsAsync(InstanceSmtpConfigurationWriteDto settings) =>
@@ -330,7 +358,7 @@ public sealed class InstanceOnboardingService(
     }
 
     public Task<AuthProviderConfigurationDto> GetAuthProviderConfigurationAsync() =>
-        GetSettingsAsync(ct => onboardingClient.GetInstanceOnboardingAuthProviderConfigurationAsync(cancellationToken: ct), () => new());
+        GetSettingsAsync(async ct => (await onboardingClient.GetInstanceOnboardingAuthProviderConfigurationAsync(cancellationToken: ct)).ToDto() ?? new(), () => new());
 
     public Task<AuthProviderConfigurationDto> GetAuthProviderConfigurationAsAdminAsync() =>
         GetSettingsAsync(ct => authenticationClient.GetInstanceAuthProviderConfigurationAsync(cancellationToken: ct), () => new());
@@ -762,7 +790,11 @@ public sealed class InstanceOnboardingService(
                 GoogleClientId = config.GoogleClientId,
                 GoogleClientSecret = config.GoogleClientSecret,
                 LockAtprotoLoginEnabled = config.LockAtprotoLoginEnabled,
-                LockGoogleSsoEnabled = config.LockGoogleSsoEnabled
+                LockGoogleSsoEnabled = config.LockGoogleSsoEnabled,
+                KeycloakPublicOnboardingPolicy = config.KeycloakPublicOnboardingPolicy,
+                KeycloakPublicSignupUrl = config.KeycloakPublicSignupUrl,
+                GooglePublicOnboardingPolicy = config.GooglePublicOnboardingPolicy,
+                GooglePublicSignupUrl = config.GooglePublicSignupUrl
             }
         }
     };

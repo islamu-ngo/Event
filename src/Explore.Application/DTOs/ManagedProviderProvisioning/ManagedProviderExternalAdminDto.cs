@@ -1,5 +1,8 @@
+using System.Text.Json.Serialization;
+
 namespace Explore.Application.DTOs.ManagedProviderProvisioning;
 
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record ManagedProviderExternalAdminDto
 {
     public required string IdentityProvider { get; init; }

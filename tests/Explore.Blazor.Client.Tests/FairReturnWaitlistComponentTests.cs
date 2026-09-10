@@ -155,17 +155,17 @@ public sealed class FairReturnWaitlistComponentTests
         int position,
         string reasonCode,
         params string[] relations) => new()
-    {
-        Id = Guid.CreateVersion7(),
-        StatusCode = statusCode,
-        Position = position,
-        ReasonCode = reasonCode,
-        _links = relations.ToDictionary(
+        {
+            Id = Guid.CreateVersion7(),
+            StatusCode = statusCode,
+            Position = position,
+            ReasonCode = reasonCode,
+            _links = relations.ToDictionary(
             relation => relation,
             relation => new HalLink
             {
                 Href = $"/waitlist/{relation}",
                 Method = HttpMethod.Post.Method
             })
-    };
+        };
 }

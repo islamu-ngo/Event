@@ -1,9 +1,10 @@
 using System.Net;
-using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Notifications;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Notifications;
 using Explore.Application.Services;
 using Explore.Domain;
@@ -12,367 +13,168 @@ using Explore.Infrastructure.Services.Keycloak;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NSubstitute;
-
-using ApplicationAccountAuthorityKind = Explore.Application.Notifications.AccountAuthorityKind;
-using ApplicationNotificationCategory = Explore.Application.Notifications.NotificationCategory;
-using ApplicationNotificationOwnership = Explore.Application.Notifications.NotificationOwnership;
+using NotificationCategory = Explore.Application.Notifications.NotificationCategory;
 
 namespace Explore.Infrastructure.Tests.Infrastructure;
 
 public sealed class KeycloakAccountAuthorityLifecycleEmailServiceTests
 {
     [Test]
-    public async Task Requests_WhenConfigured_CallExecuteActionsEmailWithProviderOwnedRequiredActions()
+    [Arguments(AccountAuthorityLifecycleEmailAction.PasswordReset, "UPDATE_PASSWORD", false)]
+    [Arguments(AccountAuthorityLifecycleEmailAction.PasswordReset, "UPDATE_PASSWORD", true)]
+    [Arguments(AccountAuthorityLifecycleEmailAction.EmailVerification, "VERIFY_EMAIL", false)]
+    [Arguments(AccountAuthorityLifecycleEmailAction.EmailVerification, "VERIFY_EMAIL", true)]
+    [Arguments(AccountAuthorityLifecycleEmailAction.EmailUpdateVerification, "UPDATE_EMAIL", false)]
+    [Arguments(AccountAuthorityLifecycleEmailAction.EmailUpdateVerification, "UPDATE_EMAIL", true)]
+    public async Task Request_WhenProviderFails_LogsOnlyBoundedStatusAndAction(
+        AccountAuthorityLifecycleEmailAction action, string requiredAction, bool structured)
     {
-        var cases = new[]
+        var userId = Guid.CreateVersion7();
+        var tenantId = Guid.CreateVersion7();
+        var loginId = Guid.CreateVersion7();
+        var subject = Guid.NewGuid().ToString("N");
+        var proposedEmail = $"{Guid.NewGuid():N}@example.test";
+        using var handler = new FailingProviderHandler(subject, requiredAction, proposedEmail);
+        using var client = new HttpClient(handler);
+        var clients = Substitute.For<IHttpClientFactory>();
+        clients.CreateClient(KeycloakAccountAuthorityLifecycleEmailService.HttpClientName).Returns(client);
+        var externalLogins = Substitute.For<IUserExternalLoginRepository>();
+        externalLogins.GetById(loginId).Returns(new UserExternalLogin
         {
-            new LifecycleEmailCase(
-                AccountAuthorityLifecycleEmailAction.EmailVerification,
-                "VERIFY_EMAIL",
-                (service, request) => service.RequestEmailVerificationAsync(request)),
-            new LifecycleEmailCase(
-                AccountAuthorityLifecycleEmailAction.PasswordReset,
-                "UPDATE_PASSWORD",
-                (service, request) => service.RequestPasswordResetAsync(request)),
-            new LifecycleEmailCase(
-                AccountAuthorityLifecycleEmailAction.EmailUpdateVerification,
-                "UPDATE_EMAIL",
-                (service, request) => service.RequestEmailUpdateVerificationAsync(request))
+            Id = loginId,
+            UserId = userId,
+            User = null!,
+            AuthenticationProviderId = (int)AuthenticationProviderKind.Keycloak,
+            AuthenticationProvider = null!,
+            ProviderKey = PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(
+                "https://keycloak.example.test/auth/realms/ISLAMU", subject).Value
+        });
+        var tenantUsers = Substitute.For<ITenantUserRepository>();
+        tenantUsers.GetByTenantAndUserAsync(tenantId, userId, Arg.Any<CancellationToken>())
+            .Returns(new TenantUser { TenantId = tenantId, UserId = userId, Tenant = null!, User = null! });
+        var intent = new NotificationIntent
+        {
+            TenantId = tenantId,
+            RecipientUserId = userId,
+            TemplateKey = "identity.lifecycle",
+            DeduplicationKey = Guid.NewGuid().ToString("N")
         };
-
-        foreach (var testCase in cases)
+        var delegation = new NotificationExternalDelegation
         {
-            var handler = new OrderedMessageHandler(
-                Expect(HttpMethod.Post, "/auth/realms/master/protocol/openid-connect/token", request =>
-                {
-                    AssertTokenRequest(request);
-                    return JsonResponse("""
-                        { "access_token": "admin-token" }
-                        """);
-                }),
-                Expect(HttpMethod.Put, "/auth/admin/realms/ISLAMU/users/keycloak-user-123/execute-actions-email", request =>
-                {
-                    AssertExecuteActionsRequest(request, testCase.RequiredAction);
-                    return new HttpResponseMessage(HttpStatusCode.NoContent);
-                }));
-            var orchestrator = new CapturingNotificationOrchestrator();
-            var service = CreateService(handler, orchestrator);
-            var lifecycleRequest = CreateRequest(correlationId: $"{testCase.RequiredAction}-correlation");
-
-            var result = await testCase.Invoke(service, lifecycleRequest);
-
-            await Assert.That(result.Status).IsEqualTo(AccountAuthorityLifecycleEmailStatus.DelegationRecorded);
-            await Assert.That(result.Action).IsEqualTo(testCase.Action);
-            await Assert.That(result.AccountAuthorityKind).IsEqualTo(ApplicationAccountAuthorityKind.Keycloak);
-            await Assert.That(result.NotificationIntentId).IsEqualTo(orchestrator.LastIntentId);
-            await Assert.That(result.LocalDelegationId).IsEqualTo(orchestrator.LastDelegationId);
-            await Assert.That(result.ReasonCode).IsEqualTo("keycloak_required_action_email_requested");
-            await Assert.That(orchestrator.EnqueueCount).IsEqualTo(1);
-            await Assert.That(handler.Requests.Count).IsEqualTo(2);
-
-            var serializedResult = JsonSerializer.Serialize(result);
-            await Assert.That(serializedResult).DoesNotContain("runtime-admin-secret");
-            await Assert.That(serializedResult).DoesNotContain("admin-token");
-            await Assert.That(serializedResult).DoesNotContain("provider raw failure");
-        }
-    }
-
-    [Test]
-    public async Task RequestPasswordResetAsync_WithUnsafeUrl_ReturnsProviderNotConfiguredWithoutAuditOrHttp()
-    {
-        var handler = new OrderedMessageHandler(_ => throw new InvalidOperationException("HTTP should not be called."));
-        var orchestrator = new CapturingNotificationOrchestrator();
-        var service = CreateService(
-            handler,
-            orchestrator,
-            keycloakOptions: CreateKeycloakOptions(baseUrl: "http://127.0.0.1:8080/auth"));
-
-        var result = await service.RequestPasswordResetAsync(CreateRequest());
-
-        await Assert.That(result.Status).IsEqualTo(AccountAuthorityLifecycleEmailStatus.ProviderNotConfigured);
-        await Assert.That(result.ReasonCode).IsEqualTo("keycloak_lifecycle_unsafe_host");
-        await Assert.That(result.NotificationIntentId).IsNull();
-        await Assert.That(result.LocalDelegationId).IsNull();
-        await Assert.That(orchestrator.EnqueueCount).IsEqualTo(0);
-        await Assert.That(handler.Requests).IsEmpty();
-    }
-
-    [Test]
-    public async Task RequestEmailVerificationAsync_WhenProviderFails_ReturnsSafeFailureWithLocalDelegationIds()
-    {
-        var handler = new OrderedMessageHandler(
-            Expect(HttpMethod.Post, "/auth/realms/master/protocol/openid-connect/token", _ => JsonResponse("""
-                { "access_token": "admin-token" }
-                """)),
-            Expect(HttpMethod.Put, "/auth/admin/realms/ISLAMU/users/keycloak-user-123/execute-actions-email", _ => new HttpResponseMessage(HttpStatusCode.InternalServerError)
+            TenantId = tenantId,
+            NotificationIntentId = intent.Id,
+            TemplateKey = intent.TemplateKey
+        };
+        var orchestrator = Substitute.For<INotificationOrchestrator>();
+        orchestrator.EnqueueAsync(Arg.Is<NotificationIntentDraft>(draft =>
+                draft != null && draft.TenantId == tenantId && draft.UserId == userId && draft.ExternalProviderId == subject),
+                Arg.Any<CancellationToken>())
+            .Returns(new NotificationOrchestrationResult(intent,
+                new NotificationOwnershipDecision(NotificationCategory.IdentityLifecycle,
+                    NotificationOwnership.AccountAuthority, AccountAuthorityKind.Keycloak),
+                ExternalDelegation: delegation));
+        var logger = new TestListLogger<KeycloakAccountAuthorityLifecycleEmailService>();
+        var provider = new KeycloakAccountAuthorityLifecycleEmailService(clients, orchestrator, tenantUsers,
+            Options.Create(new AccountAuthorityLifecycleEmailOptions { Enabled = true, ProviderConfigured = true }),
+            Options.Create(new KeycloakLifecycleEmailOptions
             {
-                Content = new StringContent("provider raw failure includes runtime-admin-secret")
-            }));
-        var orchestrator = new CapturingNotificationOrchestrator();
-        var service = CreateService(handler, orchestrator);
+                Enabled = true,
+                BaseUrl = "https://keycloak.example.test/auth",
+                Realm = "ISLAMU",
+                AdminUsername = handler.AdminUsername,
+                AdminPassword = handler.AdminPassword
+            }), logger);
+        IAccountAuthorityLifecycleEmailService service = new DefaultAccountAuthorityLifecycleEmailService(
+            externalLogins, [provider]);
+        var request = new AccountAuthorityLifecycleEmailRequest(userId, loginId, tenantId, proposedEmail);
 
-        var result = await service.RequestEmailVerificationAsync(CreateRequest());
+        var result = await (action switch
+        {
+            AccountAuthorityLifecycleEmailAction.PasswordReset => service.RequestPasswordResetAsync(request),
+            AccountAuthorityLifecycleEmailAction.EmailVerification => service.RequestEmailVerificationAsync(request),
+            AccountAuthorityLifecycleEmailAction.EmailUpdateVerification => service.RequestEmailUpdateVerificationAsync(request),
+            _ => throw new ArgumentOutOfRangeException(nameof(action))
+        });
 
         await Assert.That(result.Status).IsEqualTo(AccountAuthorityLifecycleEmailStatus.ProviderRequestFailed);
-        await Assert.That(result.NotificationIntentId).IsEqualTo(orchestrator.LastIntentId);
-        await Assert.That(result.LocalDelegationId).IsEqualTo(orchestrator.LastDelegationId);
+        await Assert.That(result.Action).IsEqualTo(action);
+        await Assert.That(result.AccountAuthorityKind).IsEqualTo(AccountAuthorityKind.Keycloak);
         await Assert.That(result.ReasonCode).IsEqualTo("keycloak_lifecycle_email_failed");
-        await Assert.That(orchestrator.EnqueueCount).IsEqualTo(1);
+        await Assert.That(result.NotificationIntentId).IsEqualTo(intent.Id);
+        await Assert.That(result.LocalDelegationId).IsEqualTo(delegation.Id);
+        await Assert.That(handler.RequestCount).IsEqualTo(2);
+        await Assert.That(logger.Entries.Count).IsEqualTo(1);
+        var entry = logger.Entries.Single();
+        await Assert.That(entry.Level).IsEqualTo(LogLevel.Warning);
+        await Assert.That(entry.Exception).IsNull();
+        await Assert.That(entry.State.Single(property => property.Key == "StatusCode").Value).IsEqualTo(503);
+        await Assert.That(entry.State.Single(property => property.Key == "Action").Value).IsEqualTo(action);
+        await Assert.That(entry.Message).Contains("503");
+        await Assert.That(entry.Message).Contains(action.ToString());
 
-        var serializedResult = JsonSerializer.Serialize(result);
-        await Assert.That(serializedResult).DoesNotContain("runtime-admin-secret");
-        await Assert.That(serializedResult).DoesNotContain("admin-token");
-        await Assert.That(serializedResult).DoesNotContain("provider raw failure");
-    }
-
-    [Test]
-    public async Task RequestEmailVerificationAsync_WhenEmailRequestTransportFails_ReturnsUnreachableFailure()
-    {
-        var handler = new OrderedMessageHandler(
-            Expect(HttpMethod.Post, "/auth/realms/master/protocol/openid-connect/token", _ => JsonResponse("""
-                { "access_token": "admin-token" }
-                """)),
-            Expect(HttpMethod.Put, "/auth/admin/realms/ISLAMU/users/keycloak-user-123/execute-actions-email", _ =>
-                throw new HttpRequestException("runtime-admin-secret transport failure")));
-        var orchestrator = new CapturingNotificationOrchestrator();
-        var service = CreateService(handler, orchestrator);
-
-        var result = await service.RequestEmailVerificationAsync(CreateRequest());
-
-        await Assert.That(result.Status).IsEqualTo(AccountAuthorityLifecycleEmailStatus.ProviderRequestFailed);
-        await Assert.That(result.ReasonCode).IsEqualTo("keycloak_lifecycle_unreachable");
-        await Assert.That(result.NotificationIntentId).IsEqualTo(orchestrator.LastIntentId);
-        await Assert.That(result.LocalDelegationId).IsEqualTo(orchestrator.LastDelegationId);
-        await Assert.That(JsonSerializer.Serialize(result)).DoesNotContain("runtime-admin-secret");
-        await Assert.That(handler.Requests.Count).IsEqualTo(2);
-    }
-
-    [Test]
-    public async Task RequestEmailVerificationAsync_WhenAdminTokenTransportFails_ReturnsUnreachableFailure()
-    {
-        var handler = new OrderedMessageHandler(
-            Expect(HttpMethod.Post, "/auth/realms/master/protocol/openid-connect/token", _ =>
-                throw new HttpRequestException("runtime-admin-secret token transport failure")));
-        var orchestrator = new CapturingNotificationOrchestrator();
-        var service = CreateService(handler, orchestrator);
-
-        var result = await service.RequestEmailVerificationAsync(CreateRequest());
-
-        await Assert.That(result.Status).IsEqualTo(AccountAuthorityLifecycleEmailStatus.ProviderRequestFailed);
-        await Assert.That(result.ReasonCode).IsEqualTo("keycloak_lifecycle_unreachable");
-        await Assert.That(result.NotificationIntentId).IsEqualTo(orchestrator.LastIntentId);
-        await Assert.That(result.LocalDelegationId).IsEqualTo(orchestrator.LastDelegationId);
-        await Assert.That(JsonSerializer.Serialize(result)).DoesNotContain("runtime-admin-secret");
-        await Assert.That(handler.Requests.Count).IsEqualTo(1);
-    }
-
-    private static KeycloakAccountAuthorityLifecycleEmailService CreateService(
-        OrderedMessageHandler handler,
-        CapturingNotificationOrchestrator orchestrator,
-        AccountAuthorityLifecycleEmailOptions? lifecycleOptions = null,
-        KeycloakLifecycleEmailOptions? keycloakOptions = null)
-    {
-        return new KeycloakAccountAuthorityLifecycleEmailService(
-            new StaticHttpClientFactory(new HttpClient(handler)),
-            orchestrator,
-            Options.Create(lifecycleOptions ?? CreateLifecycleOptions()),
-            Options.Create(keycloakOptions ?? CreateKeycloakOptions()),
-            Substitute.For<ILogger<KeycloakAccountAuthorityLifecycleEmailService>>());
-    }
-
-    private static AccountAuthorityLifecycleEmailOptions CreateLifecycleOptions()
-    {
-        return new AccountAuthorityLifecycleEmailOptions
+        var output = structured ? JsonSerializer.Serialize(entry.State) : entry.Message;
+        foreach (var identifier in new[] { tenantId, userId, loginId })
         {
-            Enabled = true,
-            ProviderConfigured = true,
-            AccountAuthorityKind = ApplicationAccountAuthorityKind.Keycloak
-        };
-    }
-
-    private static KeycloakLifecycleEmailOptions CreateKeycloakOptions(string baseUrl = "https://keycloak.example.com/auth")
-    {
-        return new KeycloakLifecycleEmailOptions
+            await Assert.That(output).DoesNotContain(identifier.ToString("D"));
+            await Assert.That(output).DoesNotContain(identifier.ToString("N"));
+        }
+        foreach (var canary in new[]
+                 {
+                     subject, proposedEmail, handler.AdminUsername, handler.AdminPassword,
+                     handler.AdminToken, handler.ResponseBodyCanary
+                 })
         {
-            Enabled = true,
-            BaseUrl = baseUrl,
-            Realm = "ISLAMU",
-            AdminUsername = "runtime-admin",
-            AdminPassword = "runtime-admin-secret",
-            DefaultClientId = "islamu-event-blazor",
-            DefaultLifespanSeconds = 900,
-            AccountAuthorityKind = ApplicationAccountAuthorityKind.Keycloak
-        };
+            await Assert.That(output).DoesNotContain(canary);
+        }
+        await Assert.That(entry.State.Select(property => property.Key))
+            .IsEquivalentTo(["StatusCode", "Action", "{OriginalFormat}"]);
     }
 
-    private static AccountAuthorityLifecycleEmailRequest CreateRequest(string? correlationId = null)
+    private sealed class FailingProviderHandler(string subject, string requiredAction, string proposedEmail)
+        : HttpMessageHandler
     {
-        return new AccountAuthorityLifecycleEmailRequest(
-            Guid.CreateVersion7(),
-            Guid.CreateVersion7(),
-            "keycloak-user-123",
-            CurrentEmail: "old@example.test",
-            ProposedEmail: "new@example.test",
-            ClientId: "islamu-event-blazor",
-            RedirectUri: "https://event.example.test/account",
-            LifespanSeconds: 300,
-            CorrelationId: correlationId ?? Guid.CreateVersion7().ToString("N"));
-    }
+        public string AdminUsername { get; } = Guid.NewGuid().ToString("N");
+        public string AdminPassword { get; } = Guid.NewGuid().ToString("N");
+        public string AdminToken { get; } = Guid.NewGuid().ToString("N");
+        public string ResponseBodyCanary { get; } = Guid.NewGuid().ToString("N");
+        public int RequestCount { get; private set; }
 
-    private static Func<HttpRequestMessage, HttpResponseMessage> Expect(
-        HttpMethod method,
-        string path,
-        Func<HttpRequestMessage, HttpResponseMessage> responseFactory)
-    {
-        return request =>
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            if (request.Method != method || request.RequestUri?.AbsolutePath != path)
+            RequestCount++;
+            var body = await request.Content!.ReadAsStringAsync(cancellationToken);
+            if (RequestCount == 1)
             {
-                throw new InvalidOperationException(
-                    $"Expected {method} {path}, got {request.Method} {request.RequestUri?.PathAndQuery}.");
+                await Assert.That(request.Method).IsEqualTo(HttpMethod.Post);
+                await Assert.That(request.RequestUri!.AbsolutePath)
+                    .IsEqualTo("/auth/realms/master/protocol/openid-connect/token");
+                await Assert.That(body).Contains($"username={AdminUsername}");
+                await Assert.That(body).Contains($"password={AdminPassword}");
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(JsonSerializer.Serialize(new { access_token = AdminToken }),
+                        Encoding.UTF8, "application/json")
+                };
             }
 
-            return responseFactory(request);
-        };
-    }
-
-    private static void AssertTokenRequest(HttpRequestMessage request)
-    {
-        var body = request.Content?.ReadAsStringAsync().GetAwaiter().GetResult() ?? string.Empty;
-        if (!body.Contains("grant_type=password", StringComparison.Ordinal)
-            || !body.Contains("client_id=admin-cli", StringComparison.Ordinal)
-            || !body.Contains("username=runtime-admin", StringComparison.Ordinal)
-            || !body.Contains("password=runtime-admin-secret", StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException($"Unexpected token request body: {body}");
-        }
-    }
-
-    private static void AssertExecuteActionsRequest(HttpRequestMessage request, string requiredAction)
-    {
-        if (request.Headers.Authorization?.Scheme != "Bearer" || request.Headers.Authorization.Parameter != "admin-token")
-            throw new InvalidOperationException("Expected bearer authorization header.");
-
-        var query = request.RequestUri?.Query ?? string.Empty;
-        if (!query.Contains("redirectUri=", StringComparison.Ordinal)
-            || !query.Contains("clientId=islamu-event-blazor", StringComparison.Ordinal)
-            || !query.Contains("lifespan=300", StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException($"Unexpected execute-actions-email query: {query}");
-        }
-
-        var body = request.Content?.ReadAsStringAsync().GetAwaiter().GetResult() ?? string.Empty;
-        if (!body.Contains(requiredAction, StringComparison.Ordinal))
-            throw new InvalidOperationException($"Expected required action {requiredAction}, got body {body}.");
-    }
-
-    private static HttpResponseMessage JsonResponse(string json)
-    {
-        return new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent(json, Encoding.UTF8, "application/json")
-        };
-    }
-
-    private sealed record LifecycleEmailCase(
-        AccountAuthorityLifecycleEmailAction Action,
-        string RequiredAction,
-        Func<KeycloakAccountAuthorityLifecycleEmailService, AccountAuthorityLifecycleEmailRequest, Task<AccountAuthorityLifecycleEmailResult>> Invoke);
-
-    private sealed class CapturingNotificationOrchestrator : INotificationOrchestrator
-    {
-        public int EnqueueCount { get; private set; }
-        public Guid? LastIntentId { get; private set; }
-        public Guid? LastDelegationId { get; private set; }
-
-        public Task<NotificationOrchestrationResult> EnqueueAsync(
-            NotificationIntentDraft draft,
-            CancellationToken cancellationToken = default)
-        {
-            EnqueueCount++;
-            LastIntentId = Guid.CreateVersion7();
-            LastDelegationId = Guid.CreateVersion7();
-            var intent = new NotificationIntent
+            await Assert.That(RequestCount).IsEqualTo(2);
+            await Assert.That(request.Method).IsEqualTo(HttpMethod.Put);
+            await Assert.That(request.RequestUri!.AbsolutePath)
+                .IsEqualTo($"/auth/admin/realms/ISLAMU/users/{subject}/execute-actions-email");
+            await Assert.That(request.Headers.Authorization?.Scheme).IsEqualTo("Bearer");
+            await Assert.That(request.Headers.Authorization?.Parameter).IsEqualTo(AdminToken);
+            await Assert.That(JsonSerializer.Deserialize<string[]>(body)!).IsEquivalentTo([requiredAction]);
+            return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
             {
-                Id = LastIntentId.Value,
-                TenantId = draft.TenantId ?? Guid.CreateVersion7(),
-                Tenant = null!,
-                CategoryId = (int)NotificationCategoryEnum.IdentityLifecycle,
-                Category = null!,
-                OwnershipTypeId = (int)NotificationOwnershipTypeEnum.AccountAuthority,
-                OwnershipType = null!,
-                RecipientKindId = (int)NotificationRecipientKindEnum.User,
-                RecipientKind = null!,
-                StatusId = (int)NotificationIntentStatusEnum.Delegated,
-                Status = null!,
-                TemplateKey = draft.TemplateKey ?? string.Empty,
-                DeduplicationKey = draft.DeduplicationKey ?? string.Empty,
-                RecipientUserId = draft.UserId!.Value
+                Content = new StringContent(JsonSerializer.Serialize(new
+                {
+                    error = ResponseBodyCanary,
+                    email = proposedEmail,
+                    password = AdminPassword,
+                    access_token = AdminToken
+                }), Encoding.UTF8, "application/json")
             };
-            var delegation = new NotificationExternalDelegation
-            {
-                Id = LastDelegationId.Value,
-                TenantId = intent.TenantId,
-                Tenant = null,
-                NotificationIntentId = intent.Id,
-                NotificationIntent = intent,
-                ProviderKindId = (int)ExternalWorkflowProviderKindEnum.None,
-                ProviderKind = null,
-                AccountAuthorityKindId = (int)AccountAuthorityKindEnum.Keycloak,
-                AccountAuthorityKind = null,
-                StatusId = (int)NotificationExternalDelegationStatusEnum.Requested,
-                Status = null,
-                RecipientKindId = (int)NotificationRecipientKindEnum.User,
-                RecipientKind = null,
-                TemplateKey = draft.TemplateKey ?? string.Empty,
-                ExternalProviderId = draft.ExternalProviderId,
-                ExternalCorrelationId = draft.ExternalCorrelationId
-            };
-
-            return Task.FromResult(new NotificationOrchestrationResult(
-                intent,
-                new NotificationOwnershipDecision(
-                    ApplicationNotificationCategory.IdentityLifecycle,
-                    ApplicationNotificationOwnership.AccountAuthority,
-                    ApplicationAccountAuthorityKind.Keycloak),
-                ExternalDelegation: delegation));
         }
     }
-
-    private sealed class StaticHttpClientFactory(HttpClient client) : IHttpClientFactory
-    {
-        public HttpClient CreateClient(string name) => client;
-    }
-
-    private sealed class OrderedMessageHandler : HttpMessageHandler
-    {
-        private readonly Queue<Func<HttpRequestMessage, HttpResponseMessage>> _responses;
-
-        public OrderedMessageHandler(params Func<HttpRequestMessage, HttpResponseMessage>[] responses)
-        {
-            _responses = new Queue<Func<HttpRequestMessage, HttpResponseMessage>>(responses);
-        }
-
-        public List<RecordedRequest> Requests { get; } = [];
-
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            Requests.Add(new RecordedRequest(
-                request.Method,
-                request.RequestUri,
-                request.Headers.Authorization,
-                request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync(cancellationToken)));
-
-            if (_responses.Count == 0)
-                throw new InvalidOperationException($"Unexpected request {request.Method} {request.RequestUri?.PathAndQuery}.");
-
-            return _responses.Dequeue()(request);
-        }
-    }
-
-    private sealed record RecordedRequest(
-        HttpMethod Method,
-        Uri? RequestUri,
-        AuthenticationHeaderValue? Authorization,
-        string Body);
 }

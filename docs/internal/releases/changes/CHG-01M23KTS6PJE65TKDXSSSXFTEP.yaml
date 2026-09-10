@@ -1,0 +1,28 @@
+Change-Id: CHG-01M23KTS6PJE65TKDXSSSXFTEP
+Title: "Observe committed attendance before guest cancellation"
+Type: fix
+Scope: registration
+Summary: "Use explicit committed reads under the existing admission row locks so guest cancellation cannot miss a check-in committed while it was acquiring those locks."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/ADMISSION_AND_REGISTRATION.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Explicit committed reads under retained admission row fences prevent cancellation from missing attendance committed during lock acquisition.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/email-optional-participation.md
+    Disposition: documented
+    Detail: Overlapping check-in and guest cancellation use committed admission history rather than stale page eligibility.

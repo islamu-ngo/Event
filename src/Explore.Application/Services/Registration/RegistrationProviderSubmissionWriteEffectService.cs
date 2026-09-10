@@ -4,6 +4,7 @@ using Explore.Application.Contracts.Services;
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Domain.Services.Registration;
 using FluentValidation;
 using MediatR;
 
@@ -70,15 +71,29 @@ public sealed class DrainRegistrationProviderSubmissionWriteEffectsCommandHandle
             return false;
         }
 
+        if (!AnonymousRegistrationRetentionPolicy.CanDisclose(delivery.Order, null, now))
+        {
+            await SettleFailureAsync(claim, "registration_data_retention_expired", retryable: false, ambiguous: false,
+                now, cancellationToken);
+            return false;
+        }
+
         if (!TryResolveSink(delivery.Binding, out RegistrationProviderTuple tuple, out IRegistrationProviderSubmissionSink? sink))
         {
             await SettleFailureAsync(claim, "provider_submission_sink_unavailable", retryable: false, ambiguous: false, now, cancellationToken);
             return false;
         }
 
-        IReadOnlyDictionary<string, string> answers = BuildProviderAnswers(delivery);
+        IReadOnlyDictionary<string, string> answers = BuildProviderAnswers(delivery, out DateTime? disclosureUntilUtc, out bool retentionExpired);
         if (answers.Count == 0)
         {
+            if (retentionExpired)
+            {
+                await SettleFailureAsync(claim, "registration_data_retention_expired", retryable: false, ambiguous: false,
+                    timeProvider.GetUtcNow().UtcDateTime, cancellationToken);
+                return false;
+            }
+
             if (HasTransferableMappings(delivery))
             {
                 await SettleFailureAsync(claim, "provider_submission_mapped_answers_empty", retryable: false, ambiguous: true, now, cancellationToken);
@@ -99,7 +114,8 @@ public sealed class DrainRegistrationProviderSubmissionWriteEffectsCommandHandle
                     claim.RegistrationAttemptId,
                     claim.RegistrationSubmissionId,
                     answers,
-                    null),
+                    null)
+                { DisclosureUntilUtc = disclosureUntilUtc },
                 cancellationToken);
             if (result.Accepted)
             {
@@ -145,8 +161,13 @@ public sealed class DrainRegistrationProviderSubmissionWriteEffectsCommandHandle
         return true;
     }
 
-    private IReadOnlyDictionary<string, string> BuildProviderAnswers(RegistrationProviderSubmissionWriteDelivery delivery)
+    private IReadOnlyDictionary<string, string> BuildProviderAnswers(
+        RegistrationProviderSubmissionWriteDelivery delivery,
+        out DateTime? disclosureUntilUtc,
+        out bool retentionExpired)
     {
+        disclosureUntilUtc = null;
+        retentionExpired = false;
         Dictionary<Guid, RegistrationFormField> fields = delivery.Fields.ToDictionary(field => field.Id);
         Dictionary<Guid, string> platformFieldKeys = fields.ToDictionary(pair => pair.Key, pair => $"{pair.Value.Namespace}.{pair.Value.Key}");
         Dictionary<string, RegistrationProviderFieldMapping> providerFieldMappings = delivery.Binding.FieldMappings
@@ -162,10 +183,33 @@ public sealed class DrainRegistrationProviderSubmissionWriteEffectsCommandHandle
             if (!fields.TryGetValue(answer.RegistrationFormFieldId, out RegistrationFormField? field) ||
                 !field.IsProviderTransferAllowed ||
                 !platformFieldKeys.TryGetValue(answer.RegistrationFormFieldId, out string? platformFieldKey) ||
-                !providerFieldMappings.TryGetValue(platformFieldKey, out RegistrationProviderFieldMapping? fieldMapping) ||
-                ToProviderValue(answer, field, fieldMapping.Id, providerOptionKeys) is not { } value)
+                !providerFieldMappings.TryGetValue(platformFieldKey, out RegistrationProviderFieldMapping? fieldMapping))
             {
                 continue;
+            }
+
+            DateTime? rowDeadline = answer.RetentionUntil;
+            if (answer.SensitiveAnswerValue?.RetentionUntil is { } sensitiveDeadline &&
+                (rowDeadline is null || sensitiveDeadline < rowDeadline))
+            {
+                rowDeadline = sensitiveDeadline;
+            }
+
+            if (!AnonymousRegistrationRetentionPolicy.CanDisclose(delivery.Order, rowDeadline, timeProvider.GetUtcNow().UtcDateTime))
+            {
+                retentionExpired = true;
+                continue;
+            }
+
+            if (ToProviderValue(answer, field, fieldMapping.Id, providerOptionKeys) is not { } value)
+            {
+                continue;
+            }
+
+            DateTime? answerDeadline = AnonymousRegistrationRetentionPolicy.GetDisclosureDeadline(delivery.Order, rowDeadline);
+            if (answerDeadline is { } deadline && (disclosureUntilUtc is null || deadline < disclosureUntilUtc))
+            {
+                disclosureUntilUtc = deadline;
             }
 
             if (!values.TryGetValue(fieldMapping.ProviderFieldKey, out List<string>? fieldValues))

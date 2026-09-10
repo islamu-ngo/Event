@@ -17,7 +17,7 @@ public interface IAtprotoFederationSettingsService
         bool isLocked,
         CancellationToken cancellationToken = default);
 
-    Task<SettingGroupResponseDto> GetTenantAsync(
+    Task<HalResourceOfSettingGroupResponseDto> GetTenantAsync(
         CancellationToken cancellationToken = default);
 
     Task<BaseCommandResponseOfGuid> UpdateTenantAsync(

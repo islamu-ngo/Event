@@ -15,9 +15,10 @@ export DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
 export DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE=1
 export DOTNET_NOLOGO=1
 
-work_root=$(mktemp -d /tmp/islamu-terminal-gui.XXXXXX)
+temporary_root=${TMPDIR:-/tmp}
+work_root=$(mktemp -d "$temporary_root/islamu-terminal-gui.XXXXXX")
 cleanup() {
-  if [[ $work_root == /tmp/islamu-terminal-gui.* ]]; then
+  if [[ $work_root == "$temporary_root"/islamu-terminal-gui.* ]]; then
     rm -rf -- "$work_root"
   fi
 }
@@ -52,7 +53,18 @@ if [[ $1 == "--check" ]]; then
     rm -rf -- "$extracted/package/services/metadata/core-properties"
     rm -f -- "$extracted/_rels/.rels" "$extracted/[Content_Types].xml"
   done
-  diff -qr "$committed_extract" "$rebuilt_extract"
+  if diff -qr "$committed_extract" "$rebuilt_extract"; then
+    :
+  else
+    audit_status=$?
+    evidence="$repo_root/artifacts/dependencies/terminal-gui"
+    mkdir -p "$evidence"
+    cp "$package_output/ISLAMU.Terminal.Gui.2.4.17-islamu.1.nupkg" "$evidence/"
+    dotnet --info > "$evidence/dotnet-info.txt"
+    sha256sum "$committed_extract/lib/net10.0/Terminal.Gui.dll" \
+      "$rebuilt_extract/lib/net10.0/Terminal.Gui.dll" > "$evidence/assembly-sha256.txt"
+    exit "$audit_status"
+  fi
   dotnet run "$verifier" -- --check
   exit
 fi

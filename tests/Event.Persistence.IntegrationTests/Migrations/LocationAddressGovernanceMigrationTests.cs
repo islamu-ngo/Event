@@ -42,7 +42,9 @@ public sealed class LocationAddressGovernanceMigrationTests(PostgreSqlContainerF
         await using ExploreDbContext context = CreateModelContext(provider);
         string[] migrations = context.Database.GetMigrations().ToArray();
 
-        await Assert.That(migrations.Count(migration => migration.EndsWith("_Init", StringComparison.Ordinal))).IsEqualTo(1);
+        await Assert.That(migrations.Where(id => id.EndsWith("_Init", StringComparison.Ordinal)))
+            .HasSingleItem();
+        await Assert.That(migrations[0]).EndsWith("_Init");
         await Assert.That(HasPendingModelChanges(context)).IsFalse();
     }
 
@@ -57,7 +59,7 @@ public sealed class LocationAddressGovernanceMigrationTests(PostgreSqlContainerF
         await using ExploreDbContext context = CreateModelContext(provider);
         IMigrationsAssembly migrations = context.GetService<IMigrationsAssembly>();
         string migrationId = context.Database.GetMigrations()
-            .Single(migration => migration.EndsWith("_Init", StringComparison.Ordinal));
+            .Single(id => id.EndsWith("_Init", StringComparison.Ordinal));
         Migration init = migrations.CreateMigration(
             migrations.Migrations[migrationId],
             context.Database.ProviderName);

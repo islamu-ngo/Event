@@ -1,0 +1,34 @@
+# ABOUTME: Records fail-closed interpretation of provider email-verification evidence.
+# ABOUTME: Removes implicit verification defaults without changing provider credential ownership.
+Change-Id: CHG-01M1VE0GQST7TA8NQCAB6B7K61
+Title: require explicit provider email verification evidence
+Type: fix
+Scope: access
+Summary: Derive mailbox verification only from an authenticated explicit claim and remove provider-name and email-presence defaults.
+Group: email-optional-self-hosting
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: Missing or malformed verification claims no longer imply a verified mailbox; GetEmailVerified no longer accepts obsolete provider and email arguments.
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: Only an authenticated ambient identity with an explicitly true email_verified claim supplies provider verification evidence.
+  Migration:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: not-applicable
+    Detail: The claim reader and its callers change without a database schema migration or bulk rewrite of existing accounts.
+  Configuration:
+    Reference: docs/public/documentation/readme/configuration-and-operations/authentication-providers.md
+    Disposition: documented
+    Detail: Providers must supply their actual email_verified claim when verified-mailbox evidence is required; no new Event configuration key is introduced.
+  OpenAPI:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: not-applicable
+    Detail: Existing endpoint routes and response schemas are unchanged; the internal public C# helper has a smaller signature.
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/authentication-providers.md
+    Disposition: documented
+    Detail: Provider sign-in remains separate from mailbox verification, and Event delivery settings do not transfer authentication or recovery authority.

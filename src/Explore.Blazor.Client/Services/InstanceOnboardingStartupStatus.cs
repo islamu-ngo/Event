@@ -50,7 +50,7 @@ internal static class InstanceOnboardingStartupStatusAdapter
 
         var disposition = (status.IsCompleted, state, mode, provider) switch
         {
-            (false, "InteractivePending", "Interactive", null) =>
+            (false, "InteractivePending", "Interactive", null or "Local" or "Keycloak" or "Atproto") =>
                 InstanceOnboardingStartupDisposition.InteractivePending,
             (false, "ConfiguredAdministratorPending", "ConfiguredAdministrator", "Keycloak" or "Atproto") =>
                 InstanceOnboardingStartupDisposition.ConfiguredAdministratorPending,

@@ -42,21 +42,21 @@ public sealed class EmailDispatchHealthCheck(
 
         if (!settings.Enabled)
         {
-            return HealthCheckResult.Degraded(
+            return HealthCheckResult.Healthy(
                 "Basic email dispatch is intentionally disabled.",
                 data: data);
         }
 
         if (settings.Mode == EmailDispatchProcessorMode.Disabled)
         {
-            return HealthCheckResult.Degraded(
+            return HealthCheckResult.Healthy(
                 "Basic email dispatch scheduler mode is Disabled.",
                 data: data);
         }
 
         if (settings.Mode == EmailDispatchProcessorMode.Quartz && !scheduler.Enabled)
         {
-            return HealthCheckResult.Unhealthy(
+            return HealthCheckResult.Degraded(
                 "Basic email dispatch is configured for Quartz, but the Quartz scheduler is disabled.",
                 data: data);
         }

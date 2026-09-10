@@ -61,7 +61,7 @@ public sealed class EmailDispatchRetentionCleanupService(
             catch (Exception exception)
             {
                 failedTenantCount++;
-                logger.LogWarning(exception, "Email dispatch retention cleanup failed for one tenant.");
+                logger.LogWarning("Email dispatch retention cleanup failed for one tenant: {ExceptionType}", exception.GetType().Name);
             }
         }
 

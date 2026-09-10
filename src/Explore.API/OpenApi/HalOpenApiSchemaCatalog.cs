@@ -4,6 +4,11 @@ internal static class HalOpenApiSchemaCatalog
 {
     public static IReadOnlyList<Type> RegisteredDtoTypes { get; } =
     [
+        typeof(Explore.Application.Contracts.Identity.LocalIdentitySummary),
+        typeof(Explore.Application.Contracts.Identity.LocalCredentialOperationStatus),
+        typeof(Explore.Application.Contracts.Identity.LocalCredentialOperationReceipt),
+        typeof(Explore.Application.Contracts.Identity.LocalCredentialResetReceipt),
+        typeof(Explore.Application.Features.Authentication.Local.Models.LocalCredentialIssueDto),
         // Event DTOs
         typeof(Explore.Application.DTOs.Event.EventDto),
         typeof(Explore.Application.DTOs.Event.EventListDto),
@@ -129,9 +134,15 @@ internal static class HalOpenApiSchemaCatalog
         // Email dispatch admin DTOs
         typeof(Explore.Application.DTOs.EmailDispatch.EmailDispatchStatusDto),
         typeof(Explore.Application.DTOs.EmailDispatch.EmailDispatchProcessorControlDto),
+        typeof(Explore.Application.DTOs.Onboarding.InstanceSmtpSettingsDto),
+        typeof(Explore.Application.DTOs.EmailDispatch.EmailDeliveryDisablePreviewDto),
+        typeof(Explore.Application.DTOs.EmailDispatch.EmailDeliveryDisableAffectedScopeDto),
 
+        typeof(Explore.Application.DTOs.RegistrationOrders.AnonymousRegistrationChallengeDto),
         typeof(Explore.Application.DTOs.RegistrationOrders.RegistrationOrderDto),
         typeof(Explore.Application.DTOs.RegistrationOrders.GuestRegistrationOrderDto),
+        typeof(Explore.Application.DTOs.RegistrationOrders.GuestRegistrationStatusDto),
+        typeof(Explore.Application.DTOs.RegistrationOrders.GuestRegistrationOrderLifecycleResponseDto),
         typeof(Explore.Application.DTOs.RegistrationOrders.RegistrationOrderParticipantsDto),
         typeof(Explore.Application.DTOs.RegistrationOrders.RegistrationPaymentDto),
         typeof(Explore.Application.DTOs.RegistrationOrders.RegistrationRefundDto),
@@ -240,6 +251,19 @@ internal static class HalOpenApiSchemaCatalog
         typeof(Explore.Application.DTOs.ControlPlane.ControlPlaneTenantEffectiveConfigurationDto),
         typeof(Explore.Application.DTOs.ControlPlane.ControlPlaneTenantEffectiveSettingDto),
         typeof(Explore.Application.DTOs.ControlPlane.ControlPlaneTenantQuotaUsageDto),
+        typeof(Explore.Application.DTOs.PublicExperience.VisitorAccessCapabilityDto),
+        typeof(Explore.Application.DTOs.PublicExperience.VisitorSignupDestinationDto),
+        typeof(Explore.Application.DTOs.Onboarding.PublicExperienceSettingsDto),
+        typeof(Explore.Application.DTOs.PublicExperience.PublicExperienceShellDto),
+        typeof(Explore.Application.DTOs.PublicExperience.PublicExperienceHomeDto),
+        typeof(Explore.Application.DTOs.PublicExperience.PublicExperienceHomeBlockDto),
+        typeof(Explore.Application.DTOs.PublicExperience.PublicExperienceNavigationDto),
+        typeof(Explore.Application.DTOs.PublicExperience.PublicExperienceNavigationLinkDto),
+        typeof(Explore.Application.DTOs.PublicExperience.PublicExperienceEventCatalogDto),
+        typeof(Explore.Application.DTOs.PublicExperience.PublicExperiencePrimaryOrganizationDto),
+        typeof(Explore.Application.DTOs.PublicExperience.PublicExperienceEventSectionDto),
+        typeof(Explore.Application.DTOs.PublicExperience.PublicExperienceCtaDto),
+        typeof(Explore.Application.DTOs.Onboarding.AuthProviderConfigurationDto),
         typeof(Explore.Application.DTOs.Onboarding.InstanceOnboardingStatusDto),
         typeof(Explore.Application.DTOs.Onboarding.TenantOnboardingStatusDto),
         typeof(Explore.Application.DTOs.Onboarding.InstanceStorageSettingsDto),
@@ -265,6 +289,22 @@ internal static class HalOpenApiSchemaCatalog
 
     public static IReadOnlyDictionary<string, Type> DetailResourceMappings { get; } = new Dictionary<string, Type>
     {
+        ["HalResourceOfVisitorAccessCapabilityDto"] = typeof(Explore.Application.DTOs.PublicExperience.VisitorAccessCapabilityDto),
+        ["HalResourceOfVisitorSignupDestinationDto"] = typeof(Explore.Application.DTOs.PublicExperience.VisitorSignupDestinationDto),
+        ["HalResourceOfPublicExperienceSettingsDto"] = typeof(Explore.Application.DTOs.Onboarding.PublicExperienceSettingsDto),
+        ["HalResourceOfPublicExperienceHomeDto"] = typeof(Explore.Application.DTOs.PublicExperience.PublicExperienceHomeDto),
+        ["HalResourceOfPublicExperienceHomeBlockDto"] = typeof(Explore.Application.DTOs.PublicExperience.PublicExperienceHomeBlockDto),
+        ["HalResourceOfPublicExperienceNavigationDto"] = typeof(Explore.Application.DTOs.PublicExperience.PublicExperienceNavigationDto),
+        ["HalResourceOfPublicExperienceNavigationLinkDto"] = typeof(Explore.Application.DTOs.PublicExperience.PublicExperienceNavigationLinkDto),
+        ["HalResourceOfPublicExperienceEventCatalogDto"] = typeof(Explore.Application.DTOs.PublicExperience.PublicExperienceEventCatalogDto),
+        ["HalResourceOfPublicExperiencePrimaryOrganizationDto"] = typeof(Explore.Application.DTOs.PublicExperience.PublicExperiencePrimaryOrganizationDto),
+        ["HalResourceOfPublicExperienceEventSectionDto"] = typeof(Explore.Application.DTOs.PublicExperience.PublicExperienceEventSectionDto),
+        ["HalResourceOfPublicExperienceCtaDto"] = typeof(Explore.Application.DTOs.PublicExperience.PublicExperienceCtaDto),
+        ["HalResourceOfInstanceSmtpSettingsDto"] = typeof(Explore.Application.DTOs.Onboarding.InstanceSmtpSettingsDto),
+        ["HalResourceOfEmailDeliveryDisablePreviewDto"] = typeof(Explore.Application.DTOs.EmailDispatch.EmailDeliveryDisablePreviewDto),
+        ["HalResourceOfLocalIdentitySummary"] = typeof(Explore.Application.Contracts.Identity.LocalIdentitySummary),
+        ["HalResourceOfLocalCredentialOperationStatus"] = typeof(Explore.Application.Contracts.Identity.LocalCredentialOperationStatus),
+        ["HalResourceOfLocalCredentialIssueDto"] = typeof(Explore.Application.Features.Authentication.Local.Models.LocalCredentialIssueDto),
         ["HalResourceOfSetupTargetEnrollmentData"] =
             typeof(ISLAMU.Wire.Contracts.SetupLive.SetupTargetEnrollmentData),
         ["HalResourceOfSetupSecretBindingOperationData"] =
@@ -296,8 +336,11 @@ internal static class HalOpenApiSchemaCatalog
         ["HalResourceOfMyEventReportDto"] = typeof(Explore.Application.DTOs.EventReporting.MyEventReportDto),
         ["HalResourceOfModerationReportDetailDto"] = typeof(Explore.Application.DTOs.EventReporting.ModerationReportDetailDto),
         ["HalResourceOfModerationReportQueueItemDto"] = typeof(Explore.Application.DTOs.EventReporting.ModerationReportQueueItemDto),
+        ["HalResourceOfAnonymousRegistrationChallengeDto"] = typeof(Explore.Application.DTOs.RegistrationOrders.AnonymousRegistrationChallengeDto),
         ["HalResourceOfRegistrationOrderDto"] = typeof(Explore.Application.DTOs.RegistrationOrders.RegistrationOrderDto),
         ["HalResourceOfGuestRegistrationOrderDto"] = typeof(Explore.Application.DTOs.RegistrationOrders.GuestRegistrationOrderDto),
+        ["HalResourceOfGuestRegistrationStatusDto"] = typeof(Explore.Application.DTOs.RegistrationOrders.GuestRegistrationStatusDto),
+        ["HalResourceOfGuestRegistrationOrderLifecycleResponseDto"] = typeof(Explore.Application.DTOs.RegistrationOrders.GuestRegistrationOrderLifecycleResponseDto),
         ["HalResourceOfRegistrationOrderParticipantsDto"] = typeof(Explore.Application.DTOs.RegistrationOrders.RegistrationOrderParticipantsDto),
         ["HalResourceOfRegistrationPaymentDto"] = typeof(Explore.Application.DTOs.RegistrationOrders.RegistrationPaymentDto),
         ["HalResourceOfRegistrationRefundDto"] = typeof(Explore.Application.DTOs.RegistrationOrders.RegistrationRefundDto),
@@ -430,6 +473,7 @@ internal static class HalOpenApiSchemaCatalog
         ["HalResourceOfControlPlaneTenantPlanDetailDto"] = typeof(Explore.Application.DTOs.ControlPlane.ControlPlaneTenantPlanDetailDto),
         ["HalResourceOfControlPlaneTenantPlanListItemDto"] = typeof(Explore.Application.DTOs.ControlPlane.ControlPlaneTenantPlanListItemDto),
         ["HalResourceOfControlPlaneTenantEffectiveConfigurationDto"] = typeof(Explore.Application.DTOs.ControlPlane.ControlPlaneTenantEffectiveConfigurationDto),
+        ["HalResourceOfAuthProviderConfigurationDto"] = typeof(Explore.Application.DTOs.Onboarding.AuthProviderConfigurationDto),
         ["HalResourceOfInstanceOnboardingStatusDto"] = typeof(Explore.Application.DTOs.Onboarding.InstanceOnboardingStatusDto),
         ["HalResourceOfTenantOnboardingStatusDto"] = typeof(Explore.Application.DTOs.Onboarding.TenantOnboardingStatusDto),
         ["HalResourceOfInstanceStorageSettingsDto"] = typeof(Explore.Application.DTOs.Onboarding.InstanceStorageSettingsDto),
@@ -446,6 +490,7 @@ internal static class HalOpenApiSchemaCatalog
 
     public static IReadOnlyDictionary<string, string> CollectionEmbeddedItemResourceMappings { get; } = new Dictionary<string, string>
     {
+        ["HalCollectionEmbeddedOfLocalIdentitySummary"] = "HalResourceOfLocalIdentitySummary",
         ["HalCollectionEmbeddedOfSetupSecretBindingReadinessItem"] =
             "HalResourceOfSetupSecretBindingReadinessItem",
         ["HalCollectionEmbeddedOfActorListDto"] = "HalResourceOfActorListDto",
@@ -524,12 +569,12 @@ internal static class HalOpenApiSchemaCatalog
         };
 
     public static IReadOnlyDictionary<Type, Type> DetailResourceEmbeddedTypeMappings
-        { get; } = new Dictionary<Type, Type>
-        {
-            [typeof(Explore.Application.DTOs.Geocoding.AddressSuggestionsResponseDto)] =
+    { get; } = new Dictionary<Type, Type>
+    {
+        [typeof(Explore.Application.DTOs.Geocoding.AddressSuggestionsResponseDto)] =
                 typeof(Explore.Application.Hateoas.HalCollectionEmbedded<
                     Explore.Application.DTOs.Geocoding.AddressSuggestionDto>)
-        };
+    };
 
     public static bool IsCatalogedDetailResourceSchema(string schemaName)
         => DetailResourceMappings.ContainsKey(schemaName);

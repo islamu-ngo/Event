@@ -54,10 +54,23 @@
                        Required="true"
                        Disabled="_isSaving"
                        data-testid="identity-access-select">
-                <MudSelectItem T="int?" Value="@((int?)AccountRequired)">Account required</MudSelectItem>
+                <MudSelectItem T="int?"
+                               Value="@((int?)AccountRequired)"
+                               Disabled="@(!AllowsAccountRequiredParticipation)">
+                    Account required
+                </MudSelectItem>
                 <MudSelectItem T="int?" Value="@((int?)GuestAllowed)">Guests allowed</MudSelectItem>
                 <MudSelectItem T="int?" Value="@((int?)CapabilityTokenAllowed)">Capability-token access</MudSelectItem>
             </MudSelect>
+        }
+
+        @if (IsPlatformManaged && !AllowsAccountRequiredParticipation)
+        {
+            <div class="participation-configuration-editor__capability-note"
+                 role="note"
+                 data-testid="account-required-unavailable">
+                @AccountRequiredUnavailableMessage
+            </div>
         }
 
         @if (UsesEmailRecovery)
@@ -148,7 +161,9 @@
 
     [Parameter, EditorRequired] public Guid EventId { get; set; }
     [Parameter, EditorRequired] public ParticipationConfiguration Configuration { get; set; } = null!;
+    [Parameter] public VisitorAccessCapabilityDto? VisitorAccess { get; set; }
     [Parameter] public EventCallback OnSaved { get; set; }
+    [Parameter] public EventCallback OnReloadRequested { get; set; }
 
     private Guid? _loadedConcurrencyStamp;
     private int? _handlingModeId;
@@ -164,6 +179,11 @@
     private bool IsPlatformManaged => _handlingModeId == PlatformManaged;
     private bool UsesEmailRecovery => IsPlatformManaged && _identityAccessModeId == GuestAllowed;
     private bool UsesCapabilityRecovery => IsPlatformManaged && _identityAccessModeId == CapabilityTokenAllowed;
+    private bool AllowsAccountRequiredParticipation =>
+        VisitorAccess?.AllowsAccountRequiredParticipation == true;
+    private string AccountRequiredUnavailableMessage => VisitorAccess is null
+        ? "Visitor access availability could not be loaded. Account-required participation cannot be selected or saved until the event is refreshed."
+        : "Account-required participation needs at least one public visitor signup destination. Existing-account and operator sign-in remain separate.";
     private bool HasConcurrencyStamp => Configuration.ConcurrencyStamp is { } stamp && stamp != Guid.Empty;
     private bool CanSave => !_isSaving && HasConcurrencyStamp && IsLegalConfiguration();
 
@@ -216,6 +236,11 @@
     private Task OnIdentityAccessModeChanged(int? value)
     {
         ClearFeedback();
+        if (value == AccountRequired && !AllowsAccountRequiredParticipation)
+        {
+            return Task.CompletedTask;
+        }
+
         _identityAccessModeId = value;
         _guestRecoveryPolicy = value switch
         {
@@ -270,6 +295,10 @@
                 _errorMessage = response.Message ?? "Participation configuration could not be saved.";
                 _errors = response.Errors?.ToList() ?? [];
                 await Announcer.AnnounceAssertiveAsync(_errorMessage);
+                if (IsCanonicalReloadRequired(response.FailureCode))
+                {
+                    await OnReloadRequested.InvokeAsync();
+                }
             }
         }
         finally
@@ -289,13 +318,19 @@
         PlatformManaged => _advanceObligationId is Optional or Required
             && _identityAccessModeId switch
             {
-                AccountRequired => _guestRecoveryPolicy is null,
+                AccountRequired => AllowsAccountRequiredParticipation && _guestRecoveryPolicy is null,
                 GuestAllowed => _guestRecoveryPolicy is VerifiedEmailRequired or UnverifiedEmailAccepted or EmailOptional,
                 CapabilityTokenAllowed => _guestRecoveryPolicy is CapabilityLinkOnly or NoRecovery,
                 _ => false
             },
         _ => false
     };
+
+    private static bool IsCanonicalReloadRequired(string? failureCode) => failureCode is
+        "event_participation_configuration_concurrency_conflict"
+        or "event_visitor_account_onboarding_required"
+        or "visitor_access_account_required_conflict"
+        or "visitor_access_policy_invalid";
 
     private void ClearFeedback()
     {

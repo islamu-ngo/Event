@@ -49,7 +49,10 @@ public sealed class SetupCliContractTests
             ["localized-message"] = SetupCliMachineContractVerifier.Mutate(root => root["message"] = "localized"),
             ["diagnostic-value"] = SetupCliMachineContractVerifier.Mutate(root => root["diagnostics"] = new JsonArray(new JsonObject
             {
-                ["code"] = "invalid-artifact", ["path"] = "$.input", ["severity"] = "error", ["value"] = "present"
+                ["code"] = "invalid-artifact",
+                ["path"] = "$.input",
+                ["severity"] = "error",
+                ["value"] = "present"
             })),
             ["artifact-body"] = SetupCliMachineContractVerifier.Mutate(root => root["artifacts"]![0]!["body"] = "present"),
             ["artifact-bytes"] = SetupCliMachineContractVerifier.Mutate(root => root["artifacts"]![0]!["bytes"] = 1)
@@ -74,11 +77,15 @@ public sealed class SetupCliContractTests
             ["duplicate-coverage"] = SetupCliMachineContractVerifier.Mutate(root => root["coverage"]!["coveredKeys"] = new JsonArray("a", "a")),
             ["readiness"] = SetupCliMachineContractVerifier.Mutate(root => root["readiness"] = new JsonObject
             {
-                ["state"] = "ready", ["missingKeys"] = new JsonArray("missing"), ["blockedKeys"] = new JsonArray()
+                ["state"] = "ready",
+                ["missingKeys"] = new JsonArray("missing"),
+                ["blockedKeys"] = new JsonArray()
             }),
             ["oversized"] = SetupCliMachineContractVerifier.Mutate(root => root["diagnostics"] = new JsonArray(new JsonObject
             {
-                ["code"] = new string('a', 97), ["path"] = "$.input", ["severity"] = "error"
+                ["code"] = new string('a', 97),
+                ["path"] = "$.input",
+                ["severity"] = "error"
             }))
         };
 
@@ -252,8 +259,14 @@ public sealed class SetupCliContractTests
                 var actualExits = Enum.GetNames(exitCode).Zip(Enum.GetValues(exitCode).Cast<object>().Select(Convert.ToInt32));
                 var expectedExits = new Dictionary<string, int>(StringComparer.Ordinal)
                 {
-                    ["Success"] = 0, ["Validation"] = 2, ["Incomplete"] = 3, ["Blocked"] = 4,
-                    ["Usage"] = 64, ["Data"] = 65, ["Internal"] = 70, ["Io"] = 74
+                    ["Success"] = 0,
+                    ["Validation"] = 2,
+                    ["Incomplete"] = 3,
+                    ["Blocked"] = 4,
+                    ["Usage"] = 64,
+                    ["Data"] = 65,
+                    ["Internal"] = 70,
+                    ["Io"] = 74
                 };
                 if (!actualExits.OrderBy(pair => pair.First, StringComparer.Ordinal)
                         .SequenceEqual(expectedExits.OrderBy(pair => pair.Key, StringComparer.Ordinal)

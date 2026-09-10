@@ -366,16 +366,20 @@ public class UserControllerTests
 
         if (!await dbContext.Users.AnyAsync(x => x.Id == userId))
         {
-            dbContext.Users.Add(new User { Id = userId, EmailVerified = true,
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = userId,
-            Pii = new UserPii
+            dbContext.Users.Add(new User
             {
-                UserId = userId,
-                Email = email,
-                FirstName = "Integration",
-                LastName = "User"
-            } });
+                Id = userId,
+                EmailVerified = true,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = userId,
+                Pii = new UserPii
+                {
+                    UserId = userId,
+                    Email = email,
+                    FirstName = "Integration",
+                    LastName = "User"
+                }
+            });
         }
 
         if (!await dbContext.UserExternalLogins.AnyAsync(x =>
@@ -383,13 +387,18 @@ public class UserControllerTests
                 && x.AuthenticationProviderId == (int)provider.ParseAuthenticationProviderKind()
                 && x.ProviderKey == providerKey))
         {
-            dbContext.UserExternalLogins.Add(new UserExternalLogin { Id = Guid.CreateVersion7(),
-            UserId = userId,
-            User = null!,
-            AuthenticationProviderId = (int)provider.ParseAuthenticationProviderKind(), AuthenticationProvider = null!, ProviderKey = providerKey,
-            ProviderDisplayName = provider,
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = userId });
+            dbContext.UserExternalLogins.Add(new UserExternalLogin
+            {
+                Id = Guid.CreateVersion7(),
+                UserId = userId,
+                User = null!,
+                AuthenticationProviderId = (int)provider.ParseAuthenticationProviderKind(),
+                AuthenticationProvider = null!,
+                ProviderKey = providerKey,
+                ProviderDisplayName = provider,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = userId
+            });
         }
 
         await dbContext.SaveChangesAsync();

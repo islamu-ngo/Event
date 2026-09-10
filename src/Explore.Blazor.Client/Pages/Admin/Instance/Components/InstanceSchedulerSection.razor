@@ -28,6 +28,15 @@
             <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-4">Loading scheduler state…</MudText>
         </MudStack>
     }
+    else if (_overview is null && !string.IsNullOrWhiteSpace(_message))
+    {
+        <MudAlert Severity="@_messageSeverity" Variant="Variant.Outlined" Class="scheduler-section__alert">
+            @_message
+        </MudAlert>
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" OnClick="RefreshAsync">
+            Refresh
+        </MudButton>
+    }
     else if (_overview is null)
     {
         <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="scheduler-section__alert">

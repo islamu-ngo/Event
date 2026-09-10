@@ -80,6 +80,7 @@ public sealed record EventDto
     public Guid FeaturedImageId { get; init; }
     public string? FeaturedImageUri { get; set; }
 
+    public Explore.Application.DTOs.PublicExperience.VisitorAccessCapabilityDto? VisitorAccess { get; init; }
     public EventParticipationConfigurationDto? ParticipationConfiguration { get; set; }
     public int? RegistrationPolicyId { get; init; }
     public string? RegistrationPolicyFullName { get; init; }

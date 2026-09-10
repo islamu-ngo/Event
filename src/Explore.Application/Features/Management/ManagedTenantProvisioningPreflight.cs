@@ -1,10 +1,10 @@
 using System.Globalization;
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Management;
 using Explore.Application.Features.ControlPlane.Plans;
-using Explore.Application.Management;
 using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Constants;
@@ -13,7 +13,6 @@ using Explore.Domain.Modules;
 using Explore.Domain.Settings;
 using Explore.Domain.Settings.Definitions;
 using Explore.Domain.Settings.Documents.Payloads;
-using Microsoft.Extensions.Options;
 
 namespace Explore.Application.Features.Management;
 
@@ -25,7 +24,7 @@ public sealed class ManagedTenantProvisioningPreflight(
     ISystemSettingRepository systemSettingRepository,
     ITenantBrandingSettingsDocumentLockService brandingLockService,
     TenantPlanStorageQuotaCeilingPolicy storageQuotaCeilingPolicy,
-    IOptions<ManagedControlPlaneOptions> options)
+    ILocalCredentialAdministration credentials)
 {
     public const string DomainNamespaceMutationKey = "domains.tenant_host_namespace";
 
@@ -111,12 +110,12 @@ public sealed class ManagedTenantProvisioningPreflight(
             return domainFailure;
         }
 
-        if (request.Administrator.Invitation is not null
-            && options.Value.TenantAdministratorSignInUrl is null)
+        if (request.Administrator.LocalIdentity is { } local
+            && await credentials.ReadLinkedIdentityAsync(local.LocalSubjectId, cancellationToken) is null)
         {
             return ManagedTenantProvisioningPreflightResult.Fail(
-                "tenant_invitation_unavailable",
-                "Tenant administrator invitation delivery is not configured on this Event instance.");
+                "tenant_local_administrator_unavailable",
+                "An existing linked Local administrator in ChangeRequired or Ready state is required.");
         }
 
         BrandingSettings branding = MapBranding(request);

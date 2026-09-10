@@ -1,0 +1,32 @@
+Change-Id: CHG-01M1SMGK4KERC58WSMFJTTY63Z
+Title: bound anonymous registration data by event purpose
+Type: feat
+Scope: privacy
+Summary: Avoid unnecessary attendee contact records and enforce event-bound read-time expiry without extending retention through edits or weakening legal holds.
+Group: email-optional-self-hosting
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/DOMAIN.md
+    Disposition: documented
+    Detail: Anonymous names and answers become unreadable at their original event-purpose deadline; historical guest data without an original bound does not receive a new window.
+  Security:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: Participant presentation, answer export, decryption, provider handoff and stored registration-content access enforce finite tenant-qualified disclosure authority.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: Generated primary-provider migrations add nullable order and stored-content retention deadlines without historical backfill or Identity changes.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: The governed anonymous_registration.retention_days setting defaults to seven and permits zero through thirty at instance and tenant scope without extending existing bounds.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: Existing read and export contracts enforce expiry and storage HAL omits unavailable download actions without adding a public DTO field or endpoint.
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/email-optional-participation.md
+    Disposition: documented
+    Detail: No-data collection avoids contact records; operational expiry is distinct from cleanup, legal-hold storage, private status access and externally retained copies.

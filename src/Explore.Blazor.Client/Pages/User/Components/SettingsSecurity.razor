@@ -1,6 +1,7 @@
 @using Explore.Blazor.Client.Pages.User.Components.Dialogs
 @using MudBlazor
 @inject IDialogService DialogService
+@inject Explore.Blazor.Client.Clients.IUserClient UserClient
 
 <div class="settings-section">
     <div class="settings-section-header mb-6">
@@ -12,6 +13,19 @@
         Sign-in identities can only be linked through their verified authentication flow. Direct provider or DID linking is not available.
     </MudAlert>
 
+    @if (_links?.ContainsKey("change-password") == true)
+    {
+        <p class="mt-4"><a href="/auth/local-account-recovery?mode=change-password">Change your Local password</a></p>
+    }
+    @if (_links?.ContainsKey("verify-email") == true)
+    {
+        <p><a href="/auth/local-account-recovery?mode=verify-current-email">Verify your current Local email</a></p>
+        <p><a href="/auth/local-account-recovery?mode=change-email">Change your Local email address</a></p>
+    }
+    @if (_discoveryUnavailable)
+    {
+        <p role="status">Account credential actions could not be checked.</p>
+    }
     <MudDivider Class="my-6" />
 
     <MudText Typo="Typo.subtitle2" Style="font-weight: 600; color: var(--mud-palette-error);" Class="mb-2">Danger Zone</MudText>
@@ -33,5 +47,17 @@
 </div>
 
 @code {
+    private IDictionary<string, Explore.Blazor.Client.Clients.HalLink>? _links;
+    private bool _discoveryUnavailable;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _links = (await UserClient.GetCurrentUserAsync())?._links; }
+        catch (Exception exception) when (exception is Explore.Blazor.Client.Clients.ApiException or HttpRequestException or OperationCanceledException)
+        {
+            _discoveryUnavailable = true;
+        }
+    }
+
     private Task ShowDeleteAccountDialog() => DeleteAccountDialog.ShowAsync(DialogService);
 }

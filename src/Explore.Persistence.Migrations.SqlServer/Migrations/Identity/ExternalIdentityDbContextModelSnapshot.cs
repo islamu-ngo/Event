@@ -23,6 +23,192 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations.Identity
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("Explore.Persistence.Identity.LocalIdentityCredentialOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("ExternalLoginId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("external_login_id");
+
+                    b.Property<Guid>("InitiatingApplicationUserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("initiating_application_user_id");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("int")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("LocalSubjectId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("local_subject_id");
+
+                    b.Property<Guid>("PersonalActorId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("personal_actor_id");
+
+                    b.Property<Guid?>("PreviousOperationConcurrencyStamp")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("previous_operation_concurrency_stamp");
+
+                    b.Property<Guid?>("PreviousOperationId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("previous_operation_id");
+
+                    b.Property<string>("ResetReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)")
+                        .HasColumnName("reset_reason");
+
+                    b.Property<int>("Stage")
+                        .HasColumnType("int")
+                        .HasColumnName("stage");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("updated_at");
+
+                    b.Property<DateTime>("VerifiedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("verified_at");
+
+                    b.Property<Guid>("VerifiedByApplicationUserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("verified_by_application_user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_local_identity_credential_operation");
+
+                    b.HasIndex("LocalSubjectId")
+                        .HasDatabaseName("ix_local_identity_credential_operation_local_subject_id");
+
+                    b.ToTable("local_identity_credential_operation", "islamu_identity", t =>
+                        {
+                            t.HasCheckConstraint("ck_local_credential_operation_kind", "kind BETWEEN 1 AND 2");
+
+                            t.HasCheckConstraint("ck_local_credential_operation_reset_metadata", "(kind = 1 AND previous_operation_id IS NULL AND previous_operation_concurrency_stamp IS NULL AND reset_reason IS NULL) OR (kind = 2 AND previous_operation_id IS NOT NULL AND previous_operation_id <> id AND previous_operation_concurrency_stamp IS NOT NULL AND reset_reason IS NOT NULL AND TRIM(reset_reason) <> '' AND stage <> 1)");
+
+                            t.HasCheckConstraint("ck_local_credential_operation_stage", "stage BETWEEN 1 AND 5");
+
+                            t.HasCheckConstraint("ck_local_credential_operation_timestamps", "((kind = 1 AND verified_at >= created_at) OR (kind = 2 AND verified_at <= created_at)) AND (updated_at IS NULL OR updated_at >= created_at)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Persistence.Identity.LocalIdentityLifecycleOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("ConsumedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("consumed_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CredentialOperationId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("credential_operation_id");
+
+                    b.Property<DateTime?>("DeliveryAdmittedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("delivery_admitted_at");
+
+                    b.Property<int>("DeliveryAttemptCount")
+                        .HasColumnType("int")
+                        .HasColumnName("delivery_attempt_count");
+
+                    b.Property<Guid?>("DeliveryAttemptId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("delivery_attempt_id");
+
+                    b.Property<DateTime?>("DeliveryCompletedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("delivery_completed_at");
+
+                    b.Property<int>("DeliveryState")
+                        .HasColumnType("int")
+                        .HasColumnName("delivery_state");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid>("ExternalLoginId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("external_login_id");
+
+                    b.Property<Guid>("Generation")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("generation");
+
+                    b.Property<Guid>("LocalSubjectId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("local_subject_id");
+
+                    b.Property<string>("PendingAddress")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)")
+                        .HasColumnName("pending_address");
+
+                    b.Property<Guid>("PersonalActorId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("personal_actor_id");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("int")
+                        .HasColumnName("purpose");
+
+                    b.Property<string>("ResultSecurityStamp")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)")
+                        .HasColumnName("result_security_stamp");
+
+                    b.Property<string>("SecurityStamp")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)")
+                        .HasColumnName("security_stamp");
+
+                    b.Property<DateTime?>("SynchronizedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("synchronized_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_local_identity_lifecycle_operations");
+
+                    b.HasIndex("LocalSubjectId", "Purpose", "ExpiresAt")
+                        .HasDatabaseName("ix_local_identity_lifecycle_operations_local_subject_id_purpose_expires_at");
+
+                    b.ToTable("local_identity_lifecycle_operations", "islamu_identity", t =>
+                        {
+                            t.HasCheckConstraint("ck_local_lifecycle_consumption", "(consumed_at IS NULL AND result_security_stamp IS NULL AND synchronized_at IS NULL) OR (consumed_at IS NOT NULL AND result_security_stamp IS NOT NULL AND consumed_at >= created_at AND consumed_at < expires_at AND (synchronized_at IS NULL OR synchronized_at >= consumed_at))");
+
+                            t.HasCheckConstraint("ck_local_lifecycle_delivery_attempt", "(delivery_attempt_count = 0 AND delivery_attempt_id IS NULL AND delivery_admitted_at IS NULL AND delivery_completed_at IS NULL AND delivery_state IN (0,3)) OR (delivery_attempt_count > 0 AND delivery_attempt_id IS NOT NULL AND delivery_admitted_at IS NOT NULL AND delivery_admitted_at >= created_at AND delivery_admitted_at < expires_at AND (delivery_completed_at IS NULL OR delivery_completed_at >= delivery_admitted_at) AND (delivery_state <> 1 OR delivery_completed_at IS NULL) AND (delivery_state <> 2 OR delivery_completed_at IS NOT NULL))");
+
+                            t.HasCheckConstraint("ck_local_lifecycle_delivery_state", "delivery_state BETWEEN 0 AND 3 AND delivery_attempt_count BETWEEN 0 AND 3");
+
+                            t.HasCheckConstraint("ck_local_lifecycle_expiry", "expires_at > created_at");
+
+                            t.HasCheckConstraint("ck_local_lifecycle_purpose", "purpose BETWEEN 1 AND 3");
+                        });
+                });
+
             modelBuilder.Entity("Explore.Persistence.Identity.LocalIdentityRole", b =>
                 {
                     b.Property<Guid>("Id")
@@ -149,7 +335,9 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations.Identity
                         .HasName("pk_local_identity_users");
 
                     b.HasIndex("NormalizedEmail")
-                        .HasDatabaseName("ix_local_identity_users_normalized_email");
+                        .IsUnique()
+                        .HasDatabaseName("ix_local_identity_users_normalized_email")
+                        .HasFilter("[normalized_email] IS NOT NULL");
 
                     b.HasIndex("NormalizedUserName")
                         .IsUnique()
@@ -290,6 +478,26 @@ namespace Explore.Persistence.Migrations.SqlServer.Migrations.Identity
                         .HasName("pk_identity_user_tokens");
 
                     b.ToTable("identity_user_tokens", "islamu_identity");
+                });
+
+            modelBuilder.Entity("Explore.Persistence.Identity.LocalIdentityCredentialOperation", b =>
+                {
+                    b.HasOne("Explore.Persistence.Identity.LocalIdentityUser", null)
+                        .WithMany()
+                        .HasForeignKey("LocalSubjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_local_identity_credential_operation_local_identity_users_local_subject_id");
+                });
+
+            modelBuilder.Entity("Explore.Persistence.Identity.LocalIdentityLifecycleOperation", b =>
+                {
+                    b.HasOne("Explore.Persistence.Identity.LocalIdentityUser", null)
+                        .WithMany()
+                        .HasForeignKey("LocalSubjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_local_identity_lifecycle_operations_local_identity_users_local_subject_id");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>

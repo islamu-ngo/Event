@@ -86,7 +86,7 @@ public sealed class EmailDispatchHealthCheckTests
     }
 
     [Test]
-    public async Task CheckHealthAsyncWhenDispatchDisabledReturnsDegraded()
+    public async Task CheckHealthAsyncWhenDispatchDisabledReturnsHealthy()
     {
         var settings = new EmailDispatchProcessorSettings
         {
@@ -98,7 +98,7 @@ public sealed class EmailDispatchHealthCheckTests
 
         var result = await setup.HealthCheck.CheckHealthAsync(new HealthCheckContext());
 
-        await Assert.That(result.Status).IsEqualTo(HealthStatus.Degraded);
+        await Assert.That(result.Status).IsEqualTo(HealthStatus.Healthy);
         await Assert.That(result.Description).Contains("intentionally disabled");
         await Assert.That(result.Data).ContainsKey("enabled").And.Value.IsEqualTo(false);
         await Assert.That(result.Data).ContainsKey("consumerId").And.Value.IsEqualTo("disabled-consumer");
@@ -112,7 +112,7 @@ public sealed class EmailDispatchHealthCheckTests
     }
 
     [Test]
-    public async Task CheckHealthAsyncWhenSchedulerModeDisabledReturnsDegraded()
+    public async Task CheckHealthAsyncWhenSchedulerModeDisabledReturnsHealthy()
     {
         var settings = new EmailDispatchProcessorSettings
         {
@@ -129,7 +129,7 @@ public sealed class EmailDispatchHealthCheckTests
 
         var result = await setup.HealthCheck.CheckHealthAsync(new HealthCheckContext());
 
-        await Assert.That(result.Status).IsEqualTo(HealthStatus.Degraded);
+        await Assert.That(result.Status).IsEqualTo(HealthStatus.Healthy);
         await Assert.That(result.Description).Contains("Disabled");
         await Assert.That(result.Data).ContainsKey("enabled").And.Value.IsEqualTo(true);
         await Assert.That(result.Data).ContainsKey("mode").And.Value.IsEqualTo(nameof(EmailDispatchProcessorMode.Disabled));
@@ -143,7 +143,7 @@ public sealed class EmailDispatchHealthCheckTests
     }
 
     [Test]
-    public async Task CheckHealthAsyncWhenQuartzModeHasDisabledSchedulerReturnsUnhealthy()
+    public async Task CheckHealthAsyncWhenQuartzModeHasDisabledSchedulerReturnsDegraded()
     {
         var settings = new EmailDispatchProcessorSettings
         {
@@ -160,7 +160,7 @@ public sealed class EmailDispatchHealthCheckTests
 
         var result = await setup.HealthCheck.CheckHealthAsync(new HealthCheckContext());
 
-        await Assert.That(result.Status).IsEqualTo(HealthStatus.Unhealthy);
+        await Assert.That(result.Status).IsEqualTo(HealthStatus.Degraded);
         await Assert.That(result.Description).Contains("Quartz");
         await Assert.That(result.Data).ContainsKey("mode").And.Value.IsEqualTo(nameof(EmailDispatchProcessorMode.Quartz));
         await Assert.That(result.Data).ContainsKey("schedulerEnabled").And.Value.IsEqualTo(false);

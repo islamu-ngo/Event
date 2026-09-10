@@ -31,6 +31,9 @@ public partial interface IGuestRegistrationOrderClient
     Task<GuestRegistrationOrderStartResult> StartGuestRegistrationOrderWithCapabilityAsync(
         Guid eventId,
         StartRegistrationOrderRequest body,
+        string idempotencyKey,
+        string protectedChallenge,
+        string nonce,
         CancellationToken cancellationToken = default);
 }
 
@@ -59,12 +62,17 @@ public partial class GuestRegistrationOrderClient
     public async Task<GuestRegistrationOrderStartResult> StartGuestRegistrationOrderWithCapabilityAsync(
         Guid eventId,
         StartRegistrationOrderRequest body,
+        string idempotencyKey,
+        string protectedChallenge,
+        string nonce,
         CancellationToken cancellationToken = default)
     {
-        using var operation = EventApiTransportBehavior.BeginGuestRegistrationOrder();
+        using var operation = EventApiTransportBehavior.BeginGuestRegistrationOrder(idempotencyKey);
         var response = await StartGuestRegistrationOrderAsync(
             eventId,
-            operation.IdempotencyKey,
+            idempotency_Key: operation.IdempotencyKey,
+            x_Registration_Challenge: protectedChallenge,
+            x_Registration_Proof: nonce,
             body: body,
             cancellationToken: cancellationToken);
         if (string.IsNullOrWhiteSpace(operation.Capability))
@@ -124,23 +132,23 @@ public static class EventApiJsonSerializerSettings
             ref Utf8JsonReader reader,
             Type typeToConvert,
             JsonSerializerOptions options) => reader.GetString() switch
-        {
-            "target.read" => SetupEnrollmentScope.Target_read,
-            "secret_binding.readiness" => SetupEnrollmentScope.Secret_binding_readiness,
-            "secret_binding.write" => SetupEnrollmentScope.Secret_binding_write,
-            _ => throw new JsonException("Invalid Setup enrollment scope.")
-        };
+            {
+                "target.read" => SetupEnrollmentScope.Target_read,
+                "secret_binding.readiness" => SetupEnrollmentScope.Secret_binding_readiness,
+                "secret_binding.write" => SetupEnrollmentScope.Secret_binding_write,
+                _ => throw new JsonException("Invalid Setup enrollment scope.")
+            };
 
         public override void Write(
             Utf8JsonWriter writer,
             SetupEnrollmentScope value,
             JsonSerializerOptions options) => writer.WriteStringValue(value switch
-        {
-            SetupEnrollmentScope.Target_read => "target.read",
-            SetupEnrollmentScope.Secret_binding_readiness => "secret_binding.readiness",
-            SetupEnrollmentScope.Secret_binding_write => "secret_binding.write",
-            _ => throw new JsonException("Invalid Setup enrollment scope.")
-        });
+            {
+                SetupEnrollmentScope.Target_read => "target.read",
+                SetupEnrollmentScope.Secret_binding_readiness => "secret_binding.readiness",
+                SetupEnrollmentScope.Secret_binding_write => "secret_binding.write",
+                _ => throw new JsonException("Invalid Setup enrollment scope.")
+            });
     }
 }
 
@@ -151,12 +159,19 @@ internal static class EventApiTransportBehavior
     internal static OperationScope BeginCreateEvent(string idempotencyKey) =>
         Begin(new OperationContext(idempotencyKey, captureCapability: false));
 
-    internal static OperationScope BeginGuestRegistrationOrder() =>
-        Begin(new OperationContext(Guid.CreateVersion7().ToString("N"), captureCapability: true));
+    internal static OperationScope BeginGuestRegistrationOrder(string idempotencyKey) =>
+        Begin(new OperationContext(idempotencyKey, captureCapability: true));
 
     internal static void PrepareRequest(HttpRequestMessage request, string? generatedUrl = null)
     {
         var operation = CurrentOperation.Value;
+        if (IsAnonymousRegistrationIntentRequest(request, generatedUrl))
+        {
+            // New guest intent has no prior-order capability scope. Run again in the message handler
+            // after HttpClient defaults are applied, identically for issuance and submission.
+            request.Headers.Remove("X-Registration-Order-Capability");
+            request.Headers.Remove("X-Registration-Attempt-Capability");
+        }
         if (request.Method == HttpMethod.Post
             && operation is { CaptureCapability: false }
             && !request.Headers.Contains("Idempotency-Key"))
@@ -199,6 +214,15 @@ internal static class EventApiTransportBehavior
         var previous = CurrentOperation.Value;
         CurrentOperation.Value = operation;
         return new OperationScope(operation, previous);
+    }
+
+    internal static bool IsAnonymousRegistrationIntentRequest(HttpRequestMessage request, string? generatedUrl = null)
+    {
+        if (request.Method != HttpMethod.Post) return false;
+        var segments = GetPathSegments(request, generatedUrl);
+        return (segments is ["api", "events", _, "guest-registration-challenges"]
+                or ["api", "events", _, "registration-orders", "guest"])
+            && Guid.TryParse(segments[2], out _);
     }
 
     private static bool IsGuestRegistrationOrderRequest(HttpRequestMessage request, string? generatedUrl) =>

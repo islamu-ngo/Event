@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Explore.Application.Configuration;
 using Explore.Application.Constants;
 using Explore.Domain;
 using Explore.Domain.Constants;
@@ -33,6 +34,7 @@ public static class PlatformIdentityPrincipalExtensions
         ApiAuthenticationSchemeNames.AtprotoBootstrap,
         ApiAuthenticationSchemeNames.AtprotoSession,
         ApiAuthenticationSchemeNames.PrivacyErasureReceipt,
+        ApiAuthenticationSchemeNames.LocalCredentialReplacement,
     ];
 
     /// <summary>
@@ -54,6 +56,17 @@ public static class PlatformIdentityPrincipalExtensions
         if (identity is null)
         {
             return null;
+        }
+
+        if (string.Equals(GetAuthProvider(identity), "local", StringComparison.Ordinal))
+        {
+            string? subject = GetProviderSubject(identity);
+            if (string.IsNullOrWhiteSpace(subject)
+                || GetProviderAccountKey(identity, "local", subject) is null)
+            {
+                return null;
+            }
+            return Guid.ParseExact(subject, "D");
         }
 
         string?[] candidates =
@@ -85,7 +98,7 @@ public static class PlatformIdentityPrincipalExtensions
 
         return identities is
         [
-            { AuthenticationType: { } authenticationType } identity
+        { AuthenticationType: { } authenticationType } identity
         ] && !PurposeBoundAuthenticationSchemes.Contains(authenticationType)
             ? identity
             : null;
@@ -131,11 +144,11 @@ public static class PlatformIdentityPrincipalExtensions
 
         string email = GetClaimValue(identity, "email", ClaimTypes.Email) ?? string.Empty;
         return new ProviderIdentity(
-            subject,
-            provider,
-            accountKey,
-            email,
-            GetEmailVerified(identity, provider, email));
+            Subject: subject,
+            Provider: provider,
+            AccountKey: accountKey,
+            Email: email,
+            EmailVerified: GetEmailVerified(identity));
     }
 
     /// <summary>
@@ -203,6 +216,17 @@ public static class PlatformIdentityPrincipalExtensions
         string provider,
         string providerSubject)
     {
+        if (string.Equals(provider, "local", StringComparison.Ordinal))
+        {
+            string? localIssuer = identity?.FindFirst("iss")?.Value;
+            return string.Equals(localIssuer, LocalIdentityOptions.Issuer, StringComparison.Ordinal)
+                && Guid.TryParseExact(providerSubject, "D", out Guid localSubjectId)
+                && localSubjectId != Guid.Empty
+                && string.Equals(providerSubject, localSubjectId.ToString("D"), StringComparison.Ordinal)
+                    ? new ProviderAccountKey(providerKind: AuthenticationProviderKind.Local, value: providerSubject)
+                    : null;
+        }
+
         if (string.Equals(provider, AuthSchemeNames.Atproto.ToLowerInvariant(), StringComparison.Ordinal))
         {
             string didValue = identity?.FindFirst("did")?.Value
@@ -258,27 +282,14 @@ public static class PlatformIdentityPrincipalExtensions
     }
 
     /// <summary>
-    /// Honors an explicit <c>email_verified</c> claim, otherwise defaults per provider: the OIDC providers
-    /// verify addresses themselves, while ATProto carries no email guarantee and must stay unverified.
+    /// Returns true only when the principal carries an explicit, parseable true <c>email_verified</c> claim.
     /// </summary>
-    public static bool GetEmailVerified(this ClaimsPrincipal principal, string provider, string email) =>
-        GetEmailVerified(RequirePrincipal(principal), provider, email);
+    public static bool GetEmailVerified(this ClaimsPrincipal principal) =>
+        GetEmailVerified(RequirePrincipal(principal));
 
-    private static bool GetEmailVerified(ClaimsIdentity? identity, string provider, string email)
-    {
-        if (bool.TryParse(identity?.FindFirst("email_verified")?.Value, out var emailVerified))
-        {
-            return emailVerified;
-        }
-
-        return provider switch
-        {
-            "keycloak" => true,
-            "google" => true,
-            "atproto" => false,
-            _ => !string.IsNullOrWhiteSpace(email),
-        };
-    }
+    private static bool GetEmailVerified(ClaimsIdentity? identity) =>
+        bool.TryParse(identity?.FindFirst("email_verified")?.Value, out var emailVerified)
+            && emailVerified;
 
     private static ClaimsIdentity? RequirePrincipal(ClaimsPrincipal principal)
     {

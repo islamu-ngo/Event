@@ -5,7 +5,6 @@ using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.Extensions.Logging;
 using MimeKit;
-using Polly;
 
 namespace Explore.Infrastructure.Mail;
 
@@ -27,35 +26,42 @@ public class SmtpEmailService : IEmailService, IEmailConnectionTester
 
     private readonly ISmtpConfigResolver _configResolver;
     private readonly ILogger<SmtpEmailService> _logger;
-    private static readonly ResiliencePipeline<EmailResult> RetryPipeline =
-        EmailResiliencePipelines.CreateSendPipeline();
+    private readonly TimeProvider _timeProvider;
 
     public SmtpEmailService(
         ISmtpConfigResolver configResolver,
-        ILogger<SmtpEmailService> logger)
+        ILogger<SmtpEmailService> logger,
+        TimeProvider? timeProvider = null)
     {
         _configResolver = configResolver;
         _logger = logger;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public async Task<EmailResult> SendAsync(
         EmailMessage message,
         CancellationToken cancellationToken = default)
     {
+        if (ContactExpired(message)) return RetentionExpired();
         var config = await _configResolver.ResolveAsync(cancellationToken);
+        if (ContactExpired(message)) return RetentionExpired();
         if (config is null)
         {
-            return EmailResult.Fail("SMTP is not configured. Configure email settings in the admin panel.");
+            return EmailResult.Fail("SMTP is not configured. Configure email settings in the admin panel.",
+                outcome: SmtpDeliveryOutcome.ConfigurationFailure);
         }
 
-        return await RetryPipeline.ExecuteAsync(
-            async ct => await SendCoreAsync(message, config, ct),
-            cancellationToken);
+        return await SendCoreAsync(message, config, cancellationToken);
     }
+
+    // Global lifecycle admission supplies an instance-owned transport snapshot under the SMTP policy lease.
+    // This entry point intentionally does not consult ambient tenant settings.
+    internal Task<EmailResult> SendAdmittedAsync(EmailMessage message, SmtpConfiguration configuration,
+        CancellationToken cancellationToken) => SendCoreAsync(message, configuration, cancellationToken);
 
     public async Task<EmailResult> TestConnectionAsync(CancellationToken cancellationToken = default)
     {
-        var config = await _configResolver.ResolveAsync(cancellationToken);
+        var config = await _configResolver.ResolveAsync(null, cancellationToken);
         if (config is null)
         {
             return EmailResult.Fail("SMTP is not configured. Set email.smtp_host in admin settings.");
@@ -117,7 +123,11 @@ public class SmtpEmailService : IEmailService, IEmailConnectionTester
         SmtpConfiguration config,
         CancellationToken cancellationToken)
     {
+        if (ContactExpired(message)) return RetentionExpired();
         var sw = Stopwatch.StartNew();
+        var sendInitiated = false;
+        var accepted = false;
+        var authenticating = false;
 
         try
         {
@@ -132,22 +142,23 @@ public class SmtpEmailService : IEmailService, IEmailConnectionTester
                 MapSecurityMode(config.Security),
                 cancellationToken);
 
+            if (ContactExpired(message)) return RetentionExpired();
             if (!string.IsNullOrWhiteSpace(config.Username))
             {
+                authenticating = true;
                 await client.AuthenticateAsync(config.Username, config.Password, cancellationToken);
+                authenticating = false;
             }
 
+            if (ContactExpired(message)) return RetentionExpired();
+            sendInitiated = true;
             await client.SendAsync(mimeMessage, cancellationToken);
+            accepted = true;
             await client.DisconnectAsync(quit: true, cancellationToken);
-
-            sw.Stop();
-            _logger.LogInformation(
-                SendAcceptedEvent,
-                "SMTP send completed with status {Status} in {DurationMs}ms",
-                "accepted",
-                sw.ElapsedMilliseconds);
-
-            return EmailResult.Ok("SMTP accepted message.", sw.Elapsed);
+        }
+        catch (Exception) when (accepted)
+        {
+            // Acceptance is final even if QUIT, cancellation, or client disposal fails.
         }
         catch (SmtpCommandException ex)
         {
@@ -159,7 +170,13 @@ public class SmtpEmailService : IEmailService, IEmailConnectionTester
                 "command_failed",
                 statusCode,
                 sw.ElapsedMilliseconds);
-            return EmailResult.Fail($"SMTP command failed ({statusCode}).", sw.Elapsed);
+            var outcome = authenticating ? SmtpDeliveryOutcome.ConfigurationFailure : statusCode switch
+            {
+                >= 400 and < 500 => SmtpDeliveryOutcome.TransientFailure,
+                >= 500 and < 600 => SmtpDeliveryOutcome.ConfigurationFailure,
+                _ => SmtpDeliveryOutcome.Uncertain
+            };
+            return EmailResult.Fail($"SMTP command failed ({statusCode}).", sw.Elapsed, outcome);
         }
         catch (SmtpProtocolException)
         {
@@ -169,21 +186,33 @@ public class SmtpEmailService : IEmailService, IEmailConnectionTester
                 "SMTP send completed with status {Status} in {DurationMs}ms",
                 "protocol_failed",
                 sw.ElapsedMilliseconds);
-            return EmailResult.Fail("SMTP connection protocol error.", sw.Elapsed);
+            return EmailResult.Fail("SMTP connection protocol error.", sw.Elapsed,
+                sendInitiated ? SmtpDeliveryOutcome.Uncertain : SmtpDeliveryOutcome.TransientFailure);
         }
-        catch (AuthenticationException)
+        catch (Exception ex) when (ex is AuthenticationException
+            or SslHandshakeException
+            or System.Security.Authentication.AuthenticationException
+            or MailKit.ServiceNotAuthenticatedException
+            or ArgumentException
+            or FormatException
+            or NotSupportedException
+            or InvalidOperationException)
         {
             sw.Stop();
             _logger.LogError(
-                SendAuthenticationFailedEvent,
+                sendInitiated ? SendTransportFailedEvent : SendAuthenticationFailedEvent,
                 "SMTP send completed with status {Status} in {DurationMs}ms",
-                "authentication_failed",
+                sendInitiated ? "uncertain" : "configuration_failed",
                 sw.ElapsedMilliseconds);
-            return EmailResult.Fail("SMTP authentication failed.", sw.Elapsed);
+            return EmailResult.Fail(
+                sendInitiated ? "SMTP acceptance is uncertain." : "SMTP authentication or configuration failed.",
+                sw.Elapsed,
+                sendInitiated ? SmtpDeliveryOutcome.Uncertain : SmtpDeliveryOutcome.ConfigurationFailure);
         }
         catch (Exception ex) when (ex is TimeoutException
             or OperationCanceledException
-            or System.IO.IOException)
+            or System.IO.IOException
+            or System.Net.Sockets.SocketException)
         {
             sw.Stop();
             var (status, safeFailureMessage) = ex switch
@@ -197,9 +226,24 @@ public class SmtpEmailService : IEmailService, IEmailConnectionTester
                 "SMTP send completed with status {Status} in {DurationMs}ms",
                 status,
                 sw.ElapsedMilliseconds);
-            return EmailResult.Fail(safeFailureMessage, sw.Elapsed);
+            return EmailResult.Fail(safeFailureMessage, sw.Elapsed,
+                sendInitiated ? SmtpDeliveryOutcome.Uncertain : SmtpDeliveryOutcome.TransientFailure);
         }
+
+        sw.Stop();
+        _logger.LogInformation(
+            SendAcceptedEvent,
+            "SMTP send completed with status {Status} in {DurationMs}ms",
+            "accepted",
+            sw.ElapsedMilliseconds);
+        return EmailResult.Ok("SMTP accepted message.", sw.Elapsed);
     }
+
+    private bool ContactExpired(EmailMessage message) =>
+        message.DisclosureUntilUtc is { } deadline && _timeProvider.GetUtcNow().UtcDateTime >= deadline;
+
+    private static EmailResult RetentionExpired() => EmailResult.Fail(
+        "registration_data_retention_expired", outcome: SmtpDeliveryOutcome.RetentionExpired);
 
     private static void ConfigureClient(SmtpClient client, SmtpConfiguration config)
     {
@@ -243,7 +287,13 @@ public class SmtpEmailService : IEmailService, IEmailConnectionTester
         mimeMessage.Subject = message.Subject;
 
         foreach (var (key, value) in message.CustomHeaders)
-            mimeMessage.Headers.Add(key, value);
+        {
+            // MimeMessage creates a Message-ID itself; a stable admitted identifier must replace it, not duplicate it.
+            if (string.Equals(key, "Message-ID", StringComparison.OrdinalIgnoreCase))
+                mimeMessage.Headers.Replace(HeaderId.MessageId, value);
+            else
+                mimeMessage.Headers.Add(key, value);
+        }
 
         var builder = new BodyBuilder();
 

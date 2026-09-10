@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
+using TUnit.Assertions.Enums;
 
 namespace Event.Persistence.IntegrationTests.Migrations;
 
@@ -42,10 +43,12 @@ public sealed class SemanticValueNonTransactionalMigrationTests(
 
         await Assert.That(await CountSemanticConstraintsAsync(context))
             .IsEqualTo(ConstraintNames.Length);
-        string[] applied = (await context.Database.GetAppliedMigrationsAsync()).ToArray();
         string[] available = context.Database.GetMigrations().ToArray();
-        await Assert.That(applied).IsEquivalentTo(available);
-        await Assert.That(applied.Count(migration => migration.EndsWith("_Init", StringComparison.Ordinal))).IsEqualTo(1);
+        await Assert.That(available.Where(id => id.EndsWith("_Init", StringComparison.Ordinal)))
+            .HasSingleItem();
+        await Assert.That(available[0]).EndsWith("_Init");
+        await Assert.That(await context.Database.GetAppliedMigrationsAsync())
+            .IsEquivalentTo(available, CollectionOrdering.Matching);
 
         await ExploreDatabaseMigrator.MigrateAsync(
             context,
@@ -54,9 +57,10 @@ public sealed class SemanticValueNonTransactionalMigrationTests(
         await Assert.That(await CountSemanticConstraintsAsync(context))
             .IsEqualTo(ConstraintNames.Length);
         await Assert.That(await context.Database.GetAppliedMigrationsAsync())
-            .IsEquivalentTo(applied);
+            .IsEquivalentTo(available, CollectionOrdering.Matching);
 
         await context.GetService<IMigrator>().MigrateAsync(Migration.InitialDatabase);
+        await Assert.That(await context.Database.GetAppliedMigrationsAsync()).IsEmpty();
         await Assert.That(await CountSemanticConstraintsAsync(context)).IsEqualTo(0);
 
         await ExploreDatabaseMigrator.MigrateAsync(
@@ -65,7 +69,7 @@ public sealed class SemanticValueNonTransactionalMigrationTests(
         await Assert.That(await CountSemanticConstraintsAsync(context))
             .IsEqualTo(ConstraintNames.Length);
         await Assert.That(await context.Database.GetAppliedMigrationsAsync())
-            .IsEquivalentTo(applied);
+            .IsEquivalentTo(available, CollectionOrdering.Matching);
 
         await SqliteApplicationInitialLifecycleTests.AssertDataProtectionLifecycleAsync(
             fixture.CreateOptions(provider));

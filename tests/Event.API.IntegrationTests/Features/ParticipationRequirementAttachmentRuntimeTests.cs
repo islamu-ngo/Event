@@ -500,7 +500,7 @@ public sealed class ParticipationRequirementAttachmentRuntimeFixture : IAsyncIni
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18-alpine")
         .WithDatabase("participation_requirement_attachments_http")
         .WithUsername("postgres")
-        .WithPassword("postgres")
+        .WithPassword(Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)))
         .Build();
 
     private PostgreSqlApiWebApplicationFactory _factory = null!;

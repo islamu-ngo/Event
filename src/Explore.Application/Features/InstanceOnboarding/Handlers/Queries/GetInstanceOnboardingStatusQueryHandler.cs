@@ -1,3 +1,4 @@
+using Explore.Application.Constants;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
@@ -16,19 +17,22 @@ public class GetInstanceOnboardingStatusQueryHandler : IRequestHandler<GetInstan
     private readonly ICurrentUserService _currentUserService;
     private readonly ISetupSecretProvider _setupSecretProvider;
     private readonly IDeploymentModeProvider _deploymentModeProvider;
+    private readonly IAuthenticationProviderDispatcher _providers;
 
     public GetInstanceOnboardingStatusQueryHandler(
         IInstanceBootstrapStateRepository instanceBootstrapStateRepository,
         IAdminContext adminContext,
         ICurrentUserService currentUserService,
         ISetupSecretProvider setupSecretProvider,
-        IDeploymentModeProvider deploymentModeProvider)
+        IDeploymentModeProvider deploymentModeProvider,
+        IAuthenticationProviderDispatcher providers)
     {
         _instanceBootstrapStateRepository = instanceBootstrapStateRepository;
         _adminContext = adminContext;
         _currentUserService = currentUserService;
         _setupSecretProvider = setupSecretProvider;
         _deploymentModeProvider = deploymentModeProvider;
+        _providers = providers;
     }
 
     public async Task<InstanceOnboardingStatusDto> Handle(GetInstanceOnboardingStatusQuery request, CancellationToken cancellationToken)
@@ -55,7 +59,15 @@ public class GetInstanceOnboardingStatusQueryHandler : IRequestHandler<GetInstan
             Mode = bootstrap?.Mode.ToString() ?? InstanceBootstrapMode.Interactive.ToString(),
             Provider = state == "ConfiguredAdministratorPending"
                 ? bootstrap!.ProviderKind?.ToString()
-                : null,
+                : state == "InteractivePending"
+                    ? (await _providers.GetActivePrimaryProviderAsync(cancellationToken)).ToString()
+                    : null,
+            PendingOperationId = state == "InteractivePending"
+                && request.SetupPrincipal?.Identities.Any(identity => identity.IsAuthenticated
+                    && identity.AuthenticationType == ApiAuthenticationSchemeNames.SetupSecret) == true
+                && await _setupSecretProvider.IsSetupModeActiveAsync(cancellationToken)
+                    ? bootstrap?.Id
+                    : null,
             Generation = bootstrap?.Generation ?? 1,
             IsAuthenticated = _currentUserService.IsAuthenticated,
             IsCurrentUserInstanceAdmin = false,

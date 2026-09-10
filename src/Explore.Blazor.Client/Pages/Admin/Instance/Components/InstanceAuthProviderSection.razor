@@ -98,6 +98,35 @@
                         <MudTextField Variant="Variant.Outlined" T="string" Label="Client Secret" InputType="InputType.Password"
                                       @bind-Value="Model.KeycloakClientSecret" autocomplete="new-password" />
 
+                        <section class="instance-auth-provider__visitor-onboarding"
+                                 aria-labelledby="keycloak-public-onboarding-heading">
+                            <MudText Id="keycloak-public-onboarding-heading" Typo="Typo.subtitle2" HtmlTag="h3">
+                                Keycloak visitor signup
+                            </MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                This controls new public visitor accounts, not operator or existing-account sign-in.
+                            </MudText>
+                            <MudSelect T="PublicOnboardingPolicy?"
+                                       Label="Public onboarding policy"
+                                       @bind-Value="Model.KeycloakPublicOnboardingPolicy"
+                                       Variant="Variant.Outlined"
+                                       data-testid="keycloak-public-onboarding-policy">
+                                <MudSelectItem T="PublicOnboardingPolicy?" Value="@((PublicOnboardingPolicy?)PublicOnboardingUnknown)">Unknown - do not advertise signup</MudSelectItem>
+                                <MudSelectItem T="PublicOnboardingPolicy?" Value="@((PublicOnboardingPolicy?)PublicOnboardingAllowed)">Allowed</MudSelectItem>
+                                <MudSelectItem T="PublicOnboardingPolicy?" Value="@((PublicOnboardingPolicy?)PublicOnboardingDenied)">Denied</MudSelectItem>
+                            </MudSelect>
+                            @if (Model.KeycloakPublicOnboardingPolicy == PublicOnboardingAllowed)
+                            {
+                                <MudTextField T="string"
+                                              Label="Public signup URL"
+                                              @bind-Value="Model.KeycloakPublicSignupUrl"
+                                              Variant="Variant.Outlined"
+                                              Required="true"
+                                              HelperText="Use the exact public HTTPS account-registration destination." />
+                                @PublicSignupUrlWarning(Model.KeycloakPublicSignupUrl)
+                            }
+                        </section>
+
                         @if (IsKeycloakPrimary)
                         {
                             <MudPaper Outlined="true" Class="pa-4 mt-2">
@@ -354,6 +383,35 @@
                             <MudTextField Variant="Variant.Outlined" T="string" Label="Client Secret" InputType="InputType.Password" @bind-Value="Model.GoogleClientSecret" />
                         }
 
+                        <section class="instance-auth-provider__visitor-onboarding"
+                                 aria-labelledby="google-public-onboarding-heading">
+                            <MudText Id="google-public-onboarding-heading" Typo="Typo.subtitle2" HtmlTag="h3">
+                                Google visitor signup
+                            </MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                This controls new public visitor accounts, not operator or existing-account sign-in.
+                            </MudText>
+                            <MudSelect T="PublicOnboardingPolicy?"
+                                       Label="Public onboarding policy"
+                                       @bind-Value="Model.GooglePublicOnboardingPolicy"
+                                       Variant="Variant.Outlined"
+                                       data-testid="google-public-onboarding-policy">
+                                <MudSelectItem T="PublicOnboardingPolicy?" Value="@((PublicOnboardingPolicy?)PublicOnboardingUnknown)">Unknown - do not advertise signup</MudSelectItem>
+                                <MudSelectItem T="PublicOnboardingPolicy?" Value="@((PublicOnboardingPolicy?)PublicOnboardingAllowed)">Allowed</MudSelectItem>
+                                <MudSelectItem T="PublicOnboardingPolicy?" Value="@((PublicOnboardingPolicy?)PublicOnboardingDenied)">Denied</MudSelectItem>
+                            </MudSelect>
+                            @if (Model.GooglePublicOnboardingPolicy == PublicOnboardingAllowed)
+                            {
+                                <MudTextField T="string"
+                                              Label="Public signup URL"
+                                              @bind-Value="Model.GooglePublicSignupUrl"
+                                              Variant="Variant.Outlined"
+                                              Required="true"
+                                              HelperText="Use the exact public HTTPS account-registration destination." />
+                                @PublicSignupUrlWarning(Model.GooglePublicSignupUrl)
+                            }
+                        </section>
+
                         @if (!IsSingleTenant)
                         {
                             <MudSwitch T="bool" Value="@(Model.LockGoogleSsoEnabled == true)" ValueChanged="@(value => Model.LockGoogleSsoEnabled = value)" Color="Color.Warning">
@@ -537,6 +595,9 @@
     private const int KeycloakProviderId = 1;
     private const int AtprotoProviderId = 2;
     private const int LocalIdentityProviderId = 4;
+    private const PublicOnboardingPolicy PublicOnboardingUnknown = PublicOnboardingPolicy.Unknown;
+    private const PublicOnboardingPolicy PublicOnboardingAllowed = PublicOnboardingPolicy.Allowed;
+    private const PublicOnboardingPolicy PublicOnboardingDenied = PublicOnboardingPolicy.Denied;
 
     [Parameter, EditorRequired]
     public AuthProviderConfigurationDto Model { get; set; } = null!;
@@ -585,6 +646,24 @@
 
     private bool IsAtprotoPrimary =>
         CurrentPrimaryProviderId == AtprotoProviderId;
+
+    private static RenderFragment PublicSignupUrlWarning(string? url) => builder =>
+    {
+        if (Uri.TryCreate(url, UriKind.Absolute, out Uri? parsed)
+            && parsed.Scheme == Uri.UriSchemeHttps
+            && string.IsNullOrEmpty(parsed.UserInfo))
+        {
+            return;
+        }
+
+        builder.OpenComponent<MudAlert>(0);
+        builder.AddAttribute(1, nameof(MudAlert.Severity), Severity.Warning);
+        builder.AddAttribute(2, nameof(MudAlert.Dense), true);
+        builder.AddAttribute(3, nameof(MudAlert.ChildContent),
+            (RenderFragment)(content => content.AddContent(4,
+                "Public signup requires an absolute HTTPS URL without embedded credentials.")));
+        builder.CloseComponent();
+    };
 
     private RenderFragment ProviderStatusChip(bool enabled) => @<MudChip T="string"
         Size="Size.Small"

@@ -38,29 +38,32 @@ public class ManagedProviderClientProvisioningDtoValidator : AbstractValidator<M
                     TenantDirectoryOperatorIdentityCapability.Activation)!);
         });
 
-        RuleFor(x => x.ExternalAdmin).NotNull().WithMessage("External admin identity is required");
+        RuleFor(x => x)
+            .Must(x => (x.ExternalAdmin is null) != (x.LocalIdentity is null))
+            .WithMessage("Exactly one external or Local administrator identity is required.");
+        RuleFor(x => x.LocalIdentity!.LocalSubjectId).NotEmpty().When(x => x.LocalIdentity is not null);
         When(x => x.ExternalAdmin != null, () =>
         {
-            RuleFor(x => x.ExternalAdmin.IdentityProvider)
+            RuleFor(x => x.ExternalAdmin!.IdentityProvider)
                 .NotEmpty().WithMessage("External admin identity provider is required")
                 .MaximumLength(255).WithMessage("External admin identity provider cannot exceed 255 characters");
 
-            RuleFor(x => x.ExternalAdmin.Subject)
+            RuleFor(x => x.ExternalAdmin!.Subject)
                 .NotEmpty().WithMessage("External admin subject is required")
                 .MaximumLength(500).WithMessage("External admin subject cannot exceed 500 characters");
 
-            RuleFor(x => x.ExternalAdmin.Email)
+            RuleFor(x => x.ExternalAdmin!.Email)
                 .NotEmpty().WithMessage("External admin email is required")
                 .EmailAddress().WithMessage("External admin email must be valid")
                 .MaximumLength(255).WithMessage("External admin email cannot exceed 255 characters");
 
-            RuleFor(x => x.ExternalAdmin.FirstName)
+            RuleFor(x => x.ExternalAdmin!.FirstName)
                 .MaximumLength(255).WithMessage("External admin first name cannot exceed 255 characters");
 
-            RuleFor(x => x.ExternalAdmin.LastName)
+            RuleFor(x => x.ExternalAdmin!.LastName)
                 .MaximumLength(255).WithMessage("External admin last name cannot exceed 255 characters");
 
-            RuleFor(x => x.ExternalAdmin.DisplayName)
+            RuleFor(x => x.ExternalAdmin!.DisplayName)
                 .MaximumLength(500).WithMessage("External admin display name cannot exceed 500 characters");
         });
 

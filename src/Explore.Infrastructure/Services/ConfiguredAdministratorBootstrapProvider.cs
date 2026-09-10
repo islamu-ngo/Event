@@ -94,7 +94,10 @@ public sealed class ConfiguredAdministratorBootstrapProvider(
         string providerText = Required("INSTANCE_BOOTSTRAP_ADMIN_PROVIDER");
         string subject = Required("INSTANCE_BOOTSTRAP_ADMIN_SUBJECT");
         string generationText = Required("INSTANCE_BOOTSTRAP_BINDING_GENERATION");
-        string email = NormalizeEmail(Required("INSTANCE_BOOTSTRAP_ADMIN_EMAIL"));
+        string? configuredEmail = Optional("INSTANCE_BOOTSTRAP_ADMIN_EMAIL");
+        string? email = configuredEmail is null ? null : NormalizeEmail(configuredEmail);
+        if (providerText == "local" && email?.Length > 254)
+            throw Failure("instance_bootstrap_email_invalid");
         string? firstName = NormalizeProfileName(Optional("INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME"));
         string? lastName = NormalizeProfileName(Optional("INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME"));
         if ((firstName is null) != (lastName is null))
@@ -104,6 +107,7 @@ public sealed class ConfiguredAdministratorBootstrapProvider(
 
         AuthenticationProviderKind providerKind = providerText switch
         {
+            "local" => AuthenticationProviderKind.Local,
             "keycloak" => AuthenticationProviderKind.Keycloak,
             "atproto" => AuthenticationProviderKind.Atproto,
             _ => throw Failure("instance_bootstrap_provider_invalid")
@@ -133,7 +137,7 @@ public sealed class ConfiguredAdministratorBootstrapProvider(
             "provider", providerText,
             "account-key", accountKey.Value,
             "generation", generation.ToString(CultureInfo.InvariantCulture),
-            "administrator-email", email,
+            "administrator-email", email ?? string.Empty,
             "administrator-first-name", firstName ?? string.Empty,
             "administrator-last-name", lastName ?? string.Empty,
             "deployment-mode", deploymentMode.ToString(),
@@ -205,6 +209,15 @@ public sealed class ConfiguredAdministratorBootstrapProvider(
     {
         try
         {
+            if (providerKind == AuthenticationProviderKind.Local)
+            {
+                if (!Guid.TryParseExact(subject, "D", out Guid localSubject)
+                    || localSubject.Version != 7 || localSubject.Variant is < 8 or > 11
+                    || subject != localSubject.ToString("D"))
+                    throw Failure("instance_bootstrap_local_subject_invalid");
+                return new ProviderAccountKey(AuthenticationProviderKind.Local, subject);
+            }
+
             if (providerKind == AuthenticationProviderKind.Atproto)
             {
                 return AtprotoDid.TryParse(subject, out AtprotoDid did)

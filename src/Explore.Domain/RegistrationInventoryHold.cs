@@ -169,6 +169,24 @@ public sealed class RegistrationInventoryHold : ITenantEntity, IAuditableEntity,
         return true;
     }
 
+    public bool TryReleaseConsumedForAnonymousCancellation(RegistrationOrder cancelledOrder, DateTime releasedAt)
+    {
+        DateTime utcReleasedAt = EnsureUtc(releasedAt, nameof(releasedAt));
+        if (cancelledOrder.TenantId != TenantId || cancelledOrder.Id != RegistrationOrderId ||
+            cancelledOrder.RegistrationOrderStatusId != (int)RegistrationOrderStatusEnum.Cancelled ||
+            cancelledOrder.ConfirmedAt is null || cancelledOrder.CancelledAt != utcReleasedAt ||
+            RegistrationInventoryHoldStatusId != (int)RegistrationInventoryHoldStatusEnum.Consumed ||
+            ConsumedAt is null || utcReleasedAt < ConsumedAt)
+        {
+            return false;
+        }
+
+        RegistrationInventoryHoldStatusId = (int)RegistrationInventoryHoldStatusEnum.Released;
+        ReleasedAt = utcReleasedAt;
+        UpdateConcurrency(utcReleasedAt);
+        return true;
+    }
+
     public bool ExtendPaymentCutoff(DateTime cutoff, DateTime changedAt)
     {
         DateTime utcCutoff = EnsureUtc(cutoff, nameof(cutoff));

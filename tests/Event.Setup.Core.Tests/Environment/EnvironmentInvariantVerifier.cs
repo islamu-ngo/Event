@@ -249,18 +249,18 @@ internal static partial class EnvironmentInvariantVerifier
         IReadOnlySet<string> capabilities,
         IReadOnlySet<string> providers,
         HashSet<string> path) => node.Kind switch
-    {
-        "topology" => node.Identifier == topology,
-        "capability" => capabilities.Contains(node.Identifier!),
-        "provider" => providers.Contains(node.Identifier!),
-        "all" => node.Operands.All(value => Evaluate(value, graph, topology, capabilities, providers, path)),
-        "any" => node.Operands.Any(value => Evaluate(value, graph, topology, capabilities, providers, path)),
-        "not" => node.Operands.Count == 1 && !Evaluate(node.Operands[0], graph, topology, capabilities, providers, path),
-        "feature" when node.Identifier is not null && path.Add(node.Identifier)
-            && graph.Features.TryGetValue(node.Identifier, out ActivationNode? feature) =>
-                Evaluate(feature, graph, topology, capabilities, providers, path),
-        _ => false,
-    };
+        {
+            "topology" => node.Identifier == topology,
+            "capability" => capabilities.Contains(node.Identifier!),
+            "provider" => providers.Contains(node.Identifier!),
+            "all" => node.Operands.All(value => Evaluate(value, graph, topology, capabilities, providers, path)),
+            "any" => node.Operands.Any(value => Evaluate(value, graph, topology, capabilities, providers, path)),
+            "not" => node.Operands.Count == 1 && !Evaluate(node.Operands[0], graph, topology, capabilities, providers, path),
+            "feature" when node.Identifier is not null && path.Add(node.Identifier)
+                && graph.Features.TryGetValue(node.Identifier, out ActivationNode? feature) =>
+                    Evaluate(feature, graph, topology, capabilities, providers, path),
+            _ => false,
+        };
 
     [GeneratedRegex("^[A-Z][A-Z0-9_]*$", RegexOptions.CultureInvariant)]
     private static partial Regex CanonicalEnvironmentKey();

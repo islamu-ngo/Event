@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.DTOs.ControlPlane;
 using Explore.Application.DTOs.EmailDispatch;
 using Explore.Application.DTOs.RegistrationOrders;
@@ -11,6 +12,8 @@ using Explore.Application.DTOs.StorageObject;
 using Explore.Application.DTOs.SupportAccess;
 using Explore.Application.DTOs.Webhooks;
 using Explore.Application.Features.Authentication.Atproto.Models;
+using Explore.Application.Features.Authentication.Local.Models;
+using Explore.Application.Features.RegistrationOrders.Commands;
 using Explore.Application.Features.Promotions;
 using Explore.Domain;
 using Explore.Application.Features.Promotions.Requests.Commands;
@@ -610,11 +613,18 @@ public sealed class BaseCommandResponseContractTests
                 .Where(method => method.ReturnType == scenario.ResponseType)
                 .OrderBy(method => method.Name, StringComparer.Ordinal)
                 .ToArray();
+            string[] expectedFactoryNames = scenario.ResponseType == typeof(LocalCredentialIssueCommandResponse)
+                ? ["Failure", "Issued", "Replayed"]
+                : scenario.ResponseType == typeof(AnonymousRegistrationChallengeIssueResult)
+                    ? ["Denied", "Issued"]
+                    : ConcreteFactoryNames;
             await Assert.That(declaredFactories.Select(method => method.Name).SequenceEqual(
-                ConcreteFactoryNames,
+                expectedFactoryNames,
                 StringComparer.Ordinal)).IsTrue();
 
-            MethodInfo successFactory = declaredFactories.Single(method => method.Name == "Success");
+            string successFactoryName = scenario.ResponseType == typeof(LocalCredentialIssueCommandResponse)
+                || scenario.ResponseType == typeof(AnonymousRegistrationChallengeIssueResult) ? "Issued" : "Success";
+            MethodInfo successFactory = declaredFactories.Single(method => method.Name == successFactoryName);
             string[] expectedParameterNames = scenario.Facts.Keys.Order(StringComparer.OrdinalIgnoreCase).ToArray();
             string[] actualParameterNames = successFactory.GetParameters()
                 .Select(parameter => parameter.Name!)
@@ -652,6 +662,12 @@ public sealed class BaseCommandResponseContractTests
             {
                 await Assert.That(scenario.ResponseType.GetProperty(propertyName)!.GetValue(success))
                     .IsEqualTo(expected);
+            }
+
+            if (scenario.ResponseType == typeof(AnonymousRegistrationChallengeIssueResult))
+            {
+                await AssertAnonymousChallengeDenials();
+                continue;
             }
 
             if (scenario.ResponseType == typeof(WebhookProviderPortalAccessCommandResponse))
@@ -865,9 +881,14 @@ public sealed class BaseCommandResponseContractTests
         WebhookProviderPortalAccessDto portal = CreatePortal();
 
         AtprotoTransientValue transient = CreateTransientValue();
+        LocalCredentialIssueDto issue = LocalCredentialIssueDto.Issued(CreateCredentialOperation(), SyntheticReveal);
+        AnonymousRegistrationChallengeDto challenge = CreateAnonymousChallenge();
 
         return
         [
+            Factory(typeof(AnonymousRegistrationChallengeIssueResult),
+                Facts(("eventId", RelatedId), ("challenge", challenge)), ("Challenge", challenge)),
+            Factory(typeof(LocalCredentialIssueCommandResponse), Facts(("issue", issue)), ("Issue", issue)),
             Factory(typeof(AtprotoTransientCommandResult), Facts(("value", transient)), ("Value", transient)),
             Factory(typeof(CreateExternalApiKeyCommandResponse),
                 Facts(("id", ResultId), ("message", "result.created"),
@@ -957,6 +978,136 @@ public sealed class BaseCommandResponseContractTests
             .Throws<ArgumentException>();
     }
 
+    [Test]
+    public async Task LocalCredentialFactoriesBindOperationAndNeverRediscloseOnReplayOrFailure()
+    {
+        LocalCredentialOperationStatus operation = CreateCredentialOperation();
+        LocalCredentialIssueDto issued = LocalCredentialIssueDto.Issued(operation, SyntheticReveal);
+        LocalCredentialIssueDto replayed = LocalCredentialIssueDto.Replayed(operation);
+        LocalCredentialIssueCommandResponse success = LocalCredentialIssueCommandResponse.Issued(issued);
+        LocalCredentialIssueCommandResponse replay = LocalCredentialIssueCommandResponse.Replayed(replayed);
+
+        await AssertFactoryParameters(RequireFactory(typeof(LocalCredentialIssueCommandResponse), "Issued"),
+            [Required<LocalCredentialIssueDto>("issue")]);
+        await AssertFactoryParameters(RequireFactory(typeof(LocalCredentialIssueCommandResponse), "Replayed"),
+            [Required<LocalCredentialIssueDto>("issue")]);
+        await Assert.That(success.Id).IsEqualTo(ResultId);
+        await Assert.That(replay.Id).IsEqualTo(ResultId);
+        await Assert.That(replay.IsSuccess).IsTrue();
+        await Assert.That(replay.Issue).IsEqualTo(replayed);
+        await Assert.That(replay.FailureCode).IsNull();
+        await Assert.That(replay.Errors).IsNull();
+        await Assert.That(replay.QuotaExceeded).IsNull();
+        await Assert.That(replay.Issue!.TemporaryPassword).IsNull();
+        JsonObject issuedPayload = Serialize(success.Issue!);
+        JsonObject replayPayload = Serialize(replay.Issue);
+        await Assert.That(issuedPayload["temporaryPassword"]!.GetValue<string>()).IsEqualTo(SyntheticReveal);
+        await Assert.That(issuedPayload["outcome"]!.GetValue<int>()).IsEqualTo((int)LocalCredentialIssueOutcome.Issued);
+        await Assert.That(replayPayload["outcome"]!.GetValue<int>()).IsEqualTo((int)LocalCredentialIssueOutcome.Replayed);
+        await Assert.That(JsonNode.DeepEquals(issuedPayload["operation"], replayPayload["operation"])).IsTrue();
+        await Assert.That(replayPayload.ContainsKey("temporaryPassword")).IsFalse();
+        await Assert.That(Serialize(replay).ToJsonString()).DoesNotContain(SyntheticReveal);
+        await Assert.That(success.ToString()).DoesNotContain(SyntheticReveal);
+
+        BaseCommandResponse<Guid>[] failures =
+        [
+            BaseCommandResponse.Validation<Guid>(OneValidationError, id: ResultId),
+            BaseCommandResponse.NotFound<Guid>(id: ResultId),
+            BaseCommandResponse.Conflict(ResultId),
+            BaseCommandResponse.Authentication<Guid>(),
+            BaseCommandResponse.Authorization<Guid>(),
+            BaseCommandResponse.Quota("quota.blocked", CreateQuota(), id: ResultId),
+            BaseCommandResponse.Failure("local_credential_unavailable", errors: FeatureErrors, id: ResultId),
+        ];
+        foreach (BaseCommandResponse<Guid> failure in failures)
+        {
+            LocalCredentialIssueCommandResponse result = LocalCredentialIssueCommandResponse.Failure(failure);
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.Id).IsEqualTo(failure.Id);
+            await Assert.That(result.FailureCode).IsEqualTo(failure.FailureCode);
+            await Assert.That(result.Message).IsEqualTo(failure.Message);
+            await Assert.That(result.Errors ?? []).IsEquivalentTo(failure.Errors ?? []);
+            await Assert.That(result.QuotaExceeded).IsEqualTo(failure.QuotaExceeded);
+            await Assert.That(result.Issue).IsNull();
+            await Assert.That(Serialize(result).ToJsonString()).DoesNotContain(SyntheticReveal);
+        }
+
+        await Assert.That(() => LocalCredentialIssueCommandResponse.Issued(replayed)).Throws<ArgumentException>();
+        await Assert.That(() => LocalCredentialIssueCommandResponse.Replayed(issued)).Throws<ArgumentException>();
+        await Assert.That(() => LocalCredentialIssueCommandResponse.Issued(null!)).Throws<ArgumentNullException>();
+        await Assert.That(() => LocalCredentialIssueCommandResponse.Replayed(null!)).Throws<ArgumentNullException>();
+        await Assert.That(() => LocalCredentialIssueCommandResponse.Failure(null!)).Throws<ArgumentNullException>();
+        await Assert.That(() => LocalCredentialIssueCommandResponse.Failure(success)).Throws<ArgumentException>();
+    }
+
+    [Test]
+    public async Task AnonymousChallengeIssuanceBindsEventAndPreservesPublicPayloadJson()
+    {
+        AnonymousRegistrationChallengeDto challenge = CreateAnonymousChallenge();
+        AnonymousRegistrationChallengeIssueResult result = AnonymousRegistrationChallengeIssueResult.Issued(RelatedId, challenge);
+        await AssertFactoryParameters(RequireFactory(typeof(AnonymousRegistrationChallengeIssueResult), "Issued"),
+            [Required<Guid>("eventId"), Required<AnonymousRegistrationChallengeDto>("challenge")]);
+        await Assert.That(result.IsSuccess).IsTrue();
+        await Assert.That(result.Id).IsEqualTo(RelatedId);
+        await Assert.That(result.Challenge).IsEqualTo(challenge);
+        JsonObject payload = Serialize(result.Challenge!);
+        var expectedPayload = new JsonObject
+        {
+            ["protectedChallenge"] = SyntheticReveal,
+            ["expiresAt"] = JsonSerializer.SerializeToNode(FixtureOffset.AddMinutes(5), JsonOptions),
+            ["difficulty"] = 18,
+            ["version"] = 1,
+        };
+        await Assert.That(JsonNode.DeepEquals(payload, expectedPayload)).IsTrue();
+        await Assert.That(JsonSerializer.Deserialize<AnonymousRegistrationChallengeDto>(payload.ToJsonString(), JsonOptions))
+            .IsEqualTo(challenge);
+        await Assert.That(result.ToString()).DoesNotContain(SyntheticReveal);
+    }
+
+    private static async Task AssertAnonymousChallengeDenials()
+    {
+        await AssertFactoryParameters(RequireFactory(typeof(AnonymousRegistrationChallengeIssueResult), "Denied"),
+            [Required<Guid>("eventId"), Required<string>("failureCode")]);
+        string[] failureCodes =
+        [
+            "anonymous_registration_challenge_invalid",
+            "anonymous_registration_challenge_unavailable",
+            "anonymous_registration_challenge_configuration_invalid",
+            "anonymous_registration_challenge_quota_exceeded",
+        ];
+        foreach (string failureCode in failureCodes)
+        {
+            AnonymousRegistrationChallengeIssueResult denied = AnonymousRegistrationChallengeIssueResult.Denied(RelatedId, failureCode);
+            await Assert.That(denied.IsSuccess).IsFalse();
+            await Assert.That(denied.Id).IsEqualTo(RelatedId);
+            await Assert.That(denied.FailureCode).IsEqualTo(failureCode);
+            await Assert.That(denied.Errors).IsNull();
+            await Assert.That(denied.QuotaExceeded).IsNull();
+            await Assert.That(denied.Challenge).IsNull();
+            JsonObject json = Serialize(denied);
+            await Assert.That(json["success"]!.GetValue<bool>()).IsFalse();
+            await Assert.That(json["failureCode"]!.GetValue<string>()).IsEqualTo(failureCode);
+            await Assert.That(json["challenge"] is null).IsTrue();
+            await Assert.That(json.ToJsonString()).DoesNotContain(SyntheticReveal);
+        }
+        string?[] invalidCodes = [null, "", " ", FailureCodes.QuotaExceeded, .. CanonicalFactoryFailureCodes];
+        foreach (string? invalidCode in invalidCodes)
+        {
+            await Assert.That(() => AnonymousRegistrationChallengeIssueResult.Denied(RelatedId, invalidCode!))
+                .Throws<ArgumentException>();
+        }
+    }
+
+    private static LocalCredentialOperationStatus CreateCredentialOperation() => new(
+        receipt: new LocalCredentialOperationReceipt(ResultId, LocalCredentialOperationKind.Create,
+            LocalCredentialOperationStage.ChangeRequired, RelatedId, TenantId, ChoiceId, RefundId, FixtureUtc),
+        operationConcurrencyStamp: ChoiceId, verifiedByApplicationUserId: RelatedId,
+        verifiedAt: FixtureUtc, updatedAt: FixtureUtc, isCurrent: true,
+        credentialState: LocalCredentialState.ChangeRequired, resetAudit: null);
+
+    private static AnonymousRegistrationChallengeDto CreateAnonymousChallenge() =>
+        new(SyntheticReveal, FixtureOffset.AddMinutes(5), difficulty: 18, version: 1);
+
     private static AtprotoTransientValue CreateTransientValue() => new(ResultId, AtprotoTransientPurpose.OAuthState,
         new string('a', 64), TenantId, SyntheticReveal, FixtureOffset.AddMinutes(1).ToUnixTimeMilliseconds());
 
@@ -997,28 +1148,28 @@ public sealed class BaseCommandResponseContractTests
     private static RegistrationPaymentDto CreatePayment(
         RegistrationRefundDto refund,
         RegistrationMaterialChangeChoiceDto choice) => new()
-    {
-        Id = ResultId,
-        RegistrationOrderId = RelatedId,
-        StatusCode = "CAPTURED",
-        StatusName = "Captured",
-        HostedRedirectAvailable = false,
-        RetryAvailable = true,
-        FailureCode = null,
-        CreatedAt = FixtureUtc,
-        LastUpdatedAt = FixtureUtc.AddMinutes(5),
-        ExpiresAt = FixtureUtc.AddHours(1),
-        RefundedAmountMinor = 125,
-        RefundPendingAmountMinor = 0,
-        Refunds = [refund],
-        Disputes = [],
-        MaterialChangeChoices = [choice],
-        BuyerRefundRequestAvailable = true,
-        OrganizerRefundAvailable = true,
-        CapturedAmountMinor = 1_000,
-        CurrencyCode = "EUR",
-        CurrencyMinorUnitDigits = 2,
-    };
+        {
+            Id = ResultId,
+            RegistrationOrderId = RelatedId,
+            StatusCode = "CAPTURED",
+            StatusName = "Captured",
+            HostedRedirectAvailable = false,
+            RetryAvailable = true,
+            FailureCode = null,
+            CreatedAt = FixtureUtc,
+            LastUpdatedAt = FixtureUtc.AddMinutes(5),
+            ExpiresAt = FixtureUtc.AddHours(1),
+            RefundedAmountMinor = 125,
+            RefundPendingAmountMinor = 0,
+            Refunds = [refund],
+            Disputes = [],
+            MaterialChangeChoices = [choice],
+            BuyerRefundRequestAvailable = true,
+            OrganizerRefundAvailable = true,
+            CapturedAmountMinor = 1_000,
+            CurrencyCode = "EUR",
+            CurrencyMinorUnitDigits = 2,
+        };
 
     private static SupportAccessSessionDto CreateSession() => new()
     {

@@ -13,6 +13,7 @@ public sealed record RegistrationProviderSubmissionWriteClaim(
     int AttemptCount);
 
 public sealed record RegistrationProviderSubmissionWriteDelivery(
+    RegistrationOrder Order,
     RegistrationAttempt Attempt,
     RegistrationSubmission Submission,
     RegistrationProviderBinding Binding,

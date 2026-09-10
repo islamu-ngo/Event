@@ -1,7 +1,12 @@
+using System.Text.Json.Serialization;
+
 namespace Explore.Application.DTOs.Onboarding;
 
 public sealed record InstanceSmtpSettingsDto
 {
+    [JsonIgnore]
+    public bool CanManageDelivery { get; init; }
+    public bool DeliveryEnabled { get; set; }
     public string Host { get; set; } = string.Empty;
     public int Port { get; set; } = 587;
     public string Security { get; set; } = "StartTls";

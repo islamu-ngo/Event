@@ -30,7 +30,7 @@ namespace Explore.API.Extensions;
 /// When behind a reverse proxy, client IP comes from HttpContext.Connection.RemoteIpAddress
 /// after trusted forwarded headers have been applied by the main API pipeline.
 /// </summary>
-public static class RateLimitingExtensions
+public static partial class RateLimitingExtensions
 {
     public const string GlobalPolicy = "Global";
     public const string AuthenticatedPolicy = "Authenticated";
@@ -177,6 +177,8 @@ public static class RateLimitingExtensions
             services.AddRateLimiter(ConfigureEnabledRateLimiting);
         }
 
+        // Anonymous allocation limits are real even when unrelated Testing policies are disabled.
+        AddAnonymousRegistrationRateLimiting(services);
         return services;
 
         void ConfigureEnabledRateLimiting(RateLimiterOptions options)
@@ -232,7 +234,11 @@ public static class RateLimitingExtensions
                         ((int)retryAfter.TotalSeconds).ToString(NumberFormatInfo.InvariantInfo);
                 }
 
-                ctx.HttpContext.Response.Headers["X-RateLimit-Limit"] = ResolvePolicyLimit(policyName).ToString(NumberFormatInfo.InvariantInfo);
+                int advertisedLimit = policyName == AnonymousRegistrationPolicy
+                    ? ctx.HttpContext.RequestServices.GetRequiredService<IConfiguration>()
+                        .GetValue("RateLimiting:AnonymousRegistration:IpPermitLimit", 10)
+                    : ResolvePolicyLimit(policyName);
+                ctx.HttpContext.Response.Headers["X-RateLimit-Limit"] = advertisedLimit.ToString(NumberFormatInfo.InvariantInfo);
                 ctx.HttpContext.Response.Headers["X-RateLimit-Remaining"] = "0";
 
                 var problemDetailsService = ctx.HttpContext.RequestServices.GetRequiredService<IProblemDetailsService>();
@@ -630,6 +636,7 @@ public static class RateLimitingExtensions
                 section.GetValue("SetupSecretBindingWrite:PermitLimit", 5),
             PublicIngestionPolicy => publicIngestionPermitLimit,
             PublicTransactionalPolicy => publicTransactionalPermitLimit,
+            AnonymousRegistrationPolicy => section.GetValue("AnonymousRegistration:IpPermitLimit", 10),
             AdmissionTicketRecoveryPolicy => admissionRecoveryPermitLimit,
             AdmissionCheckInPolicy => admissionCheckInPermitLimit,
             AdmissionScannerCapabilityPolicy => admissionScannerCapabilityPermitLimit,
@@ -723,9 +730,9 @@ public static class RateLimitingExtensions
             return endpointPolicy;
         }
 
-        if (endpointPolicy == PublicTransactionalPolicy)
+        if (endpointPolicy is PublicTransactionalPolicy or AnonymousRegistrationPolicy)
         {
-            return PublicTransactionalPolicy;
+            return endpointPolicy;
         }
 
         if (context.Request.Path.StartsWithSegments("/api/analytics", StringComparison.OrdinalIgnoreCase))

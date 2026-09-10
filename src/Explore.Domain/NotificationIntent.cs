@@ -31,6 +31,7 @@ public class NotificationIntent : ITenantEntity, IAuditableEntity, ISoftDeletabl
 
     public Guid? FanoutOccurrenceId { get; set; }
     public NotificationFanoutOccurrence? FanoutOccurrence { get; set; }
+    public long EmailDeliveryPolicyRevision { get; set; }
 
     public Guid? EventId { get; set; }
     public Event? Event { get; set; }

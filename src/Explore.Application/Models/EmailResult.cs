@@ -1,5 +1,3 @@
-// Captures success/failure, error details, and timing diagnostics.
-
 namespace Explore.Application.Models;
 
 /// <summary>
@@ -8,7 +6,10 @@ namespace Explore.Application.Models;
 public class EmailResult
 {
     /// <summary>Whether the operation succeeded.</summary>
-    public bool Success { get; set; }
+    public bool Success => Outcome == SmtpDeliveryOutcome.Accepted;
+
+    /// <summary>Transport evidence; an unspecified failure is conservatively uncertain.</summary>
+    public SmtpDeliveryOutcome Outcome { get; init; }
 
     /// <summary>Descriptive message (success note or error detail).</summary>
     public string? Message { get; set; }
@@ -21,9 +22,15 @@ public class EmailResult
 
     /// <summary>Creates a success result.</summary>
     public static EmailResult Ok(string? message = null, TimeSpan duration = default)
-        => new() { Success = true, Message = message, Duration = duration };
+        => new() { Outcome = SmtpDeliveryOutcome.Accepted, Message = message, Duration = duration };
 
-    /// <summary>Creates a failure result.</summary>
-    public static EmailResult Fail(string errorMessage, TimeSpan duration = default)
-        => new() { Success = false, ErrorMessage = errorMessage, Duration = duration };
+    /// <summary>Creates a failure result; acceptance is only represented by a successful result.</summary>
+    public static EmailResult Fail(string errorMessage, TimeSpan duration = default,
+        SmtpDeliveryOutcome outcome = SmtpDeliveryOutcome.Uncertain)
+    {
+        if (outcome == SmtpDeliveryOutcome.Accepted)
+            throw new ArgumentException("A failure cannot indicate SMTP acceptance.", nameof(outcome));
+
+        return new() { Outcome = outcome, ErrorMessage = errorMessage, Duration = duration };
+    }
 }

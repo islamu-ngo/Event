@@ -183,7 +183,8 @@ public sealed class NotificationFanoutSettlementSqliteTests
             sourceType,
             Guid.CreateVersion7(),
             coalescingKey: $"{sourceType}:{eventId:N}",
-            coalescingWindowEndsAt: occurredAt.AddMinutes(5));
+            coalescingWindowEndsAt: occurredAt.AddMinutes(5),
+            emailDeliveryPolicyRevision: 0);
 
     private static NotificationFanoutRun CreateRun(
         Guid tenantId,

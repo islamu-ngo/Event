@@ -2,6 +2,8 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Specifications.Events;
 using Explore.Domain;
 using Explore.Domain.Enums;
+using Explore.Persistence.Database;
+using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.Extensions;
 using Explore.Persistence.QueryFilters;
 using Microsoft.EntityFrameworkCore;
@@ -11,10 +13,12 @@ namespace Explore.Persistence.Repositories;
 public class EventRepository : GenericRepository<Event, Guid>, IEventRepository
 {
     private readonly ExploreDbContext _dbContext;
+    private readonly TimeProvider _timeProvider;
 
-    public EventRepository(ExploreDbContext dbContext) : base(dbContext)
+    public EventRepository(ExploreDbContext dbContext, TimeProvider? timeProvider = null) : base(dbContext)
     {
         _dbContext = dbContext;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public new async Task<Event?> GetById(Guid id)
@@ -81,6 +85,15 @@ public class EventRepository : GenericRepository<Event, Guid>, IEventRepository
             .AsNoTracking()
             .WherePubliclyEligible(_dbContext)
             .AnyAsync(@event => @event.TenantId == tenantId && @event.Id == eventId, cancellationToken);
+
+    public async Task<Event?> GetRegistrationStatusEventForUpdateAsync(Guid id, Guid tenantId, CancellationToken cancellationToken)
+    {
+        await RelationalEntityRowFence.AcquireAsync<Event>(
+            _dbContext, tenantId, target => target.Id, id, cancellationToken);
+        return await _dbContext.Events.AsNoTracking()
+            .Include(target => target.ParticipationConfiguration)
+            .FirstOrDefaultAsync(target => target.Id == id && target.TenantId == tenantId, cancellationToken);
+    }
 
     public async Task<Event?> GetAuthorizationTargetByIdAsync(Guid id, CancellationToken cancellationToken)
     {
@@ -396,7 +409,7 @@ public class EventRepository : GenericRepository<Event, Guid>, IEventRepository
             .IncludeStandardDetails()
             .AsQueryable();
 
-        var now = DateTimeOffset.UtcNow;
+        var now = _timeProvider.GetUtcNow();
         query = ApplySubqueryFilters(query, specification, now);
         query = ApplyProjectionFilters(query, specification);
 
@@ -579,8 +592,8 @@ public class EventRepository : GenericRepository<Event, Guid>, IEventRepository
                 EventSubqueryFilterType.FutureOnly => query.Where(e =>
                     e.LastSessionStartUtc == null || e.LastSessionStartUtc > (DateTimeOffset)subFilter.Value),
 
-                EventSubqueryFilterType.CurrentOrUpcomingPublishedSession => query.Where(e =>
-                    e.LastSessionEndUtc != null && e.LastSessionEndUtc > now),
+                EventSubqueryFilterType.CurrentOrUpcomingPublishedSession =>
+                    ApplyTemporalFilter(query, TemporalView.UpcomingAndOngoing, now),
 
                 EventSubqueryFilterType.TemporalView => ApplyTemporalFilter(query, subFilter),
 
@@ -782,20 +795,14 @@ public class EventRepository : GenericRepository<Event, Guid>, IEventRepository
             (!to.HasValue || p.DateTimeValue <= to.Value)));
     }
 
-    private static IQueryable<Event> ApplyTemporalFilter(IQueryable<Event> query, EventSubqueryFilter filter)
+    private IQueryable<Event> ApplyTemporalFilter(IQueryable<Event> query, EventSubqueryFilter filter)
     {
         var (view, now) = ((TemporalView, DateTimeOffset))filter.Value;
-
-        return view switch
-        {
-            TemporalView.Upcoming => query.Where(e => e.FirstSessionStartUtc != null && e.FirstSessionStartUtc > now),
-            TemporalView.Ongoing => query.Where(e => e.FirstSessionStartUtc != null && e.FirstSessionStartUtc <= now && e.LastSessionEndUtc != null && e.LastSessionEndUtc > now),
-            TemporalView.Past => query.Where(e => e.LastSessionEndUtc != null && e.LastSessionEndUtc <= now),
-            TemporalView.UpcomingAndOngoing => query.Where(e => e.LastSessionEndUtc != null && e.LastSessionEndUtc > now),
-            TemporalView.All => query,
-            _ => query
-        };
+        return ApplyTemporalFilter(query, view, now);
     }
+
+    private IQueryable<Event> ApplyTemporalFilter(IQueryable<Event> query, TemporalView view, DateTimeOffset now) =>
+        EventDirectoryTemporalQuery.Apply(_dbContext, query, view, now);
 
     public async Task<(List<Event> Items, int TotalCount)> GetMyEventsWithDetailsPaged(string userId, int pageNumber, int pageSize)
     {

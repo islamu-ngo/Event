@@ -15,6 +15,9 @@ public interface ISmtpConfigResolver
     /// <returns>Resolved SMTP configuration, or null if not configured.</returns>
     Task<SmtpConfiguration?> ResolveAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Resolves an explicit tenant scope, or instance transport when tenantId is null.</summary>
+    Task<SmtpConfiguration?> ResolveAsync(Guid? tenantId, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Invalidates the cached SMTP configuration.
     /// Call after SMTP settings are changed in the admin UI.

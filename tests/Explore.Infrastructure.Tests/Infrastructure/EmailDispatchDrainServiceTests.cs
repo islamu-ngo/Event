@@ -608,7 +608,7 @@ public sealed class EmailDispatchDrainServiceTests
         fixture.Repository.IsTenantPaused(dispatch.TenantId, Arg.Any<CancellationToken>()).Returns(false);
         ConfigureSuccessfulClaim(fixture, dispatch);
         fixture.EmailService.SendAsync(Arg.Any<EmailMessage>(), Arg.Any<CancellationToken>())
-            .Returns(EmailResult.Fail("Mailbox unavailable"));
+            .Returns(EmailResult.Fail("Mailbox unavailable", outcome: SmtpDeliveryOutcome.TransientFailure));
         fixture.Repository.SettleProviderFailure(
                 Arg.Any<EmailDispatchFailureSettlement>(),
                 Arg.Any<CancellationToken>())
@@ -645,7 +645,7 @@ public sealed class EmailDispatchDrainServiceTests
         dispatch.MaxAttempts = 3;
         ConfigureSuccessfulClaim(fixture, dispatch);
         fixture.EmailService.SendAsync(Arg.Any<EmailMessage>(), Arg.Any<CancellationToken>())
-            .Returns(EmailResult.Fail("Mailbox unavailable"));
+            .Returns(EmailResult.Fail("Mailbox unavailable", outcome: SmtpDeliveryOutcome.TransientFailure));
         fixture.Repository.SettleProviderFailure(
                 Arg.Any<EmailDispatchFailureSettlement>(),
                 Arg.Any<CancellationToken>())
@@ -682,7 +682,7 @@ public sealed class EmailDispatchDrainServiceTests
         fixture.Repository.IsTenantPaused(dispatch.TenantId, Arg.Any<CancellationToken>()).Returns(false);
         ConfigureSuccessfulClaim(fixture, dispatch);
         fixture.EmailService.SendAsync(Arg.Any<EmailMessage>(), Arg.Any<CancellationToken>())
-            .Returns(EmailResult.Fail(canary));
+            .Returns(EmailResult.Fail(canary, outcome: SmtpDeliveryOutcome.TransientFailure));
         fixture.Repository.SettleProviderFailure(
                 Arg.Any<EmailDispatchFailureSettlement>(),
                 Arg.Any<CancellationToken>())
@@ -721,7 +721,7 @@ public sealed class EmailDispatchDrainServiceTests
         fixture.Repository.IsTenantPaused(dispatch.TenantId, Arg.Any<CancellationToken>()).Returns(false);
         ConfigureSuccessfulClaim(fixture, dispatch);
         fixture.EmailService.SendAsync(Arg.Any<EmailMessage>(), Arg.Any<CancellationToken>())
-            .Returns(EmailResult.Fail("Mailbox unavailable"));
+            .Returns(EmailResult.Fail("Mailbox unavailable", outcome: SmtpDeliveryOutcome.TransientFailure));
         fixture.Repository.SettleProviderFailure(
                 Arg.Any<EmailDispatchFailureSettlement>(),
                 Arg.Any<CancellationToken>())

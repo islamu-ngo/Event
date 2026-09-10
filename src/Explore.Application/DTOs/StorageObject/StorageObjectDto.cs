@@ -1,7 +1,16 @@
+using System.Text.Json.Serialization;
+
 namespace Explore.Application.DTOs.StorageObject;
 
 public sealed record StorageObjectDto
 {
+    [JsonIgnore]
+    public StorageObjectContentEligibilityDto ContentEligibility { get; init; } = StorageObjectContentEligibilityDto.Unrestricted;
+
+    public StorageObjectDto ForDisclosureAt(DateTime utcNow) => ContentEligibility.CanReadAt(utcNow)
+        ? this
+        : this with { FullName = string.Empty, SafeDisplayName = string.Empty, Uri = string.Empty };
+
     public Guid Id { get; init; }
     public int FileTypeId { get; init; }
     public string? FileTypeFullName { get; init; }

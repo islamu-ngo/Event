@@ -72,6 +72,15 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Select Isolated .NET Installation
+        if: ${{ inputs.run-fast-tests }}
+        shell: bash
+        run: |
+          {
+            echo "DOTNET_INSTALL_DIR=$RUNNER_TEMP/audited-dotnet"
+            echo "DOTNET_ROOT=$RUNNER_TEMP/audited-dotnet"
+          } >> "$GITHUB_ENV"
+
       - name: Setup .NET
         if: ${{ inputs.run-fast-tests }}
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
@@ -80,9 +89,39 @@ jobs:
           cache: true
           cache-dependency-path: '**/packages.lock.json'
 
+      - name: Keep the SDK-Bundled Compiler Runtime
+        if: ${{ inputs.run-fast-tests }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(realpath "$DOTNET_ROOT")" = "$(realpath "$RUNNER_TEMP")/audited-dotnet"
+          sdk_version="$(jq -er '.sdk.version' global.json)"
+          runtime_version="$(jq -er '.runtimeOptions.framework.version' "$DOTNET_ROOT/sdk/$sdk_version/dotnet.runtimeconfig.json")"
+          runtime_root="$DOTNET_ROOT/shared/Microsoft.NETCore.App"
+          test -d "$runtime_root/$runtime_version"
+          holding="$(mktemp -d "$RUNNER_TEMP/audited-extra-runtimes.XXXXXX")"
+          for runtime_path in "$runtime_root"/*; do
+            if [ "$runtime_path" != "$runtime_root/$runtime_version" ]; then
+              mv -- "$runtime_path" "$holding/"
+            fi
+          done
+          dotnet --list-runtimes
+
       - name: Restore
         if: ${{ inputs.run-fast-tests }}
         run: dotnet restore --locked-mode
+
+      - name: Restore Dependency Audit Probes
+        if: ${{ inputs.run-fast-tests }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for project in \
+            eng/setup-assistant/probes/*/*.csproj \
+            eng/release/dependencies/terminal-gui/probe/TerminalGuiClosure.csproj
+          do
+            dotnet restore "$project" --locked-mode
+          done
 
       - name: Check Setup Assistant Ratchets
         if: ${{ inputs.run-fast-tests }}
@@ -117,7 +156,9 @@ jobs:
         if: ${{ inputs.run-fast-tests && inputs.run-setup-tests }}
         env:
           RestorePackagesWithLockFile: "false"
-        run: bash eng/release/dependencies/terminal-gui/BuildTerminalGuiPackage.sh --check
+        run: |
+          dotnet --info
+          bash eng/release/dependencies/terminal-gui/BuildTerminalGuiPackage.sh --check
 
       - name: Linting Check
         if: ${{ inputs.run-fast-tests }}
@@ -185,7 +226,7 @@ jobs:
       - name: Blazor Integration Tests
         if: ${{ inputs.run-fast-tests && inputs.run-blazor-tests }}
         id: test_blazor_integration
-        run: dotnet test --project tests/Explore.Blazor.IntegrationTests/Explore.Blazor.IntegrationTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --report-trx --report-trx-filename Explore.Blazor.IntegrationTests.trx
+        run: dotnet test --project tests/Explore.Blazor.IntegrationTests/Explore.Blazor.IntegrationTests.csproj --configuration "$DOTNET_CONFIGURATION" --no-build --verbosity minimal -- --maximum-parallel-tests 8 --report-trx --report-trx-filename Explore.Blazor.IntegrationTests.trx
 
       - name: Wire Contract Tests
         if: ${{ inputs.run-fast-tests }}

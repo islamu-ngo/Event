@@ -3,6 +3,8 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Identity;
+using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Contracts.LocationPrivacy;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.CustomPropertyProjection;
@@ -36,6 +38,13 @@ internal static class OpenApiStringEnumSchemaCatalog
 {
     private static IReadOnlyCollection<Type> EagerNestedEnumTypes { get; } =
     [
+        typeof(VisitorAccessMode),
+        typeof(PublicOnboardingPolicy),
+        typeof(AuthenticationProviderKind),
+        typeof(LocalCredentialState),
+        typeof(LocalCredentialOperationKind),
+        typeof(LocalCredentialOperationStage),
+        typeof(LocalCredentialIssueOutcome),
         typeof(AddressProviderOutcome),
         typeof(AdmissionCheckInDependencyStatus),
         typeof(AdmissionCheckInOperationalAction),
@@ -46,12 +55,21 @@ internal static class OpenApiStringEnumSchemaCatalog
         typeof(ConfigurationImportEffectStatus),
         typeof(ConfigurationImportScope),
         typeof(ConfigurationImportSessionState),
+        typeof(EmailDispatchParkReason),
+        typeof(EmailDispatchStatus),
         typeof(LocationAddressSourceEnum),
         typeof(LocationAddressVisibilityEnum)
     ];
 
     public static IReadOnlyCollection<Type> EnumTypes { get; } =
     [
+        typeof(VisitorAccessMode),
+        typeof(PublicOnboardingPolicy),
+        typeof(AuthenticationProviderKind),
+        typeof(LocalCredentialState),
+        typeof(LocalCredentialOperationKind),
+        typeof(LocalCredentialOperationStage),
+        typeof(LocalCredentialIssueOutcome),
         typeof(AddressProviderOutcome),
         typeof(AdmissionCheckInAction),
         typeof(AdmissionCheckInDependencyStatus),
@@ -72,6 +90,8 @@ internal static class OpenApiStringEnumSchemaCatalog
         typeof(ConfigurationPortabilityClass),
         typeof(ConfigurationManifestExportView),
         typeof(DeclineBehavior),
+        typeof(EmailDispatchParkReason),
+        typeof(EmailDispatchStatus),
         typeof(EmailDispatchUnknownReconciliationOutcome),
         typeof(EntityTypeName),
         typeof(EventReportDecisionKind),

@@ -1,0 +1,33 @@
+Change-Id: CHG-01M21EA17CVD7SHPV71F4B163Y
+Title: consolidate development migration history for email-optional hosting
+Type: fix
+Scope: self-hosting
+Summary: Retain current provider baselines and combine the unapplied email-optional application schema changes into one native integration tail while preserving independent identity and privacy authorities.
+Group: email-optional-self-hosting
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: The seven unapplied application feature stages are replaced by one integration migration per provider; six intermediate rollback targets are retired.
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Integration preserves native Local credential authority and upstream database-backed ATProto private transport without restoring public Local signup or generic credential replay.
+  Migration:
+    Reference: docs/internal/OPERATIONS.md
+    Disposition: documented
+    Detail: Retain upstream application Init histories and generate the complete feature delta natively; external Identity, Data Protection and privacy-authority histories remain independent.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: The standard and advanced environment catalogue retains explicit zero-email deployment and configured Local bootstrap semantics.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: Public contracts are regenerated from resolved source; private transient machine endpoints remain excluded from the public API inventory.
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md
+    Disposition: documented
+    Detail: Retired development histories require an explicitly disposable rebuild or matching recovery; whole-feature schema rollback is not a retained-data recovery shortcut.

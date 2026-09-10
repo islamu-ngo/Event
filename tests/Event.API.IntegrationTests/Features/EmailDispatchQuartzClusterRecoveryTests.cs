@@ -490,7 +490,7 @@ public sealed class EmailDispatchQuartzClusterRecoveryTests(QuartzPostgreSqlSche
             if (claimed.Count == 0)
             {
                 coordinator.RecordCompletedPass();
-                return new EmailDispatchDrainResult(0, 0, 0, 0, 0, 0, 0, 0, 0);
+                return new EmailDispatchDrainResult();
             }
 
             EmailDispatchOutbox dispatch = claimed.Single();
@@ -527,7 +527,7 @@ public sealed class EmailDispatchQuartzClusterRecoveryTests(QuartzPostgreSqlSche
                     null),
                 cancellationToken);
             coordinator.RecordCompletedPass();
-            return new EmailDispatchDrainResult(1, 1, 1, 0, 0, 0, 0, 0, 0);
+            return new EmailDispatchDrainResult { PendingCount = 1, ProcessedCount = 1, SentCount = 1 };
         }
 
         public async Task<EmailDispatchRecoveryResult> RecoverStaleProcessingAsync(CancellationToken cancellationToken)
@@ -565,6 +565,7 @@ public sealed class EmailDispatchQuartzClusterRecoveryTests(QuartzPostgreSqlSche
         }
 
         public Task<EmailDispatchOutbox> Create(EmailDispatchOutbox entity, CancellationToken cancellationToken) => inner.Create(entity, cancellationToken);
+        public Task<EmailDispatchTenantControl?> GetTenantControl(Guid tenantId, CancellationToken cancellationToken) => inner.GetTenantControl(tenantId, cancellationToken);
         public Task<IReadOnlyList<EmailDispatchOutbox>> ClaimPendingBatchAsync(EmailDispatchBatchClaimRequest request, CancellationToken cancellationToken) => inner.ClaimPendingBatchAsync(request, cancellationToken);
         public Task<EmailDispatchOutbox?> TryClaimSpecificAsync(EmailDispatchSpecificClaimRequest request, CancellationToken cancellationToken) => inner.TryClaimSpecificAsync(request, cancellationToken);
         public Task<EventReminderStateChangeResult> SuppressEventRemindersInCurrentTransactionAsync(EventReminderSupersessionRequest request, CancellationToken cancellationToken) => inner.SuppressEventRemindersInCurrentTransactionAsync(request, cancellationToken);

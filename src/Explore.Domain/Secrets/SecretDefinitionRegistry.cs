@@ -51,7 +51,7 @@ public static class SecretDefinitionRegistry
         _ = GetRequired(settingKey);
         var mode = settingKey switch
         {
-            Keys.SetupSecret => SecretRotationMode.UnsupportedLive,
+            Keys.SetupSecret or Keys.Authentication.LocalBootstrapPassword => SecretRotationMode.UnsupportedLive,
             Keys.Promotions.CodeLookupHmacKey
                 or Keys.Admissions.CredentialLookupHmacKey
                 or Keys.Admissions.RecoveryCapabilityHmacKey
@@ -130,6 +130,7 @@ public static class SecretDefinitionRegistry
         public static class Authentication
         {
             public const string LocalJwtKey = "authentication.local.jwt_key";
+            public const string LocalBootstrapPassword = "authentication.local.bootstrap_password";
         }
 
         public static class IdentityDatabase
@@ -284,6 +285,18 @@ public static class SecretDefinitionRegistry
                 DefaultEnvironmentVariableName = "SETUP_SECRET_BINDING_COMMITMENT_HMAC_KEY",
                 IsBootstrapSecret = false,
                 Description = "Server-only HMAC key for Setup secret-write commitments.",
+            },
+
+            new()
+            {
+                Key = Keys.Authentication.LocalBootstrapPassword,
+                AllowedScopes = instanceOnly,
+                AllowedSources = bootstrapSources,
+                DefaultInfisicalPath = "/api",
+                DefaultInfisicalKey = "INSTANCE_BOOTSTRAP_LOCAL_PASSWORD",
+                DefaultEnvironmentVariableName = "INSTANCE_BOOTSTRAP_LOCAL_PASSWORD",
+                IsBootstrapSecret = true,
+                Description = "Initial Local administrator credential requiring private first-use replacement.",
             },
 
             // --- storage/STORAGE_S3_* ---

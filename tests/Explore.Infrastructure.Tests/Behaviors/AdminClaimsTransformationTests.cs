@@ -101,13 +101,18 @@ public class AdminClaimsTransformationTests
         ProviderAccountKey accountKey =
             PlatformIdentityPrincipalExtensions.CreateOidcAccountKey(issuer, keycloakSubject.ToString());
         _userExternalLoginRepository.GetByProviderAndKey(accountKey)
-            .Returns(new UserExternalLogin { Id = Guid.CreateVersion7(),
-            UserId = localUserId,
-            User = null!,
-            AuthenticationProviderId = (int)"keycloak".ParseAuthenticationProviderKind(), AuthenticationProvider = null!, ProviderKey = accountKey.Value,
-            ProviderDisplayName = "Keycloak",
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = localUserId });
+            .Returns(new UserExternalLogin
+            {
+                Id = Guid.CreateVersion7(),
+                UserId = localUserId,
+                User = null!,
+                AuthenticationProviderId = (int)"keycloak".ParseAuthenticationProviderKind(),
+                AuthenticationProvider = null!,
+                ProviderKey = accountKey.Value,
+                ProviderDisplayName = "Keycloak",
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = localUserId
+            });
         _adminContext.IsInstanceAdminAsync(localUserId, Arg.Any<CancellationToken>()).Returns(true);
         _adminContext.GetAdminTenantIdsAsync(localUserId, Arg.Any<CancellationToken>())
             .Returns(Array.Empty<Guid>().ToList().AsReadOnly() as IReadOnlyList<Guid>);

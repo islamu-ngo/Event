@@ -94,6 +94,7 @@ public sealed class SmtpEmailServiceMailpitTests(MailpitContainerFixture mailpit
     {
         var resolver = Substitute.For<ISmtpConfigResolver>();
         resolver.ResolveAsync(Arg.Any<CancellationToken>()).Returns(config);
+        resolver.ResolveAsync(null, Arg.Any<CancellationToken>()).Returns(config);
         return new SmtpEmailService(resolver, logger ?? NullLogger<SmtpEmailService>.Instance);
     }
 }

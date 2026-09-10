@@ -1,14 +1,21 @@
 using System.Security.Cryptography;
 using System.IdentityModel.Tokens.Jwt;
+using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Configuration;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Secrets;
 using Explore.Application.Features.Authentication.Local.Models;
+using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Explore.Infrastructure.Authentication;
 using Explore.Persistence;
+using Explore.Persistence.Database;
 using Explore.Persistence.Identity;
+using Explore.Persistence.Repositories;
+using Explore.Persistence.Seed;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -25,61 +32,50 @@ public sealed class LocalIdentityAuthServiceTests
         new(2026, 9, 4, 15, 0, 0, TimeSpan.Zero);
 
     [Test]
-    public async Task RegistrationHashesPasswordAndDoesNotTrustUnverifiedEmail()
+    public async Task ControlledCredentialsStayHashedAndLoginDoesNotTrustUnverifiedEmail()
     {
         await using TestFixture fixture = await CreateFixtureAsync();
-        string password = CreateValidPassword();
-        var request = new LocalRegistrationRequestDto(
-            "admin@example.test",
-            password,
-            "Site",
-            "Administrator");
-
-        LocalRegistrationResponseDto result = await fixture.Service.RegisterAsync(
+        LocalAuthRequestDto request = await fixture.SeedUserAsync(emailConfirmed: false);
+        LocalAuthResponseDto result = await fixture.Service.AuthenticateAsync(
             request,
-            CancellationToken.None);
+            fixture.CancellationToken);
 
         await Assert.That(result.Success).IsTrue();
-        await Assert.That(result.Authentication).IsNotNull();
-        await Assert.That(result.Authentication!.EmailVerified).IsFalse();
-        LocalIdentityUser? stored = await fixture.UserManager.FindByEmailAsync(request.Email);
+        await Assert.That(result.Token).IsNotNull();
+        await Assert.That(result.EmailVerified).IsFalse();
+        LocalIdentityUser? stored = await fixture.UserManager.FindByEmailAsync(request.Identifier);
         await Assert.That(stored).IsNotNull();
         await Assert.That(stored!.PasswordHash).IsNotNull();
-        await Assert.That(stored.PasswordHash).IsNotEqualTo(password);
-        await Assert.That(await fixture.UserManager.CheckPasswordAsync(stored, password)).IsTrue();
+        await Assert.That(stored.PasswordHash).IsNotEqualTo(request.Password);
+        await Assert.That(await fixture.UserManager.CheckPasswordAsync(stored, request.Password)).IsTrue();
     }
 
     [Test]
     public async Task ConsecutiveInvalidCredentialsLockTheExistingAccount()
     {
         await using TestFixture fixture = await CreateFixtureAsync();
-        string password = CreateValidPassword();
-        var registration = new LocalRegistrationRequestDto(
-            "admin@example.test",
-            password,
-            "Site",
-            "Administrator");
-        await fixture.Service.RegisterAsync(registration, CancellationToken.None);
+        LocalAuthRequestDto login = await fixture.SeedUserAsync(emailConfirmed: false);
+        await fixture.SetInstanceIntentAsync("true");
         string wrongPassword = CreateValidPassword();
-        var invalid = new LocalAuthRequestDto(registration.Email, wrongPassword);
+        var invalid = new LocalAuthRequestDto(Identifier: login.Identifier, Password: wrongPassword);
 
         LocalAuthResponseDto first = await fixture.Service.AuthenticateAsync(
             invalid,
-            CancellationToken.None);
+            fixture.CancellationToken);
         LocalAuthResponseDto second = await fixture.Service.AuthenticateAsync(
             invalid,
-            CancellationToken.None);
+            fixture.CancellationToken);
         LocalAuthResponseDto afterLockout = await fixture.Service.AuthenticateAsync(
-            new LocalAuthRequestDto(registration.Email, password),
-            CancellationToken.None);
+            login,
+            fixture.CancellationToken);
 
-        await Assert.That(first.FailureCode).IsEqualTo("invalid_credentials");
-        await Assert.That(second.FailureCode).IsEqualTo("account_locked");
-        await Assert.That(afterLockout.FailureCode).IsEqualTo("account_locked");
+        await Assert.That(first.Failure).IsEqualTo(LocalAuthFailure.InvalidCredentials);
+        await Assert.That(second.Failure).IsEqualTo(LocalAuthFailure.AccountLocked);
+        await Assert.That(afterLockout.Failure).IsEqualTo(LocalAuthFailure.AccountLocked);
     }
 
     [Test]
-    public async Task RegistrationIssuesASecretBackedSignedToken()
+    public async Task LoginIssuesASecretBackedSignedToken()
     {
         byte[] key = RandomNumberGenerator.GetBytes(64);
         var resolver = Substitute.For<ISecretResolver>();
@@ -100,21 +96,16 @@ public sealed class LocalIdentityAuthServiceTests
             new FixedTimeProvider(Now));
         await using TestFixture fixture = await CreateFixtureAsync(tokenGenerator);
 
-        LocalRegistrationResponseDto result = await fixture.Service.RegisterAsync(
-            new LocalRegistrationRequestDto(
-                "admin@example.test",
-                CreateValidPassword(),
-                "Site",
-                "Administrator"),
-            CancellationToken.None);
+        LocalAuthRequestDto login = await fixture.SeedUserAsync(emailConfirmed: true);
+        LocalAuthResponseDto result = await fixture.Service.AuthenticateAsync(login, fixture.CancellationToken);
 
-        await Assert.That(result.Authentication).IsNotNull();
+        await Assert.That(result.Token).IsNotNull();
         var handler = new JwtSecurityTokenHandler
         {
             MapInboundClaims = false
         };
         handler.ValidateToken(
-            result.Authentication!.Token,
+            result.Token!,
             new TokenValidationParameters
             {
                 ValidateIssuerSigningKey = true,
@@ -135,11 +126,151 @@ public sealed class LocalIdentityAuthServiceTests
         ILocalJwtTokenGenerator? tokenGenerator = null) =>
         TestFixture.CreateAsync(tokenGenerator ?? new RecordingTokenGenerator());
 
+    [Test]
+    public async Task EnabledInstanceIntentRejectsUnverifiedLoginWithoutSmtpConfiguration()
+    {
+        await using TestFixture fixture = await CreateSignedFixtureAsync();
+        LocalAuthRequestDto login = await fixture.SeedUserAsync(emailConfirmed: false);
+        await fixture.SetInstanceIntentAsync("true");
+
+        LocalAuthResponseDto result = await fixture.Service.AuthenticateAsync(login, fixture.CancellationToken);
+
+        await Assert.That(result.Success).IsFalse();
+        await Assert.That(result.Failure).IsEqualTo(LocalAuthFailure.EmailVerificationRequired);
+        await Assert.That(result.Token).IsNull();
+        await Assert.That(result.ExpiresAt).IsNull();
+    }
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task DisabledOrAbsentInstanceIntentAllowsLoginWithoutConfirmingAddress(bool omitSetting)
+    {
+        await using TestFixture fixture = await CreateSignedFixtureAsync();
+        LocalAuthRequestDto login = await fixture.SeedUserAsync(emailConfirmed: false);
+        if (!omitSetting)
+            await fixture.SetInstanceIntentAsync("false");
+
+        LocalAuthResponseDto result = await fixture.Service.AuthenticateAsync(login, fixture.CancellationToken);
+
+        await Assert.That(result.Success).IsTrue();
+        await Assert.That(result.Token).IsNotNull();
+        await Assert.That(result.EmailVerified).IsFalse();
+        await Assert.That((await fixture.UserManager.FindByEmailAsync(login.Identifier))!.EmailConfirmed).IsFalse();
+    }
+
+    [Test]
+    public async Task VerifiedUserCanLoginWithEnabledIntentAndNoSmtpTransport()
+    {
+        await using TestFixture fixture = await CreateSignedFixtureAsync();
+        LocalAuthRequestDto login = await fixture.SeedUserAsync(emailConfirmed: true);
+        await fixture.SetInstanceIntentAsync("true");
+
+        LocalAuthResponseDto result = await fixture.Service.AuthenticateAsync(login, fixture.CancellationToken);
+
+        await Assert.That(result.Success).IsTrue();
+        await Assert.That(result.Token).IsNotNull();
+        await Assert.That(result.EmailVerified).IsTrue();
+    }
+
+    [Test]
+    public async Task TenantDisabledOverrideCannotWeakenEnabledInstanceVerification()
+    {
+        await using TestFixture fixture = await CreateSignedFixtureAsync();
+        LocalAuthRequestDto login = await fixture.SeedUserAsync(emailConfirmed: false);
+        await fixture.SetInstanceIntentAsync("true");
+        await fixture.SeedDisabledTenantOverrideAsync();
+
+        LocalAuthResponseDto result = await fixture.Service.AuthenticateAsync(login, fixture.CancellationToken);
+
+        await Assert.That(result.Success).IsFalse();
+        await Assert.That(result.Failure).IsEqualTo(LocalAuthFailure.EmailVerificationRequired);
+        await Assert.That(result.Token).IsNull();
+    }
+
+    [Test]
+    [Arguments("\"false\"")]
+    [Arguments("null")]
+    [Arguments("FALSE")]
+    [Arguments("")]
+    [Arguments("0")]
+    [Arguments("{}")]
+    public async Task MalformedInstanceIntentDoesNotSilentlyPermitUnverifiedLogin(string rawValue)
+    {
+        await using TestFixture fixture = await CreateSignedFixtureAsync();
+        LocalAuthRequestDto login = await fixture.SeedUserAsync(emailConfirmed: false);
+        await fixture.SeedMalformedInstanceIntentAsync(rawValue);
+
+        LocalAuthResponseDto result = await fixture.Service.AuthenticateAsync(login, fixture.CancellationToken);
+
+        await Assert.That(result.Success).IsFalse();
+        await Assert.That(result.Failure).IsEqualTo(LocalAuthFailure.AuthenticationFailed);
+        await Assert.That(result.Token).IsNull();
+    }
+
+    [Test]
+    public async Task RepeatedLoginReadsCurrentInstanceIntent()
+    {
+        await using TestFixture fixture = await CreateSignedFixtureAsync();
+        LocalAuthRequestDto login = await fixture.SeedUserAsync(emailConfirmed: false);
+        await fixture.SetInstanceIntentAsync("false");
+        LocalAuthResponseDto before = await fixture.Service.AuthenticateAsync(login, fixture.CancellationToken);
+
+        await fixture.SetInstanceIntentAsync("true");
+        LocalAuthResponseDto enabled = await fixture.Service.AuthenticateAsync(login, fixture.CancellationToken);
+
+        await fixture.SetInstanceIntentAsync("false");
+        LocalAuthResponseDto disabled = await fixture.Service.AuthenticateAsync(login, fixture.CancellationToken);
+
+        await Assert.That(before.Success).IsTrue();
+        await Assert.That(enabled.Failure).IsEqualTo(LocalAuthFailure.EmailVerificationRequired);
+        await Assert.That(enabled.Token).IsNull();
+        await Assert.That(disabled.Success).IsTrue();
+        await Assert.That(disabled.EmailVerified).IsFalse();
+    }
+
+    [Test]
+    public async Task UnavailableInstanceIntentReadDoesNotIssueAnUnverifiedSession()
+    {
+        await using TestFixture fixture = await CreateSignedFixtureAsync();
+        LocalAuthRequestDto login = await fixture.SeedUserAsync(emailConfirmed: false);
+        await fixture.SetInstanceIntentAsync("false");
+        await fixture.Context.Database.ExecuteSqlRawAsync(
+            "ALTER TABLE ie_system_settings RENAME TO unavailable_system_settings",
+            fixture.CancellationToken);
+
+        LocalAuthResponseDto result = await fixture.Service.AuthenticateAsync(login, fixture.CancellationToken);
+
+        await Assert.That(result.Success).IsFalse();
+        await Assert.That(result.Failure).IsEqualTo(LocalAuthFailure.AuthenticationFailed);
+        await Assert.That(result.Token).IsNull();
+    }
+
+    private static Task<TestFixture> CreateSignedFixtureAsync()
+    {
+        var secrets = Substitute.For<ISecretResolver>();
+        secrets.ResolveAsync(SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey, null, Arg.Any<CancellationToken>())
+            .Returns(SecretResolutionResult.Resolved(new ResolvedSecret(
+                SettingKey: SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey,
+                Value: Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
+                Source: SecretSourceType.EnvironmentVariable,
+                Scope: SecretScope.Instance,
+                ScopeId: null,
+                ResolvedAt: Now)));
+        return TestFixture.CreateAsync(new LocalJwtTokenGenerator(
+            secrets, Options.Create(new LocalIdentityOptions()), new FixedTimeProvider(Now)));
+    }
+
     private static string CreateValidPassword() =>
         $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(16))}";
 
     private sealed class RecordingTokenGenerator : ILocalJwtTokenGenerator
     {
+        public Task<LocalIssuedReplacementChallenge> GenerateReplacementChallengeAsync(
+            LocalCredentialReplacementSubject subject,
+            CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Replacement challenge issuance is unexpected in this fixture.");
+
         public Task<LocalIssuedToken> GenerateAsync(
             LocalJwtTokenSubject subject,
             CancellationToken cancellationToken) =>
@@ -156,7 +287,8 @@ public sealed class LocalIdentityAuthServiceTests
     private sealed class TestFixture : IAsyncDisposable
     {
         private readonly SqliteConnection _connection =
-            new("Data Source=:memory:");
+            new(new SqliteConnectionStringBuilder { DataSource = ":memory:" }.ToString());
+        private readonly CancellationTokenSource _timeout = new(TimeSpan.FromSeconds(30));
 
         private ServiceProvider? _provider;
         private AsyncServiceScope? _scope;
@@ -167,6 +299,9 @@ public sealed class LocalIdentityAuthServiceTests
 
         internal UserManager<LocalIdentityUser> UserManager { get; private set; } = null!;
         internal LocalIdentityAuthService Service { get; private set; } = null!;
+        internal ExploreDbContext Context { get; private set; } = null!;
+        internal CancellationToken CancellationToken => _timeout.Token;
+        private SystemSettingRepository _systemSettings = null!;
 
         internal static async Task<TestFixture> CreateAsync(
             ILocalJwtTokenGenerator tokenGenerator)
@@ -174,12 +309,13 @@ public sealed class LocalIdentityAuthServiceTests
             var fixture = new TestFixture();
             try
             {
-                await fixture._connection.OpenAsync();
+                await fixture._connection.OpenAsync(fixture.CancellationToken);
                 var services = new ServiceCollection();
                 services.AddLogging();
                 services.AddDbContext<ExploreDbContext>(options =>
                     options.UseSqlite(fixture._connection)
-                        .UseSnakeCaseNamingConvention());
+                        .UseSnakeCaseNamingConvention()
+                        .AddInterceptors(SqliteNamedLockTransactionInterceptor.Instance));
                 services.AddIdentityCore<LocalIdentityUser>(options =>
                     {
                         options.User.RequireUniqueEmail = true;
@@ -193,13 +329,22 @@ public sealed class LocalIdentityAuthServiceTests
                 fixture._scope = fixture._provider.CreateAsyncScope();
                 IServiceProvider scopedServices = fixture._scope.Value.ServiceProvider;
                 var context = scopedServices.GetRequiredService<ExploreDbContext>();
-                await context.Database.EnsureCreatedAsync();
+                await context.Database.EnsureCreatedAsync(fixture.CancellationToken);
+                fixture.Context = context;
+                await LookupTableSeeder.SeedAsync(context, fixture.CancellationToken);
+                fixture._systemSettings = new SystemSettingRepository(context,
+                    new RelationalSettingMutationLock(context, new EfCoreUnitOfWork(context)));
                 fixture.UserManager = scopedServices
                     .GetRequiredService<UserManager<LocalIdentityUser>>();
                 fixture.Service = new LocalIdentityAuthService(
                     fixture.UserManager,
                     tokenGenerator,
-                    new FixedTimeProvider(Now));
+                    fixture._systemSettings,
+                    new LocalIdentityCredentialStateStore(
+                        identityDbContext: context,
+                        applicationDbContext: context,
+                        userManager: fixture.UserManager,
+                        timeProvider: new FixedTimeProvider(Now)));
                 return fixture;
             }
             catch
@@ -207,6 +352,115 @@ public sealed class LocalIdentityAuthServiceTests
                 await fixture.DisposeAsync();
                 throw;
             }
+        }
+
+        internal async Task<LocalAuthRequestDto> SeedUserAsync(bool emailConfirmed)
+        {
+            string password = CreateValidPassword();
+            var initiator = new User
+            {
+                Id = Guid.CreateVersion7(),
+                Pii = new UserPii { Email = "initiator@example.test", FirstName = "Instance", LastName = "Operator" },
+                EmailVerified = true,
+                CreatedAt = Now.UtcDateTime
+            };
+            Context.Users.Add(initiator);
+            await Context.SaveChangesAsync(CancellationToken);
+            var credentials = new LocalIdentityCredentialStateStore(
+                identityDbContext: Context, applicationDbContext: Context,
+                userManager: UserManager, timeProvider: new FixedTimeProvider(Now));
+            LocalCredentialCreateResult created = await credentials.CreatePendingAsync(new LocalCredentialCreateRequest(
+                operationId: Guid.CreateVersion7(), initiatingApplicationUserId: initiator.Id,
+                email: "local@example.test", firstName: "Local", lastName: "User"), CancellationToken);
+            await Assert.That(created.Outcome).IsEqualTo(LocalCredentialCreateOutcome.Created);
+            LocalCredentialOperationReceipt receipt = created.Receipt!;
+            var applicationUser = new User
+            {
+                Id = receipt.LocalSubjectId,
+                EmailVerified = true,
+                CreatedAt = Now.UtcDateTime,
+                Pii = new UserPii { Email = "local@example.test", FirstName = "Local", LastName = "User" }
+            };
+            Context.Actors.Add(new Actor
+            {
+                Id = receipt.PersonalActorId,
+                UserId = applicationUser.Id,
+                User = applicationUser,
+                ActorTypeId = (int)ActorTypeEnum.User,
+                ActorType = null!,
+                Pii = new ActorPii { DisplayName = "Local User" },
+                CreatedAt = Now.UtcDateTime
+            });
+            Context.UserExternalLogins.Add(new UserExternalLogin
+            {
+                Id = receipt.ExternalLoginId,
+                UserId = applicationUser.Id,
+                User = applicationUser,
+                AuthenticationProviderId = (int)AuthenticationProviderKind.Local,
+                AuthenticationProvider = null!,
+                ProviderKey = applicationUser.Id.ToString("D"),
+                CreatedAt = Now.UtcDateTime
+            });
+            await Context.SaveChangesAsync(CancellationToken);
+            LocalCredentialProvisioningSnapshot pending = (await credentials.ReadProvisioningAsync(receipt.OperationId, CancellationToken))!;
+            await Assert.That(await credentials.ActivateChangeRequiredAsync(new LocalCredentialActivationRequest(
+                operationId: receipt.OperationId, expectedOperationConcurrencyStamp: pending.OperationConcurrencyStamp), CancellationToken))
+                .IsEqualTo(LocalCredentialActivationOutcome.Activated);
+            LocalIdentityUser user = (await UserManager.FindByIdAsync(receipt.LocalSubjectId.ToString("D")))!;
+            await Assert.That(await credentials.ReplaceAsync(new LocalCredentialReplacementRequest(
+                authority: new LocalCredentialReplacementAuthority(
+                    subject: new LocalCredentialReplacementSubject(localSubjectId: user.Id,
+                        operationId: receipt.OperationId, securityStamp: user.SecurityStamp!),
+                    issuedAtUtc: Now, expiresAtUtc: Now.AddMinutes(5)),
+                newPassword: password), CancellationToken)).IsEqualTo(LocalCredentialReplacementOutcome.Replaced);
+            await Context.Entry(user).ReloadAsync(CancellationToken);
+            user.EmailConfirmed = emailConfirmed;
+            user.LockoutEnabled = true;
+            await Assert.That((await UserManager.UpdateAsync(user)).Succeeded).IsTrue();
+            applicationUser = await Context.Users.SingleAsync(row => row.Id == receipt.LocalSubjectId, CancellationToken);
+            applicationUser.EmailVerified = emailConfirmed;
+            await Context.SaveChangesAsync(CancellationToken);
+            return new LocalAuthRequestDto(Identifier: user.Email!, Password: password);
+        }
+
+        internal Task SetInstanceIntentAsync(string value) => EmailDispatchSqliteFixture.SetEmailSettingAsync(
+            Context, GovernanceSettingKeys.Email.DeliveryEnabled, value, cancellationToken: CancellationToken);
+
+        internal async Task SeedMalformedInstanceIntentAsync(string value)
+        {
+            // Corrupt persisted state deliberately: the validating writer must never accept these values.
+            Context.SystemSettings.Add(new SystemSetting
+            {
+                Id = Guid.CreateVersion7(),
+                SettingKey = GovernanceSettingKeys.Email.DeliveryEnabled,
+                Value = value,
+                ValueType = SettingValueType.Boolean,
+                CreatedAt = Now.UtcDateTime
+            });
+            await Context.SaveChangesAsync(CancellationToken);
+        }
+
+        internal async Task SeedDisabledTenantOverrideAsync()
+        {
+            TenantStatus status = await Context.Set<TenantStatus>().SingleAsync(
+                row => row.Id == (int)TenantStatusEnum.Active, CancellationToken);
+            var tenant = new Tenant
+            {
+                Id = Guid.CreateVersion7(),
+                FullName = "Local policy tenant",
+                Slug = "local-policy",
+                TenantStatusId = status.Id,
+                TenantStatus = status,
+                CreatedAt = Now.UtcDateTime
+            };
+            Context.TenantContext = new FixedTenantContext(tenant.Id);
+            Context.Tenants.Add(tenant);
+            await Context.SaveChangesAsync(CancellationToken);
+            await EmailDispatchSqliteFixture.SetEmailSettingAsync(Context,
+                GovernanceSettingKeys.TenantDelegation.LockSmtp, "false", cancellationToken: CancellationToken);
+            await EmailDispatchSqliteFixture.SetEmailSettingAsync(Context,
+                GovernanceSettingKeys.Email.DeliveryEnabled, "false", tenantId: tenant.Id,
+                cancellationToken: CancellationToken);
         }
 
         public async ValueTask DisposeAsync()
@@ -222,6 +476,12 @@ public sealed class LocalIdentityAuthServiceTests
             }
 
             await _connection.DisposeAsync();
+            _timeout.Dispose();
         }
+    }
+
+    private sealed class FixedTenantContext(Guid tenantId) : ITenantContext
+    {
+        public Guid TenantId => tenantId;
     }
 }

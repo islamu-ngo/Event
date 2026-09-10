@@ -1,0 +1,14 @@
+
+.settings-section-header {
+    max-inline-size: 72ch;
+}
+
+.settings-form-section {
+    container-type: inline-size;
+}
+
+@container (max-width: 42rem) {
+    .settings-section-header {
+        max-inline-size: none;
+    }
+}

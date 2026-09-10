@@ -20,7 +20,7 @@ public class InstanceBootstrapStateConfiguration : IEntityTypeConfiguration<Inst
                 "mode BETWEEN 1 AND 2");
             table.HasCheckConstraint(
                 "ck_instance_bootstrap_states_provider_kind",
-                "provider_kind IS NULL OR provider_kind BETWEEN 1 AND 2");
+                "provider_kind IS NULL OR provider_kind IN (1, 2, 4)");
             table.HasCheckConstraint(
                 "ck_instance_bootstrap_states_deployment_mode",
                 "deployment_mode BETWEEN 1 AND 2");

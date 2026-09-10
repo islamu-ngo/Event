@@ -5,9 +5,13 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
+using Explore.API.Hateoas.Policies;
 using Explore.API.Models;
+using Explore.Application.Features.Authentication.Local.Handlers.Queries;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Services;
+using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.DTOs.PublicExperience;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.InstanceOnboarding.Requests.Commands;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
@@ -53,6 +57,8 @@ public class InstanceOnboardingController : EventControllerBase
     private readonly ISetupSecretProvider _setupSecretProvider;
     private readonly IInstanceBootstrapAuditLogger _bootstrapAuditLogger;
     private readonly IAuthProviderConfigurationService _authProviderConfigurationService;
+    private readonly IVisitorAccessCapabilityResolver _visitorAccessCapabilityResolver;
+    private readonly ITenantContext _tenantContext;
     private readonly ILogger<InstanceOnboardingController> _logger;
     private readonly IResourceAssembler<InstanceOnboardingStatusDto, InstanceOnboardingStatusDto> _statusAssembler;
 
@@ -62,7 +68,9 @@ public class InstanceOnboardingController : EventControllerBase
         IInstanceBootstrapAuditLogger bootstrapAuditLogger,
         IAuthProviderConfigurationService authProviderConfigurationService,
         ILogger<InstanceOnboardingController> logger,
-        IResourceAssembler<InstanceOnboardingStatusDto, InstanceOnboardingStatusDto> statusAssembler)
+        IResourceAssembler<InstanceOnboardingStatusDto, InstanceOnboardingStatusDto> statusAssembler,
+        IVisitorAccessCapabilityResolver visitorAccessCapabilityResolver,
+        ITenantContext tenantContext)
     {
         _mediator = mediator;
         _setupSecretProvider = setupSecretProvider;
@@ -70,9 +78,12 @@ public class InstanceOnboardingController : EventControllerBase
         _authProviderConfigurationService = authProviderConfigurationService;
         _logger = logger;
         _statusAssembler = statusAssembler;
+        _visitorAccessCapabilityResolver = visitorAccessCapabilityResolver;
+        _tenantContext = tenantContext;
     }
 
     [AllowAnonymous]
+    [PrivateNoStore]
     [EndpointClassification(EndpointClass.Public)]
     [HttpGet("status", Name = RouteNames.GetInstanceOnboardingStatus)]
     [EndpointSummary("Get Instance Onboarding Status")]
@@ -82,7 +93,7 @@ public class InstanceOnboardingController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<HalResource<InstanceOnboardingStatusDto>>> GetStatus(CancellationToken cancellationToken = default)
     {
-        var status = await _mediator.Send(new GetInstanceOnboardingStatusQuery(), cancellationToken);
+        var status = await _mediator.Send(new GetInstanceOnboardingStatusQuery { SetupPrincipal = User }, cancellationToken);
         var resource = await _statusAssembler.ToResource(status, HttpContext);
         return Ok(resource);
     }
@@ -167,7 +178,7 @@ public class InstanceOnboardingController : EventControllerBase
             Username = User.GetUsername(),
             AuthProvider = authProvider,
             AuthProviderId = User.GetProviderId(providerSubject, authProvider),
-            EmailVerified = User.GetEmailVerified(authProvider, email ?? string.Empty)
+            EmailVerified = User.GetEmailVerified()
         };
 
         var response = await _mediator.Send(command, cancellationToken);
@@ -182,6 +193,28 @@ public class InstanceOnboardingController : EventControllerBase
             "bootstrap_disabled");
 
         return Ok(response);
+    }
+
+    [Authorize(AuthenticationSchemes = Explore.Application.Constants.ApiAuthenticationSchemeNames.SetupSecret)]
+    [SetupSecretRequired(requireIncomplete: true)]
+    [EnableRateLimiting(RateLimitingExtensions.SetupSecretPolicy)]
+    [PrivateNoStore]
+    [SuppressIdempotencyResponseStorage]
+    [EndpointClassification(EndpointClass.Admin)]
+    [HttpPost("complete-local", Name = RouteNames.CompleteLocalInstanceOnboarding)]
+    [EndpointSummary("Complete Local Instance Onboarding")]
+    [EndpointDescription("Enrolls the initial Local administrator under setup authority. Private credential replacement is required before ordinary sign-in.")]
+    [ProducesResponseType(typeof(BaseCommandResponse<Guid>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status410Gone)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
+    public async Task<ActionResult<BaseCommandResponse<Guid>>> CompleteLocal(
+        [FromBody] CompleteLocalInstanceOnboardingRequestDto request, CancellationToken cancellationToken = default)
+    {
+        var response = await _mediator.Send(new CompleteLocalInstanceOnboardingCommand(request, User), cancellationToken);
+        return response.IsSuccess ? Ok(response) : this.ToCommandValidationProblem(response, CompleteValidationProblem);
     }
 
     [AllowAnonymous]
@@ -227,11 +260,34 @@ public class InstanceOnboardingController : EventControllerBase
     [HttpGet("auth-provider-configuration", Name = RouteNames.GetInstanceOnboardingAuthProviderConfiguration)]
     [EndpointSummary("Get Auth Provider Configuration (Public)")]
     [EndpointDescription("Returns auth provider configuration without secrets. Used by BFF at startup to discover configured providers.")]
-    [ProducesResponseType(typeof(AuthProviderConfigurationDto), StatusCodes.Status200OK)]
-    public async Task<ActionResult<AuthProviderConfigurationDto>> GetAuthProviderConfiguration(CancellationToken cancellationToken = default)
+    [PrivateNoStore]
+    [ProducesResponseType(typeof(HalResource<AuthProviderConfigurationDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<HalResource<AuthProviderConfigurationDto>>> GetAuthProviderConfiguration(CancellationToken cancellationToken = default)
     {
         var configuration = await _authProviderConfigurationService.ReadConfigurationAsync();
-        return Ok(configuration);
+        configuration = configuration with
+        {
+            VisitorAccess = VisitorAccessCapabilityDto.From(
+                await _visitorAccessCapabilityResolver.ResolveAsync(_tenantContext.TenantId, cancellationToken))
+        };
+        var capabilities = await _mediator.Send(new GetLocalIdentityLifecycleCapabilitiesQuery(PublicDiscovery: true), cancellationToken);
+        var links = LocalIdentityLifecycleLinkPolicy.GetLinks(capabilities).ToDictionary(
+            definition => definition.Rel,
+            definition => new HalLink
+            {
+                Href = Url.RouteUrl(definition.RouteName, definition.RouteValues)
+                    ?? throw new InvalidOperationException("The Local lifecycle route is not registered."),
+                Method = definition.Method,
+                Title = definition.Title
+            });
+        links.Add(LinkRelations.Self, HalLink.Create(Url.RouteUrl(RouteNames.GetInstanceOnboardingAuthProviderConfiguration)
+            ?? throw new InvalidOperationException("The authentication discovery route is not registered.")));
+        foreach (var destination in configuration.VisitorAccess.SignupDestinations)
+        {
+            links.Add(LinkRelations.VisitorSignupPrefix + destination.Provider.ToString().ToLowerInvariant(),
+                HalLink.Create(destination.Url));
+        }
+        return Ok(new HalResource<AuthProviderConfigurationDto>(configuration, links));
     }
 
     [AllowAnonymous]

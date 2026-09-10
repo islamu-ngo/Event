@@ -29,6 +29,7 @@
 <html lang="@pageLang" dir="@pageDir">
 
 <head>
+	<script nonce="@cspNonce">@((MarkupString)GuestStatusScript)</script>
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 	<base href="@GetBaseHref()" />
@@ -91,6 +92,16 @@
 </html>
 
 @code {
+    private static readonly string GuestStatusScript = ReadGuestStatusScript();
+
+    private static string ReadGuestStatusScript()
+    {
+        using var stream = typeof(App).Assembly.GetManifestResourceStream("GuestRegistrationStatusScript")
+            ?? throw new InvalidOperationException("The private bookmark startup script is missing.");
+        using var reader = new System.IO.StreamReader(stream);
+        return reader.ReadToEnd();
+    }
+
     // Resolved asynchronously from governance settings for non-onboarding paths.
     private IComponentRenderMode? _asyncResolvedMode;
 

@@ -69,6 +69,7 @@ public class AdminContext : IAdminContext, IAdminCacheInvalidator
 
     public async Task<Guid?> ResolveUserIdAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var user = _httpContextAccessor.HttpContext?.User;
         if (user is null)
             return null;
@@ -77,18 +78,10 @@ public class AdminContext : IAdminContext, IAdminCacheInvalidator
         if (providerIdentity is null)
             return user.GetPlatformUserId();
 
-        var cacheKey = $"{CacheKeyPrefix}ResolvedId_{providerIdentity.Provider}_{providerIdentity.AccountKey.Value}";
-        if (_cache.TryGetValue<Guid>(cacheKey, out var cachedUserId))
-            return cachedUserId;
-
         var externalLogin = await _userExternalLoginRepository.GetByProviderAndKey(
             providerIdentity.AccountKey);
-        Guid? resolvedUserId = externalLogin?.UserId;
-
-        if (resolvedUserId.HasValue)
-            _cache.Set(cacheKey, resolvedUserId.Value, TimeSpan.FromMinutes(10));
-
-        return resolvedUserId;
+        cancellationToken.ThrowIfCancellationRequested();
+        return externalLogin?.UserId;
     }
 
     public async Task<bool> IsInstanceAdminAsync(Guid userId, CancellationToken cancellationToken = default)

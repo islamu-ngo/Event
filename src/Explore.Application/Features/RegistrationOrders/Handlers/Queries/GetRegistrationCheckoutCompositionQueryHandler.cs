@@ -79,16 +79,16 @@ public sealed class GetRegistrationCheckoutCompositionQueryHandler(
             DirectoryOperator = directoryOperator,
             TicketTypes = ticketTypes
                 .Select(ticketType => new RegistrationCheckoutTicketTypeDto
-                    {
-                        Id = ticketType.Id,
-                        Name = ticketType.Name,
-                        TicketPricingModeId = ticketType.TicketPricingModeId,
-                        TicketPricingModeCode = ticketType.TicketPricingMode?.MasterCode,
-                        FixedPriceMinor = ticketType.FixedPriceMinor,
-                        MinimumPriceMinor = ticketType.MinimumPriceMinor,
-                        SuggestedPriceMinor = ticketType.SuggestedPriceMinor,
-                        PerOrderLimit = ticketType.PerOrderLimit,
-                        SlidingScaleOptions = ticketType.TicketPricingModeId == (int)TicketPricingModeEnum.SlidingScale
+                {
+                    Id = ticketType.Id,
+                    Name = ticketType.Name,
+                    TicketPricingModeId = ticketType.TicketPricingModeId,
+                    TicketPricingModeCode = ticketType.TicketPricingMode?.MasterCode,
+                    FixedPriceMinor = ticketType.FixedPriceMinor,
+                    MinimumPriceMinor = ticketType.MinimumPriceMinor,
+                    SuggestedPriceMinor = ticketType.SuggestedPriceMinor,
+                    PerOrderLimit = ticketType.PerOrderLimit,
+                    SlidingScaleOptions = ticketType.TicketPricingModeId == (int)TicketPricingModeEnum.SlidingScale
                             ? BuildSlidingScaleOptions(
                                 catalog.CurrencyCode,
                                 ticketType.MinimumPriceMinor.GetValueOrDefault(),
@@ -96,7 +96,7 @@ public sealed class GetRegistrationCheckoutCompositionQueryHandler(
                                 feePolicy,
                                 earningsCalculator)
                             : []
-                    })
+                })
                 .ToArray()
         };
     }

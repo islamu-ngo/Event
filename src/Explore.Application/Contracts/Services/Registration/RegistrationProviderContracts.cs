@@ -216,7 +216,10 @@ public sealed record RegistrationProviderManagedPublishPreflightResult(bool Succ
     public static RegistrationProviderManagedPublishPreflightResult Success() => new(true, null, []);
     public static RegistrationProviderManagedPublishPreflightResult Failure(string code, IReadOnlyList<string>? errors = null) => new(false, code, errors ?? [code]);
 }
-public sealed record RegistrationProviderSubmissionWriteRequest(Guid TenantId, RegistrationProviderBinding Binding, RegistrationProviderConnection Connection, RegistrationProviderTuple Tuple, Guid AttemptId, IReadOnlyDictionary<string, string> Answers);
+public sealed record RegistrationProviderSubmissionWriteRequest(Guid TenantId, RegistrationProviderBinding Binding, RegistrationProviderConnection Connection, RegistrationProviderTuple Tuple, Guid AttemptId, IReadOnlyDictionary<string, string> Answers)
+{
+    public DateTime? DisclosureUntilUtc { get; init; }
+}
 public sealed record RegistrationProviderSubmissionWriteResult(string ProviderSubmissionId, string ProviderRevisionId);
 public sealed class RegistrationProviderSubmissionDeliveryException(
     RegistrationProviderSubmissionDeliveryFailureKind failureKind,
@@ -271,7 +274,10 @@ public sealed record RegistrationProviderReconciliationResult(
     IReadOnlyList<RegistrationProviderReconciledSubmission>? Responses = null,
     string? NextCheckpoint = null,
     string? ContinuationCursor = null);
-public sealed record RegistrationProviderSubmissionSinkRequest(Guid TenantId, RegistrationProviderBinding Binding, RegistrationProviderConnection Connection, RegistrationProviderTuple Tuple, Guid AttemptId, Guid RegistrationSubmissionId, IReadOnlyDictionary<string, string> Answers, string? ProviderSubmissionId);
+public sealed record RegistrationProviderSubmissionSinkRequest(Guid TenantId, RegistrationProviderBinding Binding, RegistrationProviderConnection Connection, RegistrationProviderTuple Tuple, Guid AttemptId, Guid RegistrationSubmissionId, IReadOnlyDictionary<string, string> Answers, string? ProviderSubmissionId)
+{
+    public DateTime? DisclosureUntilUtc { get; init; }
+}
 public sealed record RegistrationProviderSubmissionSinkResult(bool Accepted, Guid SubmissionId, bool AutoFinalizable);
 
 public sealed record RegistrationProviderSchemaSnapshot(IReadOnlyList<RegistrationProviderSchemaFieldSnapshot> Fields);

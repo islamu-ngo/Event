@@ -96,6 +96,9 @@ public class EmailDispatchOutboxConfiguration : IEntityTypeConfiguration<EmailDi
         builder.ToTable(table =>
         {
             table.HasCheckConstraint(
+                "ck_email_dispatch_outbox_park_reason",
+                "park_reason IS NULL OR park_reason IN (1, 2)");
+            table.HasCheckConstraint(
                 "ck_email_dispatch_outbox_recipient_authority",
                 "(recipient_address_source = 1 AND recipient_user_id IS NOT NULL AND managed_tenant_provisioning_operation_id IS NULL AND kind <> 8) " +
                 "OR (recipient_address_source = 2 AND recipient_user_id IS NOT NULL AND managed_tenant_provisioning_operation_id IS NOT NULL " +

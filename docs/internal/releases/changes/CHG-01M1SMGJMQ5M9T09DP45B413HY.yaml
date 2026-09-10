@@ -1,0 +1,34 @@
+# ABOUTME: Records native anonymous challenge admission and exact allocation recovery.
+# ABOUTME: Binds private proof transport, durable scope budgets and stable guest retry authority.
+Change-Id: CHG-01M1SMGJMQ5M9T09DP45B413HY
+Title: bound anonymous intake and recover allocations safely
+Type: feat
+Scope: registration
+Summary: Bind native challenges to tenant event request and idempotency authority so response-loss retries reuse one order and cannot hoard additional seats through replay.
+Group: email-optional-self-hosting
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: Public guest-start requests require a bound native challenge and proof; caller-selected raw guest allocation authority is no longer accepted.
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Detail: Proof and exact protected request/order/capability binding are checked before replay disclosure; expired authority cannot allocate and uncertain browser retries retain original intent.
+  Migration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: Four native primary-context migrations add only the private tenant/event challenge-budget tables, with scope ownership and bounded counter constraints.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: Bounded process limiter configuration and governed difficulty/tenant/event quotas preserve persistent shared protection-key authority without an external CAPTCHA service.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: A named challenge-issuance HAL operation and guest-start proof headers are generated with the existing request, capability and Location contracts.
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/modular-event-aspects.md
+    Disposition: documented
+    Detail: Accessible browser work and explicit original-request retry preserve one reservation after response loss; staff assistance remains an authorized alternative rather than a public bypass.

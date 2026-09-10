@@ -29,23 +29,34 @@ public sealed class AdmissionRecoveryDeliveryEnvelopeProtector :
         }
 
         string plaintext = JsonSerializer.Serialize(envelope);
-        return new AdmissionRecoveryProtectedDeliveryMaterial(
-            protector.Protect(plaintext),
-            CurrentVersion);
+        if (envelope.DisclosureUntilUtc is not { } deadline)
+            return new AdmissionRecoveryProtectedDeliveryMaterial(protector.Protect(plaintext), CurrentVersion);
+
+        var payload = new AdmissionContactDeliveryPayload(deadline, string.Empty);
+        string ciphertext = protector.CreateProtector(payload.GetProtectionPurpose()).Protect(plaintext);
+        return new AdmissionRecoveryProtectedDeliveryMaterial(JsonSerializer.Serialize(payload with { Ciphertext = ciphertext }), 2);
     }
 
     public AdmissionRecoveryDeliveryEnvelope Unprotect(string ciphertext, int protectionVersion)
     {
-        if (string.IsNullOrWhiteSpace(ciphertext) || protectionVersion != CurrentVersion)
+        if (string.IsNullOrWhiteSpace(ciphertext) || protectionVersion is not (CurrentVersion or 2))
         {
             throw new InvalidOperationException("Recovery delivery envelope is unavailable.");
         }
 
         try
         {
-            string plaintext = protector.Unprotect(ciphertext);
-            return JsonSerializer.Deserialize<AdmissionRecoveryDeliveryEnvelope>(plaintext)
+            AdmissionContactDeliveryPayload payload = AdmissionContactDeliveryPayload.Read(ciphertext, protectionVersion);
+            if (payload.AccountUserId.HasValue)
+                throw new InvalidOperationException("Recovery requires order contact authority.");
+            IDataProtector boundProtector = protectionVersion == 2
+                ? protector.CreateProtector(payload.GetProtectionPurpose()) : protector;
+            string plaintext = boundProtector.Unprotect(payload.Ciphertext);
+            var envelope = JsonSerializer.Deserialize<AdmissionRecoveryDeliveryEnvelope>(plaintext)
                 ?? throw new InvalidOperationException("Recovery delivery envelope is unavailable.");
+            if (envelope.DisclosureUntilUtc != payload.DisclosureUntilUtc)
+                throw new InvalidOperationException("Recovery delivery envelope bound is invalid.");
+            return envelope;
         }
         catch (Exception exception) when (exception is CryptographicException or JsonException)
         {

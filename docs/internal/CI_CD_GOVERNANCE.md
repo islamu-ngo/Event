@@ -295,6 +295,11 @@ Provider-specific root directories such as `.forgejo/`, `.woodpecker/`, or `.tan
 
 If future `zizmor` findings must be temporarily accepted, document each exception with owner, date, rule ID, affected workflow, compensating control, and removal condition before weakening the workflow.
 
+Local actionlint verification must have `shellcheck` on PATH to cover embedded
+Bash; without it, a successful run only establishes workflow/expression validity.
+Keep related step outputs in one redirected block so the same shell checks pass
+locally and on GitHub-hosted runners.
+
 ### Workflow Cache Poisoning Policy
 
 Fork pull requests and untrusted contribution events must not write caches that are later consumed by trusted deployment, release, or publish workflows. `Workflow Security` enforces this with `.ci/scripts/validate-workflow-cache-policy.cs`.
@@ -315,6 +320,13 @@ Any future cache added to a privileged workflow needs an explicit owner, event m
 The workflow redacts findings, retains SARIF/text output in `secret-scanning-evidence`, and does not replace GitHub secret scanning or push protection. Repository or organization secret scanning and push protection remain required settings in the evidence checklist above.
 
 ### NuGet Locked Restore Policy
+
+Local .NET tools are a separate restore boundary from project packages. Workflows
+that build the generated Blazor client, directly or through API integration-test
+references, must run `dotnet tool restore` before the build. This restores the
+versions pinned in `dotnet-tools.json`; a warm developer cache is not evidence
+that a clean CI runner can invoke NSwag. Security change detection applies the
+same condition to package restore, tool restore, build and test execution.
 
 GitHub Actions restore steps and deployable Docker build stages use `dotnet restore --locked-mode`. All tracked project files have committed `packages.lock.json` files, and `Directory.Build.props` enables `RestorePackagesWithLockFile` plus CI-only `RestoreLockedMode` for `GITHUB_ACTIONS`.
 
@@ -387,9 +399,40 @@ The one approved advisory suppression is deliberately exact and remains visible 
 
 ### Dependency License Policy
 
+The audited Terminal.Gui rebuild gate retains its rebuilt package, assembly
+hashes and `dotnet --info` under `artifacts/dependencies/terminal-gui` when byte
+comparison fails. The normal CI evidence upload collects these diagnostics
+before scratch cleanup; upstream source, PDBs and build logs are not retained
+there. A mismatch still fails with the original comparison status. Investigate
+the changed build input before regenerating any approved package or hash.
+
+Build & Test installs the SDK selected by `global.json` into an isolated runner
+temporary directory through setup-dotnet's `DOTNET_INSTALL_DIR`, with a matching
+`DOTNET_ROOT`. This prevents newer preinstalled runtime patches from changing
+compiler/PDB identity during the audited rebuild. The audit logs `dotnet --info`
+and still compares exact package bytes; deployed application runtime selection
+is unchanged.
+
+Setup-dotnet also installs the newest LTS runtime. Before compilation, the job
+retains the Core runtime requested by the installed SDK's `dotnet.runtimeconfig.json`
+and moves extra Core runtime directories into a separate runner-temporary holding
+directory. It validates that the root is the job-owned `audited-dotnet` directory;
+system .NET and host/fxr are untouched. `dotnet --list-runtimes` records the
+available framework rather than confusing the native host version with the
+compiler runtime. This follows the documented [runtime installation layout](https://learn.microsoft.com/en-us/dotnet/core/install/remove-runtime-sdk-versions#scripted-or-manual).
+
 ISLAMU Event is licensed under AGPL-3.0-or-later, and the ISLAMU CLA grants the ISLAMU project steward broad inbound rights for contributor work. That inbound CLA does not override third-party dependency licenses, so CI must keep runtime, build, and test dependency license risk explicit before alternative-license, commercial, nonprofit, public-sector, procurement-restricted, hosted-service, or special social-impact distribution is offered.
 
 `Build & Test` runs `.ci/scripts/validate-dependency-license-policy.cs` after locked restore and the NuGet vulnerability audit. The validator scans product `packages.lock.json` files, reads restored NuGet package metadata from the local package cache, rejects denied or unknown license metadata unless a package-specific exception is encoded in the policy script, and guards future product npm or container OS package dependency surfaces until dedicated license scanning exists for those ecosystems.
+
+Restore coverage also includes the standalone dependency probes under
+`eng/setup-assistant/probes/` and the approved Terminal.Gui closure probe under
+`eng/release/dependencies/terminal-gui/probe/`. These lockfiles are audited but
+their projects are not part of solution restore. The reusable workflow restores
+them explicitly in locked mode before auditing; it must not depend on an older
+package version already being present in a warm cache. Missing metadata remains
+a blocking error, and restoring an approved graph does not authorize changing
+its frozen dependency approval.
 
 Reviewed license identifiers currently allowed by policy are `Apache-2.0`, `BSD-2-Clause`, `BSD-3-Clause`, `CC0-1.0`, `ISC`, `MIT`, `MPL-2.0`, `PostgreSQL`, `Unicode-DFS-2016`, `Unlicense`, and `Zlib`. Strong reciprocal, copyleft, source-available, and business-source families such as AGPL, GPL, LGPL, BUSL, Commons Clause, RPL, and SSPL are denied unless an explicit temporary exception is recorded in `.ci/scripts/validate-dependency-license-policy.cs`.
 
@@ -461,7 +504,22 @@ Do not promote stress, security, or runtime lanes to required status while a blo
 
 ### OpenAPI Breaking-Change Evidence
 
-`OpenAPI Contract Guard` blocks stale generated contract artifacts and verifies deterministic second-run regeneration for `schemas/openapi_islamu-event.json`, `docs/API_CONTRACT_INVENTORY.md`, and `Explore.Blazor.Client/Clients/EventApiClient.g.cs`.
+Changelog detection reads the changed-path list directly with a Bash here-string.
+Do not pipe a producer into `grep -q` under `pipefail`: early successful matches
+can close a large pipe, turn the producer's SIGPIPE into failure, and incorrectly
+report a missing changelog on large pull requests.
+
+`OpenAPI Contract Guard` blocks stale generated contract artifacts and verifies deterministic second-run regeneration for `schemas/openapi_islamu-event.json`, `docs/internal/API_CONTRACT_INVENTORY.md`, and `src/Explore.Blazor.Client/Clients/EventApiTagClients.g.cs`.
+
+The inventory generator is an independent executable. Solution restore supplies
+its dependencies, but building the API or its integration tests does not build
+the inventory project. The guard therefore builds that project explicitly in
+Release before invoking it with `--no-build`, preserving the locked-restore
+boundary and making clean-runner execution independent of local build outputs.
+
+The drift step creates its evidence directory before writing the diff and
+copying generated contracts. It must not rely on the later breaking-change
+report step to create that directory.
 
 The guard also runs `.ci/scripts/validate-api-contract-skip-inventory.cs` against [API_CONTRACT_TEST_DEBT.md](API_CONTRACT_TEST_DEBT.md). Any skipped integration test whose code skip reason includes `Category: API contract` must be listed in that inventory with a source file, owner, and removal condition. This keeps deferred route-name/HATEOAS contract enforcement visible while the owning `api-contract-stabilization` work finishes.
 
@@ -475,11 +533,28 @@ This is now a missing-evidence gate for breaking OpenAPI changes, not full autom
 
 ## Required vs Advisory Gates
 
+### Generated Migration Duplication
+
+The repository-root `.sonarcloud.properties` lists twelve EF-generated migration
+files under `sonar.cpd.exclusions`. They repeat provider schema operations by
+design. This exception applies only to copy-paste detection: handwritten code,
+security analysis, migration execution and provider-parity checks remain included.
+No duplication threshold is raised. Keep the list explicit; a new entry requires
+review of its generated provenance, not a blanket directory exclusion.
+
+Sonar automatic analysis supports this separate configuration file, not the
+CI scanner's `sonar-project.properties`. Its application to a pending PR must be
+confirmed by that PR's fresh analysis; a local path check is not scanner evidence.
+See [Sonar's automatic-analysis configuration](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/automatic-analysis#additional-analysis-configuration).
+
+### Gate Ownership
+
 | Gate | Required | Advisory / scheduled | Promotion rule |
 |---|---:|---:|---|
 | Release build + fast tests | Yes | No | Required for all code PRs. |
 | Coverage evidence | No | Yes | Artifact-only scheduled/manual Cobertura evidence for stable unit coverage. Keep non-blocking until scope, thresholds, and publication owner are documented. |
 | Infrastructure unit tests | Yes | No | Included in fast CI with `[Category!=Runtime]` so Docker-backed provider tests do not become implicit required checks. |
+| Blazor BFF integration tests | Yes | No | Limit independent test cases to eight concurrent executions with `--maximum-parallel-tests 8`; each can start a full host. Concurrency exercised inside each security test and its deadlines remain unchanged. |
 | Infrastructure email runtime tests | Conditional | Integration callers | `Explore.Infrastructure.Tests` `Email` category runs in the integration job as Mailpit/Testcontainers evidence; promote beyond conditional only after reliability data is tracked. |
 | PostgreSQL-backed integration tests | Conditional | Deploy callers | Required for integration/deploy callers; add a schedule only after reliability and runtime cost are acceptable. |
 | OpenAPI generated-artifact drift | Yes | No | Required after PR2 baseline. |

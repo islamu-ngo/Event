@@ -42,13 +42,25 @@ public partial class InstanceSchedulerSection : ComponentBase
             _plannedJobs = _overview.PlannedJobs is { } planned ? [.. planned] : [];
             _jobs = (await SchedulerAdminService.GetJobsAsync()).SchedulerJobs();
         }
+        catch (ApiException)
+        {
+            _overview = null;
+            _jobs = [];
+            _plannedJobs = [];
+            _message = "Scheduler data could not be loaded. Refresh to try again.";
+            _messageSeverity = Severity.Error;
+        }
         finally
         {
             _isLoading = false;
         }
     }
 
-    private Task RefreshAsync() => LoadAsync();
+    private Task RefreshAsync()
+    {
+        ClearMessage();
+        return LoadAsync();
+    }
 
     private void ClearMessage() => _message = null;
 

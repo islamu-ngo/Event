@@ -195,8 +195,6 @@ public class CerbosFailClosedTests : IAsyncDisposable
                     ["Database:Host"] = "localhost",
                     ["Database:Port"] = "5432",
                     ["Database:Database"] = "test_cerbos_fail_closed",
-                    ["Database:Runtime:Username"] = "postgres",
-                    ["Database:Runtime:Password"] = "postgres",
                     ["Database:Runtime:TlsMode"] = "Prefer",
                     ["Database:Runtime:TrustServerCertificate"] = "false",
                     ["Keycloak:Authority"] = _keycloakAuthority,
@@ -206,8 +204,6 @@ public class CerbosFailClosedTests : IAsyncDisposable
                     ["Keycloak:MetadataAddress"] = _keycloakMetadataAddress,
                     ["S3Settings:Region"] = "us-east-1",
                     ["S3Settings:BucketName"] = "test-bucket",
-                    ["S3Settings:AccessKeyId"] = "test-key",
-                    ["S3Settings:SecretAccessKey"] = "test-secret",
                     ["S3Settings:Endpoint"] = "https://s3.example.com",
                     ["Deployment:Mode"] = "SingleTenant",
                     ["Deployment:DefaultTenantId"] = PlatformDefaults.DefaultTenantId.ToString(),
@@ -282,15 +278,11 @@ public sealed class KeycloakOnlyFixture : IAsyncInitializer, IAsyncDisposable
     public string MetadataAddress => _keycloak.MetadataAddress;
     public string KeycloakBaseUrl => _keycloak.BaseUrl;
     public KeycloakTokenClient TokenClient => _keycloak.TokenClient;
+    public string ClientSecret => _keycloak.ClientSecret;
+    public string BootstrapAdminPassword => _keycloak.BootstrapAdminPassword;
 
-    public KeycloakTokenClient CreateTokenClient(string clientSecret)
-    {
-        return new KeycloakTokenClient(
-            KeycloakBaseUrl,
-            KeycloakContainerFixture.RealmName,
-            KeycloakContainerFixture.TestClientId,
-            clientSecret);
-    }
+    public KeycloakTokenClient CreateTokenClient(string clientSecret) =>
+        _keycloak.CreateTokenClient(clientSecret);
 
     public async Task InitializeAsync()
     {

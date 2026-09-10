@@ -39,6 +39,7 @@ using Explore.Blazor.Client.Services.Webhooks;
 using Explore.Blazor.Client.Services.Waitlist;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using ExploreControlPlaneApiAdapter = Explore.Blazor.Client.Services.ControlPlane.ControlPlaneApiAdapter;
 
 namespace Explore.Blazor.Client.Extensions;
@@ -73,6 +74,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IControlPlanePlanCatalogService>(provider => provider.GetRequiredService<ExploreControlPlaneApiAdapter>());
         services.AddScoped<IControlPlaneTenantConfigurationService>(provider => provider.GetRequiredService<ExploreControlPlaneApiAdapter>());
         services.AddScoped<IConfigurationManifestExportService, ConfigurationManifestExportService>();
+        services.AddScoped<LocalIdentityAdministrationService>();
         services.AddScoped<IConfigurationPortabilityService, ConfigurationPortabilityService>();
         services.AddScoped<ISchedulerAdminService, SchedulerAdminApiAdapter>();
         services.AddScoped<IExternalApiKeyService, ExternalApiKeyService>();
@@ -87,6 +89,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IEventOrganizerClaimService, EventOrganizerClaimService>();
         services.AddScoped<IEventModerationService, EventModerationService>();
         services.AddScoped<IRegistrationOrderService, RegistrationOrderService>();
+        services.AddScoped<IAnonymousRegistrationChallengeSolver, AnonymousRegistrationChallengeSolver>();
         services.AddScoped<IRegistrationPaymentService, RegistrationPaymentService>();
         services.AddScoped<IRegistrationProviderIntegrationService, RegistrationProviderIntegrationService>();
         services.AddScoped<Explore.Blazor.Client.Components.Registration.ProviderLaunch.RegistrationProviderLaunchState>();
@@ -200,6 +203,8 @@ public static class ServiceCollectionExtensions
             ITenantDirectoryOperatorIdentityAdminService,
             TenantDirectoryOperatorIdentityAdminService>();
         services.AddScoped<ITenantStorageSettingsAdminService, TenantStorageSettingsAdminService>();
+        services.AddScoped<IEmailDeliveryAdminService, EmailDeliveryAdminService>();
+        services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IAppearanceThemeService, AppearanceThemeService>();
         services.AddScoped<IUserAppearancePreferencesService, UserAppearancePreferencesService>();
 

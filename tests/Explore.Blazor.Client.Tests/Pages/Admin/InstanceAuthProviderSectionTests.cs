@@ -40,6 +40,24 @@ public sealed class InstanceAuthProviderSectionTests : IDisposable
     }
 
     [Test]
+    public async Task PublicOnboardingControlsRemainSeparateAndBindCompleteProviderModel()
+    {
+        AuthProviderConfigurationDto model = LocalModel();
+        model.KeycloakPublicOnboardingPolicy = PublicOnboardingPolicy.Allowed;
+        model.KeycloakPublicSignupUrl = "https://identity.example.test/realms/events/registrations";
+        model.GooglePublicOnboardingPolicy = PublicOnboardingPolicy.Denied;
+
+        var cut = Render(model);
+        var policies = cut.FindComponents<MudSelect<PublicOnboardingPolicy?>>();
+        MudSelect<PublicOnboardingPolicy?> keycloakPolicy = policies.Single(select => select.Instance.Value == PublicOnboardingPolicy.Allowed).Instance;
+        MudSelect<PublicOnboardingPolicy?> googlePolicy = policies.Single(select => select.Instance.Value == PublicOnboardingPolicy.Denied).Instance;
+
+        await Assert.That(cut.FindAll(".instance-auth-provider__visitor-onboarding")).Count().IsEqualTo(2);
+        await cut.InvokeAsync(() => googlePolicy.ValueChanged.InvokeAsync(PublicOnboardingPolicy.Allowed));
+        await Assert.That(model.GooglePublicOnboardingPolicy).IsEqualTo(PublicOnboardingPolicy.Allowed);
+    }
+
+    [Test]
     public async Task KeycloakCannotBeSelectedBeforeItsTargetConfigurationExists()
     {
         AuthProviderConfigurationDto model = LocalModel();

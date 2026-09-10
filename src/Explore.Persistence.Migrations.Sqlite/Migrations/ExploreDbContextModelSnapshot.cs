@@ -5145,6 +5145,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("notification_intent_id");
 
+                    b.Property<int?>("ParkReason")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("park_reason");
+
                     b.Property<DateTime?>("ParkedAt")
                         .HasColumnType("TEXT")
                         .HasColumnName("parked_at");
@@ -5302,6 +5306,8 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
 
                     b.ToTable("ie_email_dispatch_outbox", null, t =>
                         {
+                            t.HasCheckConstraint("ck_email_dispatch_outbox_park_reason", "park_reason IS NULL OR park_reason IN (1, 2)");
+
                             t.HasCheckConstraint("ck_email_dispatch_outbox_processing_fence", "(status = 2) = (processing_started_at IS NOT NULL AND processing_lease_token IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_email_dispatch_outbox_recipient_authority", "(recipient_address_source = 1 AND recipient_user_id IS NOT NULL AND managed_tenant_provisioning_operation_id IS NULL AND kind <> 8) OR (recipient_address_source = 2 AND recipient_user_id IS NOT NULL AND managed_tenant_provisioning_operation_id IS NOT NULL AND kind = 8 AND source_type = 'managed_tenant_provisioning' AND source_id = managed_tenant_provisioning_operation_id)");
@@ -5319,6 +5325,12 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("id");
 
+                    b.Property<long>("DeliveryPolicyRevision")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("delivery_policy_revision");
+
                     b.Property<int?>("GlobalSmtpRateLimitPerMinuteOverride")
                         .HasColumnType("INTEGER")
                         .HasColumnName("global_smtp_rate_limit_per_minute_override");
@@ -5330,6 +5342,14 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Property<bool>("OptionalRemindersDeferred")
                         .HasColumnType("INTEGER")
                         .HasColumnName("optional_reminders_deferred");
+
+                    b.Property<long?>("OptionalSuppressedThroughRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("optional_suppressed_through_revision");
+
+                    b.Property<DateTime?>("OptionalSuppressedThroughUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("optional_suppressed_through_utc");
 
                     b.Property<string>("PauseReason")
                         .HasMaxLength(500)
@@ -5377,9 +5397,13 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         {
                             t.HasCheckConstraint("ck_email_dispatch_processor_states_global_rate_override", "global_smtp_rate_limit_per_minute_override IS NULL OR global_smtp_rate_limit_per_minute_override BETWEEN 1 AND 100000");
 
+                            t.HasCheckConstraint("ck_email_dispatch_processor_states_revision_nonnegative", "delivery_policy_revision >= 0");
+
                             t.HasCheckConstraint("ck_email_dispatch_processor_states_smtp_rate_pair", "(smtp_available_tokens IS NULL) = (smtp_refill_at IS NULL)");
 
                             t.HasCheckConstraint("ck_email_dispatch_processor_states_smtp_tokens_nonnegative", "smtp_available_tokens IS NULL OR smtp_available_tokens >= 0");
+
+                            t.HasCheckConstraint("ck_email_dispatch_processor_states_suppression_revision", "optional_suppressed_through_revision IS NULL OR optional_suppressed_through_revision BETWEEN 0 AND delivery_policy_revision");
                         });
                 });
 
@@ -5493,9 +5517,23 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("created_by");
 
+                    b.Property<long>("DeliveryPolicyRevision")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("delivery_policy_revision");
+
                     b.Property<bool>("IsPaused")
                         .HasColumnType("INTEGER")
                         .HasColumnName("is_paused");
+
+                    b.Property<long?>("OptionalSuppressedThroughRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("optional_suppressed_through_revision");
+
+                    b.Property<DateTime?>("OptionalSuppressedThroughUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("optional_suppressed_through_utc");
 
                     b.Property<string>("PauseReason")
                         .HasMaxLength(500)
@@ -5542,9 +5580,13 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
 
                     b.ToTable("ie_email_dispatch_tenant_controls", null, t =>
                         {
+                            t.HasCheckConstraint("ck_email_dispatch_tenant_controls_revision_nonnegative", "delivery_policy_revision >= 0");
+
                             t.HasCheckConstraint("ck_email_dispatch_tenant_controls_smtp_rate_pair", "(smtp_available_tokens IS NULL) = (smtp_refill_at IS NULL)");
 
                             t.HasCheckConstraint("ck_email_dispatch_tenant_controls_smtp_tokens_nonnegative", "smtp_available_tokens IS NULL OR smtp_available_tokens >= 0");
+
+                            t.HasCheckConstraint("ck_email_dispatch_tenant_controls_suppression_revision", "optional_suppressed_through_revision IS NULL OR optional_suppressed_through_revision BETWEEN 0 AND delivery_policy_revision");
                         });
                 });
 
@@ -15609,7 +15651,7 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
 
                             t.HasCheckConstraint("ck_instance_bootstrap_states_mode_evidence", "(mode = 1 AND provider_kind IS NULL AND configuration_fingerprint IS NULL AND selector_fingerprint IS NULL) OR (mode = 2 AND provider_kind IS NOT NULL AND configuration_fingerprint IS NOT NULL AND selector_fingerprint IS NOT NULL)");
 
-                            t.HasCheckConstraint("ck_instance_bootstrap_states_provider_kind", "provider_kind IS NULL OR provider_kind BETWEEN 1 AND 2");
+                            t.HasCheckConstraint("ck_instance_bootstrap_states_provider_kind", "provider_kind IS NULL OR provider_kind IN (1, 2, 4)");
 
                             t.HasCheckConstraint("ck_instance_bootstrap_states_status", "status BETWEEN 1 AND 3");
 
@@ -17866,6 +17908,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("delivery_policy_id");
 
+                    b.Property<long>("EmailDeliveryPolicyRevision")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("email_delivery_policy_revision");
+
                     b.Property<Guid>("EventId")
                         .HasColumnType("TEXT")
                         .HasColumnName("event_id");
@@ -17975,6 +18021,8 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
 
                     b.ToTable("ie_notification_fanout_occurrences", null, t =>
                         {
+                            t.HasCheckConstraint("ck_notification_fanout_occurrences_email_revision", "email_delivery_policy_revision >= 0");
+
                             t.HasCheckConstraint("ck_notification_fanout_occurrences_state", "state IN (1, 2)");
 
                             t.HasCheckConstraint("ck_notification_fanout_occurrences_supersession", "(state = 1 AND superseded_by_occurrence_id IS NULL AND suppression_reason IS NULL AND superseded_at IS NULL) OR (state = 2 AND superseded_by_occurrence_id IS NOT NULL AND suppression_reason IS NOT NULL AND superseded_at IS NOT NULL)");
@@ -18215,6 +18263,12 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("deleted_by");
 
+                    b.Property<long>("EmailDeliveryPolicyRevision")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("email_delivery_policy_revision");
+
                     b.Property<Guid?>("EventId")
                         .HasColumnType("TEXT")
                         .HasColumnName("event_id");
@@ -18330,7 +18384,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.HasIndex("TenantId", "StatusId", "CreatedAt")
                         .HasDatabaseName("ix_notification_intents_tenant_id_status_id_created_at");
 
-                    b.ToTable("ie_notification_intents", (string)null);
+                    b.ToTable("ie_notification_intents", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_notification_intents_email_policy_revision_nonnegative", "email_delivery_policy_revision >= 0");
+                        });
                 });
 
             modelBuilder.Entity("Explore.Domain.NotificationIntentStatus", b =>
@@ -25567,6 +25624,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("add_on_total_minor_snapshot");
 
+                    b.Property<DateTime?>("AnonymousPiiRetentionUntilUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("anonymous_pii_retention_until_utc");
+
                     b.Property<Guid?>("AppliedPromotionCodeIdSnapshot")
                         .HasColumnType("TEXT")
                         .HasColumnName("applied_promotion_code_id_snapshot");
@@ -25631,6 +25692,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasMaxLength(44)
                         .HasColumnType("TEXT")
                         .HasColumnName("guest_access_token_hash");
+
+                    b.Property<DateTime?>("GuestStatusAccessUntilUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("guest_status_access_until_utc");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -29469,6 +29534,10 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                     b.Property<Guid?>("QuarantinedBy")
                         .HasColumnType("TEXT")
                         .HasColumnName("quarantined_by");
+
+                    b.Property<DateTime?>("RegistrationContentRetentionUntilUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("registration_content_retention_until_utc");
 
                     b.Property<string>("SafeDisplayName")
                         .IsRequired()
@@ -36510,6 +36579,192 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Explore.Persistence.Identity.LocalIdentityCredentialOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("ExternalLoginId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("external_login_id");
+
+                    b.Property<Guid>("InitiatingApplicationUserId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("initiating_application_user_id");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("LocalSubjectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("local_subject_id");
+
+                    b.Property<Guid>("PersonalActorId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("personal_actor_id");
+
+                    b.Property<Guid?>("PreviousOperationConcurrencyStamp")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("previous_operation_concurrency_stamp");
+
+                    b.Property<Guid?>("PreviousOperationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("previous_operation_id");
+
+                    b.Property<string>("ResetReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("reset_reason");
+
+                    b.Property<int>("Stage")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("stage");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("updated_at");
+
+                    b.Property<DateTime>("VerifiedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("verified_at");
+
+                    b.Property<Guid>("VerifiedByApplicationUserId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("verified_by_application_user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_local_identity_credential_operation");
+
+                    b.HasIndex("LocalSubjectId")
+                        .HasDatabaseName("ix_local_identity_credential_operation_local_subject_id");
+
+                    b.ToTable("ie_local_identity_credential_operation", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_local_credential_operation_kind", "kind BETWEEN 1 AND 2");
+
+                            t.HasCheckConstraint("ck_local_credential_operation_reset_metadata", "(kind = 1 AND previous_operation_id IS NULL AND previous_operation_concurrency_stamp IS NULL AND reset_reason IS NULL) OR (kind = 2 AND previous_operation_id IS NOT NULL AND previous_operation_id <> id AND previous_operation_concurrency_stamp IS NOT NULL AND reset_reason IS NOT NULL AND TRIM(reset_reason) <> '' AND stage <> 1)");
+
+                            t.HasCheckConstraint("ck_local_credential_operation_stage", "stage BETWEEN 1 AND 5");
+
+                            t.HasCheckConstraint("ck_local_credential_operation_timestamps", "((kind = 1 AND verified_at >= created_at) OR (kind = 2 AND verified_at <= created_at)) AND (updated_at IS NULL OR updated_at >= created_at)");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Persistence.Identity.LocalIdentityLifecycleOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("ConsumedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("consumed_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CredentialOperationId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("credential_operation_id");
+
+                    b.Property<DateTime?>("DeliveryAdmittedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("delivery_admitted_at");
+
+                    b.Property<int>("DeliveryAttemptCount")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("delivery_attempt_count");
+
+                    b.Property<Guid?>("DeliveryAttemptId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("delivery_attempt_id");
+
+                    b.Property<DateTime?>("DeliveryCompletedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("delivery_completed_at");
+
+                    b.Property<int>("DeliveryState")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("delivery_state");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid>("ExternalLoginId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("external_login_id");
+
+                    b.Property<Guid>("Generation")
+                        .IsConcurrencyToken()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("generation");
+
+                    b.Property<Guid>("LocalSubjectId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("local_subject_id");
+
+                    b.Property<string>("PendingAddress")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("pending_address");
+
+                    b.Property<Guid>("PersonalActorId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("personal_actor_id");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("purpose");
+
+                    b.Property<string>("ResultSecurityStamp")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("result_security_stamp");
+
+                    b.Property<string>("SecurityStamp")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("security_stamp");
+
+                    b.Property<DateTime?>("SynchronizedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("synchronized_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ie_local_identity_lifecycle_operations");
+
+                    b.HasIndex("LocalSubjectId", "Purpose", "ExpiresAt")
+                        .HasDatabaseName("ix_local_identity_lifecycle_operations_local_subject_id_purpose_expires_at");
+
+                    b.ToTable("ie_local_identity_lifecycle_operations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_local_lifecycle_consumption", "(consumed_at IS NULL AND result_security_stamp IS NULL AND synchronized_at IS NULL) OR (consumed_at IS NOT NULL AND result_security_stamp IS NOT NULL AND consumed_at >= created_at AND consumed_at < expires_at AND (synchronized_at IS NULL OR synchronized_at >= consumed_at))");
+
+                            t.HasCheckConstraint("ck_local_lifecycle_delivery_attempt", "(delivery_attempt_count = 0 AND delivery_attempt_id IS NULL AND delivery_admitted_at IS NULL AND delivery_completed_at IS NULL AND delivery_state IN (0,3)) OR (delivery_attempt_count > 0 AND delivery_attempt_id IS NOT NULL AND delivery_admitted_at IS NOT NULL AND delivery_admitted_at >= created_at AND delivery_admitted_at < expires_at AND (delivery_completed_at IS NULL OR delivery_completed_at >= delivery_admitted_at) AND (delivery_state <> 1 OR delivery_completed_at IS NULL) AND (delivery_state <> 2 OR delivery_completed_at IS NOT NULL))");
+
+                            t.HasCheckConstraint("ck_local_lifecycle_delivery_state", "delivery_state BETWEEN 0 AND 3 AND delivery_attempt_count BETWEEN 0 AND 3");
+
+                            t.HasCheckConstraint("ck_local_lifecycle_expiry", "expires_at > created_at");
+
+                            t.HasCheckConstraint("ck_local_lifecycle_purpose", "purpose BETWEEN 1 AND 3");
+                        });
+                });
+
             modelBuilder.Entity("Explore.Persistence.Identity.LocalIdentityRole", b =>
                 {
                     b.Property<Guid>("Id")
@@ -36635,6 +36890,7 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasName("pk_ie_local_identity_users");
 
                     b.HasIndex("NormalizedEmail")
+                        .IsUnique()
                         .HasDatabaseName("ix_local_identity_users_normalized_email");
 
                     b.HasIndex("NormalizedUserName")
@@ -36642,6 +36898,60 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .HasDatabaseName("ix_local_identity_users_normalized_user_name");
 
                     b.ToTable("ie_local_identity_users", (string)null);
+                });
+
+            modelBuilder.Entity("Explore.Persistence.Models.AnonymousChallengeEventQuota", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("event_id");
+
+                    b.Property<int>("Issued")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("issued");
+
+                    b.Property<long>("WindowMinute")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("window_minute");
+
+                    b.HasKey("TenantId", "EventId")
+                        .HasName("pk_ie_anonymous_challenge_event_quotas");
+
+                    b.ToTable("ie_anonymous_challenge_event_quotas", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_anon_challenge_event_count", "issued >= 0 AND issued <= 10000");
+
+                            t.HasCheckConstraint("ck_anon_challenge_event_minute", "window_minute >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Explore.Persistence.Models.AnonymousChallengeTenantQuota", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<int>("Issued")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("issued");
+
+                    b.Property<long>("WindowMinute")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("window_minute");
+
+                    b.HasKey("TenantId")
+                        .HasName("pk_ie_anonymous_challenge_tenant_quotas");
+
+                    b.ToTable("ie_anonymous_challenge_tenant_quotas", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_anon_challenge_tenant_count", "issued >= 0 AND issued <= 10000");
+
+                            t.HasCheckConstraint("ck_anon_challenge_tenant_minute", "window_minute >= 0");
+                        });
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
@@ -48486,6 +48796,47 @@ namespace Explore.Persistence.Migrations.Sqlite.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_configuration_direct_transfer_chunks_configuration_direct_transfer_sessions_session_id");
+                });
+
+            modelBuilder.Entity("Explore.Persistence.Identity.LocalIdentityCredentialOperation", b =>
+                {
+                    b.HasOne("Explore.Persistence.Identity.LocalIdentityUser", null)
+                        .WithMany()
+                        .HasForeignKey("LocalSubjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_local_identity_credential_operation_local_identity_users_local_subject_id");
+                });
+
+            modelBuilder.Entity("Explore.Persistence.Identity.LocalIdentityLifecycleOperation", b =>
+                {
+                    b.HasOne("Explore.Persistence.Identity.LocalIdentityUser", null)
+                        .WithMany()
+                        .HasForeignKey("LocalSubjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_local_identity_lifecycle_operations_local_identity_users_local_subject_id");
+                });
+
+            modelBuilder.Entity("Explore.Persistence.Models.AnonymousChallengeEventQuota", b =>
+                {
+                    b.HasOne("Explore.Domain.Event", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "EventId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_anonymous_challenge_event_quotas_events_tenant_id_event_id");
+                });
+
+            modelBuilder.Entity("Explore.Persistence.Models.AnonymousChallengeTenantQuota", b =>
+                {
+                    b.HasOne("Explore.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_anonymous_challenge_tenant_quotas_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>

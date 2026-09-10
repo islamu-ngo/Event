@@ -141,6 +141,129 @@ Registration and Admission are kept in separate aggregates for five critical arc
 
 ---
 
+## Visitor Onboarding And New Allocation Policy
+
+`public_experience.visitor_access_mode` is separate from the existing public display
+mode. Its values are `FullRegistrationAndAuth`, `AnonymousOnly` and
+`DirectoryListingOnly`. The default permits only capabilities actually available;
+it does not promise public signup. Local-only hosting can offer anonymous native
+participation and operator login, but cannot configure AccountRequired events on
+the strength of Local sign-in alone.
+
+The Application-owned `VisitorAccessCapabilityResolver` has one pure evaluator
+for current and complete proposed policy states. Keycloak and Google onboarding
+require explicit operator policy and a trusted signup URL; AT Protocol uses its
+provider-selected native onboarding flow. SMTP and the identity of the primary
+provider are not substitutes for the aggregate capability.
+
+Configuration, direct creation, import, draft update and ordinary/privileged
+publication must reject unusable AccountRequired participation. The shared
+`EventPublicationExecutor` preserves this condition when privileged publication
+skips approval. The common new-order starter rejects new native allocation in
+DirectoryListingOnly mode before inventory or order effects. Existing lawful
+status and cancellation access do not inherit that new-allocation restriction.
+
+Provider and visitor-setting writes evaluate their complete final effective state,
+including inherited tenants and configured unpublished events. Removing the last
+eligible public onboarding path conflicts while affected AccountRequired
+configurations remain; the writer never silently rewrites those events.
+Generic, batch, reset, lock/unlock and control-plane writes use the same boundary.
+Configuration import keeps its existing allowed-key contract rather than making
+prohibited authentication keys portable.
+
+Both sides acquire the full `VisitorAccessCapabilityResolver.AuthoritySettingKeys`
+group through `ISettingMutationLock.ExecuteOrderedGroupsAsync` before opening
+their transaction or reading its authority snapshot. Existing SMTP/reporting
+groups join that one outer acquisition in the canonical order. `ExecuteManyAsync`
+is not an outer lease: it may open a transaction itself. Rejected mutations leave
+policy, event and allocation state unchanged; notifications follow commit.
+
+## Limited Post-Confirmation Guest Status
+
+`GetGuestRegistrationStatusQuery` uses a separate
+`GuestRegistrationStatusAccessGuard`, not the general checkout guard. It reuses
+the existing random guest capability/hash and returns a PII-free lifecycle DTO.
+The original `ExpiresAt` still bounds checkout, forms, payments and participant
+editing. Status access does not extend those authorities or expose admission
+credentials.
+
+New challenged guest allocation establishes nullable UTC
+`RegistrationOrder.GuestStatusAccessUntilUtc` in its existing serializable
+transaction under the event row fence. `RegistrationOrder.GetGuestStatusDeadline`
+uses finite authoritative `Event.LastSessionEndUtc` plus 30 days. A missing,
+unrepresentable or already elapsed result rejects the new guest allocation before
+order/hold or irreversible payment state; account allocation is unchanged.
+There is no migration default, historical backfill or invented event-end snapshot.
+
+The authorized status read takes existing order/event fences and fresh
+tenant-qualified entity snapshots. Confirmed or post-confirmation Cancelled
+orders require the exact hash and a live persisted promise. A conditional
+stamp/scope/hash/deadline update may extend that live promise to a later current
+event deadline; earlier or null schedules cannot shorten it. Expired or missing
+promises do not revive. If the original promise expires during a CAS wait, the
+extension rolls back. Disclosure rechecks time after read/transaction waits.
+
+The DTO contains only event/order IDs, status lookup IDs, actual confirmation/
+cancellation times, current last-session end and the promised deadline. Event
+cancellation is not inferred to be order cancellation or completed revocation.
+No names, contact, answers, participant IDs, payment details, private location,
+raw capability or hash enter the status projection. Confirmed guest cancellation
+is the separate explicit POST below, never an effect of a status GET.
+
+The API accepts `X-Registration-Order-Capability` only and returns generic 404
+for invalid, absent, foreign, deleted, expired or unpromised access. Status and
+post-confirmation discovery are private/no-store and no-referrer, including
+short-circuit errors. Status HAL is separate from checkout HAL: self and an
+eligible existing public calendar relation only. Public calendar uses its
+existing query, Ical.Net serializer, stable UID and Public location disclosure;
+`calendar/my-access` is not extended to guests.
+
+The private browser landing scrubs fragment material before analytics/network
+initialization and restores only the exact scoped capability in memory. Explicit
+copy/download is the durable user action, with no bearer URL in server-rendered
+markup. See [the adopter guide](../public/documentation/readme/events-and-ticketing/email-optional-participation.md).
+
+## Free Anonymous Confirmed Cancellation
+
+`CancelConfirmedGuestRegistrationCommand` reuses the limited P09 capability and
+live promise but adds exact free/anonymous/attendance eligibility. Unconfirmed
+orders have no authority for this purpose and return generic 404. Valid
+post-confirmation authority on ineligible paid, attended or unsupported state
+returns bounded 409. `cancel-registration` HAL is projected from the same native
+eligibility service; no role, current balance or client status flag grants it.
+
+`AnonymousCancellationRules` uses pinned booking/participation/account facts,
+frozen line/add-on/contribution totals and exact order-level paid acceptance,
+payment-attempt and success-observation history. GuestAllowed and
+CapabilityTokenAllowed remain supported anonymous profiles. Generic Confirmed
+terminal rules and active-only hold release remain unchanged; explicit
+aggregate/coordinator methods own this narrower transition.
+
+One serializable Application transaction holds order/issuance exclusion while
+discovering full ticket lineage. Native assignment/readiness, ticket and target
+fences follow their established order and sorted identities. Check-in does not
+take the order lock, so that lock alone or an empty active-state query cannot
+prove no attendance. Current counters and append-only history, including undo,
+remain evidence. Mutation state is reloaded after any P09 promise CAS.
+Issuance also reloads an already tracked order under its authority fence, so a
+previously observed Confirmed state cannot issue admission after cancellation
+has released capacity. The refresh preserves the surrounding tracked graph.
+
+The transaction-bound core of `AdmissionRevocationService` is reused without
+nesting its public UoW wrapper. Exact consumed holds are conditionally released
+under pool fences, preserving quantity and consumption history while recording
+release time/stamp. Revocation, release and order transition commit together;
+deadline crossings and failed evidence checks roll back effects. Duplicate
+success cannot repeat those effects. Existing paid/refund/staff callers keep
+their prior transaction and authority contracts.
+
+The bodyless capability-header POST is private/no-store/no-referrer and suppresses
+generic response replay; each invocation rechecks current authority and the
+aggregate owns idempotence. The browser confirms a captured event/order/capability
+and route generation, allows one pending operation, and refreshes canonical
+status after success or conflict. The BFF retains antiforgery and private failure
+headers. No capability is added to URLs or request bodies.
+
 ## 5. End-to-End Lifecycle Sequence
 
 ```mermaid
@@ -256,6 +379,67 @@ An `AdmissionScannerCapability` has **one exact `AdmissionTarget`**. A door or t
 Connectivity loss is a denial of admission validation, not permission to validate locally. The scanner must show a bounded outage state, retain no offline validation or submission queue, and resume only after the service is available. Emergency exception admission is **not implemented**: any future design must be a separate authenticated, reasoned, append-only operator action with later reconciliation; it must not be inferred from a scanner outage.
 
 See [Operations](OPERATIONS.md#admission-check-in-operations-phase-21) for incident response, export-safe audit, alerts, and rollback evidence.
+
+### Studio Visitor-Policy Refresh
+
+Participation validation failures retain the API's machine-consumed `code`
+extension through the generated client and `EventService`. A visitor-policy
+rejection reaches `ParticipationConfigurationEditor` unchanged, allowing its
+existing reload callback to fetch current canonical capabilities. The editor
+then disables unavailable AccountRequired choices rather than inferring
+permission from its stale draft. Generic validation failures without a string
+code retain the existing fallback.
+
+### Registration Artifact Retention Authority
+
+Generic storage updates cannot change the resource kind, resource identifier or
+actor ownership of registration-owned artifacts. Ownership includes a recorded
+registration-content deadline, a registration storage kind or linked answer-file
+evidence. Ordinary metadata changes do not remove that provenance.
+
+`StorageObjectContentReader` enforces a persisted artifact deadline independently
+of whether the linked order is currently classified as anonymous. The existing
+pre-open and post-open disclosure checks both enforce it; an already-opened
+stream is disposed if the deadline passes while the provider is opening it.
+Released answer files retain their submission/order authority, and cleanup keeps
+the original export lineage.
+
+Retention cleanup acquires the provider-submission worker's transaction-owned
+claim lock before deleting answers. If a Pending effect has never been claimed,
+its mapped expired answers are selected for deletion and no transferable live
+mapped answer remains, cleanup uses the existing claim/dead-letter transitions
+to record `registration_data_retention_expired` in the same transaction. No
+intermediate claim escapes that commit. Missing or unmapped answers alone are
+not expiry evidence. Processing, previously attempted, completed and parked work
+retain their existing outcome because an external handoff may already have
+occurred.
+
+### Anonymous Cancellation And Committed Attendance
+
+`AnonymousCancellationService` retains the shared order, event, assignment,
+ticket, target and capacity-pool fences through its transaction. Its explicit
+`IUnitOfWork.ExecuteReadCommittedAsync` boundary ensures attendance reads after
+lock acquisition observe check-ins committed while earlier fences were pending.
+PostgreSQL Serializable snapshots cannot provide that freshness merely by
+acquiring `FOR UPDATE` locks later in the transaction. MySQL also receives
+explicit Read Committed rather than relying on its default Repeatable Read.
+SQLite retains Serializable writer exclusion.
+
+Order cancellation, admission revocation and exact consumed-capacity release
+remain atomic. Any recorded attendance, including subsequently undone entry,
+rejects guest cancellation. The real PostgreSQL regression commits check-in
+before cancellation's first assignment fence and verifies rejection without
+releasing capacity; no sleep or polling determines the interleaving.
+
+Hold recovery leaves an Expired audit row and creates a replacement allocation.
+`AnonymousCancellationContext` retains and validates that history, while its
+`ConsumedHolds` projection fixes the identities eligible for release. The
+projection remains stable after those entities transition to Released, so the
+service can still compare the exact returned release identities. Expired rows
+are never released again or deleted by cancellation. Deleted lineage and
+nonempty hold history without a consumed allocation remain ineligible.
+Completed replay validates the cancellation timestamp without changing stamps
+or releasing capacity twice.
 
 ## 7. Related Documentation & ADRs
 

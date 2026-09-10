@@ -140,6 +140,14 @@ x-api-runtime-env: &api-runtime-env
   SETUP_SECRET: ${SETUP_SECRET:-}
   SETUP_SECRET_FILE: ${SETUP_SECRET_FILE:-/app/bootstrap/setup-secret}
   SETUP_SECRET_REQUIRED: ${SETUP_SECRET_REQUIRED:-true}
+  INSTANCE_BOOTSTRAP_MODE: ${INSTANCE_BOOTSTRAP_MODE:-Interactive}
+  INSTANCE_BOOTSTRAP_ADMIN_PROVIDER: ${INSTANCE_BOOTSTRAP_ADMIN_PROVIDER:-}
+  INSTANCE_BOOTSTRAP_ADMIN_SUBJECT: ${INSTANCE_BOOTSTRAP_ADMIN_SUBJECT:-}
+  INSTANCE_BOOTSTRAP_BINDING_GENERATION: ${INSTANCE_BOOTSTRAP_BINDING_GENERATION:-}
+  INSTANCE_BOOTSTRAP_ADMIN_EMAIL: ${INSTANCE_BOOTSTRAP_ADMIN_EMAIL:-}
+  INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME: ${INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME:-}
+  INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME: ${INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME:-}
+  INSTANCE_BOOTSTRAP_LOCAL_PASSWORD: ${INSTANCE_BOOTSTRAP_LOCAL_PASSWORD:-}
   Hosting__ReplicaCount: ${HOSTING_REPLICA_COUNT:-1}
   Promotions__CodeLookup__ActiveKeyVersion: ${PROMOTIONS_CODE_LOOKUP_ACTIVE_KEY_VERSION:-1}
   PROMOTIONS_CODE_LOOKUP_HMAC_KEY: ${PROMOTIONS_CODE_LOOKUP_HMAC_KEY:-}
@@ -209,17 +217,17 @@ x-mcp-env: &mcp-env
   MCP_ENABLE_LEGACY_SSE: ${MCP_ENABLE_LEGACY_SSE:-true}
 
 x-smtp-env: &smtp-env
-  MAIL_SMTP_HOST: ${MAIL_SMTP_HOST:-mailpit}
-  MAIL_SMTP_PORT: ${MAIL_SMTP_PORT:-1025}
+  MAIL_SMTP_HOST: ${MAIL_SMTP_HOST:-}
+  MAIL_SMTP_PORT: ${MAIL_SMTP_PORT:-}
   MAIL_SMTP_USERNAME: ${MAIL_SMTP_USERNAME:-}
   MAIL_SMTP_PASSWORD: ${MAIL_SMTP_PASSWORD:-}
-  MAIL_SMTP_ENCRYPTION: ${MAIL_SMTP_ENCRYPTION:-None}
-  MAIL_SMTP_FROM_ADDRESS: ${MAIL_SMTP_FROM_ADDRESS:-noreply@localhost}
-  MAIL_SMTP_FROM_NAME: ${MAIL_SMTP_FROM_NAME:-ISLAMU Event Dev}
+  MAIL_SMTP_ENCRYPTION: ${MAIL_SMTP_ENCRYPTION:-}
+  MAIL_SMTP_FROM_ADDRESS: ${MAIL_SMTP_FROM_ADDRESS:-}
+  MAIL_SMTP_FROM_NAME: ${MAIL_SMTP_FROM_NAME:-}
 
 x-email-dispatch-rabbitmq-env: &email-dispatch-rabbitmq-env
   ConnectionStrings__messaging: ${MESSAGING_URI:-}
-  EmailDispatchRabbitMq__Enabled: ${EMAIL_DISPATCH_RABBITMQ_ENABLED:-true}
+  EmailDispatchRabbitMq__Enabled: ${EMAIL_DISPATCH_RABBITMQ_ENABLED:-false}
   EmailDispatchRabbitMq__ConnectionStringName: ${EMAIL_DISPATCH_RABBITMQ_CONNECTION_STRING_NAME:-messaging}
   EmailDispatchRabbitMq__ConnectionString: ${EMAIL_DISPATCH_RABBITMQ_CONNECTION_STRING:-}
   EmailDispatchRabbitMq__ExchangeName: ${EMAIL_DISPATCH_RABBITMQ_EXCHANGE_NAME:-explore.email-dispatch}
@@ -371,20 +379,19 @@ services:
       timeout: 3s
       retries: 5
 
+  # Optional local capture only. Starting this profile never enables delivery.
   mailpit:
-    image: axllent/mailpit:${MAILPIT_TAG:-latest}
+    profiles: ["mail"]
+    image: axllent/mailpit:v1.30.0@sha256:0059ef81e492a7192af3816281eed6859eb078bd7bdc58b76757c13e10e53a7d
     restart: unless-stopped
     environment:
-      MP_MAX_MESSAGES: ${MAILPIT_MAX_MESSAGES:-5000}
+      MP_MAX_MESSAGES: "500"
       MP_DATABASE: /data/mailpit.db
-      MP_SMTP_AUTH_ACCEPT_ANY: "1"
-      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
       MP_DISABLE_VERSION_CHECK: "true"
     volumes:
       - mailpit_data:/data
     ports:
-      - "${MAILPIT_SMTP_PORT:-1025}:1025"
-      - "${MAILPIT_UI_PORT:-8025}:8025"
+      - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"
 
   keycloak-db:
     image: postgres:18-alpine
@@ -524,8 +531,6 @@ services:
         condition: service_healthy
       keycloak-init:
         condition: service_completed_successfully
-      mailpit:
-        condition: service_started
       minio:
         condition: service_healthy
         required: false

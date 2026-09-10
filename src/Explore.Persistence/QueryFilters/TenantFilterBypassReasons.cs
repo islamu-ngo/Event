@@ -8,6 +8,12 @@ public static class TenantFilterBypassReasons
     public const string InstanceConfigurationManifestExport =
         "Instance-authorized configuration manifest export reads every active tenant for one whole-instance artifact.";
 
+    public const string VisitorPolicyAccountRequiredSafetyRead =
+        "Visitor policy mutation evaluates AccountRequired configurations across affected tenant scopes; optional tenant selection uses an exact predicate.";
+
+    public const string VisitorPolicyAuthorityInheritanceSafetyRead =
+        "Visitor policy mutation composes final inheritance across affected tenants using only canonical authority keys.";
+
     public const string TenantScopedRepositoryExactTenantPredicate =
         "Repository bypasses the ambient tenant filter only after applying an explicit tenant predicate.";
 
@@ -112,6 +118,9 @@ public static class TenantFilterBypassReasons
 
     public const string EmailDispatchTenantOperation =
         "Email dispatch tenant operation bypasses ambient context only after applying an explicit tenant predicate.";
+
+    public const string EmailDeliveryPolicyReconciliation =
+        "SMTP policy reconciliation accesses non-secret settings and control rows for selected tenants under delivery-policy coordination.";
 
     public const string WebhookWorkerCrossTenantQueue =
         "Webhook delivery worker polls and updates durable webhook rows across tenants using explicit id/status predicates.";

@@ -14,6 +14,32 @@ namespace Event.Application.UnitTests.Features.Authentication.Local;
 
 public sealed class LocalAuthenticationCommandHandlerTests
 {
+    [Test]
+    public async Task ReplacementChallengeNeverEntersOrdinaryUserSynchronization()
+    {
+        var service = Substitute.For<ILocalIdentityAuthService>();
+        var sender = Substitute.For<ISender>();
+        var challenge = new LocalIssuedReplacementChallenge(
+            token: Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),
+            expiresAt: DateTimeOffset.UtcNow.AddMinutes(5));
+        service.AuthenticateAsync(Arg.Any<LocalAuthRequestDto>(), Arg.Any<CancellationToken>())
+            .Returns(LocalAuthResponseDto.ReplacementRequired(challenge: challenge));
+        sender.Send(Arg.Any<SyncUserCommand>(), Arg.Any<CancellationToken>())
+            .Returns<Task<BaseCommandResponse<Guid>>>(_ => throw new InvalidOperationException(
+                "A replacement challenge must not synchronize an ordinary user session."));
+        var handler = new LocalLoginCommandHandler(authService: service,
+            providerDispatcher: CreateActiveDispatcher(), sender: sender);
+
+        LocalAuthResponseDto response = await handler.Handle(
+            new LocalLoginCommand(new LocalAuthRequestDto(Identifier: "admin@example.test", Password: CreateValidPassword())),
+            CancellationToken.None);
+
+        await Assert.That(response.Outcome).IsEqualTo(LocalAuthOutcome.ReplacementRequired);
+        await Assert.That(response.Success).IsFalse();
+        await Assert.That(response.Token).IsNull();
+        await Assert.That(response.ReplacementChallenge?.Token).IsEqualTo(challenge.Token);
+    }
+
     private static readonly Guid UserId =
         Guid.Parse("01990aa7-4c67-7fb8-a303-8b301cc615af");
 
@@ -35,7 +61,7 @@ public sealed class LocalAuthenticationCommandHandlerTests
             CancellationToken.None);
 
         await Assert.That(result.Success).IsFalse();
-        await Assert.That(result.FailureCode).IsEqualTo("invalid_request");
+        await Assert.That(result.Failure).IsEqualTo(LocalAuthFailure.InvalidRequest);
         await authService.DidNotReceiveWithAnyArgs()
             .AuthenticateAsync(default!, default);
     }
@@ -96,116 +122,78 @@ public sealed class LocalAuthenticationCommandHandlerTests
             CancellationToken.None);
 
         await Assert.That(result.Success).IsFalse();
-        await Assert.That(result.FailureCode).IsEqualTo("provider_inactive");
+        await Assert.That(result.Failure).IsEqualTo(LocalAuthFailure.ProviderInactive);
         await authService.DidNotReceiveWithAnyArgs()
             .AuthenticateAsync(default!, default);
     }
 
     [Test]
-    public async Task SuccessfulRegistrationSynchronizesNormalizedLocalAccount()
+    [Arguments(LocalAuthFailure.EmailVerificationRequired)]
+    [Arguments(LocalAuthFailure.AuthenticationFailed)]
+    public async Task DeniedIssuanceNeverAttemptsDomainSynchronization(LocalAuthFailure failure)
     {
         var authService = Substitute.For<ILocalIdentityAuthService>();
         var sender = Substitute.For<ISender>();
-        LocalRegistrationResponseDto registered =
-            LocalRegistrationResponseDto.Registered(CreateAuthenticatedResponse());
-        authService.RegisterAsync(
-                Arg.Any<LocalRegistrationRequestDto>(),
+        authService.AuthenticateAsync(
+                Arg.Any<LocalAuthRequestDto>(),
                 Arg.Any<CancellationToken>())
-            .Returns(registered);
-        sender.Send(
-                Arg.Any<SyncUserCommand>(),
-                Arg.Any<CancellationToken>())
-            .Returns(BaseCommandResponse.Success(UserId));
-        var handler = new LocalRegisterCommandHandler(
+            .Returns(LocalAuthResponseDto.Failed(failure: failure));
+        sender.Send(Arg.Any<SyncUserCommand>(), Arg.Any<CancellationToken>())
+            .Returns<Task<BaseCommandResponse<Guid>>>(_ =>
+                throw new InvalidOperationException("Denied issuance must not synchronize a domain user."));
+        var handler = new LocalLoginCommandHandler(
             authService,
             CreateActiveDispatcher(),
             sender);
 
-        LocalRegistrationResponseDto result = await handler.Handle(
-            new LocalRegisterCommand(CreateRegistrationRequest()),
-            CancellationToken.None);
-
-        await Assert.That(result).IsEqualTo(registered);
-        await sender.Received().Send(
-            Arg.Is<SyncUserCommand>(command =>
-                command != null
-                && command.AccountKey.ProviderKind == AuthenticationProviderKind.Local
-                && command.AccountKey.Value == UserId.ToString("D")
-                && command.UserDto.Id == UserId
-                && command.UserDto.EmailVerified == true),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Test]
-    public async Task FailedRegistrationNeverAttemptsDomainSynchronization()
-    {
-        var authService = Substitute.For<ILocalIdentityAuthService>();
-        var sender = Substitute.For<ISender>();
-        authService.RegisterAsync(
-                Arg.Any<LocalRegistrationRequestDto>(),
-                Arg.Any<CancellationToken>())
-            .Returns(LocalRegistrationResponseDto.Failed("registration_failed"));
-        var handler = new LocalRegisterCommandHandler(
-            authService,
-            CreateActiveDispatcher(),
-            sender);
-
-        LocalRegistrationResponseDto result = await handler.Handle(
-            new LocalRegisterCommand(CreateRegistrationRequest()),
+        LocalAuthResponseDto result = await handler.Handle(
+            new LocalLoginCommand(new LocalAuthRequestDto(Identifier: "admin@example.test", Password: CreateValidPassword())),
             CancellationToken.None);
 
         await Assert.That(result.Success).IsFalse();
-        await Assert.That(result.FailureCode).IsEqualTo("registration_failed");
-        await sender.DidNotReceiveWithAnyArgs()
-            .Send(default(SyncUserCommand)!, default);
+        await Assert.That(result.Failure).IsEqualTo(failure);
+        await Assert.That(result.Token).IsNull();
     }
 
     [Test]
-    public async Task SynchronizationFailureDoesNotExposeNewlyIssuedRegistrationToken()
+    public async Task SynchronizationFailureDoesNotExposeNewlyIssuedLoginToken()
     {
         var authService = Substitute.For<ILocalIdentityAuthService>();
         var sender = Substitute.For<ISender>();
-        authService.RegisterAsync(
-                Arg.Any<LocalRegistrationRequestDto>(),
+        authService.AuthenticateAsync(
+                Arg.Any<LocalAuthRequestDto>(),
                 Arg.Any<CancellationToken>())
-            .Returns(LocalRegistrationResponseDto.Registered(CreateAuthenticatedResponse()));
+            .Returns(CreateAuthenticatedResponse());
         sender.Send(
                 Arg.Any<SyncUserCommand>(),
                 Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Validation<Guid>(
                 ["Domain synchronization failed."],
                 "Domain synchronization failed."));
-        var handler = new LocalRegisterCommandHandler(
+        var handler = new LocalLoginCommandHandler(
             authService,
             CreateActiveDispatcher(),
             sender);
 
-        LocalRegistrationResponseDto result = await handler.Handle(
-            new LocalRegisterCommand(CreateRegistrationRequest()),
+        LocalAuthResponseDto result = await handler.Handle(
+            new LocalLoginCommand(new LocalAuthRequestDto(Identifier: "admin@example.test", Password: CreateValidPassword())),
             CancellationToken.None);
 
         await Assert.That(result.Success).IsFalse();
-        await Assert.That(result.FailureCode).IsEqualTo("user_sync_failed");
-        await Assert.That(result.Authentication).IsNull();
+        await Assert.That(result.Failure).IsEqualTo(LocalAuthFailure.UserSynchronizationFailed);
+        await Assert.That(result.Token).IsNull();
     }
-
-    private static LocalRegistrationRequestDto CreateRegistrationRequest() =>
-        new(
-            "admin@example.test",
-            CreateValidPassword(),
-            "Site",
-            "Administrator");
 
     private static LocalAuthResponseDto CreateAuthenticatedResponse() =>
         LocalAuthResponseDto.Authenticated(
-            UserId,
-            "admin@example.test",
-            "Site",
-            "Administrator",
-            true,
-            ["Admin"],
-            Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),
-            ExpiresAt);
+            userId: UserId,
+            email: "admin@example.test",
+            firstName: "Site",
+            lastName: "Administrator",
+            emailVerified: true,
+            roles: ["Admin"],
+            token: Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),
+            expiresAt: ExpiresAt);
 
     private static string CreateValidPassword() =>
         Convert.ToBase64String(RandomNumberGenerator.GetBytes(24));

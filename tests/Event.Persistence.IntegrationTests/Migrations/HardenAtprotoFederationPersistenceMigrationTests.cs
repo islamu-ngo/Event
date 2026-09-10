@@ -112,11 +112,10 @@ public sealed class AtprotoFederationBaselineGuardTests(PostgreSqlContainerFixtu
         string[] available = context.Database.GetMigrations().ToArray();
         string[] applied = (await context.Database.GetAppliedMigrationsAsync()).ToArray();
 
-        await Assert.That(available.Count(migration =>
-                migration.EndsWith("_Init", StringComparison.Ordinal)))
-            .IsEqualTo(1);
+        await Assert.That(available.Where(id => id.EndsWith("_Init", StringComparison.Ordinal)))
+            .HasSingleItem();
         await Assert.That(available[0]).EndsWith("_Init");
-        await Assert.That(applied).IsEquivalentTo(available);
+        await Assert.That(applied).IsEquivalentTo(available, TUnit.Assertions.Enums.CollectionOrdering.Matching);
     }
 
     private async Task<long> ReadCountAsync(

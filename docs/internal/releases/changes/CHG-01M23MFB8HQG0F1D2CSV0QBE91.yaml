@@ -1,0 +1,28 @@
+Change-Id: CHG-01M23MFB8HQG0F1D2CSV0QBE91
+Title: "Preserve permanent retention outcomes before answer cleanup"
+Type: fix
+Scope: privacy
+Summary: "Settle never-attempted provider submissions with expired mapped answers in the cleanup transaction, without reclassifying uncertain prior handoffs."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/ADMISSION_AND_REGISTRATION.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Cleanup atomically records known permanent retention expiry only for never-attempted provider work and preserves uncertain handoff outcomes.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/email-optional-participation.md
+    Disposition: documented
+    Detail: Cleanup ordering no longer changes known retention expiry into an ambiguous empty provider submission.

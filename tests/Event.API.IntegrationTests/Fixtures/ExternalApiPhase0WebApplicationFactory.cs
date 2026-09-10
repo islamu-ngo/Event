@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Channels;
 using System.Threading.RateLimiting;
@@ -36,7 +37,7 @@ public sealed class ExternalApiPhase0WebApplicationFactory : WebApplicationFacto
 {
     public const string TestIssuer = "https://phase0-auth.test";
 
-    private const string JwtSigningKey = "phase0-test-signing-key-12345678901234567890";
+    private readonly byte[] _jwtSigningKey = RandomNumberGenerator.GetBytes(64);
     private readonly string _databaseName = $"InMemoryDbForExternalApiPhase0_{Guid.NewGuid():N}";
 
     public DeploymentMode DeploymentMode { get; init; } = DeploymentMode.MultiTenant;
@@ -97,8 +98,6 @@ public sealed class ExternalApiPhase0WebApplicationFactory : WebApplicationFacto
                 ["Database:Host"] = "localhost",
                 ["Database:Port"] = "5432",
                 ["Database:Database"] = "explore_db_test",
-                ["Database:Runtime:Username"] = "postgres",
-                ["Database:Runtime:Password"] = "postgres",
                 ["Database:Runtime:TlsMode"] = "Prefer",
                 ["Database:Runtime:TrustServerCertificate"] = "false",
                 ["Keycloak:Authority"] = TestIssuer,
@@ -108,8 +107,6 @@ public sealed class ExternalApiPhase0WebApplicationFactory : WebApplicationFacto
                 ["Keycloak:MetadataAddress"] = $"{TestIssuer}/.well-known/openid-configuration",
                 ["S3Settings:Region"] = "us-east-1",
                 ["S3Settings:BucketName"] = "test-bucket",
-                ["S3Settings:AccessKeyId"] = "test-key",
-                ["S3Settings:SecretAccessKey"] = "test-secret",
                 ["S3Settings:Endpoint"] = "https://s3.example.com",
                 ["Deployment:Mode"] = DeploymentMode.ToString(),
                 ["Deployment:DefaultTenantId"] = DefaultTenantId.ToString(),
@@ -222,11 +219,11 @@ public sealed class ExternalApiPhase0WebApplicationFactory : WebApplicationFacto
             if (SetupSecretProviderOverride is not null)
             {
                 services.RemoveAll<ISetupSecretProvider>();
-            if (AuthProviderConfigurationServiceOverride is not null)
-            {
-                services.RemoveAll<IAuthProviderConfigurationService>();
-                services.AddSingleton(AuthProviderConfigurationServiceOverride);
-            }
+                if (AuthProviderConfigurationServiceOverride is not null)
+                {
+                    services.RemoveAll<IAuthProviderConfigurationService>();
+                    services.AddSingleton(AuthProviderConfigurationServiceOverride);
+                }
 
                 services.AddSingleton(SetupSecretProviderOverride);
             }
@@ -320,7 +317,7 @@ public sealed class ExternalApiPhase0WebApplicationFactory : WebApplicationFacto
 
             services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
             {
-                var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtSigningKey));
+                var signingKey = new SymmetricSecurityKey(_jwtSigningKey);
 
                 options.Authority = TestIssuer;
                 options.MetadataAddress = string.Empty;
@@ -349,7 +346,7 @@ public sealed class ExternalApiPhase0WebApplicationFactory : WebApplicationFacto
 
     public string CreateJwt(Guid userId, IEnumerable<Claim>? additionalClaims = null)
     {
-        var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtSigningKey));
+        var signingKey = new SymmetricSecurityKey(_jwtSigningKey);
         var credentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
         var claims = new List<Claim>
         {

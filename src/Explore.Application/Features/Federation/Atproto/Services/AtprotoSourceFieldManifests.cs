@@ -320,6 +320,7 @@ public static class AtprotoEventSourceFieldManifest
         Description("StorageObject.ContentType"),
         Description("StorageObject.Size"),
         Description("StorageObject.Purpose"),
+        Excluded("StorageObject.RegistrationContentRetentionUntilUtc", "private registration-content retention deadline, never public payload"),
         Description("StorageObject.FileType.MasterCode"),
         Description("StorageObject.FileType.FullName"),
         Description("StorageObject.FileType.Description"),

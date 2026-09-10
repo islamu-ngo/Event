@@ -3,6 +3,7 @@ namespace Explore.Application.Features.Settings.Handlers.Commands;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Features.Settings.Requests.Commands;
 using Explore.Application.Notifications;
 using Explore.Application.Responses;
@@ -24,6 +25,8 @@ public class LockSettingCommandHandler
     private readonly IPublicationPolicyMutationBoundary _publicationPolicyMutationBoundary;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ISettingMutationLock _mutationLock;
+    private readonly IEmailDeliverySettingsWriter _emailSettingsWriter;
+    private readonly IVisitorAccessSettingsWriter _visitorSettings;
 
     public LockSettingCommandHandler(
         IHierarchicalSettingsResolver resolver,
@@ -35,6 +38,8 @@ public class LockSettingCommandHandler
         IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary,
         IUnitOfWork unitOfWork,
         ISettingMutationLock mutationLock,
+        IEmailDeliverySettingsWriter emailSettingsWriter,
+        IVisitorAccessSettingsWriter visitorSettings,
         ICerbosConfigResolver? cerbosConfigResolver = null)
     {
         _resolver = resolver;
@@ -47,6 +52,8 @@ public class LockSettingCommandHandler
         _publicationPolicyMutationBoundary = publicationPolicyMutationBoundary;
         _unitOfWork = unitOfWork;
         _mutationLock = mutationLock;
+        _emailSettingsWriter = emailSettingsWriter;
+        _visitorSettings = visitorSettings;
     }
 
     public async Task<BaseCommandResponse<Guid>> Handle(
@@ -84,6 +91,26 @@ public class LockSettingCommandHandler
 
         var (scopeId, actorId) = SettingCommandHelper.GetScopeAndActorIds(
             request.Scope, _tenantContext, _currentUserService);
+
+        if (VisitorAccessSettingMutationGuard.Handles(request.Key))
+        {
+            var result = await _visitorSettings.ApplyAsync(
+                [new(request.Scope == SettingScope.Tenant ? scopeId : null, request.Key,
+                    VisitorAccessSettingMutationKind.SetLock, IsLocked: true)], actorId, cancellationToken);
+            return await result.CompleteAsync(_resolver, _mediator, request.Scope, scopeId);
+        }
+
+        if (EmailDeliverySettingKeys.Contains(request.Key))
+        {
+            var result = await _emailSettingsWriter.ApplyAsync(
+                [new EmailDeliverySettingMutation(TenantId: request.Scope == SettingScope.Tenant ? scopeId : null,
+                    Key: definition.Key, Kind: EmailDeliverySettingMutationKind.SetLock, IsLocked: true)],
+                actorUserId: actorId, cancellationToken: cancellationToken);
+            if (result.IsAccepted())
+                foreach (var notification in result.ToNotifications(actorId))
+                    await _mediator.Publish(notification, CancellationToken.None);
+            return result.ToCommandResponse(scopeId, "SMTP setting locked.");
+        }
 
         bool isGuardedPublicationPolicyMutation = PublicationPolicySettingKeys.All
             .Contains(request.Key, StringComparer.Ordinal);

@@ -34,12 +34,12 @@ public sealed class FairReturnSupplyPolicyConfiguration :
             .IsConcurrencyToken()
             .IsRequired();
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.EventId,
-                value.TicketCatalogVersionId,
-                value.EventTicketTypeId,
-            })
+        {
+            value.TenantId,
+            value.EventId,
+            value.TicketCatalogVersionId,
+            value.EventTicketTypeId,
+        })
             .IsUnique();
     }
 
@@ -104,26 +104,26 @@ public sealed class FairReturnSupplyUnitConfiguration :
             .IsConcurrencyToken()
             .IsRequired();
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.EventId,
-                value.EventTicketTypeId,
-                value.TicketCatalogVersionId,
-                value.PurchasePolicySnapshotId,
-                value.CurrencyCode,
-                value.CommercialTermsDigest,
-                value.AdmissionEntitlementDigest,
-                value.GrossMinorUnits,
-                value.RefundFundingModeId,
-                value.StatusId,
-                value.CreatedAt,
-                value.Id,
-            });
+        {
+            value.TenantId,
+            value.EventId,
+            value.EventTicketTypeId,
+            value.TicketCatalogVersionId,
+            value.PurchasePolicySnapshotId,
+            value.CurrencyCode,
+            value.CommercialTermsDigest,
+            value.AdmissionEntitlementDigest,
+            value.GrossMinorUnits,
+            value.RefundFundingModeId,
+            value.StatusId,
+            value.CreatedAt,
+            value.Id,
+        });
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.SellerRegistrationOrderLineId,
-            })
+        {
+            value.TenantId,
+            value.SellerRegistrationOrderLineId,
+        })
             .IsUnique();
     }
 }
@@ -171,20 +171,20 @@ public sealed class EventWaitlistEntryConfiguration :
             .IsUnicode(false)
             .IsRequired();
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.EventId,
-                value.EventTicketTypeId,
-                value.StatusId,
-                value.Priority,
-                value.EnqueuedAt,
-                value.Id,
-            });
+        {
+            value.TenantId,
+            value.EventId,
+            value.EventTicketTypeId,
+            value.StatusId,
+            value.Priority,
+            value.EnqueuedAt,
+            value.Id,
+        });
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.OpenRegistrationOrderLineId,
-            })
+        {
+            value.TenantId,
+            value.OpenRegistrationOrderLineId,
+        })
             .IsUnique();
     }
 }
@@ -212,17 +212,17 @@ public sealed class EventWaitlistOfferConfiguration :
             .IsConcurrencyToken()
             .IsRequired();
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.OpenEventWaitlistEntryId,
-            })
+        {
+            value.TenantId,
+            value.OpenEventWaitlistEntryId,
+        })
             .IsUnique();
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.ExpiresAt,
-                value.StatusId,
-            });
+        {
+            value.TenantId,
+            value.ExpiresAt,
+            value.StatusId,
+        });
         builder.HasOne<EventWaitlistEntry>()
             .WithMany()
             .HasForeignKey(value => new
@@ -299,16 +299,16 @@ public sealed class FairReturnSourceBindingConfiguration :
             .IsConcurrencyToken()
             .IsRequired();
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.BuyerRegistrationOrderLineId,
-            })
+        {
+            value.TenantId,
+            value.BuyerRegistrationOrderLineId,
+        })
             .IsUnique();
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.FairReturnSupplyUnitId,
-            })
+        {
+            value.TenantId,
+            value.FairReturnSupplyUnitId,
+        })
             .IsUnique();
         builder.HasOne<FairReturnSupplyUnit>()
             .WithMany()
@@ -360,12 +360,12 @@ public sealed class WaitlistProviderObservationConfiguration :
             .IsUnicode(false)
             .IsRequired();
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.ProviderCode,
-                value.ProviderObjectType,
-                value.ProviderObjectIdDigest,
-            })
+        {
+            value.TenantId,
+            value.ProviderCode,
+            value.ProviderObjectType,
+            value.ProviderObjectIdDigest,
+        })
             .IsUnique();
         builder.HasOne<FairReturnSourceBinding>()
             .WithMany()
@@ -397,24 +397,24 @@ public sealed class WaitlistRefundIntentConfiguration :
             .IsUnicode(false)
             .IsRequired();
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.FairReturnSourceBindingId,
-            })
+        {
+            value.TenantId,
+            value.FairReturnSourceBindingId,
+        })
             .IsUnique();
         builder.HasIndex(value => value.OutboxMessageId)
             .IsUnique();
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.RefundAttemptId,
-            })
+        {
+            value.TenantId,
+            value.RefundAttemptId,
+        })
             .IsUnique();
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.StableOperationId,
-            })
+        {
+            value.TenantId,
+            value.StableOperationId,
+        })
             .IsUnique();
         builder.HasOne<FairReturnSourceBinding>()
             .WithMany()
@@ -468,22 +468,22 @@ public sealed class WaitlistPaymentIntentConfiguration :
             .IsConcurrencyToken()
             .IsRequired();
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.FairReturnSourceBindingId,
-            })
+        {
+            value.TenantId,
+            value.FairReturnSourceBindingId,
+        })
             .IsUnique();
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.StableOperationId,
-            })
+        {
+            value.TenantId,
+            value.StableOperationId,
+        })
             .IsUnique();
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.ReservedRefundAttemptId,
-            })
+        {
+            value.TenantId,
+            value.ReservedRefundAttemptId,
+        })
             .IsUnique();
         builder.HasOne<FairReturnSourceBinding>()
             .WithMany()
@@ -562,28 +562,28 @@ public sealed class FairReturnOrchestrationEffectConfiguration :
             .IsConcurrencyToken()
             .IsRequired();
         builder.HasIndex(value => new
-            {
-                value.StableCursor,
-                value.Id,
-            });
+        {
+            value.StableCursor,
+            value.Id,
+        });
         builder.HasIndex(value => new
-            {
-                value.StatusId,
-                value.NextAttemptAt,
-                value.CreatedAt,
-                value.Id,
-            });
+        {
+            value.StatusId,
+            value.NextAttemptAt,
+            value.CreatedAt,
+            value.Id,
+        });
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.StableOperationId,
-            })
+        {
+            value.TenantId,
+            value.StableOperationId,
+        })
             .IsUnique();
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.WaitlistPaymentIntentId,
-            })
+        {
+            value.TenantId,
+            value.WaitlistPaymentIntentId,
+        })
             .IsUnique();
         builder.HasOne<WaitlistPaymentIntent>()
             .WithMany()

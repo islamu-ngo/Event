@@ -22,54 +22,65 @@ public sealed class AdmissionRevocationService(
             return Task.FromResult(Result(AdmissionRevocationOutcome.InvalidRequest));
         }
 
-        return unitOfWork.ExecuteInTransactionAsync(async token =>
+        return unitOfWork.ExecuteInTransactionAsync(
+            token => ReconcileInCurrentTransactionAsync(request, token), cancellationToken);
+    }
+
+    // The caller retains the order and admission fences and owns commit/rollback.
+    public async Task<AdmissionRevocationResult> ReconcileInCurrentTransactionAsync(
+        AdmissionRevocationRequest request,
+        CancellationToken token)
+    {
+        if (!IsValidRequest(request))
         {
-            AdmissionRevocationContext? context = await repository.LoadAsync(request, token);
-            if (context is null ||
-                context.TenantId != request.TenantId ||
-                context.RegistrationOrderId != request.RegistrationOrderId)
-            {
-                return Result(AdmissionRevocationOutcome.NotFound);
-            }
+            return Result(AdmissionRevocationOutcome.InvalidRequest);
+        }
 
-            if (!IsValidAllocationSet(request))
-            {
-                return new AdmissionRevocationResult(
-                    AdmissionRevocationOutcome.InvalidAllocation,
-                    [],
-                    context.Tickets.Select(ticket => ticket.Id).Order().ToArray());
-            }
+        AdmissionRevocationContext? context = await repository.LoadAsync(request, token);
+        if (context is null ||
+            context.TenantId != request.TenantId ||
+            context.RegistrationOrderId != request.RegistrationOrderId)
+        {
+            return Result(AdmissionRevocationOutcome.NotFound);
+        }
 
-            DateTime appliedAt = timeProvider.GetUtcNow().UtcDateTime;
-            var revoked = new List<Guid>();
-            var preserved = new List<Guid>();
-            foreach (AdmissionTicket ticket in context.Tickets.OrderBy(value => value.Id))
+        if (!IsValidAllocationSet(request))
+        {
+            return new AdmissionRevocationResult(
+                AdmissionRevocationOutcome.InvalidAllocation,
+                [],
+                context.Tickets.Select(ticket => ticket.Id).Order().ToArray());
+        }
+
+        DateTime appliedAt = timeProvider.GetUtcNow().UtcDateTime;
+        var revoked = new List<Guid>();
+        var preserved = new List<Guid>();
+        foreach (AdmissionTicket ticket in context.Tickets.OrderBy(value => value.Id))
+        {
+            bool targeted = request.Reason == OrderCancellationReason ||
+                IsFullyRefunded(ticket, request.RefundAllocations, appliedAt);
+            if (targeted)
             {
-                bool targeted = request.Reason == OrderCancellationReason ||
-                    IsFullyRefunded(ticket, request.RefundAllocations, appliedAt);
-                if (targeted)
+                if (request.Reason == OrderCancellationReason &&
+                    !IsTerminal((AdmissionTicketStatusEnum)ticket.AdmissionTicketStatusId))
                 {
-                    if (request.Reason == OrderCancellationReason &&
-                        !IsTerminal((AdmissionTicketStatusEnum)ticket.AdmissionTicketStatusId))
-                    {
-                        ticket.Cancel(appliedAt);
-                    }
-                    revoked.Add(ticket.Id);
+                    ticket.Cancel(appliedAt);
                 }
-                else
-                {
-                    preserved.Add(ticket.Id);
-                }
+                revoked.Add(ticket.Id);
             }
+            else
+            {
+                preserved.Add(ticket.Id);
+            }
+        }
 
-            return await repository.ApplyAsync(
-                new AdmissionRevocationPersistenceRequest(
-                    request.TenantId,
-                    request.RegistrationOrderId,
-                    revoked,
-                    preserved),
-                token);
-        }, cancellationToken);
+        return await repository.ApplyAsync(
+            new AdmissionRevocationPersistenceRequest(
+                request.TenantId,
+                request.RegistrationOrderId,
+                revoked,
+                preserved),
+            token);
     }
 
     private static bool IsValidRequest(AdmissionRevocationRequest? request) =>

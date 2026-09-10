@@ -18,7 +18,7 @@ ISLAMU Event follows **Convention over Configuration**. The platform includes se
 | Variable | Status | Default | Description |
 |---|---|---|---|
 | `ASPNETCORE_ENVIRONMENT` | **Baseline** | `Production` | Runtime mode: `Production`, `Staging`, `Development`, or `Testing`. |
-| `PUBLIC_URL` | **Baseline** | `http://localhost:7002` | Fully-qualified public HTTPS URL of your application (e.g., `https://events.example.org`). |
+| `PUBLIC_BASE_URL` | **Baseline** | `http://localhost:7002` | Fully-qualified public HTTPS URL of your application (e.g., `https://events.example.org`). |
 | `API_HTTP_PORT` | **Baseline** | `7039` | Internal HTTP port for `Explore.API`. |
 | `UI_HTTP_PORT` | **Baseline** | `7002` | Internal HTTP port for `Explore.Blazor` (BFF). |
 | `KEYCLOAK_HTTP_PORT` | **Baseline** | `8080` | Internal HTTP port binding for Keycloak container. |
@@ -91,7 +91,7 @@ onboarding and switching behavior.
 
 | Variable | Status | Default | Description |
 |---|---|---|---|
-| `KEYCLOAK_URL` | **Baseline** | `http://localhost:8080` | Public or reverse-proxied base URL of Keycloak (e.g., `https://auth.example.org`). |
+| `KEYCLOAK_ENDPOINT` | **Baseline** | `http://localhost:8080` | Public or reverse-proxied base URL of Keycloak (e.g., `https://auth.example.org`). |
 | `KEYCLOAK_REALM` | **Baseline** | `islamu` | Keycloak realm name. |
 | `KEYCLOAK_BLAZOR_CLIENT_ID` | **Baseline** | `event-blazor` | OIDC Confidential Client ID configured for the Blazor BFF. |
 | `KEYCLOAK_BLAZOR_CLIENT_SECRET` | **Baseline (Secret)** | None | 32-byte hex client secret generated for the BFF client. |
@@ -126,8 +126,7 @@ onboarding and switching behavior.
 
 | Variable | Status | Default | Description |
 |---|---|---|---|
-| `STORAGE_PROVIDER` | **Baseline** | `local` | Storage provider: `local` or `s3`. |
-| `STORAGE_LOCAL_ROOTPATH` | **Baseline** | `/app/storage-data/local` | Filesystem directory used when `STORAGE_PROVIDER=local`. |
+| `LOCAL_STORAGE_ROOT_PATH` | **Baseline** | `/app/storage-data/local` | Filesystem directory used when the application storage setting selects local storage. |
 | `STORAGE_S3_ENDPOINT` | Advanced | None | S3 API endpoint (e.g., `https://s3.amazonaws.com` or MinIO URL). |
 | `STORAGE_S3_BUCKET_NAME` | Advanced | None | Dedicated bucket name for platform uploads. |
 | `STORAGE_S3_ACCESS_KEY_ID` | Advanced (Secret) | None | S3 Access Key ID. |
@@ -138,19 +137,37 @@ onboarding and switching behavior.
 > [!NOTE]
 > **We recommend:** Use `local` storage with a mounted volume for single-node deployments. Use `s3` with Cloudflare R2 or MinIO for multi-replica or high-traffic event media hosting.
 
+Storage-provider selection is an application governance setting, not a
+`STORAGE_PROVIDER` environment variable.
+
 ---
 
 ## 6. Email (SMTP & Outbox)
 
+Outbound email defaults off. Set the governance setting `email.delivery_enabled=true`
+only when you intend to send mail; supplying SMTP environment variables does not enable
+delivery. This is an application setting, not an environment-variable alias. A disabled
+transport keeps its configuration and does not connect to SMTP.
+
+Instance SMTP is shared only while instance delivery is enabled. If tenant SMTP
+delegation is unlocked, a tenant may enable its own host and sender with tenant-scoped
+credentials even when instance delivery is off. Tenant hosts never receive instance
+credentials. Both credentials may be omitted for a deliberately unauthenticated relay.
+Missing or invalid configuration is reported separately from intentional disablement.
+
 | Variable | Status | Default | Description |
 |---|---|---|---|
-| `EMAIL_SMTP_HOST` | **Baseline** | `mailpit` | Outgoing SMTP server hostname (`mailpit` in local Compose). |
-| `EMAIL_SMTP_PORT` | **Baseline** | `1025` | SMTP port (`587` for STARTTLS, `465` for SSL, `1025` for Mailpit). |
-| `EMAIL_FROM_ADDRESS` | **Baseline** | `noreply@example.org` | Default sender email address. |
-| `EMAIL_FROM_NAME` | **Baseline** | `ISLAMU Event` | Default sender display name. |
-| `SMTP_USERNAME` | **Baseline (Secret)** | None | SMTP authentication username. |
-| `SMTP_PASSWORD` | **Baseline (Secret)** | None | SMTP authentication password. |
-| `EMAIL_SMTP_SECURITY` | **Baseline** | `None` | Security mode: `None`, `Auto`, `SslOnConnect`, `StartTls`, `StartTlsWhenAvailable`. |
+| `MAIL_SMTP_HOST` | Optional | None | Deployment SMTP hostname; Development seed initializes `email.smtp_host` if absent. |
+| `MAIL_SMTP_PORT` | Optional | None | Deployment SMTP port; Development seed initializes `email.smtp_port` if absent. |
+| `MAIL_SMTP_FROM_ADDRESS` | Optional | None | Deployment sender; Development seed initializes `email.from_address` if absent. |
+| `MAIL_SMTP_FROM_NAME` | Optional | None | Deployment sender label; Development seed initializes `email.from_name` if absent. |
+| `MAIL_SMTP_USERNAME` | Optional secret | None | Instance SMTP authentication username in the selected authority. |
+| `MAIL_SMTP_PASSWORD` | Optional secret | None | Instance SMTP authentication password in the selected authority. |
+| `MAIL_SMTP_ENCRYPTION` | Optional | `StartTls` | Deployment SMTP connection security; supported modes are `None`, `StartTls`, `SslOnConnect`, and `Auto`. |
+
+Set connection security through `email.smtp_security` (`StartTls` by default;
+`None`, `SslOnConnect`, and `Auto` are also supported). Keycloak and other account
+providers retain their own verification and recovery delivery configuration.
 
 ---
 
@@ -179,10 +196,17 @@ onboarding and switching behavior.
 |---|---|---|---|
 | `SETUP_SECRET` | **Baseline** | None | Pre-shared secret to unlock `/setup`. If left blank, generated automatically in volume. |
 | `INSTANCE_BOOTSTRAP_MODE` | **Baseline** | `Interactive` | Mode: `Interactive` (web wizard at `/setup`) or `ConfiguredAdministrator` (headless). |
-| `INSTANCE_BOOTSTRAP_ADMIN_PROVIDER` | Advanced | None | Required if headless: `keycloak` or `atproto`. |
-| `INSTANCE_BOOTSTRAP_ADMIN_SUBJECT` | Advanced | None | Required if headless: exact user ID subject claim issued by Keycloak (`sub` claim). |
+| `INSTANCE_BOOTSTRAP_ADMIN_PROVIDER` | Advanced | None | Required if headless: `local`, `keycloak` or `atproto`. |
+| `INSTANCE_BOOTSTRAP_ADMIN_SUBJECT` | Advanced | None | Exact provider subject: a canonical UUIDv7 Local username, Keycloak `sub`, or ATProto DID. |
 | `INSTANCE_BOOTSTRAP_BINDING_GENERATION` | Advanced | None | Required if headless: positive integer generation counter. |
-| `INSTANCE_BOOTSTRAP_ADMIN_EMAIL` | Advanced | None | Administrator email address for headless provisioning. |
+| `INSTANCE_BOOTSTRAP_ADMIN_EMAIL` | Advanced | None | Optional administrator account email; this does not replace required directory legal/public contact details. |
+| `INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME` / `INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME` | Advanced | None | Optional profile names; supply both or neither. |
+| `INSTANCE_BOOTSTRAP_LOCAL_PASSWORD` | Advanced (Secret) | None | Required only for configured Local bootstrap, through the selected secret authority. The initial password must be privately replaced before ordinary sign-in. |
+
+For Local bootstrap, use the configured UUIDv7 subject as the username. Bootstrap
+creates the account and administrator linkage without requiring email delivery.
+After setup completes, changing or leaving the bootstrap password configured
+does not reset the account. Use the credential-administration flow instead.
 
 ---
 
@@ -195,9 +219,9 @@ Mandatory legal identity fields required before production traffic can be served
 | `INSTANCE__OPERATORIDENTITY__OPERATORID` | **Baseline** | None | UUIDv7 unique identifier for the operating legal entity. |
 | `INSTANCE__OPERATORIDENTITY__PUBLICNAME` | **Baseline** | None | Public brand name of the deploying organization. |
 | `INSTANCE__OPERATORIDENTITY__LEGALNAME` | **Baseline** | None | Full legal registered entity name. |
-| `INSTANCE__OPERATORIDENTITY__OFFICIALINSTANCE` | **Baseline** | `false` | True only for the canonical upstream project deployment. |
-| `INSTANCE__OPERATORIDENTITY__OPERATORKIND` | **Baseline** | `community` | Operator kind: `community`, `regional`, or `commercial`. |
-| `INSTANCE__OPERATORIDENTITY__JURISDICTION` | **Baseline** | `US-CA` | Legal jurisdiction code (e.g. `US-CA`, `GB`, `FR`). |
+| `INSTANCE__OPERATORIDENTITY__ISOFFICIALINSTANCE` | **Baseline** | `false` | True only for the canonical upstream project deployment. |
+| `INSTANCE__OPERATORIDENTITY__OPERATORKINDCODE` | **Baseline** | `community` | Operator-kind code validated by the instance identity policy. |
+| `INSTANCE__OPERATORIDENTITY__JURISDICTIONCOUNTRYCODE` | **Baseline** | `US` | Two-letter jurisdiction country code, such as `US`, `GB`, or `FR`. |
 | `INSTANCE__OPERATORIDENTITY__PUBLICCONTACTEMAIL` | **Baseline** | None | Public contact email for legal and privacy inquiries. |
 | `INSTANCE__OPERATORIDENTITY__WEBSITEURL` | **Baseline** | None | Public website URL of the operating organization. |
 | `INSTANCE__OPERATORIDENTITY__LEGALNOTICEURL` | **Baseline** | None | Public URL for legal notice / imprint. |
@@ -289,6 +313,394 @@ These variables configure optional third-party integrations enabled via Docker C
 | `LISTMONK_API_KEY` | Advanced (Secret) | None | Listmonk API token. |
 
 ---
+
+<!-- BEGIN GENERATED ENVIRONMENT CATALOGUE -->
+## Complete Environment Variable Catalogue
+
+This generated reference lists every supported catalogue variable, including advanced and profile-specific settings intentionally omitted from the curated `.env.example`. Add only the overrides your deployment needs.
+
+Defaults below are declared metadata, never values read from a deployment or secret store. Secret values must be supplied through the selected secret authority.
+
+| Variable | Category | Sensitivity | Default | Requirement | Restart |
+|---|---|---|---|---|---|
+| `PUBLIC_BASE_URL` | platform | public | None | required | process |
+| `API_HTTP_PORT` | deployment | public | None | optional | deployment |
+| `UI_HTTP_PORT` | deployment | public | None | optional | deployment |
+| `KEYCLOAK_HTTP_PORT` | identity | public | None | optional | process |
+| `MAILPIT_UI_PORT` | integration | public | 8025 | defaulted | deployment |
+| `DEPLOYMENT_MODE` | deployment | public | None | optional | deployment |
+| `SECRET_PROVIDER` | security | sensitive | None | required | process |
+| `DATABASE_PROVIDER` | database | public | PostgreSql | defaulted | process |
+| `DATABASE_HOST` | database | public | None | required | process |
+| `DATABASE_PORT` | database | public | None | optional | process |
+| `DATABASE_NAME` | database | public | None | required | process |
+| `DATABASE_SCHEMA` | database | public | islamu_event | defaulted | process |
+| `DATABASE_RUNTIME_USERNAME` | database | public | None | required | process |
+| `DATABASE_RUNTIME_PASSWORD` | database | sensitive | None | required | process |
+| `DATABASE_MIGRATOR_USERNAME` | database | public | None | required | process |
+| `DATABASE_MIGRATOR_PASSWORD` | database | sensitive | None | required | process |
+| `DATABASE_TLS_MODE` | database | public | Prefer | defaulted | process |
+| `AUTHENTICATION_PROVIDER` | platform | public | None | optional | process |
+| `ATPROTO_LOGIN_ENABLED` | platform | public | None | optional | process |
+| `INSTANCE_BOOTSTRAP_ADMIN_PROVIDER` | identity | public | None | required | process |
+| `INSTANCE_BOOTSTRAP_ADMIN_SUBJECT` | identity | sensitive | None | required | process |
+| `INSTANCE_BOOTSTRAP_BINDING_GENERATION` | identity | public | None | required | process |
+| `INSTANCE_BOOTSTRAP_ADMIN_EMAIL` | identity | sensitive | None | optional | process |
+| `INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME` | identity | sensitive | None | optional | process |
+| `INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME` | identity | sensitive | None | optional | process |
+| `INSTANCE_BOOTSTRAP_LOCAL_PASSWORD` | identity | secret | None (secret) | required | process |
+| `AUTHENTICATION_LOCAL_JWT_KEY` | security | secret | None (secret) | optional | process |
+| `AUTHENTICATION_LOCAL_LOCKOUT_THRESHOLD` | security | public | 5 | defaulted | process |
+| `AUTHENTICATION_LOCAL_LOCKOUT_DURATION_MINUTES` | security | public | 15 | defaulted | process |
+| `IDENTITY_DATABASE_TOPOLOGY` | integration | public | colocated | defaulted | process |
+| `KEYCLOAK_ENDPOINT` | identity | secret | None (secret) | required | process |
+| `KEYCLOAK_REALM` | identity | secret | None (secret) | required | process |
+| `KEYCLOAK_BLAZOR_CLIENT_ID` | identity | public | None | required | process |
+| `KEYCLOAK_BLAZOR_CLIENT_SECRET` | identity | secret | None (secret) | required | process |
+| `KEYCLOAK_DB_DATABASE` | integration | public | None | optional | deployment |
+| `KEYCLOAK_DB_USERNAME` | integration | public | None | optional | deployment |
+| `KEYCLOAK_DB_PASSWORD` | integration | secret | None (secret) | optional | deployment |
+| `KEYCLOAK_ADMIN` | integration | public | None | optional | deployment |
+| `KEYCLOAK_ADMIN_PASSWORD` | integration | secret | None (secret) | optional | deployment |
+| `LOCAL_STORAGE_ROOT_PATH` | storage | public | None | optional | capability |
+| `EMAIL_DISPATCH_RABBITMQ_ENABLED` | messaging | public | false | defaulted | capability |
+| `ERASURE_TOPOLOGY` | platform | public | None | optional | process |
+| `ERASURE_EMBEDDED_PATH` | platform | public | None | optional | process |
+| `SETUP_SECRET` | platform | secret | None (secret) | required | process |
+| `INSTANCE_BOOTSTRAP_MODE` | identity | public | None | required | process |
+| `INSTANCE__OPERATORIDENTITY__OPERATORID` | identity | public | None | required | process |
+| `INSTANCE__OPERATORIDENTITY__PUBLICNAME` | identity | public | None | required | process |
+| `INSTANCE__OPERATORIDENTITY__LEGALNAME` | identity | public | None | required | process |
+| `INSTANCE__OPERATORIDENTITY__ISOFFICIALINSTANCE` | identity | public | None | optional | process |
+| `INSTANCE__OPERATORIDENTITY__OFFICIALORIGIN` | identity | public | None | optional | process |
+| `INSTANCE__OPERATORIDENTITY__OPERATORKINDCODE` | identity | public | None | required | process |
+| `INSTANCE__OPERATORIDENTITY__JURISDICTIONCOUNTRYCODE` | identity | public | None | required | process |
+| `INSTANCE__OPERATORIDENTITY__PUBLICCONTACTEMAIL` | identity | sensitive | None | optional | process |
+| `INSTANCE__OPERATORIDENTITY__WEBSITEURL` | identity | public | None | optional | process |
+| `INSTANCE__OPERATORIDENTITY__LEGALNOTICEURL` | identity | public | None | optional | process |
+| `INSTANCE__OPERATORIDENTITY__TERMSURL` | identity | public | None | optional | process |
+| `INSTANCE__OPERATORIDENTITY__PRIVACYURL` | identity | public | None | optional | process |
+| `CONFIGURATION_MANIFEST_MODE` | deployment | public | Off | defaulted | deployment |
+| `CONFIGURATION_MANIFEST_PATH` | deployment | public | None | optional | deployment |
+| `CONFIGURATION_MANIFEST_HOST_DIRECTORY` | deployment | public | None | optional | deployment |
+| `ASPNETCORE_ENVIRONMENT` | deployment | public | None | optional | process |
+| `DOTNET_ENVIRONMENT` | deployment | public | None | optional | process |
+| `MAIL_SMTP_HOST` | messaging | secret | None (secret) | optional | capability |
+| `MAIL_SMTP_PORT` | messaging | secret | None (secret) | optional | capability |
+| `MAIL_SMTP_FROM_ADDRESS` | messaging | secret | None (secret) | optional | capability |
+| `MAIL_SMTP_FROM_NAME` | messaging | secret | None (secret) | optional | capability |
+| `MAIL_SMTP_USERNAME` | messaging | secret | None (secret) | optional | capability |
+| `MAIL_SMTP_PASSWORD` | messaging | secret | None (secret) | optional | capability |
+| `MAIL_SMTP_ENCRYPTION` | messaging | public | None | optional | capability |
+| `MINIO_API_PORT` | integration | public | None | optional | deployment |
+| `MINIO_CONSOLE_PORT` | integration | public | None | optional | deployment |
+| `CERBOS_HTTP_PORT` | deployment | public | None | optional | deployment |
+| `CERBOS_GRPC_PORT` | deployment | public | None | optional | deployment |
+| `SVIX_HTTP_PORT` | integration | public | None | optional | deployment |
+| `WEBLATE_HTTP_PORT` | integration | public | None | optional | deployment |
+| `COOP_HTTP_PORT` | integration | public | None | optional | deployment |
+| `COOP_CLIENT_HTTP_PORT` | integration | public | None | optional | deployment |
+| `OSPREY_BIDI_STREAM_PORT` | integration | public | None | optional | deployment |
+| `OSPREY_SYNC_ACTION_PORT` | integration | public | None | optional | deployment |
+| `FORMBRICKS_HTTP_PORT` | integration | public | None | optional | deployment |
+| `FORMBRICKS_WEBAPP_URL` | integration | public | None | optional | deployment |
+| `FORMBRICKS_DATABASE_NAME` | integration | public | None | optional | deployment |
+| `FORMBRICKS_DATABASE_USER` | integration | public | None | optional | deployment |
+| `FORMBRICKS_DATABASE_PASSWORD` | integration | sensitive | None | optional | deployment |
+| `FORMBRICKS_NEXTAUTH_SECRET` | integration | sensitive | None | required | deployment |
+| `FORMBRICKS_ENCRYPTION_KEY` | integration | sensitive | None | required | deployment |
+| `FORMBRICKS_CRON_SECRET` | integration | sensitive | None | required | deployment |
+| `FORMBRICKS_HUB_API_KEY` | integration | sensitive | None | required | deployment |
+| `FORMBRICKS_CUBEJS_API_SECRET` | integration | sensitive | None | required | deployment |
+| `INFISICAL_URL` | security | public | None | optional | process |
+| `INFISICAL_PROJECT_ID` | security | public | None | optional | process |
+| `INFISICAL_CLIENT_ID` | security | public | None | optional | process |
+| `INFISICAL_CLIENT_SECRET` | security | sensitive | None | optional | process |
+| `INFISICAL_ENV` | security | public | None | optional | process |
+| `DATABASE_TRUST_SERVER_CERTIFICATE` | database | public | false | defaulted | process |
+| `KEYCLOAK_API_CLIENT_SECRET` | identity | secret | None (secret) | required | process |
+| `KEYCLOAK_BLAZOR_REDIRECT_URIS` | identity | public | None | optional | process |
+| `KEYCLOAK_BLAZOR_WEB_ORIGINS` | identity | public | None | optional | process |
+| `KEYCLOAK_BLAZOR_LOGOUT_REDIRECT_URIS` | identity | public | None | optional | process |
+| `KEYCLOAK_SMTP_HOST` | identity | public | None | optional | process |
+| `KEYCLOAK_SMTP_PORT` | identity | public | None | optional | process |
+| `KEYCLOAK_SMTP_FROM` | identity | public | None | optional | process |
+| `KEYCLOAK_SMTP_FROM_DISPLAY_NAME` | identity | public | None | optional | process |
+| `KEYCLOAK_SMTP_AUTH` | identity | public | None | optional | process |
+| `KEYCLOAK_SMTP_SSL` | identity | public | None | optional | process |
+| `KEYCLOAK_SMTP_STARTTLS` | identity | public | None | optional | process |
+| `KEYCLOAK_SMTP_REPLY_TO` | identity | public | None | optional | process |
+| `KEYCLOAK_SMTP_REPLY_TO_DISPLAY_NAME` | identity | public | None | optional | process |
+| `KEYCLOAK_SMTP_ENVELOPE_FROM` | identity | public | None | optional | process |
+| `KEYCLOAK_SMTP_USER` | identity | public | None | optional | process |
+| `KEYCLOAK_SMTP_PASSWORD` | identity | sensitive | None | optional | process |
+| `KEYCLOAK_REQUIRE_HTTPS_METADATA` | identity | public | None | optional | process |
+| `IDENTITY_DATABASE_PROVIDER` | integration | public | None | optional | process |
+| `IDENTITY_DATABASE_CONNECTION_STRING` | integration | secret | None (secret) | optional | process |
+| `IDENTITY_DATABASE_HOST` | integration | public | None | optional | process |
+| `IDENTITY_DATABASE_PORT` | integration | public | None | optional | process |
+| `IDENTITY_DATABASE_NAME` | integration | public | None | optional | process |
+| `IDENTITY_DATABASE_SCHEMA` | integration | public | None | optional | process |
+| `IDENTITY_DATABASE_TLS_MODE` | integration | public | None | optional | process |
+| `IDENTITY_DATABASE_TRUST_SERVER_CERTIFICATE` | integration | public | None | optional | process |
+| `IDENTITY_DATABASE_RUNTIME_USERNAME` | integration | public | None | optional | process |
+| `IDENTITY_DATABASE_RUNTIME_PASSWORD` | integration | secret | None (secret) | optional | process |
+| `IDENTITY_DATABASE_MIGRATOR_USERNAME` | integration | public | None | optional | process |
+| `IDENTITY_DATABASE_MIGRATOR_PASSWORD` | integration | secret | None (secret) | optional | process |
+| `SETUP_SECRET_REQUIRED` | platform | sensitive | None | optional | process |
+| `HOSTING_REPLICA_COUNT` | deployment | public | 1 | defaulted | deployment |
+| `PROMOTIONS_CODE_LOOKUP_ACTIVE_KEY_VERSION` | platform | public | None | optional | process |
+| `PROMOTIONS_CODE_LOOKUP_HMAC_KEY` | security | secret | None (secret) | optional | process |
+| `CONTROL_PLANE_MANAGED_MODE` | deployment | public | None | optional | deployment |
+| `CONTROL_PLANE_URL` | deployment | public | None | optional | deployment |
+| `CONTROL_PLANE_INSTANCE_ID` | deployment | public | None | optional | deployment |
+| `CONTROL_PLANE_REGISTRATION_TOKEN` | deployment | sensitive | None | optional | deployment |
+| `CONTROL_PLANE_MAXIMUM_TENANT_COUNT` | deployment | public | None | optional | deployment |
+| `CONTROL_PLANE_TENANT_ADMINISTRATOR_SIGN_IN_URL` | deployment | public | None | optional | deployment |
+| `USE_COMMERCIAL_LUCKYPENNY` | platform | public | None | optional | process |
+| `LUCKYPENNY_LICENSE_KEY` | platform | sensitive | None | optional | process |
+| `AUTOMAPPER_COMMERCIAL_VERSION` | platform | public | None | optional | process |
+| `MEDIATR_COMMERCIAL_VERSION` | platform | public | None | optional | process |
+| `GEOCODING_PROVIDER` | integration | public | None | optional | capability |
+| `GEOCODING_ENDPOINT` | integration | public | None | optional | capability |
+| `GEOCODING_LANGUAGE` | integration | public | None | optional | capability |
+| `GEOCODING_COUNTRY_CODES` | integration | public | None | optional | capability |
+| `GEOCODING_MAXIMUM_RESULTS` | integration | public | None | optional | capability |
+| `GEOCODING_MAXIMUM_RESPONSE_BYTES` | integration | public | None | optional | capability |
+| `GEOCODING_DATASET_VERSION` | integration | public | None | optional | capability |
+| `GEOCODING_TOTAL_TIMEOUT_MILLISECONDS` | integration | public | None | optional | capability |
+| `GEOCODING_MAXIMUM_RETRY_COUNT` | integration | public | None | optional | capability |
+| `GEOCODING_RETRY_DELAYS_MILLISECONDS` | integration | public | None | optional | capability |
+| `GEOCODING_READINESS_TIMEOUT_MILLISECONDS` | integration | public | None | optional | capability |
+| `GEOCODING_SELECTION_LIFETIME_SECONDS` | integration | public | None | optional | capability |
+| `PROVISIONING_TRUSTED` | platform | public | None | optional | process |
+| `PROVISIONING_MODE` | platform | public | None | optional | process |
+| `MANAGED_CLIENT_EXTERNAL_PROVIDER` | platform | public | None | optional | process |
+| `PHYSICAL_TENANCY_MODE` | platform | public | None | optional | process |
+| `API_ENDPOINT` | platform | public | None | optional | process |
+| `CONTROL_PLANE_PUBLIC_ORIGIN` | deployment | public | None | optional | deployment |
+| `INSTANCE__OPERATORIDENTITY__REGISTRATIONIDENTIFIER` | identity | public | None | optional | process |
+| `PAYMENTS_STRIPE_MODE` | platform | public | None | optional | process |
+| `PAYMENTS_ORGANIZER_DIRECT_PROVIDER_CODE` | platform | public | None | optional | process |
+| `PAYMENTS_ORGANIZER_DIRECT_CONNECT_PLATFORM_ID` | platform | public | None | optional | process |
+| `PAYMENTS__CHECKOUTGOVERNANCE__COMPLAINTOWNER` | platform | public | None | optional | process |
+| `PAYMENTS__CHECKOUTGOVERNANCE__REFUNDOWNER` | platform | public | None | optional | process |
+| `PAYMENTS__CHECKOUTGOVERNANCE__DISPUTEOWNER` | platform | public | None | optional | process |
+| `PAYMENTS__CHECKOUTGOVERNANCE__RECONCILIATIONOWNER` | platform | public | None | optional | process |
+| `PAYMENTS__CHECKOUTGOVERNANCE__ACTIVATIONSTATUS` | platform | public | None | optional | process |
+| `PAYMENTS__CHECKOUTGOVERNANCE__REFUNDPOLICYLANGUAGETAG` | platform | public | None | optional | process |
+| `PAYMENTS__CHECKOUTGOVERNANCE__STATEMENTDESCRIPTOR` | platform | public | None | optional | process |
+| `PAYMENTS__CHECKOUTGOVERNANCE__CHARGETYPE` | platform | public | None | optional | process |
+| `STRIPE_PLATFORM_SECRET_KEY` | platform | secret | None (secret) | optional | process |
+| `STRIPE_WEBHOOK_SECRET` | platform | secret | None (secret) | optional | process |
+| `ADMISSIONS_CREDENTIAL_LOOKUP_HMAC_KEY` | security | secret | None (secret) | optional | process |
+| `ADMISSIONS__CREDENTIALLOOKUP__ACTIVEKEYVERSION` | security | public | None | optional | process |
+| `ADMISSIONS_SCANNER_CAPABILITY_HMAC_KEY` | security | secret | None (secret) | optional | process |
+| `ADMISSIONS_RECOVERY_CAPABILITY_HMAC_KEY` | security | secret | None (secret) | optional | process |
+| `ADMISSIONS__RECOVERY__ACTIVEKEYVERSION` | security | public | None | optional | process |
+| `ADMISSIONS__RECOVERY__CAPABILITYLIFETIMEMINUTES` | security | public | None | optional | process |
+| `ADMISSIONS__RECOVERY__RATELIMITBUCKETCOUNT` | security | public | None | optional | process |
+| `ADMISSIONS__RECOVERY__RATELIMITPERMITCOUNT` | security | public | None | optional | process |
+| `ADMISSIONS__RECOVERY__RATELIMITWINDOWSECONDS` | security | public | None | optional | process |
+| `RATELIMITING__ANONYMOUSREGISTRATION__IPPERMITLIMIT` | security | public | 10 | defaulted | process |
+| `RATELIMITING__ANONYMOUSREGISTRATION__SUBNETPERMITLIMIT` | security | public | 40 | defaulted | process |
+| `RATELIMITING__ANONYMOUSREGISTRATION__WINDOWSECONDS` | security | public | 60 | defaulted | process |
+| `RATELIMITING__ANONYMOUSREGISTRATION__CONCURRENCYLIMIT` | security | public | 8 | defaulted | process |
+| `RATELIMITING__ANONYMOUSREGISTRATION__QUEUELIMIT` | security | public | 0 | defaulted | process |
+| `TICKETING__RECOVERY__ENABLED` | security | public | None | optional | process |
+| `TICKETING__RECOVERY__EXPECTEDRELEASEREVISION` | security | public | None | optional | process |
+| `TICKETING__RECOVERY__EXPECTEDSCHEMAREVISION` | security | public | None | optional | process |
+| `TICKETING__RECOVERY__MINIMUMRETAINEDKEYVERSION` | security | public | None | optional | process |
+| `TICKETING__RECOVERY__MINIMUMAUTHORITYFLOOR` | security | public | None | optional | process |
+| `TICKETING__RECOVERY__MINIMUMPROVIDERCURSOR` | security | public | None | optional | process |
+| `TICKETING__RECOVERY__MINIMUMIDEMPOTENCYFLOOR` | security | public | None | optional | process |
+| `TICKETING__RECOVERY__MINIMUMWORKERFENCE` | security | public | None | optional | process |
+| `TICKETING__RECOVERY__WARNINGOLDESTDUESECONDS` | security | public | None | optional | process |
+| `TICKETING__RECOVERY__UNHEALTHYOLDESTDUESECONDS` | security | public | None | optional | process |
+| `TICKETING__RECOVERY__BACKLOGTHRESHOLD` | security | public | None | optional | process |
+| `TICKETING__RECOVERY__DECLAREDRPOMINUTES` | security | public | None | optional | process |
+| `TICKETING__RECOVERY__DECLAREDRTOMINUTES` | security | public | None | optional | process |
+| `TICKETING__RECOVERY__MANIFESTSIGNINGKEYREFERENCE` | security | public | None | optional | process |
+| `TICKETING__RECOVERY__RETAINEDKEYVERSIONS__0` | security | public | None | optional | process |
+| `TICKETING_RECOVERY_MANIFEST_HMAC_KEY` | security | secret | None (secret) | required | process |
+| `AUTHORIZATION_PROVIDER` | platform | public | None | optional | process |
+| `CERBOS_GRPC_ENDPOINT` | integration | secret | None (secret) | optional | capability |
+| `CERBOS_HTTP_ENDPOINT` | integration | public | None | optional | capability |
+| `CERBOS_USE_TLS` | integration | public | None | optional | capability |
+| `CERBOS_PLAINTEXT_MODE` | integration | public | None | optional | capability |
+| `CERBOS_ADMIN_USERNAME` | integration | secret | None (secret) | optional | capability |
+| `CERBOS_ADMIN_PASSWORD_HASH` | integration | sensitive | None | optional | capability |
+| `CERBOS_ADMIN_PASSWORD` | integration | secret | None (secret) | optional | capability |
+| `CERBOS_PG_URL` | integration | public | None | optional | capability |
+| `CERBOS_POSTGRES_USER` | integration | public | None | optional | deployment |
+| `CERBOS_POSTGRES_PASSWORD` | integration | sensitive | None | optional | deployment |
+| `CERBOS_POSTGRES_DB` | integration | public | None | optional | deployment |
+| `STORAGE_S3_ENDPOINT` | storage | secret | None (secret) | optional | capability |
+| `STORAGE_S3_PUBLIC_ENDPOINT` | storage | secret | None (secret) | optional | capability |
+| `STORAGE_S3_REGION` | storage | secret | None (secret) | optional | capability |
+| `STORAGE_S3_BUCKET_NAME` | storage | secret | None (secret) | optional | capability |
+| `STORAGE_S3_ACCESS_KEY_ID` | storage | secret | None (secret) | optional | capability |
+| `STORAGE_S3_SECRET_ACCESS_KEY` | storage | secret | None (secret) | optional | capability |
+| `LOCAL_STORAGE_CREATE_ROOT_IF_MISSING` | storage | public | None | optional | capability |
+| `STORAGE_RECONCILIATION_ENABLED` | storage | public | false | defaulted | capability |
+| `STORAGE_RECONCILIATION_DRY_RUN` | storage | public | false | defaulted | capability |
+| `STORAGE_RECONCILIATION_QUARANTINE_MISSING_OBJECTS` | storage | public | None | optional | capability |
+| `STORAGE_RECONCILIATION_QUARANTINE_ORPHAN_LOCAL_FILES` | storage | public | None | optional | capability |
+| `STORAGE_RECONCILIATION_DELETE_QUARANTINED_OBJECTS` | storage | public | None | optional | capability |
+| `AI_PROVIDER` | integration | public | None | optional | capability |
+| `AI_ENDPOINT` | integration | public | None | optional | capability |
+| `AI_MODEL_ID` | integration | public | None | optional | capability |
+| `AI_API_KEY` | integration | sensitive | None | optional | capability |
+| `AI_TOOL_PROPOSALS_ENABLED` | integration | public | false | defaulted | capability |
+| `MCP_ENABLED` | platform | public | false | defaulted | process |
+| `MCP_ENDPOINT_PATH` | platform | public | None | optional | process |
+| `MCP_STATELESS` | platform | public | None | optional | process |
+| `MCP_ENABLE_LEGACY_SSE` | platform | public | None | optional | process |
+| `WEB_PUSH_ENABLED` | messaging | public | false | defaulted | capability |
+| `VAPID_SUBJECT` | messaging | public | None | optional | capability |
+| `VAPID_PUBLIC_KEY` | messaging | public | None | optional | capability |
+| `VAPID_PRIVATE_KEY` | messaging | sensitive | None | optional | capability |
+| `MESSAGING_URI` | messaging | public | None | optional | capability |
+| `EMAIL_DISPATCH_RABBITMQ_CONNECTION_STRING_NAME` | messaging | sensitive | None | optional | capability |
+| `EMAIL_DISPATCH_RABBITMQ_CONNECTION_STRING` | messaging | sensitive | None | optional | capability |
+| `EMAIL_DISPATCH_RABBITMQ_EXCHANGE_NAME` | messaging | public | None | optional | capability |
+| `EMAIL_DISPATCH_RABBITMQ_DISPATCH_QUEUE_NAME` | messaging | public | None | optional | capability |
+| `EMAIL_DISPATCH_RABBITMQ_DISPATCH_ROUTING_KEY` | messaging | public | None | optional | capability |
+| `EMAIL_DISPATCH_RABBITMQ_DEAD_LETTER_EXCHANGE_NAME` | messaging | public | None | optional | capability |
+| `EMAIL_DISPATCH_RABBITMQ_DEAD_LETTER_QUEUE_NAME` | messaging | public | None | optional | capability |
+| `EMAIL_DISPATCH_RABBITMQ_DEAD_LETTER_ROUTING_KEY` | messaging | public | None | optional | capability |
+| `EMAIL_DISPATCH_RABBITMQ_PARKING_QUEUE_NAME` | messaging | public | None | optional | capability |
+| `EMAIL_DISPATCH_RABBITMQ_PARKING_ROUTING_KEY` | messaging | public | None | optional | capability |
+| `EMAIL_DISPATCH_RABBITMQ_CLIENT_PROVIDED_NAME` | messaging | public | None | optional | capability |
+| `EMAIL_DISPATCH_RABBITMQ_CONSUMER_ID` | messaging | public | None | optional | capability |
+| `EMAIL_DISPATCH_RABBITMQ_PREFETCH_COUNT` | messaging | public | None | optional | capability |
+| `EMAIL_DISPATCH_RABBITMQ_DEAD_LETTER_REPLAY_ENABLED` | messaging | public | None | optional | capability |
+| `EMAIL_DISPATCH_RABBITMQ_DEAD_LETTER_REPLAY_CONSUMER_ID` | messaging | public | None | optional | capability |
+| `EMAIL_DISPATCH_RABBITMQ_DEAD_LETTER_REPLAY_PREFETCH_COUNT` | messaging | public | None | optional | capability |
+| `EMAIL_DISPATCH_RABBITMQ_PUBLISH_TIMEOUT_SECONDS` | messaging | public | None | optional | capability |
+| `EMAIL_DISPATCH_RABBITMQ_PUBLISHER_POLLING_INTERVAL_SECONDS` | messaging | public | None | optional | capability |
+| `EMAIL_DISPATCH_RABBITMQ_PUBLISHER_BATCH_SIZE` | messaging | public | None | optional | capability |
+| `EMAIL_DISPATCH_RABBITMQ_PUBLISHER_RETRY_DELAY_SECONDS` | messaging | public | None | optional | capability |
+| `WEBHOOKS_ENABLED` | integration | public | false | defaulted | capability |
+| `WEBHOOKS_PROVIDER` | integration | public | None | optional | capability |
+| `WEBHOOKS_SVIX_BASE_URL` | integration | public | None | optional | capability |
+| `WEBHOOKS_SVIX_ENVIRONMENT` | integration | public | None | optional | capability |
+| `WEBHOOKS_SVIX_PROVIDER_VERSION` | integration | public | None | optional | capability |
+| `WEBHOOKS_SVIX_CAPABILITY_POLICY_VERSION` | integration | public | None | optional | capability |
+| `WEBHOOKS_SVIX_AUTH_TOKEN_SECRET_REF` | integration | sensitive | None | optional | capability |
+| `WEBHOOKS_SVIX_OPERATIONAL_WEBHOOK_SECRET_REF` | integration | sensitive | None | optional | capability |
+| `WEBHOOKS_SVIX_AUTH_TOKEN` | integration | secret | None (secret) | optional | capability |
+| `WEBHOOKS_SVIX_OPERATIONAL_WEBHOOK_SECRET` | integration | secret | None (secret) | optional | capability |
+| `SVIX_TAG` | integration | public | None | optional | deployment |
+| `SVIX_DB_DATABASE` | integration | public | None | optional | deployment |
+| `SVIX_DB_USERNAME` | integration | public | None | optional | deployment |
+| `SVIX_DB_PASSWORD` | integration | sensitive | None | optional | deployment |
+| `SVIX_DB_DSN` | integration | public | None | optional | deployment |
+| `SVIX_REDIS_DSN` | integration | public | None | optional | deployment |
+| `SVIX_QUEUE_TYPE` | integration | public | None | optional | deployment |
+| `SVIX_CACHE_TYPE` | integration | public | None | optional | deployment |
+| `SVIX_JWT_SECRET` | integration | sensitive | None | optional | deployment |
+| `WEBLATE_IMAGE` | integration | public | None | optional | deployment |
+| `WEBLATE_SITE_DOMAIN` | integration | public | None | optional | deployment |
+| `WEBLATE_ADMIN_NAME` | integration | public | None | optional | deployment |
+| `WEBLATE_ADMIN_EMAIL` | integration | sensitive | None | optional | deployment |
+| `WEBLATE_ADMIN_PASSWORD` | integration | sensitive | None | optional | deployment |
+| `WEBLATE_POSTGRES_USER` | integration | public | None | optional | deployment |
+| `WEBLATE_POSTGRES_PASSWORD` | integration | sensitive | None | optional | deployment |
+| `WEBLATE_POSTGRES_DB` | integration | public | None | optional | deployment |
+| `REPORTING_ENABLED` | observability | public | false | defaulted | none |
+| `REPORTING_MODE` | observability | public | None | optional | none |
+| `REPORTING_SYNC_REPORTS` | observability | public | None | optional | none |
+| `REPORTING_EVALUATE_SIGNALS` | observability | public | None | optional | none |
+| `REPORTING_MIRROR_REVIEW_QUEUE` | observability | public | None | optional | none |
+| `REPORTING_EXECUTE_DECISIONS` | observability | public | None | optional | none |
+| `REPORTING_HEALTH_STUCK_PROVIDER_SYNC_MINUTES` | observability | public | None | optional | none |
+| `REPORTING_HEALTH_FAILED_PROVIDER_SYNC_WARNING_THRESHOLD` | observability | public | None | optional | none |
+| `REPORTING_OSPREY_ENABLED` | observability | public | None | optional | none |
+| `REPORTING_OSPREY_ENDPOINT_URL` | observability | public | None | optional | none |
+| `REPORTING_OSPREY_API_KEY` | observability | sensitive | None | optional | none |
+| `REPORTING_OSPREY_ALLOW_LOCAL_PROVIDER_ENDPOINTS` | observability | public | None | optional | none |
+| `REPORTING_COOP_ENABLED` | observability | public | None | optional | none |
+| `REPORTING_COOP_ENDPOINT_URL` | observability | public | None | optional | none |
+| `REPORTING_COOP_API_KEY` | observability | sensitive | None | optional | none |
+| `REPORTING_COOP_ALLOW_LOCAL_PROVIDER_ENDPOINTS` | observability | public | None | optional | none |
+| `REPORTING_COOP_WEBHOOK_SECRET` | observability | sensitive | None | optional | none |
+| `COOP_IMAGE` | integration | public | None | optional | deployment |
+| `COOP_MIGRATIONS_IMAGE` | integration | public | None | optional | deployment |
+| `COOP_CLIENT_IMAGE` | integration | public | None | optional | deployment |
+| `COOP_NODE_ENV` | integration | public | None | optional | deployment |
+| `COOP_OTEL_SERVICE_NAME` | integration | public | None | optional | deployment |
+| `COOP_UI_URL` | integration | public | None | optional | deployment |
+| `COOP_SESSION_SECRET` | integration | sensitive | None | optional | deployment |
+| `COOP_DATABASE_USER` | integration | public | None | optional | deployment |
+| `COOP_DATABASE_PASSWORD` | integration | sensitive | None | optional | deployment |
+| `COOP_DATABASE_NAME` | integration | public | None | optional | deployment |
+| `COOP_WAREHOUSE_ADAPTER` | integration | public | None | optional | deployment |
+| `COOP_ANALYTICS_ADAPTER` | integration | public | None | optional | deployment |
+| `COOP_SCYLLA_HOSTS` | integration | public | None | optional | deployment |
+| `COOP_SCYLLA_USERNAME` | integration | public | None | optional | deployment |
+| `COOP_SCYLLA_PASSWORD` | integration | sensitive | None | optional | deployment |
+| `COOP_SCYLLA_LOCAL_DATACENTER` | integration | public | None | optional | deployment |
+| `COOP_SCYLLA_SSL` | integration | public | None | optional | deployment |
+| `OSPREY_IMAGE` | integration | public | None | optional | deployment |
+| `OSPREY_RUST_LOG` | integration | public | None | optional | deployment |
+| `OSPREY_POD_IP` | integration | public | None | optional | deployment |
+| `LISTMONK_ENABLED` | integration | public | false | defaulted | capability |
+| `LISTMONK_INSTANCE_URL` | integration | public | None | optional | capability |
+| `LISTMONK_DEFAULT_LIST_ID` | integration | public | None | optional | capability |
+| `LISTMONK_PRECONFIRM_SUBSCRIPTIONS` | integration | public | None | optional | capability |
+| `LISTMONK_SYNC_ON_REGISTRATION` | integration | public | None | optional | capability |
+| `LISTMONK_API_USERNAME` | integration | secret | None (secret) | optional | capability |
+| `LISTMONK_API_KEY` | integration | secret | None (secret) | optional | capability |
+| `ERASURE_WRITER_REPLICA_COUNT` | platform | public | None | optional | process |
+| `ERASURE_BUSY_TIMEOUT_SECONDS` | platform | public | None | optional | process |
+| `DATABASE_ERASURE_HOST` | database | public | None | optional | process |
+| `DATABASE_ERASURE_PORT` | database | public | None | optional | process |
+| `DATABASE_ERASURE_NAME` | database | public | None | optional | process |
+| `DATABASE_ERASURE_RUNTIME_USERNAME` | database | public | None | optional | process |
+| `DATABASE_ERASURE_RUNTIME_PASSWORD` | database | sensitive | None | optional | process |
+| `DATABASE_ERASURE_MIGRATOR_USERNAME` | database | public | None | optional | process |
+| `DATABASE_ERASURE_MIGRATOR_PASSWORD` | database | sensitive | None | optional | process |
+| `DATABASE_ERASURE_TLS_MODE` | database | public | None | optional | process |
+| `DATABASE_ERASURE_TRUST_SERVER_CERTIFICATE` | database | public | None | optional | process |
+| `DATABASE_SERVER_VERSION` | integration | public | None | optional | deployment |
+| `PRIVACY_ERASURE_AUTHORITY_TOPOLOGY` | integration | public | None | optional | deployment |
+| `PRIVACY_ERASURE_AUTHORITY_EMBEDDED_PATH` | integration | public | None | optional | deployment |
+| `PRIVACY_ERASURE_AUTHORITY_WRITER_REPLICA_COUNT` | integration | public | None | optional | deployment |
+| `PRIVACY_ERASURE_AUTHORITY_BUSY_TIMEOUT_SECONDS` | integration | public | None | optional | deployment |
+| `PRIVACY_ERASURE_AUTHORITY_HOST` | integration | public | None | optional | deployment |
+| `PRIVACY_ERASURE_AUTHORITY_PORT` | integration | public | None | optional | deployment |
+| `PRIVACY_ERASURE_AUTHORITY_DATABASE` | integration | public | None | optional | deployment |
+| `PRIVACY_ERASURE_AUTHORITY_TLS_MODE` | integration | public | None | optional | deployment |
+| `PRIVACY_ERASURE_AUTHORITY_TRUST_SERVER_CERTIFICATE` | integration | public | None | optional | deployment |
+| `PRIVACY_ERASURE_AUTHORITY_RUNTIME_USERNAME` | integration | public | None | optional | deployment |
+| `PRIVACY_ERASURE_AUTHORITY_RUNTIME_PASSWORD` | integration | sensitive | None | optional | deployment |
+| `PRIVACY_ERASURE_AUTHORITY_MIGRATOR_USERNAME` | integration | public | None | optional | deployment |
+| `PRIVACY_ERASURE_AUTHORITY_MIGRATOR_PASSWORD` | integration | sensitive | None | optional | deployment |
+| `SETUP_SECRET_FILE` | integration | sensitive | None | optional | deployment |
+| `KEYCLOAK_INTERNAL_URL` | integration | public | None | optional | deployment |
+| `REDIS_CONNECTION_STRING` | integration | sensitive | None | optional | deployment |
+| `SETUP_SECRET_BINDING_COMMITMENT_HMAC_KEY` | security | secret | None (secret) | optional | process |
+| `KEYCLOAK_CLIENT_ID` | identity | secret | None (secret) | optional | process |
+| `KEYCLOAK_ADMIN_USERNAME` | identity | secret | None (secret) | optional | process |
+| `ATPROTO_OAUTH_CLIENT_PRIVATE_JWKS` | platform | secret | None (secret) | optional | process |
+| `ATPROTO_SESSION_ENCRYPTION_KEYRING` | platform | secret | None (secret) | optional | process |
+| `ATPROTO_SESSION_JWT_PRIVATE_JWKS` | platform | secret | None (secret) | optional | process |
+| `REGISTRATION_PROVIDER_API_TOKEN` | platform | secret | None (secret) | optional | process |
+| `REGISTRATION_PROVIDER_WEBHOOK_SECRET` | platform | secret | None (secret) | optional | process |
+| `POSTGRESQL_HOST` | database | secret | None (secret) | required | process |
+| `POSTGRESQL_PORT` | database | secret | None (secret) | required | process |
+| `POSTGRESQL_DATABASE` | database | secret | None (secret) | required | process |
+| `POSTGRESQL_USERNAME` | database | secret | None (secret) | required | process |
+| `POSTGRESQL_PASSWORD` | database | secret | None (secret) | required | process |
+| `ANALYTICS_POSTHOG_PUBLIC_KEY` | observability | secret | None (secret) | optional | none |
+| `ANALYTICS_POSTHOG_HOST` | observability | secret | None (secret) | optional | none |
+| `ANALYTICS_PERSONAL_API_KEY` | observability | secret | None (secret) | optional | none |
+| `LOCALIZATION_TMS_API_KEY` | platform | secret | None (secret) | optional | process |
+| `CONTROL_PLANE_REGISTRATION_CREDENTIALS` | deployment | secret | None (secret) | optional | deployment |
+| `AI_OPENAI_API_KEY` | integration | secret | None (secret) | optional | capability |
+| `AI_ANTHROPIC_API_KEY` | integration | secret | None (secret) | optional | capability |
+<!-- END GENERATED ENVIRONMENT CATALOGUE -->
 
 ## Related Guides & Next Steps
 

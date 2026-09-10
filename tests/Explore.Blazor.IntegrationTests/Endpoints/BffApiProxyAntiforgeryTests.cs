@@ -162,6 +162,44 @@ public sealed class BffApiProxyAntiforgeryTests : IAsyncDisposable
     }
 
     [Test]
+    [Arguments("guest-registration-challenges", false)]
+    [Arguments("guest-registration-challenges", true)]
+    [Arguments("registration-orders/guest", false)]
+    [Arguments("registration-orders/guest", true)]
+    public async Task AnonymousRegistrationChallenge_RequiresAntiforgeryAndPreservesProofWithoutTenantAuthority(string suffix, bool validCsrf)
+    {
+        _upstream.ResetCapture();
+        var antiforgery = await IssueAntiforgeryCookieAsync(authenticated: false);
+        var envelope = Guid.NewGuid().ToString("N");
+        var key = Guid.CreateVersion7().ToString("N");
+        using var request = CreateAnonymousProxyRequest(HttpMethod.Post, $"/api/events/{Guid.CreateVersion7()}/{suffix}");
+        request.Headers.Add("Cookie", antiforgery.CookieHeader);
+        if (validCsrf) request.Headers.Add("X-CSRF-TOKEN", antiforgery.Token);
+        request.Headers.Add("Idempotency-Key", key);
+        request.Headers.Add("X-Registration-Challenge", envelope);
+        request.Headers.Add("X-Registration-Proof", "0000000000000000");
+        request.Headers.Add("X-Tenant-Id", Guid.CreateVersion7().ToString("D"));
+        request.Headers.Add("X-Tenant-Slug", "browser-controlled-tenant");
+        request.Headers.Add("X-API-Key", Guid.NewGuid().ToString("N"));
+        request.Content = JsonContent.Create(new { ticketCatalogVersionId = Guid.CreateVersion7(), bookingPartyType = 1, lines = Array.Empty<object>() });
+
+        using var response = await _client.SendAsync(request);
+
+        await Assert.That(response.StatusCode).IsEqualTo(validCsrf ? HttpStatusCode.OK : HttpStatusCode.BadRequest);
+        if (!validCsrf)
+        {
+            await Assert.That(_upstream.LastPathAndQuery).IsNull();
+            return;
+        }
+        await Assert.That(_upstream.LastRegistrationChallenge == envelope).IsTrue();
+        await Assert.That(_upstream.LastRegistrationProof == "0000000000000000").IsTrue();
+        await Assert.That(_upstream.LastIdempotencyKey == key).IsTrue();
+        await Assert.That(_upstream.LastApiKey).IsNull();
+        await Assert.That(string.IsNullOrEmpty(_upstream.LastTenantId)).IsTrue();
+        await Assert.That(string.IsNullOrEmpty(_upstream.LastTenantSlug)).IsTrue();
+    }
+
+    [Test]
     [Arguments("/api/instance/settings/auth-provider", null)]
     [Arguments("/api/instance/settings/auth-provider", "invalid-token")]
     [Arguments("/api/InstanceOnboarding/auth-provider-configuration", null)]
@@ -390,6 +428,9 @@ public sealed class BffApiProxyAntiforgeryTests : IAsyncDisposable
         public string? LastTenantSlug { get; private set; }
 
         public string? LastConfigurationImportToken { get; private set; }
+        public string? LastRegistrationChallenge { get; private set; }
+        public string? LastRegistrationProof { get; private set; }
+        public string? LastIdempotencyKey { get; private set; }
 
         public async Task StartAsync()
         {
@@ -408,6 +449,9 @@ public sealed class BffApiProxyAntiforgeryTests : IAsyncDisposable
                 LastApiKey = context.Request.Headers["X-API-Key"].FirstOrDefault();
                 LastTenantId = context.Request.Headers["X-Tenant-Id"].FirstOrDefault();
                 LastTenantSlug = context.Request.Headers["X-Tenant-Slug"].FirstOrDefault();
+                LastRegistrationChallenge = context.Request.Headers["X-Registration-Challenge"].FirstOrDefault();
+                LastRegistrationProof = context.Request.Headers["X-Registration-Proof"].FirstOrDefault();
+                LastIdempotencyKey = context.Request.Headers["Idempotency-Key"].FirstOrDefault();
                 LastConfigurationImportToken =
                     context.Request.Headers[
                         "X-Configuration-Import-Token"].FirstOrDefault();
@@ -439,6 +483,9 @@ public sealed class BffApiProxyAntiforgeryTests : IAsyncDisposable
             LastTenantId = null;
             LastTenantSlug = null;
             LastConfigurationImportToken = null;
+            LastRegistrationChallenge = null;
+            LastRegistrationProof = null;
+            LastIdempotencyKey = null;
         }
 
         public async ValueTask DisposeAsync()

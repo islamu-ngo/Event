@@ -6,6 +6,7 @@ namespace Explore.Application.DTOs.Settings;
 /// </summary>
 public sealed record SettingGroupResponseDto
 {
+    public Guid? TenantId { get; init; }
     public required string Category { get; init; }
     public required IReadOnlyList<EffectiveSettingDto> Settings { get; init; }
 }

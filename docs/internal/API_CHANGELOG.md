@@ -3,6 +3,236 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 # API Changelog
 
+## 2026-09-08
+
+- **SQLite directory temporal queries.** The existing event directory keeps
+  filtering, counts and pagination in SQLite instead of failing on unsupported
+  `DateTimeOffset` comparisons. A connection-local instant collation preserves
+  offset equivalence and 100ns boundaries for the default current/upcoming
+  filter and explicit temporal views. Visibility and tenant predicates remain
+  enforced; no endpoint, schema or migration changes.
+- **Additive public support-contact readback.** Existing `BrandingSettingsDto`
+  adds nullable `supportEmail`, sourced from instance-scoped
+  `branding.support_email`. `GET /api/instance/settings/branding`
+  (`GetInstanceBrandingSettings`) retains its route and administrator/setup
+  authority boundary; no endpoint is added. The existing onboarding support
+  contact input now persists public site identity without modifying SMTP
+  `email.from_address` or `email.delivery_enabled`. This is a DTO field addition,
+  not a new sender configuration, environment key or database migration.
+- **Event-bound anonymous data access.** Participant/ticket projections and
+  registration exports omit anonymous names and answers after their original
+  retention deadline, including before cleanup. Missing historical bounds do
+  not grant a fresh window. Registration-owned content downloads enforce
+  tenant-qualified lineage and expiry; anonymous exports use mediated content
+  access instead of presigned URLs. Storage HAL omits unavailable download
+  actions without adding a public DTO field or endpoint. The sibling
+  registration-answer-file GET and release responses also redact expired
+  filenames, including after authorization waits, without removing release
+  evidence or changing administrative release authority.
+- **Explicit free guest confirmed cancellation.**
+  `POST /api/events/{eventId}/guest-registration-orders/{orderId}/cancellation`
+  (`CancelConfirmedGuestRegistration`) accepts the existing capability header and
+  no body. Success and valid duplicate success return 204; missing post-confirmation
+  authority returns generic private 404, while valid but ineligible authority
+  returns 409 `guest_registration_cancellation_ineligible`. The server-authored
+  `cancel-registration` POST relation appears only after native eligibility checks.
+  No GET, generic checkout DELETE, paid/refund path or session authority is expanded.
+- **Atomic admission and capacity release.** Eligible anonymous confirmations
+  use a dedicated transition that revokes admission and releases exact consumed
+  holds once, excluding real check-in and issuance races. Generic Confirmed state
+  remains terminal. Every POST revalidates authority rather than serving generic
+  idempotency response storage.
+- **Private post-confirmation guest status.**
+  `GET /api/events/{eventId}/guest-registration-orders/{orderId}/status`
+  (`GetGuestRegistrationStatus`) accepts only the established guest capability
+  header and returns PII-free lifecycle facts and the persisted access deadline.
+  Invalid, foreign, deleted, unpromised or expired access receives generic private
+  404. Self and eligible public-calendar links do not grant checkout, attendee-data,
+  payment, claim or cancellation authority.
+- **Breaking: finite guest-status promise and HAL confirmation discovery.**
+  New guest allocation requires a finite authoritative event-end-plus-30-days
+  window, recorded before payment. Live promises may extend but never shorten
+  across earlier/null schedules; missing or expired promises do not revive.
+  Guest continue/finalize responses now use a typed HAL lifecycle wrapper and
+  advertise `guest-status` only after independent authorization. The general
+  checkout expiry guard is unchanged.
+- **Private bookmark transport.** The status landing page consumes and removes
+  fragment capability material before analytics/network startup; explicit copy
+  or download is the durable save action. BFF landing/status responses enforce
+  private/no-store/no-referrer on success and failure. Public calendar export
+  remains capability-free and does not use authenticated `calendar/my-access`.
+- **Breaking: guest reservation requires bound proof.**
+  `POST /api/events/{eventId}/guest-registration-challenges`
+  (`CreateAnonymousRegistrationChallenge`) accepts the existing guest-start
+  business body and its intended `Idempotency-Key`, returning a private HAL
+  challenge without allocating inventory. `StartGuestRegistrationOrder` keeps
+  its route/body and now requires `X-Registration-Challenge` and
+  `X-Registration-Proof`. Proof validation precedes idempotency replay disclosure.
+- **Exact committed guest recovery.** A retry after allocation commit and response
+  storage failure recovers the same protected order/capability without renewing
+  holds or allocating again. Historical proof only authorizes that exact committed
+  result through original expiry plus 24 hours; expired proof never authorizes
+  new allocation, and a new envelope with the same key/body cannot reveal an older
+  response. Uncommitted live-owner requests retain conflict behavior.
+- **Bounded anonymous intake.** Issuance and guest start use dedicated effective-IP,
+  subnet and concurrency limits alongside durable tenant/event issuance quotas.
+  Existing antiforgery, capability response headers, Location, private/no-store
+  responses and ticket/capacity/approval checks remain authoritative.
+- **Breaking: visitor onboarding bounds AccountRequired participation.**
+  Create, import, draft/configuration update and ordinary/privileged publication
+  reject AccountRequired participation without an eligible public onboarding
+  path. Provider or visitor-policy changes that remove the last path conflict
+  instead of rewriting events. DirectoryListingOnly rejects new native allocation,
+  not existing lawful registration status or cancellation.
+- **Shared visitor discovery.** Existing public settings, shell, authentication
+  provider configuration and event-detail responses add `visitorAccess`. Typed
+  mode and provider enums match native string JSON. Provider HAL emits
+  `signup:atproto`, `signup:keycloak` or `signup:google` with the exact shared
+  destination; there is no `signup:local`. Public metadata and event-detail
+  candidates remain no-store, and mutations recheck authority transactionally.
+- **Secondary ATProto onboarding.** Verified, enabled, tenant-usable ATProto can
+  create a new visitor's platform account through its provider-selected flow
+  when shared policy permits it. Existing linked login and exact configured
+  administrator authority remain separate; no Local public signup is restored.
+- **Local lifecycle operations.** `POST /api/auth/local/email-verifications`
+  (`RequestLocalEmailVerification`) and `/password-recoveries`
+  (`RequestLocalPasswordRecovery`) return empty 202 responses without disclosing
+  missing or ineligible accounts. Proposed-address verification instead requires
+  the current ordinary Local session and its server-derived credential stamp.
+  `/email-verifications/consume` (`ConfirmLocalEmail`) and
+  `/password-recoveries/consume` (`CompleteLocalPasswordRecovery`) accept the exact
+  operation pointer and native purpose-bound token. Completion returns 204 without
+  issuing a session; wrong purpose, account, generation, expiry or replay is denied.
+- **Protected ordinary password change.** `POST /api/auth/local/password`
+  (`ChangeLocalPassword`) requires current Local authority plus the current and
+  proposed passwords. It works independently of SMTP, rotates credential stamps
+  and does not accept first-use replacement authority.
+- **Breaking: authentication-provider discovery uses HAL.**
+  `GetInstanceOnboardingAuthProviderConfiguration` retains its flattened
+  configuration fields and adds server-authored lifecycle links. The generated
+  response is `HalResourceOfAuthProviderConfigurationDto`; current-user HAL
+  publishes the applicable Local actions without changing external-provider
+  ownership. BFF lifecycle POSTs preserve antiforgery, private/no-store responses
+  and suppression of generic response replay. Private mail-link material travels
+  only in the browser fragment, never its query string.
+
+## 2026-09-07
+
+- **Guarded SMTP delivery disable.** Instance administration exposes
+  `POST /api/instance/settings/smtp/disable-preview` and `/disable`; current-tenant
+  administration exposes `POST /api/settings/email-delivery/disable-preview` and
+  `/disable`. Preview returns non-secret scope/revision impact and an expiring,
+  actor-bound confirmation token. Commit requires that token, the observed revision
+  and the exact acknowledgement `DISABLE EMAIL DELIVERY`; stale evidence returns
+  409 without mutation. Current persisted administrator authority and settings
+  locks are checked independently of the token.
+- **Breaking: SMTP read responses use HAL.** Instance SMTP settings publish
+  `deliveryEnabled` and server-authored action links. Clients discover
+  `disable-preview` and `disable` rather than inferring authority from roles;
+  generic settings writes cannot bypass confirmed disable. Preview/commit responses
+  are private and no-store. The native generated client now uses
+  `HalResourceOfInstanceSmtpSettingsDto` instead of its former plain response type.
+- **Breaking: Local sign-in accepts an identifier.** API and BFF Local login
+  requests use `identifier` instead of `email`, without a compatibility alias.
+  Usernames and email addresses resolve existing Local credentials; successful
+  identity data permits absent email, and JWTs omit the email claim when absent.
+- **Additive: setup-authorized Local administrator completion.**
+  `POST /api/InstanceOnboarding/complete-local`
+  (`CompleteLocalInstanceOnboarding`) accepts an operation ID, username,
+  temporary password, optional account email/profile fields and existing setup
+  settings. It requires native SetupSecret authority, incomplete setup and an
+  active Local provider. Completion returns no credential or session authority;
+  private replacement and fresh login remain required. Responses are
+  private/no-store and excluded from generic idempotency storage.
+  Onboarding status exposes `pendingOperationId` only to active setup authority,
+  and advertises `complete-local` through HAL for eligible setup.
+- **Breaking: managed Local administrators use existing identity references.**
+  Managed provisioning accepts `localIdentity.localSubjectId` instead of an
+  administrator invitation. Explicit directory-operator identity is carried
+  through validation and provisioning; credential email cannot supply it.
+  The referenced account's live global binding is checked without pinning
+  request replay to a password operation or security stamp. Provisioning links
+  tenant grants without issuing credentials or producing administrator email.
+
+- **Additive: instance-owned Local credential administration.** The following
+  private/no-store operations require a current persisted instance-admin grant:
+
+  | Method and route | Operation |
+  | --- | --- |
+  | GET `/api/instance/local-identities` | `ListLocalIdentities` |
+  | POST `/api/instance/local-identities` | `CreateLocalIdentity` |
+  | POST `/api/instance/local-identities/{userId}/temporary-credential` | `ResetLocalCredential` |
+  | GET `/api/instance/local-identity-operations/{operationId}` | `GetLocalCredentialOperation` |
+  | POST `/api/instance/local-identity-operations/{operationId}/reconcile` | `ReconcileLocalCredentialOperation` |
+
+  Create returns 201; reset, safe replay, status and reconciliation return 200.
+  Caller-owned operation IDs support recovery, but generic response replay is
+  disabled for create, reset and reconciliation: only successful issuance contains
+  the generated temporary password, and every retry rechecks current administrator
+  authority. Bodies cannot supply actor, verification or initial-password
+  authority. Missing targets return 404, conflicts 409, and denied instance
+  authority 403; unauthenticated writes retain native 401. HAL advertises create,
+  eligible reset and pending-create reconciliation; the control-plane overview
+  links to the collection. Regenerate clients from the native OpenAPI export.
+- **Correction: nullable HAL enum contracts preserve unknown state.** The native
+  HAL schema transformer now retains CLR nullable enum properties on both DTOs
+  and flattened wrappers. Generated clients can read `credentialState: null` for
+  missing or invalid credential metadata instead of throwing or inventing a state.
+  Nonnullable enum properties retain their existing wire contracts.
+- **Breaking: Local access tokens require current credential authority.** Ordinary
+  JWTs now carry `local_session_stamp` and an explicit verification fact. Protected
+  API requests validate current Ready credentials, completed operation and active
+  account binding before claims enrichment. Reset, stamp or verification changes,
+  invalid binding, and enabled email intent for unverified credentials deny access.
+  Invalid or unreadable current authority returns bounded HTTP 401. Previously
+  issued stamp-less tokens require fresh login; no compatibility path is retained.
+  External-provider and restricted replacement schemes are unchanged.
+- **Security: Local browser sessions recheck current credential authority.** Native
+  cookie validation and subsequent interactive activities probe the existing
+  current-user API with the original server-held token. Invalid authority rejects
+  the cookie or stops circuit dispatch and publishes anonymous state. Cleanup is
+  limited to the original session and cannot adopt or remove a newer same-user
+  login. No new endpoint, browser token exposure or client regeneration is required.
+
+## 2026-09-06
+
+- **Additive: first-use Local credentials yield restricted replacement authority.**
+  Local login can return `replacementChallenge` instead of an ordinary token.
+  `POST /api/auth/local/credential-replacement` accepts that challenge as Bearer
+  authorization and a password-only body. Success is empty HTTP 204 and requires
+  fresh login; password rejection is 400, invalid authority 401, and concurrency
+  conflict 409. Ordinary access tokens cannot authorize replacement. Responses
+  are private/no-store and excluded from generic idempotency storage and replay.
+  Regenerate clients from `schemas/openapi_islamu-event.json`.
+- **Additive: browser Local password replacement uses a separate restricted cookie.**
+  Temporary-password login directs the browser to `/auth/local/change-password`.
+  `POST /bff/auth/local/credential-replacement` requires antiforgery and accepts
+  only the new password; the BFF supplies its protected challenge server-side.
+  Completion clears the challenge and returns fixed `/login` navigation without
+  signing the browser in. Local credential responses are private/no-store,
+  including early request rejection.
+- **Breaking: public Local registration is removed.** `POST /api/auth/local/register`
+  (`RegisterLocalIdentity`) and `POST /bff/auth/local/register` no longer create
+  credentials. The registration command and request/response contracts are retired;
+  there is no compatibility alias. Local login remains available.
+- **Security: instance email intent gates unverified Local login.** After valid
+  credentials, enabled intent returns `email_verification_required`/401 without
+  issuing a token. Missing/disabled intent preserves unverified state; malformed
+  or unreadable intent returns `authentication_failed`/503. SMTP availability and
+  tenant overrides cannot bypass this gate. External-provider authority is unchanged.
+  Local login responses are private/no-store and excluded from generic idempotency
+  response storage and replay, so a repeated key cannot reuse an earlier success.
+### Email-dispatch operator hold ownership
+
+- Status resources expose nullable `parkReason` with `CapabilityUnavailable` or
+  `Operator`. `deliveryStatus` is now a typed enum in the contract; JSON continues
+  to use the existing named status values.
+- Permission-qualified `park` links include capability-parked messages so an
+  operator can take ownership of the hold. Repeating an existing operator hold
+  does not overwrite its reason or timestamp.
+- Undefined statuses do not advertise mutation links. Processing, redacted and
+  uncertain-send rows cannot be parked; existing reconciliation rules remain.
+
 ## 2026-09-01
 
 - **Additive: instance bootstrap status reports typed onboarding state.** The

@@ -654,17 +654,17 @@ public sealed class LocalAddressSuggestionQueryTests(PostgreSqlContainerFixture 
         Organization organization,
         ApprovalStatus status,
         Guid id) => new()
-    {
-        Id = id,
-        TenantId = tenant.Id,
-        Tenant = tenant,
-        OrganizationId = organization.Id,
-        Organization = organization,
-        ApprovalStatusId = status.Id,
-        ApprovalStatus = status,
-        CreatedAt = DateTime.UnixEpoch,
-        ConcurrencyStamp = Id(80 + id.ToByteArray()[15])
-    };
+        {
+            Id = id,
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            OrganizationId = organization.Id,
+            Organization = organization,
+            ApprovalStatusId = status.Id,
+            ApprovalStatus = status,
+            CreatedAt = DateTime.UnixEpoch,
+            ConcurrencyStamp = Id(80 + id.ToByteArray()[15])
+        };
 
     private static OrganizationMember Membership(
         OrganizationTenant participation,
@@ -672,18 +672,18 @@ public sealed class LocalAddressSuggestionQueryTests(PostgreSqlContainerFixture 
         Role role,
         Tenant tenant,
         Guid id) => new()
-    {
-        Id = id,
-        OrganizationTenantId = participation.Id,
-        OrganizationTenant = participation,
-        UserId = user.Id,
-        User = user,
-        RoleId = role.Id,
-        Role = role,
-        TenantId = tenant.Id,
-        Tenant = tenant,
-        CreatedAt = DateTime.UnixEpoch
-    };
+        {
+            Id = id,
+            OrganizationTenantId = participation.Id,
+            OrganizationTenant = participation,
+            UserId = user.Id,
+            User = user,
+            RoleId = role.Id,
+            Role = role,
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            CreatedAt = DateTime.UnixEpoch
+        };
 
     private static void ApplyGovernance(
         Location location,

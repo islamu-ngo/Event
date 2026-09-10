@@ -2,6 +2,7 @@ using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
+using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Features.Authentication.Local.Requests.Commands;
@@ -20,6 +21,8 @@ namespace Explore.API.Controllers;
 public sealed class LocalAuthController(ISender sender) : ControllerBase
 {
     [HttpPost("login", Name = RouteNames.LoginLocalIdentity)]
+    [SuppressIdempotencyResponseStorage]
+    [PrivateNoStore]
     [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
     [EndpointSummary("Sign in with Local Identity")]
     [EndpointDescription("Validates local credentials and returns a short-lived platform access token.")]
@@ -36,26 +39,6 @@ public sealed class LocalAuthController(ISender sender) : ControllerBase
     {
         LocalAuthResponseDto response = await sender.Send(
             new LocalLoginCommand(request),
-            cancellationToken);
-        return LocalAuthenticationResultMapper.Map(this, response);
-    }
-
-    [HttpPost("register", Name = RouteNames.RegisterLocalIdentity)]
-    [EnableRateLimiting(RateLimitingExtensions.WritePolicy)]
-    [EndpointSummary("Register with Local Identity")]
-    [EndpointDescription("Creates local credentials and returns a short-lived platform access token.")]
-    [Consumes("application/json")]
-    [ProducesResponseType(typeof(LocalRegistrationResponseDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
-    public async Task<ActionResult<LocalRegistrationResponseDto>> Register(
-        [FromBody] LocalRegistrationRequestDto request,
-        CancellationToken cancellationToken = default)
-    {
-        LocalRegistrationResponseDto response = await sender.Send(
-            new LocalRegisterCommand(request),
             cancellationToken);
         return LocalAuthenticationResultMapper.Map(this, response);
     }

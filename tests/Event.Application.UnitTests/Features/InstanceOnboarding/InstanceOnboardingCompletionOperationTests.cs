@@ -1,6 +1,8 @@
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Secrets;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.TenantSettings;
@@ -273,6 +275,16 @@ internal sealed class OnboardingCompletionScenario
         });
         actors.GetActorByUserId(Arg.Any<Guid>()).Returns(call =>
             _actors.SingleOrDefault(actor => actor.UserId == call.Arg<Guid>()));
+        externalLogins.GetByUser(Arg.Any<Guid>()).Returns(call =>
+            _logins.Where(login => login.UserId == call.Arg<Guid>()).ToList());
+        externalLogins.GetByProviderAndKey(Arg.Any<ProviderAccountKey>()).Returns(call =>
+        {
+            ProviderAccountKey account = call.Arg<ProviderAccountKey>()
+                ?? throw new ArgumentNullException(nameof(account));
+            return _logins.SingleOrDefault(login =>
+                login.AuthenticationProviderId == (int)account.ProviderKind
+                && string.Equals(login.ProviderKey, account.Value, StringComparison.Ordinal));
+        });
         externalLogins.Create(Arg.Any<UserExternalLogin>()).Returns(call =>
         {
             RecordWrite("external-login");
@@ -413,6 +425,58 @@ internal sealed class OnboardingCompletionScenario
         new ClaimConfiguredInstanceAdministratorCommandHandler(Operation)
             .Handle(Command(userId, account), cancellationToken);
 
+    public Task<BaseCommandResponse<Guid>> CompleteProvisionedLocalAsync()
+    {
+        var binding = new ConfiguredAdministratorBootstrapBinding(
+            BindingAccount, BindingGeneration, BindingFingerprint, Settings(),
+            new ConfiguredAdministratorProfile("configured@example.test", "Configured", "Admin"));
+        var receipt = new LocalCredentialOperationReceipt(
+            Bootstrap.Id, LocalCredentialOperationKind.Create, LocalCredentialOperationStage.ProvisioningPending,
+            UserId, UserId, Guid.CreateVersion7(), Guid.CreateVersion7(), DateTime.UtcNow);
+        var snapshot = new LocalCredentialProvisioningSnapshot(
+            receipt, Guid.CreateVersion7(), binding.AdministratorProfile.Email,
+            "Configured", "Admin", emailVerified: true, username: Account.Value);
+        var credentials = Substitute.For<ILocalCredentialAdministration>();
+        credentials.ReadProvisioningAsync(Bootstrap.Id, Arg.Any<CancellationToken>())
+            .Returns(_ => snapshot);
+        credentials.ActivateChangeRequiredAsync(Arg.Any<LocalCredentialActivationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                LocalCredentialActivationRequest request = call.Arg<LocalCredentialActivationRequest>()
+                    ?? throw new ArgumentNullException(nameof(request));
+                if (_unitOfWork.InTransaction || Bootstrap.Status != InstanceBootstrapStatus.Completed
+                    || request.OperationId != receipt.OperationId
+                    || request.ExpectedOperationConcurrencyStamp != snapshot.OperationConcurrencyStamp
+                    || !_users.Any(user => user.Id == receipt.LocalSubjectId && !user.IsDeleted)
+                    || !_actors.Any(actor => actor.Id == receipt.PersonalActorId
+                        && actor.UserId == receipt.LocalSubjectId && actor.ActorTypeId == (int)ActorTypeEnum.User
+                        && !actor.IsDeleted && !actor.IsSuspended)
+                    || !_logins.Any(login => login.Id == receipt.ExternalLoginId
+                        && login.UserId == receipt.LocalSubjectId
+                        && login.AuthenticationProviderId == (int)AuthenticationProviderKind.Local
+                        && login.ProviderKey == Account.Value))
+                    return LocalCredentialActivationOutcome.BindingIncomplete;
+
+                snapshot = new LocalCredentialProvisioningSnapshot(
+                    new LocalCredentialOperationReceipt(receipt.OperationId, receipt.Kind,
+                        LocalCredentialOperationStage.ChangeRequired, receipt.InitiatingApplicationUserId,
+                        receipt.LocalSubjectId, receipt.PersonalActorId, receipt.ExternalLoginId, receipt.CreatedAt),
+                    Guid.CreateVersion7(), snapshot.Email, snapshot.FirstName, snapshot.LastName,
+                    snapshot.EmailVerified, snapshot.Username);
+                EventSequence.Add("credential-activation");
+                return LocalCredentialActivationOutcome.Activated;
+            });
+        var bootstrapProvider = Substitute.For<IConfiguredAdministratorBootstrapProvider>();
+        bootstrapProvider.GetVerifiedBindingAsync(Account, Arg.Any<CancellationToken>()).Returns(binding);
+        var dispatcher = Substitute.For<IAuthenticationProviderDispatcher>();
+        dispatcher.GetActivePrimaryProviderAsync(Arg.Any<CancellationToken>())
+            .Returns(AuthenticationProviderKind.Local);
+        var bootstrap = new LocalAdministratorBootstrapOperation(
+            BootstrapRepository, bootstrapProvider, credentials, Substitute.For<ISecretResolver>(), Operation,
+            new EffectSetupSecret(EventSequence), DeploymentModeProvider, _unitOfWork, TimeProvider.System, dispatcher);
+        return bootstrap.CompleteConfiguredAsync(Account);
+    }
+
     public CompleteInstanceOnboardingCommand InteractiveCommand() => new()
     {
         UserId = UserId,
@@ -510,6 +574,9 @@ internal sealed class OnboardingCompletionScenario
             throw new NotSupportedException();
         public Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) =>
             throw new NotSupportedException();
+
+        public Task<T> ExecuteReadCommittedAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) =>
+            ExecuteSerializableAsync(operation, ct);
 
         public async Task<T> ExecuteSerializableAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default)
         {

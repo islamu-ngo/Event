@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Authentication;
 using Explore.Application.DTOs.User;
@@ -58,9 +59,9 @@ public class SyncUserCommandHandler : IRequestHandler<SyncUserCommand, BaseComma
         {
             ProviderAccountKey accountKey = request.AccountKey;
             AuthenticationProviderKind providerKind = accountKey.ProviderKind;
-            string provider = providerKind.ToAuthenticationProviderCode();
-            if (!string.IsNullOrWhiteSpace(userDto.AuthProvider)
-                && userDto.AuthProvider.ParseAuthenticationProviderKind() != providerKind)
+            if ((request.LocalLifecycleSynchronization is not null && providerKind != AuthenticationProviderKind.Local)
+                || (!string.IsNullOrWhiteSpace(userDto.AuthProvider)
+                    && userDto.AuthProvider.ParseAuthenticationProviderKind() != providerKind))
             {
                 return BaseCommandResponse.Validation<Guid>(
                     ["Provider account authority is invalid."],
@@ -70,19 +71,21 @@ public class SyncUserCommandHandler : IRequestHandler<SyncUserCommand, BaseComma
             var supportsEmailAutoMatch = SupportsEmailAutoMatch(providerKind);
             var email = NormalizeEmail(userDto.Email);
 
-            bool usesAtprotoAuthority = providerKind == AuthenticationProviderKind.Atproto;
-            bool hasAtprotoAuthority =
-                accountKey.ProviderKind == AuthenticationProviderKind.Atproto;
-            if (usesAtprotoAuthority != hasAtprotoAuthority)
+            var existingLogin = await _userExternalLoginRepository.GetByProviderAndKey(accountKey);
+            if (providerKind == AuthenticationProviderKind.Local)
             {
-                return BaseCommandResponse.Validation<Guid>(
-                    ["Provider account authority is invalid."],
-                    "Provider account authority is invalid.");
+                if (!await HasValidLocalBindingAsync(accountKey, userDto.Id, existingLogin, cancellationToken,
+                        request.LocalLifecycleSynchronization))
+                    return ExplicitBindingRequired();
+            }
+            else if (existingLogin is null && userDto.Id != Guid.Empty
+                && await IsLocalOwnedAsync(userDto.Id, cancellationToken))
+            {
+                return ExplicitBindingRequired();
             }
 
-            var existingLogin = await _userExternalLoginRepository.GetByProviderAndKey(accountKey);
             InstanceBootstrapState? bootstrap = await _bootstrapRepository.GetCurrent(cancellationToken);
-            if (bootstrap is
+            if (request.LocalLifecycleSynchronization is null && bootstrap is
                 {
                     Mode: InstanceBootstrapMode.ConfiguredAdministrator
                 })
@@ -95,7 +98,7 @@ public class SyncUserCommandHandler : IRequestHandler<SyncUserCommand, BaseComma
                 }
 
                 Guid claimUserId = existingLogin?.UserId
-                    ?? (userDto.Id == Guid.Empty ? Guid.CreateVersion7() : userDto.Id);
+                    ?? Guid.CreateVersion7();
                 BaseCommandResponse<Guid> claim = await _onboardingCompletion.ClaimConfiguredAsync(
                     new ClaimConfiguredInstanceAdministratorCommand
                     {
@@ -158,6 +161,8 @@ public class SyncUserCommandHandler : IRequestHandler<SyncUserCommand, BaseComma
                 }
 
                 user = emailMatches.SingleOrDefault();
+                if (user is not null && await IsLocalOwnedAsync(user.Id, cancellationToken))
+                    user = null;
             }
 
 
@@ -178,8 +183,28 @@ public class SyncUserCommandHandler : IRequestHandler<SyncUserCommand, BaseComma
             var newUserId = userDto.Id != Guid.Empty ? userDto.Id : Guid.CreateVersion7();
             var loginId = Guid.CreateVersion7();
 
-            var syncedUser = await _unitOfWork.ExecuteInTransactionAsync<User>(async ct =>
+            async Task<BaseCommandResponse<Guid>> SynchronizeAsync(CancellationToken ct)
             {
+                UserExternalLogin? currentLogin = await _userExternalLoginRepository.GetByProviderAndKey(accountKey);
+                ct.ThrowIfCancellationRequested();
+                if (providerKind == AuthenticationProviderKind.Local)
+                {
+                    if (!await HasValidLocalBindingAsync(accountKey, userDto.Id, currentLogin, ct,
+                            request.LocalLifecycleSynchronization)
+                        || user is null || currentLogin!.UserId != user.Id)
+                    {
+                        return ExplicitBindingRequired();
+                    }
+                }
+                else if (currentLogin is not null && (user is null || currentLogin.UserId != user.Id))
+                {
+                    return ExplicitBindingRequired();
+                }
+                else if (user is not null && currentLogin is null && await IsLocalOwnedAsync(user.Id, ct))
+                {
+                    return ExplicitBindingRequired();
+                }
+
                 if (user == null)
                 {
                     var newUser = new User
@@ -211,7 +236,7 @@ public class SyncUserCommandHandler : IRequestHandler<SyncUserCommand, BaseComma
                     await _actorRepository.Create(actor);
 
                     await EnsureExternalLoginLinkInTransactionAsync(createdUser, accountKey, loginId, ct);
-                    return createdUser;
+                    return BaseCommandResponse.Success(id: createdUser.Id, message: "User synchronized successfully.");
                 }
                 else
                 {
@@ -237,12 +262,19 @@ public class SyncUserCommandHandler : IRequestHandler<SyncUserCommand, BaseComma
                     await _userRepository.Update(user);
 
                     await EnsureExternalLoginLinkInTransactionAsync(user, accountKey, loginId, ct);
-                    return user;
+                    return BaseCommandResponse.Success(id: user.Id, message: "User synchronized successfully.");
                 }
-            }, cancellationToken);
+            }
 
-            await _cache.RemoveAsync($"user:detail:{syncedUser.Id}", cancellationToken);
-            return BaseCommandResponse.Success(syncedUser.Id, "User synchronized successfully.");
+            // Only the internal lifecycle receipt opts into the native store's existing transaction.
+            // Both paths execute the same binding recheck and mirror writer; no second persistence boundary.
+            var synchronization = request.LocalLifecycleSynchronization is null
+                ? await _unitOfWork.ExecuteSerializableAsync(SynchronizeAsync, cancellationToken)
+                : await SynchronizeAsync(cancellationToken);
+
+            if (synchronization.IsSuccess && request.LocalLifecycleSynchronization is null)
+                await _cache.RemoveAsync($"user:detail:{synchronization.Id}", cancellationToken);
+            return synchronization;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -256,6 +288,47 @@ public class SyncUserCommandHandler : IRequestHandler<SyncUserCommand, BaseComma
             const string message = "User synchronization failed.";
             return BaseCommandResponse.Validation<Guid>([message], message);
         }
+    }
+
+    private async Task<bool> HasValidLocalBindingAsync(
+        ProviderAccountKey accountKey,
+        Guid requestedUserId,
+        UserExternalLogin? login,
+        CancellationToken cancellationToken,
+        LocalIdentityLifecycleSynchronization? lifecycle = null)
+    {
+        if (!Guid.TryParseExact(accountKey.Value, "D", out Guid subjectId) || subjectId == Guid.Empty
+            || !string.Equals(accountKey.Value, subjectId.ToString("D"), StringComparison.Ordinal)
+            || (requestedUserId != Guid.Empty && requestedUserId != subjectId)
+            || login is null || login.UserId != subjectId
+            || login.AuthenticationProviderId != (int)AuthenticationProviderKind.Local
+            || !string.Equals(login.ProviderKey, accountKey.Value, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        User? user = await _userRepository.GetUserWithDetails(subjectId, cancellationToken);
+        return user is { IsDeleted: false, Actor: { IsDeleted: false, IsSuspended: false } }
+            && user.Actor.UserId == subjectId
+            && user.Actor.ActorTypeId == (int)ActorTypeEnum.User
+            && (lifecycle is null || (lifecycle.ApplicationUserId == subjectId
+                && requestedUserId == subjectId
+                && lifecycle.Operation.ExternalLoginId == login.Id
+                && lifecycle.Operation.PersonalActorId == user.Actor.Id));
+    }
+
+    private async Task<bool> IsLocalOwnedAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        List<UserExternalLogin> bindings = await _userExternalLoginRepository.GetByUser(userId);
+        cancellationToken.ThrowIfCancellationRequested();
+        return bindings.Any(binding => binding.AuthenticationProviderId == (int)AuthenticationProviderKind.Local);
+    }
+
+    private static BaseCommandResponse<Guid> ExplicitBindingRequired()
+    {
+        const string message = "Identity ownership requires an explicit account binding.";
+        return BaseCommandResponse.Validation<Guid>(errors: [message], message: message);
     }
 
     private async Task EnsureExternalLoginLinkInTransactionAsync(
@@ -290,8 +363,7 @@ public class SyncUserCommandHandler : IRequestHandler<SyncUserCommand, BaseComma
     private static bool SupportsEmailAutoMatch(AuthenticationProviderKind provider)
     {
         return provider is AuthenticationProviderKind.Keycloak
-            or AuthenticationProviderKind.Google
-            or AuthenticationProviderKind.Local;
+            or AuthenticationProviderKind.Google;
     }
 
     private static string NormalizeEmail(string? email)

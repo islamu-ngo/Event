@@ -192,5 +192,6 @@ public static class ApiHostStartupExtensions
                 scope.ServiceProvider,
                 provider);
         await runner.PrepareAsync(cancellationToken);
+        await scope.ServiceProvider.GetRequiredService<LocalAdministratorBootstrapRunner>().RunAsync(cancellationToken);
     }
 }

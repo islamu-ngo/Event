@@ -657,6 +657,20 @@ These profiles are correctness tests, not performance benchmarks. Runtime benchm
 
 ### Fixture Architecture
 
+API and BFF integration tests generate runtime-only credentials;
+never supply fixed passwords, client secrets, signing keys, or usable API keys.
+The checked-in Keycloak test realm contains identity, role, and verification
+facts only. Each Keycloak fixture injects its own generated credentials into an
+in-memory `JsonNode` copy and maps serialized bytes into the container. Token
+clients and browser-login tests consume that same fixture's credentials; rotation
+tests restore the originating fixture's secret, not a repository constant.
+The external-API mock JWT authority shares one generated key between signing and
+validation. PostgreSQL fixtures pass runtime container connection material through
+`TestDatabaseConfiguration`; in-memory hosts do not need DB or S3 credential defaults.
+Fixtures that need a shared generated setup value retain it only for their
+class/replica scenario. Any test that mutates process environment must serialize
+globally and restore prior values in lifecycle hooks, including failures.
+
 Onboarding HTTP tests use `OnboardingWebApplicationFactory` with a unique SQLite
 file under the test process's temporary directory. It reuses production provider
 composition, including transaction-completion interceptors that release named
@@ -665,12 +679,12 @@ in-memory replacement cannot prove this transaction lifecycle. Fixtures seed
 UUIDv7 user identities and issuer-bound external-login keys; a session ID or
 unlinked internal-user claim is not account authority.
 
-Inject disposable `SETUP_SECRET` and, for Keycloak rotation tests,
-`KEYCLOAK_BLAZOR_CLIENT_SECRET` through the environment keys documented in
-`.env.example`. These fixtures do not embed credentials or mutate process-wide
-secret values. Keep real operator credentials out of test runs and logs.
-The reusable API integration CI step generates and masks both disposable values
-for its test process; it does not need repository or operator secret access.
+Inject disposable `SETUP_SECRET` for the onboarding HTTP factory through the
+environment key documented in `.env.example`; that factory does not mutate
+process-wide secret values. Container-owned Keycloak rotation tests use their
+fixture's generated client secret consistently and verify successful restoration.
+CI-generated secret values must be masked. Keep real operator credentials out
+of test runs and logs; no repository or operator secret access is required.
 
 ```
 Event.API.IntegrationTests/

@@ -9,6 +9,7 @@
         </MudText>
     </div>
     <MudStack Spacing="3">
+        <Explore.Blazor.Client.Pages.Admin.Components.EmailDeliveryAdminSection InstanceScope="true" Changed="DeliveryChanged" />
         <MudTextField T="string" Label="SMTP Host"
                       Variant="Variant.Outlined"
                       @bind-Value="Model.Host"
@@ -102,7 +103,10 @@
 
 @code {
     [Parameter, EditorRequired]
-    public InstanceSmtpSettingsDto Model { get; set; } = null!;
+    public HalResourceOfInstanceSmtpSettingsDto Model { get; set; } = null!;
+
+    [Parameter]
+    public EventCallback DeliveryChanged { get; set; }
 
     [Parameter]
     public IInstanceOnboardingService? OnboardingService { get; set; }

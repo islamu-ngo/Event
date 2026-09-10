@@ -14,7 +14,8 @@ public sealed class LocalIdentityUserConfiguration : IEntityTypeConfiguration<Lo
             .HasDatabaseName("identity_user_name_index")
             .IsUnique();
         builder.HasIndex(user => user.NormalizedEmail)
-            .HasDatabaseName("identity_email_index");
+            .HasDatabaseName("identity_email_index")
+            .IsUnique();
 
         builder.Property(user => user.ConcurrencyStamp).IsConcurrencyToken();
         builder.Property(user => user.UserName).HasMaxLength(256);

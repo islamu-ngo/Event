@@ -11,6 +11,7 @@ using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Application.Telemetry;
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using MediatR;
 using Microsoft.Extensions.Options;
@@ -36,7 +37,8 @@ public sealed class SubmitEventReportCommandHandler(
     IPrivacyErasureStateRepository privacyErasureStateRepository,
     IEventReportEvidenceProtector evidenceProtector,
     BusinessMetrics metrics,
-    IOptions<EventReportSubmissionOptions> optionsAccessor) : IRequestHandler<SubmitEventReportCommand, BaseCommandResponse<Guid>>
+    IOptions<EventReportSubmissionOptions> optionsAccessor,
+    ISettingMutationLock mutationLock) : IRequestHandler<SubmitEventReportCommand, BaseCommandResponse<Guid>>
 {
     private const string PrivacyErasureFencedFailureCode = "privacy_erasure_fenced";
 
@@ -222,7 +224,9 @@ public sealed class SubmitEventReportCommandHandler(
         }
 
         var now = DateTime.UtcNow;
-        return await unitOfWork.ExecuteSerializableAsync(async transactionCancellationToken =>
+        return await mutationLock.ExecuteOrderedGroupsAsync(
+            [[GovernanceSettingKeys.Email.DeliveryEnabled]],
+            policyToken => unitOfWork.ExecuteSerializableAsync(async transactionCancellationToken =>
         {
             if (await IsFencedAsync(reporterUserId, transactionCancellationToken))
                 return FencedFailure();
@@ -435,7 +439,7 @@ public sealed class SubmitEventReportCommandHandler(
 
             metrics.RecordEventReportSubmission(tenantId.ToString(), "succeeded");
             return Success(report.Id, "Event report submitted successfully.");
-        }, cancellationToken);
+        }, policyToken), cancellationToken);
     }
 
     private async Task<bool> IsFencedAsync(Guid? userId, CancellationToken cancellationToken) =>

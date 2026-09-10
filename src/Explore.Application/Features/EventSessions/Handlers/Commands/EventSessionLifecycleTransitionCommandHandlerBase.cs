@@ -27,6 +27,10 @@ public abstract class EventSessionLifecycleTransitionCommandHandlerBase<TCommand
     protected virtual TransitionAttempt CreateTransitionAttempt() =>
         new(timeProvider.GetUtcNow().UtcDateTime, Guid.Empty, Guid.Empty);
 
+    protected virtual Task<BaseCommandResponse<Guid>> ExecuteTransitionAsync(
+        Func<CancellationToken, Task<BaseCommandResponse<Guid>>> operation,
+        CancellationToken cancellationToken) => operation(cancellationToken);
+
     protected virtual Task AfterTransitionInCurrentTransactionAsync(
         EventSession session,
         Event parentEvent,
@@ -82,7 +86,8 @@ public abstract class EventSessionLifecycleTransitionCommandHandlerBase<TCommand
         BaseCommandResponse<Guid> response;
         try
         {
-            response = await unitOfWork.ExecuteInTransactionAsync(async token =>
+            response = await ExecuteTransitionAsync(
+                policyToken => unitOfWork.ExecuteInTransactionAsync(async token =>
             {
                 EventSession? currentSession = await eventSessionRepository.GetByIdForEventAsync(
                     request.Id,
@@ -155,7 +160,7 @@ public abstract class EventSessionLifecycleTransitionCommandHandlerBase<TCommand
                 tenantIdToInvalidate ??= currentParentEvent.TenantId;
 
                 return Success(currentSession.Id, $"Event session {PastTenseActionName} successfully.");
-            }, cancellationToken);
+            }, policyToken), cancellationToken);
         }
         catch (ConcurrencyConflictException)
         {

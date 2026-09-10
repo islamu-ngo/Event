@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+using Explore.Application.Contracts.Services.Registration;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
@@ -20,6 +22,9 @@ public sealed record CreateRegistrationOrderWithHoldCommand : IRequest<BaseComma
     public BookingPartyTypeEnum BookingPartyType { get; init; }
 
     public CapabilityTokenHash? GuestAccessTokenHash { get; init; }
+
+    [JsonIgnore]
+    public AnonymousRegistrationChallengeAuthority? ChallengeAuthority { get; internal init; }
 
     public int? PlatformContributionBasisPoints { get; init; }
 

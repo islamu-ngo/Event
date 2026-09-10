@@ -142,13 +142,10 @@
                                          Text="Navigation Links"
                                          Class="@GetNavItemClass("nav-links")"
                                          OnClick="@(() => SelectSection("nav-links"))" />
-                            @if (_model.CanOverrideSmtp == true)
-                            {
-                                <MudListItem Icon="@Icons.Material.Filled.Email"
-                                             Text="Email (SMTP)"
-                                             Class="@GetNavItemClass("smtp")"
-                                             OnClick="@(() => SelectSection("smtp"))" />
-                            }
+                            <MudListItem Icon="@Icons.Material.Filled.Email"
+                                         Text="Email (SMTP)"
+                                         Class="@GetNavItemClass("smtp")"
+                                         OnClick="@(() => SelectSection("smtp"))" />
                             @if (_model.CanOverrideStorage == true)
                             {
                                 <MudListItem Icon="@Icons.Material.Filled.Cloud"
@@ -264,20 +261,9 @@
                         {
                             <TenantNavigationLinksSection />
                         }
-                        else if (_currentSection == "smtp" && _model.CanOverrideSmtp == true)
+                        else if (_currentSection == "smtp")
                         {
-                            <div class="settings-section">
-                                <div class="settings-section-header">
-                                    <MudText Typo="Typo.h5" Style="font-weight: 700;">Email (SMTP) Configuration</MudText>
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-1">
-                                        Configure SMTP settings for this tenant. When overridden, emails sent on behalf of this tenant will use these credentials instead of the platform defaults.
-                                    </MudText>
-                                </div>
-                                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-4">
-                                    Tenant-specific SMTP configuration is enabled by your platform administrator. Per-tenant override controls will be available in a future update.
-                                    Currently, emails are sent using the platform-level SMTP settings.
-                                </MudAlert>
-                            </div>
+                            <Explore.Blazor.Client.Pages.Admin.Components.EmailDeliveryAdminSection />
                         }
                         else if (_currentSection == "storage" && _model.CanOverrideStorage == true)
                         {

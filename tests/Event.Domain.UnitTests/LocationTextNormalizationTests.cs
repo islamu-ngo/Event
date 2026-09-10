@@ -118,8 +118,11 @@ public sealed class LocationTextNormalizationTests
 
     private static Location NewLocation() => new()
     {
-        Id = Guid.CreateVersion7(), TenantId = Guid.CreateVersion7(),
-        FullName = "Original venue", Country = "BE", City = "Brussels",
+        Id = Guid.CreateVersion7(),
+        TenantId = Guid.CreateVersion7(),
+        FullName = "Original venue",
+        Country = "BE",
+        City = "Brussels",
         ConcurrencyStamp = Guid.CreateVersion7()
     };
 }

@@ -1,6 +1,7 @@
 using System.Data;
 using System.Data.Common;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Models;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Persistence.Database;
@@ -15,10 +16,10 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
 {
     private const int MaxErrorLength = 2000;
     private const int MaxReceiptFailureLength = 1000;
-    private const string SmtpProcessorCode = "smtp";
-    private const string ClaimAdvisoryLockName = "email-dispatch-smtp-claim";
-    private const string AcceptedSettlementUnknownCategory = "accepted_settlement_unknown";
-    private const string AcceptedSettlementUnknownMessage = "SMTP accepted the message, but local settlement is uncertain. Automatic resend is disabled pending reconciliation.";
+    internal const string SmtpProcessorCode = "smtp";
+    internal const string ClaimAdvisoryLockName = "email-dispatch-smtp-claim";
+    private const string HandoffUnknownCategory = "smtp_outcome_unknown";
+    private const string HandoffUnknownMessage = "SMTP acceptance or local settlement could not be confirmed. Automatic resend is disabled pending reconciliation.";
     private const string ProviderHandoffStarted = "provider_handoff_started";
     private const string ReminderSupersededProviderStatus = "superseded";
     private const string ReminderSupersededMessage = "The reminder was superseded before SMTP provider handoff.";
@@ -781,6 +782,12 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
             .AnyAsync(e => e.TenantId == tenantId && e.IsPaused, cancellationToken);
     }
 
+    public Task<EmailDispatchTenantControl?> GetTenantControl(Guid tenantId, CancellationToken cancellationToken) =>
+        _dbContext.EmailDispatchTenantControls
+            .IgnoreTenantFilter(TenantFilterBypassReasons.EmailDispatchTenantOperation)
+            .AsNoTracking()
+            .SingleOrDefaultAsync(control => control.TenantId == tenantId, cancellationToken);
+
     public async Task<EmailDispatchTenantControl> SetTenantPauseState(
         Guid tenantId,
         bool isPaused,
@@ -867,14 +874,14 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
             .Where(e => e.TenantId == tenantId
                 && e.Id == outboxId
                 && e.ContentRedactedAt == null
-                && e.Status != EmailDispatchStatus.Sent
-                && e.Status != EmailDispatchStatus.Skipped
-                && e.Status != EmailDispatchStatus.Parked
-                && e.Status != EmailDispatchStatus.Processing
-                && e.Status != EmailDispatchStatus.Unknown)
+                && (e.Status == EmailDispatchStatus.Pending
+                    || e.Status == EmailDispatchStatus.RetryScheduled
+                    || e.Status == EmailDispatchStatus.DeadLettered
+                    || e.Status == EmailDispatchStatus.Parked && e.ParkReason == EmailDispatchParkReason.CapabilityUnavailable))
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(e => e.Status, EmailDispatchStatus.Parked)
                 .SetProperty(e => e.ParkedAt, parkedAt)
+                .SetProperty(e => e.ParkReason, (EmailDispatchParkReason?)EmailDispatchParkReason.Operator)
                 .SetProperty(e => e.NextAttemptAt, (DateTime?)null)
                 .SetProperty(e => e.ProcessingStartedAt, (DateTime?)null)
                 .SetProperty(e => e.ProcessingLeaseToken, (Guid?)null)
@@ -909,6 +916,7 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
                 .SetProperty(e => e.ProcessingLeaseToken, (Guid?)null)
                 .SetProperty(e => e.DeadLetteredAt, (DateTime?)null)
                 .SetProperty(e => e.ParkedAt, (DateTime?)null)
+                .SetProperty(e => e.ParkReason, (EmailDispatchParkReason?)null)
                 .SetProperty(e => e.UnknownAt, (DateTime?)null)
                 .SetProperty(e => e.LastFailureCategory, (string?)null)
                 .SetProperty(e => e.LastError, (string?)null)
@@ -982,6 +990,8 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
                 .SetProperty(e => e.ProcessingStartedAt, (DateTime?)null)
                 .SetProperty(e => e.ProcessingLeaseToken, (Guid?)null)
                 .SetProperty(e => e.LastFailureCategory, "operator_resolved_without_replay")
+                .SetProperty(e => e.ParkReason, (EmailDispatchParkReason?)null)
+                .SetProperty(e => e.ParkedAt, (DateTime?)null)
                 .SetProperty(e => e.LastError, Truncate(reason, MaxErrorLength))
                 .SetProperty(e => e.LastFailureAt, resolvedAt)
                 .SetProperty(e => e.UpdatedAt, resolvedAt)
@@ -3081,6 +3091,8 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
         EmailDispatchFailureSettlement settlement,
         CancellationToken cancellationToken)
     {
+        if (settlement.Outcome is not (SmtpDeliveryOutcome.TransientFailure or SmtpDeliveryOutcome.ConfigurationFailure))
+            throw new ArgumentOutOfRangeException(nameof(settlement), settlement.Outcome, "Only definite SMTP failures can be settled.");
         var strategy = _dbContext.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
         {
@@ -3093,8 +3105,11 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
         EmailDispatchFailureSettlement settlement,
         CancellationToken cancellationToken)
     {
-        var exhausted = settlement.AttemptNumber >= settlement.MaxAttempts;
-        var outcome = exhausted
+        var parked = settlement.Outcome == SmtpDeliveryOutcome.ConfigurationFailure;
+        var exhausted = !parked && settlement.AttemptNumber >= settlement.MaxAttempts;
+        var outcome = parked
+            ? EmailDispatchFailureSettlementOutcome.Parked
+            : exhausted
             ? EmailDispatchFailureSettlementOutcome.DeadLettered
             : EmailDispatchFailureSettlementOutcome.RetryScheduled;
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
@@ -3107,11 +3122,16 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
                 && outbox.ProcessingLeaseToken == settlement.ProcessingLeaseToken
                 && outbox.AttemptCount == settlement.AttemptNumber)
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(outbox => outbox.Status, exhausted
+                .SetProperty(outbox => outbox.Status, parked
+                    ? EmailDispatchStatus.Parked
+                    : exhausted
                     ? EmailDispatchStatus.DeadLettered
                     : EmailDispatchStatus.RetryScheduled)
+                .SetProperty(outbox => outbox.ParkedAt, parked ? settlement.SettledAt : (DateTime?)null)
+                .SetProperty(outbox => outbox.ParkReason, parked
+                    ? EmailDispatchParkReason.CapabilityUnavailable : (EmailDispatchParkReason?)null)
                 .SetProperty(outbox => outbox.DeadLetteredAt, exhausted ? settlement.SettledAt : (DateTime?)null)
-                .SetProperty(outbox => outbox.NextAttemptAt, exhausted
+                .SetProperty(outbox => outbox.NextAttemptAt, parked || exhausted
                     ? (DateTime?)null
                     : settlement.SettledAt.Add(settlement.RetryDelay))
                 .SetProperty(outbox => outbox.ProcessingStartedAt, (DateTime?)null)
@@ -3161,11 +3181,14 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
                 && delivery.EmailDispatchOutboxId == settlement.OutboxId
                 && delivery.ChannelId == (int)NotificationPreferenceChannelEnum.Email)
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(delivery => delivery.StatusId, exhausted
+                .SetProperty(delivery => delivery.StatusId, parked
+                    ? (int)NotificationDeliveryStatusEnum.Parked
+                    : exhausted
                     ? (int)NotificationDeliveryStatusEnum.DeadLettered
                     : (int)NotificationDeliveryStatusEnum.Queued)
                 .SetProperty(delivery => delivery.ProviderMessageId, (string?)null)
-                .SetProperty(delivery => delivery.ProviderStatus, exhausted ? "dead_lettered" : "retry_scheduled")
+                .SetProperty(delivery => delivery.ProviderStatus, parked ? "configuration_parked"
+                    : exhausted ? "dead_lettered" : "retry_scheduled")
                 .SetProperty(delivery => delivery.FailureCategory, Truncate(settlement.FailureCategory, 100))
                 .SetProperty(delivery => delivery.CompletedAt, exhausted ? settlement.SettledAt : (DateTime?)null)
                 .SetProperty(delivery => delivery.UpdatedAt, settlement.SettledAt), cancellationToken);
@@ -3259,8 +3282,8 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
                 .SetProperty(outbox => outbox.ProcessingStartedAt, (DateTime?)null)
                 .SetProperty(outbox => outbox.ProcessingLeaseToken, (Guid?)null)
                 .SetProperty(outbox => outbox.NextAttemptAt, (DateTime?)null)
-                .SetProperty(outbox => outbox.LastFailureCategory, AcceptedSettlementUnknownCategory)
-                .SetProperty(outbox => outbox.LastError, AcceptedSettlementUnknownMessage)
+                .SetProperty(outbox => outbox.LastFailureCategory, HandoffUnknownCategory)
+                .SetProperty(outbox => outbox.LastError, HandoffUnknownMessage)
                 .SetProperty(outbox => outbox.LastFailureAt, settlement.SettledAt)
                 .SetProperty(outbox => outbox.UpdatedAt, settlement.SettledAt), cancellationToken);
         if (outboxUpdated == 0)
@@ -3277,8 +3300,8 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(attempt => attempt.Outcome, EmailDispatchAttemptOutcome.Unknown)
                 .SetProperty(attempt => attempt.CompletedAt, settlement.SettledAt)
-                .SetProperty(attempt => attempt.FailureCategory, AcceptedSettlementUnknownCategory)
-                .SetProperty(attempt => attempt.SanitizedErrorMessage, AcceptedSettlementUnknownMessage)
+                .SetProperty(attempt => attempt.FailureCategory, HandoffUnknownCategory)
+                .SetProperty(attempt => attempt.SanitizedErrorMessage, HandoffUnknownMessage)
                 .SetProperty(attempt => attempt.ProviderMessageId, (string?)null)
                 .SetProperty(attempt => attempt.UpdatedAt, settlement.SettledAt), cancellationToken);
         EnsureExactlyOne(attemptUpdated, "email dispatch attempt");
@@ -3291,8 +3314,8 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
                 .SetProperty(receipt => receipt.Status, EmailDispatchReceiptStatus.Unknown)
                 .SetProperty(receipt => receipt.CompletedAt, (DateTime?)null)
                 .SetProperty(receipt => receipt.FailedAt, settlement.SettledAt)
-                .SetProperty(receipt => receipt.FailureCode, AcceptedSettlementUnknownCategory)
-                .SetProperty(receipt => receipt.FailureMessage, AcceptedSettlementUnknownMessage)
+                .SetProperty(receipt => receipt.FailureCode, HandoffUnknownCategory)
+                .SetProperty(receipt => receipt.FailureMessage, HandoffUnknownMessage)
                 .SetProperty(receipt => receipt.ProviderMessageId, (string?)null)
                 .SetProperty(receipt => receipt.UpdatedAt, settlement.SettledAt), cancellationToken);
         EnsureExactlyOne(receiptUpdated, "email dispatch receipt");
@@ -3306,7 +3329,7 @@ public class EmailDispatchOutboxRepository : IEmailDispatchOutboxRepository
                 .SetProperty(delivery => delivery.StatusId, (int)NotificationDeliveryStatusEnum.Unknown)
                 .SetProperty(delivery => delivery.ProviderMessageId, (string?)null)
                 .SetProperty(delivery => delivery.ProviderStatus, "unknown")
-                .SetProperty(delivery => delivery.FailureCategory, AcceptedSettlementUnknownCategory)
+                .SetProperty(delivery => delivery.FailureCategory, HandoffUnknownCategory)
                 .SetProperty(delivery => delivery.CompletedAt, settlement.SettledAt)
                 .SetProperty(delivery => delivery.UpdatedAt, settlement.SettledAt), cancellationToken);
         EnsureExactlyOne(deliveryUpdated, "email notification delivery");

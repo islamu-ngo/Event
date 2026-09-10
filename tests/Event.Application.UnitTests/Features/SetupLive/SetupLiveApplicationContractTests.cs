@@ -1090,8 +1090,13 @@ public sealed class SetupLiveApplicationContractTests
         CustomAttributeData[] assemblyAttributes =
             ApplicationAssembly.CustomAttributes.ToArray();
         RequireContract(
-            assemblyAttributes.Length == 13,
-            "invalid-setup-live-application-assembly-attribute-count");
+            assemblyAttributes.Length == 14,
+            $"invalid-setup-live-application-assembly-attribute-count:expected=14;actual={assemblyAttributes.Length}");
+        AssertExactManifestAttribute(
+            assemblyAttributes,
+            typeof(InternalsVisibleToAttribute),
+            [typeof(string)],
+            ["Explore.Infrastructure"]);
         AssertExactManifestAttribute(
             assemblyAttributes,
             typeof(CompilationRelaxationsAttribute),

@@ -3,6 +3,52 @@
 
 # Security
 
+## Anonymous Registration Challenge And Replay Boundary
+
+Guest allocation requires a native protected challenge and proof of work in
+addition to the existing intended `Idempotency-Key`. Challenge issuance accepts
+the same business request as guest start and allocates no seat, order or hold.
+The shared API canonicalizer binds the intended start method, resolved route,
+tenant/event, principal/capability scope, content type and complete request digest;
+it does not hash the issuance route or a proof wrapper as the business request.
+
+The versioned Data Protection envelope binds those facts, a server-generated
+UUIDv7 order ID, random guest capability, original expiry and difficulty. It
+contains no raw attendee/contact/network data or raw idempotency key. Version 1
+proof is one SHA-256 check over the exact protected text and fixed-width nonce;
+the server never searches for a solution. Fresh allocation authority lasts 120
+seconds and is rechecked after transaction/lock waits before persistence.
+
+Challenge validation precedes idempotency claim handling and cached capability
+disclosure. Historical validation lasts only until original expiry plus 24 hours
+and permits an exact already-committed read, never a new allocation. Recovery
+matches the protected order ID, tenant, event, guest hash and original typed
+request; the raw capability is reconstructed from the protected envelope, not
+stored in plaintext. A different valid envelope with the same key/body does not
+authorize the old cached capability.
+
+If allocation commits but response persistence fails, an identical retry can
+recover that original order/hold without renewing expiry, rescheduling or charging
+another seat. An in-progress claim with no exact committed result remains a
+conflict; recovery does not take over a live uncommitted owner. New allocation
+still checks current visitor/event/catalog/capacity/approval rules through the
+existing serializable starter and pool fences. No second reservation aggregate
+or process-local lock is treated as cross-replica allocation authority.
+
+Effective-IP, subnet and bounded concurrency/queue limits are process-level
+front-door controls. Private HMAC-bucket partitions expose no raw network
+identifier. Durable tenant/event issue budgets use database-minute conditional
+writes and atomic savepoint rollback under the issuer's existing transaction.
+Quota rows contain only real scope IDs, minute and count, never proof, capability,
+request body or inventory state. Invalid control values fail closed.
+
+The browser solves through native Web Crypto in a cancellable worker, retaining
+the exact original key/body/envelope/solution after an uncertain submitted
+outcome. It must not silently issue replacement authority or start another
+allocation. No new browser storage or tracking receives that material. Existing
+BFF antiforgery and private/no-store response handling remain mandatory; staff
+assistance is an existing authorized alternative, not a public challenge bypass.
+
 ## Legal-Identity Trust Boundaries
 
 Tenant directory identity is tenant-scoped untrusted input until the Application
@@ -85,6 +131,19 @@ three flat-provider families retain the fixed `ie_` prefix.
 The process boundary changes, but the trust boundary does not. The bridge is responsible only for translating a BFF session into an API request; API `MultiAuth`, endpoint authorization, MediatR resource authorization, tenant filters, rate limits, and HAL link filtering remain authoritative.
 
 ### Cookie-to-API token conversion
+
+Local browser authority is not established by cookie expiry alone. Before cookie
+acceptance and subsequent interactive activity, the BFF privately probes the
+existing current-user API with the original Local token and requires the returned
+subject to match. Native API validation checks current credential state, stamp,
+verification fact and binding. Circuit checks retain the original session and
+compare the live provider markers again after awaiting the probe. Rejection makes
+the circuit anonymous and prevents dispatch; scoped token revocation cannot
+resurrect from a stale handshake or a newer same-user session. Cleanup deletes only
+the original subject/session partition, never all sessions when that pair is
+missing. Cancellation is checked before rejection mutates claims or cached state.
+This is request/activity-time admission, not a transactional authorization fence
+or push notification to idle tabs; see [Local browser session authority](AUTHENTICATION.md#local-browser-session-authority).
 
 For an authenticated BFF browser request in either Topology, the flow is:
 
@@ -217,6 +276,21 @@ Current security gates:
 - Dev mode: accepts self-signed certificates, suppresses HTTPS metadata requirement.
 - Detailed JWT event logging on: `OnMessageReceived`, `OnAuthenticationFailed`, and `OnChallenge`.
 
+### Provider email verification evidence
+
+`PlatformIdentityPrincipalExtensions.GetEmailVerified()` accepts verification
+only from a parseable, explicitly true `email_verified` claim on the selected
+authenticated ambient identity. Missing, malformed, or false claims remain
+unverified. Neither a provider name nor a nonempty email address proves mailbox
+ownership; unauthenticated or purpose-bound identities cannot supply ambient
+verification authority. `GetProviderIdentity` and instance onboarding use this
+same reader, with no provider-specific default or compatibility overload.
+
+This is separate from authentication: a valid Keycloak/Google identity may remain
+unverified, and AT Protocol bootstrap/JIT retains its dedicated DID-verification
+path without inventing an email claim. Event email-delivery settings never
+manufacture provider verification or transfer provider-owned recovery to Local.
+
 ### ATProto bootstrap and first-party session schemes
 
 The `MultiAuth` policy selector preserves the Keycloak and API-key branches and adds two purpose-separated ATProto schemes:
@@ -296,11 +370,21 @@ Evidence API and HAL representations expose bounded document display metadata, r
 
 ## Auth Diagnostic Safety
 
+Application return destinations are rooted local paths validated with ASP.NET
+Core `RedirectHttpResult.IsLocalUrl`, not prefix checks or relative-URI parsing
+alone. Query-based returns, Local login responses and posted ATProto return paths
+reject control-character and external-destination tricks. Endpoint normalization
+uses `/` for invalid input; the ATProto handler independently rejects an unsafe
+path before issuing browser proof or starting discovery. Its existing 2048-character
+limit remains. Normal local queries and fragments are preserved. Rejected return
+values are not diagnostic data and must not be logged.
+
 OIDC and BFF challenge failures must expose only safe diagnostic handles:
 
 - Browser redirects use `challengeError=1`, a normalized `errorCode`, and a correlation ID.
 - Browser redirects must not include `errorDetail`, raw exception messages, provider response bodies, client IDs, client-secret length, client-secret prefix, tokens, or secret-derived metadata.
 - Production-path logs use structured error codes, correlation IDs, failure categories, and boolean presence flags where needed. They must not log raw provider error bodies, raw exception text from identity-provider callbacks, client-secret prefixes, client-secret lengths, tokens, or refresh-token grant payloads.
+- Challenge and signout entry logs omit caller-supplied provider selectors and complete request/return URLs. Structured placeholders do not sanitize control characters or remove sensitive query values; safe routing does not make a return URL safe to log.
 - Development-only diagnostics such as `/auth/debug` remain a local troubleshooting surface and must never include secret values.
 
 Use `ISafeAuthDiagnosticsPolicy` for BFF auth challenge and OIDC remote-failure redirects so user-facing errors stay generic while operators can correlate failures through logs and traces.
@@ -311,6 +395,7 @@ Keycloak-backed identity lifecycle email is account-authority owned. ISLAMU Even
 
 - Email verification, password reset, email update verification, MFA, and other Keycloak required-action emails must not be routed through `EmailDispatchOutbox`, `IEmailService`, RabbitMQ, the Quartz scheduler, or product unsubscribe flows.
 - Local results, logs, telemetry, and delegation audit rows may include only safe status, action, account-authority kind, local intent/delegation ids, HTTP status code, and normalized reason codes.
+- General provider-failure warnings retain only HTTP status and the lifecycle action. Tenant/user associations stay in authorized operation and delegation records, not operational log fields; this does not introduce a second audit store or change record retention.
 - They must not include Keycloak admin tokens, provider secrets, raw Keycloak response bodies, action tokens, rendered email subjects or bodies, theme output, SMTP passwords, or secret-derived metadata.
 - Keycloak email theme customization changes Keycloak-owned templates only. It does not make ISLAMU Event the sender or decision owner for identity lifecycle messages.
 - Sharing SMTP infrastructure with a self-hosted Keycloak realm is delivery plumbing only. The credential email decision and provider-side delivery state remain with Keycloak.

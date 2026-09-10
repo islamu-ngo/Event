@@ -1,0 +1,26 @@
+Change-Id: CHG-01M243K4QPMVXVKEM09YPV1C7D
+Title: "Restore SQLite event details and moderation history"
+Type: fix
+Scope: events
+Summary: "Read empty and populated moderation histories on SQLite and order entries by their actual timestamp instant."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/internal/CODEBASE_INSIGHTS.md
+    Disposition: documented
+    Detail: SQLite event details no longer fail when reading moderation history; existing tenant filters remain active.

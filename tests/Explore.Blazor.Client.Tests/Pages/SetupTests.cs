@@ -79,6 +79,47 @@ public class SetupTests : IDisposable
     }
 
     [Test]
+    public async Task LocalCookiePersistenceForcesFreshAuthorityBeforeContinuing()
+    {
+        _instanceOnboardingService.GetStatusAsync().Returns(new InstanceOnboardingStatusDto
+        {
+            IsCompleted = false,
+            Provider = "Local",
+            IsAuthenticated = false
+        });
+        _instanceOnboardingService.ValidateSecretAsync(Arg.Any<string>()).Returns(new SetupSecretValidationResultDto { Valid = true });
+        SetupBffJsModule();
+        var navigation = _ctx.Services.GetRequiredService<Bunit.TestDoubles.BunitNavigationManager>();
+        navigation.NavigateTo("/setup");
+        var cut = _ctx.Render<Setup>();
+        cut.Find("input[type=password]").Input(Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)));
+        await cut.Find("form").SubmitAsync();
+        await Assert.That(navigation.History.First().Options.ForceLoad).IsTrue();
+        await Assert.That(navigation.Uri).EndsWith("/setup");
+        await Assert.That(cut.FindAll("input[type=password]").All(input => string.IsNullOrEmpty(input.GetAttribute("value")))).IsTrue();
+    }
+
+    [Test]
+    public async Task LocalSetupAuthorityOffersSetupRatherThanOrdinaryLogin()
+    {
+        var status = new InstanceOnboardingStatusDto { IsCompleted = false, Provider = "Local", IsAuthenticated = true };
+        status.AdditionalProperties["_links"] = System.Text.Json.JsonSerializer.SerializeToElement(new Dictionary<string, object>
+        {
+            ["complete-local"] = new { href = "/api/instanceonboarding/complete-local", method = "POST" }
+        });
+        _instanceOnboardingService.GetStatusAsync().Returns(status);
+        _instanceOnboardingService.ShouldSkipAuthorizationProviderStepAsync().Returns(true);
+        SetupBffJsModule(hasPersistedSecret: true, isValid: true);
+        var navigation = _ctx.Services.GetRequiredService<Bunit.TestDoubles.BunitNavigationManager>();
+        var cut = _ctx.Render<Setup>();
+        await cut.FindAll("button").Single(button => button.TextContent.Contains("Continue Local setup", StringComparison.Ordinal))
+            .ClickAsync(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
+        await Assert.That(navigation.Uri).EndsWith("/onboarding/instance");
+        await Assert.That(navigation.History.First().Options.ForceLoad).IsTrue();
+        await Assert.That(cut.FindAll("a[href^='/login']")).IsEmpty();
+    }
+
+    [Test]
     public async Task Setup_WhenSecretIsRequired_RendersOriginalSecretEntryGateway()
     {
         _instanceOnboardingService.GetStatusAsync().Returns(new InstanceOnboardingStatusDto

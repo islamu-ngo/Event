@@ -6,10 +6,12 @@ using Explore.Application.Notifications;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
+using Explore.Domain.Services;
 using Explore.Domain.Services.Scheduling;
 using Explore.Persistence.Database;
 using Explore.Persistence.Database.ProviderPrimitives;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Repositories;
 using Explore.Persistence.Schema.ProviderPrimitives;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,12 +20,13 @@ namespace Explore.Persistence.Services;
 public sealed class EmailDispatchEligibilityEvaluator(
     ExploreDbContext dbContext,
     NotificationDeliveryPolicyResolver policyResolver,
-    INotificationPreferenceResolver preferenceResolver) : IEmailDispatchEligibilityEvaluator
+    INotificationPreferenceResolver preferenceResolver,
+    ISettingMutationLock mutationLock) : IEmailDispatchEligibilityEvaluator
 {
     private const string ProviderHandoffStarted = "provider_handoff_started";
     private const string ProviderHandoffMessage = "SMTP provider handoff started; automatic resend is suppressed until the attempt is durably settled.";
     private const string SkipMessage = "Email delivery was suppressed by current dispatch eligibility before provider handoff.";
-    private const string SmtpProcessorCode = "smtp";
+    private const string SmtpProcessorCode = EmailDispatchOutboxRepository.SmtpProcessorCode;
     // ponytail: one non-PostgreSQL eligibility writer; shard only if measured dispatch throughput requires it.
     private const string EligibilityLockName = "email-dispatch-eligibility";
     private const string SmtpRateDeferred = "smtp_rate_deferred";
@@ -33,14 +36,16 @@ public sealed class EmailDispatchEligibilityEvaluator(
         EmailDispatchEligibilityRequest request,
         CancellationToken cancellationToken = default)
     {
-        var strategy = dbContext.Database.CreateExecutionStrategy();
-        return await strategy.ExecuteAsync(async () =>
-        {
-            dbContext.ChangeTracker.Clear();
-            FanoutAuthorityHint? fanoutAuthorityHint = await LoadFanoutAuthorityHintAsync(request, cancellationToken);
-            dbContext.ChangeTracker.Clear();
-            return await EvaluateWithinTransactionAsync(request, fanoutAuthorityHint, cancellationToken);
-        });
+        return await mutationLock.ExecuteOrderedGroupsAsync(
+            [[GovernanceSettingKeys.Email.DeliveryEnabled]],
+            async token =>
+            {
+                dbContext.ChangeTracker.Clear();
+                FanoutAuthorityHint? fanoutAuthorityHint = await LoadFanoutAuthorityHintAsync(request, token);
+                dbContext.ChangeTracker.Clear();
+                return await EvaluateWithinTransactionAsync(request, fanoutAuthorityHint, token);
+            },
+            cancellationToken);
     }
 
     private async Task<EmailDispatchEligibilityResult> EvaluateWithinTransactionAsync(
@@ -97,6 +102,7 @@ public sealed class EmailDispatchEligibilityEvaluator(
             return await SkipAsync(dispatch, delivery, request, "delivery_authority_missing", cancellationToken);
         }
 
+        long originalPolicyRevision = delivery.NotificationIntent.EmailDeliveryPolicyRevision;
         if (fanoutAuthorityHint is { OccurrenceId: { } hintedOccurrenceId })
         {
             if (fanoutAuthorityHint.EventId is not Guid authorityEventId)
@@ -138,6 +144,9 @@ public sealed class EmailDispatchEligibilityEvaluator(
                     cancellationToken);
             }
 
+            // Fanout graph creation may be delayed or repaired after email is re-enabled.
+            // The validated occurrence, not the recipient graph's creation time, owns its history.
+            originalPolicyRevision = occurrence.EmailDeliveryPolicyRevision;
             if (occurrence.State == NotificationFanoutOccurrenceState.Superseded)
             {
                 return await SkipAsync(
@@ -209,6 +218,14 @@ public sealed class EmailDispatchEligibilityEvaluator(
             return await SkipAsync(dispatch, delivery, request, "delivery_state_ineligible", cancellationToken);
         }
 
+        // This retired informational invitation has no token/operation validity bound to recover.
+        // Keep it terminal even when administrator authority and email capability are restored.
+        if (dispatch.Kind == EmailDispatchKind.TenantAdministratorInvitation)
+        {
+            return await SkipAsync(
+                dispatch, delivery, request, "managed_administrator_invitation_retired", cancellationToken);
+        }
+
         var policy = policyResolver.Resolve(
             delivery.DeliveryPolicyId,
             delivery.DeliveryPolicy.MasterCode,
@@ -229,11 +246,13 @@ public sealed class EmailDispatchEligibilityEvaluator(
             return await SkipAsync(dispatch, delivery, request, "tenant_inactive", cancellationToken);
         }
 
-        var tenantPaused = await dbContext.EmailDispatchTenantControls
+        var tenantControl = await dbContext.EmailDispatchTenantControls
             .IgnoreTenantFilter(TenantFilterBypassReasons.EmailDispatchWorkerCrossTenantQueue)
             .AsNoTracking()
-            .AnyAsync(control => control.TenantId == request.TenantId && control.IsPaused, cancellationToken);
-        if (tenantPaused)
+            .Where(control => control.TenantId == request.TenantId)
+            .Select(control => new { control.IsPaused, control.OptionalSuppressedThroughRevision })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (tenantControl?.IsPaused == true)
         {
             dispatch.Status = EmailDispatchStatus.Pending;
             dispatch.ProcessingStartedAt = null;
@@ -319,7 +338,16 @@ public sealed class EmailDispatchEligibilityEvaluator(
                     operation.Status == ManagedTenantProvisioningStatus.Succeeded &&
                     operation.TenantId == request.TenantId &&
                     operation.TenantAdministratorUserId == dispatch.RecipientUserId,
-                    cancellationToken);
+                    cancellationToken)
+                && await dbContext.TenantUserRoleGrants
+                    .IgnoreTenantFilter(TenantFilterBypassReasons.EmailDispatchWorkerCrossTenantQueue)
+                    .AsNoTracking()
+                    .AnyAsync(grant =>
+                        grant.TenantId == request.TenantId
+                        && grant.TenantUserId == tenantUser.Id
+                        && grant.RoleId == (int)RoleEnum.TenantAdmin
+                        && grant.RevokedAt == null,
+                        cancellationToken);
             if (!invitationAuthorized || string.IsNullOrWhiteSpace(dispatch.RecipientEmail))
             {
                 return await SkipAsync(dispatch, delivery, request, "invitation_authority_invalid", cancellationToken);
@@ -396,6 +424,24 @@ public sealed class EmailDispatchEligibilityEvaluator(
             }
         }
 
+        var emailPolicy = await EmailDeliveryPolicyReader.ReadAsync(dbContext, request.TenantId, cancellationToken);
+        // Never inherit the processor watermark: independently enabled tenants have their own history,
+        // even if a later settings change moves them onto the instance transport.
+        bool suppressOptional = EmailDeliveryPolicy.ShouldSuppressOptional(
+            state: emailPolicy.State, honorsPreference: policy.HonorsPreference,
+            occurrenceRevision: originalPolicyRevision,
+            suppressedThroughRevision: tenantControl?.OptionalSuppressedThroughRevision);
+        if (suppressOptional || emailPolicy.State != EmailDeliveryState.Available)
+        {
+            return await SettleUnavailablePolicyAsync(
+                dispatch,
+                delivery,
+                request,
+                skipOptional: suppressOptional,
+                deliveryState: emailPolicy.State,
+                cancellationToken);
+        }
+
         var admission = await TryReserveSmtpRateAsync(dispatch, request, cancellationToken);
         if (admission.ProcessorPaused)
         {
@@ -463,6 +509,10 @@ public sealed class EmailDispatchEligibilityEvaluator(
         EmailDispatchEligibilityRequest request,
         CancellationToken cancellationToken)
     {
+        await using IAsyncDisposable controlLease = await RelationalNamedLock.AcquireTransactionAsync(
+            dbContext,
+            EmailDispatchOutboxRepository.ClaimAdvisoryLockName,
+            cancellationToken);
         await using IAsyncDisposable smtpRateLease = await RelationalNamedLock.AcquireTransactionAsync(
             dbContext,
             "email-dispatch-smtp-rate",
@@ -732,6 +782,42 @@ public sealed class EmailDispatchEligibilityEvaluator(
             || currentSession.SessionStart.ToUniversalTime() != scheduledStartUtc
                 ? "event_reminder_authority_changed"
                 : null;
+    }
+
+    private async Task<EmailDispatchEligibilityResult> SettleUnavailablePolicyAsync(
+        EmailDispatchOutbox dispatch,
+        NotificationDelivery delivery,
+        EmailDispatchEligibilityRequest request,
+        bool skipOptional,
+        EmailDeliveryState deliveryState,
+        CancellationToken cancellationToken)
+    {
+        var reason = skipOptional && deliveryState is (EmailDeliveryState.Disabled or EmailDeliveryState.Available)
+            ? "email_delivery_disabled" : "email_capability_unavailable";
+        dispatch.Status = skipOptional ? EmailDispatchStatus.Skipped : EmailDispatchStatus.Parked;
+        dispatch.ParkedAt = skipOptional ? null : request.EvaluatedAt;
+        dispatch.ParkReason = skipOptional ? null : EmailDispatchParkReason.CapabilityUnavailable;
+        dispatch.NextAttemptAt = null;
+        dispatch.ProcessingStartedAt = null;
+        dispatch.ProcessingLeaseToken = null;
+        dispatch.LastFailureCategory = reason;
+        dispatch.LastError = "Email delivery was suppressed before SMTP handoff by the current delivery policy.";
+        dispatch.LastFailureAt = request.EvaluatedAt;
+        dispatch.UpdatedAt = request.EvaluatedAt;
+        delivery.StatusId = skipOptional
+            ? (int)NotificationDeliveryStatusEnum.Skipped
+            : (int)NotificationDeliveryStatusEnum.Parked;
+        delivery.ProviderStatus = skipOptional ? "skipped" : "parked";
+        delivery.FailureCategory = reason;
+        delivery.CompletedAt = skipOptional ? request.EvaluatedAt : null;
+        delivery.UpdatedAt = request.EvaluatedAt;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await dbContext.Database.CommitTransactionAsync(cancellationToken);
+        return new EmailDispatchEligibilityResult(
+            Outcome: skipOptional ? EmailDispatchEligibilityOutcome.Skipped : EmailDispatchEligibilityOutcome.Parked,
+            RecipientEmail: null,
+            SkipReason: reason);
     }
 
     private async Task<EmailDispatchEligibilityResult> SkipAsync(

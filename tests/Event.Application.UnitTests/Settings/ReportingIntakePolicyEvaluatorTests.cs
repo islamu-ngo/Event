@@ -194,10 +194,10 @@ public sealed class ReportingIntakePolicyEvaluatorTests
         bool OrganizationSubmissionEnabled, bool GroupSubmissionEnabled)> NonIntakePolicyStates()
     {
         foreach (bool requireApproval in new[] { false, true })
-        foreach (bool userSubmissionEnabled in new[] { false, true })
-        foreach (bool organizationSubmissionEnabled in new[] { false, true })
-        foreach (bool groupSubmissionEnabled in new[] { false, true })
-            yield return (requireApproval, userSubmissionEnabled, organizationSubmissionEnabled, groupSubmissionEnabled);
+            foreach (bool userSubmissionEnabled in new[] { false, true })
+                foreach (bool organizationSubmissionEnabled in new[] { false, true })
+                    foreach (bool groupSubmissionEnabled in new[] { false, true })
+                        yield return (requireApproval, userSubmissionEnabled, organizationSubmissionEnabled, groupSubmissionEnabled);
     }
 
     public static IEnumerable<(bool UserSubmissionEnabled, bool OrganizationSubmissionEnabled,
@@ -221,16 +221,16 @@ public sealed class ReportingIntakePolicyEvaluatorTests
         bool GroupSubmissionEnabled, SubmissionPath PathToOpen)> OpeningSubmissionPathTransitions()
     {
         foreach (bool userSubmissionEnabled in new[] { false, true })
-        foreach (bool organizationSubmissionEnabled in new[] { false, true })
-        foreach (bool groupSubmissionEnabled in new[] { false, true })
-        {
-            if (!userSubmissionEnabled)
-                yield return (false, organizationSubmissionEnabled, groupSubmissionEnabled, SubmissionPath.User);
-            if (!organizationSubmissionEnabled)
-                yield return (userSubmissionEnabled, false, groupSubmissionEnabled, SubmissionPath.Organization);
-            if (!groupSubmissionEnabled)
-                yield return (userSubmissionEnabled, organizationSubmissionEnabled, false, SubmissionPath.Group);
-        }
+            foreach (bool organizationSubmissionEnabled in new[] { false, true })
+                foreach (bool groupSubmissionEnabled in new[] { false, true })
+                {
+                    if (!userSubmissionEnabled)
+                        yield return (false, organizationSubmissionEnabled, groupSubmissionEnabled, SubmissionPath.User);
+                    if (!organizationSubmissionEnabled)
+                        yield return (userSubmissionEnabled, false, groupSubmissionEnabled, SubmissionPath.Organization);
+                    if (!groupSubmissionEnabled)
+                        yield return (userSubmissionEnabled, organizationSubmissionEnabled, false, SubmissionPath.Group);
+                }
     }
 
     public static IEnumerable<(bool UserSubmissionEnabled, bool OrganizationSubmissionEnabled,

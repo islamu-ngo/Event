@@ -8,8 +8,10 @@ namespace Explore.Infrastructure.Services.Registration.Providers.SubmissionSinks
 
 public sealed class GoogleSheetsRegistrationProviderSubmissionSink(
     HttpClient httpClient,
-    ISecretResolver secretResolver) : IRegistrationProviderDescriptor, IRegistrationProviderSubmissionSink
+    ISecretResolver secretResolver,
+    TimeProvider? timeProvider = null) : IRegistrationProviderDescriptor, IRegistrationProviderSubmissionSink
 {
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     public const string HttpClientName = "RegistrationProvider.GoogleSheetsSink";
     private const int MaxPayloadBytes = 64 * 1024;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -67,6 +69,13 @@ public sealed class GoogleSheetsRegistrationProviderSubmissionSink(
         message.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         message.Headers.TryAddWithoutValidation("Idempotency-Key", request.RegistrationSubmissionId.ToString("N"));
         message.Content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        if (request.DisclosureUntilUtc is { } deadline && _timeProvider.GetUtcNow().UtcDateTime >= deadline)
+        {
+            throw new RegistrationProviderSubmissionDeliveryException(
+                RegistrationProviderSubmissionDeliveryFailureKind.PermanentBeforeHandoff,
+                "registration_data_retention_expired");
+        }
 
         using HttpResponseMessage response = await httpClient.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         if (response.IsSuccessStatusCode)

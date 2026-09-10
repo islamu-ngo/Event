@@ -41,7 +41,7 @@ public sealed class GetEmailDispatchStatusQueryHandler
             TenantId = row.TenantId,
             SourceType = row.SourceType,
             SourceId = row.SourceId,
-            DeliveryStatus = row.Status.ToString(),
+            DeliveryStatus = row.Status,
             AttemptCount = row.AttemptCount,
             NextRetryAt = row.NextAttemptAt,
             LastFailureCategory = row.LastFailureCategory,
@@ -49,6 +49,7 @@ public sealed class GetEmailDispatchStatusQueryHandler
             UnknownAt = row.UnknownAt,
             DeliveredAt = row.SentAt,
             ParkedAt = row.ParkedAt,
+            ParkReason = row.ParkReason,
             ContentRedactedAt = row.ContentRedactedAt,
             CorrelationId = row.CorrelationId
         }).ToList();

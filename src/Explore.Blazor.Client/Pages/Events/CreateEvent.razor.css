@@ -253,6 +253,15 @@
     text-align: end;
 }
 
+::deep .create-event__visitor-capability-note {
+    flex-basis: 100%;
+    padding: var(--isl-space-3);
+    border: 1px solid var(--isl-color-warning);
+    border-radius: var(--isl-radius-control);
+    background: color-mix(in srgb, var(--isl-color-warning) 8%, transparent);
+    text-align: start;
+}
+
 ::deep .create-event__option-editor-group,
 ::deep .create-event__option-chip-editor {
     display: flex;

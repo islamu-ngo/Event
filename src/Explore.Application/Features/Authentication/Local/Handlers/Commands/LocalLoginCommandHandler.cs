@@ -26,20 +26,20 @@ public sealed class LocalLoginCommandHandler(
             .ConfigureAwait(false);
         if (!validation.IsValid)
         {
-            return LocalAuthResponseDto.Failed("invalid_request");
+            return LocalAuthResponseDto.Failed(failure: LocalAuthFailure.InvalidRequest);
         }
 
         if (await providerDispatcher.GetActivePrimaryProviderAsync(cancellationToken)
                 .ConfigureAwait(false)
             != AuthenticationProviderKind.Local)
         {
-            return LocalAuthResponseDto.Failed("provider_inactive");
+            return LocalAuthResponseDto.Failed(failure: LocalAuthFailure.ProviderInactive);
         }
 
         LocalAuthResponseDto authentication = await authService
             .AuthenticateAsync(request.Request, cancellationToken)
             .ConfigureAwait(false);
-        if (!authentication.Success)
+        if (authentication.Outcome != LocalAuthOutcome.Authenticated)
         {
             return authentication;
         }
@@ -49,7 +49,7 @@ public sealed class LocalLoginCommandHandler(
             cancellationToken).ConfigureAwait(false);
         return synchronization.IsSuccess
             ? authentication
-            : LocalAuthResponseDto.Failed("user_sync_failed");
+            : LocalAuthResponseDto.Failed(failure: LocalAuthFailure.UserSynchronizationFailed);
     }
 }
 
@@ -57,7 +57,7 @@ internal static class LocalIdentitySyncCommandFactory
 {
     internal static SyncUserCommand Create(LocalAuthResponseDto authentication)
     {
-        if (!authentication.Success)
+        if (authentication.Outcome != LocalAuthOutcome.Authenticated)
         {
             throw new ArgumentException(
                 "Only successful local authentication can be synchronized.",

@@ -16,6 +16,45 @@ internal sealed class LocalJwtTokenGenerator(
     TimeProvider timeProvider)
     : ILocalJwtTokenGenerator
 {
+    public async Task<LocalIssuedReplacementChallenge> GenerateReplacementChallengeAsync(
+        LocalCredentialReplacementSubject subject,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(subject);
+        cancellationToken.ThrowIfCancellationRequested();
+        SecretResolutionResult resolution = await secretResolver.ResolveAsync(
+            SecretDefinitionRegistry.Keys.Authentication.LocalJwtKey,
+            tenantId: null,
+            cancellationToken).ConfigureAwait(false);
+        byte[] signingKey = DecodeSigningKey(resolution);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        DateTimeOffset issuedAt = DateTimeOffset.FromUnixTimeSeconds(timeProvider.GetUtcNow().ToUnixTimeSeconds());
+        DateTimeOffset expiresAt = issuedAt.Add(LocalCredentialChallengeToken.MaximumLifetime);
+        Claim[] claims =
+        [
+            new(JwtRegisteredClaimNames.Sub, subject.LocalSubjectId.ToString("D")),
+            new(LocalCredentialChallengeToken.OperationIdClaim, subject.OperationId.ToString("D")),
+            new(LocalCredentialChallengeToken.SecurityStampClaim, subject.SecurityStamp),
+            new(LocalCredentialChallengeToken.PurposeClaim, LocalCredentialChallengeToken.Purpose),
+            new(JwtRegisteredClaimNames.Jti, Guid.CreateVersion7().ToString("N")),
+            new(JwtRegisteredClaimNames.Iat, issuedAt.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture),
+                ClaimValueTypes.Integer64)
+        ];
+        var token = new JwtSecurityToken(
+            issuer: LocalIdentityOptions.Issuer,
+            audience: LocalCredentialChallengeToken.Audience,
+            claims: claims,
+            notBefore: issuedAt.UtcDateTime,
+            expires: expiresAt.UtcDateTime,
+            signingCredentials: new SigningCredentials(new SymmetricSecurityKey(signingKey),
+                LocalCredentialChallengeToken.RequiredAlgorithm));
+        token.Header["typ"] = LocalCredentialChallengeToken.TokenType;
+        return new LocalIssuedReplacementChallenge(
+            token: new JwtSecurityTokenHandler().WriteToken(token),
+            expiresAt: expiresAt);
+    }
+
     public async Task<LocalIssuedToken> GenerateAsync(
         LocalJwtTokenSubject subject,
         CancellationToken cancellationToken)
@@ -32,11 +71,11 @@ internal sealed class LocalJwtTokenGenerator(
             options.Value.AccessTokenLifetimeMinutes);
         var claims = new List<Claim>
         {
-            new(JwtRegisteredClaimNames.Sub, subject.UserId.ToString("D")),
-            new(JwtRegisteredClaimNames.Email, subject.Email),
+            new(JwtRegisteredClaimNames.Sub, subject.Authority.LocalSubjectId.ToString("D")),
+            new(LocalSessionToken.SecurityStampClaim, subject.Authority.SecurityStamp),
             new(JwtRegisteredClaimNames.GivenName, subject.FirstName),
             new(JwtRegisteredClaimNames.FamilyName, subject.LastName),
-            new("email_verified", subject.EmailVerified ? "true" : "false", ClaimValueTypes.Boolean),
+            new("email_verified", subject.Authority.EmailVerified ? "true" : "false", ClaimValueTypes.Boolean),
             new("auth_provider", "local"),
             new(JwtRegisteredClaimNames.Jti, Guid.CreateVersion7().ToString("N")),
             new(
@@ -44,6 +83,8 @@ internal sealed class LocalJwtTokenGenerator(
                 issuedAt.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture),
                 ClaimValueTypes.Integer64)
         };
+        if (subject.Email is not null)
+            claims.Add(new Claim(JwtRegisteredClaimNames.Email, subject.Email));
         claims.AddRange(subject.Roles.Select(role => new Claim("roles", role)));
 
         var token = new JwtSecurityToken(
@@ -57,8 +98,8 @@ internal sealed class LocalJwtTokenGenerator(
                 SecurityAlgorithms.HmacSha256));
 
         return new LocalIssuedToken(
-            new JwtSecurityTokenHandler().WriteToken(token),
-            expiresAt);
+            Token: new JwtSecurityTokenHandler().WriteToken(token),
+            ExpiresAt: expiresAt);
     }
 
     private static byte[] DecodeSigningKey(SecretResolutionResult resolution)

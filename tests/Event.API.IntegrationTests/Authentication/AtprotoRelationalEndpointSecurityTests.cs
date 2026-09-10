@@ -173,8 +173,11 @@ public sealed class AtprotoRelationalEndpointSecurityTests(AtprotoRelationalLogi
         Guid stamp = Guid.CreateVersion7();
         var flow = await StartChallengeAsync(fixture, browser, cookies, new
         {
-            handle = "alice.example", classification = "organization", returnPath = "/events",
-            canonicalActorId = actor, expectedCanonicalActorConcurrencyStamp = stamp
+            handle = "alice.example",
+            classification = "organization",
+            returnPath = "/events",
+            canonicalActorId = actor,
+            expectedCanonicalActorConcurrencyStamp = stamp
         });
         using var callback = await browser.GetAsync(Callback(flow));
         await Assert.That(observation.BodyActor).IsEqualTo(actor);

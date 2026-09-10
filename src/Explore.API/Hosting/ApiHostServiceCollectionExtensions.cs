@@ -277,6 +277,7 @@ public static class ApiHostServiceCollectionExtensions
             options.AddDocumentTransformer<KeycloakOpenApiSecurityTransformer>();
             options.AddDocumentTransformer<ManagedControlPlaneOpenApiSecurityTransformer>();
             options.AddDocumentTransformer<PrivacyErasureReceiptOpenApiSecurityTransformer>();
+            options.AddDocumentTransformer<LocalCredentialReplacementOpenApiSecurityTransformer>();
             options.AddDocumentTransformer<AdmissionScannerOpenApiSecurityTransformer>();
             options.AddDocumentTransformer<HalDtoSchemaTransformer>();
             options.AddDocumentTransformer<QuotaExceededDetailsOpenApiTransformer>();
@@ -287,6 +288,7 @@ public static class ApiHostServiceCollectionExtensions
             options.AddOperationTransformer<KeycloakOpenApiSecurityTransformer>();
             options.AddOperationTransformer<ManagedControlPlaneOpenApiSecurityTransformer>();
             options.AddOperationTransformer<PrivacyErasureReceiptOpenApiSecurityTransformer>();
+            options.AddOperationTransformer<LocalCredentialReplacementOpenApiSecurityTransformer>();
             options.AddOperationTransformer<AdmissionScannerOpenApiSecurityTransformer>();
             options.AddOperationTransformer<StorageUploadRequestBodyTransformer>();
             options.AddOperationTransformer<SetupLiveRequestBodyTransformer>();

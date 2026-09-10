@@ -2,6 +2,9 @@ namespace Explore.Application.Features.ConfigurationManifest.Application;
 
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.ConfigurationManifest.Catalog;
+using Explore.Application.Features.ConfigurationManifest.Importing;
+using Explore.Application.Features.ConfigurationManifest.Validation;
+using Explore.Application.Settings;
 
 public sealed record ConfigurationManifestTenantSettingMutation(
     string Key,
@@ -72,6 +75,12 @@ public sealed class ConfigurationManifestTenantSettingMutationBoundary(
             throw new ArgumentException(
                 "Tenant setting mutation timestamp must use UTC kind.",
                 nameof(input));
+        }
+
+        if (input.Mutations.Any(mutation => EmailDeliverySettingKeys.Contains(mutation.Key)))
+        {
+            throw new ConfigurationImportSessionException(
+                ConfigurationManifestFailureCodes.KeyNotAllowed);
         }
 
         var seenKeys = new HashSet<string>(StringComparer.Ordinal);

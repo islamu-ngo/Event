@@ -2,6 +2,8 @@ using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Onboarding;
+using Explore.Application.Models;
+using Explore.Domain.Settings;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
@@ -15,15 +17,63 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
     private readonly ISystemSettingRepository _systemSettingRepository;
     private readonly IConfiguration _configuration;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ISettingMutationLock _mutationLock;
+    private readonly IVisitorAccessSettingsWriter _visitorSettings;
+    private readonly MediatR.IMediator _mediator;
 
     public AuthProviderConfigurationService(
         ISystemSettingRepository systemSettingRepository,
         IConfiguration configuration,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        ISettingMutationLock mutationLock,
+        IVisitorAccessSettingsWriter visitorSettings,
+        MediatR.IMediator mediator)
     {
         _systemSettingRepository = systemSettingRepository;
         _configuration = configuration;
         _unitOfWork = unitOfWork;
+        _mutationLock = mutationLock;
+        _visitorSettings = visitorSettings;
+        _mediator = mediator;
+    }
+
+    // This single projection is shared by authoritative reads and detached proposed-state validation.
+    public static IReadOnlyList<VisitorAccessProviderState> ProjectVisitorProviders(
+        IReadOnlyDictionary<string, SystemSetting> settings, IConfiguration configuration)
+    {
+        string Stored(string key) => settings.GetValueOrDefault(key)?.Value
+            ?? SettingRegistry.Get(key)?.DefaultValue ?? "null";
+        string Text(string key) => DeserializeString(Stored(key), string.Empty);
+        string Configured(params string[] keys) => keys.Select(key => configuration[key])
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? string.Empty;
+        PublicOnboardingPolicy Onboarding(string key) =>
+            Enum.TryParse(Text(key), out PublicOnboardingPolicy policy) && Enum.IsDefined(policy)
+                ? policy : PublicOnboardingPolicy.Unknown;
+
+        string deploymentProvider = Configured("Authentication:Provider", "AUTHENTICATION_PROVIDER");
+        AuthenticationProviderKind primary = !string.IsNullOrWhiteSpace(deploymentProvider)
+            ? deploymentProvider.ParseAuthenticationProviderKind()
+            : RequireSupportedPrimaryProvider(JsonSerializer.Deserialize<int>(Stored(GovernanceSettingKeys.Authentication.PrimaryProviderId)));
+        bool atprotoEnabled = primary == AuthenticationProviderKind.Atproto
+            || DeserializeBoolean(Stored(GovernanceSettingKeys.Authentication.AtprotoLoginEnabled), false);
+        bool googleEnabled = primary != AuthenticationProviderKind.Atproto
+            && DeserializeBoolean(Stored(GovernanceSettingKeys.Authentication.GoogleSsoEnabled), false);
+        var keycloak = ProjectKeycloakConfiguration(primary,
+            settings.GetValueOrDefault(GovernanceSettingKeys.Authentication.KeycloakAuthority),
+            settings.GetValueOrDefault(GovernanceSettingKeys.Authentication.KeycloakClientId), configuration);
+        bool atprotoUsable = Uri.TryCreate(Text(GovernanceSettingKeys.Authentication.AtprotoPublicUrl), UriKind.Absolute, out var atprotoUrl)
+            && atprotoUrl.Scheme == Uri.UriSchemeHttps;
+        return [
+            new(AuthenticationProviderKind.Local, primary == AuthenticationProviderKind.Local, true, PublicOnboardingPolicy.Denied),
+            new(AuthenticationProviderKind.Keycloak, primary == AuthenticationProviderKind.Keycloak, keycloak.Enabled,
+                Onboarding(GovernanceSettingKeys.Authentication.KeycloakPublicOnboardingPolicy),
+                Text(GovernanceSettingKeys.Authentication.KeycloakPublicSignupUrl)),
+            new(AuthenticationProviderKind.Atproto, atprotoEnabled, atprotoUsable, PublicOnboardingPolicy.Allowed),
+            new(AuthenticationProviderKind.Google, googleEnabled,
+                !string.IsNullOrWhiteSpace(Text(GovernanceSettingKeys.Authentication.GoogleClientId)),
+                Onboarding(GovernanceSettingKeys.Authentication.GooglePublicOnboardingPolicy),
+                Text(GovernanceSettingKeys.Authentication.GooglePublicSignupUrl))
+        ];
     }
 
     public async Task<AuthProviderConfigurationDto> ReadConfigurationAsync()
@@ -67,32 +117,60 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
                                   || DeserializeBoolean(atprotoLoginEnabled?.Value, false),
             AtprotoPublicUrl = DeserializeString(atprotoPublicUrl?.Value, string.Empty),
             GoogleSsoEnabled = primaryProvider != AuthenticationProviderKind.Atproto
-                               && DeserializeBoolean(googleSsoEnabled?.Value, false),
+                && DeserializeBoolean(googleSsoEnabled?.Value, false),
             GoogleClientId = DeserializeString(googleClientId?.Value, string.Empty),
             GoogleClientSecret = string.Empty, // Never return secrets on read
             LockAtprotoLoginEnabled = atprotoLoginEnabled?.IsLocked == true,
             LockGoogleSsoEnabled = googleSsoEnabled?.IsLocked == true,
+            KeycloakPublicOnboardingPolicy = ReadOnboardingPolicy((await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Authentication.KeycloakPublicOnboardingPolicy))?.Value),
+            KeycloakPublicSignupUrl = DeserializeString((await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Authentication.KeycloakPublicSignupUrl))?.Value, string.Empty),
+            GooglePublicOnboardingPolicy = ReadOnboardingPolicy((await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Authentication.GooglePublicOnboardingPolicy))?.Value),
+            GooglePublicSignupUrl = DeserializeString((await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Authentication.GooglePublicSignupUrl))?.Value, string.Empty),
         };
     }
 
-    public Task ApplyConfigurationAsync(AuthProviderConfigurationDto configuration) =>
-        _unitOfWork.ExecuteInTransactionAsync(
-            transactionToken =>
-                ApplyConfigurationInCurrentTransactionAsync(
-                    configuration,
-                    transactionToken));
+    public async Task ApplyConfigurationAsync(AuthProviderConfigurationDto configuration,
+        IReadOnlySet<string>? suppliedKeys = null, CancellationToken cancellationToken = default)
+    {
+        var notifications = await _mutationLock.ExecuteOrderedGroupsAsync(
+            [VisitorAccessCapabilityResolver.AuthoritySettingKeys],
+            token => _unitOfWork.ExecuteSerializableAsync(
+                innerToken => ApplyConfigurationInCurrentTransactionAsync(configuration, suppliedKeys, innerToken), token),
+            cancellationToken);
+        foreach (var notification in notifications)
+            await _mediator.Publish(notification, CancellationToken.None);
+    }
 
-    private async Task ApplyConfigurationInCurrentTransactionAsync(
+    private async Task<System.Collections.Immutable.ImmutableArray<Explore.Application.Notifications.SettingChangedNotification>> ApplyConfigurationInCurrentTransactionAsync(
         AuthProviderConfigurationDto configuration,
+        IReadOnlySet<string>? suppliedKeys,
         CancellationToken cancellationToken)
     {
+        var writes = new List<SystemSetting>();
+        Task UpsertSettingAsync(string key, string value, SettingValueType valueType, bool isLocked,
+            string category, int displayOrder, string description, CancellationToken token)
+        {
+            if (suppliedKeys is null || suppliedKeys.Contains(key))
+                writes.Add(new SystemSetting
+                {
+                    SettingKey = key,
+                    Value = value,
+                    ValueType = valueType,
+                    IsLocked = isLocked,
+                    Category = category,
+                    DisplayOrder = displayOrder,
+                    Description = description,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                });
+            return Task.CompletedTask;
+        }
         AuthenticationProviderKind primaryProvider =
             RequireSupportedPrimaryProvider(configuration.PrimaryProviderId);
         bool atprotoLoginEnabled =
             primaryProvider == AuthenticationProviderKind.Atproto
             || configuration.AtprotoLoginEnabled;
-        bool googleSsoEnabled =
-            primaryProvider != AuthenticationProviderKind.Atproto
+        bool googleSsoEnabled = primaryProvider != AuthenticationProviderKind.Atproto
             && configuration.GoogleSsoEnabled;
         await UpsertSettingAsync(
             GovernanceSettingKeys.Authentication.PrimaryProviderId,
@@ -196,6 +274,25 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
                 "Google OAuth client secret",
                 cancellationToken);
         }
+
+        foreach (var (key, value) in new[] {
+            (GovernanceSettingKeys.Authentication.KeycloakPublicOnboardingPolicy, configuration.KeycloakPublicOnboardingPolicy.ToString()),
+            (GovernanceSettingKeys.Authentication.KeycloakPublicSignupUrl, configuration.KeycloakPublicSignupUrl),
+            (GovernanceSettingKeys.Authentication.GooglePublicOnboardingPolicy, configuration.GooglePublicOnboardingPolicy.ToString()),
+            (GovernanceSettingKeys.Authentication.GooglePublicSignupUrl, configuration.GooglePublicSignupUrl) })
+            await UpsertSettingAsync(key, JsonSerializer.Serialize(value), SettingValueType.String, true,
+                "Authentication", 0, "Public provider onboarding policy", cancellationToken);
+
+        var result = await _visitorSettings.ApplyAsync(
+            [.. writes.Where(setting => VisitorAccessCapabilityResolver.AuthoritySettingKeys.Contains(setting.SettingKey))
+                .Select(setting => new VisitorAccessSettingMutation(null, setting.SettingKey,
+                    VisitorAccessSettingMutationKind.SetValue, setting.Value, suppliedKeys is null ? setting.IsLocked : null))], null, cancellationToken);
+        if (!result.Success)
+            throw new Explore.Application.Exceptions.ConcurrencyConflictException(result.FailureCode!,
+                "The change would remove public signup required by an event participation configuration.");
+        foreach (var setting in writes.Where(setting => !VisitorAccessCapabilityResolver.AuthoritySettingKeys.Contains(setting.SettingKey)))
+            await _systemSettingRepository.UpsertInCurrentTransactionAsync(setting, cancellationToken);
+        return result.DeferredNotifications;
     }
 
     public async Task<bool> IsConfiguredAsync()
@@ -233,47 +330,32 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
         return dto;
     }
 
-    private async Task UpsertSettingAsync(
-        string settingKey,
-        string value,
-        SettingValueType valueType,
-        bool isLocked,
-        string category,
-        int displayOrder,
-        string description,
-        CancellationToken cancellationToken)
-    {
-        await _systemSettingRepository.UpsertInCurrentTransactionAsync(
-            new SystemSetting
-        {
-            SettingKey = settingKey,
-            Value = value,
-            ValueType = valueType,
-            IsLocked = isLocked,
-            Description = description,
-            Category = category,
-            DisplayOrder = displayOrder,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        },
-            cancellationToken);
-    }
-
     private async Task<(bool Enabled, string Authority, string ClientId, bool DetectedFromEnvironment)>
         ResolveKeycloakConfigurationAsync(AuthenticationProviderKind primaryProvider)
     {
         var authoritySetting = await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Authentication.KeycloakAuthority);
         var clientIdSetting = await _systemSettingRepository.GetByKey(GovernanceSettingKeys.Authentication.KeycloakClientId);
+        return ProjectKeycloakConfiguration(primaryProvider, authoritySetting, clientIdSetting, _configuration);
+    }
+
+    private static (bool Enabled, string Authority, string ClientId, bool DetectedFromEnvironment)
+        ProjectKeycloakConfiguration(AuthenticationProviderKind primaryProvider, SystemSetting? authoritySetting,
+            SystemSetting? clientIdSetting, IConfiguration configuration)
+    {
         var storedAuthority = DeserializeString(authoritySetting?.Value, string.Empty);
         var storedClientId = DeserializeString(clientIdSetting?.Value, string.Empty);
         var storedUsable = !string.IsNullOrWhiteSpace(storedAuthority)
                            && !string.IsNullOrWhiteSpace(storedClientId);
-        var deploymentAuthority = ReadFirstConfigured("Keycloak:Authority");
-        var deploymentClientId = ReadFirstConfigured("Keycloak:ClientId");
+        var deploymentAuthority = configuration["Keycloak:Authority"]?.Trim() ?? string.Empty;
+        var deploymentClientId = configuration["Keycloak:ClientId"]?.Trim() ?? string.Empty;
         var deploymentUsable = !string.IsNullOrWhiteSpace(deploymentAuthority)
                                && !string.IsNullOrWhiteSpace(deploymentClientId);
-        var authorityDeploymentManaged = IsKeycloakAuthorityDeploymentManaged();
-        var clientIdDeploymentManaged = IsKeycloakClientIdDeploymentManaged();
+        var authorityDeploymentManaged = IsDeploymentManaged(configuration, GovernanceSettingKeys.Authentication.KeycloakAuthority)
+            || IsDeploymentManaged(configuration, SecretDefinitionRegistry.Keys.Keycloak.Endpoint)
+            || IsDeploymentManaged(configuration, "Keycloak:Authority");
+        var clientIdDeploymentManaged = IsDeploymentManaged(configuration, GovernanceSettingKeys.Authentication.KeycloakClientId)
+            || IsDeploymentManaged(configuration, SecretDefinitionRegistry.Keys.Keycloak.ClientId)
+            || IsDeploymentManaged(configuration, "Keycloak:ClientId");
 
         if (authorityDeploymentManaged || clientIdDeploymentManaged)
         {
@@ -415,9 +497,11 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
             ?.Trim() ?? string.Empty;
     }
 
-    private bool IsDeploymentManaged(string key)
+    private bool IsDeploymentManaged(string key) => IsDeploymentManaged(_configuration, key);
+
+    private static bool IsDeploymentManaged(IConfiguration configuration, string key)
     {
-        var configuredKeys = _configuration.GetSection("Secrets:Ownership:DeploymentManagedKeys")
+        var configuredKeys = configuration.GetSection("Secrets:Ownership:DeploymentManagedKeys")
             .GetChildren()
             .Select(section => section.Value)
             .Where(value => !string.IsNullOrWhiteSpace(value))
@@ -463,6 +547,10 @@ public class AuthProviderConfigurationService : IAuthProviderConfigurationServic
             BootstrapAvailable = bootstrapAvailable
         };
     }
+
+    private static PublicOnboardingPolicy ReadOnboardingPolicy(string? rawValue) =>
+        Enum.TryParse(DeserializeString(rawValue, string.Empty), out PublicOnboardingPolicy policy) && Enum.IsDefined(policy)
+            ? policy : PublicOnboardingPolicy.Unknown;
 
     private static bool DeserializeBoolean(string? rawValue, bool defaultValue)
     {

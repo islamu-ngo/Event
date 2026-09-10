@@ -1,0 +1,26 @@
+Change-Id: CHG-01M243KWDF8RMY38XPDVJ6QRM6
+Title: "Keep scheduler administration usable after rejected reads"
+Type: fix
+Scope: self-hosting
+Summary: "Show a recoverable read error and manual Refresh when scheduler overview or job requests fail, including rate limiting and temporary unavailability."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/administration-and-branding/admin-guide.md
+    Disposition: documented
+    Detail: Failed reads clear stale job controls and allow manual retry without changing rate limits or scheduler state.

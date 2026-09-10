@@ -7,6 +7,9 @@ namespace Explore.Application.Models;
 /// </summary>
 public class EmailMessage
 {
+    /// <summary>Operational contact deadline; null leaves ordinary email delivery unchanged.</summary>
+    public DateTime? DisclosureUntilUtc { get; init; }
+
     /// <summary>Primary recipient email address.</summary>
     public required string To { get; set; }
 

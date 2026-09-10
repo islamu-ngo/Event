@@ -4,6 +4,7 @@ using Explore.API.Hateoas.Policies;
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EmailDispatch;
 using Explore.Application.Hateoas;
+using Explore.Domain;
 using TUnit.Assertions;
 using TUnit.Core;
 
@@ -38,7 +39,7 @@ public sealed class EmailDispatchAdminHateoasTests
     {
         var tenantId = Guid.NewGuid();
         var outboxId = Guid.NewGuid();
-        var dto = CreateStatus(tenantId, outboxId, "DeadLettered");
+        var dto = CreateStatus(tenantId: tenantId, outboxId: outboxId, deliveryStatus: EmailDispatchStatus.DeadLettered);
         var policy = new EmailDispatchStatusCollectionLinkPolicy();
 
         var links = policy.GetItemLinks(dto, user: null).ToList();
@@ -79,7 +80,7 @@ public sealed class EmailDispatchAdminHateoasTests
     {
         var policy = new EmailDispatchStatusCollectionLinkPolicy();
 
-        var links = policy.GetItemLinks(CreateStatus(Guid.NewGuid(), Guid.NewGuid(), "Sent"), user: null).ToList();
+        var links = policy.GetItemLinks(CreateStatus(tenantId: Guid.NewGuid(), outboxId: Guid.NewGuid(), deliveryStatus: EmailDispatchStatus.Sent), user: null).ToList();
 
         await Assert.That(links.Any(link => link.Rel == "replay")).IsFalse();
         await Assert.That(links.Any(link => link.Rel == "park")).IsFalse();
@@ -91,7 +92,7 @@ public sealed class EmailDispatchAdminHateoasTests
     {
         var policy = new EmailDispatchStatusCollectionLinkPolicy();
 
-        var links = policy.GetItemLinks(CreateStatus(Guid.NewGuid(), Guid.NewGuid(), "Parked"), user: null).ToList();
+        var links = policy.GetItemLinks(CreateStatus(tenantId: Guid.NewGuid(), outboxId: Guid.NewGuid(), deliveryStatus: EmailDispatchStatus.Parked), user: null).ToList();
 
         await Assert.That(links.Any(link => link.Rel == "replay")).IsTrue();
         await Assert.That(links.Any(link => link.Rel == "park")).IsFalse();
@@ -103,7 +104,7 @@ public sealed class EmailDispatchAdminHateoasTests
     {
         var policy = new EmailDispatchStatusCollectionLinkPolicy();
 
-        var links = policy.GetItemLinks(CreateStatus(Guid.NewGuid(), Guid.NewGuid(), "Processing"), user: null).ToList();
+        var links = policy.GetItemLinks(CreateStatus(tenantId: Guid.NewGuid(), outboxId: Guid.NewGuid(), deliveryStatus: EmailDispatchStatus.Processing), user: null).ToList();
 
         await Assert.That(links.Any(link => link.Rel == "replay")).IsFalse();
         await Assert.That(links.Any(link => link.Rel == "park")).IsFalse();
@@ -115,7 +116,7 @@ public sealed class EmailDispatchAdminHateoasTests
     {
         var policy = new EmailDispatchStatusCollectionLinkPolicy();
 
-        var links = policy.GetItemLinks(CreateStatus(Guid.NewGuid(), Guid.NewGuid(), "Unknown"), user: null).ToList();
+        var links = policy.GetItemLinks(CreateStatus(tenantId: Guid.NewGuid(), outboxId: Guid.NewGuid(), deliveryStatus: EmailDispatchStatus.Unknown), user: null).ToList();
 
         await Assert.That(links.Any(link => link.Rel == "reconcile")).IsTrue();
         await Assert.That(links.Any(link => link.Rel == "resolve-without-replay")).IsTrue();
@@ -126,7 +127,7 @@ public sealed class EmailDispatchAdminHateoasTests
     public async Task RedactedStatusRowsExposeNoMutationLinks()
     {
         var policy = new EmailDispatchStatusCollectionLinkPolicy();
-        var dto = CreateStatus(Guid.NewGuid(), Guid.NewGuid(), "DeadLettered");
+        var dto = CreateStatus(tenantId: Guid.NewGuid(), outboxId: Guid.NewGuid(), deliveryStatus: EmailDispatchStatus.DeadLettered);
         dto = dto with { ContentRedactedAt = DateTime.UtcNow };
 
         var links = policy.GetItemLinks(dto, user: null).ToList();
@@ -134,7 +135,86 @@ public sealed class EmailDispatchAdminHateoasTests
         await Assert.That(links).IsEmpty();
     }
 
-    private static EmailDispatchStatusDto CreateStatus(Guid tenantId, Guid outboxId, string deliveryStatus) => new()
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task CapabilityParkedRowsExposePermissionQualifiedOperatorParkCandidate(bool detail)
+    {
+        var dto = CreateStatus(tenantId: Guid.NewGuid(), outboxId: Guid.NewGuid(), deliveryStatus: EmailDispatchStatus.Parked)
+            with
+        { ParkReason = EmailDispatchParkReason.CapabilityUnavailable };
+
+        var links = detail
+            ? new EmailDispatchStatusDetailLinkPolicy().GetLinks(dto, user: null)
+            : new EmailDispatchStatusCollectionLinkPolicy().GetItemLinks(dto, user: null);
+        var park = links.Single(link => link.Rel == "park");
+
+        await Assert.That(park.RouteName).IsEqualTo(RouteNames.ParkEmailDispatch);
+        await Assert.That(park.Method).IsEqualTo("PUT");
+        await Assert.That(park.RequiresAuth).IsTrue();
+        await Assert.That(park.PermissionResourceKind).IsEqualTo(ResourceKinds.EmailDispatch);
+        await Assert.That(park.PermissionAction).IsEqualTo(AuthorizationActions.EmailDispatches.Park);
+        await Assert.That(park.PermissionScope?.TenantId).IsEqualTo(dto.TenantId.ToString());
+        await AssertPermissionFacts(link: park, tenantId: dto.TenantId, outboxId: dto.OutboxId);
+        await Assert.That(GetRouteValue<Guid>(park.RouteValues, "tenantId")).IsEqualTo(dto.TenantId);
+        await Assert.That(GetRouteValue<Guid>(park.RouteValues, "outboxId")).IsEqualTo(dto.OutboxId);
+    }
+
+    [Test]
+    [Arguments(EmailDispatchStatus.Parked, EmailDispatchParkReason.Operator)]
+    [Arguments(EmailDispatchStatus.Parked, null)]
+    [Arguments(EmailDispatchStatus.Parked, (EmailDispatchParkReason)999)]
+    [Arguments(EmailDispatchStatus.Unknown, EmailDispatchParkReason.CapabilityUnavailable)]
+    [Arguments(EmailDispatchStatus.Processing, EmailDispatchParkReason.CapabilityUnavailable)]
+    [Arguments(EmailDispatchStatus.Sent, EmailDispatchParkReason.CapabilityUnavailable)]
+    [Arguments(EmailDispatchStatus.Skipped, EmailDispatchParkReason.CapabilityUnavailable)]
+    [Arguments((EmailDispatchStatus)999, EmailDispatchParkReason.CapabilityUnavailable)]
+    public async Task IneligibleRowsOmitParkCandidateFromBothPolicies(
+        EmailDispatchStatus deliveryStatus,
+        EmailDispatchParkReason? parkReason)
+    {
+        var dto = CreateStatus(tenantId: Guid.NewGuid(), outboxId: Guid.NewGuid(), deliveryStatus: deliveryStatus)
+            with
+        { ParkReason = parkReason };
+
+        var detailLinks = new EmailDispatchStatusDetailLinkPolicy().GetLinks(dto, user: null).ToList();
+        var collectionLinks = new EmailDispatchStatusCollectionLinkPolicy().GetItemLinks(dto, user: null).ToList();
+
+        await Assert.That(detailLinks.Any(link => link.Rel == "park")).IsFalse();
+        await Assert.That(collectionLinks.Any(link => link.Rel == "park")).IsFalse();
+    }
+
+    [Test]
+    [Arguments(EmailDispatchStatus.Pending)]
+    [Arguments(EmailDispatchStatus.RetryScheduled)]
+    [Arguments(EmailDispatchStatus.DeadLettered)]
+    public async Task EligibleRowsExposeParkCandidateFromBothPolicies(EmailDispatchStatus deliveryStatus)
+    {
+        var dto = CreateStatus(tenantId: Guid.NewGuid(), outboxId: Guid.NewGuid(), deliveryStatus: deliveryStatus);
+
+        await Assert.That(new EmailDispatchStatusDetailLinkPolicy().GetLinks(dto, user: null)
+            .Any(link => link.Rel == "park")).IsTrue();
+        await Assert.That(new EmailDispatchStatusCollectionLinkPolicy().GetItemLinks(dto, user: null)
+            .Any(link => link.Rel == "park")).IsTrue();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task RedactedOrUndefinedRowsExposeNoMutationCandidatesFromBothPolicies(bool redacted)
+    {
+        var dto = CreateStatus(tenantId: Guid.NewGuid(), outboxId: Guid.NewGuid(),
+            deliveryStatus: redacted ? EmailDispatchStatus.Parked : (EmailDispatchStatus)999) with
+        {
+            ParkReason = EmailDispatchParkReason.CapabilityUnavailable,
+            ContentRedactedAt = redacted ? DateTime.UtcNow : null
+        };
+
+        await Assert.That(new EmailDispatchStatusDetailLinkPolicy().GetLinks(dto, user: null).ToList()).IsEmpty();
+        await Assert.That(new EmailDispatchStatusCollectionLinkPolicy().GetItemLinks(dto, user: null).ToList()).IsEmpty();
+    }
+
+    private static EmailDispatchStatusDto CreateStatus(Guid tenantId, Guid outboxId, EmailDispatchStatus deliveryStatus) => new()
     {
         TenantId = tenantId,
         OutboxId = outboxId,

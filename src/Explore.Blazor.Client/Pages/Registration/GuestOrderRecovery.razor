@@ -9,6 +9,7 @@
 @inject IGuestRegistrationOrderCapabilityStore CapabilityStore
 @inject IAccessibilityAnnouncerService Announcer
 @inject IAccessibilityFocusService Focus
+@inject NavigationManager Navigation
 @implements IDisposable
 
 <PageTitle>Guest registration order</PageTitle>
@@ -149,6 +150,14 @@
             }
         </div>
     }
+    @if (_hasStatusLink)
+    {
+        <section class="guest-order-recovery__summary" aria-labelledby="guest-order-private-status">
+            <h2 id="guest-order-private-status">Keep your private registration status</h2>
+            <p>Save a private link to check this registration after checkout expires. Anyone with the link can read its status. No email is sent, and a lost link cannot be recovered here.</p>
+            <AppButton OnClick="OpenStatus">Open status and save private link</AppButton>
+        </section>
+    }
 </MudContainer>
 
 @code {
@@ -158,6 +167,7 @@
     private GuestRegistrationOrderCapability? _capability;
     private HalResourceOfGuestRegistrationOrderDto? _order;
     private bool _isLoading = true;
+    private bool _hasStatusLink;
     private string? _error;
     private int? _contributionBasisPoints;
     private string _promotionCode = string.Empty;
@@ -185,6 +195,7 @@
         CancelPromotionMutation();
         ++_loadGeneration;
         _isLoading = true;
+        _hasStatusLink = false;
         _order = null;
         _capability = CapabilityStore.TryGet(EventId, OrderId, out var capability) ? capability : null;
         if (_capability is null)
@@ -207,6 +218,7 @@
         }
 
         _order = order;
+        _hasStatusLink |= order?._links?.ContainsKey("guest-status") == true;
         _contributionBasisPoints = _order?.PlatformContribution?.SelectedBasisPoints;
         _isLoading = false;
         _timer?.Dispose();
@@ -215,7 +227,15 @@
 
     private async Task ContinueAsync() => await ApplyAsync(() => RegistrationOrderService.ContinueGuestAsync(EventId, OrderId, _capability!, _contributionBasisPoints));
     private async Task FinalizeAsync() => await ApplyAsync(() => RegistrationOrderService.FinalizeGuestAsync(EventId, OrderId, _capability!));
-    private async Task CancelAsync() => await ApplyAsync(() => RegistrationOrderService.CancelGuestAsync(EventId, OrderId, _capability!));
+    private async Task CancelAsync()
+    {
+        var response = await RegistrationOrderService.CancelGuestAsync(EventId, OrderId, _capability!);
+        if (response?.Order is not null) await LoadAsync();
+        else _error = response?.Message ?? "This registration order could not be updated.";
+    }
+
+    private void OpenStatus() => Navigation.NavigateTo(new Uri(new Uri(Navigation.BaseUri),
+        $"registration/guest/events/{EventId:D}/orders/{OrderId:D}/status").AbsoluteUri);
     private Task<PaidOrderAcceptanceDisclosureDto?> LoadPaymentAcceptanceAsync(CancellationToken cancellationToken) =>
         RegistrationPaymentService.GetGuestPaymentAcceptanceAsync(EventId, OrderId, _capability!, _order!, cancellationToken);
     private Task<HalResourceOfRegistrationPaymentDto?> StartPaymentAsync(string disclosureRevision, CancellationToken cancellationToken) =>
@@ -313,11 +333,12 @@
         }
     }
 
-    private async Task ApplyAsync(Func<Task<GuestRegistrationOrderLifecycleResponseDto?>> operation)
+    private async Task ApplyAsync(Func<Task<HalResourceOfGuestRegistrationOrderLifecycleResponseDto?>> operation)
     {
         var response = await operation();
         if (response?.Order is not null)
         {
+            _hasStatusLink |= response._links?.ContainsKey("guest-status") == true;
             await LoadAsync();
         }
         else

@@ -6,12 +6,14 @@ using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Models;
+using Explore.API.Middleware;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.DTOs.RegistrationOrders;
 using Explore.Application.DTOs.RegistrationSubmissions;
 using Explore.Application.Features.Promotions.Requests.Commands;
 using Explore.Application.Features.RegistrationOrders.Requests.Commands;
 using Explore.Application.Features.RegistrationOrders.Requests.Queries;
+using Explore.Application.Features.RegistrationOrders.Queries;
 using Explore.Application.Features.RegistrationSubmissions.Commands;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
@@ -40,8 +42,10 @@ public sealed class GuestRegistrationOrderController(
 {
     [AllowAnonymous]
     [EndpointClassification(EndpointClass.PublicTransactional)]
-    [EnableRateLimiting(RateLimitingExtensions.PublicTransactionalPolicy)]
+    [EnableRateLimiting(RateLimitingExtensions.AnonymousRegistrationPolicy)]
     [RequireIdempotencyKey]
+    [RequireAnonymousRegistrationChallenge]
+    [PrivateNoStore]
     [ProtectIdempotencyReplay(CapabilityHeader, "Cache-Control", "Location")]
     [HttpPost("guest", Name = RouteNames.StartGuestRegistrationOrder)]
     [EndpointSummary("Start guest registration order")]
@@ -57,7 +61,9 @@ public sealed class GuestRegistrationOrderController(
     public async Task<ActionResult<GuestRegistrationOrderStartDto>> StartGuest(
         Guid eventId,
         [FromBody] StartRegistrationOrderRequest? request,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        [FromHeader(Name = AnonymousRegistrationChallengeBoundary.ChallengeHeader)] string? challenge = null,
+        [FromHeader(Name = AnonymousRegistrationChallengeBoundary.ProofHeader)] string? proof = null)
     {
         if (request is null)
         {
@@ -70,7 +76,10 @@ public sealed class GuestRegistrationOrderController(
                 request.TicketCatalogVersionId,
                 request.BookingPartyType,
                 request.Lines,
-                request.PlatformContributionBasisPoints),
+                request.PlatformContributionBasisPoints)
+            {
+                ChallengeAuthority = AnonymousRegistrationChallengeBoundary.GetAuthority(HttpContext)
+            },
             cancellationToken);
 
         if (!response.IsSuccess)
@@ -209,7 +218,8 @@ public sealed class GuestRegistrationOrderController(
             cancellationToken);
         return response is null
             ? this.ToNotFoundProblem(RegistrationOrderNotFoundProblem)
-            : Ok(GuestRegistrationOrderHalResourceFactory.Create(response, Url, timeProvider));
+            : Ok(GuestRegistrationOrderHalResourceFactory.Create(response, Url, timeProvider,
+                await mediator.Send(new GetGuestRegistrationStatusQuery(eventId, orderId, capability), cancellationToken)));
     }
 
     [AllowAnonymous]
@@ -336,50 +346,52 @@ public sealed class GuestRegistrationOrderController(
     [EndpointClassification(EndpointClass.PublicTransactional)]
     [EnableRateLimiting(RateLimitingExtensions.PublicTransactionalPolicy)]
     [RequireIdempotencyKey]
+    [PrivateNoStore]
     [HttpPost("guest/{orderId:guid}/continue", Name = RouteNames.ContinueGuestRegistrationOrder)]
     [EndpointSummary("Continue guest registration order")]
     [EndpointDescription("Advances the guest order only when its opaque capability header matches the scoped route.")]
-    [ProducesResponseType(typeof(GuestRegistrationOrderLifecycleResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(HalResource<GuestRegistrationOrderLifecycleResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
-    public async Task<ActionResult<GuestRegistrationOrderLifecycleResponseDto>> ContinueGuest(
+    public async Task<ActionResult<HalResource<GuestRegistrationOrderLifecycleResponseDto>>> ContinueGuest(
         Guid eventId,
         Guid orderId,
         [FromHeader(Name = CapabilityHeader)] string? capability,
         [FromBody] ContinueRegistrationOrderRequest? request = null,
         CancellationToken cancellationToken = default) =>
-        MapGuestLifecycle(await mediator.Send(
+        await MapGuestStatusLifecycle(await mediator.Send(
             new ContinueGuestRegistrationOrderCommand(
                 eventId,
                 orderId,
                 capability,
                 request?.PlatformContributionBasisPoints),
-            cancellationToken));
+            cancellationToken), eventId, orderId, capability, cancellationToken);
 
     [AllowAnonymous]
     [EndpointClassification(EndpointClass.PublicTransactional)]
     [EnableRateLimiting(RateLimitingExtensions.PublicTransactionalPolicy)]
     [RequireIdempotencyKey]
+    [PrivateNoStore]
     [HttpPost("guest/{orderId:guid}/finalize", Name = RouteNames.FinalizeGuestRegistrationOrder)]
     [EndpointSummary("Finalize guest registration order")]
     [EndpointDescription("Finalizes a free guest registration order only when its opaque capability header matches the scoped route.")]
-    [ProducesResponseType(typeof(GuestRegistrationOrderLifecycleResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(HalResource<GuestRegistrationOrderLifecycleResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
-    public async Task<ActionResult<GuestRegistrationOrderLifecycleResponseDto>> FinalizeGuest(
+    public async Task<ActionResult<HalResource<GuestRegistrationOrderLifecycleResponseDto>>> FinalizeGuest(
         Guid eventId,
         Guid orderId,
         [FromHeader(Name = CapabilityHeader)] string? capability,
         CancellationToken cancellationToken = default) =>
-        MapGuestLifecycle(await mediator.Send(
+        await MapGuestStatusLifecycle(await mediator.Send(
             new FinalizeGuestRegistrationOrderCommand(eventId, orderId, capability),
-            cancellationToken));
+            cancellationToken), eventId, orderId, capability, cancellationToken);
 
     [AllowAnonymous]
     [EndpointClassification(EndpointClass.PublicTransactional)]
@@ -438,6 +450,26 @@ public sealed class GuestRegistrationOrderController(
         Guid eventId, Guid orderId, string? capability, IRegistrationParticipantMutation mutation,
         CancellationToken cancellationToken) => MapParticipantMutation(await mediator.Send(
             new MutateGuestRegistrationParticipantsCommand(eventId, orderId, capability, mutation), cancellationToken));
+
+    private async Task<ActionResult<HalResource<GuestRegistrationOrderLifecycleResponseDto>>> MapGuestStatusLifecycle(
+        GuestRegistrationOrderLifecycleResponseDto response, Guid eventId, Guid orderId, string? capability,
+        CancellationToken cancellationToken)
+    {
+        if (!response.IsSuccess)
+        {
+            return MapGuestLifecycle(response).Result!;
+        }
+
+        var resource = new HalResource<GuestRegistrationOrderLifecycleResponseDto>(response);
+        GuestRegistrationStatusDto? status = await mediator.Send(
+            new GetGuestRegistrationStatusQuery(eventId, orderId, capability), cancellationToken);
+        if (status is not null)
+        {
+            resource.WithLink(LinkRelations.GuestStatus, HalLink.Create(Url.Link(
+                RouteNames.GetGuestRegistrationStatus, new { eventId = status.EventId, orderId = status.OrderId })!));
+        }
+        return Ok(resource);
+    }
 
     /// <summary>A missing order graph is not-found even without the code: the response cannot describe the resource.</summary>
     private ActionResult<GuestRegistrationOrderLifecycleResponseDto> MapGuestLifecycle(

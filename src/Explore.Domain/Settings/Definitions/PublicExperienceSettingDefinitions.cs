@@ -4,6 +4,13 @@ using Explore.Domain.Constants;
 
 public static class PublicExperienceSettingDefinitions
 {
+    public static readonly SettingDefinition VisitorAccessMode = PublicExperienceDefinition(
+        key: GovernanceSettingKeys.PublicExperience.VisitorAccessMode,
+        valueType: SettingValueType.String,
+        defaultValue: "\"FullRegistrationAndAuth\"",
+        description: "Public visitor access; full mode exposes only actually available account-provider capabilities",
+        allowedValues: ["FullRegistrationAndAuth", "AnonymousOnly", "DirectoryListingOnly"]);
+
     public static readonly SettingDefinition Mode = PublicExperienceDefinition(
         key: GovernanceSettingKeys.PublicExperience.Mode,
         valueType: SettingValueType.String,
@@ -111,6 +118,7 @@ public static class PublicExperienceSettingDefinitions
     public static IReadOnlyList<SettingDefinition> All =>
     [
         Mode,
+        VisitorAccessMode,
         EventCatalogLabel,
         PrimaryOrganizationId,
         HomeBlocks,

@@ -1,4 +1,5 @@
 using System.Diagnostics.Metrics;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Admissions;
@@ -14,6 +15,7 @@ using Explore.Application.Services;
 using Explore.Application.Services.Registration;
 using Explore.Application.Telemetry;
 using Explore.Domain;
+using Explore.Domain.Enums;
 using Explore.Infrastructure.Messaging;
 using Explore.Infrastructure.Services.Moderation;
 using Explore.Infrastructure.Services.Registration;
@@ -48,13 +50,14 @@ public sealed class AdmissionCompositeDispatchTests
         await context.Database.EnsureCreatedAsync();
         await context.Database.ExecuteSqlRawAsync("PRAGMA foreign_keys = OFF;");
         DateTime now = new(2026, 8, 25, 12, 0, 0, DateTimeKind.Utc);
-        const string bearer = "restart-safe-admission-bearer-canary";
+        string bearer = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         const string recipient = "attendee@example.test";
         var envelopeProtector = new AdmissionDeliveryEnvelopeProtector(new EphemeralDataProtectionProvider());
         AdmissionProtectedDeliveryMaterial protectedMaterial = envelopeProtector.Protect(
             new AdmissionCredentialDeliveryEnvelope(recipient, bearer));
+        AdmissionTicket ticket = await SeedOwningOrderAsync(context, tenantId, now);
         var intent = new AdmissionDeliveryIntent(
-            Guid.CreateVersion7(), tenantId, Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
+            Guid.CreateVersion7(), tenantId, Guid.CreateVersion7(), ticket.RegistrationTicketAssignmentId, ticket.Id,
             protectedMaterial.Ciphertext, protectedMaterial.ProtectionVersion, now);
         context.AdmissionDeliveryIntents.Add(intent);
         await context.SaveChangesAsync();
@@ -171,6 +174,39 @@ public sealed class AdmissionCompositeDispatchTests
         {
             await Assert.That(observable).DoesNotContain(forbidden);
         }
+    }
+
+    private static async Task<AdmissionTicket> SeedOwningOrderAsync(ExploreDbContext context, Guid tenantId, DateTime now)
+    {
+        Guid eventId = Guid.CreateVersion7();
+        var catalog = EventTicketCatalogVersion.Create(tenantId, eventId, "EUR", 1);
+        var type = EventTicketType.Create(Guid.CreateVersion7(), tenantId, catalog.Id, "Admission", "EUR",
+            TicketPricingModeEnum.Free, null, null, null, ParticipantDataCollectionModeEnum.None,
+            null, null, null, false, false, null, null, null, null);
+        catalog.AddTicketType(type, null);
+        catalog.AddEntitlement(type, TicketTypeEntitlement.CreateForEvent(type.Id, tenantId, eventId, 1));
+        catalog.Publish();
+        var order = RegistrationOrder.Create(tenantId, eventId, Guid.CreateVersion7(), null,
+            BookingPartyTypeEnum.Individual, catalog.Id,
+            RegistrationParticipationSnapshot.Create(Guid.CreateVersion7(), (int)ParticipationHandlingModeEnum.PlatformManaged,
+                (int)AdvanceRegistrationObligationEnum.Required, (int)IdentityAccessModeEnum.AccountRequired, null),
+            null, null, "EUR", now, null);
+        var line = RegistrationOrderLine.Create(catalog, type, order.Id, 1, null, null);
+        var participant = RegistrationParticipant.Create(tenantId, order.Id, null, ParticipantTypeEnum.Adult, null);
+        var assignment = RegistrationTicketAssignment.CreateAssigned(Guid.CreateVersion7(), line.Id, 1, participant, now);
+        order.AddLine(line);
+        order.AddParticipant(participant);
+        order.AddAssignment(line, assignment, participant);
+        order.ApplyTotals(RegistrationOrderTotalsSnapshot.Create("EUR", 0, 0, 0, 0));
+        order.TransitionTo(RegistrationOrderStatusEnum.AwaitingRequirements, now);
+        order.TransitionTo(RegistrationOrderStatusEnum.ReadyForCheckout, now);
+        order.TransitionTo(RegistrationOrderStatusEnum.Confirmed, now);
+        var ticket = AdmissionTicket.Issue(order, line, assignment, participant, catalog, type,
+            Guid.CreateVersion7(), "COMPOSITE", Guid.CreateVersion7(), 1, 1,
+            Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)), now);
+        context.AddRange(catalog, order, ticket);
+        await context.SaveChangesAsync();
+        return ticket;
     }
 
     private static CompositeOutboxMessageDispatcher CreateComposite(

@@ -36,11 +36,11 @@ public sealed class EventAddOnCatalogVersionConfiguration :
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(catalog => new
-            {
-                catalog.TenantId,
-                catalog.EventId,
-                catalog.VersionNumber,
-            })
+        {
+            catalog.TenantId,
+            catalog.EventId,
+            catalog.VersionNumber,
+        })
             .IsUnique();
         builder.HasIndex(catalog => new { catalog.TenantId, catalog.EventId })
             .IsUnique()

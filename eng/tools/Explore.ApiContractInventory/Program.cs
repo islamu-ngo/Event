@@ -11,9 +11,9 @@ namespace Explore.ApiContractInventory;
 /// This governed code generator verifies that the OpenAPI schema exists and is
 /// well formed, then keeps downstream governance artifacts synchronized with the
 /// checked-in build-time contract. CI drift detection is layered on top via
-/// <c>git diff --exit-code docs/API_CONTRACT_INVENTORY.md</c>.
+/// <c>git diff --exit-code docs/internal/API_CONTRACT_INVENTORY.md</c>.
 ///
-/// Output: <c>docs/API_CONTRACT_INVENTORY.md</c>.
+/// Output: <c>docs/internal/API_CONTRACT_INVENTORY.md</c>.
 ///
 /// Columns: Path | HTTP Method | OperationId | Summary | Tags | RouteName | Classification | Has Auth? | TenantMode | RateLimitPolicy | CachePolicy
 /// RouteName mirrors operationId because operationId is propagated from <c>RouteNames.Xxx</c>.
@@ -60,9 +60,11 @@ internal static class Program
 
         var markdown = RenderMarkdown(operations);
 
-        var outputPath = Directory.Exists(Path.Combine(repoRoot, "docs", "internal"))
-            ? Path.Combine(repoRoot, "docs", "internal", "API_CONTRACT_INVENTORY.md")
-            : Path.Combine(repoRoot, "docs", "API_CONTRACT_INVENTORY.md");
+        var outputPath = Path.Combine(
+            repoRoot,
+            "docs",
+            "internal",
+            "API_CONTRACT_INVENTORY.md");
 
         var outputDir = Path.GetDirectoryName(outputPath)!;
         Directory.CreateDirectory(outputDir);

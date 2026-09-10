@@ -57,52 +57,52 @@ public sealed class RegistrationAnswer : ITenantEntity, IAuditableEntity, ISoftD
     public static RegistrationAnswer CreateText(
         RegistrationSubmission submission, RegistrationFormField field, RegistrationRequirement requirement,
         RegistrationAnswerSubjectTypeEnum subjectType, Guid subjectId, int ordinal, string value, DateTime createdAt,
-        Guid? ticketAssignmentOrderLineId = null)
+        Guid? ticketAssignmentOrderLineId = null, DateTime? anonymousUpperBoundUtc = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value);
         return Create(submission, field, requirement, subjectType, subjectId, ordinal, createdAt,
-            ticketAssignmentOrderLineId, AnswerValueFamily.Text, answer => answer.TextValue = value);
+            ticketAssignmentOrderLineId, anonymousUpperBoundUtc, AnswerValueFamily.Text, answer => answer.TextValue = value);
     }
 
     public static RegistrationAnswer CreateInteger(
         RegistrationSubmission submission, RegistrationFormField field, RegistrationRequirement requirement,
         RegistrationAnswerSubjectTypeEnum subjectType, Guid subjectId, int ordinal, long value, DateTime createdAt,
-        Guid? ticketAssignmentOrderLineId = null) =>
+        Guid? ticketAssignmentOrderLineId = null, DateTime? anonymousUpperBoundUtc = null) =>
         Create(submission, field, requirement, subjectType, subjectId, ordinal, createdAt,
-            ticketAssignmentOrderLineId, AnswerValueFamily.Integer, answer => answer.IntegerValue = value);
+            ticketAssignmentOrderLineId, anonymousUpperBoundUtc, AnswerValueFamily.Integer, answer => answer.IntegerValue = value);
 
     public static RegistrationAnswer CreateDecimal(
         RegistrationSubmission submission, RegistrationFormField field, RegistrationRequirement requirement,
         RegistrationAnswerSubjectTypeEnum subjectType, Guid subjectId, int ordinal, decimal value, DateTime createdAt,
-        Guid? ticketAssignmentOrderLineId = null) =>
+        Guid? ticketAssignmentOrderLineId = null, DateTime? anonymousUpperBoundUtc = null) =>
         Create(submission, field, requirement, subjectType, subjectId, ordinal, createdAt,
-            ticketAssignmentOrderLineId, AnswerValueFamily.Decimal, answer => answer.DecimalValue = value);
+            ticketAssignmentOrderLineId, anonymousUpperBoundUtc, AnswerValueFamily.Decimal, answer => answer.DecimalValue = value);
 
     public static RegistrationAnswer CreateBoolean(
         RegistrationSubmission submission, RegistrationFormField field, RegistrationRequirement requirement,
         RegistrationAnswerSubjectTypeEnum subjectType, Guid subjectId, int ordinal, bool value, DateTime createdAt,
-        Guid? ticketAssignmentOrderLineId = null) =>
+        Guid? ticketAssignmentOrderLineId = null, DateTime? anonymousUpperBoundUtc = null) =>
         Create(submission, field, requirement, subjectType, subjectId, ordinal, createdAt,
-            ticketAssignmentOrderLineId, AnswerValueFamily.Boolean, answer => answer.BooleanValue = value);
+            ticketAssignmentOrderLineId, anonymousUpperBoundUtc, AnswerValueFamily.Boolean, answer => answer.BooleanValue = value);
 
     public static RegistrationAnswer CreateDate(
         RegistrationSubmission submission, RegistrationFormField field, RegistrationRequirement requirement,
         RegistrationAnswerSubjectTypeEnum subjectType, Guid subjectId, int ordinal, DateOnly value, DateTime createdAt,
-        Guid? ticketAssignmentOrderLineId = null) =>
+        Guid? ticketAssignmentOrderLineId = null, DateTime? anonymousUpperBoundUtc = null) =>
         Create(submission, field, requirement, subjectType, subjectId, ordinal, createdAt,
-            ticketAssignmentOrderLineId, AnswerValueFamily.Date, answer => answer.DateValue = value);
+            ticketAssignmentOrderLineId, anonymousUpperBoundUtc, AnswerValueFamily.Date, answer => answer.DateValue = value);
 
     public static RegistrationAnswer CreateTime(
         RegistrationSubmission submission, RegistrationFormField field, RegistrationRequirement requirement,
         RegistrationAnswerSubjectTypeEnum subjectType, Guid subjectId, int ordinal, TimeOnly value, DateTime createdAt,
-        Guid? ticketAssignmentOrderLineId = null) =>
+        Guid? ticketAssignmentOrderLineId = null, DateTime? anonymousUpperBoundUtc = null) =>
         Create(submission, field, requirement, subjectType, subjectId, ordinal, createdAt,
-            ticketAssignmentOrderLineId, AnswerValueFamily.Time, answer => answer.TimeValue = value);
+            ticketAssignmentOrderLineId, anonymousUpperBoundUtc, AnswerValueFamily.Time, answer => answer.TimeValue = value);
 
     public static RegistrationAnswer CreateInstant(
         RegistrationSubmission submission, RegistrationFormField field, RegistrationRequirement requirement,
         RegistrationAnswerSubjectTypeEnum subjectType, Guid subjectId, int ordinal, DateTime value, DateTime createdAt,
-        Guid? ticketAssignmentOrderLineId = null)
+        Guid? ticketAssignmentOrderLineId = null, DateTime? anonymousUpperBoundUtc = null)
     {
         if (value == default || value.Kind != DateTimeKind.Utc)
         {
@@ -110,13 +110,13 @@ public sealed class RegistrationAnswer : ITenantEntity, IAuditableEntity, ISoftD
         }
 
         return Create(submission, field, requirement, subjectType, subjectId, ordinal, createdAt,
-            ticketAssignmentOrderLineId, AnswerValueFamily.Instant, answer => answer.InstantValue = value);
+            ticketAssignmentOrderLineId, anonymousUpperBoundUtc, AnswerValueFamily.Instant, answer => answer.InstantValue = value);
     }
 
     public static RegistrationAnswer CreateOption(
         RegistrationSubmission submission, RegistrationFormField field, RegistrationRequirement requirement,
         RegistrationAnswerSubjectTypeEnum subjectType, Guid subjectId, int ordinal,
-        RegistrationFormFieldOption option, DateTime createdAt, Guid? ticketAssignmentOrderLineId = null)
+        RegistrationFormFieldOption option, DateTime createdAt, Guid? ticketAssignmentOrderLineId = null, DateTime? anonymousUpperBoundUtc = null)
     {
         ArgumentNullException.ThrowIfNull(option);
         if (option.TenantId != field.TenantId || option.EventId != field.EventId ||
@@ -129,13 +129,13 @@ public sealed class RegistrationAnswer : ITenantEntity, IAuditableEntity, ISoftD
         }
 
         return Create(submission, field, requirement, subjectType, subjectId, ordinal, createdAt,
-            ticketAssignmentOrderLineId, AnswerValueFamily.Option, answer => answer.SelectedOptionId = option.Id);
+            ticketAssignmentOrderLineId, anonymousUpperBoundUtc, AnswerValueFamily.Option, answer => answer.SelectedOptionId = option.Id);
     }
 
     public static RegistrationAnswer CreateSensitive(
         RegistrationSubmission submission, RegistrationFormField field, RegistrationRequirement requirement,
         RegistrationAnswerSubjectTypeEnum subjectType, Guid subjectId, int ordinal,
-        RegistrationSensitiveAnswerValue sensitiveValue, DateTime createdAt, Guid? ticketAssignmentOrderLineId = null)
+        RegistrationSensitiveAnswerValue sensitiveValue, DateTime createdAt, Guid? ticketAssignmentOrderLineId = null, DateTime? anonymousUpperBoundUtc = null)
     {
         ArgumentNullException.ThrowIfNull(sensitiveValue);
         if (sensitiveValue.TenantId != submission.TenantId)
@@ -144,7 +144,7 @@ public sealed class RegistrationAnswer : ITenantEntity, IAuditableEntity, ISoftD
         }
 
         return Create(submission, field, requirement, subjectType, subjectId, ordinal, createdAt,
-            ticketAssignmentOrderLineId, AnswerValueFamily.Sensitive, answer =>
+            ticketAssignmentOrderLineId, anonymousUpperBoundUtc, AnswerValueFamily.Sensitive, answer =>
             {
                 answer.SensitiveAnswerValueId = sensitiveValue.Id;
                 answer.SensitiveAnswerValue = sensitiveValue;
@@ -154,7 +154,7 @@ public sealed class RegistrationAnswer : ITenantEntity, IAuditableEntity, ISoftD
     private static RegistrationAnswer Create(
         RegistrationSubmission submission, RegistrationFormField field, RegistrationRequirement requirement,
         RegistrationAnswerSubjectTypeEnum subjectType, Guid subjectId, int ordinal, DateTime createdAt,
-        Guid? ticketAssignmentOrderLineId, AnswerValueFamily valueFamily, Action<RegistrationAnswer> setValue)
+        Guid? ticketAssignmentOrderLineId, DateTime? anonymousUpperBoundUtc, AnswerValueFamily valueFamily, Action<RegistrationAnswer> setValue)
     {
         ArgumentNullException.ThrowIfNull(submission);
         ArgumentNullException.ThrowIfNull(field);
@@ -183,7 +183,7 @@ public sealed class RegistrationAnswer : ITenantEntity, IAuditableEntity, ISoftD
             RegistrationFormSectionId = field.RegistrationFormSectionId,
             RegistrationFormFieldId = field.Id,
             FieldTypeId = field.FieldTypeId,
-            RetentionUntil = RegistrationRetentionDeadline.Resolve(field.RetentionPolicyId, createdAt),
+            RetentionUntil = RegistrationRetentionDeadline.Resolve(field.RetentionPolicyId, createdAt, anonymousUpperBoundUtc),
             RequirementSubjectTypeId = requirement.AppliesToSubjectTypeId,
             RequirementSubjectId = requirement.AppliesToSubjectId,
             AnswerSubjectTypeId = (int)subjectType,

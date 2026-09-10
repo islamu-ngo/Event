@@ -7,7 +7,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
 
-public sealed class RegistrationAnswerAnalyticsRepository(ExploreDbContext dbContext) : IRegistrationAnswerAnalyticsRepository
+public sealed class RegistrationAnswerAnalyticsRepository(ExploreDbContext dbContext, TimeProvider? timeProvider = null)
+    : IRegistrationAnswerAnalyticsRepository
 {
     public async Task<RegistrationAnswerAnalyticsProjection?> GetEventFormVersionAnalyticsAsync(
         Guid tenantId,
@@ -44,16 +45,30 @@ public sealed class RegistrationAnswerAnalyticsRepository(ExploreDbContext dbCon
             return new RegistrationAnswerAnalyticsProjection(eventId, formId, formVersionId, minimumCellSize, []);
         }
 
+        Guid[] fieldIds = fields.Select(field => field.Id).ToArray();
+        var candidates = await (from answer in dbContext.RegistrationAnswers.AsNoTracking()
+                                join order in dbContext.RegistrationOrders.AsNoTracking()
+                                    on new { answer.TenantId, answer.EventId, Id = answer.RegistrationOrderId }
+                                    equals new { order.TenantId, order.EventId, order.Id }
+                                where answer.TenantId == tenantId && fieldIds.Contains(answer.RegistrationFormFieldId) &&
+                                    answer.SensitiveAnswerValueId == null
+                                select new { answer.Id, answer.RegistrationFormFieldId, answer.RetentionUntil, Order = order })
+            .ToArrayAsync(cancellationToken);
+        DateTime utcNow = (timeProvider ?? TimeProvider.System).GetUtcNow().UtcDateTime;
+        var eligible = candidates.Where(candidate => AnonymousRegistrationRetentionPolicy.CanDisclose(
+            candidate.Order, candidate.RetentionUntil, utcNow)).ToArray();
+        Guid[] answerIds = eligible.Select(candidate => candidate.Id).ToArray();
+
         var aggregates = new List<RegistrationAnswerFieldAggregateProjection>(fields.Length);
         foreach (FieldSeed field in fields)
         {
             RegistrationAnswerFieldAggregateProjection? aggregate = (RegistrationFieldTypeEnum)field.FieldTypeId switch
             {
-                RegistrationFieldTypeEnum.Boolean => await BooleanAggregateAsync(field, tenantId, minimumCellSize, cancellationToken),
-                RegistrationFieldTypeEnum.Integer or RegistrationFieldTypeEnum.Rating => await IntegerAggregateAsync(field, tenantId, minimumCellSize, cancellationToken),
-                RegistrationFieldTypeEnum.Decimal => await DecimalAggregateAsync(field, tenantId, minimumCellSize, cancellationToken),
-                RegistrationFieldTypeEnum.Date => await DateAggregateAsync(field, tenantId, minimumCellSize, cancellationToken),
-                RegistrationFieldTypeEnum.SingleChoice or RegistrationFieldTypeEnum.MultipleChoice => await OptionAggregateAsync(field, tenantId, minimumCellSize, cancellationToken),
+                RegistrationFieldTypeEnum.Boolean => await BooleanAggregateAsync(field, tenantId, answerIds, minimumCellSize, cancellationToken),
+                RegistrationFieldTypeEnum.Integer or RegistrationFieldTypeEnum.Rating => await IntegerAggregateAsync(field, tenantId, answerIds, minimumCellSize, cancellationToken),
+                RegistrationFieldTypeEnum.Decimal => await DecimalAggregateAsync(field, tenantId, answerIds, minimumCellSize, cancellationToken),
+                RegistrationFieldTypeEnum.Date => await DateAggregateAsync(field, tenantId, answerIds, minimumCellSize, cancellationToken),
+                RegistrationFieldTypeEnum.SingleChoice or RegistrationFieldTypeEnum.MultipleChoice => await OptionAggregateAsync(field, tenantId, answerIds, minimumCellSize, cancellationToken),
                 _ => null
             };
 
@@ -63,18 +78,25 @@ public sealed class RegistrationAnswerAnalyticsRepository(ExploreDbContext dbCon
             }
         }
 
+        utcNow = (timeProvider ?? TimeProvider.System).GetUtcNow().UtcDateTime;
+        HashSet<Guid> crossedFields = eligible
+            .Where(candidate => !AnonymousRegistrationRetentionPolicy.CanDisclose(
+                candidate.Order, candidate.RetentionUntil, utcNow))
+            .Select(candidate => candidate.RegistrationFormFieldId).ToHashSet();
+        aggregates.RemoveAll(aggregate => crossedFields.Contains(aggregate.FieldId));
         return new RegistrationAnswerAnalyticsProjection(eventId, formId, formVersionId, minimumCellSize, aggregates);
     }
 
     private async Task<RegistrationAnswerFieldAggregateProjection?> BooleanAggregateAsync(
         FieldSeed field,
         Guid tenantId,
+        Guid[] answerIds,
         int minimumCellSize,
         CancellationToken cancellationToken)
     {
         var cells = await dbContext.RegistrationAnswers
             .AsNoTracking()
-            .Where(answer => answer.TenantId == tenantId &&
+            .Where(answer => answerIds.Contains(answer.Id) && answer.TenantId == tenantId &&
                              answer.RegistrationFormFieldId == field.Id &&
                              answer.SensitiveAnswerValueId == null &&
                              answer.BooleanValue != null &&
@@ -89,12 +111,13 @@ public sealed class RegistrationAnswerAnalyticsRepository(ExploreDbContext dbCon
     private async Task<RegistrationAnswerFieldAggregateProjection?> IntegerAggregateAsync(
         FieldSeed field,
         Guid tenantId,
+        Guid[] answerIds,
         int minimumCellSize,
         CancellationToken cancellationToken)
     {
         var values = await dbContext.RegistrationAnswers
             .AsNoTracking()
-            .Where(answer => answer.TenantId == tenantId &&
+            .Where(answer => answerIds.Contains(answer.Id) && answer.TenantId == tenantId &&
                              answer.RegistrationFormFieldId == field.Id &&
                              answer.SensitiveAnswerValueId == null &&
                              answer.IntegerValue != null &&
@@ -108,12 +131,13 @@ public sealed class RegistrationAnswerAnalyticsRepository(ExploreDbContext dbCon
     private async Task<RegistrationAnswerFieldAggregateProjection?> DecimalAggregateAsync(
         FieldSeed field,
         Guid tenantId,
+        Guid[] answerIds,
         int minimumCellSize,
         CancellationToken cancellationToken)
     {
         decimal[] values = await dbContext.RegistrationAnswers
             .AsNoTracking()
-            .Where(answer => answer.TenantId == tenantId &&
+            .Where(answer => answerIds.Contains(answer.Id) && answer.TenantId == tenantId &&
                              answer.RegistrationFormFieldId == field.Id &&
                              answer.SensitiveAnswerValueId == null &&
                              answer.DecimalValue != null &&
@@ -127,12 +151,13 @@ public sealed class RegistrationAnswerAnalyticsRepository(ExploreDbContext dbCon
     private async Task<RegistrationAnswerFieldAggregateProjection?> DateAggregateAsync(
         FieldSeed field,
         Guid tenantId,
+        Guid[] answerIds,
         int minimumCellSize,
         CancellationToken cancellationToken)
     {
         var cells = await dbContext.RegistrationAnswers
             .AsNoTracking()
-            .Where(answer => answer.TenantId == tenantId &&
+            .Where(answer => answerIds.Contains(answer.Id) && answer.TenantId == tenantId &&
                              answer.RegistrationFormFieldId == field.Id &&
                              answer.SensitiveAnswerValueId == null &&
                              answer.DateValue != null &&
@@ -147,12 +172,13 @@ public sealed class RegistrationAnswerAnalyticsRepository(ExploreDbContext dbCon
     private async Task<RegistrationAnswerFieldAggregateProjection?> OptionAggregateAsync(
         FieldSeed field,
         Guid tenantId,
+        Guid[] answerIds,
         int minimumCellSize,
         CancellationToken cancellationToken)
     {
         var cells = await dbContext.RegistrationAnswers
             .AsNoTracking()
-            .Where(answer => answer.TenantId == tenantId &&
+            .Where(answer => answerIds.Contains(answer.Id) && answer.TenantId == tenantId &&
                              answer.RegistrationFormFieldId == field.Id &&
                              answer.SensitiveAnswerValueId == null &&
                              answer.SelectedOptionId != null &&

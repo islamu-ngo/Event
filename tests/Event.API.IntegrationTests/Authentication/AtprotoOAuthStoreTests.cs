@@ -269,7 +269,8 @@ public sealed class AtprotoOAuthStoreTests(AtprotoTransientApiFixture fixture)
         var binding = proof.CreateBinding(challenge);
         string browserCookie = cookie ?? IssuedCookie(challenge);
         var seed = new BffAuth.AtprotoOAuthFlowSeed("did:plc:alice", new("https://pds.example/"), tenant,
-            tenantSlug, new(origin), "/events", "oauth-active", "person") { BrowserBinding = binding };
+            tenantSlug, new(origin), "/events", "oauth-active", "person")
+        { BrowserBinding = binding };
         var httpContext = CreateContext("events.example.com", browserCookie);
         var accessor = Substitute.For<IHttpContextAccessor>();
         accessor.HttpContext.Returns(httpContext);
@@ -297,14 +298,16 @@ public sealed class AtprotoOAuthStoreTests(AtprotoTransientApiFixture fixture)
     {
         var options = new BffOptions.AtprotoAuthenticationOptions
         {
-            PublicUrl = "https://events.example.com/", CallbackPath = "/signin-atproto"
+            PublicUrl = "https://events.example.com/",
+            CallbackPath = "/signin-atproto"
         };
         options.TenantOrigins.Add(new BffOptions.AtprotoTenantOrigin { Origin = origin, TenantId = tenant, TenantSlug = slug });
         var environment = Substitute.For<IHostEnvironment>();
         environment.EnvironmentName.Returns(Environments.Production);
         return new(Options.Create(options), Options.Create(new TenantConfiguration
         {
-            DefaultTenantId = tenant, DefaultTenant = slug
+            DefaultTenantId = tenant,
+            DefaultTenant = slug
         }), environment);
     }
 

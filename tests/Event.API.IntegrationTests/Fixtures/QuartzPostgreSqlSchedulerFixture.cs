@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Cryptography;
 using Explore.API.Scheduling;
 using Explore.Secrets.Database;
 using Npgsql;
@@ -26,7 +27,7 @@ public sealed class QuartzPostgreSqlSchedulerFixture : IAsyncInitializer, IAsync
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18-alpine")
         .WithDatabase("quartz_scheduler_test")
         .WithUsername("postgres")
-        .WithPassword("postgres")
+        .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(32)))
         .Build();
 
     /// <summary>

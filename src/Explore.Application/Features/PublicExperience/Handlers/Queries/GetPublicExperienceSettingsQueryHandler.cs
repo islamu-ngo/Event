@@ -36,6 +36,7 @@ public class GetPublicExperienceSettingsQueryHandler : IRequestHandler<GetPublic
     private readonly IMapper _mapper;
     private readonly ITenantDirectoryOperatorReadinessEvaluator _directoryOperatorReadiness;
     private readonly IInstanceOperatorIdentity _instanceOperatorIdentity;
+    private readonly IVisitorAccessCapabilityResolver _visitorAccessCapabilityResolver;
 
     public GetPublicExperienceSettingsQueryHandler(
         ITenantContext tenantContext,
@@ -52,7 +53,8 @@ public class GetPublicExperienceSettingsQueryHandler : IRequestHandler<GetPublic
         IFooterLinkGroupRepository footerLinkGroupRepository,
         IMapper mapper,
         ITenantDirectoryOperatorReadinessEvaluator directoryOperatorReadiness,
-        IInstanceOperatorIdentity instanceOperatorIdentity)
+        IInstanceOperatorIdentity instanceOperatorIdentity,
+        IVisitorAccessCapabilityResolver visitorAccessCapabilityResolver)
     {
         _tenantContext = tenantContext;
         _systemSettingRepository = systemSettingRepository;
@@ -69,6 +71,7 @@ public class GetPublicExperienceSettingsQueryHandler : IRequestHandler<GetPublic
         _mapper = mapper;
         _directoryOperatorReadiness = directoryOperatorReadiness;
         _instanceOperatorIdentity = instanceOperatorIdentity;
+        _visitorAccessCapabilityResolver = visitorAccessCapabilityResolver;
     }
 
     public async Task<PublicExperienceSettingsDto> Handle(GetPublicExperienceSettingsQuery request, CancellationToken cancellationToken)
@@ -153,6 +156,8 @@ public class GetPublicExperienceSettingsQueryHandler : IRequestHandler<GetPublic
         {
             TenantId = tenantId,
             IsAvailable = true,
+            VisitorAccess = VisitorAccessCapabilityDto.From(
+                await _visitorAccessCapabilityResolver.ResolveAsync(tenantId, cancellationToken)),
             DirectoryOperator = MapDirectoryOperator(directoryAssessment.Identity, documentRevision),
             InstanceOperator = MapInstanceOperator(_instanceOperatorIdentity),
             Mode = Explore.Application.Models.PublicExperienceMode.DiscoveryCentric,

@@ -1,0 +1,28 @@
+Change-Id: CHG-01M23M4WH6SCZ0NY6YR73WKEPB
+Title: "Cancel recovered guest allocations without rewriting expired history"
+Type: fix
+Scope: registration
+Summary: "Preserve expired hold audit rows while cancelling only the consumed replacement allocation, with exact release identities and idempotent replay."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/ADMISSION_AND_REGISTRATION.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Cancellation preserves exact consumed-allocation identities and rejects deleted history while retaining valid expired audit rows.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/email-optional-participation.md
+    Disposition: documented
+    Detail: A successfully recovered free guest confirmation can cancel its replacement allocation without deleting expired reservation history.

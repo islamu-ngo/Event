@@ -2,12 +2,14 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Security.Cryptography;
+using System.Text.Json;
 using Explore.Blazor.Client.Clients;
 using Explore.Blazor.IntegrationTests.Fixtures;
 using Explore.Blazor.Models;
 using Explore.Blazor.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -30,7 +32,7 @@ public sealed class LocalBffAuthenticationFlowTests : IAsyncDisposable
             {
                 services.RemoveAll<ILocalAuthClient>();
                 services.AddSingleton<ILocalAuthClient>(
-                    new SuccessfulLocalAuthClient(_accessToken));
+                    new LocalAuthClientStub(_accessToken));
                 services.RemoveAll<IBffOnboardingStatusProvider>();
                 services.AddSingleton<IBffOnboardingStatusProvider>(
                     new CompletedOnboardingStatusProvider());
@@ -45,6 +47,64 @@ public sealed class LocalBffAuthenticationFlowTests : IAsyncDisposable
             AllowAutoRedirect = false,
             HandleCookies = true
         });
+    }
+
+    [Test]
+    public async Task FormerRegistrationRouteIsAbsentEvenWithValidAntiforgery()
+    {
+        const string formerRoute = "/bff/auth/local/register";
+        var endpoints = _factory.Services.GetRequiredService<EndpointDataSource>()
+            .Endpoints.OfType<RouteEndpoint>().ToArray();
+        await Assert.That(endpoints.Where(endpoint => string.Equals(
+            endpoint.RoutePattern.RawText, formerRoute, StringComparison.OrdinalIgnoreCase)).ToArray())
+            .IsEmpty()
+            .Because("The registration operation must be removed from the native endpoint graph.");
+
+        string antiforgeryToken = await IssueAntiforgeryCookieAsync();
+        var credentials = CreateLoginRequest();
+        var registrationBody = new
+        {
+            credentials.Identifier,
+            credentials.Password,
+            FirstName = "Amina",
+            LastName = "Noor",
+            credentials.IsPersistent,
+            credentials.ReturnUrl
+        };
+        using var request = new HttpRequestMessage(
+            method: HttpMethod.Post,
+            requestUri: formerRoute)
+        {
+            Content = JsonContent.Create(registrationBody)
+        };
+        request.Headers.Add("X-CSRF-TOKEN", antiforgeryToken);
+        using var unknownRequest = new HttpRequestMessage(
+            method: HttpMethod.Post,
+            requestUri: "/bff/auth/local/unknown-route-contract-check")
+        {
+            Content = JsonContent.Create(registrationBody)
+        };
+        unknownRequest.Headers.Add("X-CSRF-TOKEN", antiforgeryToken);
+
+        using var response = await _client.SendAsync(request);
+        using var unknownResponse = await _client.SendAsync(unknownRequest);
+
+        Uri? location = response.Headers.Location;
+        string locationPath = location is null ? "none"
+            : location.IsAbsoluteUri ? location.AbsolutePath
+            : location.OriginalString.Split('?', '#')[0];
+        await Assert.That(response.StatusCode).IsEqualTo(unknownResponse.StatusCode)
+            .Because($"The retired route must follow native unknown-route handling; redirect path: {locationPath}.");
+        await Assert.That(response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed)
+            .IsTrue()
+            .Because($"Both absent routes must be rejected. Actual HTTP {(int)response.StatusCode}; redirect path: {locationPath}.");
+        await Assert.That(response.Content.Headers.ContentType?.MediaType)
+            .IsEqualTo(unknownResponse.Content.Headers.ContentType?.MediaType);
+        await Assert.That(location).IsNull();
+        await Assert.That(response.Headers.TryGetValues("Set-Cookie", out var cookies)
+            && cookies.Any(cookie => cookie.StartsWith(".AspNetCore.Cookies=", StringComparison.Ordinal)))
+            .IsFalse();
+        await Assert.That(await response.Content.ReadAsStringAsync()).DoesNotContain(_accessToken);
     }
 
     [Test]
@@ -82,6 +142,77 @@ public sealed class LocalBffAuthenticationFlowTests : IAsyncDisposable
             && cookie.Contains("httponly", StringComparison.OrdinalIgnoreCase))).IsTrue();
     }
 
+    [Test]
+    [Arguments("/\t/evil.example", "/")]
+    [Arguments("/\\evil.example", "/")]
+    [Arguments("//evil.example", "/")]
+    [Arguments("/dashboard?tab=one\ntwo", "/")]
+    [Arguments("~/dashboard", "/")]
+    [Arguments("dashboard", "/")]
+    [Arguments("/dashboard?tab=profile&next=/settings", "/dashboard?tab=profile&next=/settings")]
+    public async Task LoginNormalizesReturnDestinations(string returnUrl, string expectedReturnUrl)
+    {
+        string antiforgeryToken = await IssueAntiforgeryCookieAsync();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/bff/auth/local/login")
+        {
+            Content = JsonContent.Create(CreateLoginRequest(returnUrl))
+        };
+        request.Headers.Add("X-CSRF-TOKEN", antiforgeryToken);
+
+        using var response = await _client.SendAsync(request);
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        await Assert.That(document.RootElement.GetProperty("redirectUrl").GetString())
+            .IsEqualTo(expectedReturnUrl);
+    }
+
+    [Test]
+    [Arguments("email_verification_required", 401, true)]
+    [Arguments("untrusted_provider_detail", 401, false)]
+    [Arguments("email_verification_required", 403, false)]
+    public async Task LoginFailureExposesOnlyAllowlistedVerificationCode(string failureCode, int statusCode, bool exposesCode)
+    {
+        await using var factory = _factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<ILocalAuthClient>();
+            services.AddSingleton<ILocalAuthClient>(new LocalAuthClientStub(
+                accessToken: _accessToken, failureCode: failureCode, statusCode: statusCode));
+        }));
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            HandleCookies = true
+        });
+        using var tokenResponse = await client.GetAsync("/auth/status");
+        string token = tokenResponse.Headers.GetValues("Set-Cookie")
+            .Select(ReadXsrfToken).First(value => !string.IsNullOrWhiteSpace(value))!;
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/bff/auth/local/login")
+        {
+            Content = JsonContent.Create(CreateLoginRequest())
+        };
+        request.Headers.Add("X-CSRF-TOKEN", token);
+
+        using var response = await client.SendAsync(request);
+
+        await Assert.That(response.StatusCode).IsEqualTo((HttpStatusCode)statusCode);
+        string body = await response.Content.ReadAsStringAsync();
+        using var document = JsonDocument.Parse(body);
+        await Assert.That(document.RootElement.TryGetProperty("code", out var code)).IsEqualTo(exposesCode);
+        if (exposesCode)
+        {
+            await Assert.That(code.GetString()).IsEqualTo("email_verification_required");
+        }
+        else
+        {
+            await Assert.That(body).DoesNotContain(failureCode);
+        }
+        await Assert.That(body).DoesNotContain(_accessToken);
+        await Assert.That(response.Headers.TryGetValues("Set-Cookie", out var cookies)
+            && cookies.Any(cookie => cookie.StartsWith(".AspNetCore.Cookies=", StringComparison.Ordinal)))
+            .IsFalse();
+    }
+
     public async ValueTask DisposeAsync()
     {
         _client.Dispose();
@@ -117,12 +248,12 @@ public sealed class LocalBffAuthenticationFlowTests : IAsyncDisposable
         return Uri.UnescapeDataString(rawValue);
     }
 
-    private static LocalBffLoginRequest CreateLoginRequest() =>
+    private static LocalBffLoginRequest CreateLoginRequest(string returnUrl = "/dashboard") =>
         new()
         {
-            Email = "admin@example.test",
+            Identifier = "admin@example.test",
             Password = $"Aa1!{Convert.ToHexString(RandomNumberGenerator.GetBytes(16))}",
-            ReturnUrl = "/dashboard"
+            ReturnUrl = returnUrl
         };
 
     private static string CreateAccessToken()
@@ -146,20 +277,34 @@ public sealed class LocalBffAuthenticationFlowTests : IAsyncDisposable
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
-    private sealed class SuccessfulLocalAuthClient(string accessToken)
+    private sealed class LocalAuthClientStub(string accessToken, string? failureCode = null, int statusCode = 401)
         : ILocalAuthClient
     {
         public Task<LocalAuthResponseDto> LoginLocalIdentityAsync(
             LocalAuthRequestDto body,
             string? api_version = null,
             string? x_Api_Version = null,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(new LocalAuthResponseDto
+            CancellationToken cancellationToken = default)
+        {
+            if (failureCode is not null)
+            {
+                throw new ApiException<ProblemDetails>(
+                    message: "Local login rejected", statusCode: statusCode, response: null,
+                    headers: new Dictionary<string, IEnumerable<string>>(),
+                    result: new ProblemDetails
+                    {
+                        Title = accessToken,
+                        Detail = accessToken,
+                        AdditionalProperties = new Dictionary<string, object> { ["code"] = failureCode }
+                    },
+                    innerException: null);
+            }
+            return Task.FromResult(new LocalAuthResponseDto
             {
                 Success = true,
                 FailureCode = string.Empty,
                 UserId = Guid.CreateVersion7(),
-                Email = body.Email,
+                Email = body.Identifier,
                 FirstName = "Site",
                 LastName = "Administrator",
                 EmailVerified = false,
@@ -167,13 +312,7 @@ public sealed class LocalBffAuthenticationFlowTests : IAsyncDisposable
                 Token = accessToken,
                 ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(30)
             });
-
-        public Task<LocalRegistrationResponseDto> RegisterLocalIdentityAsync(
-            LocalRegistrationRequestDto body,
-            string? api_version = null,
-            string? x_Api_Version = null,
-            CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+        }
     }
 
     private sealed class LocalPrimarySchemeManager

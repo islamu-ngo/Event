@@ -1,0 +1,28 @@
+Change-Id: CHG-01M25KK0Y957Z2SBAMJWSH8PEK
+Title: "Keep analytics failure diagnostics free of user data"
+Type: fix
+Scope: privacy
+Summary: "Report analytics operation and exception type without recording caller inputs or raw JavaScript exceptions."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/BLAZOR.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Analytics failures exclude navigation paths, identifiers, payloads and exception messages from logs.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/troubleshooting-and-health.md
+    Disposition: documented
+    Detail: Analytics warnings retain the failed operation and exception type for safe troubleshooting.

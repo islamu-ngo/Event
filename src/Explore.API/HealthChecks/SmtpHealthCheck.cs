@@ -1,31 +1,55 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Services;
+using Explore.Application.Models;
+using Explore.Domain.Enums;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace Explore.API.HealthChecks;
 
-public sealed class SmtpHealthCheck(IEmailConnectionTester connectionTester) : IHealthCheck
+public sealed class SmtpHealthCheck(
+    IEmailDeliveryCapabilityResolver capabilities,
+    IEmailConnectionTester connectionTester) : IHealthCheck
 {
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
-        var result = await connectionTester.TestConnectionAsync(cancellationToken).ConfigureAwait(false);
+        EmailDeliveryCapability capability;
+        try
+        {
+            capability = await capabilities.ResolveAsync(null, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // A failed policy read is a core authority failure, not an optional transport outage.
+            return HealthCheckResult.Unhealthy("email_capability_unavailable");
+        }
+
         var data = new Dictionary<string, object>
         {
-            ["durationMs"] = result.Duration.TotalMilliseconds
+            ["enabled"] = capability.Enabled,
+            ["state"] = capability.State.ToString()
         };
-
-        if (result.Success)
+        if (!capability.Enabled)
         {
-            return HealthCheckResult.Healthy(result.Message ?? "SMTP connection is ready.", data);
+            return HealthCheckResult.Healthy("smtp_disabled", data);
+        }
+        if (capability.State != EmailDeliveryState.Available)
+        {
+            return HealthCheckResult.Degraded("smtp_configuration_unavailable", data: data);
         }
 
-        var message = result.ErrorMessage ?? "SMTP connection test failed.";
-        if (message.Contains("not configured", StringComparison.OrdinalIgnoreCase))
+        try
         {
-            return HealthCheckResult.Degraded(message, data: data);
+            var result = await connectionTester.TestConnectionAsync(cancellationToken).ConfigureAwait(false);
+            data["durationMs"] = result.Duration.TotalMilliseconds;
+            return result.Success
+                ? HealthCheckResult.Healthy("smtp_available", data)
+                : HealthCheckResult.Degraded("smtp_unavailable", data: data);
         }
-
-        return HealthCheckResult.Unhealthy(message, data: data);
+        catch (Exception)
+        {
+            return HealthCheckResult.Unhealthy("email_capability_unavailable", data: data);
+        }
     }
 }

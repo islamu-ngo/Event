@@ -35,10 +35,10 @@ public sealed class ParticipantAdmissionEligibilityConfiguration :
         builder.HasAlternateKey(value =>
             new { value.TenantId, value.Id });
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.RegistrationTicketAssignmentId,
-            })
+        {
+            value.TenantId,
+            value.RegistrationTicketAssignmentId,
+        })
             .IsUnique();
         builder.HasOne<Tenant>()
             .WithMany()

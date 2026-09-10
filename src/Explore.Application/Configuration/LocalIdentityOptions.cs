@@ -5,6 +5,8 @@ public sealed class LocalIdentityOptions
     public const string SectionName = "Authentication:Local";
     public const string Issuer = "islamu-event-local";
     public const string Audience = "islamu-event-api";
+    public const int MinimumPasswordLength = 12;
+    public const int MaximumPasswordLength = 128;
 
     public string? JwtKey { get; set; }
 

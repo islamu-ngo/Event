@@ -11,6 +11,54 @@ namespace Explore.Blazor.IntegrationTests.Handlers;
 public class SetupSecretForwardingHandlerTests
 {
     [Test]
+    public async Task AnonymousCircuitCookieFlowsThroughTheResolverInAPooledHandlerScope()
+    {
+        string secret = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        var protector = new SetupSecretCookieProtector(new EphemeralDataProtectionProvider());
+        using var provider = new ServiceCollection()
+            .AddSingleton<IHttpContextAccessor>(new HttpContextAccessor())
+            .AddSingleton<ISetupSecretSessionService>(new SetupSecretSessionService())
+            .AddSingleton<ISetupSecretCookieProtector>(protector)
+            .AddSingleton<IOptions<SetupSecretResolverOptions>>(Options.Create(new SetupSecretResolverOptions()))
+            .AddSingleton<IHostEnvironment>(new TestHostEnvironment())
+            .AddScoped<IBffAuthCookieStore, BffAuthCookieStore>()
+            .AddScoped<ISetupSecretResolver, SetupSecretResolver>()
+            .BuildServiceProvider();
+        using var circuit = provider.CreateScope();
+        var cookies = circuit.ServiceProvider.GetRequiredService<IBffAuthCookieStore>();
+        cookies.SetCookieHeader($"setup-secret={protector.Protect(secret)}");
+        using (cookies.BeginActivityScope())
+        {
+            using var pooledHandler = provider.CreateScope();
+            var resolver = pooledHandler.ServiceProvider.GetRequiredService<ISetupSecretResolver>();
+            var resolution = resolver.Resolve();
+            await Assert.That(resolution.Found).IsTrue();
+            await Assert.That(resolution.Source).IsEqualTo(SetupSecretSource.ProtectedSetupCookie);
+            await Assert.That(string.Equals(resolution.Secret, secret, StringComparison.Ordinal)).IsTrue();
+        }
+        using var outsideActivity = provider.CreateScope();
+        await Assert.That(outsideActivity.ServiceProvider.GetRequiredService<ISetupSecretResolver>().Resolve().Found).IsFalse();
+    }
+
+    [Test]
+    [Arguments("GET", "status")]
+    [Arguments("POST", "complete-local")]
+    public async Task LocalSetupUsesProtectedCookieInsteadOfCallerHeader(string method, string endpoint)
+    {
+        string secret = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        var context = new DefaultHttpContext();
+        var protector = CreateCookieProtector();
+        context.Request.Headers.Cookie = $"setup-secret={protector.Protect(secret)}";
+        var capture = new CapturingHandler();
+        using var handler = CreateHandler(context, new SetupSecretSessionService(), capture, protector);
+        using var invoker = new HttpMessageInvoker(handler, disposeHandler: false);
+        using var request = new HttpRequestMessage(new HttpMethod(method), $"https://api.example.test/api/instanceonboarding/{endpoint}");
+        request.Headers.Add("X-Setup-Secret", Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)));
+        using HttpResponseMessage response = await invoker.SendAsync(request, CancellationToken.None);
+        await Assert.That(string.Equals(capture.CapturedRequest!.Headers.GetValues("X-Setup-Secret").Single(), secret, StringComparison.Ordinal)).IsTrue();
+    }
+
+    [Test]
     public async Task SendAsync_OnboardingPath_WithCookieSecret_AddsXSetupSecretHeader()
     {
         var httpContext = new DefaultHttpContext();

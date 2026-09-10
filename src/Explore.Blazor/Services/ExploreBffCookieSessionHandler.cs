@@ -15,6 +15,15 @@ public sealed class ExploreBffCookieSessionHandler(
     internal const string UserSynchronizationCompletedProperty =
         ".islamu.bff.user-synchronization-completed";
 
+    public Task<bool> ValidatePrincipalAsync(CookieValidatePrincipalContext context) =>
+        context.Principal is null
+            ? Task.FromResult(false)
+            : adminClaimsTransformation.ValidateLocalSessionAsync(
+                context.Principal,
+                context.Properties,
+                context.Properties.GetTokenValue("access_token"),
+                context.HttpContext.RequestAborted);
+
     public async Task OnSigningInAsync(CookieSigningInContext context)
     {
         if (context.Principal is null)
@@ -109,9 +118,14 @@ public sealed class ExploreBffCookieSessionHandler(
         }
     }
 
-    public Task OnTokenRefreshRejectedAsync(CookieValidatePrincipalContext context, string reason)
+    public Task OnTokenRefreshRejectedAsync(
+        CookieValidatePrincipalContext context,
+        EventBffSessionRejectionCategory category,
+        string reason)
     {
-        ClearCircuitTokenState(context);
+        ClearCircuitTokenState(
+            context: context,
+            requireSession: category != EventBffSessionRejectionCategory.TokenRefresh);
         return Task.CompletedTask;
     }
 
@@ -138,22 +152,26 @@ public sealed class ExploreBffCookieSessionHandler(
         return true;
     }
 
-    private static void ClearCircuitTokenState(CookieValidatePrincipalContext context)
+    private static void ClearCircuitTokenState(CookieValidatePrincipalContext context, bool requireSession)
     {
+        var hasSession = context.Principal.TryGetSessionId(out var resolvedSessionId);
         var tokenService = context.HttpContext.RequestServices.GetService<ICircuitAccessTokenService>();
-        tokenService?.ClearToken();
+        if (!requireSession || hasSession)
+        {
+            tokenService?.ClearToken();
+        }
 
         context.HttpContext.RequestServices.GetService<ICircuitUserContext>()?.Clear();
         context.HttpContext.RequestServices.GetService<IBffAuthCookieStore>()?.Clear();
 
         var userId = ResolveUserId(context.Principal);
-        if (string.IsNullOrWhiteSpace(userId))
+        if (string.IsNullOrWhiteSpace(userId) || requireSession && !hasSession)
         {
             return;
         }
 
         var tokenStore = context.HttpContext.RequestServices.GetService<ICircuitTokenStore>();
-        var sessionId = context.Principal.TryGetSessionId(out var resolvedSessionId) ? resolvedSessionId.PartitionKey : null;
+        var sessionId = hasSession ? resolvedSessionId.PartitionKey : null;
         if (string.IsNullOrWhiteSpace(sessionId))
         {
             tokenStore?.ClearUser(userId);

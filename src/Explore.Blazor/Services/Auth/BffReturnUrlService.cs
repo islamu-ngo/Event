@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Blazor.Services.Auth;
@@ -23,14 +24,12 @@ public sealed class BffReturnUrlService : IBffReturnUrlService
             return "/";
         }
 
-        if (returnUrl.StartsWith('/') &&
-            !returnUrl.StartsWith("//", StringComparison.Ordinal) &&
-            !returnUrl.StartsWith("/\\", StringComparison.Ordinal))
+        if (returnUrl.StartsWith('/') && RedirectHttpResult.IsLocalUrl(returnUrl))
         {
             return returnUrl;
         }
 
-        logger.LogWarning("[AuthEndpoints] Invalid returnUrl '{ReturnUrl}' - defaulting to /", returnUrl);
+        logger.LogWarning("[AuthEndpoints] Invalid returnUrl - defaulting to /");
         return "/";
     }
 

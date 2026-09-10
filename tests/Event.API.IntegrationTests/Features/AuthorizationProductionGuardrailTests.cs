@@ -1,5 +1,6 @@
 using System.Net.Security;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
@@ -131,14 +132,10 @@ public class AuthorizationProductionGuardrailTests
                     ["Database:Port"] = "5432",
                     ["Database:Database"] = "test_guardrails",
                     ["SecretProvider:Provider"] = "Environment",
-                    ["Database:Runtime:Username"] = "postgres",
-                    ["Database:Runtime:Password"] = "postgres",
                     ["Database:Runtime:TlsMode"] = "Prefer",
                     ["Database:Runtime:TrustServerCertificate"] = "false",
                     ["S3Settings:Region"] = "us-east-1",
                     ["S3Settings:BucketName"] = "test-bucket",
-                    ["S3Settings:AccessKeyId"] = "test-key",
-                    ["S3Settings:SecretAccessKey"] = "test-secret",
                     ["S3Settings:Endpoint"] = "https://s3.example.com",
                     ["Deployment:Mode"] = "SingleTenant",
                     ["Deployment:DefaultTenantId"] = PlatformDefaults.DefaultTenantId.ToString(),
@@ -217,14 +214,10 @@ public class AuthorizationProductionGuardrailTests
                     ["Database:Port"] = "5432",
                     ["Database:Database"] = "test_no_auth",
                     ["SecretProvider:Provider"] = "Environment",
-                    ["Database:Runtime:Username"] = "postgres",
-                    ["Database:Runtime:Password"] = "postgres",
                     ["Database:Runtime:TlsMode"] = "Prefer",
                     ["Database:Runtime:TrustServerCertificate"] = "false",
                     ["S3Settings:Region"] = "us-east-1",
                     ["S3Settings:BucketName"] = "test-bucket",
-                    ["S3Settings:AccessKeyId"] = "test-key",
-                    ["S3Settings:SecretAccessKey"] = "test-secret",
                     ["S3Settings:Endpoint"] = "https://s3.example.com",
                     ["Deployment:Mode"] = "SingleTenant",
                     ["Deployment:DefaultTenantId"] = PlatformDefaults.DefaultTenantId.ToString(),
@@ -288,7 +281,7 @@ public class AuthorizationProductionGuardrailTests
     /// </summary>
     private sealed class BootstrapAuthorityEnvironmentScope : IDisposable
     {
-        private static readonly KeyValuePair<string, string?>[] Values =
+        private readonly KeyValuePair<string, string?>[] Values =
         [
             new("SECRET_PROVIDER", "Environment"),
             new("INSTANCE_BOOTSTRAP_MODE", "Interactive"),
@@ -298,10 +291,10 @@ public class AuthorizationProductionGuardrailTests
             new("Database__Runtime__Database", "guardrail"),
             new("Database__Migrator__Database", "guardrail"),
             new("Database__Runtime__Username", "postgres"),
-            new("Database__Runtime__Password", "postgres"),
+            new("Database__Runtime__Password", Convert.ToHexString(RandomNumberGenerator.GetBytes(32))),
         ];
 
-        private readonly List<KeyValuePair<string, string?>> _previous = new(Values.Length);
+        private readonly List<KeyValuePair<string, string?>> _previous = [];
 
         public BootstrapAuthorityEnvironmentScope()
         {
@@ -330,8 +323,6 @@ public class AuthorizationProductionGuardrailTests
         builder.UseSetting("Database:Host", "localhost");
         builder.UseSetting("Database:Port", "5432");
         builder.UseSetting("Database:Database", "guardrail");
-        builder.UseSetting("Database:Runtime:Username", "postgres");
-        builder.UseSetting("Database:Runtime:Password", "postgres");
         builder.UseSetting("Database:Runtime:TlsMode", "Prefer");
         builder.UseSetting("Database:Runtime:TrustServerCertificate", "false");
         builder.UseSetting("EmailDispatchProcessor:Enabled", "false");

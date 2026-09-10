@@ -5,7 +5,7 @@ public sealed record EmailDispatchPublishResult(
     ulong? PublishSequenceNumber = null,
     ushort? ReplyCode = null,
     string? ReplyText = null,
-    string? FailureCategory = null)
+    EmailDispatchPublishFailure? FailureCategory = null)
 {
     public bool Succeeded => Outcome is EmailDispatchPublishOutcome.Confirmed or EmailDispatchPublishOutcome.Disabled;
 

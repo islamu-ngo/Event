@@ -193,6 +193,13 @@ public sealed class NormalizeRegistrationSubmissionCommandHandler(
             }
         }
 
+        now = timeProvider.GetUtcNow().UtcDateTime;
+        if (normalized.Any(item => item.Field.FieldTypeId != (int)RegistrationFieldTypeEnum.Consent) &&
+            !AnonymousRegistrationRetentionPolicy.CanDisclose(order, null, now))
+        {
+            issues.Add(RegistrationSubmissionIssue.Create(submission, "ANONYMOUS_RETENTION_EXPIRED", now));
+        }
+
         List<RegistrationAnswer> answers = [];
         List<RegistrationConsentRecord> consentRecords = [];
         if (issues.Count == 0)
@@ -206,7 +213,7 @@ public sealed class NormalizeRegistrationSubmissionCommandHandler(
                     continue;
                 }
 
-                answers.AddRange(CreateAnswers(submission, requirement, field, input, value, protector, now));
+                answers.AddRange(CreateAnswers(submission, requirement, field, input, value, protector, now, order.AnonymousPiiRetentionUntilUtc));
             }
         }
 
@@ -310,7 +317,8 @@ public sealed class NormalizeRegistrationSubmissionCommandHandler(
         RegistrationSubmissionAnswerInput input,
         NormalizedRegistrationValue value,
         IRegistrationSensitiveValueProtector protector,
-        DateTime now)
+        DateTime now,
+        DateTime? anonymousUpperBoundUtc)
     {
         bool sensitive = value.OptionIds is null &&
             field.OrganizerVisibilityId == (int)RegistrationOrganizerVisibilityEnum.Hidden;
@@ -318,9 +326,9 @@ public sealed class NormalizeRegistrationSubmissionCommandHandler(
         {
             RegistrationProtectedValue protectedValue = protector.Protect(value.Canonical);
             RegistrationSensitiveAnswerValue sensitiveValue = RegistrationSensitiveAnswerValue.Create(
-                submission.TenantId, protectedValue.Ciphertext, protectedValue.KeyVersion, field.RetentionPolicyId, now);
+                submission.TenantId, protectedValue.Ciphertext, protectedValue.KeyVersion, field.RetentionPolicyId, now, anonymousUpperBoundUtc);
             yield return RegistrationAnswer.CreateSensitive(submission, field, requirement, input.SubjectType,
-                input.SubjectId, 1, sensitiveValue, now, input.TicketAssignmentOrderLineId);
+                input.SubjectId, 1, sensitiveValue, now, input.TicketAssignmentOrderLineId, anonymousUpperBoundUtc);
             yield break;
         }
 
@@ -330,20 +338,20 @@ public sealed class NormalizeRegistrationSubmissionCommandHandler(
             {
                 RegistrationFormFieldOption option = field.Options.Single(candidate => candidate.Id == optionIds[index]);
                 yield return RegistrationAnswer.CreateOption(submission, field, requirement, input.SubjectType,
-                    input.SubjectId, index + 1, option, now, input.TicketAssignmentOrderLineId);
+                    input.SubjectId, index + 1, option, now, input.TicketAssignmentOrderLineId, anonymousUpperBoundUtc);
             }
             yield break;
         }
 
         yield return value switch
         {
-            { Text: not null } => RegistrationAnswer.CreateText(submission, field, requirement, input.SubjectType, input.SubjectId, 1, value.Text, now, input.TicketAssignmentOrderLineId),
-            { IntegerValue: not null } => RegistrationAnswer.CreateInteger(submission, field, requirement, input.SubjectType, input.SubjectId, 1, value.IntegerValue.Value, now, input.TicketAssignmentOrderLineId),
-            { DecimalValue: not null } => RegistrationAnswer.CreateDecimal(submission, field, requirement, input.SubjectType, input.SubjectId, 1, value.DecimalValue.Value, now, input.TicketAssignmentOrderLineId),
-            { Boolean: not null } => RegistrationAnswer.CreateBoolean(submission, field, requirement, input.SubjectType, input.SubjectId, 1, value.Boolean.Value, now, input.TicketAssignmentOrderLineId),
-            { Date: not null } => RegistrationAnswer.CreateDate(submission, field, requirement, input.SubjectType, input.SubjectId, 1, value.Date.Value, now, input.TicketAssignmentOrderLineId),
-            { Time: not null } => RegistrationAnswer.CreateTime(submission, field, requirement, input.SubjectType, input.SubjectId, 1, value.Time.Value, now, input.TicketAssignmentOrderLineId),
-            { Instant: not null } => RegistrationAnswer.CreateInstant(submission, field, requirement, input.SubjectType, input.SubjectId, 1, value.Instant.Value, now, input.TicketAssignmentOrderLineId),
+            { Text: not null } => RegistrationAnswer.CreateText(submission, field, requirement, input.SubjectType, input.SubjectId, 1, value.Text, now, input.TicketAssignmentOrderLineId, anonymousUpperBoundUtc),
+            { IntegerValue: not null } => RegistrationAnswer.CreateInteger(submission, field, requirement, input.SubjectType, input.SubjectId, 1, value.IntegerValue.Value, now, input.TicketAssignmentOrderLineId, anonymousUpperBoundUtc),
+            { DecimalValue: not null } => RegistrationAnswer.CreateDecimal(submission, field, requirement, input.SubjectType, input.SubjectId, 1, value.DecimalValue.Value, now, input.TicketAssignmentOrderLineId, anonymousUpperBoundUtc),
+            { Boolean: not null } => RegistrationAnswer.CreateBoolean(submission, field, requirement, input.SubjectType, input.SubjectId, 1, value.Boolean.Value, now, input.TicketAssignmentOrderLineId, anonymousUpperBoundUtc),
+            { Date: not null } => RegistrationAnswer.CreateDate(submission, field, requirement, input.SubjectType, input.SubjectId, 1, value.Date.Value, now, input.TicketAssignmentOrderLineId, anonymousUpperBoundUtc),
+            { Time: not null } => RegistrationAnswer.CreateTime(submission, field, requirement, input.SubjectType, input.SubjectId, 1, value.Time.Value, now, input.TicketAssignmentOrderLineId, anonymousUpperBoundUtc),
+            { Instant: not null } => RegistrationAnswer.CreateInstant(submission, field, requirement, input.SubjectType, input.SubjectId, 1, value.Instant.Value, now, input.TicketAssignmentOrderLineId, anonymousUpperBoundUtc),
             _ => throw new InvalidOperationException("Normalized registration value has no persistable type.")
         };
     }

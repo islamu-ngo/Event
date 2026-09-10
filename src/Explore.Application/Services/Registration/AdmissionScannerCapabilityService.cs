@@ -207,11 +207,11 @@ public sealed class AdmissionScannerCapabilityService(
         new DateTimeOffset(capability.ExpiresAt),
         capability.RevokedAt.HasValue,
         "********")
-    {
-        RevokedAtUtc = capability.RevokedAt.HasValue
+        {
+            RevokedAtUtc = capability.RevokedAt.HasValue
             ? new DateTimeOffset(capability.RevokedAt.Value)
             : null
-    };
+        };
 
     private static AdmissionCheckInAction[] ToApplicationActions(
         AdmissionScannerCapabilityAction actions)

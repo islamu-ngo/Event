@@ -1,18 +1,22 @@
 namespace Explore.Persistence.Repositories;
 
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Services;
 using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Persistence.QueryFilters;
+using Explore.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 
 public class TenantSettingRepository : ITenantSettingRepository
 {
     private readonly ExploreDbContext _dbContext;
+    private readonly ISettingMutationLock _mutationLock;
 
-    public TenantSettingRepository(ExploreDbContext dbContext)
+    public TenantSettingRepository(ExploreDbContext dbContext, ISettingMutationLock mutationLock)
     {
         _dbContext = dbContext;
+        _mutationLock = mutationLock;
     }
 
     public async Task<TenantSetting?> GetByTenantAndKey(
@@ -52,46 +56,49 @@ public class TenantSettingRepository : ITenantSettingRepository
         return string.Equals(matchedHost, normalizedValue, StringComparison.OrdinalIgnoreCase) ? match : null;
     }
 
-    public async Task SetValueAsync(
+    public Task SetValueAsync(
         Guid tenantId,
         string key,
         string value,
         CancellationToken cancellationToken = default,
         Guid? actorId = null)
     {
+        VisitorAccessSettingMutationGuard.RejectGenericMutation(key);
+        EmailDeliverySettingKeys.RejectGenericMutation(key);
         if (PublicationPolicySettingKeys.All.Contains(key, StringComparer.Ordinal))
         {
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
         }
 
-        DateTime now = DateTime.UtcNow;
-        int updated = await _dbContext.TenantSettingOverrides
-            .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
-            .Where(setting => setting.TenantId == tenantId && setting.SettingKey == key)
-            .ExecuteUpdateAsync(
-                setters => setters
-                    .SetProperty(setting => setting.Value, value)
-                    .SetProperty(setting => setting.UpdatedAt, now)
-                    .SetProperty(setting => setting.UpdatedBy, actorId),
-                cancellationToken);
-
-        if (updated > 0)
+        return ExecuteEmailPolicyMutationAsync(tenantId, [key], async token =>
         {
-            return;
-        }
+            DateTime now = DateTime.UtcNow;
+            int updated = await _dbContext.TenantSettingOverrides
+                .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
+                .Where(setting => setting.TenantId == tenantId && setting.SettingKey == key)
+                .ExecuteUpdateAsync(
+                    setters => setters
+                        .SetProperty(setting => setting.Value, value)
+                        .SetProperty(setting => setting.UpdatedAt, now)
+                        .SetProperty(setting => setting.UpdatedBy, actorId), token);
 
-        _dbContext.TenantSettingOverrides.Add(new TenantSetting
-        {
-            Id = Guid.CreateVersion7(),
-            TenantId = tenantId,
-            Tenant = null!,
-            SettingKey = key,
-            Value = value,
-            IsLocked = false,
-            CreatedAt = now,
-            CreatedBy = actorId
-        });
-        await _dbContext.SaveChangesAsync(cancellationToken);
+            if (updated > 0)
+                return true;
+
+            _dbContext.TenantSettingOverrides.Add(new TenantSetting
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = tenantId,
+                Tenant = null!,
+                SettingKey = key,
+                Value = value,
+                IsLocked = false,
+                CreatedAt = now,
+                CreatedBy = actorId
+            });
+            await _dbContext.SaveChangesAsync(token);
+            return true;
+        }, cancellationToken, actorId);
     }
 
     public async Task<List<TenantSetting>> GetAllForTenant(
@@ -135,76 +142,86 @@ public class TenantSettingRepository : ITenantSettingRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<bool> RemoveOverrideAsync(
+    public Task<bool> RemoveOverrideAsync(
         Guid tenantId,
         string key,
         CancellationToken cancellationToken = default)
     {
+        VisitorAccessSettingMutationGuard.RejectGenericMutation(key);
+        EmailDeliverySettingKeys.RejectGenericMutation(key);
         if (PublicationPolicySettingKeys.All.Contains(key, StringComparer.Ordinal))
         {
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
         }
 
-        int removed = await _dbContext.TenantSettingOverrides
-            .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
-            .Where(setting => setting.TenantId == tenantId && setting.SettingKey == key)
-            .ExecuteDeleteAsync(cancellationToken);
-
-        return removed > 0;
+        return ExecuteEmailPolicyMutationAsync(tenantId, [key], async token =>
+        {
+            int removed = await _dbContext.TenantSettingOverrides
+                .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
+                .Where(setting => setting.TenantId == tenantId && setting.SettingKey == key)
+                .ExecuteDeleteAsync(token);
+            return removed > 0;
+        }, cancellationToken);
     }
 
-    public async Task<bool> LockAsync(
+    public Task<bool> LockAsync(
         Guid tenantId,
         string key,
         Guid actorId,
         CancellationToken cancellationToken = default)
     {
+        VisitorAccessSettingMutationGuard.RejectGenericMutation(key);
+        EmailDeliverySettingKeys.RejectGenericMutation(key);
         if (PublicationPolicySettingKeys.All.Contains(key, StringComparer.Ordinal))
         {
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
         }
 
-        DateTime now = DateTime.UtcNow;
-        int updated = await _dbContext.TenantSettingOverrides
-            .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
-            .Where(setting => setting.TenantId == tenantId
-                && setting.SettingKey == key
-                && !setting.IsLocked)
-            .ExecuteUpdateAsync(
-                setters => setters
-                    .SetProperty(setting => setting.IsLocked, true)
-                    .SetProperty(setting => setting.UpdatedAt, now)
-                    .SetProperty(setting => setting.UpdatedBy, actorId),
-                cancellationToken);
-
-        return updated > 0;
+        return ExecuteEmailPolicyMutationAsync(tenantId, [key], async token =>
+        {
+            DateTime now = DateTime.UtcNow;
+            int updated = await _dbContext.TenantSettingOverrides
+                .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
+                .Where(setting => setting.TenantId == tenantId
+                    && setting.SettingKey == key
+                    && !setting.IsLocked)
+                .ExecuteUpdateAsync(
+                    setters => setters
+                        .SetProperty(setting => setting.IsLocked, true)
+                        .SetProperty(setting => setting.UpdatedAt, now)
+                        .SetProperty(setting => setting.UpdatedBy, actorId), token);
+            return updated > 0;
+        }, cancellationToken, actorId);
     }
 
-    public async Task<bool> UnlockAsync(
+    public Task<bool> UnlockAsync(
         Guid tenantId,
         string key,
         Guid actorId,
         CancellationToken cancellationToken = default)
     {
+        VisitorAccessSettingMutationGuard.RejectGenericMutation(key);
+        EmailDeliverySettingKeys.RejectGenericMutation(key);
         if (PublicationPolicySettingKeys.All.Contains(key, StringComparer.Ordinal))
         {
             throw new InvalidOperationException("Guarded publication-policy settings require coordinated mutation.");
         }
 
-        DateTime now = DateTime.UtcNow;
-        int updated = await _dbContext.TenantSettingOverrides
-            .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
-            .Where(setting => setting.TenantId == tenantId
-                && setting.SettingKey == key
-                && setting.IsLocked)
-            .ExecuteUpdateAsync(
-                setters => setters
-                    .SetProperty(setting => setting.IsLocked, false)
-                    .SetProperty(setting => setting.UpdatedAt, now)
-                    .SetProperty(setting => setting.UpdatedBy, actorId),
-                cancellationToken);
-
-        return updated > 0;
+        return ExecuteEmailPolicyMutationAsync(tenantId, [key], async token =>
+        {
+            DateTime now = DateTime.UtcNow;
+            int updated = await _dbContext.TenantSettingOverrides
+                .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
+                .Where(setting => setting.TenantId == tenantId
+                    && setting.SettingKey == key
+                    && setting.IsLocked)
+                .ExecuteUpdateAsync(
+                    setters => setters
+                        .SetProperty(setting => setting.IsLocked, false)
+                        .SetProperty(setting => setting.UpdatedAt, now)
+                        .SetProperty(setting => setting.UpdatedBy, actorId), token);
+            return updated > 0;
+        }, cancellationToken, actorId);
     }
 
     public async Task<List<TenantSetting>> GetLockedForTenant(Guid tenantId)
@@ -216,12 +233,18 @@ public class TenantSettingRepository : ITenantSettingRepository
             .ToListAsync();
     }
 
-    public async Task UpsertManyForTenantAsync(
+    public Task UpsertManyForTenantAsync(
         Guid tenantId,
         IReadOnlyCollection<TenantSettingOverrideUpsert> overrides,
         Guid actorId,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(overrides);
+        foreach (var setting in overrides)
+        {
+            VisitorAccessSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
+            EmailDeliverySettingKeys.RejectGenericMutation(setting.SettingKey);
+        }
         if (overrides.Any(overrideValue => PublicationPolicySettingKeys.All.Contains(
                 overrideValue.SettingKey,
                 StringComparer.Ordinal)))
@@ -231,45 +254,50 @@ public class TenantSettingRepository : ITenantSettingRepository
 
         if (overrides.Count == 0)
         {
-            return;
+            return Task.CompletedTask;
         }
 
-        DateTime now = DateTime.UtcNow;
         string[] keys = overrides.Select(overrideValue => overrideValue.SettingKey).Distinct().ToArray();
-        List<TenantSetting> existing = await _dbContext.TenantSettingOverrides
-            .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
-            .Where(setting => setting.TenantId == tenantId && keys.Contains(setting.SettingKey))
-            .ToListAsync(cancellationToken);
-
-        Dictionary<string, TenantSetting> existingByKey = existing.ToDictionary(setting => setting.SettingKey);
-        foreach (TenantSettingOverrideUpsert overrideValue in overrides)
+        return ExecuteEmailPolicyMutationAsync(tenantId, keys, async token =>
         {
-            if (existingByKey.TryGetValue(overrideValue.SettingKey, out TenantSetting? setting))
+            DetachTrackedSmtpSettings(tenantId, keys);
+            DateTime now = DateTime.UtcNow;
+            List<TenantSetting> existing = await _dbContext.TenantSettingOverrides
+                .IgnoreTenantFilter(TenantFilterBypassReasons.TenantScopedRepositoryExactTenantPredicate)
+                .Where(setting => setting.TenantId == tenantId && keys.Contains(setting.SettingKey))
+                .ToListAsync(token);
+
+            Dictionary<string, TenantSetting> existingByKey = existing.ToDictionary(setting => setting.SettingKey);
+            foreach (TenantSettingOverrideUpsert overrideValue in overrides)
             {
-                setting.Value = overrideValue.Value;
-                setting.IsLocked = overrideValue.IsLocked;
-                setting.UpdatedAt = now;
-                setting.UpdatedBy = actorId;
-                continue;
+                if (existingByKey.TryGetValue(overrideValue.SettingKey, out TenantSetting? setting))
+                {
+                    setting.Value = overrideValue.Value;
+                    setting.IsLocked = overrideValue.IsLocked;
+                    setting.UpdatedAt = now;
+                    setting.UpdatedBy = actorId;
+                    continue;
+                }
+
+                _dbContext.TenantSettingOverrides.Add(new TenantSetting
+                {
+                    Id = Guid.CreateVersion7(),
+                    TenantId = tenantId,
+                    Tenant = null!,
+                    SettingKey = overrideValue.SettingKey,
+                    Value = overrideValue.Value,
+                    IsLocked = overrideValue.IsLocked,
+                    CreatedAt = now,
+                    CreatedBy = actorId
+                });
             }
 
-            _dbContext.TenantSettingOverrides.Add(new TenantSetting
-            {
-                Id = Guid.CreateVersion7(),
-                TenantId = tenantId,
-                Tenant = null!,
-                SettingKey = overrideValue.SettingKey,
-                Value = overrideValue.Value,
-                IsLocked = overrideValue.IsLocked,
-                CreatedAt = now,
-                CreatedBy = actorId
-            });
-        }
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
+            await _dbContext.SaveChangesAsync(token);
+            return true;
+        }, cancellationToken, actorId);
     }
 
-    public async Task CreateManyForTenantAsync(
+    public Task CreateManyForTenantAsync(
         Guid tenantId,
         IReadOnlyCollection<TenantSettingOverrideUpsert> overrides,
         Guid? actorId,
@@ -278,6 +306,11 @@ public class TenantSettingRepository : ITenantSettingRepository
     {
         ArgumentOutOfRangeException.ThrowIfEqual(tenantId, Guid.Empty);
         ArgumentNullException.ThrowIfNull(overrides);
+        foreach (var setting in overrides)
+        {
+            VisitorAccessSettingMutationGuard.RejectGenericMutation(setting.SettingKey);
+            EmailDeliverySettingKeys.RejectGenericMutation(setting.SettingKey);
+        }
         if (occurredAtUtc.Kind != DateTimeKind.Utc)
         {
             throw new ArgumentException("Setting creation timestamp must use UTC kind.", nameof(occurredAtUtc));
@@ -296,24 +329,66 @@ public class TenantSettingRepository : ITenantSettingRepository
             throw new ArgumentException("Tenant setting keys must be unique.", nameof(overrides));
         }
 
-        foreach (TenantSettingOverrideUpsert overrideValue in overrides)
+        if (overrides.Count == 0)
         {
-            _dbContext.TenantSettingOverrides.Add(new TenantSetting
-            {
-                Id = Guid.CreateVersion7(),
-                TenantId = tenantId,
-                Tenant = null!,
-                SettingKey = overrideValue.SettingKey,
-                Value = overrideValue.Value,
-                IsLocked = overrideValue.IsLocked,
-                CreatedAt = occurredAtUtc,
-                CreatedBy = actorId
-            });
+            return Task.CompletedTask;
         }
 
-        if (overrides.Count > 0)
+        return ExecuteEmailPolicyMutationAsync(tenantId, overrides.Select(value => value.SettingKey), async token =>
         {
-            await _dbContext.SaveChangesAsync(cancellationToken);
-        }
+            foreach (TenantSettingOverrideUpsert overrideValue in overrides)
+            {
+                _dbContext.TenantSettingOverrides.Add(new TenantSetting
+                {
+                    Id = Guid.CreateVersion7(),
+                    TenantId = tenantId,
+                    Tenant = null!,
+                    SettingKey = overrideValue.SettingKey,
+                    Value = overrideValue.Value,
+                    IsLocked = overrideValue.IsLocked,
+                    CreatedAt = occurredAtUtc,
+                    CreatedBy = actorId
+                });
+            }
+
+            await _dbContext.SaveChangesAsync(token);
+            return true;
+        }, cancellationToken, actorId);
+    }
+
+    private void DetachTrackedSmtpSettings(Guid tenantId, IEnumerable<string> keys)
+    {
+        var smtpKeys = keys
+            .Where(key => RelationalSettingMutationLock.RequiresEmailDeliveryFence([key]))
+            .Select(RelationalSettingMutationLock.NormalizeCanonicalKey)
+            .ToHashSet(StringComparer.Ordinal);
+        if (smtpKeys.Count == 0)
+            return;
+
+        var entries = _dbContext.ChangeTracker.Entries<TenantSetting>()
+            .Where(entry => entry.Entity.TenantId == tenantId
+                && smtpKeys.Contains(RelationalSettingMutationLock.NormalizeCanonicalKey(entry.Entity.SettingKey)))
+            .ToArray();
+        foreach (var entry in entries)
+            entry.State = EntityState.Detached;
+    }
+
+    private Task<bool> ExecuteEmailPolicyMutationAsync(Guid tenantId, IEnumerable<string> keys,
+        Func<CancellationToken, Task<bool>> operation, CancellationToken cancellationToken, Guid? actorId = null)
+    {
+        string[] smtpKeys = keys
+            .Where(key => RelationalSettingMutationLock.RequiresEmailDeliveryFence([key]))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        return smtpKeys.Length == 0
+            ? operation(cancellationToken)
+            : _mutationLock.ExecuteManyAsync(smtpKeys, async token =>
+            {
+                var before = await EmailDeliveryPolicyReader.ReadAsync(_dbContext, tenantId, token);
+                bool changed = await operation(token);
+                if (changed)
+                    await EmailDeliveryPolicyRevisionTracker.RecordTenantAsync(_dbContext, tenantId, before, actorId, token);
+                return changed;
+            }, cancellationToken);
     }
 }

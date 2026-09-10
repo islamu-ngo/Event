@@ -1,0 +1,34 @@
+# ABOUTME: Records finite private guest-status promises and explicit bookmark preservation.
+# ABOUTME: Keeps post-confirmation status separate from checkout, attendee data and calendar authority.
+Change-Id: CHG-01M1SMGJSNSW9C381WY4R55C2X
+Title: provide durable private guest status links
+Type: feat
+Scope: registration
+Summary: Keep confirmed guest status available beyond hold expiry through a limited capability and offer honest no-email guidance with public-data calendar export.
+Group: email-optional-self-hosting
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: New guest allocations require a finite status window; guest continue/finalize responses use HAL and older unpromised records gain no implicit status authority.
+  Security:
+    Reference: docs/internal/ADMISSION_AND_REGISTRATION.md
+    Disposition: documented
+    Detail: Exact header capability and fenced current snapshots govern PII-free status; deadlines are rechecked after waits and the general checkout guard remains unchanged.
+  Migration:
+    Reference: docs/internal/ADMISSION_AND_REGISTRATION.md
+    Disposition: documented
+    Detail: Four native primary migrations add the nullable UTC guest status promise without a default or historical backfill.
+  Configuration:
+    Reference: docs/internal/ADMISSION_AND_REGISTRATION.md
+    Disposition: not-applicable
+    Detail: Status reuses current event summaries, existing guest capability and public calendar authority without a new deployment setting.
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: documented
+    Detail: The new status operation and post-confirmation HAL discovery use native regenerated typed contracts with identifier-only links.
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/email-optional-participation.md
+    Disposition: documented
+    Detail: Guests explicitly save a private fragment link, see the finite server deadline and use only public calendar data; lost links are not recovered by guessing identity or email.

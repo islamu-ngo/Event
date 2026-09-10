@@ -80,11 +80,17 @@ public class UserExternalLoginRepositoryBypassTests(PostgreSqlContainerFixture f
         string provider,
         string providerKey)
     {
-        return new UserExternalLogin { Id = Guid.CreateVersion7(),
-        UserId = userId,
-        User = null!, AuthenticationProviderId = (int)provider.ParseAuthenticationProviderKind(), AuthenticationProvider = null!, ProviderKey = providerKey,
-        ProviderDisplayName = provider,
-        CreatedAt = DateTime.UtcNow, };
+        return new UserExternalLogin
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = userId,
+            User = null!,
+            AuthenticationProviderId = (int)provider.ParseAuthenticationProviderKind(),
+            AuthenticationProvider = null!,
+            ProviderKey = providerKey,
+            ProviderDisplayName = provider,
+            CreatedAt = DateTime.UtcNow,
+        };
     }
 
     private sealed record TestTenantContext(Guid TenantId) : ITenantContext;

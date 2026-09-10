@@ -1,11 +1,14 @@
 @page "/registration/events/{EventId:guid}/tickets"
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Routing
+@implements IDisposable
 @inject IRegistrationOrderService RegistrationOrderService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager Navigation
 @inject ITranslationService Translation
 
 <PageTitle>Select tickets</PageTitle>
+<NavigationLock ConfirmExternalNavigation="@(_isSubmitting || HasPendingGuestStart)" OnBeforeInternalNavigation="GuardNavigation" />
 
 <MudContainer MaxWidth="MaxWidth.Small" Class="ticket-selection">
     <MudText Typo="Typo.h4" HtmlTag="h1">Select tickets</MudText>
@@ -46,11 +49,11 @@
     {
         <div role="status">Loading ticket choices…</div>
     }
-    else if (_tickets.Count == 0)
+    else if (_tickets.Count == 0 && !HasPendingGuestStart)
     {
         <div role="alert">Tickets are not available for this event.</div>
     }
-    else if (HasPaidTickets && _composition?.DirectoryOperator is null)
+    else if (HasPaidTickets && _composition?.DirectoryOperator is null && !HasPendingGuestStart)
     {
         <div role="alert"
              aria-live="assertive"
@@ -60,6 +63,8 @@
     }
     else
     {
+        <fieldset class="ticket-selection__choices" disabled="@(_isSubmitting || HasPendingGuestStart)">
+        <legend class="sr-only">Ticket quantities and prices</legend>
         @foreach (var state in _tickets)
         {
             <section class="ticket-selection__ticket" aria-label="@state.Ticket.Name">
@@ -97,23 +102,44 @@
                 }
             </section>
         }
+        </fieldset>
 
         @if (_error is not null)
         {
             <div role="alert">@_error</div>
         }
 
-        <AppButton Disabled="_isSubmitting"
-                   OnClick="StartAsync"
-                   aria-busy="@_isSubmitting.ToString().ToLowerInvariant()"
-                   data-testid="ticket-reservation-action">
-            @(_isSubmitting
-                ? T("ticketSelection.reserving", "Reserving selected tickets…")
-                : T("ticketSelection.reserve", "Reserve selected tickets"))
-        </AppButton>
-        <div role="status" aria-live="polite" aria-atomic="true">
-            @(_isSubmitting ? T("ticketSelection.reservingStatus", "Reservation is in progress.") : null)
+        <div class="ticket-selection__actions">
+            <AppButton Disabled="@(_isSubmitting || RetryBlocked)"
+                       OnClick="StartAsync"
+                       aria-busy="@_isSubmitting.ToString().ToLowerInvariant()"
+                       data-testid="ticket-reservation-action">
+                @(_isSubmitting
+                    ? T("ticketSelection.reserving", "Reserving selected tickets…")
+                    : HasPendingGuestStart
+                        ? T("ticketSelection.retryOriginal", "Retry original reservation")
+                        : T("ticketSelection.reserve", "Reserve selected tickets"))
+            </AppButton>
+            @if (_isSubmitting && RegistrationOrderService.GuestStartPhase is GuestRegistrationStartPhase.Issuing or GuestRegistrationStartPhase.Solving)
+            {
+                <AppButton OnClick="CancelChallenge" data-testid="ticket-challenge-cancel">
+                    @T("ticketSelection.cancelCheck", "Cancel browser check")
+                </AppButton>
+            }
         </div>
+        <div role="status" aria-live="polite" aria-atomic="true" data-testid="ticket-challenge-status">
+            @GuestStatus
+        </div>
+        @if (HasPendingGuestStart)
+        {
+            <p data-testid="ticket-reservation-uncertain">
+                @T("ticketSelection.uncertain", "The reservation may already exist. Keep this page open. Retry checks the original request; it does not start a replacement. Do not reload or start another reservation.")
+            </p>
+        }
+        @if (RegistrationOrderService.GuestStartPhase is GuestRegistrationStartPhase.Unavailable or GuestRegistrationStartPhase.Expired or GuestRegistrationStartPhase.RetryExhausted)
+        {
+            <p>@T("ticketSelection.assistedAlternative", "You can ask the event organizer for staff-assisted registration. Browser checks do not reserve tickets until the server accepts the request.")</p>
+        }
     }
 </MudContainer>
 
@@ -126,9 +152,43 @@
     private bool _isSubmitting;
     private string? _error;
     private bool HasPaidTickets => _tickets.Any(state => IsPaidMode(state.Ticket.TicketPricingModeCode));
+    private CancellationTokenSource? _submission;
+    private Guid _loadedEventId;
+    private bool HasPendingGuestStart => RegistrationOrderService.PendingGuestEventId.HasValue;
+    private bool RetryBlocked => RegistrationOrderService.GuestStartPhase == GuestRegistrationStartPhase.RetryExhausted
+        || (RegistrationOrderService.PendingGuestEventId is { } pending && pending != EventId);
+
+    protected override void OnInitialized() => RegistrationOrderService.GuestStartChanged += GuestStartChanged;
+    private void GuestStartChanged() => _ = InvokeAsync(StateHasChanged);
+    private void CancelChallenge() => _submission?.Cancel();
+    private void GuardNavigation(LocationChangingContext context)
+    {
+        if (_isSubmitting || HasPendingGuestStart) context.PreventNavigation();
+    }
+    public void Dispose()
+    {
+        RegistrationOrderService.GuestStartChanged -= GuestStartChanged;
+        _submission?.Cancel();
+        _submission?.Dispose();
+    }
+
+    private string? GuestStatus => RegistrationOrderService.GuestStartPhase switch
+    {
+        GuestRegistrationStartPhase.Issuing => T("ticketSelection.preparingCheck", "Preparing a private browser check. No tickets have been reserved."),
+        GuestRegistrationStartPhase.Solving => $"{T("ticketSelection.browserCheck", "Checking this browser. You can cancel before reservation.")} {RegistrationOrderService.GuestProofAttempts:N0}",
+        GuestRegistrationStartPhase.Submitting => T("ticketSelection.reservingStatus", "Reservation is in progress."),
+        GuestRegistrationStartPhase.Cancelled => T("ticketSelection.checkCancelled", "Browser check cancelled. No reservation was sent."),
+        GuestRegistrationStartPhase.Expired => T("ticketSelection.checkExpired", "The browser check expired before submission. Select Reserve to request a new check."),
+        GuestRegistrationStartPhase.Unavailable => T("ticketSelection.checkUnavailable", "The browser check is unavailable. No reservation was sent. Try again explicitly or contact the organizer."),
+        GuestRegistrationStartPhase.IntentChanged => T("ticketSelection.intentChanged", "The event or selection changed. An unresolved original reservation cannot be replaced."),
+        GuestRegistrationStartPhase.RetryExhausted => T("ticketSelection.retryLimit", "The retry limit was reached. The original reservation is still unresolved; contact the organizer before making another."),
+        _ => _isSubmitting ? T("ticketSelection.reservingStatus", "Reservation is in progress.") : null
+    };
 
     protected override async Task OnParametersSetAsync()
     {
+        if (_loadedEventId != EventId) _submission?.Cancel();
+        _loadedEventId = EventId;
         _isLoading = true;
         _composition = await RegistrationOrderService.GetCheckoutAsync(EventId);
         _tickets.Clear();
@@ -138,6 +198,25 @@
 
     private async Task StartAsync()
     {
+        if (_isSubmitting || RetryBlocked) return;
+        if (HasPendingGuestStart)
+        {
+            _isSubmitting = true;
+            _error = null;
+            _submission?.Dispose();
+            _submission = new CancellationTokenSource();
+            try
+            {
+                var recovered = await RegistrationOrderService.RetryGuestAsync(EventId, _submission.Token);
+                if (recovered?.Id is { } recoveredId)
+                {
+                    _isSubmitting = false;
+                    Navigation.NavigateTo($"/registration/guest/events/{EventId}/orders/{recoveredId}");
+                }
+            }
+            finally { _isSubmitting = false; }
+            return;
+        }
         var lines = _tickets
             .Where(state => state.Quantity > 0 && state.Ticket.Id.HasValue)
             .Select(state => new RegistrationOrderLineSelection
@@ -161,21 +240,32 @@
             BookingPartyType = 1,
             Lines = lines
         };
-        var isAuthenticated = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User.Identity?.IsAuthenticated == true;
-        var orderId = isAuthenticated
-            ? (await RegistrationOrderService.StartAuthenticatedAsync(EventId, request))?.Id
-            : (await RegistrationOrderService.StartGuestAsync(EventId, request))?.Id;
-
-        if (orderId is null)
+        _submission?.Dispose();
+        _submission = new CancellationTokenSource();
+        var eventId = EventId;
+        try
         {
-            _error = "The registration order could not be started.";
-            _isSubmitting = false;
-            return;
-        }
+            var isAuthenticated = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User.Identity?.IsAuthenticated == true;
+            _submission.Token.ThrowIfCancellationRequested();
+            var orderId = isAuthenticated
+                ? (await RegistrationOrderService.StartAuthenticatedAsync(eventId, request, _submission.Token))?.Id
+                : (await RegistrationOrderService.StartGuestAsync(eventId, request, _submission.Token))?.Id;
 
-        Navigation.NavigateTo(isAuthenticated
-            ? $"/registration/events/{EventId}/orders/{orderId}"
-            : $"/registration/guest/events/{EventId}/orders/{orderId}");
+            if (orderId is null)
+            {
+                if (isAuthenticated) _error = "The registration order could not be started.";
+                return;
+            }
+            _isSubmitting = false;
+            Navigation.NavigateTo(isAuthenticated
+                ? $"/registration/events/{eventId}/orders/{orderId}"
+                : $"/registration/guest/events/{eventId}/orders/{orderId}");
+        }
+        catch (OperationCanceledException)
+        {
+            _error = T("ticketSelection.requestInterrupted", "The request was interrupted. A submitted reservation may still exist.");
+        }
+        finally { _isSubmitting = false; }
     }
 
     private static bool AllowsChosenPrice(RegistrationCheckoutTicketTypeDto ticket) =>

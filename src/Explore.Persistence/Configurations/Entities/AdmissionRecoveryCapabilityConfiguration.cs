@@ -35,34 +35,34 @@ public sealed class AdmissionRecoveryCapabilityConfiguration :
         builder.Property(value => value.ConcurrencyStamp).IsConcurrencyToken();
         builder.HasAlternateKey(value => new { value.TenantId, value.Id });
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.AdmissionTicketId,
-                value.Purpose,
-                value.CapabilityVersion
-            })
+        {
+            value.TenantId,
+            value.AdmissionTicketId,
+            value.Purpose,
+            value.CapabilityVersion
+        })
             .IsUnique();
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.LookupKeyVersion,
-                value.LookupDigest
-            })
+        {
+            value.TenantId,
+            value.LookupKeyVersion,
+            value.LookupDigest
+        })
             .IsUnique();
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.LookupKeyVersion,
-                value.LocatorDigest
-            })
+        {
+            value.TenantId,
+            value.LookupKeyVersion,
+            value.LocatorDigest
+        })
             .IsUnique();
         builder.HasIndex(value => new
-            {
-                value.TenantId,
-                value.AdmissionTicketId,
-                value.Purpose,
-                value.ActiveUniquenessSlot
-            })
+        {
+            value.TenantId,
+            value.AdmissionTicketId,
+            value.Purpose,
+            value.ActiveUniquenessSlot
+        })
             .IsUnique();
         builder.HasIndex(value => new { value.TenantId, value.RecoveryRequestId, value.Purpose });
         builder.HasIndex(value => new { value.ExpiresAt, value.ConsumedAt, value.RotatedAt });

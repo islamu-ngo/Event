@@ -68,6 +68,16 @@ public class InstanceOnboardingControllerTests
             Purpose = "Keep this operator note out of persisted settings."
         };
 
+        string originalFromAddress;
+        using (var baselineScope = factory.Services.CreateScope())
+        {
+            var baselineDbContext = baselineScope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            originalFromAddress = await baselineDbContext.SystemSettings
+                .Where(setting => setting.SettingKey == GovernanceSettingKeys.Email.FromAddress)
+                .Select(setting => setting.Value)
+                .SingleAsync();
+        }
+
         using var request = CreateInstanceAdminRequest(
             HttpMethod.Patch,
             $"{BaseUrl}/profile",
@@ -82,16 +92,21 @@ public class InstanceOnboardingControllerTests
         var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
         var settings = await dbContext.SystemSettings
             .Where(setting => setting.SettingKey == GovernanceSettingKeys.Branding.DisplayName
-                || setting.SettingKey == GovernanceSettingKeys.Email.FromAddress
+                || setting.SettingKey == GovernanceSettingKeys.Branding.SupportEmail
                 || setting.SettingKey == GovernanceSettingKeys.Domains.InstanceBaseDomain
                 || setting.SettingKey == GovernanceSettingKeys.Localization.DefaultLanguage)
             .ToDictionaryAsync(setting => setting.SettingKey, setting => setting.Value);
 
         await Assert.That(settings[GovernanceSettingKeys.Branding.DisplayName]).IsEqualTo(JsonSerializer.Serialize("Community Events"));
-        await Assert.That(settings[GovernanceSettingKeys.Email.FromAddress]).IsEqualTo(JsonSerializer.Serialize("support@example.org"));
+        await Assert.That(settings[GovernanceSettingKeys.Branding.SupportEmail]).IsEqualTo(JsonSerializer.Serialize("support@example.org"));
         await Assert.That(settings[GovernanceSettingKeys.Domains.InstanceBaseDomain]).IsEqualTo(JsonSerializer.Serialize("events.example.org"));
         await Assert.That(settings[GovernanceSettingKeys.Localization.DefaultLanguage]).IsEqualTo(JsonSerializer.Serialize("en"));
         await Assert.That(settings.Count).IsEqualTo(4);
+        var fromAddress = await dbContext.SystemSettings
+            .Where(setting => setting.SettingKey == GovernanceSettingKeys.Email.FromAddress)
+            .Select(setting => setting.Value)
+            .SingleAsync();
+        await Assert.That(fromAddress).IsEqualTo(originalFromAddress);
     }
 
     [Test]
@@ -152,6 +167,7 @@ public class InstanceOnboardingControllerTests
         var allowedSettingKeys = new[]
         {
             GovernanceSettingKeys.Branding.DisplayName,
+            GovernanceSettingKeys.Branding.SupportEmail,
             GovernanceSettingKeys.Email.FromAddress,
             GovernanceSettingKeys.Domains.InstanceBaseDomain,
             GovernanceSettingKeys.Localization.DefaultLanguage
@@ -449,15 +465,25 @@ public class InstanceOnboardingControllerTests
     {
         using var factory = CreateFactoryWithSetupSecret(new Dictionary<string, string?>
         {
-            ["Keycloak:Authority"] = string.Empty,
-            ["Keycloak:Audience"] = string.Empty,
-            ["Keycloak:ClientId"] = string.Empty,
-            ["PublicBaseUrl"] = "https://integration.test"
+            ["Authentication:Provider"] = "local",
+            ["PublicBaseUrl"] = string.Empty,
+            ["App:PublicBaseUrl"] = string.Empty,
+            ["ASPNETCORE_URLS"] = string.Empty
         });
         using var client = factory.CreateClient();
 
         var userId = Guid.CreateVersion7();
         await EnsureUserExistsAsync(factory, userId);
+
+        using var preflightResponse = await client.GetAsync("/api/system/onboarding-preflight");
+        await Assert.That(preflightResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        var preflight = await preflightResponse.Content.ReadFromJsonAsync<OnboardingPreflightDto>(TestJsonOptions.Default);
+        await Assert.That(preflight).IsNotNull();
+        await Assert.That(preflight!.IsReadyToLaunch).IsFalse();
+        await Assert.That(preflight.BlockingChecks.Single(check => check.Status == OnboardingPreflightCheckStatus.Fail).Code)
+            .IsEqualTo("canonical_host");
+        await Assert.That(preflight.BlockingChecks.Single(check => check.Code == "auth_config").Status)
+            .IsEqualTo(OnboardingPreflightCheckStatus.Pass);
 
         using var request = CreateInstanceAdminRequest(
             HttpMethod.Post,
@@ -472,7 +498,15 @@ public class InstanceOnboardingControllerTests
 
         var problemDetails = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
         await Assert.That(problemDetails).IsNotNull();
-        await Assert.That(problemDetails!.Detail).IsEqualTo("Instance cannot be launched because critical launch requirements are not met. Please review the blocking issues and try again.");
+        await Assert.That(problemDetails!.Status).IsEqualTo(StatusCodes.Status400BadRequest);
+        await Assert.That(problemDetails.Errors.ContainsKey("instanceOnboarding")).IsTrue();
+
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+        await Assert.That(await dbContext.InstanceBootstrapStates.AnyAsync()).IsFalse();
+        await Assert.That(await dbContext.PlatformUserRoles.AnyAsync(role => role.UserId == userId)).IsFalse();
+        var setupSecretProvider = scope.ServiceProvider.GetRequiredService<ISetupSecretProvider>();
+        await Assert.That(await setupSecretProvider.IsSetupModeActiveAsync()).IsTrue();
     }
 
     [Test]
@@ -665,7 +699,7 @@ public class InstanceOnboardingControllerTests
         var getResponse = await client.SendAsync(getRequest);
         await Assert.That(getResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
 
-        var config = await getResponse.Content.ReadFromJsonAsync<AuthProviderConfigurationDto>();
+        var config = await getResponse.Content.ReadFromJsonAsync<AuthProviderConfigurationDto>(TestJsonOptions.Default);
         await Assert.That(config).IsNotNull();
         await Assert.That(config!.PrimaryProviderId)
             .IsEqualTo((int)AuthenticationProviderKind.Local);
@@ -738,7 +772,7 @@ public class InstanceOnboardingControllerTests
         var internalWithSecretResponse = await client.SendAsync(internalWithSecretRequest);
         await Assert.That(internalWithSecretResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
 
-        var internalConfig = await internalWithSecretResponse.Content.ReadFromJsonAsync<AuthProviderConfigurationDto>();
+        var internalConfig = await internalWithSecretResponse.Content.ReadFromJsonAsync<AuthProviderConfigurationDto>(TestJsonOptions.Default);
         await Assert.That(internalConfig).IsNotNull();
         await Assert.That(internalConfig!.GoogleSsoEnabled).IsTrue();
         await Assert.That(internalConfig.GoogleClientSecret).IsEqualTo(
@@ -751,7 +785,7 @@ public class InstanceOnboardingControllerTests
             body: null, includeSetupSecret: false);
         var adminResponse = await client.SendAsync(adminGetRequest);
         await Assert.That(adminResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        var adminConfig = await adminResponse.Content.ReadFromJsonAsync<AuthProviderConfigurationDto>();
+        var adminConfig = await adminResponse.Content.ReadFromJsonAsync<AuthProviderConfigurationDto>(TestJsonOptions.Default);
         await Assert.That(adminConfig).IsNotNull();
         await Assert.That(adminConfig!.GoogleClientSecret).IsEqualTo(string.Empty);
 
@@ -809,7 +843,7 @@ public class InstanceOnboardingControllerTests
         var internalWithSecretResponse = await client.SendAsync(internalWithSecretRequest);
 
         await Assert.That(internalWithSecretResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        var internalConfig = await internalWithSecretResponse.Content.ReadFromJsonAsync<AuthProviderConfigurationDto>();
+        var internalConfig = await internalWithSecretResponse.Content.ReadFromJsonAsync<AuthProviderConfigurationDto>(TestJsonOptions.Default);
         await Assert.That(internalConfig).IsNotNull();
         await Assert.That(internalConfig!.PrimaryProviderId)
             .IsEqualTo((int)AuthenticationProviderKind.Keycloak);
@@ -1115,13 +1149,18 @@ public class InstanceOnboardingControllerTests
             return;
         }
 
-        dbContext.UserExternalLogins.Add(new UserExternalLogin { Id = Guid.CreateVersion7(),
-        UserId = userId,
-        User = null!,
-        AuthenticationProviderId = (int)provider.ParseAuthenticationProviderKind(), AuthenticationProvider = null!, ProviderKey = providerKey,
-        ProviderDisplayName = provider,
-        CreatedAt = DateTime.UtcNow,
-        CreatedBy = userId });
+        dbContext.UserExternalLogins.Add(new UserExternalLogin
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = userId,
+            User = null!,
+            AuthenticationProviderId = (int)provider.ParseAuthenticationProviderKind(),
+            AuthenticationProvider = null!,
+            ProviderKey = providerKey,
+            ProviderDisplayName = provider,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId
+        });
 
         await dbContext.SaveChangesAsync();
     }
@@ -1137,15 +1176,19 @@ public class InstanceOnboardingControllerTests
             return;
         }
 
-        dbContext.Users.Add(new User { Id = userId, CreatedAt = DateTime.UtcNow,
-        CreatedBy = userId,
-        Pii = new UserPii
+        dbContext.Users.Add(new User
         {
-            UserId = userId,
-            Email = $"{userId:N}@integration.test",
-            FirstName = "Instance",
-            LastName = "Admin"
-        } });
+            Id = userId,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId,
+            Pii = new UserPii
+            {
+                UserId = userId,
+                Email = $"{userId:N}@integration.test",
+                FirstName = "Instance",
+                LastName = "Admin"
+            }
+        });
 
         await dbContext.SaveChangesAsync();
         await EnsureUserExternalLoginAsync(factory, userId, "keycloak", userId.ToString());

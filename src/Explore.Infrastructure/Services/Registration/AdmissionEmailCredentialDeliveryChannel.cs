@@ -4,7 +4,7 @@ using Explore.Application.Models;
 
 namespace Explore.Infrastructure.Services.Registration;
 
-public sealed class AdmissionEmailCredentialDeliveryChannel(IEmailService emailService)
+public sealed class AdmissionEmailCredentialDeliveryChannel(IEmailService emailService, TimeProvider? timeProvider = null)
     : IAdmissionCredentialDirectDeliveryChannel
 {
     public async Task<AdmissionCredentialDirectDeliveryResult> DeliverAsync(
@@ -19,8 +19,11 @@ public sealed class AdmissionEmailCredentialDeliveryChannel(IEmailService emailS
         }
 
         string idempotencyKey = request.DeliveryIntentId.ToString("N");
+        if (request.DisclosureUntilUtc is { } deadline && (timeProvider ?? TimeProvider.System).GetUtcNow().UtcDateTime >= deadline)
+            return new AdmissionCredentialDirectDeliveryResult(AdmissionCredentialDirectDeliveryOutcome.RetentionExpired);
         EmailResult result = await emailService.SendAsync(new EmailMessage
         {
+            DisclosureUntilUtc = request.DisclosureUntilUtc,
             To = request.RecipientAddress,
             Subject = "Your admission credential",
             PlainTextBody = $"Admission ticket: {request.AdmissionTicketId:N}\nCredential: {request.PlaintextCredential}",
@@ -30,6 +33,8 @@ public sealed class AdmissionEmailCredentialDeliveryChannel(IEmailService emailS
             }
         }, cancellationToken);
 
+        if (result.Outcome == SmtpDeliveryOutcome.RetentionExpired)
+            return new AdmissionCredentialDirectDeliveryResult(AdmissionCredentialDirectDeliveryOutcome.RetentionExpired);
         return result.Success
             ? new AdmissionCredentialDirectDeliveryResult(
                 AdmissionCredentialDirectDeliveryOutcome.Accepted,

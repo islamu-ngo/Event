@@ -1,6 +1,8 @@
 ---
 description: Select, bind, rotate, and recover secrets through fail-closed authorities.
 ---
+<!-- ABOUTME: Operator guide for selecting, binding, and rotating external secret authorities. -->
+<!-- ABOUTME: Explains fail-closed resolution and credential ownership without exposing secret material. -->
 
 # Secrets Management
 
@@ -40,6 +42,18 @@ The selected secret provider reports distinct operational states: `Unconfigured`
 First-run setup secrets generated in volumes must be retrieved securely and purged after onboarding (see [Setup Secret Recovery](troubleshooting-and-health.md#recipe-6-lost-setup-secret-recovery)).
 
 ---
+
+## SMTP Credential Ownership
+
+Email is disabled until explicitly enabled through `email.delivery_enabled`. Credentials
+stay in the selected secret authority. Use `MAIL_SMTP_USERNAME` and `MAIL_SMTP_PASSWORD`
+for instance SMTP; register tenant-scoped bindings for a tenant's own server. A tenant's
+server cannot inherit instance credentials, even if the tenant has no credential bindings.
+Without either binding the tenant transport is anonymous; providing only one credential
+or failing to resolve a configured credential prevents delivery.
+
+Changing Event SMTP does not configure Keycloak or the account provider's authentication
+emails. Manage those providers' credentials and delivery settings with their own controls.
 
 ## Secret Rotation Procedure
 

@@ -43,10 +43,10 @@ internal static class ProviderNeutralTypeGraph
     {
         yield return contract;
         foreach (System.Reflection.ConstructorInfo constructor in contract.GetConstructors())
-        foreach (System.Reflection.ParameterInfo parameter in constructor.GetParameters())
-        {
-            yield return parameter.ParameterType;
-        }
+            foreach (System.Reflection.ParameterInfo parameter in constructor.GetParameters())
+            {
+                yield return parameter.ParameterType;
+            }
         foreach (System.Reflection.MethodInfo method in contract.GetMethods(
                      System.Reflection.BindingFlags.Instance |
                      System.Reflection.BindingFlags.Public |

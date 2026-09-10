@@ -349,6 +349,27 @@ Domain rules reject illegal combinations. Information-only and walk-in require a
 
 External participation destinations are reviewed `EventPublicAction` records, not fields on the event. Public HAL synthesis may emit one stored-ID redirect only when the participation mode permits that action. Native workflow authorization is permitted only for `PLATFORM_MANAGED`; a click or redirect is engagement, never proof of registration.
 
+### Anonymous Registration Retention
+
+`RegistrationOrder.AnonymousPiiRetentionUntilUtc` records the original guest
+allocation's event-purpose deadline even when no PII exists. It is independent
+of the extendable private-status promise. `AnonymousRegistrationRetentionPolicy`
+uses pinned guest participation and the persisted bound, not missing email or
+current account linkage. Claiming an order, editing data, changing settings,
+rescheduling or deleting an earlier PII row cannot grant a later deadline.
+
+Ordinary anonymous names and answers use the earlier of their existing row
+deadline and the allocation bound. Collection None creates Unnamed participants
+without contact PII; required names do not create purchaser email records.
+Legal-hold rows remain physically retained, while operational reads still stop
+at the anonymous bound. Consent and export evidence retain their separate policy.
+
+`StorageObject.RegistrationContentRetentionUntilUtc` retains the minimum
+included-content deadline for generated registration exports after source
+answers disappear. Neither scalar replaces the existing row retention categories
+or user-erasure authority. Historical guest data with no original bound fails
+closed for PII rather than deriving a new window from today's event schedule.
+
 ### Registration Workflow Authoring
 
 `RegistrationWorkflow` is the event- and purpose-owned authoring aggregate. It owns ordered `RegistrationRequirement` rows, and each requirement owns ordered `RegistrationChannel` rows. Requirements and channels require positive owner-scoped ordinals; aggregate mutators reject duplicate IDs or ordinals. A native channel has no provider binding; a provider channel carries `RegistrationProviderBindingId`.
@@ -626,7 +647,7 @@ Specialized variants: `PdsSyncOutbox` (federation), `PolicyChangeOutbox` (govern
 - `NotificationPreferenceProfile`: Unique non-deleted row per tenant/scope/target for global mute state with the same scope-target constraints.
 - `NotificationFanoutRun`: Unique source tuple per `(TenantId, FanoutKind, NotificationEntityTypeId, EntityId, SourceActorId)`.
 - `EventContactShareConsent`: Exactly one typed subject FK (`User`, registration purchaser order, registration participant, or guest-contact order) and one current row per `(TenantId, SubjectTypeId, SubjectId, RecipientActorId, PurposeCode)`; grant/regrant/withdrawal evidence is append-only in `EventContactShareConsentHistory`.
-- Registration answer and PII retention: policy duration is resolved to an immutable UTC `RetentionUntil` when the row is created. Standard operational data uses 730 days, sensitive data 90 days, marketing-consent evidence 2555 days, and legal hold has no automatic deadline.
+- Registration answer and PII retention: policy duration resolves to UTC `RetentionUntil`. Standard operational data uses 730 days, sensitive data 90 days, marketing-consent evidence 2555 days, and legal hold has no automatic physical-deletion deadline. Anonymous names/answers additionally obey the original event-purpose bound above; edits cannot increase their finite row deadline.
 - `EventReport`: Composite tenant/event alternate keys enforce same-tenant event ownership; status/priority/reporter/source enum ranges are DB constrained; terminal statuses require `ClosedAt`.
 - `EventReportCase`: Composite tenant/report/case keys enforce queue ownership; queue code is required; status/priority ranges are constrained; concurrency stamp is the optimistic write guard.
 - `EventReportEvidence`: Reporter-text evidence rows require encrypted text; content hashes are optional but non-blank when present; retention and content-hash indexes support cleanup/deduplication without exposing raw evidence.

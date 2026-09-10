@@ -1,5 +1,6 @@
 using Asp.Versioning;
 using Explore.API.Attributes;
+using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.DTOs.Onboarding;
@@ -36,6 +37,7 @@ public class PublicExperienceController : ControllerBase
 
     [HttpGet("settings", Name = RouteNames.GetPublicExperienceSettings)]
     [AllowAnonymous]
+    [PrivateNoStore]
     [EndpointSummary("Get Public Experience Settings")]
     [EndpointDescription("Returns effective home-page and white-label settings for the current tenant context.")]
     [ProducesResponseType(typeof(PublicExperienceSettingsDto), StatusCodes.Status200OK)]
@@ -54,7 +56,7 @@ public class PublicExperienceController : ControllerBase
     [EndpointDescription("Returns the typed public shell read model for the current tenant context.")]
     [ProducesResponseType(typeof(PublicExperienceShellDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
-    [OutputCache(PolicyName = "PublicExperienceShell")]
+    [PrivateNoStore]
     public async Task<ActionResult<PublicExperienceShellDto>> GetShell(CancellationToken cancellationToken = default)
     {
         var shell = await _mediator.Send(new GetPublicExperienceShellQuery(), cancellationToken);

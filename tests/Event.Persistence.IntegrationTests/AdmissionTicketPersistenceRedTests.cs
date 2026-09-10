@@ -1603,6 +1603,7 @@ public sealed class AdmissionTicketPersistencePostgreSqlRedTests(PostgreSqlConta
         };
         var user = new User
         {
+            EmailVerified = true,
             Pii = new UserPii
             {
                 Email = $"admission-{suffix}-{Guid.CreateVersion7():N}@example.test",
@@ -1926,6 +1927,13 @@ public sealed class AdmissionTicketPersistencePostgreSqlRedTests(PostgreSqlConta
 
     private sealed class CommitAcknowledgementLostUnitOfWork(IUnitOfWork inner) : IUnitOfWork
     {
+        public async Task<T> ExecuteReadCommittedAsync<T>(
+            Func<CancellationToken, Task<T>> operation, CancellationToken ct = default)
+        {
+            await inner.ExecuteReadCommittedAsync(operation, ct);
+            throw new TimeoutException("Simulated lost commit acknowledgement.");
+        }
+
         public Task ExecuteInTransactionAsync(
             Func<CancellationToken, Task> operation,
             CancellationToken ct = default) =>

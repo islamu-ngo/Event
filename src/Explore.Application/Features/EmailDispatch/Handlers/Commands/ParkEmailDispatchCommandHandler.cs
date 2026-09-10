@@ -71,9 +71,17 @@ public sealed class ParkEmailDispatchCommandHandler : IRequestHandler<ParkEmailD
                 ["Unknown email dispatch rows must be reconciled or resolved without replay."]);
         }
 
-        if (dispatch.Status == EmailDispatchStatus.Parked)
+        if (dispatch.Status == EmailDispatchStatus.Parked && dispatch.ParkReason == EmailDispatchParkReason.Operator)
         {
             return Success(dispatch.Id, "Email dispatch is already parked.");
+        }
+
+        if (!EmailDispatchOutbox.CanParkForOperator(status: dispatch.Status, parkReason: dispatch.ParkReason))
+        {
+            return Failure(
+                "Email dispatch cannot enter an operator hold from its current state.",
+                EmailDispatchFailureCodes.InvalidTransition,
+                ["Email dispatch cannot enter an operator hold from its current state."]);
         }
 
         var parked = await _repository.TryParkForOperator(

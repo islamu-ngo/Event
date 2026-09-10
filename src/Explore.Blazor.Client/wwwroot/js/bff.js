@@ -157,13 +157,40 @@ export async function fetchJson(url) {
 /**
  * Submit Local Identity credentials from the browser so the BFF Set-Cookie
  * response is applied to the browser cookie jar rather than a server self-call.
- * @param {string} url - Local login or registration endpoint.
+ * @param {string} url - Local login endpoint.
  * @param {object} body - Typed Local Identity request body.
- * @returns {Promise<object|null>} The bounded success response, or null.
+ * @returns {Promise<object|null>} Safe navigation, the allowlisted verification code, or null.
  */
 export async function authenticateLocal(url, body) {
     const result = await _bffMutate('POST', url, body);
-    return result.ok ? result.data : null;
+    if (result.ok) {
+        return result.data;
+    }
+    return result.status === 401 && result.data?.code === 'email_verification_required'
+        ? { errorCode: 'email_verification_required' }
+        : null;
+}
+
+/** Submit a new password; restricted authority stays in the BFF-owned HttpOnly cookie. */
+export async function replaceLocalCredential(body) {
+    const result = await _bffMutate('POST', '/bff/auth/local/credential-replacement', body);
+    if (result.status === 200 && result.data?.redirectUrl === '/login') {
+        return { redirectUrl: '/login' };
+    }
+
+    if (result.status === 400 && result.data?.code === 'password_rejected') {
+        return { errorCode: 'password_rejected' };
+    }
+    if (result.status === 401 && result.data?.code === 'replacement_required') {
+        return { errorCode: 'replacement_required' };
+    }
+    if (result.status === 409 && result.data?.code === 'replacement_conflict') {
+        return { errorCode: 'replacement_conflict' };
+    }
+    if (result.status === 429) {
+        return { errorCode: 'rate_limited' };
+    }
+    return null;
 }
 
 /** @private Shared mutation helper. Reads XSRF token from cookie if present. */
@@ -174,10 +201,15 @@ async function _bffMutate(method, url, body) {
             headers['Content-Type'] = 'application/json';
         }
 
-        const xsrf = getCookie('XSRF-TOKEN');
-        if (xsrf) {
-            headers['X-CSRF-TOKEN'] = xsrf;
+        let xsrf = getCookie('XSRF-TOKEN');
+        if (!xsrf) {
+            await fetch('/auth/status', { credentials: 'same-origin' });
+            xsrf = getCookie('XSRF-TOKEN');
         }
+        if (!xsrf) {
+            return { ok: false, status: 400, error: 'Request verification is unavailable.', data: null };
+        }
+        headers['X-CSRF-TOKEN'] = xsrf;
 
         const response = await fetch(url, {
             method,

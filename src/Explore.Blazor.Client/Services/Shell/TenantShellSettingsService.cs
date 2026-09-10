@@ -7,7 +7,7 @@ public sealed class TenantShellSettingsService(ISettingsClient apiClient) : ITen
 {
     public const string Category = "UiShell";
 
-    public Task<SettingGroupResponseDto> GetAsync(CancellationToken cancellationToken = default) =>
+    public Task<HalResourceOfSettingGroupResponseDto> GetAsync(CancellationToken cancellationToken = default) =>
         apiClient.GetTenantScopedSettingsAsync(Category, cancellationToken: cancellationToken);
 
     public Task<BaseCommandResponseOfGuid> UpdateAsync(

@@ -13,6 +13,7 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Secrets;
 using Explore.Atproto.Transport;
 using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
 using Explore.Infrastructure.Services;
@@ -75,6 +76,17 @@ public sealed class AtprotoRelationalLoginFixture : IAsyncInitializer, IAsyncDis
                 var bootstrap = InstanceBootstrapState.CreateInteractivePending(Guid.CreateVersion7(), DeploymentMode.SingleTenant, now);
                 bootstrap.CompleteInteractive(administratorId, now);
                 db.InstanceBootstrapStates.Add(bootstrap);
+                // Completed visitor onboarding needs persisted provider usability, not only
+                // the Atproto:PublicUrl transport option. The deployment selects ATProto primary.
+                db.SystemSettings.Add(new SystemSetting
+                {
+                    Id = Guid.CreateVersion7(),
+                    SettingKey = GovernanceSettingKeys.Authentication.AtprotoPublicUrl,
+                    Value = JsonSerializer.Serialize(CanonicalOrigin),
+                    ValueType = SettingValueType.String,
+                    Category = "Authentication",
+                    CreatedAt = now
+                });
                 await db.SaveChangesAsync();
             }
         }
@@ -233,11 +245,14 @@ public sealed class AtprotoRelationalLoginFixture : IAsyncInitializer, IAsyncDis
     {
         using var signing = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         var key = signing.ExportParameters(true);
-        return JsonSerializer.Serialize(new { keys = new[] { new
+        return JsonSerializer.Serialize(new
+        {
+            keys = new[] { new
         {
             kty = "EC", crv = "P-256", kid = "platform-session", use = "sig", alg = "ES256", status = "active",
             x = Base64UrlEncoder.Encode(key.Q.X!), y = Base64UrlEncoder.Encode(key.Q.Y!), d = Base64UrlEncoder.Encode(key.D!)
-        } } });
+        } }
+        });
     }
 
     public sealed class ExternalAtprotoTransport : BffAuth.IAtprotoOAuthTransportFactory, IAtprotoCorePrimaryHandlerFactory
@@ -300,9 +315,12 @@ public sealed class AtprotoRelationalLoginFixture : IAsyncInitializer, IAsyncDis
                         "invalid_pds" => [Service("not-a-uri")],
                         _ => [Service("https://pds.example")]
                     };
-                    return Json(new { id = owner.SubjectDid,
+                    return Json(new
+                    {
+                        id = owner.SubjectDid,
                         alsoKnownAs = new[] { owner.IdentityDocumentScenario == "conflicting_handle" ? "at://mallory.example" : "at://alice.example" },
-                        service = services });
+                        service = services
+                    });
                 }
                 if (request.Method == HttpMethod.Get && uri.Host == "pds.example" && uri.AbsolutePath == "/.well-known/oauth-protected-resource")
                     return Json(new { authorization_servers = new[] { "https://issuer.example" } });
@@ -311,14 +329,22 @@ public sealed class AtprotoRelationalLoginFixture : IAsyncInitializer, IAsyncDis
                     Interlocked.Increment(ref owner.authorizationMetadataRequests);
                     return Json(new
                     {
-                        issuer = "https://issuer.example", authorization_endpoint = owner.AuthorizationEndpoint,
-                        token_endpoint = "https://issuer.example/oauth/token", pushed_authorization_request_endpoint = "https://issuer.example/oauth/par",
-                        revocation_endpoint = "https://issuer.example/oauth/revoke", require_pushed_authorization_requests = true,
-                        token_endpoint_auth_methods_supported = new[] { "private_key_jwt" }, token_endpoint_auth_signing_alg_values_supported = new[] { "ES256" },
-                        dpop_signing_alg_values_supported = new[] { "ES256" }, grant_types_supported = new[] { "authorization_code", "refresh_token" },
-                        response_types_supported = new[] { "code" }, code_challenge_methods_supported = new[] { "S256" },
-                        authorization_response_iss_parameter_supported = true, client_id_metadata_document_supported = true,
-                        scopes_supported = new[] { "atproto" }, require_request_uri_registration = true
+                        issuer = "https://issuer.example",
+                        authorization_endpoint = owner.AuthorizationEndpoint,
+                        token_endpoint = "https://issuer.example/oauth/token",
+                        pushed_authorization_request_endpoint = "https://issuer.example/oauth/par",
+                        revocation_endpoint = "https://issuer.example/oauth/revoke",
+                        require_pushed_authorization_requests = true,
+                        token_endpoint_auth_methods_supported = new[] { "private_key_jwt" },
+                        token_endpoint_auth_signing_alg_values_supported = new[] { "ES256" },
+                        dpop_signing_alg_values_supported = new[] { "ES256" },
+                        grant_types_supported = new[] { "authorization_code", "refresh_token" },
+                        response_types_supported = new[] { "code" },
+                        code_challenge_methods_supported = new[] { "S256" },
+                        authorization_response_iss_parameter_supported = true,
+                        client_id_metadata_document_supported = true,
+                        scopes_supported = new[] { "atproto" },
+                        require_request_uri_registration = true
                     });
                 }
                 if (request.Method == HttpMethod.Post && uri.Host == "issuer.example" && uri.AbsolutePath is "/oauth/par" or "/oauth/token")
@@ -344,8 +370,15 @@ public sealed class AtprotoRelationalLoginFixture : IAsyncInitializer, IAsyncDis
                         || Base64UrlEncoder.Encode(SHA256.HashData(Encoding.ASCII.GetBytes(form["code_verifier"]))) != authorization.Challenge)
                         throw new InvalidOperationException("External authorization code or PKCE verifier is invalid.");
                     owner.TokenClientKeyId = new JsonWebToken(form["client_assertion"]).Kid;
-                    return JsonWithNonce(new { access_token = owner.AccessToken, token_type = "DPoP", expires_in = 3600,
-                        refresh_token = owner.RefreshToken, scope = "atproto transition:generic", sub = owner.SubjectDid });
+                    return JsonWithNonce(new
+                    {
+                        access_token = owner.AccessToken,
+                        token_type = "DPoP",
+                        expires_in = 3600,
+                        refresh_token = owner.RefreshToken,
+                        scope = "atproto transition:generic",
+                        sub = owner.SubjectDid
+                    });
                 }
                 if (request.Method == HttpMethod.Get && uri.Host == "pds.example" && uri.AbsolutePath == "/xrpc/com.atproto.server.getSession")
                 {

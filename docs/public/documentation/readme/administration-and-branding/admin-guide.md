@@ -1,6 +1,8 @@
 ---
 description: Walkthrough of administrative consoles and management workflows for instance and tenant admins.
 ---
+<!-- ABOUTME: Operator walkthrough of instance, tenant and organization administration. -->
+<!-- ABOUTME: Explains console capabilities and safe Local account credential handover and recovery. -->
 
 # Administration Guide
 
@@ -20,9 +22,54 @@ This guide walks administrators through the web consoles in the Blazor managemen
 
 ---
 
-## 2. Instance Administration (Multi-Tenant Deployments)
+## 2. Instance Administration
 
-The **Instance Console** (`/admin/instance`) is the operational command center for platform owners:
+In multi-tenant deployments, the **Instance Console** (`/admin/instance`) manages
+tenants and platform operations. Instance settings are available in both deployment modes.
+
+### Local Accounts
+
+Open `/settings/instance?section=local-accounts`. The Local accounts entry appears
+only when the server advertises the capability for your current instance access.
+Tenant administration does not grant permission to manage these shared credentials.
+
+Use **Create local account** to enter the person's email and name. A successful
+creation reveals a generated temporary password once. Record the operation ID,
+hand over the password privately, then select **Dismiss credential**. The recipient
+must replace that temporary password before ordinary sign-in; no email delivery is
+required for this supervised handover. Do not save credential-bearing responses in
+logs, scripts or support tickets.
+
+For an eligible existing account, **Issue temporary credential** requires a reason.
+Reset invalidates its previous credential and sessions, preserves verification,
+and requires another private password replacement. Missing or invalid credential
+metadata is shown as unknown; the screen does not invent a reset action for it.
+
+If an issuance response is lost, keep its operation ID and use **Check operation**.
+Status reads never repeat issuance or reveal the password. Use **Reconcile** only
+when offered to complete interrupted account linking. If handover is no longer
+possible, inspect the resulting account and perform a separately authorized reset
+with a new operation ID. Refreshing or reopening the section cannot recover a
+previously dismissed password. See [Authentication](../security-and-identity/authentication.md)
+for the sign-in and recovery boundaries.
+
+An access-denied or conflict response can arrive after the credential change was
+saved. Keep the original operation reference until its status is known; cancelling
+its form or checking another operation does not resolve it. These references stay
+only in the open component, so record them before leaving the section.
+
+Successful issuance and recovery refresh the account details on your current
+page without dismissing the password handover. Accounts are ordered oldest-first:
+a newly created account may be on a later page rather than page one.
+If refreshing account details fails, further resets remain unavailable until a
+refresh succeeds; the current password handover stays visible.
+
+### Background Scheduler
+
+When enabled, **Background Scheduler** in Instance Settings shows the current
+scheduler and job state. If a read is rate-limited or temporarily unavailable,
+the section shows an error instead of stale job controls. Wait for the service
+to recover, then select **Refresh**; refreshing does not run, pause or resume jobs.
 
 ### Tenant Lifecycle Management
 - **Create Tenant**: Provision a new community tenant with a unique slug and primary administrator.

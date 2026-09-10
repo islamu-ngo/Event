@@ -8,7 +8,6 @@ public static partial class CanonicalEnvironmentCatalogue
         API_HTTP_PORT
         UI_HTTP_PORT
         KEYCLOAK_HTTP_PORT
-        MAILPIT_SMTP_PORT
         MAILPIT_UI_PORT
         DEPLOYMENT_MODE
         SECRET_PROVIDER
@@ -30,6 +29,7 @@ public static partial class CanonicalEnvironmentCatalogue
         INSTANCE_BOOTSTRAP_ADMIN_EMAIL
         INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME
         INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME
+        INSTANCE_BOOTSTRAP_LOCAL_PASSWORD
         AUTHENTICATION_LOCAL_JWT_KEY
         AUTHENTICATION_LOCAL_LOCKOUT_THRESHOLD
         AUTHENTICATION_LOCAL_LOCKOUT_DURATION_MINUTES
@@ -44,13 +44,7 @@ public static partial class CanonicalEnvironmentCatalogue
         KEYCLOAK_ADMIN
         KEYCLOAK_ADMIN_PASSWORD
         LOCAL_STORAGE_ROOT_PATH
-        MAIL_SMTP_HOST
-        MAIL_SMTP_PORT
-        MAIL_SMTP_FROM_ADDRESS
-        MAIL_SMTP_FROM_NAME
-        MAIL_SMTP_USERNAME
-        MAIL_SMTP_PASSWORD
-        MAIL_SMTP_ENCRYPTION
+        EMAIL_DISPATCH_RABBITMQ_ENABLED
         ERASURE_TOPOLOGY
         ERASURE_EMBEDDED_PATH
         SETUP_SECRET
@@ -59,6 +53,7 @@ public static partial class CanonicalEnvironmentCatalogue
         INSTANCE__OPERATORIDENTITY__PUBLICNAME
         INSTANCE__OPERATORIDENTITY__LEGALNAME
         INSTANCE__OPERATORIDENTITY__ISOFFICIALINSTANCE
+        INSTANCE__OPERATORIDENTITY__OFFICIALORIGIN
         INSTANCE__OPERATORIDENTITY__OPERATORKINDCODE
         INSTANCE__OPERATORIDENTITY__JURISDICTIONCOUNTRYCODE
         INSTANCE__OPERATORIDENTITY__PUBLICCONTACTEMAIL
@@ -73,6 +68,15 @@ public static partial class CanonicalEnvironmentCatalogue
 
     private static readonly string[] AdvancedKeyData = Lines(
         """
+        ASPNETCORE_ENVIRONMENT
+        DOTNET_ENVIRONMENT
+        MAIL_SMTP_HOST
+        MAIL_SMTP_PORT
+        MAIL_SMTP_FROM_ADDRESS
+        MAIL_SMTP_FROM_NAME
+        MAIL_SMTP_USERNAME
+        MAIL_SMTP_PASSWORD
+        MAIL_SMTP_ENCRYPTION
         MINIO_API_PORT
         MINIO_CONSOLE_PORT
         CERBOS_HTTP_PORT
@@ -83,8 +87,6 @@ public static partial class CanonicalEnvironmentCatalogue
         COOP_CLIENT_HTTP_PORT
         OSPREY_BIDI_STREAM_PORT
         OSPREY_SYNC_ACTION_PORT
-        MAILPIT_TAG
-        MAILPIT_MAX_MESSAGES
         FORMBRICKS_HTTP_PORT
         FORMBRICKS_WEBAPP_URL
         FORMBRICKS_DATABASE_NAME
@@ -162,7 +164,6 @@ public static partial class CanonicalEnvironmentCatalogue
         PHYSICAL_TENANCY_MODE
         API_ENDPOINT
         CONTROL_PLANE_PUBLIC_ORIGIN
-        INSTANCE__OPERATORIDENTITY__OFFICIALORIGIN
         INSTANCE__OPERATORIDENTITY__REGISTRATIONIDENTIFIER
         PAYMENTS_STRIPE_MODE
         PAYMENTS_ORGANIZER_DIRECT_PROVIDER_CODE
@@ -186,6 +187,11 @@ public static partial class CanonicalEnvironmentCatalogue
         ADMISSIONS__RECOVERY__RATELIMITBUCKETCOUNT
         ADMISSIONS__RECOVERY__RATELIMITPERMITCOUNT
         ADMISSIONS__RECOVERY__RATELIMITWINDOWSECONDS
+        RATELIMITING__ANONYMOUSREGISTRATION__IPPERMITLIMIT
+        RATELIMITING__ANONYMOUSREGISTRATION__SUBNETPERMITLIMIT
+        RATELIMITING__ANONYMOUSREGISTRATION__WINDOWSECONDS
+        RATELIMITING__ANONYMOUSREGISTRATION__CONCURRENCYLIMIT
+        RATELIMITING__ANONYMOUSREGISTRATION__QUEUELIMIT
         TICKETING__RECOVERY__ENABLED
         TICKETING__RECOVERY__EXPECTEDRELEASEREVISION
         TICKETING__RECOVERY__EXPECTEDSCHEMAREVISION
@@ -240,7 +246,6 @@ public static partial class CanonicalEnvironmentCatalogue
         VAPID_PUBLIC_KEY
         VAPID_PRIVATE_KEY
         MESSAGING_URI
-        EMAIL_DISPATCH_RABBITMQ_ENABLED
         EMAIL_DISPATCH_RABBITMQ_CONNECTION_STRING_NAME
         EMAIL_DISPATCH_RABBITMQ_CONNECTION_STRING
         EMAIL_DISPATCH_RABBITMQ_EXCHANGE_NAME
@@ -434,6 +439,14 @@ public static partial class CanonicalEnvironmentCatalogue
         SETUP_SECRET
         SETUP_SECRET_FILE
         SETUP_SECRET_REQUIRED
+        INSTANCE_BOOTSTRAP_MODE
+        INSTANCE_BOOTSTRAP_ADMIN_PROVIDER
+        INSTANCE_BOOTSTRAP_ADMIN_SUBJECT
+        INSTANCE_BOOTSTRAP_BINDING_GENERATION
+        INSTANCE_BOOTSTRAP_ADMIN_EMAIL
+        INSTANCE_BOOTSTRAP_ADMIN_FIRST_NAME
+        INSTANCE_BOOTSTRAP_ADMIN_LAST_NAME
+        INSTANCE_BOOTSTRAP_LOCAL_PASSWORD
         HOSTING_REPLICA_COUNT
         PROMOTIONS_CODE_LOOKUP_ACTIVE_KEY_VERSION
         PROMOTIONS_CODE_LOOKUP_HMAC_KEY
@@ -564,9 +577,6 @@ public static partial class CanonicalEnvironmentCatalogue
         CONFIGURATION_MANIFEST_MODE
         CONFIGURATION_MANIFEST_PATH
         CONFIGURATION_MANIFEST_HOST_DIRECTORY
-        MAILPIT_TAG
-        MAILPIT_MAX_MESSAGES
-        MAILPIT_SMTP_PORT
         MAILPIT_UI_PORT
         KEYCLOAK_DB_USERNAME
         KEYCLOAK_DB_PASSWORD
@@ -660,6 +670,7 @@ public static partial class CanonicalEnvironmentCatalogue
     private static readonly string[] SecretKeyData = Lines(
         """
         SETUP_SECRET
+        INSTANCE_BOOTSTRAP_LOCAL_PASSWORD
         SETUP_SECRET_BINDING_COMMITMENT_HMAC_KEY
         STORAGE_S3_ENDPOINT
         STORAGE_S3_PUBLIC_ENDPOINT
@@ -812,6 +823,9 @@ public static partial class CanonicalEnvironmentCatalogue
                 ["configured-bootstrap-config"] = EnvironmentActivationExpression.All(
                     EnvironmentActivationExpression.Capability("identity"),
                     EnvironmentActivationExpression.Provider("configured-administrator")),
+                ["local-bootstrap-config"] = EnvironmentActivationExpression.All(
+                    EnvironmentActivationExpression.Feature("configured-bootstrap-config"),
+                    EnvironmentActivationExpression.Provider("local")),
                 ["atproto-bootstrap-config"] = EnvironmentActivationExpression.All(
                     EnvironmentActivationExpression.Feature("configured-bootstrap-config"),
                     EnvironmentActivationExpression.Provider("atproto")),

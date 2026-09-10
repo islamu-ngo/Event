@@ -53,18 +53,18 @@ public sealed class EventAddOnCatalogItemConfiguration :
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(item => new
-            {
-                item.TenantId,
-                item.EventAddOnCatalogVersionId,
-                item.Id,
-            })
+        {
+            item.TenantId,
+            item.EventAddOnCatalogVersionId,
+            item.Id,
+        })
             .IsUnique();
         builder.HasIndex(item => new
-            {
-                item.TenantId,
-                item.EventAddOnCatalogVersionId,
-                item.Name,
-            })
+        {
+            item.TenantId,
+            item.EventAddOnCatalogVersionId,
+            item.Name,
+        })
             .IsUnique();
     }
 }

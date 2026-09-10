@@ -38,7 +38,8 @@ public sealed class EventApiPerTagClientBehaviorTests
 
         var result = await client.StartGuestRegistrationOrderWithCapabilityAsync(
             Guid.CreateVersion7(),
-            new StartRegistrationOrderRequest());
+            new StartRegistrationOrderRequest(),
+            Guid.CreateVersion7().ToString("N"), Guid.NewGuid().ToString("N"), "0000000000000000");
 
         await Assert.That(result.HasCapability).IsTrue();
         await Assert.That(terminal.Request!.Headers.Contains("Idempotency-Key")).IsTrue();

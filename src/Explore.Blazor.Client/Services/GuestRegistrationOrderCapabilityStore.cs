@@ -13,4 +13,18 @@ public sealed class GuestRegistrationOrderCapabilityStore : IGuestRegistrationOr
         _capabilities.TryGetValue((eventId, orderId), out capability);
 
     public void Remove(Guid eventId, Guid orderId) => _capabilities.Remove((eventId, orderId));
+
+    public void RestoreBookmark(Guid eventId, Guid orderId, string value)
+    {
+        Remove(eventId, orderId);
+        if (eventId != Guid.Empty && orderId != Guid.Empty && value.Length == 43
+            && value.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_'))
+        {
+            Store(eventId, orderId, new GuestRegistrationOrderCapability(value));
+        }
+    }
+
+    public static bool IsStatusPath(string? path) =>
+        path?.Contains("/registration/guest/events/", StringComparison.OrdinalIgnoreCase) == true
+        && path.TrimEnd('/').EndsWith("/status", StringComparison.OrdinalIgnoreCase);
 }

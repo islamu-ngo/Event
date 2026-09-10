@@ -486,7 +486,8 @@ public sealed class AddressSuggestionComboboxTests : IDisposable
             Guid?,
             int,
             CancellationToken,
-            Task<IReadOnlyList<HalResourceOfAddressSuggestionDto>>> Search { get; set; } =
+            Task<IReadOnlyList<HalResourceOfAddressSuggestionDto>>> Search
+        { get; set; } =
             (_, _, _, _) =>
                 Task.FromResult<IReadOnlyList<HalResourceOfAddressSuggestionDto>>([]);
 
@@ -532,7 +533,8 @@ public sealed class AddressSuggestionComboboxTests : IDisposable
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public TaskCompletionSource<IReadOnlyList<HalResourceOfAddressSuggestionDto>>
-            Completion { get; } =
+            Completion
+        { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public CancellationToken Token { get; private set; }

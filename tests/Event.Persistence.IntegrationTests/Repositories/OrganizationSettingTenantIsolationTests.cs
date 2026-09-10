@@ -153,33 +153,33 @@ public sealed class OrganizationSettingTenantIsolationTests(PostgreSqlContainerF
         Tenant tenant,
         Organization organization,
         ApprovalStatus approved) => new()
-    {
-        Id = id,
-        TenantId = tenant.Id,
-        Tenant = tenant,
-        OrganizationId = organization.Id,
-        Organization = organization,
-        ApprovalStatusId = approved.Id,
-        ApprovalStatus = approved,
-        CreatedAt = DateTime.UnixEpoch,
-        ConcurrencyStamp = Id(220 + id.ToByteArray()[15])
-    };
+        {
+            Id = id,
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            OrganizationId = organization.Id,
+            Organization = organization,
+            ApprovalStatusId = approved.Id,
+            ApprovalStatus = approved,
+            CreatedAt = DateTime.UnixEpoch,
+            ConcurrencyStamp = Id(220 + id.ToByteArray()[15])
+        };
 
     private static OrganizationSetting Setting(
         Guid id,
         Tenant tenant,
         OrganizationTenant participation,
         string value) => new()
-    {
-        Id = id,
-        TenantId = tenant.Id,
-        Tenant = tenant,
-        OrganizationTenantId = participation.Id,
-        OrganizationTenant = participation,
-        SettingKey = "address_governance.organization_creation_grant",
-        Value = value,
-        CreatedAt = DateTime.UnixEpoch
-    };
+        {
+            Id = id,
+            TenantId = tenant.Id,
+            Tenant = tenant,
+            OrganizationTenantId = participation.Id,
+            OrganizationTenant = participation,
+            SettingKey = "address_governance.organization_creation_grant",
+            Value = value,
+            CreatedAt = DateTime.UnixEpoch
+        };
 
     private static ExploreDbContext CreateSqliteContext(string path)
     {

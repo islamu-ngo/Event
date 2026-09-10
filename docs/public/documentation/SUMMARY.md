@@ -32,6 +32,7 @@
     * [Modular Event Aspects](readme/events-and-ticketing/modular-event-aspects.md)
     * [Custom Properties](readme/events-and-ticketing/custom-properties.md)
     * [Ticketing & Check-In](readme/events-and-ticketing/ticketing-and-check-in.md)
+    * [Guest Participation Without Email](readme/events-and-ticketing/email-optional-participation.md)
     * [Paid Events & Payouts](readme/events-and-ticketing/paid-events-and-payouts.md)
   * [Communications & Notifications](readme/communications-and-notifications/README.md)
     * [In-App Notifications](readme/communications-and-notifications/in-app-notifications.md)

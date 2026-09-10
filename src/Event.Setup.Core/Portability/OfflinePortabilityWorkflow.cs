@@ -48,7 +48,7 @@ public static class OfflinePortabilityWorkflow
                 Spec = new ConfigurationManifestSpecV1Alpha2
                 {
                     Instance = new ConfigurationManifestInstanceV1Alpha2
-                        { Settings = EmptySettings(), Documents = EmptyDocuments(), LegalDocuments = EmptyLegal() },
+                    { Settings = EmptySettings(), Documents = EmptyDocuments(), LegalDocuments = EmptyLegal() },
                     Tenants = tenants
                 }
             };
@@ -98,7 +98,9 @@ public static class OfflinePortabilityWorkflow
                 Spec = new TenantConfigurationPackageSpecV1Alpha2
                 {
                     DisplayName = sourceTenantDisplayName,
-                    Settings = EmptySettings(), Documents = EmptyDocuments(), LegalDocuments = EmptyLegal()
+                    Settings = EmptySettings(),
+                    Documents = EmptyDocuments(),
+                    LegalDocuments = EmptyLegal()
                 }
             };
             _ = ConfigurationPortabilityJsonCodec.ParseTenantConfigurationPackage(
@@ -281,31 +283,34 @@ public static class OfflinePortabilityWorkflow
 
     private static ConfigurationManifestInstanceV1Alpha2 EditInstance(
         ConfigurationManifestInstanceV1Alpha2 value, string key, OfflinePortabilitySectionEdit edit) => key switch
-    {
-        "instance.settings" => value with { Settings = edit.IsRemoval ? EmptySettings() : edit.Replacement!.RequireSettings() },
-        "instance.documents" => value with { Documents = edit.IsRemoval ? EmptyDocuments() : edit.Replacement!.RequireDocuments() },
-        "instance.legal_documents" => value with { LegalDocuments = edit.IsRemoval ? EmptyLegal() : edit.Replacement!.RequireLegalDocuments() },
-        _ => throw new ArgumentException("Section is invalid.")
-    };
+        {
+            "instance.settings" => value with { Settings = edit.IsRemoval ? EmptySettings() : edit.Replacement!.RequireSettings() },
+            "instance.documents" => value with { Documents = edit.IsRemoval ? EmptyDocuments() : edit.Replacement!.RequireDocuments() },
+            "instance.legal_documents" => value with { LegalDocuments = edit.IsRemoval ? EmptyLegal() : edit.Replacement!.RequireLegalDocuments() },
+            _ => throw new ArgumentException("Section is invalid.")
+        };
 
     private static ConfigurationManifestTenantSpecV1Alpha2 EditTenant(
         ConfigurationManifestTenantSpecV1Alpha2 value, string key, OfflinePortabilitySectionEdit edit) => key switch
-    {
-        "tenant.settings" => value with { Settings = edit.IsRemoval ? EmptySettings() : edit.Replacement!.RequireSettings() },
-        "tenant.documents" => value with { Documents = edit.IsRemoval ? EmptyDocuments() : edit.Replacement!.RequireDocuments() },
-        "tenant.legal_documents" => value with { LegalDocuments = edit.IsRemoval ? EmptyLegal() : edit.Replacement!.RequireLegalDocuments() },
-        _ => throw new ArgumentException("Section is invalid.")
-    };
+        {
+            "tenant.settings" => value with { Settings = edit.IsRemoval ? EmptySettings() : edit.Replacement!.RequireSettings() },
+            "tenant.documents" => value with { Documents = edit.IsRemoval ? EmptyDocuments() : edit.Replacement!.RequireDocuments() },
+            "tenant.legal_documents" => value with { LegalDocuments = edit.IsRemoval ? EmptyLegal() : edit.Replacement!.RequireLegalDocuments() },
+            _ => throw new ArgumentException("Section is invalid.")
+        };
 
     private static TenantConfigurationPackageV1Alpha2 EditPackage(
         TenantConfigurationPackageV1Alpha2 package, string key, OfflinePortabilitySectionEdit edit) =>
-        package with { Spec = key switch
+        package with
         {
-            "tenant.settings" => package.Spec with { Settings = edit.IsRemoval ? EmptySettings() : edit.Replacement!.RequireSettings() },
-            "tenant.documents" => package.Spec with { Documents = edit.IsRemoval ? EmptyDocuments() : edit.Replacement!.RequireDocuments() },
-            "tenant.legal_documents" => package.Spec with { LegalDocuments = edit.IsRemoval ? EmptyLegal() : edit.Replacement!.RequireLegalDocuments() },
-            _ => throw new ArgumentException("Section is invalid.")
-        }};
+            Spec = key switch
+            {
+                "tenant.settings" => package.Spec with { Settings = edit.IsRemoval ? EmptySettings() : edit.Replacement!.RequireSettings() },
+                "tenant.documents" => package.Spec with { Documents = edit.IsRemoval ? EmptyDocuments() : edit.Replacement!.RequireDocuments() },
+                "tenant.legal_documents" => package.Spec with { LegalDocuments = edit.IsRemoval ? EmptyLegal() : edit.Replacement!.RequireLegalDocuments() },
+                _ => throw new ArgumentException("Section is invalid.")
+            }
+        };
 
     private static List<SetupDiagnostic> SelectionDiagnostics(OfflinePortabilityDocument document)
     {

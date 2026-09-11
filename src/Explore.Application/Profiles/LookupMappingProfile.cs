@@ -3,7 +3,6 @@ using Explore.Application.DTOs.ActorType;
 using Explore.Application.DTOs.CategoryType;
 using Explore.Application.DTOs.CategoryTypeCategories;
 using Explore.Application.DTOs.DidCustodyType;
-using Explore.Application.DTOs.EventFormat;
 using Explore.Application.DTOs.FileType;
 using Explore.Application.DTOs.Location;
 using Explore.Application.DTOs.LocationRoom;
@@ -66,9 +65,6 @@ public class LookupMappingProfile : Profile
             .ForMember(dest => dest.TagTypeMasterCode, opt => opt.MapFrom(src => src.TagType != null ? src.TagType.MasterCode : null));
         CreateMap<CreateTagTypeTagsDto, Domain.TagTypeTags>();
         CreateMap<UpdateTagTypeTagsDto, Domain.TagTypeTags>();
-
-        CreateMap<EventFormat, EventFormatDto>().ReverseMap();
-        CreateMap<EventFormat, EventFormatListDto>().ReverseMap();
 
         CreateMap<VisibilityType, VisibilityTypeDto>().ReverseMap();
         CreateMap<VisibilityType, VisibilityTypeListDto>().ReverseMap();

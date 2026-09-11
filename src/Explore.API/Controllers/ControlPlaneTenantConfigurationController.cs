@@ -5,6 +5,8 @@ using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.Application.Authentication;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Users.Requests.Queries;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.DTOs.ControlPlane;
 using Explore.Application.DTOs.Tenant;
@@ -39,13 +41,16 @@ namespace Explore.API.Controllers;
 public sealed class ControlPlaneTenantConfigurationController : EventControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> _identityQuery;
     private readonly IResourceAssembler<ControlPlaneTenantEffectiveConfigurationDto, ControlPlaneTenantEffectiveConfigurationDto> _tenantEffectiveConfigurationAssembler;
 
     public ControlPlaneTenantConfigurationController(
         IMediator mediator,
+        IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
         IResourceAssembler<ControlPlaneTenantEffectiveConfigurationDto, ControlPlaneTenantEffectiveConfigurationDto> tenantEffectiveConfigurationAssembler)
     {
         _mediator = mediator;
+        _identityQuery = identityQuery;
         _tenantEffectiveConfigurationAssembler = tenantEffectiveConfigurationAssembler;
     }
 
@@ -175,7 +180,7 @@ public sealed class ControlPlaneTenantConfigurationController : EventControllerB
         [FromBody] SwitchTenantPlanAssignmentRequest request,
         CancellationToken cancellationToken = default)
     {
-        var operatorId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var operatorId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!operatorId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
@@ -204,7 +209,7 @@ public sealed class ControlPlaneTenantConfigurationController : EventControllerB
         Guid assignmentId,
         CancellationToken cancellationToken = default)
     {
-        var operatorId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var operatorId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!operatorId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
@@ -232,7 +237,7 @@ public sealed class ControlPlaneTenantConfigurationController : EventControllerB
         Guid assignmentId,
         CancellationToken cancellationToken = default)
     {
-        var operatorId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var operatorId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!operatorId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");

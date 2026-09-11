@@ -164,9 +164,9 @@ public sealed class UserMappingHandlerTests
         var handler = new ResolveCurrentUserIdByIdentityRequestHandler(repository);
         var request = new ResolveCurrentUserIdByIdentityRequest
         { Provider = "google", ProviderId = " provider-account ", Email = "forged@example.invalid", EmailVerified = true };
-        await Assert.That(await handler.Handle(request, CancellationToken.None)).IsEqualTo(user.Id);
-        await Assert.That(await handler.Handle(request with { ProviderId = "unlinked", Email = user.Email }, CancellationToken.None)).IsNull();
-        await Assert.That(await handler.Handle(request with { Provider = "local" }, CancellationToken.None)).IsNull();
+        await Assert.That(await handler.QueryAsync(request, CancellationToken.None)).IsEqualTo(user.Id);
+        await Assert.That(await handler.QueryAsync(request with { ProviderId = "unlinked", Email = user.Email }, CancellationToken.None)).IsNull();
+        await Assert.That(await handler.QueryAsync(request with { Provider = "local" }, CancellationToken.None)).IsNull();
     }
 
     private static IUserRepository UserRepository(User user)

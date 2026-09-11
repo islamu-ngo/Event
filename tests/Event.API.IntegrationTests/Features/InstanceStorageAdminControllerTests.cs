@@ -1,3 +1,4 @@
+using Event.Api.IntegrationTests.Helpers;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;
 using Explore.Application.Authorization;
@@ -15,8 +16,10 @@ using NSubstitute;
 
 namespace Event.Api.IntegrationTests.Features;
 
-public sealed class InstanceStorageAdminControllerTests
+public sealed class InstanceStorageAdminControllerTests : IDisposable
 {
+    private readonly IdentityQueryTestScope _identity = new();
+    public void Dispose() => _identity.Dispose();
     [Test]
     public async Task GetStorageSettings_WhenInstanceAdmin_ReturnsHalResource()
     {
@@ -134,7 +137,7 @@ public sealed class InstanceStorageAdminControllerTests
         await mediator.DidNotReceive().Send(Arg.Any<RecalculateInstanceStorageUsageCommand>(), Arg.Any<CancellationToken>());
     }
 
-    private static InstanceStorageSettingsController CreateController(
+    private InstanceStorageSettingsController CreateController(
         IMediator mediator,
         IAdminContext adminContext,
         ISetupSecretProvider? setupSecretProvider = null,
@@ -142,6 +145,7 @@ public sealed class InstanceStorageAdminControllerTests
     {
         return new InstanceStorageSettingsController(
             mediator,
+            _identity.Query,
             storageSettingsAssembler ?? Substitute.For<IResourceAssembler<InstanceStorageSettingsDto, InstanceStorageSettingsDto>>(),
             adminContext,
             setupSecretProvider ?? Substitute.For<ISetupSecretProvider>())

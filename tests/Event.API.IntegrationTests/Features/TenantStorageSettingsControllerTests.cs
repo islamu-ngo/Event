@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Security.Claims;
 using Event.Api.IntegrationTests.Fixtures;
+using Event.Api.IntegrationTests.Helpers;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Identity;
@@ -23,8 +24,10 @@ namespace Event.Api.IntegrationTests.Features;
 
 [Category(TestCategories.Fast)]
 [Category("TenantStorageSettings")]
-public sealed class TenantStorageSettingsControllerTests
+public sealed class TenantStorageSettingsControllerTests : IDisposable
 {
+    private readonly IdentityQueryTestScope _identity = new();
+    public void Dispose() => _identity.Dispose();
     [Test]
     public async Task GetStorageSettings_ReturnsMediatorSettings()
     {
@@ -146,7 +149,7 @@ public sealed class TenantStorageSettingsControllerTests
             Arg.Any<CancellationToken>());
     }
 
-    private static TenantStorageSettingsController CreateController(
+    private TenantStorageSettingsController CreateController(
         IMediator mediator,
         Guid? userId = null,
         IResourceAssembler<TenantStorageSettingsDto, TenantStorageSettingsDto>? storageSettingsAssembler = null)
@@ -163,6 +166,7 @@ public sealed class TenantStorageSettingsControllerTests
 
         return new TenantStorageSettingsController(
             mediator,
+            _identity.Query,
             storageSettingsAssembler ?? Substitute.For<IResourceAssembler<TenantStorageSettingsDto, TenantStorageSettingsDto>>())
         {
             ControllerContext = new ControllerContext

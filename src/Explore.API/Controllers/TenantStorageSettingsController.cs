@@ -3,6 +3,8 @@ using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Hateoas;
 using Explore.Application.Authentication;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Users.Requests.Queries;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.Tenant;
@@ -24,6 +26,7 @@ namespace Explore.API.Controllers;
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 public sealed class TenantStorageSettingsController(
     IMediator mediator,
+    IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
     IResourceAssembler<TenantStorageSettingsDto, TenantStorageSettingsDto> storageSettingsAssembler)
     : EventControllerBase
 {
@@ -58,7 +61,7 @@ public sealed class TenantStorageSettingsController(
         [FromBody] PatchTenantStorageSettingsDto settings,
         CancellationToken cancellationToken = default)
     {
-        var userId = await mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var userId = await identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem(

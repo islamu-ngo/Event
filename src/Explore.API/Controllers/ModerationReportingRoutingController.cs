@@ -3,6 +3,8 @@ using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Hateoas;
 using Explore.Application.Authentication;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Users.Requests.Queries;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.EventReporting;
@@ -25,6 +27,7 @@ namespace Explore.API.Controllers;
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 public sealed class ModerationReportingRoutingController(
     IMediator mediator,
+    IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
     ITenantContext tenantContext,
     IResourceAssembler<ReportingRoutingStateDto, ReportingRoutingStateDto> routingStateAssembler)
     : EventControllerBase
@@ -68,7 +71,7 @@ public sealed class ModerationReportingRoutingController(
         [FromBody] UpdateReportingRoutingSettingsDto settings,
         CancellationToken cancellationToken = default)
     {
-        var userId = await mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var userId = await identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem(
@@ -104,7 +107,7 @@ public sealed class ModerationReportingRoutingController(
         [FromRoute] EventReportExternalProvider provider,
         CancellationToken cancellationToken = default)
     {
-        var userId = await mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var userId = await identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem(

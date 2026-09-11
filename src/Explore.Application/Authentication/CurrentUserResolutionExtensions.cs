@@ -1,15 +1,13 @@
 using System.Security.Claims;
 using Explore.Application.Features.Users.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Authentication;
 
 /// <summary>
 /// Resolution for principals whose provider subject is not itself a platform user id — ATProto DIDs and
-/// Google subjects, chiefly. It is an extension over <see cref="IMediator"/> rather than an injected service
-/// because both inputs, the mediator and the principal, are already in hand at every call site; adding a
-/// constructor dependency would buy nothing and adding a base-class helper would hide the query behind
-/// inheritance.
+/// Google subjects, chiefly. Callers inject the closed identity query handler explicitly; principal
+/// interpretation remains owned by <see cref="PlatformIdentityPrincipalExtensions"/>.
 /// </summary>
 public static class CurrentUserResolutionExtensions
 {
@@ -19,11 +17,11 @@ public static class CurrentUserResolutionExtensions
     /// the caller to map — never a reason to fall back to a different identity source.
     /// </summary>
     public static async Task<Guid?> ResolveCurrentUserIdAsync(
-        this IMediator mediator,
+        this IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
         ClaimsPrincipal principal,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(mediator);
+        ArgumentNullException.ThrowIfNull(identityQuery);
         ArgumentNullException.ThrowIfNull(principal);
 
         if (principal.GetAmbientPlatformIdentity() is null)
@@ -34,7 +32,7 @@ public static class CurrentUserResolutionExtensions
         var providerIdentity = principal.GetProviderIdentity();
         if (providerIdentity is not null)
         {
-            Guid? linkedUserId = await mediator.Send(
+            Guid? linkedUserId = await identityQuery.QueryAsync(
                 new ResolveCurrentUserIdByIdentityRequest
                 {
                     Provider = providerIdentity.Provider,

@@ -302,12 +302,13 @@ public class UserControllerTests
     [Test]
     public async Task DeleteUser_WithUuidV7Idempotency_ReturnsAcceptedReceiptContract()
     {
-        Guid userId = Guid.CreateVersion7();
-        Guid intentId = Guid.CreateVersion7();
+        using var identity = new IdentityQueryTestScope();
+        Guid userId = Guid.Parse("018e4e5c-7f00-7000-8000-000000000081");
+        Guid intentId = Guid.Parse("018e4e5c-7f00-7000-8000-000000000082");
         var expected = new PrivacyErasureStartDto(
             "completed",
             "once-revealed-receipt",
-            DateTime.UtcNow.AddDays(7));
+            new DateTime(2026, 9, 18, 0, 0, 0, DateTimeKind.Utc));
         IMediator mediator = Substitute.For<IMediator>();
         var resourceAssembler = Substitute.For<IResourceAssembler<UserDto, UserDto>>();
         mediator.Send(
@@ -315,7 +316,7 @@ public class UserControllerTests
                     command.UserId == userId && command.IntentId == intentId),
                 Arg.Any<CancellationToken>())
             .Returns(expected);
-        var controller = new UserController(mediator, resourceAssembler)
+        var controller = new UserController(mediator, identity.Query, resourceAssembler)
         {
             ControllerContext = new ControllerContext
             {

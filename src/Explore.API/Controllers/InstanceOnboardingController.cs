@@ -1,4 +1,6 @@
 using Explore.Application.Authentication;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Users.Requests.Queries;
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
@@ -54,6 +56,7 @@ public class InstanceOnboardingController : EventControllerBase
         "Instance authorization-provider endpoint verification failed.");
 
     private readonly IMediator _mediator;
+    private readonly IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> _identityQuery;
     private readonly ISetupSecretProvider _setupSecretProvider;
     private readonly IInstanceBootstrapAuditLogger _bootstrapAuditLogger;
     private readonly IAuthProviderConfigurationService _authProviderConfigurationService;
@@ -64,6 +67,7 @@ public class InstanceOnboardingController : EventControllerBase
 
     public InstanceOnboardingController(
         IMediator mediator,
+        IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
         ISetupSecretProvider setupSecretProvider,
         IInstanceBootstrapAuditLogger bootstrapAuditLogger,
         IAuthProviderConfigurationService authProviderConfigurationService,
@@ -73,6 +77,7 @@ public class InstanceOnboardingController : EventControllerBase
         ITenantContext tenantContext)
     {
         _mediator = mediator;
+        _identityQuery = identityQuery;
         _setupSecretProvider = setupSecretProvider;
         _bootstrapAuditLogger = bootstrapAuditLogger;
         _authProviderConfigurationService = authProviderConfigurationService;
@@ -141,7 +146,7 @@ public class InstanceOnboardingController : EventControllerBase
     public async Task<ActionResult<BaseCommandResponse<Guid>>> Complete([FromBody] CompleteInstanceOnboardingRequest settings, CancellationToken cancellationToken = default)
     {
         var providerSubject = User.GetProviderSubject();
-        var currentUserId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var currentUserId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!currentUserId.HasValue && !string.IsNullOrWhiteSpace(providerSubject))
         {
             currentUserId = Guid.CreateVersion7();

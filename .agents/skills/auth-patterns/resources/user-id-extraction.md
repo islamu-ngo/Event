@@ -36,11 +36,15 @@ ATProto DIDs and Google subjects are not GUIDs, so the chain above returns `null
 present. Resolve the linked local account instead of guessing:
 
 ```csharp
-Guid? userId = await mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+// Inject IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery.
+Guid? userId = await identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
 ```
 
-That short-circuits on `internal_user_id`, then looks the account up by provider identity. A `null` result is an
-authentication outcome to map — never a reason to fall back to a different identity source.
+A reconstructed provider account takes precedence over GUID/internal-user claims. The exact provider-account
+binding is authoritative, with no email fallback. Only when no provider identity is available does resolution
+use the existing platform-ID chain. A `null` result is an authentication outcome to map, never a reason to
+fall back to a different identity source. The native query is deliberately unannotated identity resolution;
+its protected DI wrapper does not invent a PDP capability.
 
 ## Provider Bootstrap
 

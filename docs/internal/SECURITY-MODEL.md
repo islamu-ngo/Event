@@ -852,9 +852,10 @@ Notes:
 - `internal_user_id` is a BFF-enriched local-user claim added after external identity resolution. It is the
   **last** link in the chain, not a separate one: the provider claims come first because for platform-managed
   accounts the provider subject *is* the local user id, which keeps a single identifier authoritative.
-- When the subject is not a GUID at all (ATProto DIDs, Google subjects), the chain yields `null`. Resolve the
-  linked local account with `IMediator.ResolveCurrentUserIdAsync(principal, ct)` rather than reading a different
-  claim — a `null` result is an authentication outcome to map, not a reason to fall back elsewhere.
+- Resolve provider-linked accounts with `identityQuery.ResolveCurrentUserIdAsync(principal, ct)`, injecting
+  `IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?>`. A reconstructed provider identity takes
+  precedence over GUID/internal-user claims. An unlinked account returns `null` without email fallback;
+  this remains identity resolution, not a new PDP capability.
 - Purpose-bound schemes (API key, setup secret, managed control plane, ATProto session, privacy-erasure receipt)
   validate their own claims at the authentication boundary and deliberately do **not** route through this chain.
 - A few BFF-only helpers stop at `sub` -> `ClaimTypes.NameIdentifier` where the server-authenticated session is

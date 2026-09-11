@@ -1,4 +1,6 @@
 using Explore.Application.Authentication;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Users.Requests.Queries;
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
@@ -48,14 +50,17 @@ namespace Explore.API.Controllers;
 public sealed class InstanceMessagingSettingsController : InstanceSettingsControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> _identityQuery;
 
     public InstanceMessagingSettingsController(
         IMediator mediator,
+        IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
         IAdminContext adminContext,
         ISetupSecretProvider setupSecretProvider)
         : base(adminContext, setupSecretProvider)
     {
         _mediator = mediator;
+        _identityQuery = identityQuery;
     }
 
     [HttpGet("smtp", Name = RouteNames.GetInstanceSmtpSettings)]
@@ -129,7 +134,7 @@ public sealed class InstanceMessagingSettingsController : InstanceSettingsContro
     public async Task<ActionResult<BaseCommandResponse<Guid>>> UpdateSmtpSettings(
         [FromBody] PatchInstanceSmtpSettingsDto settings, CancellationToken cancellationToken = default)
     {
-        var userId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue) return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
 
         var response = await _mediator.Send(new UpdateInstanceSmtpSettingsCommand { UserId = userId.Value, Patch = settings }, cancellationToken);
@@ -175,7 +180,7 @@ public sealed class InstanceMessagingSettingsController : InstanceSettingsContro
     public async Task<ActionResult<BaseCommandResponse<Guid>>> UpdateResolverConfiguration(
         [FromBody] PatchResolverConfigurationDto configuration, CancellationToken cancellationToken = default)
     {
-        var userId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue) return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
 
         var response = await _mediator.Send(new UpdateResolverConfigurationCommand { UserId = userId.Value, Patch = configuration }, cancellationToken);

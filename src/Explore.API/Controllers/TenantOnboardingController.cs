@@ -4,6 +4,8 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.Application.Authentication;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Users.Requests.Queries;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.TenantOnboarding.Requests.Commands;
 using Explore.Application.Features.TenantOnboarding.Requests.Queries;
@@ -34,13 +36,16 @@ public class TenantOnboardingController : EventControllerBase
         "Tenant onboarding step progress save failed.");
 
     private readonly IMediator _mediator;
+    private readonly IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> _identityQuery;
     private readonly IResourceAssembler<TenantOnboardingStatusDto, TenantOnboardingStatusDto> _statusAssembler;
 
     public TenantOnboardingController(
         IMediator mediator,
+        IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
         IResourceAssembler<TenantOnboardingStatusDto, TenantOnboardingStatusDto> statusAssembler)
     {
         _mediator = mediator;
+        _identityQuery = identityQuery;
         _statusAssembler = statusAssembler;
     }
 
@@ -83,7 +88,7 @@ public class TenantOnboardingController : EventControllerBase
         [FromServices] IOutputCacheStore cacheStore,
         CancellationToken cancellationToken = default)
     {
-        var currentUserId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var currentUserId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!currentUserId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem(
@@ -121,7 +126,7 @@ public class TenantOnboardingController : EventControllerBase
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> SaveStep([FromBody] SaveTenantOnboardingStepDto dto, CancellationToken cancellationToken = default)
     {
-        var currentUserId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var currentUserId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!currentUserId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem(

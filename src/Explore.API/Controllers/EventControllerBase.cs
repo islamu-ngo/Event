@@ -10,8 +10,8 @@ namespace Explore.API.Controllers;
 /// constructor dependency they would otherwise all have to thread through.
 /// <para>
 /// Controllers whose provider subject is not a platform user id — ATProto and Google logins — resolve their
-/// local account with <c>mediator.ResolveCurrentUserIdAsync(User, cancellationToken)</c> rather than reading
-/// claims themselves.
+/// local account with <c>identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken)</c> on an explicitly
+/// injected closed identity query handler rather than reading claims themselves.
 /// </para>
 /// </summary>
 public abstract class EventControllerBase : ControllerBase

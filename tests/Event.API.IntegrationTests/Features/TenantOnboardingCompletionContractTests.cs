@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Event.Api.IntegrationTests.Helpers;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;
 using Explore.Application.DTOs.Onboarding;
@@ -21,11 +22,13 @@ public sealed class TenantOnboardingCompletionContractTests
     [Test]
     public async Task Complete_WithIdentityRequest_MapsDedicatedContractToCommand()
     {
-        Guid userId = Guid.CreateVersion7();
-        Guid expectedStamp = Guid.CreateVersion7();
+        using var identity = new IdentityQueryTestScope();
+        Guid userId = Guid.Parse("018e4e5c-7f00-7000-8000-000000000081");
+        Guid expectedStamp = Guid.Parse("018e4e5c-7f00-7000-8000-000000000082");
         var mediator = new CapturingMediator();
         var controller = new TenantOnboardingController(
             mediator,
+            identity.Query,
             Substitute.For<IResourceAssembler<TenantOnboardingStatusDto, TenantOnboardingStatusDto>>())
         {
             ControllerContext = new ControllerContext
@@ -77,7 +80,7 @@ public sealed class TenantOnboardingCompletionContractTests
             if (request is CompleteTenantOnboardingCommand command)
             {
                 Command = command;
-                object result = BaseCommandResponse.Success(Guid.CreateVersion7(), "Completed.");
+                object result = BaseCommandResponse.Success(Guid.Parse("018e4e5c-7f00-7000-8000-000000000083"), "Completed.");
                 return Task.FromResult((TResponse)result);
             }
             throw new InvalidOperationException($"Unexpected request {request.GetType().Name}.");

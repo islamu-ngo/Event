@@ -1,4 +1,6 @@
 using Explore.Application.Authentication;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Users.Requests.Queries;
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
@@ -44,16 +46,19 @@ namespace Explore.API.Controllers;
 public sealed class InstanceAuthenticationSettingsController : InstanceSettingsControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> _identityQuery;
     private readonly IAuthProviderConfigurationService _authProviderConfigurationService;
 
     public InstanceAuthenticationSettingsController(
         IMediator mediator,
+        IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
         IAuthProviderConfigurationService authProviderConfigurationService,
         IAdminContext adminContext,
         ISetupSecretProvider setupSecretProvider)
         : base(adminContext, setupSecretProvider)
     {
         _mediator = mediator;
+        _identityQuery = identityQuery;
         _authProviderConfigurationService = authProviderConfigurationService;
     }
 
@@ -92,7 +97,7 @@ public sealed class InstanceAuthenticationSettingsController : InstanceSettingsC
         }
         else
         {
-            var userId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+            var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
             if (!userId.HasValue) return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
 
             response = await _mediator.Send(
@@ -162,7 +167,7 @@ public sealed class InstanceAuthenticationSettingsController : InstanceSettingsC
         [FromBody] KeycloakClientSecretRotationRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var userId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue) return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
         if (!await AdminContext.IsInstanceAdminAsync(userId.Value, cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator authority is required for this operation.");
 

@@ -4,6 +4,8 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Hateoas;
 using Explore.API.Models;
 using Explore.Application.Authentication;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Users.Requests.Queries;
 using Explore.Application.DTOs.Group;
 using Explore.Application.DTOs.Notification;
 using Explore.Application.Features.Groups.Requests.Commands;
@@ -60,15 +62,18 @@ public class GroupController : EventControllerBase
         "Group not found.");
 
     private readonly IMediator _mediator;
+    private readonly IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> _identityQuery;
     private readonly IResourceAssembler<GroupDto, GroupListDto> _resourceAssembler;
     private readonly IResourceAssembler<NotificationPreferenceMatrixDto> _preferenceAssembler;
 
     public GroupController(
         IMediator mediator,
+        IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
         IResourceAssembler<GroupDto, GroupListDto> resourceAssembler,
         IResourceAssembler<NotificationPreferenceMatrixDto> preferenceAssembler)
     {
         _mediator = mediator;
+        _identityQuery = identityQuery;
         _resourceAssembler = resourceAssembler;
         _preferenceAssembler = preferenceAssembler;
     }
@@ -245,7 +250,7 @@ public class GroupController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> Create([FromBody] CreateGroupDto group, CancellationToken cancellationToken = default)
     {
-        var userId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem(

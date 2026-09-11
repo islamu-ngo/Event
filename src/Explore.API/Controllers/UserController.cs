@@ -5,6 +5,7 @@ using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Organization;
 using Explore.Application.DTOs.PrivacyErasure;
 using Explore.Application.DTOs.User;
@@ -25,6 +26,7 @@ namespace Explore.API.Controllers;
 public class UserController : EventControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> _identityQuery;
     private readonly IResourceAssembler<UserDto, UserDto> _resourceAssembler;
 
     private static readonly ApiValidationProblemDescriptor SyncValidationProblem = new(
@@ -41,9 +43,11 @@ public class UserController : EventControllerBase
         "User not found",
         "The requested user could not be found.");
 
-    public UserController(IMediator mediator, IResourceAssembler<UserDto, UserDto> resourceAssembler)
+    public UserController(IMediator mediator, IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
+        IResourceAssembler<UserDto, UserDto> resourceAssembler)
     {
         _mediator = mediator;
+        _identityQuery = identityQuery;
         _resourceAssembler = resourceAssembler;
     }
 
@@ -104,7 +108,7 @@ public class UserController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<HalResource<UserDto>>> GetCurrentUser(CancellationToken cancellationToken = default)
     {
-        var currentUserId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var currentUserId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!currentUserId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem();
@@ -130,7 +134,7 @@ public class UserController : EventControllerBase
     [EndpointDescription("Returns instance, tenant, organization, and group admin status for the authenticated user. Consumed by BFF and route authorization.")]
     public async Task<ActionResult<AdminAuthorityDto>> GetAdminAuthority(CancellationToken cancellationToken = default)
     {
-        var currentUserId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var currentUserId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!currentUserId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem(
@@ -153,7 +157,7 @@ public class UserController : EventControllerBase
     [ProducesResponseType(typeof(UserTenantRedirectionDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<UserTenantRedirectionDto>> ResolveTenantRedirection(CancellationToken cancellationToken = default)
     {
-        var currentUserId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var currentUserId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!currentUserId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem();
@@ -175,7 +179,7 @@ public class UserController : EventControllerBase
     [ProducesResponseType(typeof(bool), StatusCodes.Status200OK)]
     public async Task<ActionResult<bool>> UpdateLastActiveTenant(Guid tenantId, CancellationToken cancellationToken = default)
     {
-        var currentUserId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var currentUserId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!currentUserId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem();
@@ -204,7 +208,7 @@ public class UserController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<List<OrganizationListDto>>> GetUserOrganizations(Guid userId, CancellationToken cancellationToken = default)
     {
-        var currentUserId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var currentUserId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!currentUserId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem();
@@ -230,7 +234,7 @@ public class UserController : EventControllerBase
         [FromHeader(Name = "If-Match")] string? ifMatch,
         CancellationToken cancellationToken = default)
     {
-        var currentUserId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var currentUserId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!currentUserId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem();
@@ -275,7 +279,7 @@ public class UserController : EventControllerBase
         [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         CancellationToken cancellationToken = default)
     {
-        var currentUserId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var currentUserId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!currentUserId.HasValue)
         {
             return this.ToAuthenticationRequiredProblem();

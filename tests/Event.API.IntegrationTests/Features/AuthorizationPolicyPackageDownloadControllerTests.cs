@@ -1,3 +1,4 @@
+using Event.Api.IntegrationTests.Helpers;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;
 using Explore.Application.Authorization;
@@ -14,8 +15,10 @@ using NSubstitute;
 
 namespace Event.Api.IntegrationTests.Features;
 
-public sealed class AuthorizationPolicyPackageDownloadControllerTests
+public sealed class AuthorizationPolicyPackageDownloadControllerTests : IDisposable
 {
+    private readonly IdentityQueryTestScope _identity = new();
+    public void Dispose() => _identity.Dispose();
     [Test]
     public async Task SetupDownloadAuthorizationPolicyPackage_ReturnsZipArchiveFile()
     {
@@ -25,6 +28,7 @@ public sealed class AuthorizationPolicyPackageDownloadControllerTests
             .Returns(archive);
         var controller = new InstanceOnboardingController(
             mediator,
+            _identity.Query,
             Substitute.For<ISetupSecretProvider>(),
             Substitute.For<IInstanceBootstrapAuditLogger>(),
             Substitute.For<IAuthProviderConfigurationService>(),
@@ -54,6 +58,7 @@ public sealed class AuthorizationPolicyPackageDownloadControllerTests
         adminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(true);
         var controller = new InstanceAuthorizationSettingsController(
             mediator,
+            _identity.Query,
             Substitute.For<IAuthorizationProviderConfigurationService>(),
             adminContext,
             Substitute.For<ISetupSecretProvider>());
@@ -78,6 +83,7 @@ public sealed class AuthorizationPolicyPackageDownloadControllerTests
         setupSecretProvider.IsSetupModeActive.Returns(false);
         var controller = new InstanceAuthorizationSettingsController(
             mediator,
+            _identity.Query,
             Substitute.For<IAuthorizationProviderConfigurationService>(),
             adminContext,
             setupSecretProvider)
@@ -102,7 +108,7 @@ public sealed class AuthorizationPolicyPackageDownloadControllerTests
             "test-policy-package",
             "1.0.0",
             "0123456789abcdef",
-            DateTimeOffset.UtcNow,
+            new DateTimeOffset(2026, 9, 11, 0, 0, 0, TimeSpan.Zero),
             []);
 
         return new PolicyPackageArchive(

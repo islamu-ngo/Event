@@ -42,8 +42,9 @@ Guid? userId = principal.GetPlatformUserId();           // sub -> nameidentifier
 Guid required = principal.GetRequiredPlatformUserId();  // throws UnauthorizedAccessException
 
 // In a controller, ExploreControllerBase already exposes CurrentUserId / RequiredUserId.
-// When the provider subject is not a platform user id (ATProto DID, Google subject):
-Guid? resolved = await mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+// For provider-linked accounts, inject IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery.
+// Provider binding wins over GUID/internal-user claims; an unlinked account has no email fallback.
+Guid? resolved = await identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
 ```
 
 ```csharp

@@ -1,4 +1,6 @@
 using Explore.Application.Authentication;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Users.Requests.Queries;
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
@@ -44,14 +46,17 @@ namespace Explore.API.Controllers;
 public sealed class InstanceGovernanceSettingsController : InstanceSettingsControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> _identityQuery;
 
     public InstanceGovernanceSettingsController(
         IMediator mediator,
+        IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
         IAdminContext adminContext,
         ISetupSecretProvider setupSecretProvider)
         : base(adminContext, setupSecretProvider)
     {
         _mediator = mediator;
+        _identityQuery = identityQuery;
     }
 
     [HttpGet("modules", Name = RouteNames.GetInstanceModuleSettings)]
@@ -75,7 +80,7 @@ public sealed class InstanceGovernanceSettingsController : InstanceSettingsContr
     public async Task<ActionResult<BaseCommandResponse<Guid>>> UpdateModuleSettings(
         [FromBody] PatchModuleSettingsDto settings, CancellationToken cancellationToken = default)
     {
-        var userId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue) return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
 
         var response = await _mediator.Send(new UpdateModuleSettingsCommand { UserId = userId.Value, Patch = settings }, cancellationToken);
@@ -103,7 +108,7 @@ public sealed class InstanceGovernanceSettingsController : InstanceSettingsContr
     public async Task<ActionResult<BaseCommandResponse<Guid>>> UpdateEventPolicy(
         [FromBody] PatchEventPolicyDto settings, CancellationToken cancellationToken = default)
     {
-        var userId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue) return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
 
         var response = await _mediator.Send(new UpdateEventPolicyCommand { UserId = userId.Value, Patch = settings }, cancellationToken);
@@ -131,7 +136,7 @@ public sealed class InstanceGovernanceSettingsController : InstanceSettingsContr
     public async Task<ActionResult<BaseCommandResponse<Guid>>> UpdateOrganizationPolicy(
         [FromBody] PatchOrganizationPolicyDto settings, CancellationToken cancellationToken = default)
     {
-        var userId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue) return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
 
         var response = await _mediator.Send(new UpdateOrganizationPolicyCommand { UserId = userId.Value, Patch = settings }, cancellationToken);
@@ -159,7 +164,7 @@ public sealed class InstanceGovernanceSettingsController : InstanceSettingsContr
     public async Task<ActionResult<BaseCommandResponse<Guid>>> UpdateTenantDelegationSettings(
         [FromBody] PatchTenantDelegationSettingsDto settings, CancellationToken cancellationToken = default)
     {
-        var userId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue) return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
 
         var response = await _mediator.Send(new UpdateTenantDelegationSettingsCommand { UserId = userId.Value, Patch = settings }, cancellationToken);
@@ -187,7 +192,7 @@ public sealed class InstanceGovernanceSettingsController : InstanceSettingsContr
     public async Task<ActionResult<BaseCommandResponse<Guid>>> UpdateAiAssistantGovernanceSettings(
         [FromBody] PatchAiAssistantGovernanceSettingsDto settings, CancellationToken cancellationToken = default)
     {
-        var userId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue) return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
 
         var response = await _mediator.Send(new UpdateAiAssistantGovernanceSettingsCommand { UserId = userId.Value, Patch = settings }, cancellationToken);
@@ -215,7 +220,7 @@ public sealed class InstanceGovernanceSettingsController : InstanceSettingsContr
     public async Task<ActionResult<BaseCommandResponse<Guid>>> UpdateMcpGovernanceSettings(
         [FromBody] PatchMcpGovernanceSettingsDto settings, CancellationToken cancellationToken = default)
     {
-        var userId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue) return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
 
         var response = await _mediator.Send(new UpdateMcpGovernanceSettingsCommand { UserId = userId.Value, Patch = settings }, cancellationToken);
@@ -244,7 +249,7 @@ public sealed class InstanceGovernanceSettingsController : InstanceSettingsContr
     public async Task<ActionResult<BaseCommandResponse<Guid>>> UpdateAnalyticsGovernanceSettings(
         [FromBody] PatchAnalyticsGovernanceSettingsDto settings, CancellationToken cancellationToken = default)
     {
-        var userId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue) return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
 
         var response = await _mediator.Send(new UpdateAnalyticsGovernanceSettingsCommand { UserId = userId.Value, Patch = settings }, cancellationToken);
@@ -274,7 +279,7 @@ public sealed class InstanceGovernanceSettingsController : InstanceSettingsContr
         [FromBody] PatchFooterGovernanceSettingsDto settings, CancellationToken cancellationToken = default)
     {
         if (!await IsInstanceAdminOrSetupAuthenticated(cancellationToken)) return this.ToForbiddenProblem(detail: "Instance administrator or active setup secret authority is required for this operation.");
-        var userId = await _mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var userId = await _identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
         if (!userId.HasValue) return this.ToAuthenticationRequiredProblem(detail: "The authenticated principal could not be resolved to an application user.");
 
         var response = await _mediator.Send(new UpdateFooterGovernanceSettingsCommand { UserId = userId.Value, Patch = settings }, cancellationToken);

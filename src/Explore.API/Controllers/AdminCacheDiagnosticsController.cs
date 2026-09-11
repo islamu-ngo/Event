@@ -5,7 +5,8 @@ using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.Application.Contracts.Identity;
-using MediatR;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Users.Requests.Queries;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -25,7 +26,7 @@ public sealed class AdminCacheDiagnosticsController : EventControllerBase
     [Authorize]
     [HttpPost("current-user/snapshot")]
     public async Task<ActionResult<AdminCacheCurrentUserDiagnostics>> SnapshotCurrentUser(
-        [FromServices] IMediator mediator,
+        [FromServices] IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
         [FromServices] IHostEnvironment hostEnvironment,
         [FromServices] IConfiguration configuration,
         CancellationToken cancellationToken)
@@ -36,7 +37,7 @@ public sealed class AdminCacheDiagnosticsController : EventControllerBase
         }
 
         var providerIdentity = User.GetProviderIdentity();
-        var resolvedUserId = await mediator.ResolveCurrentUserIdAsync(User, cancellationToken);
+        var resolvedUserId = await identityQuery.ResolveCurrentUserIdAsync(User, cancellationToken);
 
         return Ok(new AdminCacheCurrentUserDiagnostics(
             User.Identity?.AuthenticationType,

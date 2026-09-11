@@ -344,6 +344,7 @@ Special thanks to the organizations providing free tooling, infrastructure, and 
 | Organization | Contribution & Usage |
 |:---:|---|
 | <a href="https://www.gitbook.com"><img src="https://api.iconify.design/simple-icons:gitbook.svg?color=%233884FF" width="48" height="48" alt="GitBook Logo" /><br />**GitBook**</a> | Generously provides their **Community Plan** to host and power our [Official Public Documentation](https://islamu.gitbook.io/islamu-event). |
+| <a href="https://gitar.ai"><img src="https://api.iconify.design/simple-icons:sonar.svg?color=%23FD3456" width="48" height="48" alt="Sonar Gitar Logo" /><br />**Sonar Gitar**</a> | Generously provides their **Gitar Open Source Program** to empower our development with AI code review: *“Gitar keeps going — committing fixes, diagnosing CI failures, and iterating until your pipeline is green and the PR is ready to merge.”* |
 
 > If your organization would like to support ISLAMU Event with in-kind tooling, infrastructure, or software licenses, please reach out to us at [contact@openislamu.org][contact-email].
 
@@ -487,6 +488,7 @@ The AGPL-3.0-or-later license and any alternative license offered by ISLAMU appl
 [mangadex-link]: https://mangadex.org/
 [hi.events-link]: https://hi.events/
 [gitbook-link]: https://www.gitbook.com/
+[sonar-gitar-link]: https://gitar.ai/
 [stripe-monthly-link]: https://donate.stripe.com/bJeeVeesc9kIdpCbMPaR201
 [stripe-oneoff-link]: https://donate.stripe.com/14A6oIesc0Oc2KYg35aR200
 [stripe-donation-link]: https://donate.stripe.com/bJeeVeesc9kIdpCbMPaR201

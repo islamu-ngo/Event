@@ -58,6 +58,7 @@ To discuss corporate sponsorship, custom invoicing, or enterprise partnerships, 
 We deeply appreciate technology organizations that support open-source development by providing complimentary licenses, hosting, or infrastructure:
 
 * **[GitBook](https://www.gitbook.com):** Generously provides their **Community Plan** to host and power this official documentation portal.
+* **[Sonar Gitar](https://gitar.ai):** Generously provides their **Gitar Open Source Program** to empower our development with AI code review: *“Gitar keeps going — committing fixes, diagnosing CI failures, and iterating until your pipeline is green and the PR is ready to merge.”*
 
 If your organization offers developer tools, hosting, or security scanning services and would like to support ISLAMU Event as an in-kind supporter, please reach out to **[contact@openislamu.org](mailto:contact@openislamu.org)**.
 

@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.TagType;
 using Explore.Application.Features.TagTypes.Requests.Queries;
@@ -9,17 +9,15 @@ namespace Explore.Application.Features.TagTypes.Handlers.Queries;
 public class GetTagTypeListRequestHandler : IRequestHandler<GetTagTypeListRequest, List<TagTypeListDto>>
 {
     private readonly ITagTypeRepository _repository;
-    private readonly IMapper _mapper;
 
-    public GetTagTypeListRequestHandler(ITagTypeRepository repository, IMapper mapper)
+    public GetTagTypeListRequestHandler(ITagTypeRepository repository)
     {
         _repository = repository;
-        _mapper = mapper;
     }
 
     public async Task<List<TagTypeListDto>> Handle(GetTagTypeListRequest request, CancellationToken cancellationToken)
     {
         var tagTypes = await _repository.GetTagTypesWithDetails();
-        return _mapper.Map<List<TagTypeListDto>>(tagTypes);
+        return tagTypes.Select(TagTypeMapper.ToListItem).ToList();
     }
 }

@@ -4,7 +4,6 @@ using Explore.Application.DTOs.FileType;
 using Explore.Application.DTOs.Location;
 using Explore.Application.DTOs.LocationRoom;
 using Explore.Application.DTOs.Tag;
-using Explore.Application.DTOs.TagType;
 using Explore.Application.DTOs.TagTypeTags;
 using Explore.Application.Lookups;
 using Explore.Domain;
@@ -41,9 +40,6 @@ public class LookupMappingProfile : Profile
             .ForMember(dest => dest.CategoryTypeMasterCode, opt => opt.MapFrom(src => src.CategoryType != null ? src.CategoryType.MasterCode : null));
         CreateMap<CreateCategoryTypeCategoriesDto, Domain.CategoryTypeCategories>();
         CreateMap<UpdateCategoryTypeCategoriesDto, Domain.CategoryTypeCategories>();
-
-        CreateMap<TagType, TagTypeDto>().ReverseMap();
-        CreateMap<TagType, TagTypeListDto>().ReverseMap();
 
         CreateMap<Domain.TagTypeTags, TagTypeTagsDto>()
             .ForMember(dest => dest.TagFullName, opt => opt.MapFrom(src => src.Tag != null ? src.Tag.FullName : null))

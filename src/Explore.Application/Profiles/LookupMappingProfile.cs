@@ -10,7 +10,6 @@ using Explore.Application.DTOs.OrganizationPosition;
 using Explore.Application.DTOs.Tag;
 using Explore.Application.DTOs.TagType;
 using Explore.Application.DTOs.TagTypeTags;
-using Explore.Application.DTOs.VisibilityType;
 using Explore.Application.Lookups;
 using Explore.Domain;
 
@@ -65,9 +64,6 @@ public class LookupMappingProfile : Profile
             .ForMember(dest => dest.TagTypeMasterCode, opt => opt.MapFrom(src => src.TagType != null ? src.TagType.MasterCode : null));
         CreateMap<CreateTagTypeTagsDto, Domain.TagTypeTags>();
         CreateMap<UpdateTagTypeTagsDto, Domain.TagTypeTags>();
-
-        CreateMap<VisibilityType, VisibilityTypeDto>().ReverseMap();
-        CreateMap<VisibilityType, VisibilityTypeListDto>().ReverseMap();
 
         CreateMap<Domain.ActorType, ActorTypeDto>().ReverseMap();
         CreateMap<Domain.ActorType, ActorTypeListDto>().ReverseMap();

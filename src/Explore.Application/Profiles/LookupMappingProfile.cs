@@ -7,7 +7,6 @@ using Explore.Application.DTOs.EventFormat;
 using Explore.Application.DTOs.EventSessionStatus;
 using Explore.Application.DTOs.EventStatus;
 using Explore.Application.DTOs.FileType;
-using Explore.Application.DTOs.Language;
 using Explore.Application.DTOs.Location;
 using Explore.Application.DTOs.LocationRoom;
 using Explore.Application.DTOs.Madhab;
@@ -38,9 +37,6 @@ public class LookupMappingProfile : Profile
         CreateMap<Tag, TagDto>().ReverseMap();
         CreateMap<Tag, TagListDto>();
         CreateMap<CreateTagDto, Tag>();
-
-        CreateMap<Language, LanguageDto>().ReverseMap();
-        CreateMap<Language, LanguageListDto>().ReverseMap();
 
         CreateMap<CategoryType, CategoryTypeDto>().ReverseMap();
         CreateMap<CategoryType, CategoryTypeListDto>().ReverseMap();

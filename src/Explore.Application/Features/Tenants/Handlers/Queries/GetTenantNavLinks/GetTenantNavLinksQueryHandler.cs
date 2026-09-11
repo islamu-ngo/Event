@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Tenant;
@@ -18,16 +18,13 @@ public class GetTenantNavLinksQueryHandler : IRequestHandler<GetTenantNavLinksQu
 {
     private readonly ITenantNavigationLinkRepository _navigationLinkRepository;
     private readonly ITenantContext _tenantContext;
-    private readonly IMapper _mapper;
 
     public GetTenantNavLinksQueryHandler(
         ITenantNavigationLinkRepository navigationLinkRepository,
-        ITenantContext tenantContext,
-        IMapper mapper)
+        ITenantContext tenantContext)
     {
         _navigationLinkRepository = navigationLinkRepository;
         _tenantContext = tenantContext;
-        _mapper = mapper;
     }
 
     public async Task<List<TenantNavigationLinkDto>> Handle(GetTenantNavLinksQuery request, CancellationToken cancellationToken)
@@ -37,9 +34,6 @@ public class GetTenantNavLinksQueryHandler : IRequestHandler<GetTenantNavLinksQu
             _tenantContext.TenantId,
             cancellationToken);
 
-        // Map to DTOs
-        var dtos = _mapper.Map<List<TenantNavigationLinkDto>>(navigationLinks);
-
-        return dtos;
+        return navigationLinks.Select(TenantMapper.ToNavigationLink).ToList();
     }
 }

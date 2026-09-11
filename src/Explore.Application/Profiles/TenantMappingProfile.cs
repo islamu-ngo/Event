@@ -1,6 +1,5 @@
 using AutoMapper;
 using Explore.Application.DTOs.Footer;
-using Explore.Application.DTOs.Tenant;
 using Explore.Application.DTOs.TenantUserRoleGrant;
 using Explore.Domain;
 
@@ -10,9 +9,6 @@ public class TenantMappingProfile : Profile
 {
     public TenantMappingProfile()
     {
-        CreateMap<TenantNavigationLink, TenantNavigationLinkDto>();
-        CreateMap<CreateTenantNavigationLinkDto, TenantNavigationLink>();
-
         CreateMap<TenantUserRoleGrant, TenantUserRoleGrantDto>()
             .ForMember(dest => dest.UserId, opt => opt.MapFrom(src => src.TenantUser.UserId))
             .ForMember(dest => dest.UserEmail, opt => opt.MapFrom(src => src.TenantUser.User != null ? src.TenantUser.User.Email : null))

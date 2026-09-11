@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Tenant.Validators;
@@ -25,18 +24,15 @@ public class CreateTenantNavLinkCommandHandler : IRequestHandler<CreateTenantNav
     private readonly ITenantNavigationLinkRepository _navigationLinkRepository;
     private readonly ITenantContext _tenantContext;
     private readonly IHierarchicalSettingsResolver _settingsResolver;
-    private readonly IMapper _mapper;
 
     public CreateTenantNavLinkCommandHandler(
         ITenantNavigationLinkRepository navigationLinkRepository,
         ITenantContext tenantContext,
-        IHierarchicalSettingsResolver settingsResolver,
-        IMapper mapper)
+        IHierarchicalSettingsResolver settingsResolver)
     {
         _navigationLinkRepository = navigationLinkRepository;
         _tenantContext = tenantContext;
         _settingsResolver = settingsResolver;
-        _mapper = mapper;
     }
 
     public async Task<BaseCommandResponse<Guid>> Handle(CreateTenantNavLinkCommand request, CancellationToken cancellationToken)
@@ -56,8 +52,13 @@ public class CreateTenantNavLinkCommandHandler : IRequestHandler<CreateTenantNav
                 "Validation failed.");
         }
 
-        // Map DTO to entity
-        var navigationLink = _mapper.Map<TenantNavigationLink>(request.NavigationLinkDto);
+        var navigationLink = new TenantNavigationLink
+        {
+            Label = request.NavigationLinkDto.Label,
+            Url = request.NavigationLinkDto.Url,
+            Icon = request.NavigationLinkDto.Icon,
+            OpenInNewTab = request.NavigationLinkDto.OpenInNewTab
+        };
 
         // Set tenant ID from context
         navigationLink.TenantId = _tenantContext.TenantId;

@@ -26,13 +26,13 @@ ISLAMU Event powers ISLAMU’s Islamic events instance, but the software itself 
 
 </div>
 
+![Event List Screenshot][event-list-image]
+
 ## About ISLAMU Event
 
 ISLAMU Event is a **self-hostable event discovery and management platform** for publishing, discovering, and operating events across one organization or many isolated tenants.
 
 The public ISLAMU instance is Islamic-focused, but the software itself is **purpose-agnostic, white-label, and designed to be rebranded for any event ecosystem**.
-
-![Event List Screenshot][event-list-image]
 
 ## ✨ Who It Serves
 
@@ -455,7 +455,7 @@ The AGPL-3.0-or-later license and any alternative license offered by ISLAMU appl
 [github-stars-shield]: https://img.shields.io/github/stars/islamu-ngo/Event?color=594ae2&style=flat-square&logo=github
 [github-stars-link]: https://github.com/islamu-ngo/Event/stargazers
 [github-license-shield]: https://img.shields.io/github/license/islamu-ngo/Event?color=594ae2&logo=github&style=flat-square
-[github-license-link]: https://github.com/islamu-ngo/Event/blob/main/LICENSE
+[github-license-link]: https://github.com/islamu-ngo/Event/blob/develop/LICENSE
 [github-last-commit-shield]: https://img.shields.io/github/last-commit/islamu-ngo/Event?color=594ae2&style=flat-square&logo=github
 [github-last-commit-link]: https://github.com/islamu-ngo/Event
 [github-contributors-shield]: https://img.shields.io/github/contributors/islamu-ngo/Event?color=594ae2&style=flat-square&logo=github

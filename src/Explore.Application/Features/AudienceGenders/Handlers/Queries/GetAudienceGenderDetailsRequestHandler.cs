@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.AudienceGender;
 using Explore.Application.Features.AudienceGenders.Requests.Queries;
@@ -9,12 +9,10 @@ namespace Explore.Application.Features.AudienceGenders.Handlers.Queries;
 public class GetAudienceGenderDetailsRequestHandler : IRequestHandler<GetAudienceGenderDetailsRequest, AudienceGenderDto>
 {
     private readonly IAudienceGenderRepository _audienceGenderRepository;
-    private readonly IMapper _mapper;
 
-    public GetAudienceGenderDetailsRequestHandler(IAudienceGenderRepository audienceGenderRepository, IMapper mapper)
+    public GetAudienceGenderDetailsRequestHandler(IAudienceGenderRepository audienceGenderRepository)
     {
         _audienceGenderRepository = audienceGenderRepository;
-        _mapper = mapper;
     }
 
     public async Task<AudienceGenderDto> Handle(GetAudienceGenderDetailsRequest request, CancellationToken cancellationToken)
@@ -25,6 +23,6 @@ public class GetAudienceGenderDetailsRequestHandler : IRequestHandler<GetAudienc
             return null;
         }
 
-        return _mapper.Map<AudienceGenderDto>(audienceGender);
+        return EventMapper.ToDetail(audienceGender);
     }
 }

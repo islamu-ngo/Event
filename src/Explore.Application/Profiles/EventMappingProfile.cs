@@ -1,6 +1,4 @@
 using AutoMapper;
-using Explore.Application.DTOs.AudienceAge;
-using Explore.Application.DTOs.AudienceGender;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.EventAgendaItem;
 using Explore.Application.DTOs.EventAspects;
@@ -9,7 +7,6 @@ using Explore.Application.DTOs.EventDay;
 using Explore.Application.DTOs.EventOrganizerClaim;
 using Explore.Application.DTOs.EventSessionGroup;
 using Explore.Application.DTOs.EventTags;
-using Explore.Application.DTOs.EventType;
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -22,12 +19,6 @@ public class EventMappingProfile : Profile
 {
     public EventMappingProfile()
     {
-        // Audience Lookups
-        CreateMap<AudienceAge, AudienceAgeDto>().ReverseMap();
-        CreateMap<AudienceAge, AudienceAgeListDto>().ReverseMap();
-        CreateMap<AudienceGender, AudienceGenderDto>().ReverseMap();
-        CreateMap<AudienceGender, AudienceGenderListDto>().ReverseMap();
-
         CreateMap<EventPublicAction, EventPublicActionDto>()
             .ForMember(dest => dest.KindId, opt => opt.MapFrom(src => src.EventPublicActionKindId))
             .ForMember(dest => dest.KindCode, opt => opt.MapFrom(src => src.EventPublicActionKind != null ? src.EventPublicActionKind.MasterCode : null))
@@ -218,9 +209,6 @@ public class EventMappingProfile : Profile
             .ForMember(dest => dest.Actor, opt => opt.Ignore())
             .ForMember(dest => dest.FeaturedImage, opt => opt.Ignore())
             .ForMember(dest => dest.Tenant, opt => opt.Ignore());
-
-        // Event Type
-        CreateMap<EventType, EventTypeListDto>().ReverseMap();
 
         // Event Day
         CreateMap<EventDay, EventDayDto>()

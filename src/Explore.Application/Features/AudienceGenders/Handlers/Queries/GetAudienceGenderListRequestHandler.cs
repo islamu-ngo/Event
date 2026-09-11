@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.AudienceGender;
 using Explore.Application.Features.AudienceGenders.Requests.Queries;
@@ -12,17 +12,15 @@ namespace Explore.Application.Features.AudienceGenders.Handlers.Queries;
 public class GetAudienceGenderListRequestHandler : IRequestHandler<GetAudienceGenderListRequest, List<AudienceGenderListDto>>
 {
     private readonly IAudienceGenderRepository _audienceGenderRepository;
-    private readonly IMapper _mapper;
 
-    public GetAudienceGenderListRequestHandler(IAudienceGenderRepository audienceGenderRepository, IMapper mapper)
+    public GetAudienceGenderListRequestHandler(IAudienceGenderRepository audienceGenderRepository)
     {
         _audienceGenderRepository = audienceGenderRepository;
-        _mapper = mapper;
     }
 
     public async Task<List<AudienceGenderListDto>> Handle(GetAudienceGenderListRequest request, CancellationToken cancellationToken)
     {
         var audienceGenders = await _audienceGenderRepository.GetAll();
-        return _mapper.Map<List<AudienceGenderListDto>>(audienceGenders);
+        return audienceGenders.Select(EventMapper.ToListItem).ToList();
     }
 }

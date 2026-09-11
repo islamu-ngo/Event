@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.AudienceAge;
 using Explore.Application.Features.AudienceAges.Requests.Queries;
@@ -9,12 +9,10 @@ namespace Explore.Application.Features.AudienceAges.Handlers.Queries;
 public class GetAudienceAgeDetailsRequestHandler : IRequestHandler<GetAudienceAgeDetailsRequest, AudienceAgeDto>
 {
     private readonly IAudienceAgeRepository _audienceAgeRepository;
-    private readonly IMapper _mapper;
 
-    public GetAudienceAgeDetailsRequestHandler(IAudienceAgeRepository audienceAgeRepository, IMapper mapper)
+    public GetAudienceAgeDetailsRequestHandler(IAudienceAgeRepository audienceAgeRepository)
     {
         _audienceAgeRepository = audienceAgeRepository;
-        _mapper = mapper;
     }
 
     public async Task<AudienceAgeDto> Handle(GetAudienceAgeDetailsRequest request, CancellationToken cancellationToken)
@@ -25,6 +23,6 @@ public class GetAudienceAgeDetailsRequestHandler : IRequestHandler<GetAudienceAg
             return null;
         }
 
-        return _mapper.Map<AudienceAgeDto>(audienceAge);
+        return EventMapper.ToDetail(audienceAge);
     }
 }

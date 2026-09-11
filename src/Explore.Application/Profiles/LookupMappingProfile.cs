@@ -1,5 +1,4 @@
 using AutoMapper;
-using Explore.Application.DTOs.CategoryType;
 using Explore.Application.DTOs.CategoryTypeCategories;
 using Explore.Application.DTOs.FileType;
 using Explore.Application.DTOs.Location;
@@ -29,9 +28,6 @@ public class LookupMappingProfile : Profile
         CreateMap<Tag, TagDto>().ReverseMap();
         CreateMap<Tag, TagListDto>();
         CreateMap<CreateTagDto, Tag>();
-
-        CreateMap<CategoryType, CategoryTypeDto>().ReverseMap();
-        CreateMap<CategoryType, CategoryTypeListDto>().ReverseMap();
 
         CreateMap<Domain.CategoryTypeCategories, CategoryTypeCategoriesDto>()
             .ForMember(dest => dest.CategoryFullName, opt => opt.MapFrom(src => src.Category != null ? src.Category.FullName : null))

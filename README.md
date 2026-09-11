@@ -337,6 +337,8 @@ Support ISLAMU Event's ongoing development, infrastructure, and open-source miss
 
 * **One-Time Contribution:** [👉 Donate Once via Stripe][stripe-oneoff-link]
 
+> 💼 To discuss corporate sponsorship, custom invoicing, or enterprise partnerships, email us at [contact@openislamu.org][contact-email].
+
 ## 🤝 In-Kind Supporters
 
 Special thanks to the organizations providing free tooling, infrastructure, and licenses to support ISLAMU Event's open-source development:

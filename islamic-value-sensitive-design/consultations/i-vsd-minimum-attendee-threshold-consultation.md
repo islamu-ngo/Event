@@ -276,8 +276,8 @@ stateDiagram-v2
 - `src/Explore.Domain/EventParticipationConfiguration.cs`: Participation modes and registration obligations.
 - `src/Explore.Domain/EventCapacityPool.cs`: Event-owned capacity resource modeling.
 - `src/Explore.Domain/Enums/RegistrationOrderStatusEnum.cs`: Registration order state machine identities.
-- `islamic-value-sensitive-design/i-vsd-paid-event-payments-consultation.md`: Predecessor consultation establishing `OrganizerDirect` Stripe Connect defaults and refund fee constraints.
-- `islamic-value-sensitive-design/i-vsd-event-ticketing-lifecycle.md`: Ticketing lifecycle, purchase governance, and capacity hold rules.
+- `islamic-value-sensitive-design/consultations/i-vsd-paid-event-payments-consultation.md`: Predecessor consultation establishing `OrganizerDirect` Stripe Connect defaults and refund fee constraints.
+- `islamic-value-sensitive-design/consultations/i-vsd-event-ticketing-lifecycle.md`: Ticketing lifecycle, purchase governance, and capacity hold rules.
 - Clean-room web research on Eventbrite, Meetup, Luma, Peatix, Stripe SetupIntents, and Islamic crowdfunding contracts (`2026-09-02`).
 
 ---

@@ -1325,7 +1325,7 @@ intents:
       - "docs/internal/TROUBLESHOOTING.md"
       - "docs/internal/adr/ADR-022-paid-event-commerce-and-stripe-connect.md"
       - "docs/internal/releases/changes/CHG-*.yaml"
-      - "islamic-value-sensitive-design/i-vsd-branding-legal-identity-authority.md"
+      - "islamic-value-sensitive-design/governance/i-vsd-branding-legal-identity-authority.md"
       - "dev/zarchive/branding-legal-identity-authority/**"
     paths_forbidden:
       - ".claude/settings*.json"
@@ -1463,7 +1463,7 @@ intents:
       - docs/internal/adr/ADR-022-paid-event-commerce-and-stripe-connect.md
       - docs/internal/adr/ADR-023-admission-credential-check-in-transfer-recovery.md
       - docs/internal/adr/ADR-024-external-business-integrations-and-protected-payout-boundaries.md
-      - islamic-value-sensitive-design/i-vsd-paid-event-payments-consultation.md
+      - islamic-value-sensitive-design/consultations/i-vsd-paid-event-payments-consultation.md
     load_skills:
       - clean-architecture-rules
       - cqrs-mediatr-guidelines
@@ -1651,7 +1651,7 @@ intents:
       - "docs/internal/adr/ADR-022-paid-event-commerce-and-stripe-connect.md"
       - "docs/internal/adr/ADR-023-admission-credential-check-in-transfer-recovery.md"
       - "docs/internal/adr/ADR-024-external-business-integrations-and-protected-payout-boundaries.md"
-      - "islamic-value-sensitive-design/i-vsd-paid-event-payments-consultation.md"
+      - "islamic-value-sensitive-design/consultations/i-vsd-paid-event-payments-consultation.md"
       - "docs/internal/API.md"
       - "docs/internal/API_CHANGELOG.md"
       - "docs/internal/API_CONTRACT_INVENTORY.md"
@@ -1813,7 +1813,7 @@ intents:
       - docs/internal/TESTING.md
       - docs/internal/legal/IP_GOVERNANCE.md
       - docs/internal/adr/ADR-024-external-business-integrations-and-protected-payout-boundaries.md
-      - islamic-value-sensitive-design/i-vsd-paid-event-payments-consultation.md
+      - islamic-value-sensitive-design/consultations/i-vsd-paid-event-payments-consultation.md
     load_skills:
       - clean-architecture-rules
       - cqrs-mediatr-guidelines
@@ -1882,7 +1882,7 @@ intents:
       - ".env.example"
       - "docker-compose.yml"
       - "docs/internal/adr/ADR-024-external-business-integrations-and-protected-payout-boundaries.md"
-      - "islamic-value-sensitive-design/i-vsd-paid-event-payments-consultation.md"
+      - "islamic-value-sensitive-design/consultations/i-vsd-paid-event-payments-consultation.md"
       - "docs/internal/API.md"
       - "docs/internal/API_CHANGELOG.md"
       - "docs/internal/API_CONTRACT_INVENTORY.md"
@@ -2123,7 +2123,7 @@ intents:
       - "docs/internal/BLAZOR.md"
       - "README.md"
       - "dev/zarchive/secrets-refactor-control-plane/**"
-      - "islamic-value-sensitive-design/i-vsd-secrets-refactor-control-plane.md"
+      - "islamic-value-sensitive-design/workstreams/i-vsd-secrets-refactor-control-plane.md"
     minimum_tests:
       - Event.Domain.UnitTests
       - Event.Application.UnitTests

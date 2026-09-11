@@ -96,7 +96,7 @@ Do not convert a search miss into proof of absence without recording what was se
 ## 8A. Complete I-VSD And Grill-Me Intake
 
 1. Supply I-VSD with the stable task name, original request, verified current-state evidence, provider-controlled decisions, affected stakeholders, known constraints, and missing evidence.
-2. Create or update `islamic-value-sensitive-design/i-vsd-<task-name>.md` as a `draft` planning report with stable `IVSD-Fnnn` findings, `IVSD-Mnnn` mitigations, escalation gates, and refresh triggers.
+2. Create or update `islamic-value-sensitive-design/workstreams/i-vsd-<task-name>.md` as a `draft` planning report with stable `IVSD-Fnnn` findings, `IVSD-Mnnn` mitigations, escalation gates, and refresh triggers.
 3. Resolve every material branch answerable from repository evidence.
 4. For each remaining branch that could alter scope, provider responsibility, architecture, API contracts, scenarios, or tasks, follow `grill-me`: recommend an answer with rationale, ask exactly one question, and wait.
 5. Do not design the future state until those branches are resolved or the user explicitly defers them with the resulting risk and ownership recorded. Plan open questions remain limited to genuinely deferrable details.
@@ -142,7 +142,7 @@ dev/active/<task-name>/
 
 All three files must contain `Last Updated: YYYY-MM-DD Europe/Brussels`. Cross-check status, next action, blockers, decisions, risks, phase names, task ids, and validation commands across the files before stopping.
 
-Link `islamic-value-sensitive-design/i-vsd-<task-name>.md` from the plan, context, and tasks artifacts, include its reviewed-input revision/status and the resolved Grill-Me decisions, then revalidate the completed triad through I-VSD planning mode. Every material `IVSD-*` ID must map to a named scenario/task, explicit non-applicability, or escalation gate. A `changes-required` or `escalation-required` disposition blocks plan-aligned status.
+Link `islamic-value-sensitive-design/workstreams/i-vsd-<task-name>.md` from the plan, context, and tasks artifacts, include its reviewed-input revision/status and the resolved Grill-Me decisions, then revalidate the completed triad through I-VSD planning mode. Every material `IVSD-*` ID must map to a named scenario/task, explicit non-applicability, or escalation gate. A `changes-required` or `escalation-required` disposition blocks plan-aligned status.
 
 Write the maintenance contract into the artifacts themselves so implementation agents do not need to reload this skill repeatedly:
 

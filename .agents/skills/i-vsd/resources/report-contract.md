@@ -18,11 +18,12 @@ last_updated_required: true
 
 Determine identity before checking for an existing report:
 
-- Planning workstream: `islamic-value-sensitive-design/i-vsd-<task-name>.md`.
-- Standalone subject review: `islamic-value-sensitive-design/i-vsd-<subject>-<report-kind>.md`.
-- Repository-wide review: `islamic-value-sensitive-design/i-vsd-repository-<report-kind>.md`.
-- Moral diff review: `islamic-value-sensitive-design/i-vsd-<workstream-or-branch>-moral-diff-review.md`.
-- Multiple reports: one subject-specific report per report kind plus `i-vsd-review-index.md`.
+- Planning workstream: `islamic-value-sensitive-design/workstreams/i-vsd-<task-name>.md`.
+- Standalone subject review / consultation: `islamic-value-sensitive-design/consultations/i-vsd-<subject>-<report-kind>.md`.
+- Constitutional & strategy review: `islamic-value-sensitive-design/governance/i-vsd-<subject>-<report-kind>.md`.
+- Repository-wide review: `islamic-value-sensitive-design/consultations/i-vsd-repository-<report-kind>.md` (or `governance/`).
+- Moral diff review: `islamic-value-sensitive-design/workstreams/i-vsd-<workstream-or-branch>-moral-diff-review.md`.
+- Multiple reports: one subject-specific report per report kind in its respective tier plus `islamic-value-sensitive-design/README.md` or `i-vsd-review-index.md`.
 
 Action-only filenames such as `i-vsd-consultancy-report.md` are allowed only when the workspace has one declared subject and the report metadata names it. Never reuse a generic path for unrelated subjects.
 

@@ -3197,15 +3197,15 @@ traceability only. It does not establish stakeholder or operational validation.
 | E004 | `docs/SECRETS.md` | Secret-provider and `.env` boundaries |
 | E005 | `docs/SECURITY-MODEL.md` | BFF, token, logging, and secret trust patterns |
 | E006 | `src/Explore.Domain/Secrets/SecretDefinitionRegistry.cs` | Secret keys, scopes, source types, and environment names |
-| E007 | `islamic-value-sensitive-design/i-vsd-configuration-manifest.md` | Manifest/package portability and strict non-secret boundary |
+| E007 | `islamic-value-sensitive-design/consultations/i-vsd-configuration-manifest.md` | Manifest/package portability and strict non-secret boundary |
 | E008 | `Directory.Packages.props` and `Directory.Build.props` | Central versions, lock files, and outbound package posture |
 | E009 | `docs/legal/IP_GOVERNANCE.md` and clean-room dependency gate | Complete dependency and provenance requirements |
-| E017 | `LICENSE` and `islamic-value-sensitive-design/i-vsd-licensing-and-commercial-strategy.md` | AGPL network-service and open-source governance context |
+| E017 | `LICENSE` and `islamic-value-sensitive-design/governance/i-vsd-licensing-and-commercial-strategy.md` | AGPL network-service and open-source governance context |
 | E022 | `docs/ACCESSIBILITY.md` | WCAG 2.2 AA-aligned repository standards |
 | E023 | `docs/LOCALIZATION.md` | Localization, offline bundles, and RTL behavior |
 | E024 | `src/Explore.Blazor.Client/Pages/Legal/TermsOfService.razor`, `PrivacyPolicy.razor`, and the active legal-document feature | Current role-labelled last-published legal rendering |
 | E025 | `docs/FOOTER_MANAGEMENT.md` | Existing instance/tenant legal-link and operator-role separation |
-| E026 | `islamic-value-sensitive-design/i-vsd-branding-legal-identity-authority.md` | Legal identity, operator attribution, and no-fallback boundaries |
+| E026 | `islamic-value-sensitive-design/governance/i-vsd-branding-legal-identity-authority.md` | Legal identity, operator attribution, and no-fallback boundaries |
 | E027 | `docs/DUAL_VERSIONING.md`, `docs/legal/IP_GOVERNANCE.md`, and `legal/CLA.md` | FOSS/commercial distinction, dependency obligations, and alternative outbound paths |
 | E031 | `eng/release/src/ISLAMU.ReleaseEngineering/Program.cs` and schema-generator `Program.cs` | Existing deterministic command, exit, bounded-output, and help conventions |
 | E032 | `.agents/skills/_SKILL_SCHEMA.md` | Required skill metadata, progressive disclosure, and verification shape |
@@ -3216,11 +3216,11 @@ traceability only. It does not establish stakeholder or operational validation.
 | E037 | `dev/active/setup-assistant-security-and-portability/setup-assistant-security-and-portability-clean-room-evidence.md` | Source-free WPF/framework observations, independent B1 architecture, clean-room attestation, outbound boundaries, and evidence limits |
 | E038 | `docs/AUTHORIZATION.md`, `docs/MULTI_TENANCY.md`, and repository authorization/tenant contracts | Existing server-owned actor, target, and tenant authority boundary |
 | E039 | `docs/PRIVACY_ERASURE.md` and repository privacy-erasure authority contracts | Authority-first ordering, anti-resurrection fencing, payload-free receipts, replay, and retention |
-| E040 | `docs/PAYMENTS.md`, `islamic-value-sensitive-design/i-vsd-paid-event-payments-consultation.md`, and repository payment/refund contracts | OrganizerDirect, immutable recipient/currency, deterministic allocation, idempotency, and reconciliation truth |
+| E040 | `docs/PAYMENTS.md`, `islamic-value-sensitive-design/consultations/i-vsd-paid-event-payments-consultation.md`, and repository payment/refund contracts | OrganizerDirect, immutable recipient/currency, deterministic allocation, idempotency, and reconciliation truth |
 | E041 | `dev/active/setup-assistant-security-and-portability/setup-assistant-security-and-portability-dependency-evidence.md` | Sanitized handoff preserving A's BCL-only graph and defining unapproved B1 CommunityToolkit/Avalonia/Terminal.Gui geometry/re-entry evidence |
 | E042 | `dev/active/setup-assistant-security-and-portability/setup-assistant-security-and-portability-cto-review.md` | Technical approval bound to successor A's exact Green revision; grants no approval to B or later work |
 | E043 | `dev/active/setup-assistant-security-and-portability/setup-assistant-security-and-portability-approval.md` | User approval bound to successor A's exact Green revision; confirms no later-successor inheritance |
-| E047 | `dev/active/setup-assistant-presentation-targets/` and `islamic-value-sensitive-design/i-vsd-setup-assistant-presentation-targets-b0.md` | Historical B0 shared-Razor/static-browser branch; explicitly superseded, non-executable, non-authorizing, never user-approved, and non-transferable to B1 |
+| E047 | `dev/active/setup-assistant-presentation-targets/` and `islamic-value-sensitive-design/workstreams/i-vsd-setup-assistant-presentation-targets-b0.md` | Historical B0 shared-Razor/static-browser branch; explicitly superseded, non-executable, non-authorizing, never user-approved, and non-transferable to B1 |
 | E048 | `dev/active/setup-assistant-security-and-portability/setup-assistant-security-and-portability-b1-review-bindings.md` | Immutable B1 binding ID, six exact artifact hashes, architecture scope, authority boundary, and drift invalidation |
 | E049 | `dev/active/setup-assistant-security-and-portability/setup-assistant-security-and-portability-b1-intake-review.md` | Tier 1 decision-complete architecture, session/generation/secret invariants, adapter semantics, probe gates, and stop conditions |
 | E050 | `dev/active/setup-assistant-security-and-portability/setup-assistant-security-and-portability-b1-post-red-review-bindings.md` | Exact post-Red binding, activation scope, safe CLI environment, unchanged product preimage, and drift invalidation |
@@ -3351,7 +3351,7 @@ recomputed and matched:
 | `dev/active/setup-assistant-security-and-portability/setup-assistant-security-and-portability-context.md` | `a6459a97e175bf29a68c1960de3e82f7315fde7e4990fad81327aa7d46e6ceb1` |
 | `dev/active/setup-assistant-security-and-portability/setup-assistant-security-and-portability-clean-room-evidence.md` | `d0a0d0e1a581d6b930e2bfb7b66d8787acd8b8e933660d3844eea9ccf5d3687c` |
 | `dev/active/setup-assistant-security-and-portability/setup-assistant-security-and-portability-dependency-evidence.md` | `ce005b80fd4853a93e2bc20a393e9f015387454738484f5854c70ce20be4bee1` |
-| `islamic-value-sensitive-design/i-vsd-setup-assistant-security-and-portability.md` (review preimage) | `84978de42607bdd8c6459de7777a2d4331134384c31d67b88900902b68a326a5` |
+| `islamic-value-sensitive-design/consultations/i-vsd-setup-assistant-security-and-portability.md` (review preimage) | `84978de42607bdd8c6459de7777a2d4331134384c31d67b88900902b68a326a5` |
 | `src/Event.Setup.Core/Event.Setup.Core.csproj` | `b038160cde81ff2b188739d3a8f67eb014323e5b46f8833e48fdc7c6b59737cf` |
 | `src/Event.Setup.Core/packages.lock.json` | `d8d75d293ca094de8a27aaa566500176f5185cf1c06149668bb0a225efe8e8a8` |
 | `tests/Event.Setup.Core.Tests/Event.Setup.Core.Tests.csproj` | `49f51e7f7c93c134bc359134be73fc1060033ba9c015265dbb50f9ff01f40d9e` |
@@ -3395,7 +3395,7 @@ matching the expected digest. Every artifact named by that binding matched:
 | `dev/active/setup-assistant-security-and-portability/setup-assistant-security-and-portability-phase8-dependency-review.md` | `d055ae1ab361d1be3cfe3a54a589df76bdd36634f3a16cb4305483337af2f051` |
 | `dev/active/setup-assistant-security-and-portability/setup-assistant-security-and-portability-phase8-security-review.md` | `83b07a08a533a763557ac0b0f8b801d89ce7570274ef0094da20fde75ab966cf` |
 | `dev/active/setup-assistant-security-and-portability/setup-assistant-security-and-portability-phase8-cto-review.md` | `a732deaef47aac604dfc2003836a08b72827efde821efb46e4ff4f00c1632ce2` |
-| `islamic-value-sensitive-design/i-vsd-setup-assistant-security-and-portability.md` (review preimage) | `f13b603a4429e233ff241a0161d86c0812b822dc7e5797997e1a0803ebd5dbf6` |
+| `islamic-value-sensitive-design/consultations/i-vsd-setup-assistant-security-and-portability.md` (review preimage) | `f13b603a4429e233ff241a0161d86c0812b822dc7e5797997e1a0803ebd5dbf6` |
 | `src/Event.Setup.Core/Event.Setup.Core.csproj` | `b038160cde81ff2b188739d3a8f67eb014323e5b46f8833e48fdc7c6b59737cf` |
 | `src/Event.Setup.Core/packages.lock.json` | `d8d75d293ca094de8a27aaa566500176f5185cf1c06149668bb0a225efe8e8a8` |
 | `tests/Event.Setup.Core.Tests/Event.Setup.Core.Tests.csproj` | `49f51e7f7c93c134bc359134be73fc1060033ba9c015265dbb50f9ff01f40d9e` |
@@ -3439,7 +3439,7 @@ update:
 | `dev/active/setup-assistant-security-and-portability/setup-assistant-security-and-portability-phase8-security-review.md` | `83b07a08a533a763557ac0b0f8b801d89ce7570274ef0094da20fde75ab966cf` |
 | `dev/active/setup-assistant-security-and-portability/setup-assistant-security-and-portability-phase8-cto-review.md` | `a732deaef47aac604dfc2003836a08b72827efde821efb46e4ff4f00c1632ce2` |
 | `dev/active/setup-assistant-security-and-portability/setup-assistant-security-and-portability-phase8-corrected-cto-review.md` | `ff9c0099a9bd2fea7ec92d8a81ae1bcab6d45dbf3953b2ac8f88f745f180534b` |
-| `islamic-value-sensitive-design/i-vsd-setup-assistant-security-and-portability.md` (review preimage) | `ccb3d207f06926d9d34d8695a85ce61e685b6474d4eaad1142ef4c5519b9c13f` |
+| `islamic-value-sensitive-design/consultations/i-vsd-setup-assistant-security-and-portability.md` (review preimage) | `ccb3d207f06926d9d34d8695a85ce61e685b6474d4eaad1142ef4c5519b9c13f` |
 | `src/Event.Setup.Core/Event.Setup.Core.csproj` | `b038160cde81ff2b188739d3a8f67eb014323e5b46f8833e48fdc7c6b59737cf` |
 | `src/Event.Setup.Core/packages.lock.json` | `d8d75d293ca094de8a27aaa566500176f5185cf1c06149668bb0a225efe8e8a8` |
 | `tests/Event.Setup.Core.Tests/Event.Setup.Core.Tests.csproj` | `49f51e7f7c93c134bc359134be73fc1060033ba9c015265dbb50f9ff01f40d9e` |

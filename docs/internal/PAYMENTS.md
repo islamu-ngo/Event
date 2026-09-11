@@ -596,4 +596,4 @@ merchant's accounting, tax, invoice, credit-note, banking, or escrow system.
 - [SECRETS.md](SECRETS.md) - Multi-provider secret management
 - [SECURITY-MODEL.md](SECURITY-MODEL.md) - Platform security invariants and privilege boundaries
 - [WEBHOOKS.md](WEBHOOKS.md) - Webhook delivery, callback verifications, and operational runbooks
-- [I-VSD Paid Event Payments Consultation](../../islamic-value-sensitive-design/i-vsd-paid-event-payments-consultation.md)
+- [I-VSD Paid Event Payments Consultation](../../islamic-value-sensitive-design/consultations/i-vsd-paid-event-payments-consultation.md)

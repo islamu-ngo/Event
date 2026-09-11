@@ -25,7 +25,7 @@ priority: high
 - Selected Sunni ethical principles are normative; laws and industry standards may operationalize them only where compatible.
 - Review responsibility across strategy, business model, UX, architecture, data/AI, operations, governance, support, portability, and evaluation—not only the surface named in the prompt.
 - Trace findings to principles, affected stakeholders, provider-controlled decisions, evidence reviewed, missing evidence, rejected alternatives, and concrete mitigations.
-- Persist substantive I-VSD findings, recommendations, advisories, audits, and consultations under `islamic-value-sensitive-design/i-vsd-*.md`; menus, refusals, context inventories, clarification questions, and agreement prompts remain conversational.
+- Persist substantive I-VSD findings under `islamic-value-sensitive-design/` partitioned by purpose (`governance/` for constitutional policies, `consultations/` for domain deep dives, and `workstreams/` for `dev/active/<task>` planning deliverables) using the `i-vsd-*.md` naming pattern; menus, refusals, context inventories, clarification questions, and agreement prompts remain conversational.
 - State uncertainty and evidence limits; never replace absent stakeholder, operational, audit, or scholarly evidence with confidence.
 
 ## Invocation Modes

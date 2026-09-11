@@ -420,7 +420,7 @@ ISLAMU Event operates on a transparent three-pillar model designed for universal
 2. **Enterprise Internal-Use License (Anti-SaaS):** For enterprises whose internal compliance policies ban AGPL copyleft on private internal infrastructure. This license waives Section 13 network copyleft for private on-premises/VPC deployments and internal corporate events, while **strictly forbidding external SaaS or commercial cloud hosting**. Paid for commercial corporations (funding security audits and maintainers); gratis ($0) for verified non-profits and educational institutions.
 3. **Official Partner Program:** For certified agencies, hosters, and integrators. Partners operate on the exact same 100% AGPLv3 codebase (no proprietary code privilege). Commercial value is generated through quality certification, trust branding, and official directory listings.
 
-For the full ethical and strategic design analysis, see the [I-VSD Strategy Review](islamic-value-sensitive-design/i-vsd-licensing-and-commercial-strategy.md).
+For the full ethical and strategic design analysis, see the [I-VSD Strategy Review](islamic-value-sensitive-design/governance/i-vsd-licensing-and-commercial-strategy.md).
 
 ### Standalone Core And Optional Services
 

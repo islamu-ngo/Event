@@ -45,7 +45,7 @@ Questions:
 
 Check:
 
-- `plan.md`, `context.md`, and `tasks.md` link the same `islamic-value-sensitive-design/i-vsd-*.md`.
+- `plan.md`, `context.md`, and `tasks.md` link the same `islamic-value-sensitive-design/workstreams/i-vsd-*.md`.
 - The report distinguishes provider responsibility from religious rulings or certification.
 - Applicable principles, stakeholders, risks, mitigations, and evidence are traceable to plan tasks.
 - Missing evidence and Sunni scholarly escalation needs are explicit.

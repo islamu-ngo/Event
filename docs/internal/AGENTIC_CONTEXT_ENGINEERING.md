@@ -88,7 +88,7 @@ This is the standard, end-to-end path for implementing substantial features and 
 flowchart TD
     subgraph Stage1["Stage 1: Ethical & Value Framing (User-Invoked)"]
         UserTrigger1["User Prompt:\n'Run i-vsd on <feature>'"] --> IVSD["i-vsd Skill\n• Evaluates Provider Responsibility\n• Sunni Islamic Moral Boundaries\n• Mitigation & Uncertainty Traceability"]
-        IVSD --> IVSDDoc["Persists Deliverable:\nislamic-value-sensitive-design/\ni-vsd-<task-name>.md"]
+        IVSD --> IVSDDoc["Persists Deliverable:\nislamic-value-sensitive-design/workstreams/\ni-vsd-<task-name>.md"]
     end
 
     subgraph Stage2["Stage 2: Implementation Planning & Interrogation (User-Invoked)"]

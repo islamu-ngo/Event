@@ -56,7 +56,7 @@ banner rule. Generated artifacts remain tool-owned; never prepend banners by han
 - [Domain semantics](../DOMAIN.md#location-unicode-search-text)
 - [Runtime and migration operations](../OPERATIONS.md#location-unicode-runtime-compatibility)
 - [Public operator guidance](../../public/documentation/readme/configuration-and-operations/backup-restore-upgrade.md#location-search-upgrade-and-runtime-changes)
-- [I-VSD review](../../../islamic-value-sensitive-design/i-vsd-unicode-location-search-simplification.md)
+- [I-VSD review](../../../islamic-value-sensitive-design/workstreams/i-vsd-unicode-location-search-simplification.md)
 
 Research handoff used official Unicode normalization, .NET globalization, EF collation,
 SQL Server CHARINDEX, and MySQL binary-collation behavior as source-free requirements.

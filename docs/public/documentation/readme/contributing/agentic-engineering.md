@@ -43,7 +43,7 @@ flowchart TD
 Before designing features that touch user data, privacy, monetization, or permissions, we run an **Islamic Value-Sensitive Design (I-VSD)** assessment:
 * Evaluates provider responsibility and normative Sunni ethics.
 * Identifies stakeholder harm vectors and mandates explicit mitigations.
-* Persists durable findings under `islamic-value-sensitive-design/i-vsd-<task>.md`.
+* Persists durable findings under `islamic-value-sensitive-design/workstreams/i-vsd-<task>.md`.
 
 ### Stage 2: Implementation Planning (`implementation-plan`)
 The planning phase is strictly analytical and architectural:

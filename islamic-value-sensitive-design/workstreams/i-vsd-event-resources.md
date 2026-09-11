@@ -124,7 +124,7 @@ Repository HEAD: `506e0bf7585c9906bbb1f79d5cbd49090f043741` on `develop`, tracki
 The main agent reviewed the following source manifest after graph-first discovery. Concatenate GNU `sha256sum` output for these paths in this exact order and hash the concatenation to reproduce the evidence revision; no plan/report file includes its own digest.
 
 ```text
-islamic-value-sensitive-design/i-vsd-event-resource-consultancy-report.md
+islamic-value-sensitive-design/consultations/i-vsd-event-resource-consultancy-report.md
 src/Explore.Domain/Event.cs
 src/Explore.Domain/EventSession.cs
 src/Explore.Domain/RegistrationParticipant.cs

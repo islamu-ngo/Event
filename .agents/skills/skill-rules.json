@@ -653,7 +653,7 @@
         "intentPatterns": []
       },
       "fileTriggers": {
-        "pathPatterns": ["**/islamic-value-sensitive-design/*.md"],
+        "pathPatterns": ["**/islamic-value-sensitive-design/**/*.md", "**/islamic-value-sensitive-design/*.md"],
         "contentPatterns": []
       }
     },

@@ -46,7 +46,7 @@ CTO review implication:
 
 Before approval:
 
-- verify that `plan.md`, `context.md`, and `tasks.md` link the same dated `islamic-value-sensitive-design/i-vsd-*.md`;
+- verify that `plan.md`, `context.md`, and `tasks.md` link the same dated `islamic-value-sensitive-design/workstreams/i-vsd-*.md`;
 - block approval when provider-controlled moral risks, evidence limits, mitigations, or scholarly escalation boundaries are missing;
 - apply the `grill-me` mindset to rollback safety, tenant boundaries, query-performance thresholds, operator clarity, dependency failures, and edge cases;
 - resolve challenges from repository evidence first, then require an explicit decision for every remaining material fork instead of accepting an assumption.

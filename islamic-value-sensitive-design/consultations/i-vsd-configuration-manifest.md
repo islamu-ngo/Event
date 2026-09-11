@@ -1445,13 +1445,13 @@ only. It does not provide stakeholder or operational validation.
 | E009 | `docs/EXTENSIBILITY.md` and `docs/CUSTOM_PROPERTIES.md` | Module, template, custom-property, projection, and extension boundaries |
 | E010 | `docs/FOOTER_MANAGEMENT.md` and `docs/ADMIN_GUIDE.md` | Tenant/instance administration, footer, templates, navigation, and authority |
 | E011 | `docs/SECRETS.md`, `docs/SECURITY-MODEL.md`, and `docs/CONFIGURATION_MANIFEST.md` | Secret, BFF, trust, and current manifest boundaries |
-| E012 | `islamic-value-sensitive-design/i-vsd-paid-event-payments-consultation.md` | Paid-policy, provider, liability, refund, and organizer authority separation |
+| E012 | `islamic-value-sensitive-design/consultations/i-vsd-paid-event-payments-consultation.md` | Paid-policy, provider, liability, refund, and organizer authority separation |
 | E013 | `docs/LOCALIZATION.md` | Localization governance and static bundle import/export precedent |
 | E014 | `docs/ACCESSIBILITY.md` | WCAG 2.2 AA, focus, announcements, reflow, and RTL requirements |
 | E015 | `src/Explore.Blazor.Client/Pages/Legal/TermsOfService.razor` and `PrivacyPolicy.razor` | Current static legal-text implementation |
 | E016 | `docs/FOOTER_MANAGEMENT.md` | Existing role-separated instance/tenant legal links |
-| E017 | `islamic-value-sensitive-design/i-vsd-branding-legal-identity-authority.md` | Legal identity and no-substitution boundaries |
-| E018 | `islamic-value-sensitive-design/i-vsd-setup-assistant-security-and-portability.md` | Legal templates, Markdown editor, FOSS licensing, CLI/TUI, agent skill, and cross-platform constraints |
+| E017 | `islamic-value-sensitive-design/governance/i-vsd-branding-legal-identity-authority.md` | Legal identity and no-substitution boundaries |
+| E018 | `islamic-value-sensitive-design/consultations/i-vsd-setup-assistant-security-and-portability.md` | Legal templates, Markdown editor, FOSS licensing, CLI/TUI, agent skill, and cross-platform constraints |
 | E019 | [Terminal.Gui documentation](https://tui-cs.github.io/Terminal.Gui/index.html) and [NuGet metadata](https://api.nuget.org/v3/catalog0/data/2026.07.07.12.25.25/terminal.gui.2.4.17.json) | Cross-platform TUI capabilities, MIT package metadata, and transitive inventory |
 | E020 | `eng/release/src/ISLAMU.ReleaseEngineering/Program.cs`, schema-generator `Program.cs`, `.agents/skills/_SKILL_SCHEMA.md`, and skill-authoring workflow | Existing CLI and skill contracts |
 | E021 | `docs/legal/IP_GOVERNANCE.md`, `docs/DUAL_VERSIONING.md`, and `legal/CLA.md` | FOSS/commercial, reciprocal, and alternative-outbound boundaries |

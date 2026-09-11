@@ -34,7 +34,7 @@ Refusals, menus, context inventories, clarification questions, and agreement pro
 Use when `implementation-plan` invokes I-VSD for a named workstream. The explicit user request to create or re-baseline the implementation plan satisfies the normal agreement prompt for this integrated intake only; it does not authorize assumptions or suppress necessary questions.
 
 1. The planner performs one shared repository/current-state investigation and supplies the evidence packet, stable task name, proposed scope, stakeholders, and provider-controlled decisions.
-2. I-VSD creates or updates `islamic-value-sensitive-design/i-vsd-<task-name>.md` as `draft`, with stable findings, mitigations, escalation questions, and refresh triggers.
+2. I-VSD creates or updates `islamic-value-sensitive-design/workstreams/i-vsd-<task-name>.md` as `draft`, with stable findings, mitigations, escalation questions, and refresh triggers.
 3. I-VSD or `grill-me` may stop for material user context. Do not draft around an unresolved decision that changes provider responsibility or task structure.
 4. The planner resolves remaining requirements and drafts behavior, architecture, scenarios, and tasks.
 5. I-VSD revalidates the completed triad against the same evidence packet plus proposed design. It sets `plan-aligned`, `changes-required`, or `escalation-required`.

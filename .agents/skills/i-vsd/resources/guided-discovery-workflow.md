@@ -3,7 +3,7 @@
 
 # Guided Discovery Workflow
 
-Use this resource for the `guided-discovery` action when the user does not yet have enough context, artifacts, or decisions for an evidence review. The goal is to ask structured questions first, help the user clarify mission and constraints, then produce `islamic-value-sensitive-design/i-vsd-guided-discovery.md` with contextual I-VSD recommendations.
+Use this resource for the `guided-discovery` action when the user does not yet have enough context, artifacts, or decisions for an evidence review. The goal is to ask structured questions first, help the user clarify mission and constraints, then produce `islamic-value-sensitive-design/consultations/i-vsd-guided-discovery.md` with contextual I-VSD recommendations.
 
 ## Core Rule
 

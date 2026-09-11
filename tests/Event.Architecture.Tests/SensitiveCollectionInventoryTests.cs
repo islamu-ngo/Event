@@ -40,7 +40,8 @@ public sealed class SensitiveCollectionInventoryTests
         requestType
             .GetInterfaces()
             .Where(contract => contract.IsGenericType
-                && contract.GetGenericTypeDefinition() == typeof(IRequest<>))
+                && (contract.GetGenericTypeDefinition() == typeof(IRequest<>)
+                    || OperationContractDiscovery.IsResultContract(contract)))
             .Select(contract => contract.GetGenericArguments()[0])
             .Any(ContainsPaginatedResult);
 

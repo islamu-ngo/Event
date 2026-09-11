@@ -510,7 +510,7 @@ public sealed class CoordinateWriteAuthorityArchitectureTests
 
         string name = type.Name;
         string typeNamespace = type.Namespace ?? string.Empty;
-        if (typeof(IBaseRequest).IsAssignableFrom(type))
+        if (OperationContractDiscovery.IsRequest(type))
         {
             return typeNamespace.Contains(".Requests.Commands", StringComparison.Ordinal)
                 || name.EndsWith("Command", StringComparison.Ordinal)
@@ -527,7 +527,7 @@ public sealed class CoordinateWriteAuthorityArchitectureTests
         string name = type.Name;
         string typeNamespace = type.Namespace ?? string.Empty;
 
-        return typeof(IBaseRequest).IsAssignableFrom(type)
+        return OperationContractDiscovery.IsRequest(type)
             || typeNamespace.StartsWith("Explore.Application", StringComparison.Ordinal)
                 && !typeNamespace.Contains(".Validators", StringComparison.Ordinal)
                 && !name.EndsWith("Validator", StringComparison.Ordinal)
@@ -547,7 +547,7 @@ public sealed class CoordinateWriteAuthorityArchitectureTests
         || name.EndsWith($"{suffix}Dto", StringComparison.Ordinal);
 
     private static bool IsMachineGeneratedRequest(Type type) =>
-        typeof(IBaseRequest).IsAssignableFrom(type) && IsGenerated(type);
+        OperationContractDiscovery.IsRequest(type) && IsGenerated(type);
 
     private static bool IsGenerated(Type type) =>
         type.GetCustomAttribute<GeneratedCodeAttribute>() is not null

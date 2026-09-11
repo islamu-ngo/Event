@@ -354,7 +354,7 @@ namespace Event.Architecture.Tests
         private static bool IsCompiledApplicationRequest(Type type) =>
             type.Assembly == ApplicationAssembly
             && type is { IsClass: true, IsAbstract: false }
-            && typeof(IBaseRequest).IsAssignableFrom(type)
+            && OperationContractDiscovery.IsRequest(type)
             && !IsGenerated(type)
             && !IsTestFixture(type);
 
@@ -419,7 +419,7 @@ namespace Event.Architecture.Tests
                 return ContractClassification.TestFixture;
             if (IsRecord(type))
                 return ContractClassification.Record;
-            if (type is { IsClass: true, IsAbstract: false } && typeof(IBaseRequest).IsAssignableFrom(type))
+            if (type is { IsClass: true, IsAbstract: false } && OperationContractDiscovery.IsRequest(type))
                 return ContractClassification.ConcreteMediatRClassRequest;
             if (type is { IsClass: true, IsAbstract: false } && IsApplicationContractOwned(type))
                 return ContractClassification.HandwrittenApplicationClassDto;

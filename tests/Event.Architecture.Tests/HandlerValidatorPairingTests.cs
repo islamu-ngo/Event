@@ -30,8 +30,7 @@ public sealed class HandlerValidatorPairingTests
     }
 
     private static bool IsRequestHandlerInterface(Type type) =>
-        type.IsGenericType
-        && type.GetGenericTypeDefinition() == typeof(IRequestHandler<,>);
+        OperationContractDiscovery.IsHandler(type);
 
     private static bool IsValidatorType(Type type) =>
         type.IsGenericType

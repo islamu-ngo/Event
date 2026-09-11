@@ -591,18 +591,21 @@ internal static class AuthorizationSurfaceInventory
 
     private static bool IsConcreteMediatRRequest(Type type) =>
         type is { IsAbstract: false, IsInterface: false }
-        && GetResponseType(type) is not null;
+        && (GetResponseType(type) is not null || OperationContractDiscovery.IsNativeRequest(type));
 
     private static Type? GetResponseType(Type type) =>
         type.GetInterfaces()
-            .Where(interfaceType => interfaceType.IsGenericType && interfaceType.GetGenericTypeDefinition() == typeof(IRequest<>))
+            .Where(interfaceType => interfaceType.IsGenericType
+                && (interfaceType.GetGenericTypeDefinition() == typeof(IRequest<>)
+                    || OperationContractDiscovery.IsResultContract(interfaceType)))
             .Select(interfaceType => interfaceType.GetGenericArguments()[0])
             .FirstOrDefault();
 
     private static bool IsMutatingRequest(Type type)
     {
         var responseType = GetResponseType(type);
-        return type.Name.EndsWith("Command", StringComparison.Ordinal)
+        return OperationContractDiscovery.IsCommand(type)
+            || type.Name.EndsWith("Command", StringComparison.Ordinal)
             || (type.Namespace?.Contains(".Commands", StringComparison.Ordinal) ?? false)
             || MutatingNamePrefixes.Any(prefix => type.Name.StartsWith(prefix, StringComparison.Ordinal))
             || IsCommandResponse(responseType)

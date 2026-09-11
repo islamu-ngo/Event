@@ -1,4 +1,3 @@
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.OrganizationReview;
@@ -12,18 +11,26 @@ public class CreateOrganizationReviewCommandHandler : IRequestHandler<CreateOrga
 {
     private readonly IOrganizationReviewRepository _organizationReviewRepository;
     private readonly ITenantContext _tenantContext;
-    private readonly IMapper _mapper;
 
-    public CreateOrganizationReviewCommandHandler(IOrganizationReviewRepository organizationReviewRepository, ITenantContext tenantContext, IMapper mapper)
+    public CreateOrganizationReviewCommandHandler(IOrganizationReviewRepository organizationReviewRepository, ITenantContext tenantContext)
     {
         _organizationReviewRepository = organizationReviewRepository;
         _tenantContext = tenantContext;
-        _mapper = mapper;
     }
 
     public async Task<BaseCommandResponse<Guid>> Handle(CreateOrganizationReviewCommand request, CancellationToken cancellationToken)
     {
-        var organizationReview = _mapper.Map<OrganizationReview>(request.CreateOrganizationReviewDto);
+        var organizationReview = new OrganizationReview
+        {
+            OrganizationId = request.CreateOrganizationReviewDto.OrganizationId,
+            Organization = null!,
+            EventId = request.CreateOrganizationReviewDto.ProgramId,
+            Event = null!,
+            ReviewerName = request.CreateOrganizationReviewDto.ReviewerName,
+            Rating = request.CreateOrganizationReviewDto.Rating,
+            Comment = request.CreateOrganizationReviewDto.Comment,
+            Tenant = null!
+        };
 
         organizationReview.UserId = request.ReviewerUserId;
         organizationReview.CreatedAt = DateTime.UtcNow;

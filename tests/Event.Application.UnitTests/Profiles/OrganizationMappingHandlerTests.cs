@@ -3,6 +3,12 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Group;
 using Explore.Application.DTOs.Organization;
+using Explore.Application.DTOs.OrganizationReview;
+using Explore.Application.Features.OrganizationReviews.Commands.CreateOrganizationReview;
+using Explore.Application.Features.OrganizationReviews.Queries.GetMyReviews;
+using Explore.Application.Features.OrganizationReviews.Queries.GetOrganizationReviews;
+using Explore.Application.Mappings;
+using System.Text.Json;
 using Explore.Application.Features.Organizations.Handlers.Commands;
 using Explore.Application.Features.Organizations.Handlers.Queries;
 using Explore.Application.Features.Organizations.Requests.Commands;
@@ -184,6 +190,89 @@ public sealed class OrganizationMappingHandlerTests
         await Assert.That(members.Items.Single().RoleId).IsEqualTo((int)RoleEnum.OrgAdmin);
         await Assert.That(actors.Items.Single().DisplayName).IsEqualTo("New organization");
         await Assert.That(actors.Items.Single().OrganizationId).IsEqualTo(Id);
+    }
+
+    [Test]
+    public async Task ReviewCreation_KeepsProgramTranslationAndTrustedTenantUserAuditFields()
+    {
+        var store = new ReviewStore([]);
+        var handler = new CreateOrganizationReviewCommandHandler(store, new TenantContext(TenantId));
+        var input = JsonSerializer.Deserialize<CreateOrganizationReviewDto>("""
+            {
+              "organizationId":"01900000-0000-7000-8000-000000000001",
+              "programId":"01900000-0000-7000-8000-000000000004",
+              "reviewerName":"Submitted reviewer", "rating":4, "comment":"Useful event",
+              "tenantId":"01900000-0000-7000-8000-000000000004",
+              "userId":"01900000-0000-7000-8000-000000000004", "isDeleted":true
+            }
+            """, JsonOptions)!;
+        var result = await handler.Handle(new CreateOrganizationReviewCommand { CreateOrganizationReviewDto = input, ReviewerUserId = ActorId }, default);
+        await Assert.That(result.IsSuccess).IsTrue();
+        var review = store.Items.Single();
+        await Assert.That(review.OrganizationId).IsEqualTo(Id);
+        await Assert.That(review.EventId).IsEqualTo(Stamp);
+        await Assert.That(review.ReviewerName).IsEqualTo("Submitted reviewer");
+        await Assert.That(review.Rating).IsEqualTo(4);
+        await Assert.That(review.Comment).IsEqualTo("Useful event");
+        await Assert.That(review.TenantId).IsEqualTo(TenantId);
+        await Assert.That(review.UserId).IsEqualTo(ActorId);
+        await Assert.That(review.CreatedBy).IsEqualTo(ActorId);
+        await Assert.That(review.UpdatedBy).IsEqualTo(ActorId);
+        await Assert.That(review.IsDeleted).IsFalse();
+        await Assert.That(review.DeletedBy).IsNull();
+        var mine = await new GetMyReviewsQueryHandler(store).Handle(new GetMyReviewsQuery(ActorId), default);
+        await Assert.That(mine.Single().UserFullName).IsNull();
+        await Assert.That(mine.Single().Rating).IsEqualTo(4);
+        await Assert.That(await new GetMyReviewsQueryHandler(store).Handle(new GetMyReviewsQuery(TenantId), default)).IsEmpty();
+        await AssertFields(mine.Single(), "id", "organizationId", "organizationFullName", "userId", "userFullName", "rating", "comment", "createdAt");
+    }
+
+    [Test]
+    public async Task ReviewQueries_PreserveOrderedSnapshotsWithoutReviewerOrTenantDisclosure()
+    {
+        var first = new OrganizationReview
+        {
+            Id = Id, OrganizationId = Id, Organization = CreateOrganization(), EventId = Stamp, Event = null!,
+            UserId = ActorId, User = CreateUser(), ReviewerName = "Private submitted reviewer", Rating = 5,
+            Comment = "Public comment", CreatedAt = CreatedAt, TenantId = TenantId, Tenant = null!, CreatedBy = TenantId, IsDeleted = true
+        };
+        var second = new OrganizationReview
+        {
+            Id = Stamp, OrganizationId = Id, Organization = null!, Event = null!, UserId = ActorId,
+            ReviewerName = "Do not use as fallback", Rating = 1, Tenant = null!, Comment = null
+        };
+        var store = new ReviewStore([second, first]);
+        var items = await new GetOrganizationReviewsQueryHandler(store).Handle(new GetOrganizationReviewsQuery(Id), default);
+        await Assert.That(items.Select(item => item.Id).SequenceEqual(new[] { Stamp, Id })).IsTrue();
+        await Assert.That(items[0].Comment).IsNull();
+        await Assert.That(items[0].UserFullName).IsNull();
+        var dto = items[1];
+        await Assert.That(dto.OrganizationId).IsEqualTo(Id);
+        await Assert.That(dto.OrganizationFullName).IsEqualTo("Community organization");
+        await Assert.That(dto.UserId).IsEqualTo(ActorId);
+        await Assert.That(dto.UserFullName).IsEqualTo("Member Name");
+        await Assert.That(dto.Rating).IsEqualTo(5);
+        await Assert.That(dto.Comment).IsEqualTo("Public comment");
+        await Assert.That(dto.CreatedAt).IsEqualTo(CreatedAt);
+        await AssertFields(dto, "id", "organizationId", "organizationFullName", "userId", "userFullName", "rating", "comment", "createdAt");
+        store.Items.Clear();
+        first.User!.Pii = null!;
+        first.Organization.Pii = null!;
+        first.Comment = "Changed";
+        var erased = OrganizationMapper.ToOrganizationReview(first);
+        await Assert.That(erased.UserFullName).IsNull();
+        await Assert.That(erased.OrganizationFullName).IsNull();
+        await Assert.That(items[1].Comment).IsEqualTo("Public comment");
+        await Assert.That(items[1].UserFullName).IsEqualTo("Member Name");
+    }
+
+    internal sealed class ReviewStore(List<OrganizationReview> items) : Store<OrganizationReview, Guid>, IOrganizationReviewRepository
+    {
+        public List<OrganizationReview> Items { get; } = items;
+        public override Task<OrganizationReview> Create(OrganizationReview entity) { entity.Id = Id; Items.Add(entity); return Task.FromResult(entity); }
+        public Task<List<OrganizationReview>> GetByOrganizationId(Guid organizationId) => Task.FromResult(Items.Where(item => item.OrganizationId == organizationId).ToList());
+        public Task<List<OrganizationReview>> GetByUserId(Guid userId) => Task.FromResult(Items.Where(item => item.UserId == userId).ToList());
+        public Task<bool> HasUserReviewedProgram(Guid userId, Guid programId) => throw new NotSupportedException();
     }
 
     internal sealed class OrganizationStore(List<Organization> items) : Store<Organization, Guid>, IOrganizationRepository

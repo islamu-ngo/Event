@@ -2,6 +2,7 @@ using Explore.Application.DTOs.Group;
 using Explore.Application.DTOs.GroupMember;
 using Explore.Application.DTOs.Organization;
 using Explore.Application.DTOs.OrganizationMember;
+using Explore.Application.DTOs.OrganizationReview;
 using Explore.Domain.Enums;
 using Explore.Domain;
 using Riok.Mapperly.Abstractions;
@@ -196,6 +197,24 @@ public static partial class OrganizationMapper
     [MapProperty(nameof(OrganizationMember.User), nameof(OrganizationInvitationDto.Email), Use = nameof(InvitationEmail))]
     [MapProperty(nameof(OrganizationMember.RoleId), nameof(OrganizationInvitationDto.Role), Use = nameof(InvitationRole))]
     public static partial OrganizationInvitationDto ToOrganizationInvitation(OrganizationMember source);
+
+    // Review transport omits the submitted reviewer name, event, tenant and audit authors.
+    [MapperIgnoreSource(nameof(OrganizationReview.EventId))]
+    [MapperIgnoreSource(nameof(OrganizationReview.Event))]
+    [MapperIgnoreSource(nameof(OrganizationReview.ReviewerName))]
+    [MapperIgnoreSource(nameof(OrganizationReview.TenantId))]
+    [MapperIgnoreSource(nameof(OrganizationReview.Tenant))]
+    [MapperIgnoreSource(nameof(OrganizationReview.CreatedBy))]
+    [MapperIgnoreSource(nameof(OrganizationReview.UpdatedAt))]
+    [MapperIgnoreSource(nameof(OrganizationReview.UpdatedBy))]
+    [MapperIgnoreSource(nameof(OrganizationReview.IsDeleted))]
+    [MapperIgnoreSource(nameof(OrganizationReview.DeletedAt))]
+    [MapperIgnoreSource(nameof(OrganizationReview.DeletedBy))]
+    [MapProperty(nameof(OrganizationReview.Organization), nameof(OrganizationReviewDto.OrganizationFullName), Use = nameof(ReviewOrganizationName))]
+    [MapProperty(nameof(OrganizationReview.User), nameof(OrganizationReviewDto.UserFullName), Use = nameof(MemberName))]
+    public static partial OrganizationReviewDto ToOrganizationReview(OrganizationReview source);
+
+    private static string? ReviewOrganizationName(Organization? organization) => organization?.Pii?.FullName;
 
     private static string? ParticipationOrganizationName(OrganizationTenant? participation) => participation?.Organization?.Pii?.FullName;
     private static string? OrganizationPositionName(OrganizationPosition? position) => position?.FullName;

@@ -266,6 +266,34 @@ public sealed class OrganizationMappingHandlerTests
         await Assert.That(items[1].UserFullName).IsEqualTo("Member Name");
     }
 
+    [Test]
+    public async Task ApprovalStatuses_PreserveOrderedScalarSnapshotsAndNullableDescription()
+    {
+        var first = new ApprovalStatus { Id = 7, MasterCode = "APPROVED", FullName = "Approved", Description = "Public description" };
+        var second = new ApprovalStatus { Id = 2, MasterCode = "PENDING", FullName = "Pending", Description = null };
+        var store = new ApprovalStatusStore([first, second]);
+        var handler = new Explore.Application.Features.StatusTypes.Handlers.Queries.GetStatusTypeListRequestHandler(store);
+        var items = await handler.Handle(new Explore.Application.Features.StatusTypes.Requests.Queries.GetStatusTypeListRequest { FullName = "Not a filter", Id = 999 }, default);
+        await Assert.That(items.Select(item => item.Id).SequenceEqual(new[] { 7, 2 })).IsTrue();
+        await Assert.That(items[0].MasterCode).IsEqualTo("APPROVED");
+        await Assert.That(items[0].FullName).IsEqualTo("Approved");
+        await Assert.That(items[0].Description).IsEqualTo("Public description");
+        await Assert.That(items[1].MasterCode).IsEqualTo("PENDING");
+        await Assert.That(items[1].FullName).IsEqualTo("Pending");
+        await Assert.That(items[1].Description).IsNull();
+        await AssertFields(items[0], "id", "masterCode", "fullName", "description");
+        store.Items.Clear();
+        first.FullName = "Changed";
+        await Assert.That(items[0].FullName).IsEqualTo("Approved");
+        await Assert.That(await handler.Handle(new Explore.Application.Features.StatusTypes.Requests.Queries.GetStatusTypeListRequest { FullName = "" }, default)).IsEmpty();
+    }
+
+    internal sealed class ApprovalStatusStore(List<ApprovalStatus> items) : Store<ApprovalStatus, int>, IApprovalStatusRepository
+    {
+        public List<ApprovalStatus> Items { get; } = items;
+        public override Task<IReadOnlyList<ApprovalStatus>> GetAll() => Task.FromResult<IReadOnlyList<ApprovalStatus>>(Items);
+    }
+
     internal sealed class ReviewStore(List<OrganizationReview> items) : Store<OrganizationReview, Guid>, IOrganizationReviewRepository
     {
         public List<OrganizationReview> Items { get; } = items;

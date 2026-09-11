@@ -3,6 +3,7 @@ using Explore.Application.DTOs.GroupMember;
 using Explore.Application.DTOs.Organization;
 using Explore.Application.DTOs.OrganizationMember;
 using Explore.Application.DTOs.OrganizationReview;
+using Explore.Application.DTOs.StatusType;
 using Explore.Domain.Enums;
 using Explore.Domain;
 using Riok.Mapperly.Abstractions;
@@ -213,6 +214,8 @@ public static partial class OrganizationMapper
     [MapProperty(nameof(OrganizationReview.Organization), nameof(OrganizationReviewDto.OrganizationFullName), Use = nameof(ReviewOrganizationName))]
     [MapProperty(nameof(OrganizationReview.User), nameof(OrganizationReviewDto.UserFullName), Use = nameof(MemberName))]
     public static partial OrganizationReviewDto ToOrganizationReview(OrganizationReview source);
+
+    public static partial StatusTypeListDto ToApprovalStatus(ApprovalStatus source);
 
     private static string? ReviewOrganizationName(Organization? organization) => organization?.Pii?.FullName;
 

@@ -1,4 +1,3 @@
-using AutoMapper;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
@@ -23,7 +22,6 @@ public class CreateGroupCommandHandler : IRequestHandler<CreateGroupCommand, Bas
     private readonly IActorRepository _actorRepository;
     private readonly IStorageObjectRepository _storageObjectRepository;
     private readonly IAdminCacheInvalidator _adminCacheInvalidator;
-    private readonly IMapper _mapper;
     private readonly ITenantContext _tenantContext;
     private readonly HybridCache _cache;
     private readonly BusinessMetrics _metrics;
@@ -36,7 +34,6 @@ public class CreateGroupCommandHandler : IRequestHandler<CreateGroupCommand, Bas
         IActorRepository actorRepository,
         IStorageObjectRepository storageObjectRepository,
         IAdminCacheInvalidator adminCacheInvalidator,
-        IMapper mapper,
         ITenantContext tenantContext,
         HybridCache cache,
         BusinessMetrics metrics)
@@ -48,7 +45,6 @@ public class CreateGroupCommandHandler : IRequestHandler<CreateGroupCommand, Bas
         _actorRepository = actorRepository;
         _storageObjectRepository = storageObjectRepository;
         _adminCacheInvalidator = adminCacheInvalidator;
-        _mapper = mapper;
         _tenantContext = tenantContext;
         _cache = cache;
         _metrics = metrics;
@@ -87,7 +83,11 @@ public class CreateGroupCommandHandler : IRequestHandler<CreateGroupCommand, Bas
 
                 var currentUserId = request.CreatorUserId;
 
-                var group = _mapper.Map<Group>(request.GroupDto);
+                var group = new Group
+                {
+                    FullName = request.GroupDto.FullName,
+                    Description = request.GroupDto.Description
+                };
 
                 group.CreatedAt = DateTime.UtcNow;
 

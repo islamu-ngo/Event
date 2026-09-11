@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Group;
@@ -13,18 +13,15 @@ namespace Explore.Application.Features.Groups.Handlers.Queries;
 public class GetGroupListRequestHandler : IRequestHandler<GetGroupListRequest, PaginatedResult<GroupListDto>>
 {
     private readonly IGroupRepository _groupRepository;
-    private readonly IMapper _mapper;
     private readonly IObjectStorageService _objectStorageService;
     private readonly ILogger<GetGroupListRequestHandler> _logger;
 
     public GetGroupListRequestHandler(
         IGroupRepository groupRepository,
-        IMapper mapper,
         IObjectStorageService objectStorageService,
         ILogger<GetGroupListRequestHandler> logger)
     {
         _groupRepository = groupRepository;
-        _mapper = mapper;
         _objectStorageService = objectStorageService;
         _logger = logger;
     }
@@ -32,7 +29,7 @@ public class GetGroupListRequestHandler : IRequestHandler<GetGroupListRequest, P
     public async Task<PaginatedResult<GroupListDto>> Handle(GetGroupListRequest request, CancellationToken cancellationToken)
     {
         var (groups, totalCount) = await _groupRepository.GetGroupsWithDetailsPaged(request.PageNumber, request.PageSize);
-        var groupDtos = _mapper.Map<List<GroupListDto>>(groups);
+        var groupDtos = groups.Select(OrganizationMapper.ToGroupListItem).ToList();
 
         foreach (var dto in groupDtos)
         {

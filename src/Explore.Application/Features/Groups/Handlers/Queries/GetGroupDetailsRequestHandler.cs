@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Group;
@@ -13,20 +13,17 @@ namespace Explore.Application.Features.Groups.Handlers.Queries;
 public class GetGroupDetailsRequestHandler : IRequestHandler<GetGroupDetailsRequest, GroupDto>
 {
     private readonly IGroupRepository _groupRepository;
-    private readonly IMapper _mapper;
     private readonly IObjectStorageService _objectStorageService;
     private readonly ILogger<GetGroupDetailsRequestHandler> _logger;
     private readonly HybridCache _cache;
 
     public GetGroupDetailsRequestHandler(
         IGroupRepository groupRepository,
-        IMapper mapper,
         IObjectStorageService objectStorageService,
         ILogger<GetGroupDetailsRequestHandler> logger,
         HybridCache cache)
     {
         _groupRepository = groupRepository;
-        _mapper = mapper;
         _objectStorageService = objectStorageService;
         _logger = logger;
         _cache = cache;
@@ -40,7 +37,7 @@ public class GetGroupDetailsRequestHandler : IRequestHandler<GetGroupDetailsRequ
             async _ =>
             {
                 var group = await _groupRepository.GetGroupWithDetails(request.Id);
-                return _mapper.Map<GroupDto>(group);
+                return group is null ? null : OrganizationMapper.ToGroupDetail(group);
             },
             new HybridCacheEntryOptions
             {

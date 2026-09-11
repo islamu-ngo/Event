@@ -1,7 +1,5 @@
-using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
-using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Application.Features.EventCustomPropertyProjections.Handlers.Queries;
 using Explore.Application.Features.EventCustomPropertyProjections.Requests.Queries;
 using Explore.Application.Features.EventSessionCustomPropertyProjections.Handlers.Queries;
@@ -14,27 +12,25 @@ namespace Event.Application.UnitTests.Features.EventCustomPropertyProjections.Qu
 
 public sealed class GetCustomPropertyProjectionStatusQueryHandlerTests
 {
+    private static readonly Guid TenantId = Guid.Parse("01920000-0000-7000-8000-000000000005");
     private readonly ICustomPropertyProjectionStatusRepository _statusRepository;
     private readonly ICustomPropertyProjectionDirtyScopeRepository _dirtyScopeRepository;
-    private readonly IMapper _mapper;
 
     public GetCustomPropertyProjectionStatusQueryHandlerTests()
     {
         _statusRepository = Substitute.For<ICustomPropertyProjectionStatusRepository>();
         _dirtyScopeRepository = Substitute.For<ICustomPropertyProjectionDirtyScopeRepository>();
-        _mapper = Substitute.For<IMapper>();
     }
 
     [Test]
     public async Task EventStatus_WithDirtyScopeBacklog_ReturnsActionableSignal()
     {
-        var tenantId = Guid.NewGuid();
+        var tenantId = TenantId;
         var status = CreateStatus(
             IEventCustomPropertyProjectionUpdater.ProjectionName,
             IEventCustomPropertyProjectionUpdater.ProjectionVersion,
             tenantId,
             CustomPropertyProjectionState.Idle);
-        var dto = CreateDto(status);
 
         _statusRepository
             .GetAsync(status.ProjectionName, status.ProjectionVersion, tenantId, Arg.Any<CancellationToken>())
@@ -42,12 +38,10 @@ public sealed class GetCustomPropertyProjectionStatusQueryHandlerTests
         _dirtyScopeRepository
             .CountPendingAsync(status.ProjectionName, status.ProjectionVersion, tenantId, Arg.Any<CancellationToken>())
             .Returns(7);
-        _mapper.Map<ProjectionStatusDto>(status).Returns(dto);
 
         var handler = new GetEventCustomPropertyProjectionStatusQueryHandler(
             _statusRepository,
-            _dirtyScopeRepository,
-            _mapper);
+            _dirtyScopeRepository);
 
         var result = await handler.Handle(
             new GetEventCustomPropertyProjectionStatusQuery { TenantId = tenantId },
@@ -65,14 +59,13 @@ public sealed class GetCustomPropertyProjectionStatusQueryHandlerTests
     [Test]
     public async Task SessionStatus_WithStaleRebuild_ReturnsLockInvestigationSignal()
     {
-        var tenantId = Guid.NewGuid();
+        var tenantId = TenantId;
         var status = CreateStatus(
             IEventSessionCustomPropertyProjectionUpdater.ProjectionName,
             IEventSessionCustomPropertyProjectionUpdater.ProjectionVersion,
             tenantId,
             CustomPropertyProjectionState.Rebuilding);
-        status.LastRebuildStartedAt = DateTimeOffset.UtcNow.AddMinutes(-15);
-        var dto = CreateDto(status);
+        status.LastRebuildStartedAt = DateTimeOffset.UnixEpoch;
 
         _statusRepository
             .GetAsync(status.ProjectionName, status.ProjectionVersion, tenantId, Arg.Any<CancellationToken>())
@@ -80,12 +73,10 @@ public sealed class GetCustomPropertyProjectionStatusQueryHandlerTests
         _dirtyScopeRepository
             .CountPendingAsync(status.ProjectionName, status.ProjectionVersion, tenantId, Arg.Any<CancellationToken>())
             .Returns(0);
-        _mapper.Map<ProjectionStatusDto>(status).Returns(dto);
 
         var handler = new GetEventSessionCustomPropertyProjectionStatusQueryHandler(
             _statusRepository,
-            _dirtyScopeRepository,
-            _mapper);
+            _dirtyScopeRepository);
 
         var result = await handler.Handle(
             new GetEventSessionCustomPropertyProjectionStatusQuery { TenantId = tenantId },
@@ -112,26 +103,12 @@ public sealed class GetCustomPropertyProjectionStatusQueryHandlerTests
             ProjectionVersion = projectionVersion,
             TenantId = tenantId,
             State = state,
-            LastRebuildStartedAt = DateTimeOffset.UtcNow.AddMinutes(-1),
-            LastRebuildCompletedAt = DateTimeOffset.UtcNow,
+            LastRebuildStartedAt = DateTimeOffset.UnixEpoch,
+            LastRebuildCompletedAt = DateTimeOffset.UnixEpoch.AddMinutes(1),
             RowsProcessed = 10,
             RowsFailed = 0,
-            ConcurrencyStamp = Guid.NewGuid()
+            ConcurrencyStamp = Guid.Parse("01920000-0000-7000-8000-000000000001")
         };
     }
 
-    private static ProjectionStatusDto CreateDto(CustomPropertyProjectionStatus status)
-    {
-        return new ProjectionStatusDto
-        {
-            ProjectionName = status.ProjectionName,
-            ProjectionVersion = status.ProjectionVersion,
-            TenantId = status.TenantId,
-            State = status.State,
-            LastRebuildStartedAt = status.LastRebuildStartedAt,
-            LastRebuildCompletedAt = status.LastRebuildCompletedAt,
-            RowsProcessed = status.RowsProcessed,
-            RowsFailed = status.RowsFailed
-        };
-    }
 }

@@ -1,7 +1,7 @@
-using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Application.Features.EventCustomPropertyProjections.Requests.Queries;
+using Explore.Application.Mappings;
 using Explore.Application.Responses;
 using MediatR;
 
@@ -11,14 +11,11 @@ public class GetCustomPropertyProjectionDirtyScopesQueryHandler
     : IRequestHandler<GetCustomPropertyProjectionDirtyScopesQuery, PaginatedResult<ProjectionDirtyScopeDto>>
 {
     private readonly ICustomPropertyProjectionDirtyScopeRepository _dirtyScopeRepository;
-    private readonly IMapper _mapper;
 
     public GetCustomPropertyProjectionDirtyScopesQueryHandler(
-        ICustomPropertyProjectionDirtyScopeRepository dirtyScopeRepository,
-        IMapper mapper)
+        ICustomPropertyProjectionDirtyScopeRepository dirtyScopeRepository)
     {
         _dirtyScopeRepository = dirtyScopeRepository;
-        _mapper = mapper;
     }
 
     public async Task<PaginatedResult<ProjectionDirtyScopeDto>> Handle(
@@ -41,7 +38,7 @@ public class GetCustomPropertyProjectionDirtyScopesQueryHandler
             pageSize,
             cancellationToken);
 
-        var dtos = _mapper.Map<List<ProjectionDirtyScopeDto>>(items);
+        var dtos = items.Select(CustomPropertyProjectionMapper.ToDirtyScope).ToList();
 
         return PaginatedResult<ProjectionDirtyScopeDto>.Create(dtos, pendingCount, pageNumber, pageSize);
     }

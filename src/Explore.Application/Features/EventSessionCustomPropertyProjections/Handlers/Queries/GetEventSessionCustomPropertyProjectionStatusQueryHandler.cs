@@ -1,9 +1,9 @@
-using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Application.Features.CustomProperties;
 using Explore.Application.Features.EventSessionCustomPropertyProjections.Requests.Queries;
+using Explore.Application.Mappings;
 using Explore.Application.Responses;
 using MediatR;
 
@@ -14,16 +14,13 @@ public class GetEventSessionCustomPropertyProjectionStatusQueryHandler
 {
     private readonly ICustomPropertyProjectionStatusRepository _statusRepository;
     private readonly ICustomPropertyProjectionDirtyScopeRepository _dirtyScopeRepository;
-    private readonly IMapper _mapper;
 
     public GetEventSessionCustomPropertyProjectionStatusQueryHandler(
         ICustomPropertyProjectionStatusRepository statusRepository,
-        ICustomPropertyProjectionDirtyScopeRepository dirtyScopeRepository,
-        IMapper mapper)
+        ICustomPropertyProjectionDirtyScopeRepository dirtyScopeRepository)
     {
         _statusRepository = statusRepository;
         _dirtyScopeRepository = dirtyScopeRepository;
-        _mapper = mapper;
     }
 
     public async Task<BaseCommandResponse<IReadOnlyList<ProjectionStatusDto>>> Handle(
@@ -46,7 +43,7 @@ public class GetEventSessionCustomPropertyProjectionStatusQueryHandler
         var dtos = new List<ProjectionStatusDto>();
         if (status is not null)
         {
-            var dto = _mapper.Map<ProjectionStatusDto>(status);
+            var dto = CustomPropertyProjectionMapper.ToStatus(status);
             var pendingDirtyScopes = await _dirtyScopeRepository.CountPendingAsync(
                 IEventSessionCustomPropertyProjectionUpdater.ProjectionName,
                 IEventSessionCustomPropertyProjectionUpdater.ProjectionVersion,

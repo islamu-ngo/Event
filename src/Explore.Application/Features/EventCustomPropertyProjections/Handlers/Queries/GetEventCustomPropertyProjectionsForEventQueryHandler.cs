@@ -1,7 +1,7 @@
-using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Application.Features.EventCustomPropertyProjections.Requests.Queries;
+using Explore.Application.Mappings;
 using Explore.Application.Responses;
 using MediatR;
 
@@ -11,14 +11,11 @@ public class GetEventCustomPropertyProjectionsForEventQueryHandler
     : IRequestHandler<GetEventCustomPropertyProjectionsForEventQuery, BaseCommandResponse<IReadOnlyList<EventCustomPropertyProjectionDto>>>
 {
     private readonly IEventCustomPropertyProjectionRepository _projectionRepository;
-    private readonly IMapper _mapper;
 
     public GetEventCustomPropertyProjectionsForEventQueryHandler(
-        IEventCustomPropertyProjectionRepository projectionRepository,
-        IMapper mapper)
+        IEventCustomPropertyProjectionRepository projectionRepository)
     {
         _projectionRepository = projectionRepository;
-        _mapper = mapper;
     }
 
     public async Task<BaseCommandResponse<IReadOnlyList<EventCustomPropertyProjectionDto>>> Handle(
@@ -37,7 +34,7 @@ public class GetEventCustomPropertyProjectionsForEventQueryHandler
             request.ExposureCeiling,
             cancellationToken);
 
-        var dtos = _mapper.Map<List<EventCustomPropertyProjectionDto>>(projections);
+        var dtos = projections.Select(CustomPropertyProjectionMapper.ToEventRow).ToList();
 
         return BaseCommandResponse.Success<IReadOnlyList<EventCustomPropertyProjectionDto>>(
             dtos,

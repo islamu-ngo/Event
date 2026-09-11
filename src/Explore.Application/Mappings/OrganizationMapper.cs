@@ -1,4 +1,5 @@
 using Explore.Application.DTOs.Group;
+using Explore.Application.DTOs.GroupMember;
 using Explore.Domain;
 using Riok.Mapperly.Abstractions;
 
@@ -57,6 +58,32 @@ public static partial class OrganizationMapper
     [MapProperty(nameof(Group.Actor), nameof(GroupListDto.ActorBackgroundEffect), Use = nameof(BackgroundEffect))]
     [MapProperty(nameof(Group.Actor), nameof(GroupListDto.ActorBannerColor), Use = nameof(BannerColor))]
     public static partial GroupListDto ToGroupListItem(Group source);
+
+    // Membership reads expose only the existing contact/role/position scalars, never tenant or audit graphs.
+    [MapperIgnoreSource(nameof(GroupMember.GroupTenantId))]
+    [MapperIgnoreSource(nameof(GroupMember.TenantId))]
+    [MapperIgnoreSource(nameof(GroupMember.Tenant))]
+    [MapperIgnoreSource(nameof(GroupMember.CreatedAt))]
+    [MapperIgnoreSource(nameof(GroupMember.CreatedBy))]
+    [MapperIgnoreSource(nameof(GroupMember.UpdatedAt))]
+    [MapperIgnoreSource(nameof(GroupMember.UpdatedBy))]
+    [MapperIgnoreSource(nameof(GroupMember.IsDeleted))]
+    [MapperIgnoreSource(nameof(GroupMember.DeletedAt))]
+    [MapperIgnoreSource(nameof(GroupMember.DeletedBy))]
+    // GroupId was not populated by the old profile; participation is used only for the name.
+    [MapperIgnoreTarget(nameof(GroupMemberDto.GroupId))]
+    [MapProperty(nameof(GroupMember.GroupTenant), nameof(GroupMemberDto.GroupFullName), Use = nameof(GroupName))]
+    [MapProperty(nameof(GroupMember.User), nameof(GroupMemberDto.UserEmail), Use = nameof(MemberEmail))]
+    [MapProperty(nameof(GroupMember.User), nameof(GroupMemberDto.UserFullName), Use = nameof(MemberName))]
+    [MapProperty(nameof(GroupMember.Role), nameof(GroupMemberDto.RoleName), Use = nameof(RoleName))]
+    [MapProperty(nameof(GroupMember.GroupPosition), nameof(GroupMemberDto.GroupPositionFullName), Use = nameof(GroupPositionName))]
+    public static partial GroupMemberDto ToGroupMember(GroupMember source);
+
+    private static string? GroupName(GroupTenant? participation) => participation?.Group?.FullName;
+    private static string? MemberEmail(User? user) => user?.Pii?.Email;
+    private static string? MemberName(User? user) => user?.Pii is { } pii ? $"{pii.FirstName} {pii.LastName}" : null;
+    private static string? RoleName(Role? role) => role?.FullName;
+    private static string? GroupPositionName(GroupPosition? position) => position?.FullName;
 
     private static Guid? ProfileId(Actor? actor) => actor?.Id;
     private static string? ProfileName(Actor? actor) => actor?.Pii?.DisplayName;

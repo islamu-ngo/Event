@@ -1,5 +1,4 @@
 using AutoMapper;
-using Explore.Application.DTOs.GroupMember;
 using Explore.Application.DTOs.Organization;
 using Explore.Application.DTOs.OrganizationMember;
 using Explore.Application.DTOs.OrganizationReview;
@@ -12,22 +11,6 @@ public class OrganizationMappingProfile : Profile
 {
     public OrganizationMappingProfile()
     {
-        // Group Member
-        CreateMap<GroupMember, GroupMemberDto>()
-            .ForMember(dest => dest.GroupFullName, opt => opt.MapFrom(src => src.GroupTenant.Group.FullName))
-            .ForMember(dest => dest.UserEmail, opt => opt.MapFrom(src => src.User != null ? src.User.Email : null))
-            .ForMember(dest => dest.UserFullName, opt => opt.MapFrom(src => src.User != null ? $"{src.User.FirstName} {src.User.LastName}" : null))
-            .ForMember(dest => dest.RoleName, opt => opt.MapFrom(src => src.Role != null ? src.Role.FullName : null))
-            .ForMember(dest => dest.GroupPositionFullName, opt => opt.MapFrom(src => src.GroupPosition != null ? src.GroupPosition.FullName : null));
-        CreateMap<GroupMember, GroupMemberListDto>()
-            .ForMember(dest => dest.GroupFullName, opt => opt.MapFrom(src => src.GroupTenant.Group.FullName))
-            .ForMember(dest => dest.UserEmail, opt => opt.MapFrom(src => src.User != null ? src.User.Email : null))
-            .ForMember(dest => dest.UserFullName, opt => opt.MapFrom(src => src.User != null ? $"{src.User.FirstName} {src.User.LastName}" : null))
-            .ForMember(dest => dest.RoleName, opt => opt.MapFrom(src => src.Role != null ? src.Role.FullName : null))
-            .ForMember(dest => dest.GroupPositionFullName, opt => opt.MapFrom(src => src.GroupPosition != null ? src.GroupPosition.FullName : null));
-        CreateMap<AddGroupMemberDto, GroupMember>();
-        CreateMap<UpdateGroupMemberRoleDto, GroupMember>();
-
         // Organization
         CreateMap<Organization, OrganizationDto>()
             .ForMember(dest => dest.ApprovalStatusFullName, opt => opt.Ignore())

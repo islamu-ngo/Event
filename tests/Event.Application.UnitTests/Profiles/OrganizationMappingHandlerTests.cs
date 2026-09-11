@@ -58,8 +58,9 @@ public sealed class OrganizationMappingHandlerTests
         var members = new GroupMemberStore([]);
         var actors = new ActorStore();
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
+        using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
         var handler = new CreateGroupCommandHandler(groups, participations, null!, members, actors, null!,
-            new CacheInvalidator(), new TenantContext(TenantId), new InlineCache(), new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>()));
+            new CacheInvalidator(), new TenantContext(TenantId), new InlineCache(), metrics);
         var result = await handler.Handle(new CreateGroupCommand
         {
             CreatorUserId = ActorId,

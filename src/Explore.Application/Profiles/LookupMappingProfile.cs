@@ -9,7 +9,6 @@ using Explore.Application.DTOs.EventStatus;
 using Explore.Application.DTOs.FileType;
 using Explore.Application.DTOs.Location;
 using Explore.Application.DTOs.LocationRoom;
-using Explore.Application.DTOs.Madhab;
 using Explore.Application.DTOs.OrganizationPosition;
 using Explore.Application.DTOs.Tag;
 using Explore.Application.DTOs.TagType;
@@ -69,9 +68,6 @@ public class LookupMappingProfile : Profile
             .ForMember(dest => dest.TagTypeMasterCode, opt => opt.MapFrom(src => src.TagType != null ? src.TagType.MasterCode : null));
         CreateMap<CreateTagTypeTagsDto, Domain.TagTypeTags>();
         CreateMap<UpdateTagTypeTagsDto, Domain.TagTypeTags>();
-
-        CreateMap<Madhab, MadhabDto>().ReverseMap();
-        CreateMap<Madhab, MadhabListDto>().ReverseMap();
 
         CreateMap<Domain.EventStatus, EventStatusDto>().ReverseMap();
         CreateMap<Domain.EventStatus, EventStatusListDto>().ReverseMap();

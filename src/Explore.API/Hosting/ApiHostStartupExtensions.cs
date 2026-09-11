@@ -28,8 +28,8 @@ public static class ApiHostStartupExtensions
         ArgumentNullException.ThrowIfNull(shutdownCts);
         ArgumentNullException.ThrowIfNull(markShuttingDown);
 
-        // Before migrations, setup, hosted workers or traffic. OpenAPI intentionally omits runtime
-        // dependencies; its final descriptor validation already ran in the provider factory.
+        // Before shared API setup, hosted workers or traffic; standalone-owned bootstrap runs earlier.
+        // OpenAPI omits runtime dependencies; final descriptors were validated in the provider factory.
         if (!state.IsOpenApiGeneration)
             app.Services.ValidateNativeOperations();
 

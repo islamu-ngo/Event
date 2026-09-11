@@ -1,0 +1,33 @@
+# Native operation composition correction and reviewed release impacts.
+Change-Id: CHG-01M29AEBG2B94QD8BC62DFD3HY
+Title: "Close native operation composition bypasses"
+Type: fix
+Scope: access
+Summary: "Reject ambiguous disposable handler aliases and guard concrete handler injection at API consumer boundaries."
+Group: native-operation-composition
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: No existing product operation or transport contract is changed.
+  Security:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: documented
+    Detail: Compiled consumer checks reject concrete handler injection through API services and action service bindings, and reject scoped concrete resolution. Disposable handler aliases fail final composition validation before traffic.
+  Migration:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: No schema or persisted-data migration is included.
+  Configuration:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: No operator configuration, secret or edition selector changes.
+  OpenAPI:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: Routes and serialized request and response contracts are unchanged.
+  Operator:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: documented
+    Detail: Native handlers with service ports keep disposable resources in injected scoped dependencies. Standalone descriptor validation precedes bootstrap; shared runtime preflight precedes workers and traffic.

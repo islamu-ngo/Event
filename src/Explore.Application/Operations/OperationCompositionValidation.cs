@@ -28,6 +28,26 @@ public static class OperationCompositionValidation
                 || services.Count(descriptor => descriptor.ServiceType == entry.Implementation) != 1
                 || !services.Contains(entry.ConcreteDescriptor))
                 throw Error("missing or replaced registration", entry.Contract);
+
+            if (!typeof(IDisposable).IsAssignableFrom(entry.Implementation)
+                && !typeof(IAsyncDisposable).IsAssignableFrom(entry.Implementation))
+                continue;
+
+            foreach (var descriptor in services)
+            {
+                if (ReferenceEquals(descriptor, entry.ConcreteDescriptor)
+                    || catalog.Registrations.Any(candidate => ReferenceEquals(candidate.PublicDescriptor, descriptor)))
+                    continue;
+                var implementation = descriptor.IsKeyedService
+                    ? descriptor.KeyedImplementationType : descriptor.ImplementationType;
+                var hasFactory = descriptor.IsKeyedService
+                    ? descriptor.KeyedImplementationFactory is not null : descriptor.ImplementationFactory is not null;
+                // DI captures disposable factory results independently for each descriptor.
+                // Opaque assignable factories cannot prove that the scoped owner is not returned.
+                if (implementation == entry.Implementation
+                    || (hasFactory && descriptor.ServiceType.IsAssignableFrom(entry.Implementation)))
+                    throw Error("disposable handler service alias", descriptor.ServiceType);
+            }
         }
     }
 

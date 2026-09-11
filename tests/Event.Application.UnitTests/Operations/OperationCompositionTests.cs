@@ -134,6 +134,47 @@ public sealed class OperationCompositionTests
         await Assert.That(evidence.Executed).IsEqualTo(0);
     }
 
+    [Test]
+    [Arguments(false, false, false)]
+    [Arguments(false, true, false)]
+    [Arguments(true, false, false)]
+    [Arguments(true, true, false)]
+    [Arguments(false, false, true)]
+    [Arguments(false, true, true)]
+    [Arguments(true, false, true)]
+    [Arguments(true, true, true)]
+    public async Task DisposableHandlerAliasesAreRejectedBeforeAcquiringMultipleOwners(bool asynchronous, bool opaque, bool beforeDiscovery)
+    {
+        var handler = asynchronous ? typeof(AsyncDisposableHandler) : typeof(DisposableHandler);
+        var services = new ServiceCollection();
+        services.AddSingleton(new DisposalEvidence());
+        if (!beforeDiscovery)
+            services.AddNativeOperations([typeof(Write), handler]);
+        if (opaque)
+            services.AddScoped<IDisposablePort>(provider => (IDisposablePort)provider.GetRequiredService(handler));
+        else
+            services.AddScoped(typeof(IDisposablePort), handler);
+        if (beforeDiscovery)
+            services.AddNativeOperations([typeof(Write), handler]);
+
+        await Assert.That(services.ValidateNativeOperationRegistrations).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task UnaliasedAsyncHandlerHasOneScopeDisposalOwner()
+    {
+        var services = Services(typeof(Write), typeof(AsyncDisposableHandler));
+        var evidence = new DisposalEvidence();
+        services.AddSingleton(evidence);
+        services.ValidateNativeOperationRegistrations();
+        await using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+        await provider.ValidateNativeOperationsDeepAsync();
+
+        await Assert.That(evidence.Constructed).IsEqualTo(1);
+        await Assert.That(evidence.Disposed).IsEqualTo(1);
+        await Assert.That(evidence.Executed).IsEqualTo(0);
+    }
+
     public sealed record Write : ICommand;
     public sealed record ResultWrite : ICommand<int>;
     public sealed record Read : IQuery<int>;
@@ -142,6 +183,7 @@ public sealed class OperationCompositionTests
     public interface IState;
     public interface IDirectState;
     public interface IMissing;
+    public interface IDisposablePort;
     public sealed class EscapedNativeCycleException : Exception;
     public sealed class DisposalEvidence
     {
@@ -149,7 +191,7 @@ public sealed class OperationCompositionTests
         public int Disposed { get; set; }
         public int Executed { get; set; }
     }
-    public sealed class DisposableHandler : ICommandHandler<Write>, IDisposable
+    public sealed class DisposableHandler : ICommandHandler<Write>, IDisposablePort, IDisposable
     {
         private readonly DisposalEvidence _evidence;
         public DisposableHandler(DisposalEvidence evidence)
@@ -163,6 +205,29 @@ public sealed class OperationCompositionTests
             return Task.CompletedTask;
         }
         public void Dispose() => _evidence.Disposed++;
+    }
+
+    public sealed class AsyncDisposableHandler : ICommandHandler<Write>, IDisposablePort, IAsyncDisposable
+    {
+        private readonly DisposalEvidence _evidence;
+
+        public AsyncDisposableHandler(DisposalEvidence evidence)
+        {
+            _evidence = evidence;
+            evidence.Constructed++;
+        }
+
+        public Task ExecuteAsync(Write command, CancellationToken cancellationToken)
+        {
+            _evidence.Executed++;
+            return Task.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            _evidence.Disposed++;
+            return ValueTask.CompletedTask;
+        }
     }
 
     public sealed class OwnedState : IDisposable

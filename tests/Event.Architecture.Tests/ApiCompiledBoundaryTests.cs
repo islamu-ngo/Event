@@ -46,7 +46,7 @@ public sealed class ApiCompiledBoundaryTests
             .Because("controller dependencies arrive through typed constructors, never request service location");
     }
 
-    private static IEnumerable<MethodBase> EnumerateImplementationBodies(Type controller)
+    internal static IEnumerable<MethodBase> EnumerateImplementationBodies(Type controller)
     {
         const BindingFlags flags = BindingFlags.Instance
             | BindingFlags.Static
@@ -76,7 +76,7 @@ public sealed class ApiCompiledBoundaryTests
         }
     }
 
-    private static IEnumerable<MethodBase> ResolveCalls(MethodBase body)
+    internal static IEnumerable<MethodBase> ResolveCalls(MethodBase body)
     {
         byte[] il = body.GetMethodBody()?.GetILAsByteArray() ?? [];
         Type[]? declaringArguments = body.DeclaringType?.GetGenericArguments();

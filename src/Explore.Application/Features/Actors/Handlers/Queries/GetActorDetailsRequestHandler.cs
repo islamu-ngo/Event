@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Actor;
@@ -14,18 +14,15 @@ public class GetActorDetailsRequestHandler : IRequestHandler<GetActorDetailsRequ
 {
     private readonly IActorRepository _actorRepository;
     private readonly ITenantContext _tenantContext;
-    private readonly IMapper _mapper;
     private readonly ILogger<GetActorDetailsRequestHandler> _logger;
 
     public GetActorDetailsRequestHandler(
         IActorRepository actorRepository,
         ITenantContext tenantContext,
-        IMapper mapper,
         ILogger<GetActorDetailsRequestHandler> logger)
     {
         _actorRepository = actorRepository;
         _tenantContext = tenantContext;
-        _mapper = mapper;
         _logger = logger;
     }
 
@@ -39,11 +36,7 @@ public class GetActorDetailsRequestHandler : IRequestHandler<GetActorDetailsRequ
             return null;
         }
 
-        var dto = _mapper.Map<ActorDto>(actor);
-        if (dto is null)
-        {
-            return null;
-        }
+        var dto = ActorFederationMapper.ToActorDetail(actor);
 
         if (request.TenantId is { } contextualTenantId)
         {

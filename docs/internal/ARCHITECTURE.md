@@ -336,6 +336,19 @@ Not fully implemented today:
 - Complete ActivityPub gateway endpoint surface.
 - First-party ATProto PDS/AppView hosting and ActivityPub interoperability expected by third-party federated servers.
 
+### Actor Projection And Creation
+
+`ActorFederationMapper` generates bounded actor and storage DTO projections. When
+an actor's `Pii` row is absent, its projection defaults to an empty display name and
+null profile-picture URI instead of dereferencing the missing row. Loaded PII scalar
+values remain unchanged; projections never recreate PII or identities. Repository
+visibility and handler-owned tenant overrides and storage disclosure remain the
+authority; authorized tenant participation overrides still take precedence.
+
+`CreateActorCommandHandler` explicitly initializes `ActorPii` on a new actor after
+validation and image eligibility checks, avoiding the uninitialized proxy setter.
+This is an Application handler guarantee, not a new public creation endpoint.
+
 ## AT Protocol Ownership
 
 1. `Explore.Blazor` owns CarpaNet confidential-client OAuth, protected single-use state, canonical callback/handoff, and the server cookie. PDS credentials and private key material never enter the browser.

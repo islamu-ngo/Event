@@ -1,0 +1,33 @@
+# Actor profile mapping fixes and reviewed release impacts.
+Change-Id: CHG-01M29APX3699SSW3M36M88Z8MH
+Title: "Handle actor profile creation and absent PII"
+Type: fix
+Scope: federation
+Summary: "Initialize profile PII for new actors and return actor responses safely when profile PII is absent, without recreating erased data."
+Group: actor-profile-mapping
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/api-reference/README.md
+    Disposition: not-applicable
+    Detail: Successful actor and storage response contracts remain unchanged; missing profile data no longer causes projection failure.
+  Security:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: documented
+    Detail: Projections do not recreate erased PII or identities. New actor creation initializes only its own validated profile; visibility, tenant overrides and storage disclosure stay in their existing authorities.
+  Migration:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: No persisted-data or schema migration is required.
+  Configuration:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: No configuration or secret changes.
+  OpenAPI:
+    Reference: docs/public/api-reference/README.md
+    Disposition: documented
+    Detail: Actor responses with absent profile PII default to an empty display name and null picture URI; existing tenant overrides still take precedence. Routes, schema shapes and generated clients are unchanged; no creation endpoint is added.
+  Operator:
+    Reference: docs/public/api-reference/README.md
+    Disposition: documented
+    Detail: Integrators should render the empty profile values without inferring erasure status or restored visibility.

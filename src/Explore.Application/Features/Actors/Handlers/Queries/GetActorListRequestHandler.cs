@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Actor;
@@ -13,18 +13,15 @@ namespace Explore.Application.Features.Actors.Handlers.Queries;
 public class GetActorListRequestHandler : IRequestHandler<GetActorListRequest, PaginatedResult<ActorListDto>>
 {
     private readonly IActorRepository _actorRepository;
-    private readonly IMapper _mapper;
     private readonly IObjectStorageService _objectStorageService;
     private readonly ILogger<GetActorListRequestHandler> _logger;
 
     public GetActorListRequestHandler(
         IActorRepository actorRepository,
-        IMapper mapper,
         IObjectStorageService objectStorageService,
         ILogger<GetActorListRequestHandler> logger)
     {
         _actorRepository = actorRepository;
-        _mapper = mapper;
         _objectStorageService = objectStorageService;
         _logger = logger;
     }
@@ -36,7 +33,7 @@ public class GetActorListRequestHandler : IRequestHandler<GetActorListRequest, P
             pageNumber,
             pageSize,
             cancellationToken);
-        var dtos = _mapper.Map<List<ActorListDto>>(actors);
+        var dtos = actors.Select(ActorFederationMapper.ToActorListItem).ToList();
 
         // Resolve presigned URLs for profile pictures
         foreach (var dto in dtos)

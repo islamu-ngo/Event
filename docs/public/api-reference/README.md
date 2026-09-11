@@ -52,4 +52,12 @@ or `?api-version=0.1`. Requests without an explicit version default to `0.1`. UR
 * Retryable documented writes use a stable per-operation UUIDv7 `Idempotency-Key`.
 * Operational `/alive`, `/health`, and `/metrics` endpoints are outside generated controller operations.
 
+## Missing actor profile data
+
+When a visible actor has no profile PII, actor responses default to an empty display
+name and a null profile-picture URI rather than failing while reading the profile.
+Existing tenant-specific profile overrides still take precedence.
+This does not restore erased data or make a hidden actor visible. Existing profile
+values, including an anonymized display name, remain unchanged.
+
 Continue with [HAL/REST Contract](readme/hal-rest.md) and [API Cookbook](readme/api-cookbook.md).

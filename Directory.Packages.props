@@ -158,6 +158,7 @@
     <PackageVersion Include="RabbitMQ.Client" Version="7.2.1" />
     <PackageVersion Include="Refit.HttpClientFactory" Version="14.0.1" />
     <PackageVersion Include="Respawn" Version="7.0.0" />
+    <PackageVersion Include="Riok.Mapperly" Version="4.3.1" />
     <PackageVersion Include="Scalar.AspNetCore" Version="2.16.17" />
     <!-- SSH.NET pinned to patched 2026.0.0 for GHSA-q939-rpr3-3284 (transitive via Testcontainers) -->
     <PackageVersion Include="SSH.NET" Version="2026.0.0" />

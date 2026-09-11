@@ -1,7 +1,6 @@
 using AutoMapper;
 using Explore.Application.DTOs.CategoryTypeCategories;
 using Explore.Application.DTOs.FileType;
-using Explore.Application.DTOs.LocationRoom;
 using Explore.Application.DTOs.Tag;
 using Explore.Application.DTOs.TagTypeTags;
 using Explore.Domain;
@@ -12,11 +11,6 @@ public class LookupMappingProfile : Profile
 {
     public LookupMappingProfile()
     {
-        CreateMap<LocationRoom, LocationRoomDto>()
-            .ForMember(dest => dest.LocationFullName, opt => opt.MapFrom(src => src.Location != null ? src.Location.FullName : null));
-        CreateMap<LocationRoom, LocationRoomListDto>();
-        CreateMap<CreateLocationRoomDto, LocationRoom>();
-
         CreateMap<Tag, TagDto>().ReverseMap();
         CreateMap<Tag, TagListDto>();
         CreateMap<CreateTagDto, Tag>();

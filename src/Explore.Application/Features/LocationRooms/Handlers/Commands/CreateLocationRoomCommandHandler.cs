@@ -1,9 +1,8 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.LocationRoom.Validators;
 using Explore.Application.Features.LocationRooms.Requests.Commands;
 using Explore.Application.Responses;
-using Explore.Domain;
 using MediatR;
 
 namespace Explore.Application.Features.LocationRooms.Handlers.Commands;
@@ -12,16 +11,13 @@ public class CreateLocationRoomCommandHandler : IRequestHandler<CreateLocationRo
 {
     private readonly ILocationRoomRepository _locationRoomRepository;
     private readonly ILocationRepository _locationRepository;
-    private readonly IMapper _mapper;
 
     public CreateLocationRoomCommandHandler(
         ILocationRoomRepository locationRoomRepository,
-        ILocationRepository locationRepository,
-        IMapper mapper)
+        ILocationRepository locationRepository)
     {
         _locationRoomRepository = locationRoomRepository;
         _locationRepository = locationRepository;
-        _mapper = mapper;
     }
 
     public async Task<BaseCommandResponse<Guid>> Handle(CreateLocationRoomCommand request, CancellationToken cancellationToken)
@@ -44,8 +40,7 @@ public class CreateLocationRoomCommandHandler : IRequestHandler<CreateLocationRo
                 "Location not found in the current tenant.");
         }
 
-        var room = _mapper.Map<LocationRoom>(request.LocationRoomDto);
-        room.TenantId = parentLocation.TenantId;
+        var room = LocationRoomMapper.Create(request.LocationRoomDto, parentLocation.TenantId);
 
         room = await _locationRoomRepository.Create(room);
 

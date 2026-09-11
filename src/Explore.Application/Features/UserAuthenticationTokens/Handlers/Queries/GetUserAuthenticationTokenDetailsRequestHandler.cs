@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
@@ -12,16 +12,13 @@ namespace Explore.Application.Features.UserAuthenticationTokens.Handlers.Queries
 public class GetUserAuthenticationTokenDetailsRequestHandler : IRequestHandler<GetUserAuthenticationTokenDetailsRequest, UserAuthenticationTokenDto?>
 {
     private readonly IUserAuthenticationTokenRepository _userAuthenticationTokenRepository;
-    private readonly IMapper _mapper;
     private readonly ICurrentUserService _currentUserService;
 
     public GetUserAuthenticationTokenDetailsRequestHandler(
         IUserAuthenticationTokenRepository userAuthenticationTokenRepository,
-        IMapper mapper,
         ICurrentUserService currentUserService)
     {
         _userAuthenticationTokenRepository = userAuthenticationTokenRepository;
-        _mapper = mapper;
         _currentUserService = currentUserService;
     }
 
@@ -39,6 +36,6 @@ public class GetUserAuthenticationTokenDetailsRequestHandler : IRequestHandler<G
             return null;
         }
 
-        return _mapper.Map<UserAuthenticationTokenDto>(token);
+        return UserMapper.ToTokenDetail(token);
     }
 }

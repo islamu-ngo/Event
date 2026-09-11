@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
@@ -13,16 +13,13 @@ namespace Explore.Application.Features.UserAuthenticationTokens.Handlers.Queries
 public class GetUserAuthenticationTokenListRequestHandler : IRequestHandler<GetUserAuthenticationTokenListRequest, List<UserAuthenticationTokenListDto>>
 {
     private readonly IUserAuthenticationTokenRepository _userAuthenticationTokenRepository;
-    private readonly IMapper _mapper;
     private readonly ICurrentUserService _currentUserService;
 
     public GetUserAuthenticationTokenListRequestHandler(
         IUserAuthenticationTokenRepository userAuthenticationTokenRepository,
-        IMapper mapper,
         ICurrentUserService currentUserService)
     {
         _userAuthenticationTokenRepository = userAuthenticationTokenRepository;
-        _mapper = mapper;
         _currentUserService = currentUserService;
     }
 
@@ -34,6 +31,6 @@ public class GetUserAuthenticationTokenListRequestHandler : IRequestHandler<GetU
         var tokens = await _userAuthenticationTokenRepository.GetUserAuthenticationTokensWithDetailsForUser(
             currentUserId,
             cancellationToken);
-        return _mapper.Map<List<UserAuthenticationTokenListDto>>(tokens);
+        return UserMapper.ToTokenList(tokens);
     }
 }

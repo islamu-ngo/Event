@@ -1,7 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.User;
@@ -17,7 +17,6 @@ public class GetUserRequestHandler : IRequestHandler<GetUserRequest, UserDto>
 {
     private readonly IUserRepository _userRepository;
     private readonly IObjectStorageService _objectStorageService;
-    private readonly IMapper _mapper;
     private readonly ILogger<GetUserRequestHandler> _logger;
     private readonly HybridCache _cache;
     private readonly IPrivacyErasureStateRepository _privacyErasureStateRepository;
@@ -25,14 +24,12 @@ public class GetUserRequestHandler : IRequestHandler<GetUserRequest, UserDto>
     public GetUserRequestHandler(
         IUserRepository userRepository,
         IObjectStorageService objectStorageService,
-        IMapper mapper,
         ILogger<GetUserRequestHandler> logger,
         HybridCache cache,
         IPrivacyErasureStateRepository privacyErasureStateRepository)
     {
         _userRepository = userRepository;
         _objectStorageService = objectStorageService;
-        _mapper = mapper;
         _logger = logger;
         _cache = cache;
         _privacyErasureStateRepository = privacyErasureStateRepository;
@@ -57,7 +54,7 @@ public class GetUserRequestHandler : IRequestHandler<GetUserRequest, UserDto>
                     return null;
                 }
 
-                var dto = _mapper.Map<UserDto>(user);
+                var dto = UserMapper.ToDetail(user);
 
                 if (!string.IsNullOrEmpty(user.Actor?.ProfilePictureUri))
                 {

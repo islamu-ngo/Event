@@ -1,5 +1,4 @@
 using System.Linq;
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.User.Validators;
@@ -20,7 +19,6 @@ public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, BaseC
     private readonly IPrivacyErasureStateRepository _privacyErasureStateRepository;
     private readonly ITenantContext _tenantContext;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IMapper _mapper;
     private readonly HybridCache _cache;
 
     public UpdateUserCommandHandler(
@@ -30,7 +28,6 @@ public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, BaseC
         IPrivacyErasureStateRepository privacyErasureStateRepository,
         ITenantContext tenantContext,
         IUnitOfWork unitOfWork,
-        IMapper mapper,
         HybridCache cache)
     {
         _userRepository = userRepository;
@@ -39,7 +36,6 @@ public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, BaseC
         _privacyErasureStateRepository = privacyErasureStateRepository;
         _tenantContext = tenantContext;
         _unitOfWork = unitOfWork;
-        _mapper = mapper;
         _cache = cache;
     }
 
@@ -80,7 +76,8 @@ public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, BaseC
             // Update names (FirstName/LastName) when provided.
             if (request.UpdateUserDto.Names is not null)
             {
-                _mapper.Map(request.UpdateUserDto.Names, user);
+                user.FirstName = request.UpdateUserDto.Names.FirstName;
+                user.LastName = request.UpdateUserDto.Names.LastName;
             }
 
             // Update profile picture and link the storage object when provided.

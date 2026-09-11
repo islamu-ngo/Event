@@ -5,7 +5,6 @@ using Explore.Application.DTOs.Location;
 using Explore.Application.DTOs.LocationRoom;
 using Explore.Application.DTOs.Tag;
 using Explore.Application.DTOs.TagTypeTags;
-using Explore.Application.Lookups;
 using Explore.Domain;
 
 namespace Explore.Application.Profiles;
@@ -53,13 +52,6 @@ public class LookupMappingProfile : Profile
             .ForMember(dest => dest.TagTypeMasterCode, opt => opt.MapFrom(src => src.TagType != null ? src.TagType.MasterCode : null));
         CreateMap<CreateTagTypeTagsDto, Domain.TagTypeTags>();
         CreateMap<UpdateTagTypeTagsDto, Domain.TagTypeTags>();
-
-        CreateMap<Domain.Permission, DTOs.Permission.PermissionDto>()
-            .ForMember(dest => dest.RoleScopeCode, opt => opt.MapFrom(src => NormalizedLookupMetadata.RoleScope(src.RoleScopeId).Code))
-            .ForMember(dest => dest.RoleScopeName, opt => opt.MapFrom(src => NormalizedLookupMetadata.RoleScope(src.RoleScopeId).Name));
-        CreateMap<Domain.Permission, DTOs.Permission.PermissionListDto>()
-            .ForMember(dest => dest.RoleScopeCode, opt => opt.MapFrom(src => NormalizedLookupMetadata.RoleScope(src.RoleScopeId).Code))
-            .ForMember(dest => dest.RoleScopeName, opt => opt.MapFrom(src => NormalizedLookupMetadata.RoleScope(src.RoleScopeId).Name));
 
         CreateMap<Domain.FileType, FileTypeDto>().ReverseMap();
         CreateMap<Domain.FileType, FileTypeListDto>().ReverseMap();

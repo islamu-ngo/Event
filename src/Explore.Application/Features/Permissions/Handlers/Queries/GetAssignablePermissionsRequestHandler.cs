@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Permission;
 using Explore.Application.Features.Permissions.Requests.Queries;
@@ -9,14 +9,11 @@ namespace Explore.Application.Features.Permissions.Handlers.Queries;
 public class GetAssignablePermissionsRequestHandler : IRequestHandler<GetAssignablePermissionsRequest, List<PermissionListDto>>
 {
     private readonly IPermissionRepository _permissionRepository;
-    private readonly IMapper _mapper;
 
     public GetAssignablePermissionsRequestHandler(
-        IPermissionRepository permissionRepository,
-        IMapper mapper)
+        IPermissionRepository permissionRepository)
     {
         _permissionRepository = permissionRepository;
-        _mapper = mapper;
     }
 
     public async Task<List<PermissionListDto>> Handle(GetAssignablePermissionsRequest request, CancellationToken cancellationToken)
@@ -25,6 +22,6 @@ public class GetAssignablePermissionsRequestHandler : IRequestHandler<GetAssigna
             request.CallerRoleIds,
             request.TargetScope);
 
-        return _mapper.Map<List<PermissionListDto>>(permissions);
+        return permissions.Select(PermissionMapper.ToListItem).ToList();
     }
 }

@@ -55,10 +55,7 @@ To discuss corporate sponsorship, custom invoicing, or enterprise partnerships, 
 
 ### 3. In-Kind Tooling & Infrastructure Supporters
 
-We deeply appreciate technology organizations that support open-source development by providing complimentary licenses, hosting, or infrastructure:
-
-* **[GitBook](https://www.gitbook.com):** Generously provides their **Community Plan** to host and power this official documentation portal.
-* **[Sonar Gitar](https://gitar.ai):** Generously provides their **Gitar Open Source Program** to empower our development with AI code review: *“Gitar keeps going — committing fixes, diagnosing CI failures, and iterating until your pipeline is green and the PR is ready to merge.”*
+We deeply appreciate technology organizations that support open-source development by providing complimentary licenses, hosting, or infrastructure. Active supporters are recognized under [In-Kind Supporters](#-in-kind-supporters) below.
 
 If your organization offers developer tools, hosting, or security scanning services and would like to support ISLAMU Event as an in-kind supporter, please reach out to **[contact@openislamu.org](mailto:contact@openislamu.org)**.
 
@@ -110,6 +107,21 @@ Active tiers display ongoing monthly recurring sponsors. One-time contributions 
 #### Old Sponsors
 
 * **One-Time Contribution:** [👉 Donate Once via Stripe](https://donate.stripe.com/14A6oIesc0Oc2KYg35aR200)
+
+---
+
+## 🤝 In-Kind Supporters
+
+Special thanks to the organizations providing free tooling, infrastructure, and licenses to support ISLAMU Event's open-source development:
+
+| Organization | Contribution & Usage |
+|:---:|---|
+| <a href="https://www.gitbook.com"><img src="https://api.iconify.design/simple-icons:gitbook.svg?color=%233884FF" width="48" height="48" alt="GitBook Logo" /><br />**GitBook**</a> | Generously provides their **Community Plan** to host and power our [Official Public Documentation](https://islamu.gitbook.io/islamu-event). |
+| <a href="https://gitar.ai"><img src="https://gitar.ai/images/logos/logo.svg" width="48" height="48" alt="Gitar Logo" /><br />**Sonar Gitar**</a> | Generously provides their **Gitar Open Source Program** to empower our development with AI code review: *“Gitar keeps going — committing fixes, diagnosing CI failures, and iterating until your pipeline is green and the PR is ready to merge.”* |
+
+{% hint style="info" %}
+If your organization would like to support ISLAMU Event with in-kind tooling, infrastructure, or software licenses, please reach out to us at **[contact@openislamu.org](mailto:contact@openislamu.org)**.
+{% endhint %}
 
 ---
 

@@ -344,7 +344,7 @@ Special thanks to the organizations providing free tooling, infrastructure, and 
 | Organization | Contribution & Usage |
 |:---:|---|
 | <a href="https://www.gitbook.com"><img src="https://api.iconify.design/simple-icons:gitbook.svg?color=%233884FF" width="48" height="48" alt="GitBook Logo" /><br />**GitBook**</a> | Generously provides their **Community Plan** to host and power our [Official Public Documentation](https://islamu.gitbook.io/islamu-event). |
-| <a href="https://gitar.ai"><img src="https://api.iconify.design/simple-icons:sonar.svg?color=%23FD3456" width="48" height="48" alt="Sonar Gitar Logo" /><br />**Sonar Gitar**</a> | Generously provides their **Gitar Open Source Program** to empower our development with AI code review: *“Gitar keeps going — committing fixes, diagnosing CI failures, and iterating until your pipeline is green and the PR is ready to merge.”* |
+| <a href="https://gitar.ai"><img src="https://gitar.ai/images/logos/logo.svg" width="48" height="48" alt="Gitar Logo" /><br />**Sonar Gitar**</a> | Generously provides their **Gitar Open Source Program** to empower our development with AI code review: *“Gitar keeps going — committing fixes, diagnosing CI failures, and iterating until your pipeline is green and the PR is ready to merge.”* |
 
 > If your organization would like to support ISLAMU Event with in-kind tooling, infrastructure, or software licenses, please reach out to us at [contact@openislamu.org][contact-email].
 

@@ -11,7 +11,7 @@ Last Updated: 2026-09-11
 - Report status: current
 - Disposition: plan-aligned
 - Evidence cutoff: 2026-09-11
-- Reviewed input: develop `1fdcfbe42679a5e2f549171be4090df72ebed504` plus `dev/active/mapping-and-cqs-migration` triad revision `planning-r1`
+- Reviewed input: develop `1fdcfbe42679a5e2f549171be4090df72ebed504` plus `dev/active/mapping-and-cqs-migration` triad revision `review-r3` (ten-path subscription pilot) and `dev/backlog/mapping-and-native-cqs-rollout.md` (graduated program, boundaries 1-6)
 - Supersedes: none; applies the [Steward consultation](i-vsd-automapper-mapperly-and-mediatr-replacement-consultation.md) to a concrete implementation plan without replacing that decision record.
 
 ## Scope
@@ -55,7 +55,7 @@ Finding IDs retain the consultation's meaning. New technical qualifications refi
 - Stakeholders: tenants, attendees, API consumers, maintainers.
 - Provider decision: combine strict mapping diagnostics with explicit disclosure boundaries and independent serialization tests.
 - Evidence: E03/E06. RequiredMappingStrategy reports unmapped members; an automatically matched member can still disclose an unintended value. The plan does not describe it as an automatic PII whitelist.
-- Mitigations: IVSD-M001, IVSD-M002; preserve immutable collection ownership and existing domain factories instead of making entities mutable for a mapper.
+- Mitigations: IVSD-M001, IVSD-M002; preserve immutable collection ownership and domain aggregate encapsulation (no direct entity property/collection mutation; DTOs map to immutable value objects/commands, and domain entities mutate strictly via aggregate methods).
 - Owner: mapping/DTO maintainers; validation: S1/S6 and each mapping-family task.
 
 ### IVSD-F004 — Replacement must remove hidden request dispatch completely
@@ -65,7 +65,7 @@ Finding IDs retain the consultation's meaning. New technical qualifications refi
 - Stakeholders: contributors, operators and all operation consumers.
 - Provider decision: typed command/query handlers, direct dependencies and deletion of MediatR, without a substitute generic dispatcher.
 - Evidence: E01/E04.
-- Mitigation: IVSD-M003; inventory includes nested handlers, MCP callbacks, jobs, middleware, HAL assemblers, infrastructure services and test helpers, not only controllers.
+- Mitigation: IVSD-M003; inventory includes nested handlers, MCP callbacks, jobs, middleware, HAL assemblers, infrastructure services and test helpers, not only controllers. Rollout sequences the 124 cohorts via a leaf-first DAG to avoid cross-module PR cascading and merge conflicts.
 - Owner: Application/API maintainers; validation: S2–S5 and complete capability inventory/caller closure.
 
 ### IVSD-F005 — Dependency and license records must be accurate
@@ -85,7 +85,7 @@ Finding IDs retain the consultation's meaning. New technical qualifications refi
 - Stakeholders: tenants, authenticated users, capability-token holders and background-work subjects.
 - Provider decision: apply the authorization decorator to void commands, result commands and queries; preserve resource fact precedence and existing public/capability/worker authority.
 - Evidence: E03/E04/E08.
-- Mitigations: IVSD-M003, IVSD-M006, IVSD-M007. Current code has no IAuthorizedRequest declaration, so the plan preserves the actual attribute/secure-facts contract. Universal wrapping does not authorize blanket new PDP denials or introduce opt-out metadata.
+- Mitigations: IVSD-M003, IVSD-M006, IVSD-M007. Deep handler resolution is placed into compiled CI Architecture/Integration tests; runtime startup preflight is bounded to 0-allocation metadata and factory checks to prevent readiness timeout loops on low-power self-hosted hardware.
 - Owner: Application security maintainer; validation: S2/S3/S6 and native composition/authorization invariant tests.
 
 ### IVSD-F007 — The validator convention remains a separate governance decision
@@ -115,25 +115,27 @@ Finding IDs retain the consultation's meaning. New technical qualifications refi
 - Stakeholders: maintainers and future contributors.
 - Provider decision: capability-split controllers with constructor injection under current repository authority.
 - Evidence: E02/E04.
-- Mitigation: IVSD-M010. Preserve route/verb/operationId/tag/authorization/HAL semantics; do not replace the mediator with a dependency bag or generic controller facade.
+- Mitigation: IVSD-M010. Preserve route/verb/operationId/tag/authorization/HAL semantics; do not replace the mediator with a dependency bag or generic controller facade. Split controllers explicitly preserve [Tags] annotations to protect client SDKs, and permit targeted [FromServices] for heavy fan-in endpoints to prevent constructor allocation bloat.
 - Owner: API maintainers; validation: S1/S2 and settings/provider/guest capability split tests.
 
 ## Recommendations
 
 Proceed with the decided migration through the plan's bounded mapper and operation slices. Each primitive family is independently reviewed; the entire 1,400-file dispatch migration is not a single review unit. A request belongs to exactly one dispatch cohort while migrating; no old-to-new dispatcher adapter or compatibility API remains.
 
-| Mitigation | Concrete provider-responsibility requirement | Planning mapping |
+Ownership under `review-r3`: the active ledger owns only the ten-path subscription pilot; every other mitigation is owned by a numbered boundary in the graduated backlog and requires its own promoted packet before implementation. No mitigation is unowned.
+
+| Mitigation | Concrete provider-responsibility requirement | review-r3 owner |
 |---|---|---|
-| IVSD-M001 | Complete generated mapping with explicit disclosure/collection behavior and final removal of frozen mapping dependency | S1/S6/S7; tasks 1, mapping-family rows, 6.1 |
-| IVSD-M002 | Delete edition plumbing, stale current guidance and exhausted audit exceptions | S7; tasks 6.1, 7.1–7.4 |
-| IVSD-M003 | Native typed operations and complete consumer migration, no mediator substitute | S2–S5; tasks 3, 4, capability annex and special-consumer closure |
-| IVSD-M004 | Operator docs/catalogue expose only real supported choices | S7; tasks 7.1/7.2 |
-| IVSD-M005 | Accurate Apache-2.0 package/role/obligations record and license validation | S7; tasks 1.1/1.3, 7.2/7.3 |
-| IVSD-M006 | Every operation shape is wrapped; original authority and zero-payload telemetry are preserved | S2/S3/S6; tasks 3.1–3.5, 6.2 |
-| IVSD-M007 | Bounded native composition catches missing/duplicate/late entries and actual construction errors | S3; tasks 3.2/3.4, 6.3 |
-| IVSD-M008 | Manual validators remain | S2/S5; task 5.2 and architecture assurance |
-| IVSD-M009 | Handler transactions, outbox, and authority-first erasure remain | S4/S5; tasks 4.2, 5.2/5.4, 7.R2 |
-| IVSD-M010 | Capability splits retain understandable explicit dependencies | S1/S2; tasks 4.3/5.3 |
+| IVSD-M001 | Complete generated mapping with explicit disclosure/collection behavior and final removal of frozen mapping dependency | Partial: active pilot (ActorSubscription detail/list disclosure vectors, exhausted profile deleted). Remainder: backlog boundary 1. **Refinement:** the pilot deliberately has no `ReverseMap`, existing-target, or nested-graph map; the *second* promoted mapping family must be one that has them (Event or CustomProperty). Domain aggregate encapsulation is strictly enforced: Mapperly never sets entity properties directly. |
+| IVSD-M002 | Delete edition plumbing, stale current guidance and exhausted audit exceptions | Backlog boundaries 5 and 6 |
+| IVSD-M003 | Native typed operations and complete consumer migration, no mediator substitute | Backlog boundaries 2 and 4. **Refinement:** rollout sequences the 124 cohorts via a leaf-first DAG (handlers with 0 internal callers first) to avoid cross-module PR cascading. |
+| IVSD-M004 | Operator docs/catalogue expose only real supported choices | Backlog boundary 6 |
+| IVSD-M005 | Accurate Apache-2.0 package/role/obligations record and license validation | Partial: active pilot (dependency record `docs/internal/legal/dependencies/mapperly.md`, scanner run, locked restore). Remainder: backlog boundary 5. **Verified 2026-09-11 (E06):** Mapperly 4.x ships RMG012/RMG020/RMG037/RMG038 as strict defaults and `RequiredMappingStrategy` defaults to `Both`; the `.editorconfig` entries pin those severities against future default drift rather than create them. |
+| IVSD-M006 | Every operation shape is wrapped; original authority and zero-payload telemetry are preserved | Backlog boundary 2 (gate at that PR's exit, not the final sweep) |
+| IVSD-M007 | Bounded native composition catches missing/duplicate/late entries and actual construction errors | Backlog boundary 2. **Refinement:** deep handler resolution moves to CI Architecture/Integration tests (`NativeOperationHostCompositionTests`); runtime preflight inside the container boot is bounded to 0-allocation metadata and factory checks, ensuring cold-boot latency on standalone SQLite / Raspberry Pi instances remains negligible (<10ms) and prevents orchestrator readiness timeout loops. |
+| IVSD-M008 | Manual validators remain | Backlog boundary 4 and native-aware architecture assurance |
+| IVSD-M009 | Handler transactions, outbox, and authority-first erasure remain | Backlog boundaries 3 and 4 (settings, commerce, erasure slices) |
+| IVSD-M010 | Capability splits retain understandable explicit dependencies | Backlog boundaries 3 and 4 (settings, provider-management, guest-order splits). **Refinement:** split controllers preserve explicit `[Tags]` annotations to protect client SDKs, and permit targeted `[FromServices]` on high-fan-in endpoints to avoid constructor bloat. |
 
 Rejected alternatives remain the Steward's rejected mediator facade, third-party mediator, Scrutor, two images, indefinite frozen libraries and blanket textbook decorators. No new alternative needs a moral decision. Within the selected Microsoft DI design, actual scoped construction plus a native-operation re-entry guard replaces an unprovable promise to inspect arbitrary factory bodies.
 
@@ -174,7 +176,9 @@ No religious-legal escalation is required for this planning task. If package ter
 | E03 | ApplicationServicesRegistration, AuthorizationBehavior, PerformanceBehavior, Profiles, SettingUpsertService, InstanceSmtpSettingService | Actual current composition, mapping and post-commit behavior. |
 | E04 | CurrentUserResolutionExtensions; large controller families; MCP projected factory; outbox/identity/Jetstream consumers; current authorization architecture tests | Trust/caller surface beyond ordinary controllers. |
 | E05 | Directory.Packages.props, Directory.Build.props, API/Blazor Dockerfiles, docker-compose, canonical environment catalogue/metadata, API configuration mapping | Real edition plumbing targeted for removal. |
-| E06 | [Mapperly publisher package](https://www.nuget.org/packages/Riok.Mapperly/), [mapping configuration](https://mapperly.riok.app/docs/configuration/mapper), [v4 diagnostic changes](https://mapperly.riok.app/docs/breaking-changes/4-0); accessed via Tavily/Context7 2026-09-11 | 4.3.1, Apache-2.0, strict-diagnostic limitations and reference-copy semantics. |
+| E06 | [Mapperly publisher package](https://www.nuget.org/packages/Riok.Mapperly/), [mapping configuration](https://mapperly.riok.app/docs/configuration/mapper), [analyzer diagnostics](https://mapperly.riok.app/docs/configuration/analyzer-diagnostics), [v4 diagnostic changes](https://mapperly.riok.app/docs/breaking-changes/4-0); first accessed via Tavily/Context7 during planning-r1, independently re-verified via Context7 (`/websites/mapperly_riok_app`) and web search on 2026-09-11 for review-r2 | 4.3.1 current stable; Apache-2.0 (`LICENSE` file and NuGet metadata); RMG012/020/037/038 strict by default since 4.0 with `.editorconfig` `dotnet_diagnostic.<id>.severity` override; `RequiredMappingStrategy` defaults to `Both`; `UseReferenceHandling` and `UseDeepCloning` are opt-in, so assignable references are reused by default. |
+| E09 | `dev/active/mapping-and-cqs-migration` triad revision `review-r2` and `dev/backlog/mapping-and-native-cqs-rollout.md` (Graduation Decision, boundaries 1-6, "I-VSD Ownership After Split") | Ten-path pilot ownership; every non-pilot mitigation assigned to a backlog boundary; Senior CTO refinements (three handler shapes, shared evaluator, re-entry guard, scoped preflight, capability splits). |
+| E10 | `dev/active/mapping-and-cqs-migration` triad revision `review-r3` | Four refined architectural decisions: CI deep DI validation + bounded 0-allocation boot preflight (M007), domain aggregate encapsulation (M001), OpenAPI tag protection + targeted `[FromServices]` (M010), leaf-first DAG rollout (M003). |
 | E07 | [Microsoft DI overview](https://learn.microsoft.com/en-us/dotnet/core/extensions/dependency-injection/overview), [ValidateOnBuild](https://learn.microsoft.com/en-us/dotnet/api/microsoft.extensions.dependencyinjection.serviceprovideroptions.validateonbuild); Context7/Tavily 2026-09-11 | Scope/construction contract and validation limitations. |
 | E08 | dev/active/mapping-and-cqs-migration plan/context/tasks revision planning-r1 and 1,744-path candidate inventory | Scenarios, exact ownership protocol, 124 feature cohorts, verification and release/graduation tasks. |
 
@@ -192,13 +196,16 @@ The planner reused one shared repository evidence packet and the supplied consul
 |---|---|---|---|---|
 | 2026-09-11 | none | draft | Apply accepted consultation to concrete migration workstream | E01–E08 |
 | 2026-09-11 | draft | current | Revalidate completed triad: every F001–F009/M001–M010 maps to a scenario/task; independent technical findings resolved; no new moral or architecture decision left open | E08; native factory guard, atomic caller rewrite and explicit inbound-construction refinements |
+| 2026-09-11 | current | stale | Senior CTO review-r2 split the program into a ten-path pilot plus graduated backlog; mitigation task ownership changed | E09 |
+| 2026-09-11 | stale | current | Planning-mode revalidation against review-r2: every mitigation re-owned by the pilot ledger or a numbered backlog boundary; Mapperly diagnostic/strategy facts independently re-verified; two technical refinements added (hardest mapping family second, measured startup preflight delta). No finding closed; no new moral decision opened | E06 (re-verified), E09 |
+| 2026-09-11 | current | current | Planning-mode revalidation against review-r3: deep DI resolution shifted to CI with bounded 0-allocation boot preflight (M007); domain aggregate encapsulation invariant enforced against direct entity mutation (M001); controller splits protect OpenAPI client tags with targeted `[FromServices]` (M010); leaf-first DAG sequencing for 124 cohorts (M003) | E10 |
 
 ## Planning Handoff
 
 - Workstream: mapping-and-cqs-migration
 - Status: current / plan-aligned
-- Reviewed input: triad revision planning-r1 at develop 1fdcfbe42679a5e2f549171be4090df72ebed504
-- Findings and mitigations: all consultation IDs retained; mappings in Recommendations and plan §9.
-- Required mappings: S1–S7 and named mapping/composition/capability/cleanup tasks above.
+- Reviewed input: triad revision review-r3 at develop 1fdcfbe42679a5e2f549171be4090df72ebed504, plus `dev/backlog/mapping-and-native-cqs-rollout.md` Graduation Decision
+- Findings and mitigations: all consultation IDs retained (F001–F009 -> M001–M010); ownership table in Recommendations; plan §9 mirrors it by phase name.
+- Required mappings: S1–S7; active pilot owns partial M001 and M005; backlog boundaries 1–6 own every remaining mitigation as stated in the ownership table. Each promoted packet re-enters planning-mode revalidation for its own scope before implementation.
 - Escalations before implementation: only an actual dependency/provenance rejection or a newly discovered material architectural conflict; no redundant approval of the already-decided replacement pattern.
-- Refresh triggers: native authority changes, transaction/notification semantics change, new package/license evidence, unsafe mapping boundary, changed edition scope, or material triad rewrite.
+- Refresh triggers: promotion of any backlog boundary to an active packet (revalidate that packet's scope); native authority changes; transaction/notification semantics change; new package/license evidence; unsafe mapping boundary; changed edition scope; material triad rewrite.

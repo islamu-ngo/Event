@@ -54,13 +54,6 @@ public class LookupMappingProfile : Profile
         CreateMap<CreateTagTypeTagsDto, Domain.TagTypeTags>();
         CreateMap<UpdateTagTypeTagsDto, Domain.TagTypeTags>();
 
-        CreateMap<Domain.Role, DTOs.Role.RoleDto>()
-            .ForMember(dest => dest.RoleScopeCode, opt => opt.MapFrom(src => NormalizedLookupMetadata.RoleScope(src.RoleScopeId).Code))
-            .ForMember(dest => dest.RoleScopeName, opt => opt.MapFrom(src => NormalizedLookupMetadata.RoleScope(src.RoleScopeId).Name));
-        CreateMap<Domain.Role, DTOs.Role.RoleListDto>()
-            .ForMember(dest => dest.RoleScopeCode, opt => opt.MapFrom(src => NormalizedLookupMetadata.RoleScope(src.RoleScopeId).Code))
-            .ForMember(dest => dest.RoleScopeName, opt => opt.MapFrom(src => NormalizedLookupMetadata.RoleScope(src.RoleScopeId).Name));
-
         CreateMap<Domain.Permission, DTOs.Permission.PermissionDto>()
             .ForMember(dest => dest.RoleScopeCode, opt => opt.MapFrom(src => NormalizedLookupMetadata.RoleScope(src.RoleScopeId).Code))
             .ForMember(dest => dest.RoleScopeName, opt => opt.MapFrom(src => NormalizedLookupMetadata.RoleScope(src.RoleScopeId).Name));

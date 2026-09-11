@@ -1,7 +1,6 @@
 using AutoMapper;
 using Explore.Application.DTOs.CategoryTypeCategories;
 using Explore.Application.DTOs.FileType;
-using Explore.Application.DTOs.Location;
 using Explore.Application.DTOs.LocationRoom;
 using Explore.Application.DTOs.Tag;
 using Explore.Application.DTOs.TagTypeTags;
@@ -13,11 +12,6 @@ public class LookupMappingProfile : Profile
 {
     public LookupMappingProfile()
     {
-        CreateMap<Location, LocationDto>()
-            .ForMember(destination => destination.Latitude, options => options.MapFrom(source => ValidLatitude(source)))
-            .ForMember(destination => destination.Longitude, options => options.MapFrom(source => ValidLongitude(source)));
-        CreateMap<Location, LocationListDto>();
-
         CreateMap<LocationRoom, LocationRoomDto>()
             .ForMember(dest => dest.LocationFullName, opt => opt.MapFrom(src => src.Location != null ? src.Location.FullName : null));
         CreateMap<LocationRoom, LocationRoomListDto>();
@@ -57,7 +51,4 @@ public class LookupMappingProfile : Profile
         CreateMap<Domain.FileType, FileTypeListDto>().ReverseMap();
     }
 
-    private static double? ValidLatitude(Location location) => location.GetCoordinate()?.Latitude;
-
-    private static double? ValidLongitude(Location location) => location.GetCoordinate()?.Longitude;
 }

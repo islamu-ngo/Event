@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventOrganizerClaim;
@@ -17,8 +17,7 @@ public sealed class GetClaimantOrganizerClaimsRequestHandler(
     IOrganizationMemberRepository organizationMemberRepository,
     IGroupMemberRepository groupMemberRepository,
     ITenantContext tenantContext,
-    ICurrentUserService currentUserService,
-    IMapper mapper)
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetClaimantOrganizerClaimsRequest, IReadOnlyList<EventOrganizerClaimDto>>
 {
     public async Task<IReadOnlyList<EventOrganizerClaimDto>> Handle(
@@ -42,6 +41,6 @@ public sealed class GetClaimantOrganizerClaimsRequestHandler(
         }
 
         var claims = await claimRepository.ListByClaimantAsync(request.ClaimantActorId, cancellationToken);
-        return mapper.Map<List<EventOrganizerClaimDto>>(claims);
+        return claims.Select(EventMapper.ToDetail).ToList();
     }
 }

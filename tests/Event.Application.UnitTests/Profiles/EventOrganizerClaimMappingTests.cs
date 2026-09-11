@@ -3,12 +3,14 @@ using AutoMapper;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.EventOrganizerClaim;
 using Explore.Application.Profiles;
+using Explore.Application.Mappings;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 
 namespace Event.Application.UnitTests.Profiles;
 
+[Category("EventClaimsMapping")]
 public sealed class EventOrganizerClaimMappingTests
 {
     [Test]
@@ -55,25 +57,17 @@ public sealed class EventOrganizerClaimMappingTests
     [Test]
     public async Task EventOrganizerClaimMapping_ProjectsClaimantActorOwnership()
     {
-#if USE_COMMERCIAL_LUCKYPENNY_LIBS
-        var configuration = new MapperConfiguration(
-            cfg => cfg.AddProfile<EventMappingProfile>(),
-            Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
-#else
-        var configuration = new MapperConfiguration(cfg => cfg.AddProfile<EventMappingProfile>());
-#endif
-        var mapper = configuration.CreateMapper();
-        var tenantId = Guid.NewGuid();
-        var eventId = Guid.NewGuid();
-        var claimantActorId = Guid.NewGuid();
-        var claimantGroupId = Guid.NewGuid();
+        var tenantId = Guid.Parse("01900000-0000-7000-8000-000000000001");
+        var eventId = Guid.Parse("01900000-0000-7000-8000-000000000002");
+        var claimantActorId = Guid.Parse("01900000-0000-7000-8000-000000000003");
+        var claimantGroupId = Guid.Parse("01900000-0000-7000-8000-000000000004");
         var claim = EventOrganizerClaim.CreatePending(
             tenantId,
             eventId,
             claimantActorId,
             "domain-proof",
             "bounded-reference",
-            DateTime.UtcNow);
+            new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
         typeof(EventOrganizerClaim).GetProperty(nameof(EventOrganizerClaim.ClaimantActor))!
             .SetValue(claim, new Actor
             {
@@ -83,7 +77,7 @@ public sealed class EventOrganizerClaimMappingTests
                 Pii = new ActorPii { DisplayName = "Claimant group" }
             });
 
-        var dto = mapper.Map<EventOrganizerClaimDto>(claim);
+        var dto = EventMapper.ToDetail(claim);
 
         await Assert.That(dto.ClaimantActorGroupId).IsEqualTo(claimantGroupId);
         await Assert.That(dto.ClaimantActorUserId).IsNull();

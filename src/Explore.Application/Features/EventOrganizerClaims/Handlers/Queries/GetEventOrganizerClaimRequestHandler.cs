@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventOrganizerClaim;
 using Explore.Application.Features.EventOrganizerClaims.Requests.Queries;
@@ -7,8 +7,7 @@ using MediatR;
 namespace Explore.Application.Features.EventOrganizerClaims.Handlers.Queries;
 
 public sealed class GetEventOrganizerClaimRequestHandler(
-    IEventOrganizerClaimRepository claimRepository,
-    IMapper mapper)
+    IEventOrganizerClaimRepository claimRepository)
     : IRequestHandler<GetEventOrganizerClaimRequest, EventOrganizerClaimDto?>
 {
     public async Task<EventOrganizerClaimDto?> Handle(
@@ -20,7 +19,7 @@ public sealed class GetEventOrganizerClaimRequestHandler(
             trackChanges: false,
             cancellationToken);
         return claim is not null && claim.EventId == request.EventId
-            ? mapper.Map<EventOrganizerClaimDto>(claim)
+            ? EventMapper.ToDetail(claim)
             : null;
     }
 }

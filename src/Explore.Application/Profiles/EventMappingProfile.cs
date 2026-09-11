@@ -4,7 +4,6 @@ using Explore.Application.DTOs.EventAgendaItem;
 using Explore.Application.DTOs.EventAspects;
 using Explore.Application.DTOs.EventCategories;
 using Explore.Application.DTOs.EventDay;
-using Explore.Application.DTOs.EventOrganizerClaim;
 using Explore.Application.DTOs.EventSessionGroup;
 using Explore.Application.DTOs.EventTags;
 using Explore.Application.Services;
@@ -57,22 +56,6 @@ public class EventMappingProfile : Profile
                     !string.IsNullOrWhiteSpace(attachment.RegistrationFormVersion.UiSchemaArtifact) &&
                     !string.IsNullOrWhiteSpace(attachment.RegistrationFormVersion.LogicSchemaArtifact) &&
                     !string.IsNullOrWhiteSpace(attachment.RegistrationFormVersion.MappingArtifact))));
-
-        CreateMap<EventOrganizerClaim, EventOrganizerClaimDto>()
-            .ForMember(dest => dest.ClaimantActorDisplayName, opt => opt.MapFrom(src => src.ClaimantActor != null ? src.ClaimantActor.DisplayName : null))
-            .ForMember(dest => dest.ClaimantActorUserId, opt => opt.MapFrom(src => src.ClaimantActor != null ? src.ClaimantActor.UserId : null))
-            .ForMember(dest => dest.ClaimantActorOrganizationId, opt => opt.MapFrom(src => src.ClaimantActor != null ? src.ClaimantActor.OrganizationId : null))
-            .ForMember(dest => dest.ClaimantActorGroupId, opt => opt.MapFrom(src => src.ClaimantActor != null ? src.ClaimantActor.GroupId : null))
-            .ForMember(dest => dest.StatusCode, opt => opt.MapFrom(src => src.Status != null ? src.Status.MasterCode : null))
-            .ForMember(dest => dest.StatusName, opt => opt.MapFrom(src => src.Status != null ? src.Status.FullName : null))
-            .ForMember(dest => dest.EventActorId, opt => opt.MapFrom(src => src.Event != null ? src.Event.ActorId : Guid.Empty))
-            .ForMember(dest => dest.EventActorUserId, opt => opt.MapFrom(src => src.Event != null && src.Event.Actor != null ? src.Event.Actor.UserId : null))
-            .ForMember(dest => dest.EventActorOrganizationId, opt => opt.MapFrom(src => src.Event != null && src.Event.Actor != null ? src.Event.Actor.OrganizationId : null))
-            .ForMember(dest => dest.EventActorGroupId, opt => opt.MapFrom(src => src.Event != null && src.Event.Actor != null ? src.Event.Actor.GroupId : null))
-            .ForMember(dest => dest.EventProvenanceTypeId, opt => opt.MapFrom(src => src.Event != null ? src.Event.EventProvenanceTypeId : 0))
-            .ForMember(dest => dest.EventProvenanceTypeCode, opt => opt.MapFrom(src => src.Event != null && src.Event.EventProvenanceType != null ? src.Event.EventProvenanceType.MasterCode : null))
-            .ForMember(dest => dest.EventOrganizerActorId, opt => opt.MapFrom(src => src.Event != null ? src.Event.OrganizerActorId : null))
-            .ForMember(dest => dest.EventSubmittedByUserId, opt => opt.MapFrom(src => src.Event != null ? src.Event.SubmittedByUserId : null));
 
         // Event → EventDto
         CreateMap<Event, EventDto>()

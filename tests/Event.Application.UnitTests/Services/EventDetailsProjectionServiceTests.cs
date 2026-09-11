@@ -124,7 +124,6 @@ public sealed class EventDetailsProjectionServiceTests
         _eventTagsRepository.GetTagsByEvent(eventId).Returns(tags);
         _eventCategoriesRepository.GetCategoriesByEvent(eventId).Returns(categories);
         _mapper.Map<List<TagListDto>>(tags).Returns(tagDtos);
-        _mapper.Map<List<CategoryListDto>>(categories).Returns(categoryDtos);
 
         var result = await _service.BuildAsync(eventId, CancellationToken.None);
 
@@ -134,7 +133,8 @@ public sealed class EventDetailsProjectionServiceTests
         await Assert.That(result.Categories.SequenceEqual(expectedCategoryDtos)).IsTrue();
 
         tagDtos.Clear();
-        categoryDtos.Clear();
+        categories[0].FullName = "Changed";
+        categories.Clear();
 
         await Assert.That(result.Tags.SequenceEqual(expectedTagDtos)).IsTrue();
         await Assert.That(result.Categories.SequenceEqual(expectedCategoryDtos)).IsTrue();

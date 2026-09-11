@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.CustomPropertyDefinition;
 using Explore.Application.Features.CustomPropertyDefinitions.Requests.Queries;
@@ -12,16 +12,13 @@ namespace Explore.Application.Features.CustomPropertyDefinitions.Handlers.Querie
 public class GetCustomPropertyDefinitionListRequestHandler : IRequestHandler<GetCustomPropertyDefinitionListRequest, PaginatedResult<CustomPropertyDefinitionListDto>>
 {
     private readonly ICustomPropertyDefinitionRepository _customPropertyDefinitionRepository;
-    private readonly IMapper _mapper;
     private readonly HybridCache _cache;
 
     public GetCustomPropertyDefinitionListRequestHandler(
         ICustomPropertyDefinitionRepository customPropertyDefinitionRepository,
-        IMapper mapper,
         HybridCache cache)
     {
         _customPropertyDefinitionRepository = customPropertyDefinitionRepository;
-        _mapper = mapper;
         _cache = cache;
     }
 
@@ -38,7 +35,7 @@ public class GetCustomPropertyDefinitionListRequestHandler : IRequestHandler<Get
                     request.EntityTypeName,
                     pageNumber,
                     pageSize);
-                var dtos = _mapper.Map<List<CustomPropertyDefinitionListDto>>(definitions);
+                var dtos = definitions.Select(CustomPropertyMapper.ToListItem).ToList();
                 return PaginatedResult<CustomPropertyDefinitionListDto>.Create(dtos, totalCount, pageNumber, pageSize);
             },
             new HybridCacheEntryOptions

@@ -1,4 +1,3 @@
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -19,7 +18,6 @@ public class SetEventSessionCustomPropertyMultiValuesCommandHandler : IRequestHa
     private readonly ICustomPropertyQuotaResolver _quotaResolver;
     private readonly ITenantContext _tenantContext;
     private readonly ICurrentUserService _currentUserService;
-    private readonly IMapper _mapper;
     private readonly IUnitOfWork _unitOfWork;
 
     public SetEventSessionCustomPropertyMultiValuesCommandHandler(
@@ -28,7 +26,6 @@ public class SetEventSessionCustomPropertyMultiValuesCommandHandler : IRequestHa
         ICustomPropertyQuotaResolver quotaResolver,
         ITenantContext tenantContext,
         ICurrentUserService currentUserService,
-        IMapper mapper,
         IUnitOfWork unitOfWork)
     {
         _sessionCustomPropertyRepository = sessionCustomPropertyRepository;
@@ -36,7 +33,6 @@ public class SetEventSessionCustomPropertyMultiValuesCommandHandler : IRequestHa
         _quotaResolver = quotaResolver;
         _tenantContext = tenantContext;
         _currentUserService = currentUserService;
-        _mapper = mapper;
         _unitOfWork = unitOfWork;
     }
 
@@ -95,16 +91,19 @@ public class SetEventSessionCustomPropertyMultiValuesCommandHandler : IRequestHa
         }
 
         var values = request.Values
-            .Select((dto, index) =>
+            .Select((dto, index) => new EventSessionCustomPropertyValue
             {
-                var value = _mapper.Map<EventSessionCustomPropertyValue>(dto);
-                value.EventSessionCustomPropertyDefinitionId = request.DefinitionId;
-                value.EventSessionId = request.EventSessionId;
-                value.TenantId = _tenantContext.TenantId;
-                value.Ordinal = index;
-                value.CreatedBy = _currentUserService.UserId;
-                value.UpdatedBy = _currentUserService.UserId;
-                return value;
+                EventSessionCustomPropertyDefinitionId = request.DefinitionId,
+                EventSessionId = request.EventSessionId,
+                Ordinal = index,
+                TextValue = dto.TextValue,
+                NumberValue = dto.NumberValue,
+                BooleanValue = dto.BooleanValue,
+                DateTimeValue = dto.DateTimeValue,
+                OptionId = dto.OptionId,
+                TenantId = _tenantContext.TenantId,
+                CreatedBy = _currentUserService.UserId,
+                UpdatedBy = _currentUserService.UserId
             })
             .ToList();
 

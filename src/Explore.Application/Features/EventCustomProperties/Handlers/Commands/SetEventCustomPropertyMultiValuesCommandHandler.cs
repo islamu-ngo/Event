@@ -1,4 +1,3 @@
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -19,7 +18,6 @@ public class SetEventCustomPropertyMultiValuesCommandHandler : IRequestHandler<S
     private readonly ICustomPropertyQuotaResolver _quotaResolver;
     private readonly ITenantContext _tenantContext;
     private readonly ICurrentUserService _currentUserService;
-    private readonly IMapper _mapper;
     private readonly IUnitOfWork _unitOfWork;
 
     public SetEventCustomPropertyMultiValuesCommandHandler(
@@ -28,7 +26,6 @@ public class SetEventCustomPropertyMultiValuesCommandHandler : IRequestHandler<S
         ICustomPropertyQuotaResolver quotaResolver,
         ITenantContext tenantContext,
         ICurrentUserService currentUserService,
-        IMapper mapper,
         IUnitOfWork unitOfWork)
     {
         _eventCustomPropertyRepository = eventCustomPropertyRepository;
@@ -36,7 +33,6 @@ public class SetEventCustomPropertyMultiValuesCommandHandler : IRequestHandler<S
         _quotaResolver = quotaResolver;
         _tenantContext = tenantContext;
         _currentUserService = currentUserService;
-        _mapper = mapper;
         _unitOfWork = unitOfWork;
     }
 
@@ -95,16 +91,19 @@ public class SetEventCustomPropertyMultiValuesCommandHandler : IRequestHandler<S
         }
 
         var values = request.Values
-            .Select((dto, index) =>
+            .Select((dto, index) => new EventCustomPropertyValue
             {
-                var value = _mapper.Map<EventCustomPropertyValue>(dto);
-                value.EventCustomPropertyDefinitionId = request.DefinitionId;
-                value.EventId = request.EventId;
-                value.TenantId = _tenantContext.TenantId;
-                value.Ordinal = index;
-                value.CreatedBy = _currentUserService.UserId;
-                value.UpdatedBy = _currentUserService.UserId;
-                return value;
+                EventCustomPropertyDefinitionId = request.DefinitionId,
+                EventId = request.EventId,
+                Ordinal = index,
+                TextValue = dto.TextValue,
+                NumberValue = dto.NumberValue,
+                BooleanValue = dto.BooleanValue,
+                DateTimeValue = dto.DateTimeValue,
+                OptionId = dto.OptionId,
+                TenantId = _tenantContext.TenantId,
+                CreatedBy = _currentUserService.UserId,
+                UpdatedBy = _currentUserService.UserId
             })
             .ToList();
 

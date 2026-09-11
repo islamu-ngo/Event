@@ -2,7 +2,7 @@ using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
-using Explore.Application.DTOs.Category;
+using Explore.Application.Mappings;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.Tag;
 using Microsoft.Extensions.Logging;
@@ -69,7 +69,7 @@ public sealed class EventDetailsProjectionService : IEventDetailsProjectionServi
         return dto with
         {
             Tags = _mapper.Map<List<TagListDto>>(tags),
-            Categories = _mapper.Map<List<CategoryListDto>>(categories)
+            Categories = categories.Select(CustomPropertyMapper.ToListItem).ToList()
         };
     }
 

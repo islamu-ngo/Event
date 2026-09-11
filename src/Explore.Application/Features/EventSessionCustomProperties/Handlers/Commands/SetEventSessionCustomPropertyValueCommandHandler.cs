@@ -1,4 +1,3 @@
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -18,22 +17,19 @@ public class SetEventSessionCustomPropertyValueCommandHandler : IRequestHandler<
     private readonly IUnitOfWork _unitOfWork;
     private readonly ITenantContext _tenantContext;
     private readonly ICurrentUserService _currentUserService;
-    private readonly IMapper _mapper;
 
     public SetEventSessionCustomPropertyValueCommandHandler(
         IEventSessionCustomPropertyRepository sessionCustomPropertyRepository,
         IEventSessionCustomPropertyProjectionUpdater projectionUpdater,
         IUnitOfWork unitOfWork,
         ITenantContext tenantContext,
-        ICurrentUserService currentUserService,
-        IMapper mapper)
+        ICurrentUserService currentUserService)
     {
         _sessionCustomPropertyRepository = sessionCustomPropertyRepository;
         _projectionUpdater = projectionUpdater;
         _unitOfWork = unitOfWork;
         _tenantContext = tenantContext;
         _currentUserService = currentUserService;
-        _mapper = mapper;
     }
 
     public async Task<BaseCommandResponse<Guid>> Handle(SetEventSessionCustomPropertyValueCommand request, CancellationToken cancellationToken)
@@ -63,10 +59,21 @@ public class SetEventSessionCustomPropertyValueCommandHandler : IRequestHandler<
                 "Event session custom property value set failed.");
         }
 
-        var value = _mapper.Map<EventSessionCustomPropertyValue>(request.ValueDto);
-        value.TenantId = _tenantContext.TenantId;
-        value.CreatedBy = _currentUserService.UserId;
-        value.UpdatedBy = _currentUserService.UserId;
+        var dto = request.ValueDto;
+        var value = new EventSessionCustomPropertyValue
+        {
+            EventSessionCustomPropertyDefinitionId = dto.EventSessionCustomPropertyDefinitionId,
+            EventSessionId = dto.EventSessionId,
+            Ordinal = dto.Ordinal,
+            TextValue = dto.TextValue,
+            NumberValue = dto.NumberValue,
+            BooleanValue = dto.BooleanValue,
+            DateTimeValue = dto.DateTimeValue,
+            OptionId = dto.OptionId,
+            TenantId = _tenantContext.TenantId,
+            CreatedBy = _currentUserService.UserId,
+            UpdatedBy = _currentUserService.UserId
+        };
 
         var persisted = await _unitOfWork.ExecuteInTransactionAsync(
             async ct =>

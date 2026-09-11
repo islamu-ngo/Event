@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Category.Validators;
@@ -18,18 +17,15 @@ public class CreateCategoryCommandHandler : IRequestHandler<CreateCategoryComman
 {
     private readonly ICategoryRepository _categoryRepository;
     private readonly ITenantContext _tenantContext;
-    private readonly IMapper _mapper;
     private readonly HybridCache _cache;
 
     public CreateCategoryCommandHandler(
         ICategoryRepository categoryRepository,
         ITenantContext tenantContext,
-        IMapper mapper,
         HybridCache cache)
     {
         _categoryRepository = categoryRepository;
         _tenantContext = tenantContext;
-        _mapper = mapper;
         _cache = cache;
     }
 
@@ -45,10 +41,14 @@ public class CreateCategoryCommandHandler : IRequestHandler<CreateCategoryComman
                 "Category creation failed.");
         }
 
-        var category = _mapper.Map<Category>(request.CategoryDto);
-
-        // Set TenantId from the request context
-        category.TenantId = _tenantContext.TenantId;
+        var category = new Category
+        {
+            MasterCode = request.CategoryDto.MasterCode,
+            FullName = request.CategoryDto.FullName,
+            ParentId = request.CategoryDto.ParentId,
+            TenantId = _tenantContext.TenantId,
+            Tenant = null!
+        };
 
         category = await _categoryRepository.Create(category);
 

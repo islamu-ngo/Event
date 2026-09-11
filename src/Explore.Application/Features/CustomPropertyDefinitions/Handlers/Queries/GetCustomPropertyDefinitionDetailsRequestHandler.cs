@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.CustomPropertyDefinition;
 using Explore.Application.Exceptions;
@@ -11,14 +11,11 @@ namespace Explore.Application.Features.CustomPropertyDefinitions.Handlers.Querie
 public class GetCustomPropertyDefinitionDetailsRequestHandler : IRequestHandler<GetCustomPropertyDefinitionDetailsRequest, CustomPropertyDefinitionDto>
 {
     private readonly ICustomPropertyDefinitionRepository _customPropertyDefinitionRepository;
-    private readonly IMapper _mapper;
 
     public GetCustomPropertyDefinitionDetailsRequestHandler(
-        ICustomPropertyDefinitionRepository customPropertyDefinitionRepository,
-        IMapper mapper)
+        ICustomPropertyDefinitionRepository customPropertyDefinitionRepository)
     {
         _customPropertyDefinitionRepository = customPropertyDefinitionRepository;
-        _mapper = mapper;
     }
 
     public async Task<CustomPropertyDefinitionDto> Handle(GetCustomPropertyDefinitionDetailsRequest request, CancellationToken cancellationToken)
@@ -29,6 +26,6 @@ public class GetCustomPropertyDefinitionDetailsRequestHandler : IRequestHandler<
             throw new NotFoundException(nameof(CustomPropertyDefinition), request.Id);
         }
 
-        return _mapper.Map<CustomPropertyDefinitionDto>(definition);
+        return CustomPropertyMapper.ToDetail(definition);
     }
 }

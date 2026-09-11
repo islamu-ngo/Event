@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventTemplate;
 using Explore.Application.Exceptions;
@@ -11,14 +11,11 @@ namespace Explore.Application.Features.EventTemplates.Handlers.Queries;
 public class GetEventTemplateDetailsRequestHandler : IRequestHandler<GetEventTemplateDetailsRequest, EventTemplateDto>
 {
     private readonly IEventTemplateRepository _eventTemplateRepository;
-    private readonly IMapper _mapper;
 
     public GetEventTemplateDetailsRequestHandler(
-        IEventTemplateRepository eventTemplateRepository,
-        IMapper mapper)
+        IEventTemplateRepository eventTemplateRepository)
     {
         _eventTemplateRepository = eventTemplateRepository;
-        _mapper = mapper;
     }
 
     public async Task<EventTemplateDto> Handle(GetEventTemplateDetailsRequest request, CancellationToken cancellationToken)
@@ -29,6 +26,6 @@ public class GetEventTemplateDetailsRequestHandler : IRequestHandler<GetEventTem
             throw new NotFoundException(nameof(EventTemplate), request.Id);
         }
 
-        return _mapper.Map<EventTemplateDto>(template);
+        return CustomPropertyMapper.ToDetail(template);
     }
 }

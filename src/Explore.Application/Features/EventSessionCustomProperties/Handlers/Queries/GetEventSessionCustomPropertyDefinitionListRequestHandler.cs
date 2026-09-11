@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionCustomProperty;
 using Explore.Application.Features.EventSessionCustomProperties.Requests.Queries;
@@ -11,16 +11,13 @@ namespace Explore.Application.Features.EventSessionCustomProperties.Handlers.Que
 public class GetEventSessionCustomPropertyDefinitionListRequestHandler : IRequestHandler<GetEventSessionCustomPropertyDefinitionListRequest, PaginatedResult<EventSessionCustomPropertyDefinitionListDto>>
 {
     private readonly IEventSessionCustomPropertyRepository _sessionCustomPropertyRepository;
-    private readonly IMapper _mapper;
     private readonly HybridCache _cache;
 
     public GetEventSessionCustomPropertyDefinitionListRequestHandler(
         IEventSessionCustomPropertyRepository sessionCustomPropertyRepository,
-        IMapper mapper,
         HybridCache cache)
     {
         _sessionCustomPropertyRepository = sessionCustomPropertyRepository;
-        _mapper = mapper;
         _cache = cache;
     }
 
@@ -37,7 +34,7 @@ public class GetEventSessionCustomPropertyDefinitionListRequestHandler : IReques
                     request.EventSessionId,
                     pageNumber,
                     pageSize);
-                var dtos = _mapper.Map<List<EventSessionCustomPropertyDefinitionListDto>>(definitions);
+                var dtos = definitions.Select(CustomPropertyMapper.ToListItem).ToList();
                 return PaginatedResult<EventSessionCustomPropertyDefinitionListDto>.Create(dtos, totalCount, pageNumber, pageSize);
             },
             new HybridCacheEntryOptions

@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventCustomProperty;
 using Explore.Application.Exceptions;
@@ -11,14 +11,11 @@ namespace Explore.Application.Features.EventCustomProperties.Handlers.Queries;
 public class GetEventCustomPropertyDefinitionDetailsRequestHandler : IRequestHandler<GetEventCustomPropertyDefinitionDetailsRequest, EventCustomPropertyDefinitionDto>
 {
     private readonly IEventCustomPropertyRepository _eventCustomPropertyRepository;
-    private readonly IMapper _mapper;
 
     public GetEventCustomPropertyDefinitionDetailsRequestHandler(
-        IEventCustomPropertyRepository eventCustomPropertyRepository,
-        IMapper mapper)
+        IEventCustomPropertyRepository eventCustomPropertyRepository)
     {
         _eventCustomPropertyRepository = eventCustomPropertyRepository;
-        _mapper = mapper;
     }
 
     public async Task<EventCustomPropertyDefinitionDto> Handle(GetEventCustomPropertyDefinitionDetailsRequest request, CancellationToken cancellationToken)
@@ -29,6 +26,6 @@ public class GetEventCustomPropertyDefinitionDetailsRequestHandler : IRequestHan
             throw new NotFoundException(nameof(EventCustomPropertyDefinition), request.Id);
         }
 
-        return _mapper.Map<EventCustomPropertyDefinitionDto>(definition);
+        return CustomPropertyMapper.ToDetail(definition);
     }
 }

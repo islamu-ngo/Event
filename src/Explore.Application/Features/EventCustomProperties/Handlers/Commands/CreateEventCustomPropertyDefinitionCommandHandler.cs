@@ -1,4 +1,3 @@
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -20,7 +19,6 @@ public class CreateEventCustomPropertyDefinitionCommandHandler : IRequestHandler
     private readonly ICustomPropertyQuotaResolver _quotaResolver;
     private readonly ITenantContext _tenantContext;
     private readonly ICurrentUserService _currentUserService;
-    private readonly IMapper _mapper;
     private readonly HybridCache _cache;
     private readonly IUnitOfWork _unitOfWork;
 
@@ -30,7 +28,6 @@ public class CreateEventCustomPropertyDefinitionCommandHandler : IRequestHandler
         ICustomPropertyQuotaResolver quotaResolver,
         ITenantContext tenantContext,
         ICurrentUserService currentUserService,
-        IMapper mapper,
         HybridCache cache,
         IUnitOfWork unitOfWork)
     {
@@ -39,7 +36,6 @@ public class CreateEventCustomPropertyDefinitionCommandHandler : IRequestHandler
         _quotaResolver = quotaResolver;
         _tenantContext = tenantContext;
         _currentUserService = currentUserService;
-        _mapper = mapper;
         _cache = cache;
         _unitOfWork = unitOfWork;
     }
@@ -110,13 +106,43 @@ public class CreateEventCustomPropertyDefinitionCommandHandler : IRequestHandler
                     _tenantContext.TenantId));
         }
 
-        var definition = _mapper.Map<EventCustomPropertyDefinition>(request.DefinitionDto);
-        definition.TenantId = _tenantContext.TenantId;
-        definition.Namespace = governance.NormalizedNamespace;
-        definition.Key = governance.NormalizedKey;
-        definition.InstantiatedAt = DateTimeOffset.UtcNow;
-        definition.CreatedBy = _currentUserService.UserId;
-        definition.UpdatedBy = _currentUserService.UserId;
+        var dto = request.DefinitionDto;
+        var definition = new EventCustomPropertyDefinition
+        {
+            EventId = dto.EventId,
+            Namespace = governance.NormalizedNamespace,
+            Key = governance.NormalizedKey,
+            DisplayName = dto.DisplayName,
+            Description = dto.Description,
+            PropertyType = dto.PropertyType,
+            IsRequired = dto.IsRequired,
+            IsMulti = dto.IsMulti,
+            IsActive = dto.IsActive,
+            SortOrder = dto.SortOrder,
+            ExposureLevel = dto.ExposureLevel,
+            IsSearchable = dto.IsSearchable,
+            IsFilterable = dto.IsFilterable,
+            IsExportable = dto.IsExportable,
+            IsModerationRelevant = dto.IsModerationRelevant,
+            IsAnalyticsRelevant = dto.IsAnalyticsRelevant,
+            IsSystemOwned = dto.IsSystemOwned,
+            DefaultTextValue = dto.DefaultTextValue,
+            DefaultNumberValue = dto.DefaultNumberValue,
+            DefaultBooleanValue = dto.DefaultBooleanValue,
+            DefaultDateTimeValue = dto.DefaultDateTimeValue,
+            MinLength = dto.MinLength,
+            MaxLength = dto.MaxLength,
+            RegexPattern = dto.RegexPattern,
+            MinNumber = dto.MinNumber,
+            MaxNumber = dto.MaxNumber,
+            MinDateTime = dto.MinDateTime,
+            MaxDateTime = dto.MaxDateTime,
+            AllowedUrlSchemes = dto.AllowedUrlSchemes,
+            TenantId = _tenantContext.TenantId,
+            InstantiatedAt = DateTimeOffset.UtcNow,
+            CreatedBy = _currentUserService.UserId,
+            UpdatedBy = _currentUserService.UserId
+        };
 
         var options = CreateOptionEntities(request.DefinitionDto.Options, definition.Id);
         var defaultOption = options.SingleOrDefault(x => x.IsDefault);

@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventTemplate;
@@ -13,18 +13,15 @@ public class GetEventTemplateListRequestHandler : IRequestHandler<GetEventTempla
 {
     private readonly IEventTemplateRepository _eventTemplateRepository;
     private readonly ITenantContext _tenantContext;
-    private readonly IMapper _mapper;
     private readonly HybridCache _cache;
 
     public GetEventTemplateListRequestHandler(
         IEventTemplateRepository eventTemplateRepository,
         ITenantContext tenantContext,
-        IMapper mapper,
         HybridCache cache)
     {
         _eventTemplateRepository = eventTemplateRepository;
         _tenantContext = tenantContext;
-        _mapper = mapper;
         _cache = cache;
     }
 
@@ -42,7 +39,7 @@ public class GetEventTemplateListRequestHandler : IRequestHandler<GetEventTempla
                     request.EventTypeId,
                     pageNumber,
                     pageSize);
-                var dtos = _mapper.Map<List<EventTemplateListDto>>(templates);
+                var dtos = templates.Select(CustomPropertyMapper.ToListItem).ToList();
                 return PaginatedResult<EventTemplateListDto>.Create(dtos, totalCount, pageNumber, pageSize);
             },
             new HybridCacheEntryOptions

@@ -1,4 +1,3 @@
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -22,7 +21,6 @@ public class UpdateCustomPropertyDefinitionCommandHandler : IRequestHandler<Upda
     private readonly ICustomPropertyGovernancePolicy _customPropertyGovernancePolicy;
     private readonly ICustomPropertyQuotaResolver _quotaResolver;
     private readonly ICurrentUserService _currentUserService;
-    private readonly IMapper _mapper;
     private readonly HybridCache _cache;
     private readonly IUnitOfWork _unitOfWork;
 
@@ -31,7 +29,6 @@ public class UpdateCustomPropertyDefinitionCommandHandler : IRequestHandler<Upda
         ICustomPropertyGovernancePolicy customPropertyGovernancePolicy,
         ICustomPropertyQuotaResolver quotaResolver,
         ICurrentUserService currentUserService,
-        IMapper mapper,
         HybridCache cache,
         IUnitOfWork unitOfWork)
     {
@@ -39,7 +36,6 @@ public class UpdateCustomPropertyDefinitionCommandHandler : IRequestHandler<Upda
         _customPropertyGovernancePolicy = customPropertyGovernancePolicy;
         _quotaResolver = quotaResolver;
         _currentUserService = currentUserService;
-        _mapper = mapper;
         _cache = cache;
         _unitOfWork = unitOfWork;
     }
@@ -168,7 +164,34 @@ public class UpdateCustomPropertyDefinitionCommandHandler : IRequestHandler<Upda
             }
         }
 
-        _mapper.Map(candidate, definition);
+        // Only validated business fields change; identity and option relationships remain owned here.
+        definition.EntityTypeName = candidate.EntityTypeName;
+        definition.DisplayName = candidate.DisplayName;
+        definition.Description = candidate.Description;
+        definition.PropertyType = candidate.PropertyType;
+        definition.IsRequired = candidate.IsRequired;
+        definition.IsMulti = candidate.IsMulti;
+        definition.IsActive = candidate.IsActive;
+        definition.SortOrder = candidate.SortOrder;
+        definition.ExposureLevel = candidate.ExposureLevel;
+        definition.IsSearchable = candidate.IsSearchable;
+        definition.IsFilterable = candidate.IsFilterable;
+        definition.IsExportable = candidate.IsExportable;
+        definition.IsModerationRelevant = candidate.IsModerationRelevant;
+        definition.IsAnalyticsRelevant = candidate.IsAnalyticsRelevant;
+        definition.IsSystemOwned = candidate.IsSystemOwned;
+        definition.DefaultTextValue = candidate.DefaultTextValue;
+        definition.DefaultNumberValue = candidate.DefaultNumberValue;
+        definition.DefaultBooleanValue = candidate.DefaultBooleanValue;
+        definition.DefaultDateTimeValue = candidate.DefaultDateTimeValue;
+        definition.MinLength = candidate.MinLength;
+        definition.MaxLength = candidate.MaxLength;
+        definition.RegexPattern = candidate.RegexPattern;
+        definition.MinNumber = candidate.MinNumber;
+        definition.MaxNumber = candidate.MaxNumber;
+        definition.MinDateTime = candidate.MinDateTime;
+        definition.MaxDateTime = candidate.MaxDateTime;
+        definition.AllowedUrlSchemes = candidate.AllowedUrlSchemes;
         definition.Namespace = governance.NormalizedNamespace;
         definition.Key = governance.NormalizedKey;
         definition.UpdatedBy = _currentUserService.UserId;

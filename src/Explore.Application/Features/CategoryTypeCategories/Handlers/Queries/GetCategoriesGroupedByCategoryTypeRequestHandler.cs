@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Category;
 using Explore.Application.DTOs.CategoryType;
@@ -11,12 +11,10 @@ public class GetCategoriesGroupedByCategoryTypeRequestHandler
     : IRequestHandler<GetCategoriesGroupedByCategoryTypeRequest, List<CategoryTypeWithCategoriesDto>>
 {
     private readonly ICategoryTypeCategoriesRepository _repository;
-    private readonly IMapper _mapper;
 
-    public GetCategoriesGroupedByCategoryTypeRequestHandler(ICategoryTypeCategoriesRepository repository, IMapper mapper)
+    public GetCategoriesGroupedByCategoryTypeRequestHandler(ICategoryTypeCategoriesRepository repository)
     {
         _repository = repository;
-        _mapper = mapper;
     }
 
     public async Task<List<CategoryTypeWithCategoriesDto>> Handle(
@@ -29,7 +27,7 @@ public class GetCategoriesGroupedByCategoryTypeRequestHandler
             Id = g.CategoryType.Id,
             FullName = g.CategoryType.FullName,
             Description = g.CategoryType.Description,
-            Categories = _mapper.Map<List<CategoryListDto>>(g.Categories)
+            Categories = g.Categories.Select(CustomPropertyMapper.ToListItem).ToList()
         }).ToList();
     }
 }

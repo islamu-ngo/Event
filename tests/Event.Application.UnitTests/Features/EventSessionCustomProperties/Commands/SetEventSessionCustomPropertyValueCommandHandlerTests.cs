@@ -1,4 +1,3 @@
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -102,8 +101,7 @@ public class SetEventSessionCustomPropertyValueCommandHandlerTests
             Substitute.For<IEventSessionCustomPropertyProjectionUpdater>(),
             Substitute.For<IUnitOfWork>(),
             Substitute.For<ITenantContext>(),
-            Substitute.For<ICurrentUserService>(),
-            Substitute.For<IMapper>());
+            Substitute.For<ICurrentUserService>());
     }
 
     private static SetEventSessionCustomPropertyValueCommand CreateCommand(Guid definitionId, Guid sessionId, int ordinal, string textValue)

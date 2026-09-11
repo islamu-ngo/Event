@@ -10,10 +10,6 @@ public class TenantMappingProfile : Profile
 {
     public TenantMappingProfile()
     {
-        CreateMap<Tenant, TenantDto>().ReverseMap();
-        CreateMap<Tenant, TenantListDto>().ReverseMap();
-        CreateMap<CreateTenantDto, Tenant>();
-
         CreateMap<TenantNavigationLink, TenantNavigationLinkDto>();
         CreateMap<CreateTenantNavigationLinkDto, TenantNavigationLink>();
 

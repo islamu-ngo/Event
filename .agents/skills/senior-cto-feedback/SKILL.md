@@ -1,6 +1,6 @@
 ---
 name: senior-cto-feedback
-description: "Load when asked for blunt Senior CTO critique, architectural audit, risk review, sequencing correction, or direct refinement of an existing `dev/active/<task>` implementation plan/context/tasks workstream before coding; directly updates plan.md, context.md, and tasks.md without writing review markdown files; not for open-ended CTO advice or direct code implementation."
+description: "Load for Senior CTO critique, architectural audit, risk review, sequencing correction, or refinement of an existing implementation-plan triad; edits the requested plan/context/tasks in place without creating a worktree or review file. Not for open-ended CTO advice, product implementation, or implementation workspace setup."
 type: workflow
 enforcement: suggest
 priority: high
@@ -20,7 +20,7 @@ priority: high
 
 ## Rules
 
-1. **Direct Triad Refinement**: Never write `*-cto-review.md` or separate feedback files. Directly update the workstream `plan.md`, `context.md`, and `tasks.md`; preserve actionable findings there.
+1. **Direct Triad Refinement — In Place Only**: Update the user-requested `plan.md`, `context.md`, and `tasks.md` in their existing location. Do not create worktrees, create or switch branches, relocate planning artifacts, or execute implementation during review. Never write `*-cto-review.md` or separate feedback files.
 
 Review depth is defined in [output-template.md](resources/output-template.md).
 
@@ -33,13 +33,13 @@ Review depth is defined in [output-template.md](resources/output-template.md).
 8. **Invariant-First & Anti-Tautology Verification**: Enforce strict Test-First Invariant order in `tasks.md` (failing Red Phase tests before Green Phase implementation for core domain invariants, concurrency, and security). Prohibit tautological mock-mirroring (`Received(1)` on internal services) or framework boilerplate.
 9. **Greenfield Breaking Change Posture**: ISLAMU Event is pre-v1 with 0 external adopters. Reject backward-compatibility shims, deprecated aliases, and adapter baggage. Directly simplify contracts and delete obsolete paths in the plan.
 10. **4-Point "Right-Sizing" Rule**: Mandate a PR split when 2+ symptoms match (multi-intent "and also" scope, > 8-10 major tasks, big-bang layer mixing, or backend slice could ship independently). Scope the active triad to the primary slice and graduate deferred scope to `dev/backlog/<slug>.md`.
-11. **Per-Phase Planned Commit Readiness & Atomic Slicing**: Ensure every phase in `tasks.md` has a self-sufficient declarative Conventional Commit contract (or atomic commit sequence if large/multi-concern) with exact metadata, commit paths, inspection commands, `git add`, path-limited `git commit`, and verification command. Commits strictly stage only plan-related files on the task branch.
+11. **Planned Commit Readiness**: Ensure every implementation phase in `tasks.md` has a self-sufficient declarative Conventional Commit contract (or atomic sequence) with exact metadata, paths, inspection commands, `git add`, path-limited `git commit`, and verification. These are instructions for later implementation, not actions to execute during review. Preserve explicit user implementation constraints.
 12. **Knowledge Graduation**: Move deferred scope to `dev/backlog/<slug>.md`, durable architectural decisions to `docs/internal/adr/`, and lessons to `dev/_journal/`.
 13. **Zero-Loss Information Preservation**: Eliminating separate review files does NOT mean discarding review intelligence. Every critical finding, 3D evaluation scorecard, Socratic stress-test challenge, ranked risk with minimum acceptable fix, "Worst Break" failure mode, and architectural trade-off MUST be permanently written into its dedicated section in `plan.md` (§0, §2, §5, §7.1, §12, §13/§14.2), `context.md` (Key Decisions, Review State), and `tasks.md` (Phase Red Invariant Tests). Chat output is strictly an executive summary of what is already durably preserved in the triad.
 
 ## Workflow
 
-1. **Ingest Triad**: Read `dev/active/<task>/<task>-plan.md`, `...-context.md`, and `...-tasks.md`. Verify architectural claims against actual repository code using `code-review-graph`.
+1. **Ingest Triad In Place**: Resolve the exact directory the user requested and read its plan, context, and tasks without changing checkout or branch. Verify architectural claims against actual repository code using `code-review-graph`.
 2. **Audit Architecture**: Evaluate against the 3D Scorecard, 4-Point Right-Sizing, Worst Break failure scenario, and greenfield breaking change principles.
 3. **Directly Update Triad**:
    - `plan.md`: Refine architecture, tighten sequence, define RFC 2119 behavior scenarios, remove legacy shims, update metadata CTO review status to `Applied & Aligned (YYYY-MM-DD)`.
@@ -51,5 +51,6 @@ Review depth is defined in [output-template.md](resources/output-template.md).
 ## Verification
 
 - Confirm zero `*-cto-review.md` files exist in `dev/active/<task>/`.
+- Confirm the updated triad remains at the exact requested path and no review branch/worktree was created.
 - Validate triad consistency: `plan.md`, `context.md`, and `tasks.md` agree on status, next steps, and phase breakdown.
 - Ensure frontmatter adheres to [../_SKILL_SCHEMA.md](../_SKILL_SCHEMA.md).

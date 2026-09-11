@@ -221,12 +221,12 @@ Check:
 - Every planned default title uses an allowed capability/engineering scope and benefit-led subject; its exact description explains the phase motivation and data/control flow; its changelog treatment and trailers satisfy `conventional-commit`.
 - Every contract contains exact commit paths, declarative type/scope/title/description, and trailers. No phase leaves placeholders, generic “complete phase” wording, or message composition to the implementation agent.
 - Planning and CTO review load `conventional-commit`; the approved task embeds everything normal execution needs. The implementation agent must not reload the skill when using the truthful default.
-- The approved tasks file authorizes the implementing agent to commit on the task branch in the same session; no final commit-only session or repeat user invocation is required.
+- The approved tasks file authorizes the implementing agent to execute its planned commits; it does not authorize review-time implementation or commits.
 - The implementation agent must use the planned contract unchanged while truthful. Only an allowed override loads `conventional-commit`; triggers are explicit user-driven outcome changes, atomic phase splits, material implementation divergence, changed breaking/change-fragment classification, or factual invalidity.
 - Any override must be recorded before commit with the reason and an updated declarative contract; stylistic preference is rejected.
 - Task branch staging is explicit-path only (`git add -- <paths>`). The plan forbids blind staging (`git add .`, `git add -A`).
 - Phase-attributable failures block the commit and must be resolved before phase completion.
-- The phase executes the commit on the task branch and confirms clean git status before completion; atomicity requires multiple atomic commits for large phases rather than an umbrella phase commit.
+- During implementation, the phase executes its commit, preserving unrelated changes; atomicity requires multiple atomic commits for large phases rather than an umbrella phase commit.
 
 ## 12. Dev-Docs Quality
 
@@ -243,6 +243,7 @@ Check:
 - `tasks.md` maps cleanly to phases and contains the hot execution ledger (Red/Green task sequence, phase-owned paths, verification disposition, concrete planned declarative commit contracts, tightly governed overrides, and immediate commit checkboxes).
 - Status across all artifacts agrees.
 - Another implementation agent could resume without re-asking the user for core context.
+- The reviewer edits the exact requested triad in place without creating worktrees, creating or switching branches, relocating planning artifacts, or executing implementation.
 - Knowledge Graduation: Out-of-scope, follow-up, or deferred items are explicitly identified for promotion to `dev/backlog/<slug>.md` (and durable architecture to `docs/internal/adr/`), rather than being left as dead text in an ephemeral plan.
 
 ## CTO Decisions & Direct Triad Actions

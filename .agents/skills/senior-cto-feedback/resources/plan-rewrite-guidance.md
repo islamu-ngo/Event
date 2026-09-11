@@ -8,6 +8,8 @@ Senior CTO review **never** writes `*-cto-review.md` files. Instead, 100% of the
 
 ## Rewrite Principles
 
+Edit the triad at the exact path requested by the user. Do not create worktrees, create or switch branches, relocate planning artifacts, or execute implementation during review. Planned commit packets describe later execution only.
+
 A better implementation plan should be:
 
 - smaller,
@@ -199,7 +201,7 @@ Last Updated: YYYY-MM-DD Europe/Brussels
 - **Message override:** Not overridden
 <!-- Repeat Planned Commit Contract block for Contract 2, 3, etc. if phase is large -->
 #### Commit Tasks
-- Stage exact phase-owned paths using `git add -- <paths>` and execute commit using the declarative contract on `feat/<task-name>`. Confirm clean git status before proceeding.
+- During implementation, stage exact phase-owned paths using `git add -- <paths>` and execute the declarative commit contract. Preserve unrelated work.
 - Load `conventional-commit` only when a permitted material divergence override replaces the default contract.
 ## Remaining / Deferred Work
 ```
@@ -212,7 +214,7 @@ Rewrite rules:
 - each phase should list exact phase-owned paths and place its commit task(s) immediately after verification;
 - each phase commit should contain declarative metadata: type, scope, title, description, changelog treatment, trailers, and commit paths;
 - if a phase is large (touching dozens or hundreds of files) or spans multiple separable concerns, mandate an ordered sequence of atomic commit contracts rather than one monolithic umbrella commit;
-- commits stage and commit ONLY changes directly belonging to the implementation plan on the dedicated task branch (`feat/<task-name>`);
+- implementation commits stage and commit ONLY plan-owned changes; the reviewer does not execute these commands;
 - the implementing agent executes that self-sufficient contract without reloading `conventional-commit`;
 - overrides should be rare and are the only execution path that loads `conventional-commit`;
 - phase-attributable failures block commit and must be resolved before phase completion;
@@ -276,7 +278,7 @@ Prefer splitting by risk boundary:
    - cleanup obsolete compatibility paths,
    - delete obsolete tests.
 
-These are risk boundaries, not permission for a final umbrella commit. If represented as phases in one workstream, each boundary closes on its task branch/worktree with its own verified, phase-owned Conventional Commit.
+These are implementation risk boundaries, not permission for a final umbrella commit or review-time implementation. Each boundary closes with its own verified, phase-owned Conventional Commit during implementation.
 
 ## Test-First Invariant Rewrite Pattern (for `tasks.md`)
 

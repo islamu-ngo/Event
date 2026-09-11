@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionStatus;
 using Explore.Application.Features.EventSessionStatuses.Requests.Queries;
@@ -10,14 +10,11 @@ public class GetEventSessionStatusListRequestHandler
     : IRequestHandler<GetEventSessionStatusListRequest, List<EventSessionStatusListDto>>
 {
     private readonly IEventSessionStatusRepository _eventSessionStatusRepository;
-    private readonly IMapper _mapper;
 
     public GetEventSessionStatusListRequestHandler(
-        IEventSessionStatusRepository eventSessionStatusRepository,
-        IMapper mapper)
+        IEventSessionStatusRepository eventSessionStatusRepository)
     {
         _eventSessionStatusRepository = eventSessionStatusRepository;
-        _mapper = mapper;
     }
 
     public async Task<List<EventSessionStatusListDto>> Handle(
@@ -25,6 +22,6 @@ public class GetEventSessionStatusListRequestHandler
         CancellationToken cancellationToken)
     {
         var statuses = await _eventSessionStatusRepository.GetAll();
-        return _mapper.Map<List<EventSessionStatusListDto>>(statuses);
+        return statuses.Select(EventSessionStatusMapper.ToListItem).ToList();
     }
 }

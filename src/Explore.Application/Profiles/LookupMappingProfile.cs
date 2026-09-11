@@ -62,9 +62,6 @@ public class LookupMappingProfile : Profile
         CreateMap<CreateTagTypeTagsDto, Domain.TagTypeTags>();
         CreateMap<UpdateTagTypeTagsDto, Domain.TagTypeTags>();
 
-        CreateMap<Domain.GroupPosition, DTOs.GroupPosition.GroupPositionDto>().ReverseMap();
-        CreateMap<Domain.GroupPosition, DTOs.GroupPosition.GroupPositionListDto>().ReverseMap();
-
         CreateMap<Domain.Role, DTOs.Role.RoleDto>()
             .ForMember(dest => dest.RoleScopeCode, opt => opt.MapFrom(src => NormalizedLookupMetadata.RoleScope(src.RoleScopeId).Code))
             .ForMember(dest => dest.RoleScopeName, opt => opt.MapFrom(src => NormalizedLookupMetadata.RoleScope(src.RoleScopeId).Name));

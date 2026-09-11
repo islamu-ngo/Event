@@ -4,7 +4,6 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Mappings;
 using Explore.Application.DTOs.Event;
-using Explore.Application.DTOs.Tag;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Services;
@@ -68,7 +67,7 @@ public sealed class EventDetailsProjectionService : IEventDetailsProjectionServi
         dto.IsUnmoderationEligible = latestModerationRecord?.AllowsUnmoderation == true;
         return dto with
         {
-            Tags = _mapper.Map<List<TagListDto>>(tags),
+            Tags = tags.Select(TagMapper.ToListItem).ToList(),
             Categories = categories.Select(CustomPropertyMapper.ToListItem).ToList()
         };
     }

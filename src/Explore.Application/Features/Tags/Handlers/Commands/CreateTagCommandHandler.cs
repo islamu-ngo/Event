@@ -2,13 +2,12 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Tag.Validators;
 using Explore.Application.Features.Tags.Requests.Commands;
 using Explore.Application.Responses;
-using Explore.Domain;
 using MediatR;
 
 namespace Explore.Application.Features.Tags.Handlers.Commands;
@@ -17,16 +16,13 @@ public class CreateTagCommandHandler : IRequestHandler<CreateTagCommand, BaseCom
 {
     private readonly ITagRepository _tagRepository;
     private readonly ITenantContext _tenantContext;
-    private readonly IMapper _mapper;
 
     public CreateTagCommandHandler(
         ITagRepository tagRepository,
-        ITenantContext tenantContext,
-        IMapper mapper)
+        ITenantContext tenantContext)
     {
         _tagRepository = tagRepository;
         _tenantContext = tenantContext;
-        _mapper = mapper;
     }
 
     public async Task<BaseCommandResponse<Guid>> Handle(CreateTagCommand request, CancellationToken cancellationToken)
@@ -41,10 +37,7 @@ public class CreateTagCommandHandler : IRequestHandler<CreateTagCommand, BaseCom
                 "Tag creation failed.");
         }
 
-        var tag = _mapper.Map<Tag>(request.TagDto);
-
-        // Set TenantId from the request context
-        tag.TenantId = _tenantContext.TenantId;
+        var tag = TagMapper.Create(request.TagDto, _tenantContext.TenantId);
 
         tag = await _tagRepository.Create(tag);
 

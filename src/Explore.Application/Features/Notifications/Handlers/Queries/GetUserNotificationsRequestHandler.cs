@@ -1,8 +1,8 @@
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Notification;
 using Explore.Application.Features.Notifications.Requests.Queries;
+using Explore.Application.Mappings;
 using Explore.Application.Responses;
 using MediatR;
 
@@ -12,16 +12,13 @@ public class GetUserNotificationsRequestHandler : IRequestHandler<GetUserNotific
 {
     private readonly INotificationRepository _notificationRepository;
     private readonly ICurrentUserService _currentUserService;
-    private readonly IMapper _mapper;
 
     public GetUserNotificationsRequestHandler(
         INotificationRepository notificationRepository,
-        ICurrentUserService currentUserService,
-        IMapper mapper)
+        ICurrentUserService currentUserService)
     {
         _notificationRepository = notificationRepository;
         _currentUserService = currentUserService;
-        _mapper = mapper;
     }
 
     public async Task<PaginatedResult<NotificationListDto>> Handle(GetUserNotificationsRequest request, CancellationToken cancellationToken)
@@ -36,7 +33,7 @@ public class GetUserNotificationsRequestHandler : IRequestHandler<GetUserNotific
             userId.Value, pageNumber, pageSize, request.IsRead, request.NotificationTypeId,
             request.NotificationScopeId, request.NotificationReasonId, request.IsArchived, request.IsSnoozed);
 
-        var dtos = _mapper.Map<List<NotificationListDto>>(items);
+        var dtos = items.Select(NotificationMapper.ToListItem).ToList();
 
         return PaginatedResult<NotificationListDto>.Create(dtos, totalCount, pageNumber, pageSize);
     }

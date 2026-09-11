@@ -1,7 +1,5 @@
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
-using Explore.Application.DTOs.Notification;
 using Explore.Application.Features.Notifications.Handlers.Queries;
 using Explore.Application.Features.Notifications.Requests.Queries;
 using Explore.Domain;
@@ -14,29 +12,28 @@ namespace Event.Application.UnitTests.Features.Notifications.Queries;
 
 public class GetNotificationByIdRequestHandlerTests
 {
+    private static readonly Guid UserId = Guid.Parse("01910000-0000-7000-8000-000000000002");
+    private static readonly Guid NotificationId = Guid.Parse("01910000-0000-7000-8000-000000000001");
     private readonly INotificationRepository _notificationRepository;
     private readonly ICurrentUserService _currentUserService;
-    private readonly IMapper _mapper;
     private readonly GetNotificationByIdRequestHandler _handler;
 
     public GetNotificationByIdRequestHandlerTests()
     {
         _notificationRepository = Substitute.For<INotificationRepository>();
         _currentUserService = Substitute.For<ICurrentUserService>();
-        _mapper = Substitute.For<IMapper>();
 
         _handler = new GetNotificationByIdRequestHandler(
             _notificationRepository,
-            _currentUserService,
-            _mapper);
+            _currentUserService);
     }
 
     [Test]
     public async Task Handle_WithExistingNotification_ReturnsDto()
     {
         // Arrange
-        var userId = Guid.NewGuid();
-        var notificationId = Guid.NewGuid();
+        var userId = UserId;
+        var notificationId = NotificationId;
         _currentUserService.UserId.Returns(userId);
 
         var notification = new Notification
@@ -52,16 +49,7 @@ public class GetNotificationByIdRequestHandlerTests
             NotificationType = null!,
             NotificationScope = null!
         };
-        var expectedDto = new NotificationDto
-        {
-            Id = notificationId,
-            UserId = userId,
-            NotificationTypeId = (int)NotificationTypeEnum.EventCreated,
-            Title = "New Event Created"
-        };
-
         _notificationRepository.GetByIdForUser(notificationId, userId).Returns(notification);
-        _mapper.Map<NotificationDto>(notification).Returns(expectedDto);
 
         var request = new GetNotificationByIdRequest(notificationId);
 
@@ -78,12 +66,12 @@ public class GetNotificationByIdRequestHandlerTests
     public async Task Handle_WithNonExistentNotification_ReturnsNull()
     {
         // Arrange
-        var userId = Guid.NewGuid();
+        var userId = UserId;
         _currentUserService.UserId.Returns(userId);
 
         _notificationRepository.GetByIdForUser(Arg.Any<Guid>(), userId).Returns((Notification?)null);
 
-        var request = new GetNotificationByIdRequest(Guid.NewGuid());
+        var request = new GetNotificationByIdRequest(NotificationId);
 
         // Act
         var result = await _handler.Handle(request, CancellationToken.None);
@@ -97,7 +85,7 @@ public class GetNotificationByIdRequestHandlerTests
     {
         // Arrange
         _currentUserService.UserId.Returns((Guid?)null);
-        var request = new GetNotificationByIdRequest(Guid.NewGuid());
+        var request = new GetNotificationByIdRequest(NotificationId);
 
         // Act
         var result = await _handler.Handle(request, CancellationToken.None);

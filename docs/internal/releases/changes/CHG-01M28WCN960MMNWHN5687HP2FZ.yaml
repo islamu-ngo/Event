@@ -1,0 +1,34 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M28WCN960MMNWHN5687HP2FZ
+Title: "Isolate external erasure database configuration"
+Type: fix
+Scope: privacy
+Summary: "External privacy-erasure database settings use a distinct prefix so recursive Infisical reads cannot overwrite primary database settings."
+Group: privacy-erasure-configuration
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/documentation/readme/configuration-and-operations/environment-variables.md
+    Disposition: documented
+    Detail: ExternalDatabase deployments must replace every DATABASE_ERASURE_* setting with ERASURE_DATABASE_* before upgrade; the removed names are rejected rather than translated.
+  Security:
+    Reference: docs/internal/SECRETS.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Recursive Infisical database reads keep external privacy-erasure authority credentials distinct from primary database configuration.
+  Migration:
+    Reference: docs/internal/PRIVACY_ERASURE.md
+    Disposition: documented
+    Detail: Operators rename the external authority variables; no database data migration or compatibility fallback is provided.
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: documented
+    Detail: The ERASURE_DATABASE_* prefix is required in .env, Compose, and the Infisical /database/erasure folder.
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/configuration-and-operations/infisical.md
+    Disposition: documented
+    Detail: The Infisical setup guide lists the exact external-authority folder keys and role separation requirements.

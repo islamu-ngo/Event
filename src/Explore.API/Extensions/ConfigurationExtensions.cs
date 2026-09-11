@@ -323,18 +323,18 @@ public static class ConfigurationExtensions
         TrySet(mappedConfig, config, "Database:ServerVersion", ReadFirst(config, "DATABASE_SERVER_VERSION", "Database:ServerVersion"));
 
         // Privacy Erasure Authority Database (/database/erasure)
-        var erasureDbName = ReadFirst(config, "DATABASE_ERASURE_NAME", "DATABASE_ERASURE_DATABASE", "Database:Erasure:Name", "Database:Erasure:Database", "ERASURE_DATABASE_NAME", "ERASURE_DATABASE");
-        TrySet(mappedConfig, config, "Database:Erasure:Provider", ReadFirst(config, "DATABASE_ERASURE_PROVIDER", "Database:Erasure:Provider", "ERASURE_DATABASE_PROVIDER"));
-        TrySet(mappedConfig, config, "Database:Erasure:Host", ReadFirst(config, "DATABASE_ERASURE_HOST", "Database:Erasure:Host", "ERASURE_DATABASE_HOST"));
-        TrySet(mappedConfig, config, "Database:Erasure:Port", ReadFirst(config, "DATABASE_ERASURE_PORT", "Database:Erasure:Port", "ERASURE_DATABASE_PORT"));
+        var erasureDbName = ReadFirst(config, "ERASURE_DATABASE_NAME", "Database:Erasure:Name", "Database:Erasure:Database");
+        TrySet(mappedConfig, config, "Database:Erasure:Provider", ReadFirst(config, "ERASURE_DATABASE_PROVIDER", "Database:Erasure:Provider"));
+        TrySet(mappedConfig, config, "Database:Erasure:Host", ReadFirst(config, "ERASURE_DATABASE_HOST", "Database:Erasure:Host"));
+        TrySet(mappedConfig, config, "Database:Erasure:Port", ReadFirst(config, "ERASURE_DATABASE_PORT", "Database:Erasure:Port"));
         TrySet(mappedConfig, config, "Database:Erasure:Database", erasureDbName);
         TrySet(mappedConfig, config, "Database:Erasure:Name", erasureDbName);
-        TrySet(mappedConfig, config, "Database:Erasure:Runtime:Username", ReadFirst(config, "DATABASE_ERASURE_RUNTIME_USERNAME", "Database:Erasure:Runtime:Username", "ERASURE_DATABASE_RUNTIME_USERNAME"));
-        TrySet(mappedConfig, config, "Database:Erasure:Runtime:Password", ReadFirst(config, "DATABASE_ERASURE_RUNTIME_PASSWORD", "Database:Erasure:Runtime:Password", "ERASURE_DATABASE_RUNTIME_PASSWORD"));
-        TrySet(mappedConfig, config, "Database:Erasure:Migrator:Username", ReadFirst(config, "DATABASE_ERASURE_MIGRATOR_USERNAME", "Database:Erasure:Migrator:Username", "ERASURE_DATABASE_MIGRATOR_USERNAME"));
-        TrySet(mappedConfig, config, "Database:Erasure:Migrator:Password", ReadFirst(config, "DATABASE_ERASURE_MIGRATOR_PASSWORD", "Database:Erasure:Migrator:Password", "ERASURE_DATABASE_MIGRATOR_PASSWORD"));
-        TrySet(mappedConfig, config, "Database:Erasure:TlsMode", ReadFirst(config, "DATABASE_ERASURE_TLS_MODE", "Database:Erasure:TlsMode", "ERASURE_DATABASE_TLS_MODE"));
-        TrySet(mappedConfig, config, "Database:Erasure:TrustServerCertificate", NormalizeBoolean(ReadFirst(config, "DATABASE_ERASURE_TRUST_SERVER_CERTIFICATE", "Database:Erasure:TrustServerCertificate", "ERASURE_DATABASE_TRUST_SERVER_CERTIFICATE")));
+        TrySet(mappedConfig, config, "Database:Erasure:Runtime:Username", ReadFirst(config, "ERASURE_DATABASE_RUNTIME_USERNAME", "Database:Erasure:Runtime:Username"));
+        TrySet(mappedConfig, config, "Database:Erasure:Runtime:Password", ReadFirst(config, "ERASURE_DATABASE_RUNTIME_PASSWORD", "Database:Erasure:Runtime:Password"));
+        TrySet(mappedConfig, config, "Database:Erasure:Migrator:Username", ReadFirst(config, "ERASURE_DATABASE_MIGRATOR_USERNAME", "Database:Erasure:Migrator:Username"));
+        TrySet(mappedConfig, config, "Database:Erasure:Migrator:Password", ReadFirst(config, "ERASURE_DATABASE_MIGRATOR_PASSWORD", "Database:Erasure:Migrator:Password"));
+        TrySet(mappedConfig, config, "Database:Erasure:TlsMode", ReadFirst(config, "ERASURE_DATABASE_TLS_MODE", "Database:Erasure:TlsMode"));
+        TrySet(mappedConfig, config, "Database:Erasure:TrustServerCertificate", NormalizeBoolean(ReadFirst(config, "ERASURE_DATABASE_TRUST_SERVER_CERTIFICATE", "Database:Erasure:TrustServerCertificate")));
         TrySet(mappedConfig, config, "PrivacyErasureAuthorityDatabase:Provider", config["PrivacyErasureAuthorityDatabase:Provider"]);
         TrySet(mappedConfig, config, "PrivacyErasureAuthorityDatabase:Host", config["PrivacyErasureAuthorityDatabase:Host"]);
         TrySet(mappedConfig, config, "PrivacyErasureAuthorityDatabase:Port", config["PrivacyErasureAuthorityDatabase:Port"]);

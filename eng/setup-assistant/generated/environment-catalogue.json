@@ -8405,7 +8405,7 @@
       }
     },
     {
-      "key": "DATABASE_ERASURE_HOST",
+      "key": "ERASURE_DATABASE_HOST",
       "category": "database",
       "sensitivity": "public",
       "requirement": "optional",
@@ -8419,8 +8419,8 @@
         "composeRequired": false
       },
       "documentation": {
-        "localizationKey": "environment.database.database_erasure_host",
-        "helpKey": "environment.help.database_erasure_host",
+        "localizationKey": "environment.database.erasure_database_host",
+        "helpKey": "environment.help.erasure_database_host",
         "anchor": "environment-database"
       },
       "activation": {
@@ -8430,7 +8430,7 @@
       }
     },
     {
-      "key": "DATABASE_ERASURE_PORT",
+      "key": "ERASURE_DATABASE_PORT",
       "category": "database",
       "sensitivity": "public",
       "requirement": "optional",
@@ -8444,8 +8444,8 @@
         "composeRequired": false
       },
       "documentation": {
-        "localizationKey": "environment.database.database_erasure_port",
-        "helpKey": "environment.help.database_erasure_port",
+        "localizationKey": "environment.database.erasure_database_port",
+        "helpKey": "environment.help.erasure_database_port",
         "anchor": "environment-database"
       },
       "activation": {
@@ -8455,7 +8455,7 @@
       }
     },
     {
-      "key": "DATABASE_ERASURE_NAME",
+      "key": "ERASURE_DATABASE_NAME",
       "category": "database",
       "sensitivity": "public",
       "requirement": "optional",
@@ -8469,8 +8469,8 @@
         "composeRequired": false
       },
       "documentation": {
-        "localizationKey": "environment.database.database_erasure_name",
-        "helpKey": "environment.help.database_erasure_name",
+        "localizationKey": "environment.database.erasure_database_name",
+        "helpKey": "environment.help.erasure_database_name",
         "anchor": "environment-database"
       },
       "activation": {
@@ -8480,7 +8480,7 @@
       }
     },
     {
-      "key": "DATABASE_ERASURE_RUNTIME_USERNAME",
+      "key": "ERASURE_DATABASE_RUNTIME_USERNAME",
       "category": "database",
       "sensitivity": "public",
       "requirement": "optional",
@@ -8494,8 +8494,8 @@
         "composeRequired": false
       },
       "documentation": {
-        "localizationKey": "environment.database.database_erasure_runtime_username",
-        "helpKey": "environment.help.database_erasure_runtime_username",
+        "localizationKey": "environment.database.erasure_database_runtime_username",
+        "helpKey": "environment.help.erasure_database_runtime_username",
         "anchor": "environment-database"
       },
       "activation": {
@@ -8505,7 +8505,7 @@
       }
     },
     {
-      "key": "DATABASE_ERASURE_RUNTIME_PASSWORD",
+      "key": "ERASURE_DATABASE_RUNTIME_PASSWORD",
       "category": "database",
       "sensitivity": "sensitive",
       "requirement": "optional",
@@ -8519,8 +8519,8 @@
         "composeRequired": false
       },
       "documentation": {
-        "localizationKey": "environment.database.database_erasure_runtime_password",
-        "helpKey": "environment.help.database_erasure_runtime_password",
+        "localizationKey": "environment.database.erasure_database_runtime_password",
+        "helpKey": "environment.help.erasure_database_runtime_password",
         "anchor": "environment-database"
       },
       "activation": {
@@ -8530,7 +8530,7 @@
       }
     },
     {
-      "key": "DATABASE_ERASURE_MIGRATOR_USERNAME",
+      "key": "ERASURE_DATABASE_MIGRATOR_USERNAME",
       "category": "database",
       "sensitivity": "public",
       "requirement": "optional",
@@ -8544,8 +8544,8 @@
         "composeRequired": false
       },
       "documentation": {
-        "localizationKey": "environment.database.database_erasure_migrator_username",
-        "helpKey": "environment.help.database_erasure_migrator_username",
+        "localizationKey": "environment.database.erasure_database_migrator_username",
+        "helpKey": "environment.help.erasure_database_migrator_username",
         "anchor": "environment-database"
       },
       "activation": {
@@ -8555,7 +8555,7 @@
       }
     },
     {
-      "key": "DATABASE_ERASURE_MIGRATOR_PASSWORD",
+      "key": "ERASURE_DATABASE_MIGRATOR_PASSWORD",
       "category": "database",
       "sensitivity": "sensitive",
       "requirement": "optional",
@@ -8569,8 +8569,8 @@
         "composeRequired": false
       },
       "documentation": {
-        "localizationKey": "environment.database.database_erasure_migrator_password",
-        "helpKey": "environment.help.database_erasure_migrator_password",
+        "localizationKey": "environment.database.erasure_database_migrator_password",
+        "helpKey": "environment.help.erasure_database_migrator_password",
         "anchor": "environment-database"
       },
       "activation": {
@@ -8580,7 +8580,7 @@
       }
     },
     {
-      "key": "DATABASE_ERASURE_TLS_MODE",
+      "key": "ERASURE_DATABASE_TLS_MODE",
       "category": "database",
       "sensitivity": "public",
       "requirement": "optional",
@@ -8594,8 +8594,8 @@
         "composeRequired": false
       },
       "documentation": {
-        "localizationKey": "environment.database.database_erasure_tls_mode",
-        "helpKey": "environment.help.database_erasure_tls_mode",
+        "localizationKey": "environment.database.erasure_database_tls_mode",
+        "helpKey": "environment.help.erasure_database_tls_mode",
         "anchor": "environment-database"
       },
       "activation": {
@@ -8605,7 +8605,7 @@
       }
     },
     {
-      "key": "DATABASE_ERASURE_TRUST_SERVER_CERTIFICATE",
+      "key": "ERASURE_DATABASE_TRUST_SERVER_CERTIFICATE",
       "category": "database",
       "sensitivity": "public",
       "requirement": "optional",
@@ -8619,8 +8619,8 @@
         "composeRequired": false
       },
       "documentation": {
-        "localizationKey": "environment.database.database_erasure_trust_server_certificate",
-        "helpKey": "environment.help.database_erasure_trust_server_certificate",
+        "localizationKey": "environment.database.erasure_database_trust_server_certificate",
+        "helpKey": "environment.help.erasure_database_trust_server_certificate",
         "anchor": "environment-database"
       },
       "activation": {
@@ -9731,23 +9731,23 @@
     "PRIVACY_ERASURE_AUTHORITY_WRITER_REPLICA_COUNT",
     "ERASURE_BUSY_TIMEOUT_SECONDS",
     "PRIVACY_ERASURE_AUTHORITY_BUSY_TIMEOUT_SECONDS",
-    "DATABASE_ERASURE_HOST",
+    "ERASURE_DATABASE_HOST",
     "PRIVACY_ERASURE_AUTHORITY_HOST",
-    "DATABASE_ERASURE_PORT",
+    "ERASURE_DATABASE_PORT",
     "PRIVACY_ERASURE_AUTHORITY_PORT",
-    "DATABASE_ERASURE_NAME",
+    "ERASURE_DATABASE_NAME",
     "PRIVACY_ERASURE_AUTHORITY_DATABASE",
-    "DATABASE_ERASURE_TLS_MODE",
+    "ERASURE_DATABASE_TLS_MODE",
     "PRIVACY_ERASURE_AUTHORITY_TLS_MODE",
-    "DATABASE_ERASURE_TRUST_SERVER_CERTIFICATE",
+    "ERASURE_DATABASE_TRUST_SERVER_CERTIFICATE",
     "PRIVACY_ERASURE_AUTHORITY_TRUST_SERVER_CERTIFICATE",
-    "DATABASE_ERASURE_RUNTIME_USERNAME",
+    "ERASURE_DATABASE_RUNTIME_USERNAME",
     "PRIVACY_ERASURE_AUTHORITY_RUNTIME_USERNAME",
-    "DATABASE_ERASURE_RUNTIME_PASSWORD",
+    "ERASURE_DATABASE_RUNTIME_PASSWORD",
     "PRIVACY_ERASURE_AUTHORITY_RUNTIME_PASSWORD",
-    "DATABASE_ERASURE_MIGRATOR_USERNAME",
+    "ERASURE_DATABASE_MIGRATOR_USERNAME",
     "PRIVACY_ERASURE_AUTHORITY_MIGRATOR_USERNAME",
-    "DATABASE_ERASURE_MIGRATOR_PASSWORD",
+    "ERASURE_DATABASE_MIGRATOR_PASSWORD",
     "PRIVACY_ERASURE_AUTHORITY_MIGRATOR_PASSWORD",
     "STORAGE_S3_ENDPOINT",
     "STORAGE_S3_PUBLIC_ENDPOINT",
@@ -10258,15 +10258,15 @@
     "LISTMONK_API_KEY",
     "ERASURE_WRITER_REPLICA_COUNT",
     "ERASURE_BUSY_TIMEOUT_SECONDS",
-    "DATABASE_ERASURE_HOST",
-    "DATABASE_ERASURE_PORT",
-    "DATABASE_ERASURE_NAME",
-    "DATABASE_ERASURE_RUNTIME_USERNAME",
-    "DATABASE_ERASURE_RUNTIME_PASSWORD",
-    "DATABASE_ERASURE_MIGRATOR_USERNAME",
-    "DATABASE_ERASURE_MIGRATOR_PASSWORD",
-    "DATABASE_ERASURE_TLS_MODE",
-    "DATABASE_ERASURE_TRUST_SERVER_CERTIFICATE",
+    "ERASURE_DATABASE_HOST",
+    "ERASURE_DATABASE_PORT",
+    "ERASURE_DATABASE_NAME",
+    "ERASURE_DATABASE_RUNTIME_USERNAME",
+    "ERASURE_DATABASE_RUNTIME_PASSWORD",
+    "ERASURE_DATABASE_MIGRATOR_USERNAME",
+    "ERASURE_DATABASE_MIGRATOR_PASSWORD",
+    "ERASURE_DATABASE_TLS_MODE",
+    "ERASURE_DATABASE_TRUST_SERVER_CERTIFICATE",
     "SETUP_SECRET_BINDING_COMMITMENT_HMAC_KEY",
     "KEYCLOAK_CLIENT_ID",
     "KEYCLOAK_ADMIN_USERNAME",

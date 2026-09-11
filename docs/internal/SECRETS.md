@@ -252,10 +252,10 @@ Blazor client.
 
 | Compose / Infisical key | Direct .NET key | Consumer |
 |---|---|---|
-| `DATABASE_RUNTIME_USERNAME`, `DATABASE_RUNTIME_PASSWORD` (in `/database/erasure`) or `DATABASE_ERASURE_RUNTIME_USERNAME` | `Database:Erasure:Runtime:Username`, `Database:Erasure:Runtime:Password` | API only, and only for `ExternalDatabase` |
-| `DATABASE_MIGRATOR_USERNAME`, `DATABASE_MIGRATOR_PASSWORD` (in `/database/erasure`) or `DATABASE_ERASURE_MIGRATOR_USERNAME` | `Database:Erasure:Migrator:Username`, `Database:Erasure:Migrator:Password` | `Event.MigrationService` only |
+| `ERASURE_DATABASE_RUNTIME_USERNAME`, `ERASURE_DATABASE_RUNTIME_PASSWORD` (flat `.env` or Infisical `/database/erasure`) | `Database:Erasure:Runtime:Username`, `Database:Erasure:Runtime:Password` | API only, and only for `ExternalDatabase` |
+| `ERASURE_DATABASE_MIGRATOR_USERNAME`, `ERASURE_DATABASE_MIGRATOR_PASSWORD` (flat `.env` or Infisical `/database/erasure`) | `Database:Erasure:Migrator:Username`, `Database:Erasure:Migrator:Password` | `Event.MigrationService` only |
 
-For `ExternalDatabase`, endpoint metadata is supplied under `/database/erasure` in Infisical (or via `DATABASE_ERASURE_HOST`, `PORT`, `DATABASE_NAME`, `TLS_MODE`, and `TRUST_SERVER_CERTIFICATE` / `PrivacyErasureAuthorityDatabase:*`); the provider is fixed to PostgreSQL. Use separate
+For `ExternalDatabase`, endpoint metadata uses the same `ERASURE_DATABASE_*` names in both authorities: `ERASURE_DATABASE_HOST`, `PORT`, `NAME`, `TLS_MODE`, and `TRUST_SERVER_CERTIFICATE` (or structured `PrivacyErasureAuthorityDatabase:*`); the provider is fixed to PostgreSQL. The `ERASURE_DATABASE_` prefix is mandatory inside `/database/erasure` because the `/database` folder is read recursively; an unprefixed `DATABASE_HOST` stored there would also be returned by the primary read and overwrite `Database:Host`. Use separate
 roles: runtime receives only authority append/read/state/evaluate function
 execution and still has zero table or sequence access, while the migrator owns
 schema, lifecycle functions, grants, and destructive compaction execution. The
@@ -403,16 +403,16 @@ Infisical uses `SCREAMING_SNAKE_CASE` with path-based sections. The provider map
 | `/database/DATABASE_MIGRATOR_USERNAME` | Migrator database username |
 | `/database/DATABASE_MIGRATOR_PASSWORD` | Migrator database password |
 | `/database/ERASURE_TOPOLOGY` | Privacy erasure topology: `EmbeddedSqlite`, `CoLocated`, `ExternalDatabase` |
-| `/database/erasure/DATABASE_PROVIDER` | External authority provider (fixed to `PostgreSql`) |
-| `/database/erasure/DATABASE_HOST` | External authority PostgreSQL host |
-| `/database/erasure/DATABASE_PORT` | External authority PostgreSQL port (default: `5432`) |
-| `/database/erasure/DATABASE_NAME` | External authority PostgreSQL database name |
-| `/database/erasure/DATABASE_TLS_MODE` | External authority TLS mode: `Prefer`, `Required`, `Disabled` |
-| `/database/erasure/DATABASE_TRUST_SERVER_CERTIFICATE` | `false` (default: strict CA verification) or `true` (accept self-signed certs) |
-| `/database/erasure/DATABASE_RUNTIME_USERNAME` | External authority runtime username (function-execution role) |
-| `/database/erasure/DATABASE_RUNTIME_PASSWORD` | External authority runtime password |
-| `/database/erasure/DATABASE_MIGRATOR_USERNAME` | External authority migrator username (schema/admin role) |
-| `/database/erasure/DATABASE_MIGRATOR_PASSWORD` | External authority migrator password |
+| `/database/erasure/ERASURE_DATABASE_PROVIDER` | External authority provider (fixed to `PostgreSql`) |
+| `/database/erasure/ERASURE_DATABASE_HOST` | External authority PostgreSQL host |
+| `/database/erasure/ERASURE_DATABASE_PORT` | External authority PostgreSQL port (default: `5432`) |
+| `/database/erasure/ERASURE_DATABASE_NAME` | External authority PostgreSQL database name |
+| `/database/erasure/ERASURE_DATABASE_TLS_MODE` | External authority TLS mode: `Prefer`, `Required`, `Disabled` |
+| `/database/erasure/ERASURE_DATABASE_TRUST_SERVER_CERTIFICATE` | `false` (default: strict CA verification) or `true` (accept self-signed certs) |
+| `/database/erasure/ERASURE_DATABASE_RUNTIME_USERNAME` | External authority runtime username (function-execution role) |
+| `/database/erasure/ERASURE_DATABASE_RUNTIME_PASSWORD` | External authority runtime password |
+| `/database/erasure/ERASURE_DATABASE_MIGRATOR_USERNAME` | External authority migrator username (schema/admin role) |
+| `/database/erasure/ERASURE_DATABASE_MIGRATOR_PASSWORD` | External authority migrator password |
 | storage path + `STORAGE_S3_*` | `Storage:S3*` (for example `/storage/STORAGE_S3_ENDPOINT` → `Storage:S3Endpoint`) |
 | `/smtp/MAIL_SMTP_HOST` | `smtp.host` secret binding default; Development seed maps it to `email.smtp_host` when no SMTP setting exists |
 | `/smtp/MAIL_SMTP_PORT` | `smtp.port` secret binding default; Development seed maps it to `email.smtp_port` when no SMTP setting exists |

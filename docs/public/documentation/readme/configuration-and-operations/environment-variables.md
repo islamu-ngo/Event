@@ -179,11 +179,17 @@ providers retain their own verification and recovery delivery configuration.
 | `ERASURE_EMBEDDED_PATH` | **Baseline** | `/app/data/privacy_erasure_authority.db` | File path when `ERASURE_TOPOLOGY=EmbeddedSqlite`. |
 | `ERASURE_WRITER_REPLICA_COUNT` | Advanced | `1` | Maximum write concurrency for the embedded authority database. |
 | `ERASURE_BUSY_TIMEOUT_SECONDS` | Advanced | `30` | SQLite busy timeout before serializable retry. |
-| `DATABASE_ERASURE_HOST` | Advanced | None | Hostname if using `ExternalDatabase` topology. |
-| `DATABASE_ERASURE_PORT` | Advanced | `5432` | Port for external erasure authority database. |
-| `DATABASE_ERASURE_NAME` | Advanced | None | Database name for external erasure authority. |
-| `DATABASE_ERASURE_RUNTIME_USERNAME` | Advanced | None | Least-privilege runtime user for external erasure DB. |
-| `DATABASE_ERASURE_RUNTIME_PASSWORD` | Advanced (Secret) | None | Password for runtime user on external erasure DB. |
+| `ERASURE_DATABASE_HOST` | Advanced | None | Hostname if using `ExternalDatabase` topology. |
+| `ERASURE_DATABASE_PORT` | Advanced | `5432` | Port for external erasure authority database. |
+| `ERASURE_DATABASE_NAME` | Advanced | None | Database name for external erasure authority. |
+| `ERASURE_DATABASE_RUNTIME_USERNAME` | Advanced | None | Least-privilege runtime user for external erasure DB. |
+| `ERASURE_DATABASE_RUNTIME_PASSWORD` | Advanced (Secret) | None | Password for runtime user on external erasure DB. |
+| `ERASURE_DATABASE_MIGRATOR_USERNAME` | Advanced | None | Schema-owner user for external erasure DB; must differ from the runtime user. |
+| `ERASURE_DATABASE_MIGRATOR_PASSWORD` | Advanced (Secret) | None | Password for migrator user on external erasure DB. |
+| `ERASURE_DATABASE_TLS_MODE` | Advanced | `Prefer` | TLS mode for external erasure DB: `Prefer`, `Required`, or `Disabled`. |
+| `ERASURE_DATABASE_TRUST_SERVER_CERTIFICATE` | Advanced | `false` | Set `true` only in local development to trust self-signed TLS certificates. |
+
+The same `ERASURE_DATABASE_*` names are used inside the Infisical `/database/erasure` folder, so a flat `.env` and an Infisical project never disagree on the key name. See [Infisical Setup](infisical.md#databaseerasure).
 
 > [!NOTE]
 > **We recommend:** Keep `EmbeddedSqlite`. It runs with zero operational overhead and guarantees strict GDPR anti-resurrection isolation without requiring a second database server.
@@ -654,15 +660,15 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `LISTMONK_API_KEY` | integration | secret | None (secret) | optional | capability |
 | `ERASURE_WRITER_REPLICA_COUNT` | platform | public | None | optional | process |
 | `ERASURE_BUSY_TIMEOUT_SECONDS` | platform | public | None | optional | process |
-| `DATABASE_ERASURE_HOST` | database | public | None | optional | process |
-| `DATABASE_ERASURE_PORT` | database | public | None | optional | process |
-| `DATABASE_ERASURE_NAME` | database | public | None | optional | process |
-| `DATABASE_ERASURE_RUNTIME_USERNAME` | database | public | None | optional | process |
-| `DATABASE_ERASURE_RUNTIME_PASSWORD` | database | sensitive | None | optional | process |
-| `DATABASE_ERASURE_MIGRATOR_USERNAME` | database | public | None | optional | process |
-| `DATABASE_ERASURE_MIGRATOR_PASSWORD` | database | sensitive | None | optional | process |
-| `DATABASE_ERASURE_TLS_MODE` | database | public | None | optional | process |
-| `DATABASE_ERASURE_TRUST_SERVER_CERTIFICATE` | database | public | None | optional | process |
+| `ERASURE_DATABASE_HOST` | database | public | None | optional | process |
+| `ERASURE_DATABASE_PORT` | database | public | None | optional | process |
+| `ERASURE_DATABASE_NAME` | database | public | None | optional | process |
+| `ERASURE_DATABASE_RUNTIME_USERNAME` | database | public | None | optional | process |
+| `ERASURE_DATABASE_RUNTIME_PASSWORD` | database | sensitive | None | optional | process |
+| `ERASURE_DATABASE_MIGRATOR_USERNAME` | database | public | None | optional | process |
+| `ERASURE_DATABASE_MIGRATOR_PASSWORD` | database | sensitive | None | optional | process |
+| `ERASURE_DATABASE_TLS_MODE` | database | public | None | optional | process |
+| `ERASURE_DATABASE_TRUST_SERVER_CERTIFICATE` | database | public | None | optional | process |
 | `DATABASE_SERVER_VERSION` | integration | public | None | optional | deployment |
 | `PRIVACY_ERASURE_AUTHORITY_TOPOLOGY` | integration | public | None | optional | deployment |
 | `PRIVACY_ERASURE_AUTHORITY_EMBEDDED_PATH` | integration | public | None | optional | deployment |

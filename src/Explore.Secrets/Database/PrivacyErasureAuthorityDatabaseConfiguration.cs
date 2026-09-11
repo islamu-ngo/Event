@@ -191,12 +191,9 @@ public static class PrivacyErasureAuthorityDatabaseConfiguration
             return defaultValue;
         }
 
-        return configuration[$"DATABASE_ERASURE_{discreteSuffix}"]
-            ?? configuration[$"DATABASE_ERASURE_DATABASE_{discreteSuffix}"]
-            ?? configuration[$"ERASURE_DATABASE_{discreteSuffix}"]
-            ?? configuration[$"ERASURE_{discreteSuffix}"]
+        return configuration[$"ERASURE_DATABASE_{discreteSuffix}"]
             ?? configuration[$"{EnvironmentPrefix}{discreteSuffix}"]
-            ?? (discreteSuffix == "DATABASE" ? (configuration["DATABASE_ERASURE_NAME"] ?? configuration["ERASURE_DATABASE_NAME"] ?? configuration["ERASURE_NAME"]) : null)
+            ?? (discreteSuffix == "DATABASE" ? configuration["ERASURE_DATABASE_NAME"] : null)
             ?? defaultValue;
     }
 
@@ -214,10 +211,7 @@ public static class PrivacyErasureAuthorityDatabaseConfiguration
             return explicitValue;
         }
 
-        return configuration[$"DATABASE_ERASURE_{role.ToUpperInvariant()}_{field.ToUpperInvariant()}"]
-            ?? configuration[$"DATABASE_ERASURE_{discreteSuffix}"]
-            ?? configuration[$"ERASURE_DATABASE_{discreteSuffix}"]
-            ?? configuration[$"ERASURE_{discreteSuffix}"]
+        return configuration[$"ERASURE_DATABASE_{role.ToUpperInvariant()}_{field.ToUpperInvariant()}"]
             ?? configuration[$"{EnvironmentPrefix}{discreteSuffix}"];
     }
 

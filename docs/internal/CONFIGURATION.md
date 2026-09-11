@@ -674,7 +674,7 @@ retained authority rows there because the primary database is its sole sink.
 Compose and Infisical map `ERASURE_TOPOLOGY` (or `PRIVACY_ERASURE_AUTHORITY_TOPOLOGY`),
 `ERASURE_EMBEDDED_PATH`, `ERASURE_WRITER_REPLICA_COUNT`, and
 `ERASURE_BUSY_TIMEOUT_SECONDS` to the embedded .NET keys.
-For the external topology they map `DATABASE_ERASURE_HOST` (or Infisical `/database/erasure/DATABASE_HOST`),
+For the external topology they map `ERASURE_DATABASE_HOST` (or Infisical `/database/erasure/ERASURE_DATABASE_HOST`),
 `PORT`, `NAME` / `DATABASE`, `TLS_MODE`, `TRUST_SERVER_CERTIFICATE`, and the `RUNTIME_*` /
 `MIGRATOR_*` credential families to `Database:Erasure:*` and `PrivacyErasureAuthorityDatabase:*`.
 External fields are ignored by `EmbeddedSqlite` and `CoLocated`. Back up the embedded file/volume independently;

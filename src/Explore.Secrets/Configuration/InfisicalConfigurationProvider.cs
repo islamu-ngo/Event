@@ -248,18 +248,21 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
         // 1. Privacy Erasure Authority Database (/database/erasure) -> Database:Erasure:*
         if (normalizedPath.Equals("database/erasure", StringComparison.OrdinalIgnoreCase))
         {
+            // Keys carry the ERASURE_DATABASE_ prefix so they stay distinct from the primary
+            // /database keys. Folder reads are recursive, so an unprefixed DATABASE_HOST stored
+            // here would also be returned by the /database read and overwrite Database:Host.
             return secretKey.ToUpperInvariant() switch
             {
-                "DATABASE_HOST" or "HOST" => "Database:Erasure:Host",
-                "DATABASE_PORT" or "PORT" => "Database:Erasure:Port",
-                "DATABASE_NAME" or "DATABASE" or "NAME" => "Database:Erasure:Database",
-                "DATABASE_PROVIDER" or "PROVIDER" => "Database:Erasure:Provider",
-                "DATABASE_RUNTIME_USERNAME" or "RUNTIME_USERNAME" => "Database:Erasure:Runtime:Username",
-                "DATABASE_RUNTIME_PASSWORD" or "RUNTIME_PASSWORD" => "Database:Erasure:Runtime:Password",
-                "DATABASE_MIGRATOR_USERNAME" or "MIGRATOR_USERNAME" => "Database:Erasure:Migrator:Username",
-                "DATABASE_MIGRATOR_PASSWORD" or "MIGRATOR_PASSWORD" => "Database:Erasure:Migrator:Password",
-                "DATABASE_TLS_MODE" or "TLS_MODE" => "Database:Erasure:TlsMode",
-                "DATABASE_TRUST_SERVER_CERTIFICATE" or "TRUST_SERVER_CERTIFICATE" => "Database:Erasure:TrustServerCertificate",
+                "ERASURE_DATABASE_HOST" => "Database:Erasure:Host",
+                "ERASURE_DATABASE_PORT" => "Database:Erasure:Port",
+                "ERASURE_DATABASE_NAME" => "Database:Erasure:Database",
+                "ERASURE_DATABASE_PROVIDER" => "Database:Erasure:Provider",
+                "ERASURE_DATABASE_RUNTIME_USERNAME" => "Database:Erasure:Runtime:Username",
+                "ERASURE_DATABASE_RUNTIME_PASSWORD" => "Database:Erasure:Runtime:Password",
+                "ERASURE_DATABASE_MIGRATOR_USERNAME" => "Database:Erasure:Migrator:Username",
+                "ERASURE_DATABASE_MIGRATOR_PASSWORD" => "Database:Erasure:Migrator:Password",
+                "ERASURE_DATABASE_TLS_MODE" => "Database:Erasure:TlsMode",
+                "ERASURE_DATABASE_TRUST_SERVER_CERTIFICATE" => "Database:Erasure:TrustServerCertificate",
                 _ => $"Database:Erasure:{ToPascalCase(secretKey)}"
             };
         }

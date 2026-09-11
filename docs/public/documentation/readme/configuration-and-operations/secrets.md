@@ -15,7 +15,7 @@ Secrets are external authority bindings, not application configuration values to
 The platform resolves sensitive credentials through one of three approved authorities (configured via `SECRET_PROVIDER`):
 
 * **Environment** (`SECRET_PROVIDER=Environment`): Direct injection of variables from an uncommitted `.env` file or container orchestrator secrets. See [Environment Variables Reference](environment-variables.md).
-* **Infisical** (`SECRET_PROVIDER=Infisical`): Centrally managed secret delivery using Infisical Universal Auth. See [Infisical Configuration](environment-variables.md#4-secret-authority-management).
+* **Infisical** (`SECRET_PROVIDER=Infisical`): Centrally managed secret delivery using Infisical Universal Auth. See [Infisical Setup](infisical.md) for the project, folder tree, and machine identity.
 * **Shared .NET User Secrets** (`SECRET_PROVIDER=UserSecrets`): Available **strictly in Development and Testing environments** for local developer isolation (see [Local Development](../contributing/local-development.md)).
 
 > [!WARNING]

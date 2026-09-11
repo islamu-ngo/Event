@@ -99,32 +99,32 @@ x-privacy-erasure-authority-env: &privacy-erasure-authority-env
   PrivacyErasureAuthorityEmbedded__WriterReplicaCount: ${ERASURE_WRITER_REPLICA_COUNT:-${PRIVACY_ERASURE_AUTHORITY_WRITER_REPLICA_COUNT:-1}}
   PrivacyErasureAuthorityEmbedded__BusyTimeoutSeconds: ${ERASURE_BUSY_TIMEOUT_SECONDS:-${PRIVACY_ERASURE_AUTHORITY_BUSY_TIMEOUT_SECONDS:-30}}
   PrivacyErasureAuthorityDatabase__Provider: PostgreSql
-  PrivacyErasureAuthorityDatabase__Host: ${DATABASE_ERASURE_HOST:-${PRIVACY_ERASURE_AUTHORITY_HOST:-privacy-erasure-db}}
-  PrivacyErasureAuthorityDatabase__Port: ${DATABASE_ERASURE_PORT:-${PRIVACY_ERASURE_AUTHORITY_PORT:-5432}}
-  PrivacyErasureAuthorityDatabase__Database: ${DATABASE_ERASURE_NAME:-${PRIVACY_ERASURE_AUTHORITY_DATABASE:-islamu_event_privacy_erasure}}
-  PrivacyErasureAuthorityDatabase__TlsMode: ${DATABASE_ERASURE_TLS_MODE:-${PRIVACY_ERASURE_AUTHORITY_TLS_MODE:-Prefer}}
-  PrivacyErasureAuthorityDatabase__TrustServerCertificate: ${DATABASE_ERASURE_TRUST_SERVER_CERTIFICATE:-${PRIVACY_ERASURE_AUTHORITY_TRUST_SERVER_CERTIFICATE:-false}}
+  PrivacyErasureAuthorityDatabase__Host: ${ERASURE_DATABASE_HOST:-${PRIVACY_ERASURE_AUTHORITY_HOST:-privacy-erasure-db}}
+  PrivacyErasureAuthorityDatabase__Port: ${ERASURE_DATABASE_PORT:-${PRIVACY_ERASURE_AUTHORITY_PORT:-5432}}
+  PrivacyErasureAuthorityDatabase__Database: ${ERASURE_DATABASE_NAME:-${PRIVACY_ERASURE_AUTHORITY_DATABASE:-islamu_event_privacy_erasure}}
+  PrivacyErasureAuthorityDatabase__TlsMode: ${ERASURE_DATABASE_TLS_MODE:-${PRIVACY_ERASURE_AUTHORITY_TLS_MODE:-Prefer}}
+  PrivacyErasureAuthorityDatabase__TrustServerCertificate: ${ERASURE_DATABASE_TRUST_SERVER_CERTIFICATE:-${PRIVACY_ERASURE_AUTHORITY_TRUST_SERVER_CERTIFICATE:-false}}
   Database__Erasure__Provider: PostgreSql
-  Database__Erasure__Host: ${DATABASE_ERASURE_HOST:-${PRIVACY_ERASURE_AUTHORITY_HOST:-privacy-erasure-db}}
-  Database__Erasure__Port: ${DATABASE_ERASURE_PORT:-${PRIVACY_ERASURE_AUTHORITY_PORT:-5432}}
-  Database__Erasure__Database: ${DATABASE_ERASURE_NAME:-${PRIVACY_ERASURE_AUTHORITY_DATABASE:-islamu_event_privacy_erasure}}
-  Database__Erasure__Name: ${DATABASE_ERASURE_NAME:-${PRIVACY_ERASURE_AUTHORITY_DATABASE:-islamu_event_privacy_erasure}}
-  Database__Erasure__TlsMode: ${DATABASE_ERASURE_TLS_MODE:-${PRIVACY_ERASURE_AUTHORITY_TLS_MODE:-Prefer}}
-  Database__Erasure__TrustServerCertificate: ${DATABASE_ERASURE_TRUST_SERVER_CERTIFICATE:-${PRIVACY_ERASURE_AUTHORITY_TRUST_SERVER_CERTIFICATE:-false}}
+  Database__Erasure__Host: ${ERASURE_DATABASE_HOST:-${PRIVACY_ERASURE_AUTHORITY_HOST:-privacy-erasure-db}}
+  Database__Erasure__Port: ${ERASURE_DATABASE_PORT:-${PRIVACY_ERASURE_AUTHORITY_PORT:-5432}}
+  Database__Erasure__Database: ${ERASURE_DATABASE_NAME:-${PRIVACY_ERASURE_AUTHORITY_DATABASE:-islamu_event_privacy_erasure}}
+  Database__Erasure__Name: ${ERASURE_DATABASE_NAME:-${PRIVACY_ERASURE_AUTHORITY_DATABASE:-islamu_event_privacy_erasure}}
+  Database__Erasure__TlsMode: ${ERASURE_DATABASE_TLS_MODE:-${PRIVACY_ERASURE_AUTHORITY_TLS_MODE:-Prefer}}
+  Database__Erasure__TrustServerCertificate: ${ERASURE_DATABASE_TRUST_SERVER_CERTIFICATE:-${PRIVACY_ERASURE_AUTHORITY_TRUST_SERVER_CERTIFICATE:-false}}
 
 x-privacy-erasure-runtime-env: &privacy-erasure-runtime-env
   <<: *privacy-erasure-authority-env
-  PrivacyErasureAuthorityDatabase__Runtime__Username: ${DATABASE_ERASURE_RUNTIME_USERNAME:-${PRIVACY_ERASURE_AUTHORITY_RUNTIME_USERNAME:-privacy_erasure_runtime}}
-  PrivacyErasureAuthorityDatabase__Runtime__Password: ${DATABASE_ERASURE_RUNTIME_PASSWORD:-${PRIVACY_ERASURE_AUTHORITY_RUNTIME_PASSWORD:-}}
-  Database__Erasure__Runtime__Username: ${DATABASE_ERASURE_RUNTIME_USERNAME:-${PRIVACY_ERASURE_AUTHORITY_RUNTIME_USERNAME:-privacy_erasure_runtime}}
-  Database__Erasure__Runtime__Password: ${DATABASE_ERASURE_RUNTIME_PASSWORD:-${PRIVACY_ERASURE_AUTHORITY_RUNTIME_PASSWORD:-}}
+  PrivacyErasureAuthorityDatabase__Runtime__Username: ${ERASURE_DATABASE_RUNTIME_USERNAME:-${PRIVACY_ERASURE_AUTHORITY_RUNTIME_USERNAME:-privacy_erasure_runtime}}
+  PrivacyErasureAuthorityDatabase__Runtime__Password: ${ERASURE_DATABASE_RUNTIME_PASSWORD:-${PRIVACY_ERASURE_AUTHORITY_RUNTIME_PASSWORD:-}}
+  Database__Erasure__Runtime__Username: ${ERASURE_DATABASE_RUNTIME_USERNAME:-${PRIVACY_ERASURE_AUTHORITY_RUNTIME_USERNAME:-privacy_erasure_runtime}}
+  Database__Erasure__Runtime__Password: ${ERASURE_DATABASE_RUNTIME_PASSWORD:-${PRIVACY_ERASURE_AUTHORITY_RUNTIME_PASSWORD:-}}
 
 x-privacy-erasure-migrator-env: &privacy-erasure-migrator-env
   <<: *privacy-erasure-authority-env
-  PrivacyErasureAuthorityDatabase__Migrator__Username: ${DATABASE_ERASURE_MIGRATOR_USERNAME:-${PRIVACY_ERASURE_AUTHORITY_MIGRATOR_USERNAME:-privacy_erasure_migrator}}
-  PrivacyErasureAuthorityDatabase__Migrator__Password: ${DATABASE_ERASURE_MIGRATOR_PASSWORD:-${PRIVACY_ERASURE_AUTHORITY_MIGRATOR_PASSWORD:-}}
-  Database__Erasure__Migrator__Username: ${DATABASE_ERASURE_MIGRATOR_USERNAME:-${PRIVACY_ERASURE_AUTHORITY_MIGRATOR_USERNAME:-privacy_erasure_migrator}}
-  Database__Erasure__Migrator__Password: ${DATABASE_ERASURE_MIGRATOR_PASSWORD:-${PRIVACY_ERASURE_AUTHORITY_MIGRATOR_PASSWORD:-}}
+  PrivacyErasureAuthorityDatabase__Migrator__Username: ${ERASURE_DATABASE_MIGRATOR_USERNAME:-${PRIVACY_ERASURE_AUTHORITY_MIGRATOR_USERNAME:-privacy_erasure_migrator}}
+  PrivacyErasureAuthorityDatabase__Migrator__Password: ${ERASURE_DATABASE_MIGRATOR_PASSWORD:-${PRIVACY_ERASURE_AUTHORITY_MIGRATOR_PASSWORD:-}}
+  Database__Erasure__Migrator__Username: ${ERASURE_DATABASE_MIGRATOR_USERNAME:-${PRIVACY_ERASURE_AUTHORITY_MIGRATOR_USERNAME:-privacy_erasure_migrator}}
+  Database__Erasure__Migrator__Password: ${ERASURE_DATABASE_MIGRATOR_PASSWORD:-${PRIVACY_ERASURE_AUTHORITY_MIGRATOR_PASSWORD:-}}
 
 x-s3-env: &s3-env
   STORAGE_S3_ENDPOINT: ${STORAGE_S3_ENDPOINT:-http://minio:9000}
@@ -330,9 +330,9 @@ services:
     image: postgres:18-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${DATABASE_ERASURE_MIGRATOR_USERNAME:-privacy_erasure_migrator}
-      POSTGRES_PASSWORD: ${DATABASE_ERASURE_MIGRATOR_PASSWORD:-}
-      POSTGRES_DB: ${DATABASE_ERASURE_NAME:-islamu_event_privacy_erasure}
+      POSTGRES_USER: ${ERASURE_DATABASE_MIGRATOR_USERNAME:-privacy_erasure_migrator}
+      POSTGRES_PASSWORD: ${ERASURE_DATABASE_MIGRATOR_PASSWORD:-}
+      POSTGRES_DB: ${ERASURE_DATABASE_NAME:-islamu_event_privacy_erasure}
     volumes:
       - privacy_erasure_postgres_data:/var/lib/postgresql/data
     healthcheck:

@@ -74,7 +74,7 @@ internal static class EnvironmentContractExpectedVectors
     internal static readonly string[] SentinelKeys =
     [
         "API_HTTP_PORT", "DATABASE_PROVIDER", "SECRET_PROVIDER",
-        "STRIPE_PLATFORM_SECRET_KEY", "DATABASE_ERASURE_MIGRATOR_PASSWORD",
+        "STRIPE_PLATFORM_SECRET_KEY", "ERASURE_DATABASE_MIGRATOR_PASSWORD",
     ];
 
     internal static readonly ActivationGraphFixture ValidActivationGraph = new(

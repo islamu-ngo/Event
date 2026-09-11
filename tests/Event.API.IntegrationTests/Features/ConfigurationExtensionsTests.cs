@@ -244,18 +244,18 @@ public sealed class ConfigurationExtensionsTests
     }
 
     [Test]
-    public async Task AddSecretAuthorityConfiguration_MapsErasureFolderAliases()
+    public async Task AddSecretAuthorityConfiguration_MapsErasureDatabaseKeys()
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
             ["ERASURE_TOPOLOGY"] = "ExternalDatabase",
-            ["ERASURE_HOST"] = "erasure-authority",
-            ["ERASURE_PORT"] = "5432",
-            ["ERASURE_NAME"] = "erasure_db",
-            ["ERASURE_RUNTIME_USERNAME"] = "erasure_runtime",
-            ["ERASURE_RUNTIME_PASSWORD"] = "erasure-secret",
-            ["ERASURE_MIGRATOR_USERNAME"] = "erasure_migrator",
-            ["ERASURE_MIGRATOR_PASSWORD"] = "erasure-migrator-secret",
+            ["ERASURE_DATABASE_HOST"] = "erasure-authority",
+            ["ERASURE_DATABASE_PORT"] = "5432",
+            ["ERASURE_DATABASE_NAME"] = "erasure_db",
+            ["ERASURE_DATABASE_RUNTIME_USERNAME"] = "erasure_runtime",
+            ["ERASURE_DATABASE_RUNTIME_PASSWORD"] = "erasure-secret",
+            ["ERASURE_DATABASE_MIGRATOR_USERNAME"] = "erasure_migrator",
+            ["ERASURE_DATABASE_MIGRATOR_PASSWORD"] = "erasure-migrator-secret",
         });
 
         await Assert.That(configuration["PrivacyErasure:Authority:Topology"])

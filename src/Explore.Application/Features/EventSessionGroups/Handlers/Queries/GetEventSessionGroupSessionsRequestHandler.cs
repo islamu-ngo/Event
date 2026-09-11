@@ -1,4 +1,3 @@
-using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventSession;
@@ -12,18 +11,15 @@ public class GetEventSessionGroupSessionsRequestHandler : IRequestHandler<GetEve
 {
     private readonly IEventSessionGroupRepository _eventSessionGroupRepository;
     private readonly IEventSessionGroupSessionRepository _assignmentRepository;
-    private readonly IMapper _mapper;
     private readonly IEventLocationDisclosureService _disclosureService;
 
     public GetEventSessionGroupSessionsRequestHandler(
         IEventSessionGroupRepository eventSessionGroupRepository,
         IEventSessionGroupSessionRepository assignmentRepository,
-        IMapper mapper,
         IEventLocationDisclosureService disclosureService)
     {
         _eventSessionGroupRepository = eventSessionGroupRepository;
         _assignmentRepository = assignmentRepository;
-        _mapper = mapper;
         _disclosureService = disclosureService;
     }
 
@@ -42,7 +38,6 @@ public class GetEventSessionGroupSessionsRequestHandler : IRequestHandler<GetEve
 
         return await PublicEventSessionLocationProjector.ProjectAsync(
             sessions,
-            _mapper,
             _disclosureService,
             cancellationToken);
     }

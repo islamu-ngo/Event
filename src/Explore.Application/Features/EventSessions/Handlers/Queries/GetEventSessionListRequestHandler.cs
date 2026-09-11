@@ -1,4 +1,3 @@
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -14,20 +13,17 @@ namespace Explore.Application.Features.EventSessions.Handlers.Queries;
 public class GetEventSessionListRequestHandler : IRequestHandler<GetEventSessionListRequest, PaginatedResult<EventSessionListDto>>
 {
     private readonly IEventSessionRepository _eventSessionRepository;
-    private readonly IMapper _mapper;
     private readonly ICustomPropertyQuotaResolver _quotaResolver;
     private readonly ITenantContext _tenantContext;
     private readonly IEventLocationDisclosureService _disclosureService;
 
     public GetEventSessionListRequestHandler(
         IEventSessionRepository eventSessionRepository,
-        IMapper mapper,
         ICustomPropertyQuotaResolver quotaResolver,
         ITenantContext tenantContext,
         IEventLocationDisclosureService disclosureService)
     {
         _eventSessionRepository = eventSessionRepository;
-        _mapper = mapper;
         _quotaResolver = quotaResolver;
         _tenantContext = tenantContext;
         _disclosureService = disclosureService;
@@ -48,7 +44,6 @@ public class GetEventSessionListRequestHandler : IRequestHandler<GetEventSession
             return PaginatedResult<EventSessionListDto>.Create(
                 await PublicEventSessionLocationProjector.ProjectAsync(
                     items,
-                    _mapper,
                     _disclosureService,
                     cancellationToken),
                 totalCount,
@@ -64,7 +59,6 @@ public class GetEventSessionListRequestHandler : IRequestHandler<GetEventSession
         return PaginatedResult<EventSessionListDto>.Create(
             await PublicEventSessionLocationProjector.ProjectAsync(
                 sessions,
-                _mapper,
                 _disclosureService,
                 cancellationToken),
             total,

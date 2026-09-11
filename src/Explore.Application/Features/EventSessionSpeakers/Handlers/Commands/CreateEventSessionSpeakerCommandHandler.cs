@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
@@ -22,7 +21,6 @@ public class CreateEventSessionSpeakerCommandHandler : IRequestHandler<CreateEve
     private readonly IActorRepository _actorRepository;
     private readonly IEventSessionRepository _eventSessionRepository;
     private readonly ITenantContext _tenantContext;
-    private readonly IMapper _mapper;
     private readonly HybridCache _cache;
 
     public CreateEventSessionSpeakerCommandHandler(
@@ -30,14 +28,12 @@ public class CreateEventSessionSpeakerCommandHandler : IRequestHandler<CreateEve
         IActorRepository actorRepository,
         IEventSessionRepository eventSessionRepository,
         ITenantContext tenantContext,
-        IMapper mapper,
         HybridCache cache)
     {
         _speakerRepository = speakerRepository;
         _actorRepository = actorRepository;
         _eventSessionRepository = eventSessionRepository;
         _tenantContext = tenantContext;
-        _mapper = mapper;
         _cache = cache;
     }
 
@@ -79,9 +75,16 @@ public class CreateEventSessionSpeakerCommandHandler : IRequestHandler<CreateEve
             return ValidationFailure("Actor is already assigned as a speaker for this event session.");
         }
 
-        var speaker = _mapper.Map<EventSessionSpeaker>(request.SpeakerDto);
-
-        speaker.TenantId = eventSession.TenantId;
+        // Only the requested relationship keys are client-owned; tenant comes from the checked session.
+        var speaker = new EventSessionSpeaker
+        {
+            ActorId = request.SpeakerDto.ActorId,
+            EventSessionId = request.SpeakerDto.EventSessionId,
+            TenantId = eventSession.TenantId,
+            Actor = null!,
+            EventSession = null!,
+            Tenant = null!
+        };
 
         speaker = await _speakerRepository.Create(speaker);
         await _cache.RemoveAsync($"event:detail:{eventSession.EventId}", cancellationToken);

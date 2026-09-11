@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventSession;
@@ -37,7 +36,6 @@ public class CreateEventSessionCommandHandler : IRequestHandler<CreateEventSessi
     private readonly IStorageObjectRepository _storageObjectRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly EventLocationAttachmentService _eventLocationAttachmentService;
-    private readonly IMapper _mapper;
 
     public CreateEventSessionCommandHandler(
         IEventSessionRepository eventSessionRepository,
@@ -54,8 +52,7 @@ public class CreateEventSessionCommandHandler : IRequestHandler<CreateEventSessi
         IEventDayRepository eventDayRepository,
         IStorageObjectRepository storageObjectRepository,
         IUnitOfWork unitOfWork,
-        EventLocationAttachmentService eventLocationAttachmentService,
-        IMapper mapper)
+        EventLocationAttachmentService eventLocationAttachmentService)
     {
         _eventSessionRepository = eventSessionRepository;
         _eventRepository = eventRepository;
@@ -72,7 +69,6 @@ public class CreateEventSessionCommandHandler : IRequestHandler<CreateEventSessi
         _storageObjectRepository = storageObjectRepository;
         _unitOfWork = unitOfWork;
         _eventLocationAttachmentService = eventLocationAttachmentService;
-        _mapper = mapper;
     }
 
     public async Task<BaseCommandResponse<Guid>> Handle(CreateEventSessionCommand request, CancellationToken cancellationToken)
@@ -112,9 +108,26 @@ public class CreateEventSessionCommandHandler : IRequestHandler<CreateEventSessi
                 "Event session creation failed.");
         }
 
-        var eventSession = _mapper.Map<EventSession>(request.EventSessionDto);
-        eventSession.CurrentAudienceAttendees = 0;
-        eventSession.TenantId = parentEvent.TenantId;
+        // Allow only client-owned business fields. Scheduling, lifecycle and template state stay handler-owned.
+        var input = request.EventSessionDto;
+        var eventSession = new EventSession(EventSessionStatusEnum.Draft)
+        {
+            EventId = input.EventId,
+            Event = null!,
+            Tenant = null!,
+            TenantId = parentEvent.TenantId,
+            LocationId = input.LocationId,
+            RoomId = input.RoomId,
+            FeaturedImageId = input.FeaturedImageId,
+            SortOrder = input.SortOrder,
+            Title = input.Title,
+            EventSessionKindId = input.EventSessionKindId,
+            Description = input.Description,
+            Slug = input.Slug,
+            MaxAudienceAttendees = input.MaxAudienceAttendees,
+            RegistrationModeId = input.RegistrationModeId,
+            CurrentAudienceAttendees = 0
+        };
 
         // Populate cached local projection fields via the single authorized write path on EventSession.
         // Handlers never touch LocalStart*/LocalEnd* directly; the aggregate method consumes the calculator.

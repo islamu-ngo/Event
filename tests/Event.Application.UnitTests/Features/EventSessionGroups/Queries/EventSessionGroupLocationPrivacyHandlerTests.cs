@@ -1,7 +1,5 @@
-using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
-using Explore.Application.DTOs.EventSessionGroup;
 using Explore.Application.Features.EventSessionGroups.Handlers.Queries;
 using Explore.Application.Features.EventSessionGroups.Requests.Queries;
 using Explore.Domain;
@@ -10,22 +8,18 @@ using NSubstitute;
 namespace Event.Application.UnitTests.Features.EventSessionGroups.Queries;
 
 [Category("EventLocationPrivacy")]
+[Category("EventSessionMapping")]
 public sealed class EventSessionGroupLocationPrivacyHandlerTests
 {
     [Test]
     public async Task PublicByEvent_RedactsPhysicalLocation()
     {
         var repository = Substitute.For<IEventSessionGroupRepository>();
-        var mapper = Substitute.For<IMapper>();
-        var eventId = Guid.NewGuid();
+        var eventId = Guid.Parse("01900000-0000-7000-8000-000000000001");
         var entity = CreateEntity(eventId);
-        var dto = CreateListDto(eventId);
-        dto = dto with { Id = entity.Id };
         repository.GetPublicByEventAsync(eventId, Arg.Any<CancellationToken>()).Returns([entity]);
-        mapper.Map<List<EventSessionGroupListDto>>(Arg.Any<List<EventSessionGroup>>()).Returns([dto]);
         var handler = new GetEventSessionGroupsByEventRequestHandler(
             repository,
-            mapper,
             Substitute.For<IEventLocationDisclosureService>());
 
         var result = await handler.Handle(
@@ -42,15 +36,11 @@ public sealed class EventSessionGroupLocationPrivacyHandlerTests
     public async Task PublicDetail_RedactsPhysicalLocation()
     {
         var repository = Substitute.For<IEventSessionGroupRepository>();
-        var mapper = Substitute.For<IMapper>();
-        var eventId = Guid.NewGuid();
+        var eventId = Guid.Parse("01900000-0000-7000-8000-000000000001");
         var entity = CreateEntity(eventId);
-        var dto = CreateDetailDto(eventId);
         repository.GetPublicWithDetailsAsync(entity.Id, Arg.Any<CancellationToken>()).Returns(entity);
-        mapper.Map<EventSessionGroupDto>(entity).Returns(dto);
         var handler = new GetEventSessionGroupDetailRequestHandler(
             repository,
-            mapper,
             Substitute.For<IEventLocationDisclosureService>());
 
         var result = await handler.Handle(
@@ -67,13 +57,10 @@ public sealed class EventSessionGroupLocationPrivacyHandlerTests
     public async Task ManagedByEvent_RetainsPhysicalLocation()
     {
         var repository = Substitute.For<IEventSessionGroupRepository>();
-        var mapper = Substitute.For<IMapper>();
-        var eventId = Guid.NewGuid();
+        var eventId = Guid.Parse("01900000-0000-7000-8000-000000000001");
         var entity = CreateEntity(eventId);
-        var dto = CreateListDto(eventId);
         repository.GetActiveByEventAsync(eventId, Arg.Any<CancellationToken>()).Returns([entity]);
-        mapper.Map<List<EventSessionGroupListDto>>(Arg.Any<List<EventSessionGroup>>()).Returns([dto]);
-        var handler = new GetManagedEventSessionGroupsByEventRequestHandler(repository, mapper);
+        var handler = new GetManagedEventSessionGroupsByEventRequestHandler(repository);
 
         var result = await handler.Handle(
             new GetManagedEventSessionGroupsByEventRequest { EventId = eventId },
@@ -89,13 +76,10 @@ public sealed class EventSessionGroupLocationPrivacyHandlerTests
     public async Task ManagedDetail_RetainsPhysicalLocation()
     {
         var repository = Substitute.For<IEventSessionGroupRepository>();
-        var mapper = Substitute.For<IMapper>();
-        var eventId = Guid.NewGuid();
+        var eventId = Guid.Parse("01900000-0000-7000-8000-000000000001");
         var entity = CreateEntity(eventId);
-        var dto = CreateDetailDto(eventId);
         repository.GetWithDetailsAsync(entity.Id, Arg.Any<CancellationToken>()).Returns(entity);
-        mapper.Map<EventSessionGroupDto>(entity).Returns(dto);
-        var handler = new GetManagedEventSessionGroupDetailRequestHandler(repository, mapper);
+        var handler = new GetManagedEventSessionGroupDetailRequestHandler(repository);
 
         var result = await handler.Handle(
             new GetManagedEventSessionGroupDetailRequest { EventId = eventId, Id = entity.Id },
@@ -111,7 +95,7 @@ public sealed class EventSessionGroupLocationPrivacyHandlerTests
     {
         var location = new Location
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.Parse("01900000-0000-7000-8000-000000000002"),
             FullName = "Private venue",
             Country = "Belgium",
             City = "Brussels",
@@ -119,7 +103,7 @@ public sealed class EventSessionGroupLocationPrivacyHandlerTests
         };
         var room = new LocationRoom
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.Parse("01900000-0000-7000-8000-000000000003"),
             LocationId = location.Id,
             Location = location,
             Name = "Private room",
@@ -128,7 +112,7 @@ public sealed class EventSessionGroupLocationPrivacyHandlerTests
 
         return new EventSessionGroup
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.Parse("01900000-0000-7000-8000-000000000004"),
             EventId = eventId,
             Event = null!,
             Name = "Group",
@@ -140,25 +124,4 @@ public sealed class EventSessionGroupLocationPrivacyHandlerTests
         };
     }
 
-    private static EventSessionGroupListDto CreateListDto(Guid eventId) => new()
-    {
-        Id = Guid.NewGuid(),
-        EventId = eventId,
-        Name = "Group",
-        LocationId = Guid.NewGuid(),
-        LocationName = "Private venue",
-        RoomId = Guid.NewGuid(),
-        RoomName = "Private room"
-    };
-
-    private static EventSessionGroupDto CreateDetailDto(Guid eventId) => new()
-    {
-        Id = Guid.NewGuid(),
-        EventId = eventId,
-        Name = "Group",
-        LocationId = Guid.NewGuid(),
-        LocationName = "Private venue",
-        RoomId = Guid.NewGuid(),
-        RoomName = "Private room"
-    };
 }

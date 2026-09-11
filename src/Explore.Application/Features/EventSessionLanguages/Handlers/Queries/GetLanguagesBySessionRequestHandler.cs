@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionLanguage;
 using Explore.Application.Features.EventSessionLanguages.Requests.Queries;
@@ -14,16 +14,13 @@ public class GetLanguagesBySessionRequestHandler :
 {
     private readonly IEventSessionLanguageRepository _repository;
     private readonly IEventSessionRepository _eventSessionRepository;
-    private readonly IMapper _mapper;
 
     public GetLanguagesBySessionRequestHandler(
         IEventSessionLanguageRepository repository,
-        IEventSessionRepository eventSessionRepository,
-        IMapper mapper)
+        IEventSessionRepository eventSessionRepository)
     {
         _repository = repository;
         _eventSessionRepository = eventSessionRepository;
-        _mapper = mapper;
     }
 
     public async Task<List<EventSessionLanguageListDto>> Handle(GetLanguagesBySessionRequest request, CancellationToken cancellationToken)
@@ -43,7 +40,7 @@ public class GetLanguagesBySessionRequestHandler :
         CancellationToken cancellationToken)
     {
         var eventSessionLanguages = await _repository.GetBySession(eventSessionId, cancellationToken);
-        var dtos = _mapper.Map<List<EventSessionLanguageListDto>>(eventSessionLanguages);
+        var dtos = eventSessionLanguages.Select(EventSessionMapper.ToListItem).ToList();
         foreach (var dto in dtos)
         {
             dto.EventId = eventSession.EventId;
@@ -56,8 +53,7 @@ public class GetLanguagesBySessionRequestHandler :
 
 public sealed class GetManagedLanguagesBySessionRequestHandler(
     IEventSessionLanguageRepository repository,
-    IEventSessionRepository eventSessionRepository,
-    IMapper mapper)
+    IEventSessionRepository eventSessionRepository)
     : IRequestHandler<GetManagedLanguagesBySessionRequest, List<EventSessionLanguageListDto>>
 {
     public async Task<List<EventSessionLanguageListDto>> Handle(
@@ -69,7 +65,7 @@ public sealed class GetManagedLanguagesBySessionRequestHandler(
             return [];
 
         var assignments = await repository.GetBySession(request.EventSessionId, cancellationToken);
-        var dtos = mapper.Map<List<EventSessionLanguageListDto>>(assignments);
+        var dtos = assignments.Select(EventSessionMapper.ToListItem).ToList();
         foreach (var dto in dtos)
         {
             dto.EventId = eventSession.EventId;

@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventSessionAgendaItem;
@@ -14,16 +13,13 @@ namespace Explore.Application.Features.EventSessionAgendaItems.Handlers.Queries;
 public class GetEventSessionAgendaItemListRequestHandler : IRequestHandler<GetEventSessionAgendaItemListRequest, PaginatedResult<EventSessionAgendaItemListDto>>
 {
     private readonly IEventSessionAgendaItemRepository _agendaItemRepository;
-    private readonly IMapper _mapper;
     private readonly IEventLocationDisclosureService _disclosureService;
 
     public GetEventSessionAgendaItemListRequestHandler(
         IEventSessionAgendaItemRepository agendaItemRepository,
-        IMapper mapper,
         IEventLocationDisclosureService disclosureService)
     {
         _agendaItemRepository = agendaItemRepository;
-        _mapper = mapper;
         _disclosureService = disclosureService;
     }
 
@@ -36,7 +32,6 @@ public class GetEventSessionAgendaItemListRequestHandler : IRequestHandler<GetEv
             cancellationToken);
         var dtos = await PublicEventSessionAgendaItemLocationProjector.ProjectAsync(
             agendaItems,
-            _mapper,
             _disclosureService,
             cancellationToken);
         return PaginatedResult<EventSessionAgendaItemListDto>.Create(dtos, totalCount, pageNumber, pageSize);

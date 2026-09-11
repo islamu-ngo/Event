@@ -28,6 +28,7 @@ using NSubstitute;
 namespace Event.Application.UnitTests.Features.EventLocations.Queries;
 
 [Category("EventLocationPrivacy")]
+[Category("EventSessionMapping")]
 public sealed class PublicEventLocationProjectionTests
 {
     private const string PublicVenueName = "Purpose-limited venue";
@@ -37,53 +38,25 @@ public sealed class PublicEventLocationProjectionTests
     public async Task SessionResponses_MaterializePublicLocationAndRedactLegacyFields()
     {
         var repository = Substitute.For<IEventSessionRepository>();
-        var mapper = Substitute.For<IMapper>();
         var disclosureService = new RecordingDisclosureService();
         Guid tenantId = Guid.NewGuid();
         Guid eventId = Guid.NewGuid();
         Guid roomId = Guid.NewGuid();
         EventSession session = CreateSession(tenantId, eventId, roomId);
         Guid eventLocationId = session.EventLocationId!.Value;
-        var detailDto = new EventSessionDto
-        {
-            Id = session.Id,
-            EventId = eventId,
-            EventTitle = "Public event",
-            LocationId = Guid.NewGuid(),
-            LocationFullName = "Private venue canary",
-            LocationAddress = "Private address canary",
-            LocationCity = "Private city canary",
-            LocationCountry = "Private country canary",
-            RoomId = Guid.NewGuid(),
-            RoomName = "Private room canary"
-        };
-        var listDto = new EventSessionListDto
-        {
-            Id = session.Id,
-            EventId = eventId,
-            EventTitle = "Public event",
-            LocationId = Guid.NewGuid(),
-            LocationFullName = "Private venue canary",
-            LocationCity = "Private city canary",
-            RoomId = Guid.NewGuid(),
-            RoomName = "Private room canary"
-        };
         repository.GetPublicSessionWithDetailsAsync(session.Id, Arg.Any<CancellationToken>()).Returns(session);
         repository.GetPublicSessionsWithDetailsPagedAsync(1, 20, Arg.Any<CancellationToken>()).Returns(([session], 1));
         repository.GetPublicSessionsByEventAsync(eventId, Arg.Any<CancellationToken>()).Returns([session]);
-        mapper.Map<EventSessionDto>(session).Returns(detailDto);
-        mapper.Map<List<EventSessionListDto>>(Arg.Any<List<EventSession>>()).Returns([listDto]);
 
-        EventSessionDto? detail = await new GetEventSessionDetailsRequestHandler(repository, mapper, disclosureService)
+        EventSessionDto? detail = await new GetEventSessionDetailsRequestHandler(repository, disclosureService)
             .Handle(new GetEventSessionDetailsRequest { Id = session.Id }, CancellationToken.None);
         EventSessionListDto paged = (await new GetEventSessionListRequestHandler(
                 repository,
-                mapper,
                 Substitute.For<ICustomPropertyQuotaResolver>(),
                 Substitute.For<ITenantContext>(),
                 disclosureService)
             .Handle(new GetEventSessionListRequest(), CancellationToken.None)).Items.Single();
-        EventSessionListDto byEvent = (await new GetSessionsByEventRequestHandler(repository, mapper, disclosureService)
+        EventSessionListDto byEvent = (await new GetSessionsByEventRequestHandler(repository, disclosureService)
             .Handle(new GetSessionsByEventRequest { EventId = eventId }, CancellationToken.None)).Single();
 
         await AssertPublicLocationAsync(detail!.EventLocation, eventLocationId, expectRoom: true);
@@ -113,40 +86,17 @@ public sealed class PublicEventLocationProjectionTests
     public async Task SessionGroupResponses_MaterializePublicLocationAndRedactLegacyFields()
     {
         var repository = Substitute.For<IEventSessionGroupRepository>();
-        var mapper = Substitute.For<IMapper>();
         var disclosureService = new RecordingDisclosureService();
         Guid tenantId = Guid.NewGuid();
         Guid eventId = Guid.NewGuid();
         EventSessionGroup group = CreateSessionGroup(tenantId, eventId, Guid.NewGuid());
         Guid eventLocationId = group.EventLocationId!.Value;
-        var detailDto = new EventSessionGroupDto
-        {
-            Id = group.Id,
-            EventId = eventId,
-            Name = group.Name,
-            LocationId = Guid.NewGuid(),
-            LocationName = "Private venue canary",
-            RoomId = Guid.NewGuid(),
-            RoomName = "Private room canary"
-        };
-        var listDto = new EventSessionGroupListDto
-        {
-            Id = group.Id,
-            EventId = eventId,
-            Name = group.Name,
-            LocationId = Guid.NewGuid(),
-            LocationName = "Private venue canary",
-            RoomId = Guid.NewGuid(),
-            RoomName = "Private room canary"
-        };
         repository.GetPublicWithDetailsAsync(group.Id, Arg.Any<CancellationToken>()).Returns(group);
         repository.GetPublicByEventAsync(eventId, Arg.Any<CancellationToken>()).Returns([group]);
-        mapper.Map<EventSessionGroupDto>(group).Returns(detailDto);
-        mapper.Map<List<EventSessionGroupListDto>>(Arg.Any<List<EventSessionGroup>>()).Returns([listDto]);
 
-        EventSessionGroupDto? detail = await new GetEventSessionGroupDetailRequestHandler(repository, mapper, disclosureService)
+        EventSessionGroupDto? detail = await new GetEventSessionGroupDetailRequestHandler(repository, disclosureService)
             .Handle(new GetEventSessionGroupDetailRequest { Id = group.Id }, CancellationToken.None);
-        EventSessionGroupListDto byEvent = (await new GetEventSessionGroupsByEventRequestHandler(repository, mapper, disclosureService)
+        EventSessionGroupListDto byEvent = (await new GetEventSessionGroupsByEventRequestHandler(repository, disclosureService)
             .Handle(new GetEventSessionGroupsByEventRequest { EventId = eventId }, CancellationToken.None)).Single();
 
         await AssertPublicLocationAsync(detail!.EventLocation, eventLocationId, expectRoom: true);
@@ -206,40 +156,20 @@ public sealed class PublicEventLocationProjectionTests
     public async Task SessionAgendaResponses_MaterializePublicLocationAndRedactLegacyFields()
     {
         var repository = Substitute.For<IEventSessionAgendaItemRepository>();
-        var mapper = Substitute.For<IMapper>();
         var disclosureService = new RecordingDisclosureService();
         Guid tenantId = Guid.NewGuid();
         Guid eventId = Guid.NewGuid();
         EventSessionAgendaItem item = CreateSessionAgendaItem(tenantId, eventId);
         Guid eventLocationId = item.EventLocationId!.Value;
-        var detailDto = new EventSessionAgendaItemDto
-        {
-            Id = item.Id,
-            EventId = eventId,
-            EventSessionId = item.EventSessionId,
-            Title = item.Title,
-            LocationId = Guid.NewGuid(),
-            LocationFullName = "Private venue canary"
-        };
-        var listDto = new EventSessionAgendaItemListDto
-        {
-            Id = item.Id,
-            EventId = eventId,
-            EventSessionId = item.EventSessionId,
-            Title = item.Title,
-            LocationFullName = "Private venue canary"
-        };
         repository.GetPublicByIdWithDetailsAsync(item.Id, Arg.Any<CancellationToken>()).Returns(item);
         repository.GetPublicAgendaItemsWithDetailsPagedAsync(1, 20, Arg.Any<CancellationToken>()).Returns(([item], 1));
         repository.GetPublicBySessionAsync(item.EventSessionId, Arg.Any<CancellationToken>()).Returns([item]);
-        mapper.Map<EventSessionAgendaItemDto>(item).Returns(detailDto);
-        mapper.Map<List<EventSessionAgendaItemListDto>>(Arg.Any<List<EventSessionAgendaItem>>()).Returns([listDto]);
 
-        EventSessionAgendaItemDto? detail = await new GetEventSessionAgendaItemDetailsRequestHandler(repository, mapper, disclosureService)
+        EventSessionAgendaItemDto? detail = await new GetEventSessionAgendaItemDetailsRequestHandler(repository, disclosureService)
             .Handle(new GetEventSessionAgendaItemDetailsRequest { Id = item.Id }, CancellationToken.None);
-        EventSessionAgendaItemListDto paged = (await new GetEventSessionAgendaItemListRequestHandler(repository, mapper, disclosureService)
+        EventSessionAgendaItemListDto paged = (await new GetEventSessionAgendaItemListRequestHandler(repository, disclosureService)
             .Handle(new GetEventSessionAgendaItemListRequest(), CancellationToken.None)).Items.Single();
-        EventSessionAgendaItemListDto bySession = (await new GetAgendaItemsBySessionRequestHandler(repository, mapper, disclosureService)
+        EventSessionAgendaItemListDto bySession = (await new GetAgendaItemsBySessionRequestHandler(repository, disclosureService)
             .Handle(new GetAgendaItemsBySessionRequest { EventSessionId = item.EventSessionId }, CancellationToken.None)).Single();
 
         await AssertPublicLocationAsync(detail!.EventLocation, eventLocationId, expectRoom: false);
@@ -354,18 +284,10 @@ public sealed class PublicEventLocationProjectionTests
     public async Task Cancellation_StopsBeforePublicLocationMaterialization()
     {
         var repository = Substitute.For<IEventSessionRepository>();
-        var mapper = Substitute.For<IMapper>();
         var disclosureService = new RecordingDisclosureService();
         EventSession session = CreateSession(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
-        var mapped = new EventSessionDto
-        {
-            Id = session.Id,
-            EventId = session.EventId,
-            EventTitle = "Public event"
-        };
         repository.GetPublicSessionWithDetailsAsync(session.Id, Arg.Any<CancellationToken>()).Returns(session);
-        mapper.Map<EventSessionDto>(session).Returns(mapped);
-        var handler = new GetEventSessionDetailsRequestHandler(repository, mapper, disclosureService);
+        var handler = new GetEventSessionDetailsRequestHandler(repository, disclosureService);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
@@ -373,7 +295,6 @@ public sealed class PublicEventLocationProjectionTests
                 new GetEventSessionDetailsRequest { Id = session.Id },
                 cancellation.Token))
             .Throws<OperationCanceledException>();
-        await Assert.That(mapped.EventLocation).IsNull();
         await Assert.That(disclosureService.Calls).IsEmpty();
     }
 
@@ -383,11 +304,11 @@ public sealed class PublicEventLocationProjectionTests
         Guid roomId,
         EventLocation? eventLocation = null)
     {
-        EventSession session = DataBuilder.EventSession.Generate();
-        session.EventId = eventId;
-        session.TenantId = tenantId;
-        session.Event = null!;
-        session.Tenant = null!;
+        var session = new EventSession
+        {
+            Id = Guid.Parse("01900000-0000-7000-8000-000000000011"),
+            EventId = eventId, TenantId = tenantId, Event = null!, Tenant = null!, Title = "Public session"
+        };
         session.StartTime = new DateTimeOffset(2026, 7, 20, 9, 0, 0, TimeSpan.Zero);
         session.EndTime = session.StartTime.Value.AddHours(1);
         session.ReprojectLocalTimes("UTC", new EventScheduleProjectionCalculator());
@@ -398,7 +319,9 @@ public sealed class PublicEventLocationProjectionTests
             Guid.NewGuid(),
             DateTime.UtcNow);
         session.AssignEventLocation(eventLocation);
+        session.Location = PrivateLocation();
         session.RoomId = roomId;
+        session.Room = new LocationRoom { Name = "Private room canary", Location = session.Location, Tenant = null! };
         return session;
     }
 
@@ -420,7 +343,9 @@ public sealed class PublicEventLocationProjectionTests
             Guid.NewGuid(),
             Guid.NewGuid(),
             DateTime.UtcNow));
+        group.Location = PrivateLocation();
         group.RoomId = roomId;
+        group.Room = new LocationRoom { Name = "Private room canary", Location = group.Location, Tenant = null! };
         return group;
     }
 
@@ -452,13 +377,27 @@ public sealed class PublicEventLocationProjectionTests
     private static EventSessionAgendaItem CreateSessionAgendaItem(Guid tenantId, Guid eventId)
     {
         EventSession session = CreateSession(tenantId, eventId, Guid.NewGuid());
-        EventSessionAgendaItem item = DataBuilder.EventSessionAgendaItem.Generate();
-        item.EventSessionId = session.Id;
-        item.EventSession = session;
-        item.TenantId = tenantId;
-        item.Tenant = null!;
+        var item = new EventSessionAgendaItem
+        {
+            Id = Guid.Parse("01900000-0000-7000-8000-000000000012"),
+            EventSessionId = session.Id, EventSession = session, TenantId = tenantId, Tenant = null!,
+            Title = "Session agenda", StartTime = new DateTimeOffset(2026, 7, 20, 9, 0, 0, TimeSpan.Zero),
+            EndTime = new DateTimeOffset(2026, 7, 20, 9, 30, 0, TimeSpan.Zero)
+        };
         item.AssignEventLocation(session.EventLocation!);
+        item.Location = PrivateLocation();
         return item;
+    }
+
+    private static Location PrivateLocation()
+    {
+        var location = new Location
+        {
+            FullName = "Private venue canary", City = "Private city canary",
+            Country = "Private country canary", Tenant = null!
+        };
+        location.SetManualAddress("Private address canary", "1000");
+        return location;
     }
 
     private static Explore.Domain.Event CreatePublicEvent(Guid tenantId, Guid eventId)

@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionAgendaItem;
 using Explore.Application.Features.EventSessionAgendaItems.Requests.Queries;
@@ -8,8 +8,7 @@ namespace Explore.Application.Features.EventSessionAgendaItems.Handlers.Queries;
 
 public sealed class GetManagedAgendaItemsBySessionRequestHandler(
     IEventSessionRepository sessionRepository,
-    IEventSessionAgendaItemRepository agendaItemRepository,
-    IMapper mapper)
+    IEventSessionAgendaItemRepository agendaItemRepository)
     : IRequestHandler<GetManagedAgendaItemsBySessionRequest, List<EventSessionAgendaItemListDto>?>
 {
     public async Task<List<EventSessionAgendaItemListDto>?> Handle(
@@ -21,7 +20,7 @@ public sealed class GetManagedAgendaItemsBySessionRequestHandler(
             return null;
 
         var items = await agendaItemRepository.GetBySession(request.EventSessionId, cancellationToken);
-        var dtos = mapper.Map<List<EventSessionAgendaItemListDto>>(items);
+        var dtos = items.Select(EventSessionMapper.ToListItem).ToList();
         for (var index = 0; index < dtos.Count; index++)
             dtos[index].LocationFullName = items[index].Location?.FullName;
 

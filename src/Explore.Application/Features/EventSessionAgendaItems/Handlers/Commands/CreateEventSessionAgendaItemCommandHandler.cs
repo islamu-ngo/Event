@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionAgendaItem.Validators;
@@ -22,7 +21,6 @@ public class CreateEventSessionAgendaItemCommandHandler : IRequestHandler<Create
     private readonly ITenantContext _tenantContext;
     private readonly IUnitOfWork _unitOfWork;
     private readonly EventLocationAttachmentService _eventLocationAttachmentService;
-    private readonly IMapper _mapper;
 
     public CreateEventSessionAgendaItemCommandHandler(
         IEventSessionAgendaItemRepository agendaItemRepository,
@@ -30,8 +28,7 @@ public class CreateEventSessionAgendaItemCommandHandler : IRequestHandler<Create
         ILocationRepository locationRepository,
         ITenantContext tenantContext,
         IUnitOfWork unitOfWork,
-        EventLocationAttachmentService eventLocationAttachmentService,
-        IMapper mapper)
+        EventLocationAttachmentService eventLocationAttachmentService)
     {
         _agendaItemRepository = agendaItemRepository;
         _eventSessionRepository = eventSessionRepository;
@@ -39,7 +36,6 @@ public class CreateEventSessionAgendaItemCommandHandler : IRequestHandler<Create
         _tenantContext = tenantContext;
         _unitOfWork = unitOfWork;
         _eventLocationAttachmentService = eventLocationAttachmentService;
-        _mapper = mapper;
     }
 
     public async Task<BaseCommandResponse<Guid>> Handle(CreateEventSessionAgendaItemCommand request, CancellationToken cancellationToken)
@@ -54,7 +50,19 @@ public class CreateEventSessionAgendaItemCommandHandler : IRequestHandler<Create
                 "Agenda item creation failed.");
         }
 
-        var agendaItem = _mapper.Map<EventSessionAgendaItem>(request.AgendaItemDto);
+        // Only business fields are copied; the checked parent and location attachment are resolved below.
+        var input = request.AgendaItemDto;
+        var agendaItem = new EventSessionAgendaItem
+        {
+            EventSessionId = input.EventSessionId,
+            EventSession = null!,
+            Tenant = null!,
+            StartTime = input.StartTime,
+            EndTime = input.EndTime,
+            Title = input.Title,
+            Description = input.Description,
+            LocationId = input.LocationId
+        };
 
         // Set TenantId from the request context
         agendaItem.TenantId = _tenantContext.TenantId;

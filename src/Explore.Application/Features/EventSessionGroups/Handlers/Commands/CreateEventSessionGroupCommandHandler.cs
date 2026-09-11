@@ -1,4 +1,3 @@
-using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionGroup.Validators;
 using Explore.Application.Features.EventSessionGroups.Requests.Commands;
@@ -17,7 +16,6 @@ public class CreateEventSessionGroupCommandHandler : IRequestHandler<CreateEvent
     private readonly ILocationRoomRepository _locationRoomRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly EventLocationAttachmentService _eventLocationAttachmentService;
-    private readonly IMapper _mapper;
 
     public CreateEventSessionGroupCommandHandler(
         IEventSessionGroupRepository eventSessionGroupRepository,
@@ -25,8 +23,7 @@ public class CreateEventSessionGroupCommandHandler : IRequestHandler<CreateEvent
         ILocationRepository locationRepository,
         ILocationRoomRepository locationRoomRepository,
         IUnitOfWork unitOfWork,
-        EventLocationAttachmentService eventLocationAttachmentService,
-        IMapper mapper)
+        EventLocationAttachmentService eventLocationAttachmentService)
     {
         _eventSessionGroupRepository = eventSessionGroupRepository;
         _eventRepository = eventRepository;
@@ -34,7 +31,6 @@ public class CreateEventSessionGroupCommandHandler : IRequestHandler<CreateEvent
         _locationRoomRepository = locationRoomRepository;
         _unitOfWork = unitOfWork;
         _eventLocationAttachmentService = eventLocationAttachmentService;
-        _mapper = mapper;
     }
 
     public async Task<BaseCommandResponse<Guid>> Handle(CreateEventSessionGroupCommand request, CancellationToken cancellationToken)
@@ -68,8 +64,23 @@ public class CreateEventSessionGroupCommandHandler : IRequestHandler<CreateEvent
                 "Event session group creation failed.");
         }
 
-        var group = _mapper.Map<EventSessionGroup>(request.EventSessionGroup);
-        group.TenantId = parentEvent.TenantId;
+        // Identity, tenant, audit and relationship state are not client-mapped.
+        var input = request.EventSessionGroup;
+        var group = new EventSessionGroup
+        {
+            EventId = input.EventId,
+            Event = null!,
+            Tenant = null!,
+            TenantId = parentEvent.TenantId,
+            Name = input.Name,
+            Slug = input.Slug,
+            Description = input.Description,
+            LocationId = input.LocationId,
+            RoomId = input.RoomId,
+            Color = input.Color,
+            SortOrder = input.SortOrder,
+            IsPublished = input.IsPublished
+        };
 
         group = await _unitOfWork.ExecuteInTransactionAsync(async token =>
         {

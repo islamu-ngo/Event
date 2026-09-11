@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionSpeaker;
 using Explore.Application.Features.EventSessionSpeakers.Requests.Queries;
@@ -13,14 +13,11 @@ namespace Explore.Application.Features.EventSessionSpeakers.Handlers.Queries;
 public class GetEventSessionSpeakerListRequestHandler : IRequestHandler<GetEventSessionSpeakerListRequest, PaginatedResult<EventSessionSpeakerListDto>>
 {
     private readonly IEventSessionSpeakerRepository _speakerRepository;
-    private readonly IMapper _mapper;
 
     public GetEventSessionSpeakerListRequestHandler(
-        IEventSessionSpeakerRepository speakerRepository,
-        IMapper mapper)
+        IEventSessionSpeakerRepository speakerRepository)
     {
         _speakerRepository = speakerRepository;
-        _mapper = mapper;
     }
 
     public async Task<PaginatedResult<EventSessionSpeakerListDto>> Handle(GetEventSessionSpeakerListRequest request, CancellationToken cancellationToken)
@@ -30,7 +27,7 @@ public class GetEventSessionSpeakerListRequestHandler : IRequestHandler<GetEvent
             pageNumber,
             pageSize,
             cancellationToken);
-        var dtos = _mapper.Map<List<EventSessionSpeakerListDto>>(speakers);
+        var dtos = speakers.Select(EventSessionMapper.ToListItem).ToList();
         return PaginatedResult<EventSessionSpeakerListDto>.Create(dtos, totalCount, pageNumber, pageSize);
     }
 }

@@ -1,6 +1,6 @@
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventSession;
@@ -15,16 +15,13 @@ namespace Explore.Application.Features.EventSessions.Handlers.Queries;
 public class GetEventSessionDetailsRequestHandler : IRequestHandler<GetEventSessionDetailsRequest, EventSessionDto?>
 {
     private readonly IEventSessionRepository _eventSessionRepository;
-    private readonly IMapper _mapper;
     private readonly IEventLocationDisclosureService _disclosureService;
 
     public GetEventSessionDetailsRequestHandler(
         IEventSessionRepository eventSessionRepository,
-        IMapper mapper,
         IEventLocationDisclosureService disclosureService)
     {
         _eventSessionRepository = eventSessionRepository;
-        _mapper = mapper;
         _disclosureService = disclosureService;
     }
 
@@ -35,7 +32,6 @@ public class GetEventSessionDetailsRequestHandler : IRequestHandler<GetEventSess
             cancellationToken);
         return await PublicEventSessionLocationProjector.ProjectAsync(
             eventSession,
-            _mapper,
             _disclosureService,
             cancellationToken);
     }
@@ -45,7 +41,6 @@ internal static class PublicEventSessionLocationProjector
 {
     public static async Task<EventSessionDto?> ProjectAsync(
         EventSession? session,
-        IMapper mapper,
         IEventLocationDisclosureService disclosureService,
         CancellationToken cancellationToken)
     {
@@ -59,7 +54,7 @@ internal static class PublicEventSessionLocationProjector
                 disclosureService,
                 [Placement(session)],
                 cancellationToken);
-        EventSessionDto dto = mapper.Map<EventSessionDto>(session);
+        EventSessionDto dto = EventSessionMapper.ToDetail(session);
         ClearLegacyLocation(dto);
         dto.EventLocation = session.EventLocationId is { } eventLocationId
             ? locations.GetValueOrDefault(eventLocationId)
@@ -69,7 +64,6 @@ internal static class PublicEventSessionLocationProjector
 
     public static async Task<List<EventSessionListDto>> ProjectAsync(
         IReadOnlyCollection<EventSession> sessions,
-        IMapper mapper,
         IEventLocationDisclosureService disclosureService,
         CancellationToken cancellationToken)
     {
@@ -78,7 +72,7 @@ internal static class PublicEventSessionLocationProjector
                 disclosureService,
                 sessions.Select(Placement),
                 cancellationToken);
-        List<EventSessionListDto> dtos = mapper.Map<List<EventSessionListDto>>(sessions);
+        List<EventSessionListDto> dtos = sessions.Select(EventSessionMapper.ToListItem).ToList();
         IReadOnlyDictionary<Guid, EventSession> sessionById = sessions.ToDictionary(session => session.Id);
         foreach (EventSessionListDto dto in dtos)
         {

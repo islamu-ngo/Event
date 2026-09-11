@@ -228,8 +228,8 @@ owns the tenant-binding, ciphertext, expiry and uncertain-consume contract.
 
 ## Request Flow
 1. HTTP request enters the middleware pipeline (exception handling → security headers → correlation ID → logging → compression → HATEOAS → routing → timeouts → auth → rate limiting → authorization → output cache → ETag → idempotency).
-2. Controller receives request, dispatches MediatR command/query.
-3. MediatR pipeline behaviors execute: `PerformanceBehavior` (>500ms warning), `AuthorizationBehavior` (resource-level permission checks via `IAuthorizedRequest` / `[AuthorizeResource]`; uses reflection caching and emits OpenTelemetry activity spans).
+2. Controllers invoke their operation contract. During migration existing requests retain MediatR; native requests use explicitly injected closed command/query handler interfaces, never a generic sender.
+3. Native composition is authorization -> performance -> handler. The remaining MediatR cohort retains `PerformanceBehavior` -> `AuthorizationBehavior`. Both authorization integrations use `RequestAuthorization<TRequest>` and the existing `[AuthorizeResource]`/typed-facts contract.
 4. Handler orchestrates validation (manually instantiated validators), repository calls, mapping.
 5. Persistence layer returns entities; handlers map to DTO/response contracts.
 6. Controller delegates to an `IResourceAssembler<TDto, TListDto>` — by default the generic `HalResourceAssembler<TDto, TListDto>` over `ResourceAssemblerBase` — for HATEOAS HAL wrapping with authorization-aware link generation.
@@ -251,7 +251,7 @@ owns the tenant-binding, ciphertext, expiry and uncertain-consume contract.
 
 ## Authorization Architecture
 1. Endpoint-level auth is handled via ASP.NET attributes/policies. `[AuthorizeResource]` attribute pairs a resource kind with a domain action constant from `AuthorizationActions`.
-2. Resource-level auth is handled in the `AuthorizationBehavior` MediatR pipeline. Checks route to `IAuthorizationProvider` which resolves to Cerbos PDP or local fallback.
+2. `RequestAuthorization<TRequest>` owns resource-level evaluation for native authorization decorators and the remaining `AuthorizationBehavior` MediatR integration. Checks route to `IAuthorizationProvider`, which resolves to Cerbos PDP or local fallback.
 3. `AuthorizationActions` (string constants) and `ResourceKinds` (string constants) form the canonical action/resource catalogs shared by commands, link policies, and Cerbos policies.
 4. `IAuthorizableResourceDescriptor<T>` + `ResourceDescriptors` extract resource metadata (kind, id, attributes, scope) from DTOs — eliminating manual attribute dictionaries in HATEOAS link policies.
 5. HATEOAS capability planning uses a 4-phase pipeline: candidate links → normalized `AuthorizationCheck` with dedup key → batch evaluate unique checks → map decisions back to links. Fail-closed on batch failure.
@@ -309,12 +309,24 @@ No PostGIS extension, spatial entity/index, proximity endpoint, or readiness che
 3. **ETag Middleware** (conditional requests): RecyclableMemoryStream-based, SHA256 weak ETags on JSON/HAL responses, returns `304 Not Modified`. Skips bodies larger than 256KB.
 
 ## MediatR Pipeline Behaviors
-1. `PerformanceBehavior` — logs any request taking >500ms as a warning.
-2. `AuthorizationBehavior` — checks `IAuthorizedRequest` interface or `[AuthorizeResource]` attribute. Optionally enhanced by `ISecureRequest` for dynamic resource context. Throws `AuthorizationException` on deny. Uses `ConcurrentDictionary` reflection caching for attribute lookups and emits activity spans via the `Explore.Authorization` ActivitySource for distributed tracing.
+The remaining MediatR cohort retains its performance-then-authorization registration order. `AuthorizationBehavior` delegates to the shared evaluator described below; there is no `IAuthorizedRequest` contract.
+
+## Protected Native Operations
+`Explore.Application.Contracts.Operations` defines void commands (`Task ExecuteAsync`), result commands (`Task<TResult> ExecuteAsync`), queries (`Task<TResult> QueryAsync`), and typed notifications (`Task HandleAsync`). Requests implement exactly one operation shape. This foundation converts no product capability. Notification consumers are explicitly composed by their owning migration, not discovered as an event bus.
+
+`OperationServicesRegistration` scans Application once, registers scoped concrete owners and closed decorated interfaces, and caches wrapper factories during registration. Every native operation resolves as authorization -> performance -> business handler. Existing concrete service aliases retain their scoped owner. Validators remain manual; transactions and durable outbox writes remain handler-owned. Consumers must inject closed interfaces rather than concrete handlers or service locators.
+
+`RequestAuthorization<TRequest>` caches the attribute per closed request type and preserves request facts -> optional typed enricher -> persisted-resource resolver -> capability catalog -> provider ordering. Existing unannotated public, worker and handler-owned authorities retain their reviewed enforcement; universal decorator presence does not invent a universal PDP requirement. Ordinary denial throws `AuthorizationException`; provider unavailability throws `AuthorizationProviderUnavailableException`. Authorization emits existing `Explore.Authorization` spans and safe decision metadata.
+
+Native timing intentionally excludes authorization. Invocation-local timestamps use `TimeProvider.System`'s monotonic Stopwatch clock; successful calls exceeding 500ms log only request type and elapsed milliseconds. Denied, failed and cancelled operations produce no successful timing warning. No allocation, throughput or cold-start latency claim is made.
+
+The API and standalone shared host composition validate final descriptors after all modules and test substitutions, rejecting missing, duplicate, open-generic or late raw native entries. Microsoft DI scope/build validation covers inspectable registrations; it does not prove open-generic or opaque factory graphs. A scoped native construction guard detects reentry through aliases and clears its state in `finally`, with bounded type-only errors. It does not analyze cycles wholly inside unrelated opaque factories.
+
+Before migrations, setup, workers or traffic, normal and Testing startup perform cached constructor-parameter availability checks without constructing the operation graph. OpenAPI validates descriptors only because its runtime dependencies are intentionally absent. CI calls `ValidateNativeOperationsDeepAsync` against the actual final provider in a disposable scope, resolving every closed native handler without calling business operations. Constructors must remain free of network and business side effects.
 
 ## Contract Value Semantics
 
-Handwritten immutable contracts follow the [canonical record-selection policy](GOVERNANCE.md#canonical-record-selection-policy); [RECORD_CONTRACTS.md](RECORD_CONTRACTS.md) is the contributor implementation guide. Concrete Application MediatR requests, immutable DTO/payload snapshots, valid-state command results, and structurally eligible generated browser response/value contracts use record semantics. EF entities, persisted outbox lifecycle rows, generated protocol inputs and HAL/inherited/file/exception shapes, and Blazor edit/component state remain classes. This is a shallow immutability boundary: every published collection-bearing handwritten record exposes a read-only/immutable shape and copies mutable input, while generated records preserve NSwag collection shapes and keep only System.Text.Json extension data settable.
+Handwritten immutable contracts follow the [canonical record-selection policy](GOVERNANCE.md#canonical-record-selection-policy); [RECORD_CONTRACTS.md](RECORD_CONTRACTS.md) is the contributor implementation guide. Concrete Application native and remaining MediatR requests, immutable DTO/payload snapshots, valid-state command results, and structurally eligible generated browser response/value contracts use record semantics. EF entities, persisted outbox lifecycle rows, generated protocol inputs and HAL/inherited/file/exception shapes, and Blazor edit/component state remain classes. This is a shallow immutability boundary: every published collection-bearing handwritten record exposes a read-only/immutable shape and copies mutable input, while generated records preserve NSwag collection shapes and keep only System.Text.Json extension data settable.
 
 NSwag remains the sole OpenAPI-to-C# source generator. `Explore.Blazor.Client` applies the repository-owned SDK-Roslyn transformer before final byte normalization; it adds no package dependency or copied template and produces byte-identical output for identical input. `GeneratedClientRecordArchitectureTests` ratchets the compiled record/init surface and exact mutable-class manifest alongside the cross-layer `PublishedCollectionContractArchitectureTests`.
 

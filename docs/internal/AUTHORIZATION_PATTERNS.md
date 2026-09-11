@@ -1,40 +1,32 @@
-ABOUTME: Defines the three authorization request patterns used by the MediatR pipeline.
-ABOUTME: Documents provider selection and failure behavior (Cerbos, BYO Cerbos, fallback RBAC).
+> **Scope:** Native operations and remaining MediatR requests; shared authorization facts and provider failure semantics.
 
 # Authorization Patterns
 
-This project enforces fine-grained authorization in `Explore.Application.Behaviors.AuthorizationBehavior<TRequest,TResponse>`.
+`Explore.Application.Authorization.RequestAuthorization<TRequest>` owns evaluation for native operation decorators and the remaining `AuthorizationBehavior<TRequest,TResponse>` integration.
 
 ## Enforcement Point
 
 - Requests are checked before handlers execute.
 - Denials throw `AuthorizationException`.
 - `Explore.API.ExceptionHandling.GlobalExceptionHandler` maps `AuthorizationException` to HTTP `403 Forbidden`.
-- Registered pipeline order is:
-  - `PerformanceBehavior`
-  - `AuthorizationBehavior`
+- Native order is authorization -> performance -> handler; denial never enters timing.
+- Remaining MediatR order is `PerformanceBehavior` -> `AuthorizationBehavior`.
+- Provider-unavailable decisions throw `AuthorizationProviderUnavailableException`, distinct from ordinary denial.
 - There is no global validation pipeline behavior in current registration; validators are used from handlers/services.
 
 ## Request Patterns
 
-1. `IAuthorizedRequest`
-   - use when resource kind/action/id are request-dependent.
-   - required fields: `ResourceKind`, `ResourceId`, `Action` (optional attributes).
-   - behavior reads all values directly from request instance.
-2. `[AuthorizeResource]`
-   - use when resource kind/action are static.
-   - required data: attribute values only.
-   - behavior defaults resource ID to request type name.
-3. `[AuthorizeResource]` + `ISecureRequest`
-   - use when kind/action are static but ID or attributes are runtime values.
-   - required data: attribute + optional `ResourceId`/`ResourceAttributes`.
-   - behavior prefers dynamic values from `ISecureRequest`; falls back when missing.
+1. `[AuthorizeResource]`: fixed catalog resource/action, with request type name as the default resource ID.
+2. `[AuthorizeResource]` + `ISecureRequest`: optional resource ID and typed `AuthorizationFacts` supplied by the request.
+3. Optional `IAuthorizationContextEnricher<TRequest>`: resolves typed context before `AuthorizationResourceContextResolver` replaces it with persisted facts wherever supported. Caller or enricher facts do not override persisted authority.
+
+There is no `IAuthorizedRequest` or caller-authored policy dictionary. Unannotated requests retain their exact reviewed public, capability-token, worker or handler-owned enforcement from [AUTHORIZATION.md](AUTHORIZATION.md#reviewed-handler-and-worker-authorities); do not add blanket bypass flags or arbitrary exception inventories.
 
 ## How To Choose
 
 1. Fixed resource kind and no instance-specific context: `[AuthorizeResource]`
 2. Fixed kind but policy depends on entity ID/attributes: `[AuthorizeResource]` + `ISecureRequest`
-3. Fully dynamic kind/action/id from request state: `IAuthorizedRequest`
+3. Persisted resource or feature-owned context: add a typed enricher while retaining the authoritative persisted resolver and fixed catalog capability.
 
 ## Provider Resolution (Runtime)
 

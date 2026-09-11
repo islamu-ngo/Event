@@ -87,11 +87,12 @@ For authentication, JWT validation, and security-header behavior, see [SECURITY_
 
 ### 3.2. Resource-Level Authorization (MediatR)
 
-This is the core of the fine-grained authorization system, enforced within the MediatR request pipeline.
+The same resource authority protects native operations and the remaining MediatR cohort during migration.
 
--   **Enforcement Point**: `AuthorizationBehavior<TRequest, TResponse>`. This pipeline behavior intercepts CQRS requests before they reach their handlers.
--   **Denial Behavior**: If authorization fails, the behavior throws an `AuthorizationException`. This is caught by the `GlobalExceptionHandler`, which returns an HTTP `403 Forbidden` response.
--   **Trigger Patterns**: The behavior is triggered by decorating CQRS request objects with specific interfaces or attributes. (See Implementation Patterns section below).
+- **Enforcement point:** `RequestAuthorization<TRequest>` is shared by native authorization decorators and `AuthorizationBehavior<TRequest,TResponse>`. Native void commands, result commands and queries are always wrapped, with authorization outside timing.
+- **Trust ordering:** `[AuthorizeResource]` selects the catalog capability; `ISecureRequest` supplies optional typed facts; a typed enricher may refine context; the persisted-resource resolver has final authority before the provider call.
+- **Failure behavior:** ordinary denial throws `AuthorizationException` (HTTP 403); provider-unavailable decisions throw `AuthorizationProviderUnavailableException` with the existing distinct unavailable response. Neither reaches the business operation.
+- **Composition:** final descriptor validation rejects raw native replacements; runtime startup checks cached parameter metadata, while CI deeply resolves the actual provider in disposable scopes. See [Protected Native Operations](ARCHITECTURE.md#protected-native-operations).
 
 ### Reviewed Handler And Worker Authorities
 
@@ -439,19 +440,13 @@ Paid-event policy settings follow the settings boundary: instance `view`/`update
 
 ### 6.1. CQRS Authorization Patterns
 
-Authorization is triggered in the MediatR pipeline based on one of three patterns applied to a command or query request class.
+Native decorators and the remaining MediatR behavior use the same request contract:
 
-1.  **`IAuthorizedRequest` Interface**:
-    -   **Use When**: The resource kind, ID, and action are dynamic and depend on the request's properties.
-    -   **Implementation**: The request class implements `IAuthorizedRequest` and provides the `ResourceKind`, `ResourceId`, and `Action`.
+1. `[AuthorizeResource(ResourceKind, Action)]` declares the fixed catalog capability.
+2. Optional `ISecureRequest.ResourceId` and `AuthorizationFacts` provide typed initial context.
+3. Optional `IAuthorizationContextEnricher<TRequest>` resolves feature context before `AuthorizationResourceContextResolver` applies persisted-resource authority.
 
-2.  **`[AuthorizeResource]` Attribute**:
-    -   **Use When**: The resource kind and action are static for all requests of this type.
-    -   **Implementation**: The request class is decorated with `[AuthorizeResource(ResourceKind, Action)]`.
-
-3.  **`[AuthorizeResource]` Attribute + `ISecureRequest` Interface**:
-    -   **Use When**: The resource kind and action are static, but the resource ID or other attributes needed for the policy are determined at runtime.
-    -   **Implementation**: A combination of the attribute and the interface. The behavior prefers the dynamic values from `ISecureRequest` at runtime.
+There is no `IAuthorizedRequest` contract. An unannotated request is not newly granted authority: its reviewed handler, public capability or worker boundary remains responsible, and compiled native-aware discovery rejects new unclassified mutations.
 
 Notification preference organization and group queries/commands use this pattern with `ResourceKinds.Organization` or `ResourceKinds.Group` and `AuthorizationActions.View`/`AuthorizationActions.Update`. Current-user preference endpoints are authenticated user-self endpoints; organization/group preference endpoints still pass through the resource authorization pipeline before handlers run.
 

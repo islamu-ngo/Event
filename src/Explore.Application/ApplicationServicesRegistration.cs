@@ -453,6 +453,7 @@ public static class ApplicationServicesRegistration
         // Appearance resolution and palette generation
         services.AddScoped<IAppearanceResolutionService, AppearanceResolutionService>();
 
+        services.AddNativeOperations();
         return services;
     }
 }

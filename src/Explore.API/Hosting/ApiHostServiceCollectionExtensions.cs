@@ -18,6 +18,7 @@ using Explore.Application.Features.Events.OpenGraph;
 using Explore.Application.Features.OrganizerPaymentConnections;
 using Explore.Application.Services.Webhooks;
 using Explore.Application.Telemetry;
+using Explore.Application.Operations;
 using Explore.Infrastructure;
 using Explore.Infrastructure.Geocoding;
 using Explore.Infrastructure.HealthChecks;
@@ -52,6 +53,29 @@ public sealed record ApiHostCompositionState(
 
 public static class ApiHostServiceCollectionExtensions
 {
+    /// <summary>Validates the final service collection, including later standalone and test modules.</summary>
+    public static void ConfigureNativeOperationValidation(this WebApplicationBuilder builder, bool isOpenApiGeneration)
+    {
+        builder.Host.UseServiceProviderFactory(new NativeOperationServiceProviderFactory(isOpenApiGeneration));
+    }
+
+    private sealed class NativeOperationServiceProviderFactory(bool isOpenApiGeneration) : IServiceProviderFactory<IServiceCollection>
+    {
+        private readonly DefaultServiceProviderFactory _factory = new(new ServiceProviderOptions
+        {
+            ValidateScopes = true,
+            ValidateOnBuild = !isOpenApiGeneration
+        });
+
+        public IServiceCollection CreateBuilder(IServiceCollection services) => _factory.CreateBuilder(services);
+
+        public IServiceProvider CreateServiceProvider(IServiceCollection containerBuilder)
+        {
+            containerBuilder.ValidateNativeOperationRegistrations();
+            return _factory.CreateServiceProvider(containerBuilder);
+        }
+    }
+
     public static ApiHostCompositionState AddApiHostServices(
         this WebApplicationBuilder builder,
         Func<bool> isShuttingDown,
@@ -61,6 +85,7 @@ public static class ApiHostServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(isShuttingDown);
 
         var isOpenApiGeneration = OpenApiGenerationMode.IsBuildTimeGeneration;
+        builder.ConfigureNativeOperationValidation(isOpenApiGeneration);
 
         builder.WebHost.ConfigureKestrel(options =>
         {

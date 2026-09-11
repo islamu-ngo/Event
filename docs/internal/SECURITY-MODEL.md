@@ -685,18 +685,19 @@ Forwarded-host trust for direct API traffic:
 Server-side enforcement is layered:
 
 1. API endpoint-level attributes (`[AllowAnonymous]`, `[Authorize]`).
-2. Application MediatR pipeline `AuthorizationBehavior`:
-   - Checks `IAuthorizedRequest` interface — commands/queries declare required permissions.
-   - Checks `[AuthorizeResource]` attribute — declarative resource-level authorization.
-   - Optionally enhanced by `ISecureRequest` — provides dynamic resource context for fine-grained permission evaluation.
+2. Application `RequestAuthorization<TRequest>`, shared by native operation authorization decorators and the remaining MediatR `AuthorizationBehavior`:
+   - Checks `[AuthorizeResource]` for the fixed catalog resource/action; there is no `IAuthorizedRequest` contract.
+   - Resolves `ISecureRequest` typed facts, then optional typed enrichment, then authoritative persisted-resource overrides.
+   - Native void commands, result commands and queries all resolve behind authorization, outside performance timing. Existing exact public, capability and worker authorities remain owner-enforced.
 3. Runtime provider (`RuntimeAuthorizationProvider`) deciding Cerbos vs fallback.
 
 See [AUTHORIZATION.md](AUTHORIZATION.md) for the full provider model, request patterns, and role boundary details.
 
 Hard deny behavior:
 
-- `AuthorizationBehavior` throws `AuthorizationException` on deny.
-- API global exception handler returns HTTP `403 Forbidden` via RFC 7807 ProblemDetails.
+- The shared evaluator throws `AuthorizationException` on ordinary denial and `AuthorizationProviderUnavailableException` on provider unavailability; no protected business operation executes in either case.
+- API exception handling retains distinct forbidden and unavailable RFC 7807 responses.
+- Final native DI descriptors reject raw replacements. Scope-local construction guards reject native reentry through opaque aliases with bounded type-only errors and `finally` cleanup. Production preflight checks metadata without running operations; CI resolves complete native graphs in disposable scopes. See [native composition](ARCHITECTURE.md#protected-native-operations).
 
 Paid-event publication repeats its policy, organizer, connection, currency, disclosure, and commerce-authority checks in the server-side publish transaction; browser preflight is advisory UI state only. The organizer payment connection and policy reads are authenticated `private, no-store` resources. Browser policy responses omit policy and tenant identifiers. Browser-visible connection state is limited to status, merchant country, charge-capability state, requirements state, supported currencies, and readiness timestamp. It must not contain provider, platform, account, tenant, actor, connection, lineage, or evidence identifiers. Hosted onboarding exposes only an absolute HTTP(S) URL and whether an existing connection was reused; return and refresh redirects never assert readiness.
 

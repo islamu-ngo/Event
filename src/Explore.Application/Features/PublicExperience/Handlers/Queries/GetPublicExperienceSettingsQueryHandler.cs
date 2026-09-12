@@ -1,5 +1,5 @@
 using System.Text.Json;
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Analytics;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
@@ -33,7 +33,6 @@ public class GetPublicExperienceSettingsQueryHandler : IRequestHandler<GetPublic
     private readonly IHierarchicalSettingsResolver _hierarchicalSettingsResolver;
     private readonly ITypedSettingsDocumentResolver _typedSettingsDocumentResolver;
     private readonly IFooterLinkGroupRepository _footerLinkGroupRepository;
-    private readonly IMapper _mapper;
     private readonly ITenantDirectoryOperatorReadinessEvaluator _directoryOperatorReadiness;
     private readonly IInstanceOperatorIdentity _instanceOperatorIdentity;
     private readonly IVisitorAccessCapabilityResolver _visitorAccessCapabilityResolver;
@@ -51,7 +50,6 @@ public class GetPublicExperienceSettingsQueryHandler : IRequestHandler<GetPublic
         IHierarchicalSettingsResolver hierarchicalSettingsResolver,
         ITypedSettingsDocumentResolver typedSettingsDocumentResolver,
         IFooterLinkGroupRepository footerLinkGroupRepository,
-        IMapper mapper,
         ITenantDirectoryOperatorReadinessEvaluator directoryOperatorReadiness,
         IInstanceOperatorIdentity instanceOperatorIdentity,
         IVisitorAccessCapabilityResolver visitorAccessCapabilityResolver)
@@ -68,7 +66,6 @@ public class GetPublicExperienceSettingsQueryHandler : IRequestHandler<GetPublic
         _hierarchicalSettingsResolver = hierarchicalSettingsResolver;
         _typedSettingsDocumentResolver = typedSettingsDocumentResolver;
         _footerLinkGroupRepository = footerLinkGroupRepository;
-        _mapper = mapper;
         _directoryOperatorReadiness = directoryOperatorReadiness;
         _instanceOperatorIdentity = instanceOperatorIdentity;
         _visitorAccessCapabilityResolver = visitorAccessCapabilityResolver;
@@ -142,7 +139,7 @@ public class GetPublicExperienceSettingsQueryHandler : IRequestHandler<GetPublic
                 CopyrightText = footerSettingGroup.CopyrightText,
                 ShowCookieSettingsLink = footerSettingGroup.ShowCookieSettingsLink,
             },
-            LinkGroups = _mapper.Map<List<FooterLinkGroupDto>>(footerLinkGroups),
+            LinkGroups = footerLinkGroups.Select(FooterMapper.ToPublicGroup).ToList(),
         };
 
         // Resolve AI assistant availability (enabled + configured API key)

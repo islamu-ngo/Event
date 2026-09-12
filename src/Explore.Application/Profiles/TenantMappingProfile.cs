@@ -1,5 +1,4 @@
 using AutoMapper;
-using Explore.Application.DTOs.Footer;
 using Explore.Application.DTOs.TenantUserRoleGrant;
 using Explore.Domain;
 
@@ -23,15 +22,5 @@ public class TenantMappingProfile : Profile
             .ForMember(dest => dest.RoleName, opt => opt.MapFrom(src => src.Role != null ? src.Role.FullName : null));
         CreateMap<CreateTenantUserRoleGrantDto, TenantUserRoleGrant>();
 
-        CreateMap<TenantFooterLink, FooterLinkItemDto>();
-
-        CreateMap<TenantFooterLinkGroup, FooterLinkGroupDto>()
-            .ForMember(d => d.Links, opt => opt.MapFrom(s => s.Links));
-
-        CreateMap<TenantFooterLinkGroup, FooterLinkGroupListDto>()
-            .ForMember(d => d.LinkCount, opt => opt.MapFrom(s => s.Links.Count));
-
-        CreateMap<TenantFooterLinkGroup, FooterLinkGroupDetailsDto>()
-            .ForMember(d => d.Links, opt => opt.MapFrom(s => s.Links));
     }
 }

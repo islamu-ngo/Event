@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Footer;
@@ -10,8 +10,7 @@ namespace Explore.Application.Features.Footer.Handlers.Queries;
 
 public sealed class GetFooterLinkGroupDetailsQueryHandler(
     IFooterLinkGroupRepository footerLinkGroupRepository,
-    ITenantContext tenantContext,
-    IMapper mapper)
+    ITenantContext tenantContext)
     : IRequestHandler<GetFooterLinkGroupDetailsQuery, FooterLinkGroupDetailsDto>
 {
     public async Task<FooterLinkGroupDetailsDto> Handle(
@@ -22,6 +21,6 @@ public sealed class GetFooterLinkGroupDetailsQueryHandler(
         if (group is null || group.TenantId != tenantContext.TenantId)
             throw new NotFoundException(nameof(group), request.GroupId);
 
-        return mapper.Map<FooterLinkGroupDetailsDto>(group);
+        return FooterMapper.ToDetail(group);
     }
 }

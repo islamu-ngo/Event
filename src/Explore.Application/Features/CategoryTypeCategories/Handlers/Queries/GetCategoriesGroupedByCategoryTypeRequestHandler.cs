@@ -3,12 +3,12 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Category;
 using Explore.Application.DTOs.CategoryType;
 using Explore.Application.Features.CategoryTypeCategories.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.CategoryTypeCategories.Handlers.Queries;
 
 public class GetCategoriesGroupedByCategoryTypeRequestHandler
-    : IRequestHandler<GetCategoriesGroupedByCategoryTypeRequest, List<CategoryTypeWithCategoriesDto>>
+    : IQueryHandler<GetCategoriesGroupedByCategoryTypeRequest, List<CategoryTypeWithCategoriesDto>>
 {
     private readonly ICategoryTypeCategoriesRepository _repository;
 
@@ -17,7 +17,7 @@ public class GetCategoriesGroupedByCategoryTypeRequestHandler
         _repository = repository;
     }
 
-    public async Task<List<CategoryTypeWithCategoriesDto>> Handle(
+    public async Task<List<CategoryTypeWithCategoriesDto>> QueryAsync(
         GetCategoriesGroupedByCategoryTypeRequest request, CancellationToken cancellationToken)
     {
         var groups = await _repository.GetAllCategoriesGroupedByCategoryType();

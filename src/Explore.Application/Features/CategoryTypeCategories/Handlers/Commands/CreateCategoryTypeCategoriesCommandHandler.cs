@@ -4,11 +4,11 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.CategoryTypeCategories.Validators;
 using Explore.Application.Features.CategoryTypeCategories.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.CategoryTypeCategories.Handlers.Commands;
 
-public class CreateCategoryTypeCategoriesCommandHandler : IRequestHandler<CreateCategoryTypeCategoriesCommand, BaseCommandResponse<Guid>>
+public class CreateCategoryTypeCategoriesCommandHandler : ICommandHandler<CreateCategoryTypeCategoriesCommand, BaseCommandResponse<Guid>>
 {
     private readonly ICategoryTypeCategoriesRepository _repository;
     private readonly ICategoryRepository _categoryRepository;
@@ -27,7 +27,7 @@ public class CreateCategoryTypeCategoriesCommandHandler : IRequestHandler<Create
         _tenantContext = tenantContext;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateCategoryTypeCategoriesCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateCategoryTypeCategoriesCommand request, CancellationToken cancellationToken)
     {
         var validator = new CreateCategoryTypeCategoriesDtoValidator(_categoryRepository, _categoryTypeRepository, _repository);
         var validationResult = await validator.ValidateAsync(request.CategoryTypeCategoriesDto, cancellationToken);

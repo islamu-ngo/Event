@@ -5,7 +5,6 @@ using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.CategoryType;
 using Explore.Application.Features.CategoryTypeCategories.Requests.Queries;
 using Explore.Application.Features.CategoryTypes.Requests.Queries;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -19,7 +18,7 @@ namespace Explore.API.Controllers;
 public class CategoryTypeController(
     IQueryHandler<GetCategoryTypeListRequest, List<CategoryTypeListDto>> categoryTypes,
     IQueryHandler<GetCategoryTypeDetailsRequest, CategoryTypeDto?> categoryTypeDetails,
-    IMediator mediator) : ControllerBase
+    IQueryHandler<GetCategoriesGroupedByCategoryTypeRequest, List<CategoryTypeWithCategoriesDto>> groupedCategories) : ControllerBase
 {
 
     // GET: api/categorytype
@@ -51,7 +50,7 @@ public class CategoryTypeController(
     [ProducesResponseType(typeof(List<CategoryTypeWithCategoriesDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<List<CategoryTypeWithCategoriesDto>>> GetWithCategories(CancellationToken cancellationToken = default)
     {
-        var result = await mediator.Send(new GetCategoriesGroupedByCategoryTypeRequest(), cancellationToken);
+        var result = await groupedCategories.QueryAsync(new GetCategoriesGroupedByCategoryTypeRequest(), cancellationToken);
         return Ok(result);
     }
 }

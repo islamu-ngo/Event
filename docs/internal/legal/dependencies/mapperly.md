@@ -3,7 +3,22 @@
 > **Audience:** Contributors | Maintainers | Distribution reviewers
 > **Owner:** Contributor Experience
 > **Reviewed:** 2026-09-11
-> **Scope:** Subscription mapping pilot; no native CQS or edition migration
+> **Scope:** Application DTO projections; native CQS and remaining MediatR edition policy are separately owned
+
+## Runtime Mapping Retirement
+
+All former Application AutoMapper profile families now use repository-native
+static projections with Mapperly-generated implementations or explicit
+handler-owned input allowlists. AutoMapper registration, unused constructor
+dependencies, package pins and the empty profile namespace are removed.
+Regenerated locks remove its dependency edges; compiled-reference and service
+registration guards replace the obsolete vendor depth-limit check.
+
+The exact AutoMapper license override and vulnerability exception are also
+removed. The vulnerability validator rejects the formerly suppressed advisory
+instead of relying on a runtime mapping-depth ceiling. MediatR remains separately
+tracked until its request and caller migration is complete. The pilot evidence
+below is historical admission evidence, not the current dependency inventory.
 
 ## Admission
 
@@ -30,7 +45,7 @@ does not relicense Mapperly or confer rights in third-party material.
 Any distribution containing Mapperly or covered upstream material must include
 the Apache-2.0 license, retain applicable copyright and attribution notices, and
 carry any applicable upstream NOTICE. Modified upstream files require change
-notices. No upstream files are modified by this pilot.
+notices. No upstream files are modified by this migration.
 
 Apache-2.0 includes a contributor patent grant with patent-litigation termination,
 does not grant trademark rights, and includes warranty and liability limitations.
@@ -48,8 +63,8 @@ this document is an admission record, not a substitute for a distributed license
 ## Generated Output
 
 Mapperly generates mapping implementations during compilation; generated files
-belong under `obj`, not in source control. The authoring inputs and scalar
-contracts in this pilot are repository-native. No third-party implementation
+belong under `obj`, not in source control. The authoring inputs and bounded DTO
+contracts are repository-native. No third-party implementation
 source, test, or expressive design was used to author them.
 
 The official introduction establishes the build-time role and absence of a
@@ -81,9 +96,8 @@ resolution remain the authority for visibility; mapping grants no access.
 - No reverse mapping, aggregate mutation, private-setter access, generic mapper
   service, recursive cloning or authorization/configuration change is introduced.
 
-The exhausted subscription AutoMapper profile is removed with both consumers.
-The ten other live profile families and MediatR remain until their own bounded
-migrations; this is not a fallback path for subscription mapping.
+The exhausted subscription AutoMapper profile was removed with both consumers.
+The remaining mapping families have since migrated; no AutoMapper fallback remains.
 
 ## Source Register And Independent Design
 
@@ -113,7 +127,7 @@ consumers, tests, generated output and package evidence and approved the pilot
 with no remaining findings. The separately captured list Red closes the initial
 detail-first assertion gap. This engineering admission is not legal certification.
 
-## Verification Evidence
+## Historical Pilot Verification Evidence
 
 - Application restore passed and changed only its `packages.lock.json`, adding
   the direct package without transitive dependencies.

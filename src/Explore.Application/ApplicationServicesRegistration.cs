@@ -1,5 +1,4 @@
 using System.Reflection;
-using AutoMapper.Internal;
 using Explore.Application.Analytics;
 using Explore.Application.Authorization;
 using Explore.Application.Behaviors;
@@ -108,30 +107,11 @@ public static class ApplicationServicesRegistration
             }, "Privacy-erasure lifecycle settings are invalid.")
             .ValidateOnStart();
 
-        services.AddAutoMapper(cfg =>
-        {
-#if USE_COMMERCIAL_LUCKYPENNY_LIBS
-            // AutoMapper 15+ requires a Lucky Penny commercial license key at runtime.
-            // Injected from Infisical /api folder: LUCKYPENNY_LICENSE_KEY → Licensing:LuckyPenny:LicenseKey.
-            // No throw here: the OpenAPI doc generator runs Program.Main at build time without secrets.
-            // Lucky Penny libraries themselves enforce licensing at runtime.
-            var licenseKey = configuration["Licensing:LuckyPenny:LicenseKey"];
-            if (!string.IsNullOrEmpty(licenseKey))
-            {
-                cfg.LicenseKey = licenseKey;
-            }
-#endif
-            // Bound every map traversal in the FOSS line to mitigate CVE-2026-32933.
-            // The same ceiling is defense in depth for commercial vendor-patched builds.
-            cfg.Internal().ForAllMaps((_, mapping) => mapping.MaxDepth(64));
-            cfg.AddMaps(Assembly.GetExecutingAssembly());
-        });
-
         services.AddMediatR(cfg =>
         {
 #if USE_COMMERCIAL_LUCKYPENNY_LIBS
             // MediatR 13+ requires a Lucky Penny commercial license key at runtime.
-            // Same key as AutoMapper — single LUCKYPENNY_LICENSE_KEY from Infisical.
+            // LUCKYPENNY_LICENSE_KEY is injected from the selected secret authority.
             var licenseKey = configuration["Licensing:LuckyPenny:LicenseKey"];
             if (!string.IsNullOrEmpty(licenseKey))
             {

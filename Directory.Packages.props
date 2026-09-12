@@ -2,35 +2,27 @@
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
 
-    <!-- Dual-versioning: FOSS by default, commercial via build flag.
+    <!-- Remaining MediatR dual-versioning: FOSS by default, commercial via build flag.
          Self-hosters: plain `dotnet build` resolves FOSS versions. No license needed.
          ISLAMU production: `dotnet build -p:UseCommercialLuckyPennyLibraries=true`
-         Lucky Penny commercial licensing starts at AutoMapper 15.0.0+ and MediatR 13.0.0+.
-         Earlier versions remain MIT / Apache-2.0.
-         See docs/DUAL_VERSIONING.md for full details. -->
+         Lucky Penny commercial licensing starts at MediatR 13.0.0+.
+         Earlier versions remain Apache-2.0.
+         See docs/internal/DUAL_VERSIONING.md for full details. -->
     <UseCommercialLuckyPennyLibraries Condition="'$(UseCommercialLuckyPennyLibraries)' == ''">false</UseCommercialLuckyPennyLibraries>
 
-    <!-- Commercial version pins (overridable via MSBuild properties or env vars).
-         Example: dotnet build -p:AutoMapperCommercialVersion=17.0.0 -->
-    <AutoMapperCommercialVersion Condition="'$(AutoMapperCommercialVersion)' == ''">16.1.1</AutoMapperCommercialVersion>
+    <!-- Remaining commercial mediator version pin. -->
     <MediatRCommercialVersion Condition="'$(MediatRCommercialVersion)' == ''">14.1.0</MediatRCommercialVersion>
   </PropertyGroup>
 
-  <!-- FOSS versions (default for self-hosters).
-       AutoMapper 14.0.0 = last MIT-licensed version (⚠️ CVE-2026-32933, security-frozen).
+  <!-- FOSS version (default for self-hosters).
        MediatR 12.5.0 = last Apache-2.0-licensed version. -->
   <ItemGroup Condition="'$(UseCommercialLuckyPennyLibraries)' != 'true'">
-    <PackageVersion Include="AutoMapper" Version="14.0.0" />
     <PackageVersion Include="MediatR" Version="12.5.0" />
-    <!-- CVE-2026-32933 is mitigated by the global MaxDepth ceiling in ApplicationServicesRegistration.
-         Production commercial builds use vendor-patched AutoMapper 16.1.1 instead. -->
-    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-rvv3-g6hj-g44x" />
   </ItemGroup>
 
   <!-- Commercial Lucky Penny versions (ISLAMU production builds).
-       Requires runtime license keys via Licensing:AutoMapper:LicenseKey and Licensing:MediatR:LicenseKey. -->
+       Uses the selected secret authority for Licensing:LuckyPenny:LicenseKey. -->
   <ItemGroup Condition="'$(UseCommercialLuckyPennyLibraries)' == 'true'">
-    <PackageVersion Include="AutoMapper" Version="$(AutoMapperCommercialVersion)" />
     <PackageVersion Include="MediatR" Version="$(MediatRCommercialVersion)" />
   </ItemGroup>
 

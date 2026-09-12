@@ -13,9 +13,8 @@ if (!File.Exists(reportPath))
 
 using var report = JsonDocument.Parse(File.ReadAllText(reportPath));
 var findings = new List<Finding>();
-var suppressedFindings = new List<Finding>();
-Visit(report.RootElement, project: string.Empty, framework: string.Empty, relationship: "Unknown", findings, suppressedFindings);
-WriteSummary(reportPath, findings, suppressedFindings);
+Visit(report.RootElement, project: string.Empty, framework: string.Empty, relationship: "Unknown", findings);
+WriteSummary(reportPath, findings);
 
 if (findings.Count > 0)
 {
@@ -34,7 +33,7 @@ if (findings.Count > 0)
     return 1;
 }
 
-Console.WriteLine($"No unapproved NuGet vulnerabilities detected. Approved suppressed package graphs: {suppressedFindings.Count}.");
+Console.WriteLine("No NuGet vulnerabilities detected.");
 return 0;
 
 static void Visit(
@@ -42,8 +41,7 @@ static void Visit(
     string project,
     string framework,
     string relationship,
-    List<Finding> findings,
-    List<Finding> suppressedFindings)
+    List<Finding> findings)
 {
     switch (node.ValueKind)
     {
@@ -58,10 +56,7 @@ static void Visit(
                 && vulnerabilitiesElement.GetArrayLength() > 0)
             {
                 var vulnerabilities = vulnerabilitiesElement.EnumerateArray().Select(ReadVulnerability).ToList();
-                AddFinding(findings, currentProject, currentFramework, packageId, resolvedVersion, relationship,
-                    vulnerabilities.Where(vulnerability => !IsApprovedSuppression(packageId, resolvedVersion, vulnerability.AdvisoryUrl)).ToList());
-                AddFinding(suppressedFindings, currentProject, currentFramework, packageId, resolvedVersion, relationship,
-                    vulnerabilities.Where(vulnerability => IsApprovedSuppression(packageId, resolvedVersion, vulnerability.AdvisoryUrl)).ToList());
+                AddFinding(findings, currentProject, currentFramework, packageId, resolvedVersion, relationship, vulnerabilities);
             }
 
             foreach (var property in node.EnumerateObject())
@@ -73,7 +68,7 @@ static void Visit(
                     _ => relationship
                 };
 
-                Visit(property.Value, currentProject, currentFramework, childRelationship, findings, suppressedFindings);
+                Visit(property.Value, currentProject, currentFramework, childRelationship, findings);
             }
 
             break;
@@ -81,7 +76,7 @@ static void Visit(
         case JsonValueKind.Array:
             foreach (var item in node.EnumerateArray())
             {
-                Visit(item, project, framework, relationship, findings, suppressedFindings);
+                Visit(item, project, framework, relationship, findings);
             }
 
             break;
@@ -101,13 +96,6 @@ static void AddFinding(
     {
         findings.Add(new Finding(project, framework, packageId, resolvedVersion, relationship, vulnerabilities));
     }
-}
-
-static bool IsApprovedSuppression(string packageId, string resolvedVersion, string advisoryUrl)
-{
-    return packageId.Equals("AutoMapper", StringComparison.OrdinalIgnoreCase)
-        && resolvedVersion.Equals("14.0.0", StringComparison.OrdinalIgnoreCase)
-        && advisoryUrl.Equals("https://github.com/advisories/GHSA-rvv3-g6hj-g44x", StringComparison.OrdinalIgnoreCase);
 }
 
 static Vulnerability ReadVulnerability(JsonElement vulnerability)
@@ -135,7 +123,7 @@ static void WriteConsoleBreakdown(IReadOnlyCollection<Finding> findings)
     }
 }
 
-static void WriteSummary(string reportPath, IReadOnlyList<Finding> findings, IReadOnlyList<Finding> suppressedFindings)
+static void WriteSummary(string reportPath, IReadOnlyList<Finding> findings)
 {
     var summaryPath = Environment.GetEnvironmentVariable("NUGET_VULNERABILITY_SUMMARY_PATH");
     if (string.IsNullOrWhiteSpace(summaryPath))
@@ -150,13 +138,11 @@ static void WriteSummary(string reportPath, IReadOnlyList<Finding> findings, IRe
     builder.AppendLine();
     builder.Append("Actionable vulnerable package graph count: ");
     builder.AppendLine(findings.Count.ToString(CultureInfo.InvariantCulture));
-    builder.Append("Approved suppressed package graph count: ");
-    builder.AppendLine(suppressedFindings.Count.ToString(CultureInfo.InvariantCulture));
     builder.AppendLine();
 
     if (findings.Count == 0)
     {
-        builder.AppendLine("No unapproved vulnerable direct or transitive packages were reported by `dotnet list package --vulnerable`.");
+        builder.AppendLine("No vulnerable direct or transitive packages were reported by `dotnet list package --vulnerable`.");
     }
 
     else
@@ -205,14 +191,6 @@ static void WriteSummary(string reportPath, IReadOnlyList<Finding> findings, IRe
                 builder.AppendLine(vulnerability.AdvisoryUrl);
             }
         }
-    }
-
-    if (suppressedFindings.Count > 0)
-    {
-        builder.AppendLine();
-        builder.AppendLine("### Approved Suppressions");
-        builder.AppendLine();
-        builder.AppendLine("- `AutoMapper` 14.0.0 / `GHSA-rvv3-g6hj-g44x`: global `MaxDepth(64)` mitigation; see `docs/CI_CD_GOVERNANCE.md`.");
     }
 
     File.WriteAllText(summaryPath, builder.ToString());

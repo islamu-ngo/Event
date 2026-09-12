@@ -3,6 +3,16 @@
 
 # Dual-Versioning Strategy
 
+## Current Migration Status
+
+AutoMapper has been removed from Application registration and the restored
+dependency graph. Its version matrix, security-depth mitigation, build override
+and license guidance below are historical and must not be used for current builds.
+The remaining MediatR edition policy still applies until its native-operation
+closure is complete. This guide is retired by the final single-edition migration;
+[Mapperly provenance](legal/dependencies/mapperly.md) owns the current mapping
+dependency contract.
+
 ## 1. Overview
 
 ISLAMU Event uses a **dual-versioning strategy** for Lucky Penny libraries — specifically **AutoMapper** and **MediatR**. These libraries transitioned from permissive open-source licenses to a commercial model under the "Lucky Penny" umbrella.

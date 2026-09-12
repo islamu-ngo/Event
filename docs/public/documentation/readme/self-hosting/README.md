@@ -51,6 +51,14 @@ for the exact runtime matrix and safe switching procedure.
 
 Kubernetes, Helm, ActivityPub infrastructure, first-party PDS/AppView hosting, and initial `linux/arm64` packaging are not implemented deployment options.
 
+## Build-time mapping
+
+DTO mappings are generated during the .NET build. AutoMapper is no longer a
+runtime or restored package dependency, and `AutoMapperCommercialVersion` no
+longer selects a mapping library. No mapping license key or runtime depth setting
+is needed. The remaining MediatR edition and license settings are separate until
+its native-operation migration is complete.
+
 ## Shared production gate
 
 Every path must define durable state, migrations, identity, authorization, tenant binding, secrets, TLS/DNS, health, backups, restore rehearsal, upgrade, and rollback. Continue with [Configuration & Operations](../configuration-and-operations/) after choosing a topology.

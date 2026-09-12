@@ -376,7 +376,6 @@ static class LicensePolicy
 
     internal static readonly Dictionary<string, LicenseOverride> ApprovedOverrides = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["AutoMapper"] = new("RPL-1.5", "temporary exception for existing runtime mapper dependency; replace or obtain legal approval before alternative-license distribution", true),
         ["MediatR"] = new("RPL-1.5", "temporary exception for existing runtime mediator dependency; replace or obtain legal approval before alternative-license distribution", true),
         ["SonarAnalyzer.CSharp"] = new("SONAR-Source-Available-1.0", "build analyzer exception; not shipped with runtime artifacts", true),
         ["Microsoft.VisualStudio.Azure.Containers.Tools.Targets"] = new("Microsoft-EULA", "build tooling exception; not shipped with runtime artifacts", true),

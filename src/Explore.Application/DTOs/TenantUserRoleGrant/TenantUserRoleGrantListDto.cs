@@ -5,8 +5,8 @@ public sealed record TenantUserRoleGrantListDto
     public Guid Id { get; init; }
     public Guid TenantUserId { get; init; }
     public Guid UserId { get; init; }
-    public required string UserEmail { get; init; }
-    public required string UserFullName { get; init; }
+    public required string? UserEmail { get; init; }
+    public required string? UserFullName { get; init; }
     public Guid TenantId { get; init; }
     public required string TenantFullName { get; init; }
     public int RoleId { get; init; }

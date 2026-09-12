@@ -32,6 +32,14 @@ Do not send both. Browser users normally reach the API through the BFF. Direct i
 
 Tenant context is resolved from the request host or `X-Tenant-Slug`; a scoped API key may finalize binding. The server validates this against trusted/persisted authority. Never put an authoritative user or tenant identity in a request body and expect it to override the authenticated context.
 
+## Role-grant identity labels
+
+Role-grant detail and list responses can contain null `userEmail` and
+`userFullName` when profile PII is absent. The schema and generated client now
+describe that existing behavior accurately. Grant and user identifiers remain
+available under the same access rules; a missing label is not an erasure-status
+signal or a change in authority.
+
 ## Version negotiation
 
 Use one of:

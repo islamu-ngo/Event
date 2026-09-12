@@ -178407,12 +178407,10 @@ namespace Explore.Blazor.Client.Clients
         public System.Guid? UserId { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("userEmail")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string UserEmail { get; set; } = default!;
+        public string? UserEmail { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("userFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string UserFullName { get; set; } = default!;
+        public string? UserFullName { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("tenantId")]
         public System.Guid? TenantId { get; set; } = default!;
@@ -178487,12 +178485,10 @@ namespace Explore.Blazor.Client.Clients
         public System.Guid? UserId { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("userEmail")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string UserEmail { get; set; } = default!;
+        public string? UserEmail { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("userFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string UserFullName { get; set; } = default!;
+        public string? UserFullName { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("tenantId")]
         public System.Guid? TenantId { get; set; } = default!;
@@ -198125,12 +198121,10 @@ namespace Explore.Blazor.Client.Clients
         public System.Guid? UserId { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("userEmail")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string UserEmail { get; init; } = default!;
+        public string? UserEmail { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("userFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string UserFullName { get; init; } = default!;
+        public string? UserFullName { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("tenantId")]
         public System.Guid? TenantId { get; init; } = default!;
@@ -198198,12 +198192,10 @@ namespace Explore.Blazor.Client.Clients
         public System.Guid? UserId { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("userEmail")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string UserEmail { get; init; } = default!;
+        public string? UserEmail { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("userFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string UserFullName { get; init; } = default!;
+        public string? UserFullName { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("tenantId")]
         public System.Guid? TenantId { get; init; } = default!;

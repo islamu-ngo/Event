@@ -149218,10 +149218,16 @@
             "format": "uuid"
           },
           "userEmail": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "userFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "tenantId": {
             "type": "string",
@@ -149321,10 +149327,16 @@
             "format": "uuid"
           },
           "userEmail": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "userFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "tenantId": {
             "type": "string",
@@ -172164,10 +172176,16 @@
             "format": "uuid"
           },
           "userEmail": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "userFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "tenantId": {
             "type": "string",
@@ -172253,10 +172271,16 @@
             "format": "uuid"
           },
           "userEmail": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "userFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "tenantId": {
             "type": "string",

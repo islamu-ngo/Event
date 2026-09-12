@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.TenantUserRoleGrant;
 using Explore.Application.Features.TenantUserRoleGrants.Requests.Queries;
@@ -9,12 +9,10 @@ namespace Explore.Application.Features.TenantUserRoleGrants.Handlers.Queries;
 public class GetTenantUserRoleGrantDetailsRequestHandler : IRequestHandler<GetTenantUserRoleGrantDetailsRequest, TenantUserRoleGrantDto?>
 {
     private readonly ITenantUserRoleGrantRepository _tenantUserRoleGrantRepository;
-    private readonly IMapper _mapper;
 
-    public GetTenantUserRoleGrantDetailsRequestHandler(ITenantUserRoleGrantRepository tenantUserRoleGrantRepository, IMapper mapper)
+    public GetTenantUserRoleGrantDetailsRequestHandler(ITenantUserRoleGrantRepository tenantUserRoleGrantRepository)
     {
         _tenantUserRoleGrantRepository = tenantUserRoleGrantRepository;
-        _mapper = mapper;
     }
 
     public async Task<TenantUserRoleGrantDto?> Handle(GetTenantUserRoleGrantDetailsRequest request, CancellationToken cancellationToken)
@@ -25,6 +23,6 @@ public class GetTenantUserRoleGrantDetailsRequestHandler : IRequestHandler<GetTe
             return null;
         }
 
-        return _mapper.Map<TenantUserRoleGrantDto>(tenantUserRoleGrant);
+        return TenantUserRoleGrantMapper.ToDetail(tenantUserRoleGrant);
     }
 }

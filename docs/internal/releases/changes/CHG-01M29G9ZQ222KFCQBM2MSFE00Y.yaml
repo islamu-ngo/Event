@@ -1,0 +1,33 @@
+# Role-grant identity-label nullability and projection correction.
+Change-Id: CHG-01M29G9ZQ222KFCQBM2MSFE00Y
+Title: "Reflect nullable role grant identity labels"
+Type: fix
+Scope: access
+Summary: "Role-grant email and name fields accurately describe existing null values when user PII is absent; generated projections preserve grant identity and disclosure."
+Group: tenant-role-grant-mapping
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/api-reference/README.md
+    Disposition: not-applicable
+    Detail: Existing JSON values and required property presence are unchanged; metadata now acknowledges already-possible null labels.
+  Security:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: documented
+    Detail: Missing user PII remains absent. Grant identity, repository filtering and authorization ownership are preserved.
+  Migration:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: No schema or persisted-data migration.
+  Configuration:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: No configuration or secret changes.
+  OpenAPI:
+    Reference: docs/public/api-reference/README.md
+    Disposition: documented
+    Detail: UserEmail and UserFullName are nullable in raw and HAL role-grant schemas and generated client surfaces, matching existing response behavior.
+  Operator:
+    Reference: docs/public/api-reference/README.md
+    Disposition: documented
+    Detail: Client code should render optional identity labels without inferring erased-user status or changed grant authority.

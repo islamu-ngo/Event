@@ -326,6 +326,16 @@ The API and standalone shared host composition validate final descriptors after 
 
 Normal and Testing startup perform cached constructor-parameter availability checks without constructing the operation graph before shared API setup, workers or traffic. Standalone-owned migrations and administrator bootstrap precede this shared runtime preflight; final descriptor validation still runs during Build, before standalone bootstrap. OpenAPI validates descriptors only because its runtime dependencies are intentionally absent. CI calls `ValidateNativeOperationsDeepAsync` against the actual final provider in a disposable scope, resolving every closed native handler without calling business operations. Constructors must remain free of network and business side effects.
 
+## Tenant Role-Grant Projections
+
+`TenantUserRoleGrantMapper` emits separate detail and list disclosures without
+copying user, tenant, role or audit navigation graphs. Missing user PII preserves
+null email/name labels and does not remove the persisted grant/user identity.
+`UserEmail` and `UserFullName` are explicitly nullable in both DTOs, the generated
+OpenAPI schemas and the NSwag client. Required property presence remains intact;
+this corrects metadata to match existing JSON rather than adding empty strings or
+reconstructing erased PII. Repository filtering and handler authority are unchanged.
+
 ## Contract Value Semantics
 
 Handwritten immutable contracts follow the [canonical record-selection policy](GOVERNANCE.md#canonical-record-selection-policy); [RECORD_CONTRACTS.md](RECORD_CONTRACTS.md) is the contributor implementation guide. Concrete Application native and remaining MediatR requests, immutable DTO/payload snapshots, valid-state command results, and structurally eligible generated browser response/value contracts use record semantics. EF entities, persisted outbox lifecycle rows, generated protocol inputs and HAL/inherited/file/exception shapes, and Blazor edit/component state remain classes. This is a shallow immutability boundary: every published collection-bearing handwritten record exposes a read-only/immutable shape and copies mutable input, while generated records preserve NSwag collection shapes and keep only System.Text.Json extension data settable.

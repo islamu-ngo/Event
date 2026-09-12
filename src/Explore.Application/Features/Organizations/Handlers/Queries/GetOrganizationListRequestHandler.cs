@@ -8,12 +8,12 @@ using Explore.Application.DTOs.Organization;
 using Explore.Application.Features.Organizations.Requests.Queries;
 using Explore.Application.Responses;
 using Explore.Application.Services;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.Organizations.Handlers.Queries;
 
-public class GetOrganizationListRequestHandler : IRequestHandler<GetOrganizationListRequest, PaginatedResult<OrganizationListDto>>
+public class GetOrganizationListRequestHandler : IQueryHandler<GetOrganizationListRequest, PaginatedResult<OrganizationListDto>>
 {
     private readonly IOrganizationRepository _organizationRepository;
     private readonly IObjectStorageService _objectStorageService;
@@ -29,13 +29,13 @@ public class GetOrganizationListRequestHandler : IRequestHandler<GetOrganization
         _logger = logger;
     }
 
-    public async Task<PaginatedResult<OrganizationListDto>> Handle(GetOrganizationListRequest request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<OrganizationListDto>> QueryAsync(GetOrganizationListRequest request, CancellationToken cancellationToken)
     {
         // Get organizations with ApprovalStatus for admin purposes
         var (organizations, totalCount) = await _organizationRepository.GetOrganizationsWithDetailsPaged(request.PageNumber, request.PageSize, cancellationToken);
         var organizationDtos = organizations.Select(OrganizationMapper.ToOrganizationListItem).ToList();
 
-        // Resolve presigned URLs for profile pictures
+        // Normalize public profile image references.
         foreach (var dto in organizationDtos)
         {
             dto.ActorProfilePictureUri = await ResolveImageUrl(dto.ActorProfilePictureUri);

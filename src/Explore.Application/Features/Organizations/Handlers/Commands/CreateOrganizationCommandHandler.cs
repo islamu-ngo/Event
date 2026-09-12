@@ -10,12 +10,12 @@ using Explore.Application.Services;
 using Explore.Application.Telemetry;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Organizations.Handlers.Commands;
 
-public class CreateOrganizationCommandHandler : IRequestHandler<CreateOrganizationCommand, BaseCommandResponse<Guid>>
+public class CreateOrganizationCommandHandler : ICommandHandler<CreateOrganizationCommand, BaseCommandResponse<Guid>>
 {
     private readonly IOrganizationRepository _organizationRepository;
     private readonly IOrganizationTenantRepository _organizationTenantRepository;
@@ -55,7 +55,7 @@ public class CreateOrganizationCommandHandler : IRequestHandler<CreateOrganizati
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateOrganizationCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateOrganizationCommand request, CancellationToken cancellationToken)
     {
         var validator = new CreateOrganizationDtoValidator();
         var validationResult = await validator.ValidateAsync(request.OrganizationDto, cancellationToken);

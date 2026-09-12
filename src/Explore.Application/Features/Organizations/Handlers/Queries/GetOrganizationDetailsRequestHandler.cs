@@ -7,13 +7,13 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Organization;
 using Explore.Application.Features.Organizations.Requests.Queries;
 using Explore.Application.Services;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.Organizations.Handlers.Queries;
 
-public class GetOrganizationDetailsRequestHandler : IRequestHandler<GetOrganizationDetailsRequest, OrganizationDto?>
+public class GetOrganizationDetailsRequestHandler : IQueryHandler<GetOrganizationDetailsRequest, OrganizationDto?>
 {
     private readonly IOrganizationRepository _organizationRepository;
     private readonly IObjectStorageService _objectStorageService;
@@ -32,7 +32,7 @@ public class GetOrganizationDetailsRequestHandler : IRequestHandler<GetOrganizat
         _cache = cache;
     }
 
-    public async Task<OrganizationDto?> Handle(GetOrganizationDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<OrganizationDto?> QueryAsync(GetOrganizationDetailsRequest request, CancellationToken cancellationToken)
     {
         var cacheKey = $"organization:detail:{request.Id}";
         var dto = await _cache.GetOrCreateAsync(
@@ -51,7 +51,7 @@ public class GetOrganizationDetailsRequestHandler : IRequestHandler<GetOrganizat
             },
             cancellationToken: cancellationToken);
 
-        // Resolve presigned URL for profile picture
+        // Normalize the public profile image reference.
         if (dto != null)
         {
             dto.ActorProfilePictureUri = await ResolveImageUrl(dto.ActorProfilePictureUri);

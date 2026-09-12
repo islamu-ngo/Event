@@ -4,7 +4,7 @@ using Explore.Application.Exceptions;
 using Explore.Application.Features.Organizations.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Organizations.Handlers.Commands;
@@ -12,9 +12,9 @@ namespace Explore.Application.Features.Organizations.Handlers.Commands;
 public sealed class DeleteOrganizationCommandHandler(
     IOrganizationRepository organizationRepository,
     IOrganizationMemberRepository organizationMemberRepository,
-    HybridCache cache) : IRequestHandler<DeleteOrganizationCommand, BaseCommandResponse<Guid>>
+    HybridCache cache) : ICommandHandler<DeleteOrganizationCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(DeleteOrganizationCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteOrganizationCommand request, CancellationToken cancellationToken)
     {
         var organization = await organizationRepository.GetById(request.Id);
         if (organization is null)

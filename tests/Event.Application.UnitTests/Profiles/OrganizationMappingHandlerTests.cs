@@ -119,17 +119,17 @@ public sealed class OrganizationMappingHandlerTests
         var list = new GetOrganizationListRequestHandler(store, null!, NullLogger<GetOrganizationListRequestHandler>.Instance);
         var mine = new GetMyOrganizationsRequestHandler(store, members, null!, NullLogger<GetMyOrganizationsRequestHandler>.Instance);
         var detail = new GetOrganizationDetailsRequestHandler(store, null!, NullLogger<GetOrganizationDetailsRequestHandler>.Instance, new InlineCache());
-        var page = await list.Handle(new GetOrganizationListRequest { PageNumber = 1, PageSize = 10 }, default);
+        var page = await list.QueryAsync(new GetOrganizationListRequest { PageNumber = 1, PageSize = 10 }, default);
         await Assert.That(page.Items.Select(item => item.Id).SequenceEqual(new[] { Stamp, Id })).IsTrue();
         await Assert.That(page.TotalCount).IsEqualTo(2);
         await Assert.That(page.PageSize).IsEqualTo(10);
         await Assert.That(page.PageNumber).IsEqualTo(1);
-        await Assert.That(await detail.Handle(new GetOrganizationDetailsRequest(TenantId), default)).IsNull();
-        await Assert.That((await detail.Handle(new GetOrganizationDetailsRequest(Id), default))!.ActorDisplayName).IsEqualTo("Public actor");
-        await Assert.That((await detail.Handle(new GetOrganizationDetailsRequest(ActorId), default))!.FullName).IsEqualTo("Community organization");
-        var own = await mine.Handle(new GetMyOrganizationsRequest { UserId = ActorId.ToString() }, default);
+        await Assert.That(await detail.QueryAsync(new GetOrganizationDetailsRequest(TenantId), default)).IsNull();
+        await Assert.That((await detail.QueryAsync(new GetOrganizationDetailsRequest(Id), default))!.ActorDisplayName).IsEqualTo("Public actor");
+        await Assert.That((await detail.QueryAsync(new GetOrganizationDetailsRequest(ActorId), default))!.FullName).IsEqualTo("Community organization");
+        var own = await mine.QueryAsync(new GetMyOrganizationsRequest { UserId = ActorId.ToString() }, default);
         await Assert.That(own.Items.Single().CurrentUserRoleId).IsEqualTo((int)RoleEnum.OrgAdmin);
-        await Assert.That((await mine.Handle(new GetMyOrganizationsRequest { UserId = "invalid" }, default)).Items).IsEmpty();
+        await Assert.That((await mine.QueryAsync(new GetMyOrganizationsRequest { UserId = "invalid" }, default)).Items).IsEmpty();
         var userOrganizations = new GetUserOrganizationsRequestHandler(members, new CurrentUser(ActorId));
         await Assert.That((await userOrganizations.Handle(new GetUserOrganizationsRequest(ActorId), default)).Single().CurrentUserRoleId).IsEqualTo((int)RoleEnum.OrgAdmin);
         await Assert.That(async () => await userOrganizations.Handle(new GetUserOrganizationsRequest(TenantId), default)).Throws<AuthorizationException>();
@@ -156,7 +156,7 @@ public sealed class OrganizationMappingHandlerTests
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
         var handler = new CreateOrganizationCommandHandler(organizations, participations, members, actors, null!, authority,
             new CacheInvalidator(), new TenantContext(TenantId), new InlineCache(), metrics, new InlineUnitOfWork());
-        var result = await handler.Handle(new CreateOrganizationCommand
+        var result = await handler.ExecuteAsync(new CreateOrganizationCommand
         {
             CreatorUserId = ActorId,
             OrganizationDto = new CreateOrganizationDto

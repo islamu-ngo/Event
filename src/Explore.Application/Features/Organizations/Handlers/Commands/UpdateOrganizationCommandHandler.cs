@@ -8,12 +8,12 @@ using Explore.Application.Models.Common;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Organizations.Handlers.Commands;
 
-public class UpdateOrganizationCommandHandler : IRequestHandler<UpdateOrganizationCommand, BaseCommandResponse<Guid>>
+public class UpdateOrganizationCommandHandler : ICommandHandler<UpdateOrganizationCommand, BaseCommandResponse<Guid>>
 {
     private readonly IOrganizationRepository _organizationRepository;
     private readonly IOrganizationMemberRepository _organizationMemberRepository;
@@ -29,7 +29,7 @@ public class UpdateOrganizationCommandHandler : IRequestHandler<UpdateOrganizati
         _cache = cache;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateOrganizationCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateOrganizationCommand request, CancellationToken cancellationToken)
     {
         var validator = new UpdateOrganizationDtoValidator();
         var validationResult = await validator.ValidateAsync(request.UpdateOrganizationDto, cancellationToken);

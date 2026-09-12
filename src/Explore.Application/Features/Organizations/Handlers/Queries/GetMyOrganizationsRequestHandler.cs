@@ -6,12 +6,12 @@ using Explore.Application.Features.Organizations.Requests.Queries;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.Organizations.Handlers.Queries;
 
-public class GetMyOrganizationsRequestHandler : IRequestHandler<GetMyOrganizationsRequest, PaginatedResult<OrganizationListDto>>
+public class GetMyOrganizationsRequestHandler : IQueryHandler<GetMyOrganizationsRequest, PaginatedResult<OrganizationListDto>>
 {
     private readonly IOrganizationRepository _organizationRepository;
     private readonly IOrganizationMemberRepository _organizationMemberRepository;
@@ -30,7 +30,7 @@ public class GetMyOrganizationsRequestHandler : IRequestHandler<GetMyOrganizatio
         _logger = logger;
     }
 
-    public async Task<PaginatedResult<OrganizationListDto>> Handle(GetMyOrganizationsRequest request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<OrganizationListDto>> QueryAsync(GetMyOrganizationsRequest request, CancellationToken cancellationToken)
     {
         if (!Guid.TryParse(request.UserId, out Guid userGuid))
         {
@@ -53,7 +53,7 @@ public class GetMyOrganizationsRequestHandler : IRequestHandler<GetMyOrganizatio
             {
                 dto.CurrentUserRoleId = roleId;
             }
-            // Resolve presigned URL for profile picture
+            // Normalize the public profile image reference.
             dto.ActorProfilePictureUri = await ResolveImageUrl(dto.ActorProfilePictureUri);
             dtos.Add(dto);
         }

@@ -31,7 +31,7 @@ public class RegistrationMapperTests
             new() { Id = 2, MasterCode = "SECOND", FullName = "Second", Description = null }
         };
         var handler = new GetRegistrationScopeListRequestHandler(new ScopeStore(items));
-        var result = await handler.Handle(new GetRegistrationScopeListRequest(), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetRegistrationScopeListRequest(), CancellationToken.None);
         items[0].FullName = "Changed";
         items[0].Description = "Changed";
         items.Clear();
@@ -148,7 +148,7 @@ public class RegistrationMapperTests
     public async Task EmptyRepositories_ReturnEmptyJsonArrays()
     {
         await AssertJson(await new GetRegistrationScopeListRequestHandler(new ScopeStore([]))
-            .Handle(new GetRegistrationScopeListRequest(), CancellationToken.None), new JsonArray());
+            .QueryAsync(new GetRegistrationScopeListRequest(), CancellationToken.None), new JsonArray());
         await AssertJson(await new GetEventRegistrationPolicyListRequestHandler(new PolicyStore([]))
             .Handle(new GetEventRegistrationPolicyListRequest(), CancellationToken.None), new JsonArray());
         await AssertJson(await new GetEventSessionKindListRequestHandler(new SessionKindStore([]))

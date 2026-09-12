@@ -10,7 +10,7 @@ namespace Event.Application.UnitTests.Features.RegistrationScopes.Queries;
 public class GetRegistrationScopeListRequestHandlerTests
 {
     [Test]
-    public async Task Handle_WithExistingScopes_ReturnsMappedList()
+    public async Task QueryAsync_WithExistingScopes_ReturnsMappedList()
     {
         var scopes = new List<RegistrationScope>
         {
@@ -20,7 +20,7 @@ public class GetRegistrationScopeListRequestHandlerTests
         };
         var handler = new GetRegistrationScopeListRequestHandler(new ScopeStore(scopes));
 
-        var result = await handler.Handle(new GetRegistrationScopeListRequest(), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetRegistrationScopeListRequest(), CancellationToken.None);
         scopes[0].FullName = "Changed";
         scopes[0].Description = "Changed";
         scopes.Clear();
@@ -41,11 +41,11 @@ public class GetRegistrationScopeListRequestHandlerTests
     }
 
     [Test]
-    public async Task Handle_WithNoScopes_ReturnsEmptyList()
+    public async Task QueryAsync_WithNoScopes_ReturnsEmptyList()
     {
         var handler = new GetRegistrationScopeListRequestHandler(new ScopeStore([]));
 
-        var result = await handler.Handle(new GetRegistrationScopeListRequest(), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetRegistrationScopeListRequest(), CancellationToken.None);
 
         await Assert.That(result).IsNotNull();
         await Assert.That(result.Count).IsEqualTo(0);

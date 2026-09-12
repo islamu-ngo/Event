@@ -2,10 +2,8 @@ using AutoMapper;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.EventAgendaItem;
 using Explore.Application.DTOs.EventAspects;
-using Explore.Application.DTOs.EventCategories;
 using Explore.Application.DTOs.EventDay;
 using Explore.Application.DTOs.EventSessionGroup;
-using Explore.Application.DTOs.EventTags;
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -212,26 +210,6 @@ public class EventMappingProfile : Profile
         CreateMap<CreateEventAgendaItemDto, EventAgendaItem>()
             .ForMember(dest => dest.StartTime, opt => opt.Ignore())
             .ForMember(dest => dest.EndTime, opt => opt.Ignore());
-
-        // Event Tags
-        CreateMap<EventTags, EventTagsDto>()
-            .ForMember(dest => dest.EventTitle, opt => opt.MapFrom(src => src.Event != null ? src.Event.Title : null))
-            .ForMember(dest => dest.TagFullName, opt => opt.MapFrom(src => src.Tag != null ? src.Tag.FullName : null))
-            .ForMember(dest => dest.TagMasterCode, opt => opt.MapFrom(src => src.Tag != null ? src.Tag.MasterCode : null));
-        CreateMap<EventTags, EventTagsListDto>()
-            .ForMember(dest => dest.EventTitle, opt => opt.MapFrom(src => src.Event != null ? src.Event.Title : null))
-            .ForMember(dest => dest.TagFullName, opt => opt.MapFrom(src => src.Tag != null ? src.Tag.FullName : null))
-            .ForMember(dest => dest.TagMasterCode, opt => opt.MapFrom(src => src.Tag != null ? src.Tag.MasterCode : null));
-        CreateMap<CreateEventTagsDto, EventTags>();
-
-        // Event Categories
-        CreateMap<EventCategories, EventCategoriesDto>()
-            .ForMember(dest => dest.EventTitle, opt => opt.MapFrom(src => src.Event != null ? src.Event.Title : null))
-            .ForMember(dest => dest.CategoryFullName, opt => opt.MapFrom(src => src.Category != null ? src.Category.FullName : null));
-        CreateMap<EventCategories, EventCategoriesListDto>()
-            .ForMember(dest => dest.EventTitle, opt => opt.MapFrom(src => src.Event != null ? src.Event.Title : null))
-            .ForMember(dest => dest.CategoryFullName, opt => opt.MapFrom(src => src.Category != null ? src.Category.FullName : null));
-        CreateMap<CreateEventCategoriesDto, EventCategories>();
 
         // Aspects
         CreateMap<EventIslamicAspect, EventIslamicAspectDto>()

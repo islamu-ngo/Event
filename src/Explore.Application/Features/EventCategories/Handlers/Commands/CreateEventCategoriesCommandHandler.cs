@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventCategories.Validators;
@@ -18,20 +17,17 @@ public class CreateEventCategoriesCommandHandler : IRequestHandler<CreateEventCa
     private readonly IEventRepository _eventRepository;
     private readonly ICategoryRepository _categoryRepository;
     private readonly ITenantContext _tenantContext;
-    private readonly IMapper _mapper;
 
     public CreateEventCategoriesCommandHandler(
         IEventCategoriesRepository eventCategoriesRepository,
         IEventRepository eventRepository,
         ICategoryRepository categoryRepository,
-        ITenantContext tenantContext,
-        IMapper mapper)
+        ITenantContext tenantContext)
     {
         _eventCategoriesRepository = eventCategoriesRepository;
         _eventRepository = eventRepository;
         _categoryRepository = categoryRepository;
         _tenantContext = tenantContext;
-        _mapper = mapper;
     }
 
     public async Task<BaseCommandResponse<Guid>> Handle(CreateEventCategoriesCommand request, CancellationToken cancellationToken)
@@ -46,7 +42,14 @@ public class CreateEventCategoriesCommandHandler : IRequestHandler<CreateEventCa
                 "Event Category assignment failed.");
         }
 
-        var eventCategories = _mapper.Map<Domain.EventCategories>(request.EventCategoriesDto);
+        var eventCategories = new Domain.EventCategories
+        {
+            EventId = request.EventCategoriesDto.EventId,
+            CategoryId = request.EventCategoriesDto.CategoryId,
+            Event = null!,
+            Category = null!,
+            Tenant = null!
+        };
 
         // Set TenantId from the request context
         eventCategories.TenantId = _tenantContext.TenantId;

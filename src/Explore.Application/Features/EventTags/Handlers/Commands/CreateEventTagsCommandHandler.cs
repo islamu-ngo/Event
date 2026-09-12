@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventTags.Validators;
@@ -18,20 +17,17 @@ public class CreateEventTagsCommandHandler : IRequestHandler<CreateEventTagsComm
     private readonly IEventRepository _eventRepository;
     private readonly ITagRepository _tagRepository;
     private readonly ITenantContext _tenantContext;
-    private readonly IMapper _mapper;
 
     public CreateEventTagsCommandHandler(
         IEventTagsRepository eventTagsRepository,
         IEventRepository eventRepository,
         ITagRepository tagRepository,
-        ITenantContext tenantContext,
-        IMapper mapper)
+        ITenantContext tenantContext)
     {
         _eventTagsRepository = eventTagsRepository;
         _eventRepository = eventRepository;
         _tagRepository = tagRepository;
         _tenantContext = tenantContext;
-        _mapper = mapper;
     }
 
     public async Task<BaseCommandResponse<Guid>> Handle(CreateEventTagsCommand request, CancellationToken cancellationToken)
@@ -46,7 +42,14 @@ public class CreateEventTagsCommandHandler : IRequestHandler<CreateEventTagsComm
                 "Event Tag assignment failed.");
         }
 
-        var eventTags = _mapper.Map<Domain.EventTags>(request.EventTagsDto);
+        var eventTags = new Domain.EventTags
+        {
+            EventId = request.EventTagsDto.EventId,
+            TagId = request.EventTagsDto.TagId,
+            Event = null!,
+            Tag = null!,
+            Tenant = null!
+        };
 
         // Set TenantId from the request context
         eventTags.TenantId = _tenantContext.TenantId;

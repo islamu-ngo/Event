@@ -6,12 +6,11 @@ using Explore.API.Hateoas;
 using Explore.API.Filters;
 using Explore.API.Models;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EmailDispatch;
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
-using Explore.Application.Features.EmailDispatch.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -23,10 +22,11 @@ namespace Explore.API.Controllers;
 [ApiController]
 [Authorize]
 [EndpointClassification(EndpointClass.Authenticated)]
-public class SettingsController(IMediator mediator) : ControllerBase
+[Tags("Settings")]
+public class EmailDeliverySettingsController(
+    ICommandHandler<PreviewEmailDeliveryDisableCommand, BaseCommandResponse<EmailDeliveryDisablePreviewDto>> previewCommand,
+    ICommandHandler<DisableEmailDeliveryCommand, BaseCommandResponse<Guid>> disableCommand) : ControllerBase
 {
-    private readonly IMediator _mediator = mediator;
-
     [HttpPost("email-delivery/disable-preview", Name = RouteNames.PreviewTenantSmtpDisable)]
     [EndpointSummary("Preview Tenant SMTP Disable")]
     [PrivateNoStore]
@@ -43,7 +43,7 @@ public class SettingsController(IMediator mediator) : ControllerBase
         [FromServices] IResourceAssembler<EmailDeliveryDisablePreviewDto, EmailDeliveryDisablePreviewDto> assembler,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new PreviewEmailDeliveryDisableQuery(TenantId: tenantContext.TenantId), cancellationToken);
+        var response = await previewCommand.ExecuteAsync(new PreviewEmailDeliveryDisableCommand(TenantId: tenantContext.TenantId), cancellationToken);
         return response.IsSuccess
             ? Ok(await assembler.ToResource(response.Id!, HttpContext))
             : this.ToEmailDeliveryDisableProblem(response);
@@ -65,7 +65,7 @@ public class SettingsController(IMediator mediator) : ControllerBase
         [FromBody] EmailDeliveryDisableRequest body,
         [FromServices] ITenantContext tenantContext, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new DisableEmailDeliveryCommand(TenantId: tenantContext.TenantId,
+        var response = await disableCommand.ExecuteAsync(new DisableEmailDeliveryCommand(TenantId: tenantContext.TenantId,
             ExpectedRevision: body.ExpectedRevision, Acknowledgement: body.Acknowledgement,
             ConfirmationToken: body.ConfirmationToken), cancellationToken);
         return response.IsSuccess ? Ok(response) : this.ToEmailDeliveryDisableProblem(response);

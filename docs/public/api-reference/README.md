@@ -44,6 +44,11 @@ affordances; batch writes retain their strict default and existing conflict rule
 The `/api/settings/instance/atproto-federation` routes require instance-administrator
 authority and expose only the registered ATProto administrator settings. Setup
 authority does not grant access to this capability.
+SMTP disable remains a preview-then-confirm flow: request a fresh preview, then
+submit its confirmation token and revision with the exact acknowledgement.
+The server rechecks administrator authority and scope when applying the change.
+Stale confirmations fail rather than disabling a changed configuration; preview
+and disable responses remain private/no-store.
 
 ## Role-grant identity labels
 

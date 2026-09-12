@@ -6,6 +6,8 @@ using Explore.API.Hateoas;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.DTOs.Settings;
+using Explore.Application.DTOs.EmailDispatch;
+using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using Explore.Application.Features.Settings.Requests.Commands;
 using Explore.Application.Features.Settings.Requests.Queries;
 using Explore.Application.Hateoas;
@@ -20,6 +22,56 @@ namespace Event.Api.IntegrationTests.Features;
 
 public sealed class NativeSettingsEndpointContractTests
 {
+    [Test]
+    public async Task EmailCapability_UsesTwoNativeCommandsIncludingConfirmationIssuance()
+    {
+        Type[] expected =
+        [
+            typeof(ICommandHandler<PreviewEmailDeliveryDisableCommand, BaseCommandResponse<EmailDeliveryDisablePreviewDto>>),
+            typeof(ICommandHandler<DisableEmailDeliveryCommand, BaseCommandResponse<Guid>>)
+        ];
+        var tenantPorts = typeof(EmailDeliverySettingsController).GetConstructors().Single()
+            .GetParameters().Select(parameter => parameter.ParameterType).ToArray();
+        await Assert.That(tenantPorts.SequenceEqual(expected)).IsTrue();
+        var instancePorts = typeof(InstanceMessagingSettingsController).GetConstructors().Single()
+            .GetParameters().Select(parameter => parameter.ParameterType).ToArray();
+        await Assert.That(expected.All(instancePorts.Contains)).IsTrue();
+    }
+
+    [Test]
+    public async Task EmailCapability_PreservesPrivateConfirmationRoutesAndPolicies()
+    {
+        var controller = typeof(EmailDeliverySettingsController);
+        await Assert.That(controller.GetCustomAttribute<RouteAttribute>()!.Template).IsEqualTo("api/settings");
+        await Assert.That(controller.GetCustomAttribute<AuthorizeAttribute>()).IsNotNull();
+        await Assert.That(controller.GetCustomAttribute<AllowAnonymousAttribute>()).IsNull();
+        await Assert.That(controller.GetCustomAttribute<TagsAttribute>()!.Tags.SequenceEqual(["Settings"])).IsTrue();
+        (string Method, string Template, string Name, int[] Statuses)[] routes =
+        [
+            (nameof(EmailDeliverySettingsController.PreviewEmailDeliveryDisable), "email-delivery/disable-preview",
+                RouteNames.PreviewTenantSmtpDisable, [200, 400, 401, 403, 404]),
+            (nameof(EmailDeliverySettingsController.DisableEmailDelivery), "email-delivery/disable",
+                RouteNames.DisableTenantSmtp, [200, 400, 401, 403, 404, 409])
+        ];
+        await Assert.That(controller.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly).Length)
+            .IsEqualTo(routes.Length);
+        foreach (var route in routes)
+        {
+            var method = controller.GetMethod(route.Method)!;
+            var attribute = method.GetCustomAttribute<HttpMethodAttribute>()!;
+            await Assert.That(attribute.HttpMethods.Single()).IsEqualTo("POST");
+            await Assert.That(attribute.Template).IsEqualTo(route.Template);
+            await Assert.That(attribute.Name).IsEqualTo(route.Name);
+            await Assert.That(method.GetCustomAttribute<PrivateNoStoreAttribute>()).IsNotNull();
+            await Assert.That(method.GetCustomAttribute<SuppressIdempotencyResponseStorageAttribute>()).IsNotNull();
+            await Assert.That(method.GetCustomAttribute<EnableRateLimitingAttribute>()!.PolicyName)
+                .IsEqualTo(Explore.API.Extensions.RateLimitingExtensions.WritePolicy);
+            var statuses = method.GetCustomAttributes<ProducesResponseTypeAttribute>()
+                .Select(response => response.StatusCode).Order().ToArray();
+            await Assert.That(statuses.SequenceEqual(route.Statuses)).IsTrue();
+        }
+    }
+
     [Test]
     public async Task InstanceCapability_DeclaresOnlyNativeSettingsAuthorityAndHalPorts()
     {

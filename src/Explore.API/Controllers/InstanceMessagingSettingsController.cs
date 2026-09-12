@@ -9,7 +9,6 @@ using Explore.API.Hateoas;
 using Explore.API.Filters;
 using Explore.Application.DTOs.EmailDispatch;
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
-using Explore.Application.Features.EmailDispatch.Requests.Queries;
 using Explore.API.Models;
 using Explore.Application.Authorization;
 using Explore.Application.Constants;
@@ -51,16 +50,22 @@ public sealed class InstanceMessagingSettingsController : InstanceSettingsContro
 {
     private readonly IMediator _mediator;
     private readonly IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> _identityQuery;
+    private readonly ICommandHandler<PreviewEmailDeliveryDisableCommand, BaseCommandResponse<EmailDeliveryDisablePreviewDto>> _previewDisableCommand;
+    private readonly ICommandHandler<DisableEmailDeliveryCommand, BaseCommandResponse<Guid>> _disableCommand;
 
     public InstanceMessagingSettingsController(
         IMediator mediator,
         IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
         IAdminContext adminContext,
-        ISetupSecretProvider setupSecretProvider)
+        ISetupSecretProvider setupSecretProvider,
+        ICommandHandler<PreviewEmailDeliveryDisableCommand, BaseCommandResponse<EmailDeliveryDisablePreviewDto>> previewDisableCommand,
+        ICommandHandler<DisableEmailDeliveryCommand, BaseCommandResponse<Guid>> disableCommand)
         : base(adminContext, setupSecretProvider)
     {
         _mediator = mediator;
         _identityQuery = identityQuery;
+        _previewDisableCommand = previewDisableCommand;
+        _disableCommand = disableCommand;
     }
 
     [HttpGet("smtp", Name = RouteNames.GetInstanceSmtpSettings)]
@@ -95,7 +100,7 @@ public sealed class InstanceMessagingSettingsController : InstanceSettingsContro
         [FromServices] IResourceAssembler<EmailDeliveryDisablePreviewDto, EmailDeliveryDisablePreviewDto> assembler,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new PreviewEmailDeliveryDisableQuery(TenantId: null), cancellationToken);
+        var response = await _previewDisableCommand.ExecuteAsync(new PreviewEmailDeliveryDisableCommand(TenantId: null), cancellationToken);
         return response.IsSuccess
             ? Ok(await assembler.ToResource(response.Id!, HttpContext))
             : this.ToEmailDeliveryDisableProblem(response);
@@ -117,7 +122,7 @@ public sealed class InstanceMessagingSettingsController : InstanceSettingsContro
     public async Task<ActionResult<BaseCommandResponse<Guid>>> DisableSmtp(
         [FromBody] EmailDeliveryDisableRequest body, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new DisableEmailDeliveryCommand(TenantId: null,
+        var response = await _disableCommand.ExecuteAsync(new DisableEmailDeliveryCommand(TenantId: null,
             ExpectedRevision: body.ExpectedRevision, Acknowledgement: body.Acknowledgement,
             ConfirmationToken: body.ConfirmationToken), cancellationToken);
         return response.IsSuccess ? Ok(response) : this.ToEmailDeliveryDisableProblem(response);

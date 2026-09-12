@@ -7,7 +7,6 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EmailDispatch;
 using Explore.Application.Features.EmailDispatch.Handlers.Commands;
-using Explore.Application.Features.EmailDispatch.Handlers.Queries;
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using Explore.Application.Notifications;
 using Explore.Application.Notifications.Handlers;
@@ -80,7 +79,7 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
         }
         using var session = scenario.Open(tenantActor: true);
         string before = await scenario.StateAsync();
-        var result = await session.Preview.Handle(new(scenario.TenantId), CancellationToken.None);
+        var result = await session.Preview.ExecuteAsync(new(scenario.TenantId), CancellationToken.None);
 
         await Assert.That(result.IsSuccess).IsTrue();
         await Assert.That(result.Id!.IsLocked).IsEqualTo(locked);
@@ -106,8 +105,8 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
         if (reason == "revoked-admin") await scenario.RevokeAsync(tenantActor: true);
         Guid? target = reason == "instance-target" ? null : scenario.TenantId;
         string before = await scenario.StateAsync();
-        var preview = await session.Preview.Handle(new(target), CancellationToken.None);
-        var result = await session.Disable.Handle(new(target, 0, null, null), CancellationToken.None);
+        var preview = await session.Preview.ExecuteAsync(new(target), CancellationToken.None);
+        var result = await session.Disable.ExecuteAsync(new(target, 0, null, null), CancellationToken.None);
 
         await Assert.That(preview.FailureCode).IsEqualTo(FailureCodes.AdminRequired);
         await Assert.That(result.FailureCode).IsEqualTo(FailureCodes.AdminRequired);
@@ -121,8 +120,8 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
         await using var scenario = await Scenario.CreateAsync();
         using var session = scenario.Open();
         string before = await scenario.StateAsync();
-        var preview = await session.Preview.Handle(new(Guid.Empty), CancellationToken.None);
-        var result = await session.Disable.Handle(new(Guid.Empty, 0,
+        var preview = await session.Preview.ExecuteAsync(new(Guid.Empty), CancellationToken.None);
+        var result = await session.Disable.ExecuteAsync(new(Guid.Empty, 0,
             DisableEmailDeliveryCommand.RequiredAcknowledgement, null), CancellationToken.None);
 
         await Assert.That(preview.IsSuccess).IsFalse();
@@ -219,7 +218,7 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
         using var session = scenario.Open();
         string before = await scenario.StateAsync();
         // The instance always exists; a nonexistent tenant is the native reader's missing-scope boundary.
-        var preview = await session.Preview.Handle(new(Guid.CreateVersion7()), CancellationToken.None);
+        var preview = await session.Preview.ExecuteAsync(new(Guid.CreateVersion7()), CancellationToken.None);
 
         await Assert.That(preview.FailureCode).IsEqualTo(FailureCodes.NotFound);
         await Assert.That(await scenario.StateAsync()).IsEqualTo(before);
@@ -261,7 +260,7 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
             published.SetResult();
         };
 
-        var response = await session.Disable.Handle(Command(preview), CancellationToken.None);
+        var response = await session.Disable.ExecuteAsync(Command(preview), CancellationToken.None);
 
         await Assert.That(response.IsSuccess).IsTrue();
         await published.Task.WaitAsync(TimeSpan.FromSeconds(15));
@@ -304,7 +303,7 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
         };
         await session.PrimeStaleCacheAsync();
         string before = await scenario.StateAsync();
-        var result = await session.Disable.Handle(command, CancellationToken.None);
+        var result = await session.Disable.ExecuteAsync(command, CancellationToken.None);
 
         await Assert.That(result.IsSuccess).IsFalse();
         await Assert.That(result.Errors).IsNotNull();
@@ -332,7 +331,7 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
             _ => command
         };
         string before = await scenario.StateAsync();
-        var result = await session.Disable.Handle(command, CancellationToken.None);
+        var result = await session.Disable.ExecuteAsync(command, CancellationToken.None);
 
         await Assert.That(result.FailureCode).IsEqualTo(FailureCodes.ConcurrencyConflict);
         await Assert.That(await scenario.StateAsync()).IsEqualTo(before);
@@ -361,7 +360,7 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
         else await Assert.That(fresh.ExpectedRevision).IsGreaterThan(preview.ExpectedRevision);
         string before = await scenario.StateAsync();
 
-        var result = await session.Disable.Handle(Command(preview), CancellationToken.None);
+        var result = await session.Disable.ExecuteAsync(Command(preview), CancellationToken.None);
 
         await Assert.That(result.FailureCode).IsEqualTo(FailureCodes.ConcurrencyConflict);
         await Assert.That(await scenario.StateAsync()).IsEqualTo(before);
@@ -377,16 +376,16 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
         using var session = scenario.Open(tenantActor: tenantTarget);
         Guid? target = tenantTarget ? scenario.TenantId : null;
         var command = Command(await session.PreviewAsync(target));
-        await Assert.That((await session.Disable.Handle(command, CancellationToken.None)).IsSuccess).IsTrue();
+        await Assert.That((await session.Disable.ExecuteAsync(command, CancellationToken.None)).IsSuccess).IsTrue();
         string disabled = await scenario.StateAsync();
-        await Assert.That((await session.Disable.Handle(command, CancellationToken.None)).FailureCode)
+        await Assert.That((await session.Disable.ExecuteAsync(command, CancellationToken.None)).FailureCode)
             .IsEqualTo(FailureCodes.ConcurrencyConflict);
         await Assert.That(await scenario.StateAsync()).IsEqualTo(disabled);
         await using (var writer = CreateContext(scenario.Path))
             await SetEmailSettingAsync(writer, GovernanceSettingKeys.Email.DeliveryEnabled, "true", tenantId: target);
         string reenabled = await scenario.StateAsync();
 
-        var replay = await session.Disable.Handle(command, CancellationToken.None);
+        var replay = await session.Disable.ExecuteAsync(command, CancellationToken.None);
 
         await Assert.That(replay.FailureCode).IsEqualTo(FailureCodes.ConcurrencyConflict);
         await Assert.That(await scenario.StateAsync()).IsEqualTo(reenabled);
@@ -416,7 +415,7 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
         }
         await context.Database.CloseConnectionAsync();
         Exception? failure = null;
-        try { await session.Disable.Handle(command, CancellationToken.None); }
+        try { await session.Disable.ExecuteAsync(command, CancellationToken.None); }
         catch (Exception exception) when (exception is SqliteException or DbUpdateException) { failure = exception; }
 
         await Assert.That(failure).IsNotNull();
@@ -449,7 +448,7 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
         session.Audit.Failure = failure;
 
         Exception? observed = null;
-        try { await session.Disable.Handle(command, cancellation.Token); }
+        try { await session.Disable.ExecuteAsync(command, cancellation.Token); }
         catch (Exception exception) { observed = exception; }
 
         await Assert.That(observed).IsSameReferenceAs(failure);
@@ -649,7 +648,7 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
         internal List<string> LeaseKeys { get; } = [];
         internal Func<string, CancellationToken, Task>? BeforeLock { get; set; }
         internal AuditSink Audit { get; }
-        internal PreviewEmailDeliveryDisableQueryHandler Preview { get; }
+        internal PreviewEmailDeliveryDisableCommandHandler Preview { get; }
         internal DisableEmailDeliveryCommandHandler Disable { get; }
 
         internal Session(Scenario scenario, Guid actor, Guid currentTenant)
@@ -683,7 +682,7 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
 
         internal async Task<EmailDeliveryDisablePreviewDto> PreviewAsync(Guid? target)
         {
-            var result = await Preview.Handle(new(target), CancellationToken.None);
+            var result = await Preview.ExecuteAsync(new(target), CancellationToken.None);
             await Assert.That(result.IsSuccess).IsTrue();
             await Assert.That(result.Id!.CanDisable).IsTrue();
             await Assert.That(result.Id.ConfirmationToken).IsNotNull();
@@ -691,8 +690,8 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
         }
 
         internal async Task<string?> FailureAsync(bool preview, DisableEmailDeliveryCommand command, CancellationToken token = default) =>
-            preview ? (await Preview.Handle(new(command.TenantId), token)).FailureCode
-                : (await Disable.Handle(command, token)).FailureCode;
+            preview ? (await Preview.ExecuteAsync(new(command.TenantId), token)).FailureCode
+                : (await Disable.ExecuteAsync(command, token)).FailureCode;
 
         internal Task<bool> CachedAdminAsync(bool tenantTarget) => tenantTarget
             ? Fixture.AdminContext.IsTenantAdminAsync(_scenario.TenantId) : Fixture.AdminContext.IsInstanceAdminAsync();

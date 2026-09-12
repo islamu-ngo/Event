@@ -5,15 +5,15 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EmailDispatch;
-using Explore.Application.Features.EmailDispatch.Requests.Queries;
+using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Settings.Groups;
 using Explore.Domain.Constants;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
-namespace Explore.Application.Features.EmailDispatch.Handlers.Queries;
+namespace Explore.Application.Features.EmailDispatch.Handlers.Commands;
 
-public sealed class PreviewEmailDeliveryDisableQueryHandler(
+public sealed class PreviewEmailDeliveryDisableCommandHandler(
     IAdminContext adminContext,
     ITenantContext tenantContext,
     IEmailDeliveryDisableImpactReader impactReader,
@@ -22,10 +22,10 @@ public sealed class PreviewEmailDeliveryDisableQueryHandler(
     IUnitOfWork unitOfWork,
     IPlatformUserRoleRepository platformRoles,
     ITenantUserRoleGrantRepository tenantRoles)
-    : IRequestHandler<PreviewEmailDeliveryDisableQuery, BaseCommandResponse<EmailDeliveryDisablePreviewDto>>
+    : ICommandHandler<PreviewEmailDeliveryDisableCommand, BaseCommandResponse<EmailDeliveryDisablePreviewDto>>
 {
-    public async Task<BaseCommandResponse<EmailDeliveryDisablePreviewDto>> Handle(
-        PreviewEmailDeliveryDisableQuery request,
+    public async Task<BaseCommandResponse<EmailDeliveryDisablePreviewDto>> ExecuteAsync(
+        PreviewEmailDeliveryDisableCommand request,
         CancellationToken cancellationToken)
     {
         if (await ResolveAuthorizedActorAsync(request.TenantId, cancellationToken) is null)

@@ -7,7 +7,7 @@ using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using Explore.Application.Notifications;
 using Explore.Application.Responses;
 using Explore.Application.Settings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EmailDispatch.Handlers.Commands;
 
@@ -19,9 +19,9 @@ public sealed class DisableEmailDeliveryCommandHandler(
     IUnitOfWork unitOfWork,
     IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers,
     IPlatformUserRoleRepository platformRoles,
-    ITenantUserRoleGrantRepository tenantRoles) : IRequestHandler<DisableEmailDeliveryCommand, BaseCommandResponse<Guid>>
+    ITenantUserRoleGrantRepository tenantRoles) : ICommandHandler<DisableEmailDeliveryCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         DisableEmailDeliveryCommand request,
         CancellationToken cancellationToken)
     {

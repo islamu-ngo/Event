@@ -330,9 +330,9 @@ Normal and Testing startup perform cached constructor-parameter availability che
 
 The shared settings family uses five native result commands and one native query.
 `UserSettingsController` owns the four existing personal-preference routes and
-depends only on their four closed operation ports. The remaining settings HTTP
-owners call the same native ports while their capability extraction proceeds;
-only the separately tracked email-disable workflow still uses legacy dispatch.
+depends only on their four closed operation ports. Tenant and ATProto instance
+settings use the same native ports through separate capability controllers.
+Email-disable confirmation and execution have their own native command ports.
 
 Handler-owned scope authorization, manual validation, mutation locks and dedicated
 publication/visitor/SMTP transactional boundaries are unchanged. Cache eviction
@@ -351,6 +351,16 @@ five closed native ports, the admin context and HAL assembler. Reads require
 instance-administrator authority and filter the registered administrator keys;
 writes reject unknown keys before dispatch. This capability does not inherit the
 setup-authority exception used by other instance settings controllers.
+
+`EmailDeliverySettingsController` owns the two tenant SMTP-disable routes.
+`InstanceMessagingSettingsController` consumes the same two command ports for its
+instance routes; its other onboarding operations retain their separate ownership.
+`PreviewEmailDeliveryDisableCommand` is a command because it issues a protected
+confirmation token, not a pure read. Both handlers retain persisted administrator
+rechecks inside ordered setting locks and serializable transactions. Disable
+retains actor/scope/revision/token binding, rollback and post-commit sequential
+notifications using `CancellationToken.None`. HTTP previews and results remain
+private/no-store and excluded from idempotency response storage.
 
 ## Tenant Role-Grant Projections
 

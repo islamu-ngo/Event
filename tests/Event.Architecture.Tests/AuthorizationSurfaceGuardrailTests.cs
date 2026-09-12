@@ -86,9 +86,9 @@ public sealed class AuthorizationSurfaceGuardrailTests
             "handler-current-scope-administrator",
             "Current platform admin or exact ambient tenant/admin grant is rechecked after the ordered SMTP lease inside Serializable execution; writer binds actor, target, revision, protected confirmation and acknowledgement. Evidence: EmailDeliveryDisableCommandHandlerTests.AuthorityRevokedWhileAcquiringLeaseIsRechecked and ConfirmedTokenCannotReplayImmediatelyOrAfterReenable; EmailDeliveryDisableHttpTests."),
         new(
-            "Explore.Application.Features.EmailDispatch.Requests.Queries.PreviewEmailDeliveryDisableQuery",
+            "Explore.Application.Features.EmailDispatch.Requests.Commands.PreviewEmailDeliveryDisableCommand",
             "handler-current-scope-administrator-proof-preview",
-            "Command-response discovery deliberately includes this Query: fresh scoped admin is checked before and within the lease/Serializable snapshot; only actionable impact issues confirmation. Evidence: EmailDeliveryDisableCommandHandlerTests.UnauthorizedTargetsCannotPreviewOrDisable and LockedOrNoOpPreviewNeverIssuesConfirmation."),
+            "Confirmation-issuance command: fresh scoped admin is checked before and within the lease/Serializable snapshot; only actionable impact issues confirmation. Evidence: EmailDeliveryDisableCommandHandlerTests.UnauthorizedTargetsCannotPreviewOrDisable and LockedOrNoOpPreviewNeverIssuesConfirmation."),
         new(
             "Explore.Application.Features.InstanceOnboarding.Requests.Commands.CompleteLocalInstanceOnboardingCommand",
             "handler-active-setup-secret-bootstrap",

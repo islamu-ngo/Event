@@ -81,6 +81,12 @@ passwordless authority.
 | `IDENTITY_DATABASE_MIGRATOR_USERNAME` | External topology | None | Schema-owner/migrator credential username. |
 | `IDENTITY_DATABASE_MIGRATOR_PASSWORD` | External topology (Secret) | None | Schema-owner/migrator credential password. |
 
+> [!WARNING]
+> **Do not blindly mirror `IDENTITY_DATABASE_TOPOLOGY` and `ERASURE_DATABASE_TOPOLOGY`.**
+> Although both settings configure database topologies, they serve fundamentally different architectural purposes with opposing default recommendations:
+> - **`IDENTITY_DATABASE_TOPOLOGY` (Recommended: `colocated`):** In standard single-instance setups, keep this `colocated` so user credentials share the primary application database with zero extra operational overhead. Only switch to `external` if your organization requires a central, shared identity database across multiple distinct applications or SaaS solutions (such as sharing one user database across all ISLAMU solutions).
+> - **`ERASURE_DATABASE_TOPOLOGY` (Recommended: `EmbeddedSqlite`):** The privacy erasure authority must remain *outside* the primary application database to ensure GDPR anti-resurrection guarantees survive primary database backup restoration. See [Section 7: Privacy Erasure Authority](#7-privacy-erasure-authority-gdpr--anti-resurrection).
+
 Keycloak variables are required only when `AUTHENTICATION_PROVIDER=keycloak`:
 
 The supported primary/AT Protocol combinations are `local/false`,
@@ -191,8 +197,11 @@ providers retain their own verification and recovery delivery configuration.
 
 The same `ERASURE_DATABASE_*` names are used inside the Infisical `/database/erasure` folder, so a flat `.env` and an Infisical project never disagree on the key name. See [Infisical Setup](infisical.md#databaseerasure).
 
-> [!NOTE]
-> **We recommend:** Keep `EmbeddedSqlite`. It runs with zero operational overhead and guarantees strict GDPR anti-resurrection isolation without requiring a second database server.
+> [!WARNING]
+> **Why `EmbeddedSqlite` is recommended (and distinct from Identity topology):**
+> Do not blindly set `ERASURE_DATABASE_TOPOLOGY` to match `IDENTITY_DATABASE_TOPOLOGY`. They solve completely different architectural problems:
+> - **Erasure Authority (`EmbeddedSqlite` recommended):** The erasure ledger is lightweight and intentionally decoupled from the primary application database. If your primary database ever needs to be restored from an earlier backup, an independent embedded or external erasure authority retains the history of user deletion requests that occurred *after* that backup, immediately re-enforcing those deletions and preventing illegal GDPR data resurrection.
+> - **Identity Database (`colocated` recommended):** By contrast, `IDENTITY_DATABASE_TOPOLOGY` defaults to `colocated` within the primary database for standard deployments, and is only separated into an `external` database when an enterprise or SaaS operator needs a single, unified credential database shared across multiple distinct applications (such as across all ISLAMU products).
 
 ---
 

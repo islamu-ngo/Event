@@ -168,6 +168,13 @@ Primary application database. Every key maps into the structured `Database:*` co
 
 Runtime and migrator logins must be distinct. Never give runtime services the migrator role, and never expose either to the Blazor client.
 
+> [!WARNING]
+> **Do not blindly mirror `ERASURE_DATABASE_TOPOLOGY` and `IDENTITY_DATABASE_TOPOLOGY`.**
+> Although both topology settings live side-by-side in `/database`, they address completely different architectural concerns and carry contrasting recommended defaults:
+>
+> - **`ERASURE_DATABASE_TOPOLOGY` (Recommended default: `EmbeddedSqlite`):** The privacy erasure authority acts as an immutable anti-resurrection ledger for GDPR compliance. It is lightweight and strongly recommended to remain *outside* the primary application database in a dedicated local SQLite file. This ensures that if the primary application database is ever restored from a backup (e.g. taken 24 hours prior), erasures executed *after* that backup was taken are preserved in the independent erasure ledger and immediately replayed, preventing deleted user data from being accidentally resurrected.
+> - **`IDENTITY_DATABASE_TOPOLOGY` (Recommended default: `colocated`):** Local Identity credential storage defaults to `colocated` within the primary application database for operational simplicity and transactional consistency in standard single-solution deployments. By contrast, an `external` topology is intended for multi-tenant SaaS providers, ERP suites, or multi-solution organizations (such as the ISLAMU platform ecosystem) that operate a single, shared identity database across all organizational applications.
+
 ### `/database/erasure`
 
 Endpoint and credentials for the privacy-erasure authority, used only when `ERASURE_DATABASE_TOPOLOGY=ExternalDatabase`. The provider is fixed to PostgreSQL.
@@ -211,7 +218,7 @@ External Local Identity credential store, used only when `IDENTITY_DATABASE_TOPO
 | `IDENTITY_DATABASE_TLS_MODE` | `Prefer`, `Required`, or `Disabled`. |
 | `IDENTITY_DATABASE_TRUST_SERVER_CERTIFICATE` | `false` for strict CA verification. |
 
-Local Identity tables share the primary application database when colocated, and connect to this external store when configured with external topology.
+Local Identity tables share the primary application database when colocated (`IDENTITY_DATABASE_TOPOLOGY=colocated`, recommended for single-instance deployments), and connect to this external store when configured with external topology (e.g. when sharing a central identity database across multiple distinct applications or SaaS solutions like the ISLAMU suite).
 
 ### `/cerbos`
 

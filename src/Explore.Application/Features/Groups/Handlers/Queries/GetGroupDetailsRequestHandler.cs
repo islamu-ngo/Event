@@ -4,13 +4,13 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Group;
 using Explore.Application.Features.Groups.Requests.Queries;
 using Explore.Application.Services;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.Groups.Handlers.Queries;
 
-public class GetGroupDetailsRequestHandler : IRequestHandler<GetGroupDetailsRequest, GroupDto>
+public class GetGroupDetailsRequestHandler : IQueryHandler<GetGroupDetailsRequest, GroupDto?>
 {
     private readonly IGroupRepository _groupRepository;
     private readonly IObjectStorageService _objectStorageService;
@@ -29,7 +29,7 @@ public class GetGroupDetailsRequestHandler : IRequestHandler<GetGroupDetailsRequ
         _cache = cache;
     }
 
-    public async Task<GroupDto> Handle(GetGroupDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<GroupDto?> QueryAsync(GetGroupDetailsRequest request, CancellationToken cancellationToken)
     {
         var cacheKey = $"group:detail:{request.Id}";
         var dto = await _cache.GetOrCreateAsync(

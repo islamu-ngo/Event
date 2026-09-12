@@ -8,12 +8,12 @@ using Explore.Application.Services;
 using Explore.Application.Telemetry;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Groups.Handlers.Commands;
 
-public class CreateGroupCommandHandler : IRequestHandler<CreateGroupCommand, BaseCommandResponse<Guid>>
+public class CreateGroupCommandHandler : ICommandHandler<CreateGroupCommand, BaseCommandResponse<Guid>>
 {
     private readonly IGroupRepository _groupRepository;
     private readonly IGroupTenantRepository _groupTenantRepository;
@@ -50,7 +50,7 @@ public class CreateGroupCommandHandler : IRequestHandler<CreateGroupCommand, Bas
         _metrics = metrics;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateGroupCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateGroupCommand request, CancellationToken cancellationToken)
     {
         var validator = new CreateGroupDtoValidator();
         var validationResult = await validator.ValidateAsync(request.GroupDto, cancellationToken);

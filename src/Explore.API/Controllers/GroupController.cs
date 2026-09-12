@@ -62,17 +62,38 @@ public class GroupController : EventControllerBase
         "Group not found.");
 
     private readonly IMediator _mediator;
+    private readonly ICommandHandler<CreateGroupCommand, BaseCommandResponse<Guid>> _createGroup;
+    private readonly ICommandHandler<UpdateGroupCommand, BaseCommandResponse<Guid>> _updateGroup;
+    private readonly ICommandHandler<DeleteGroupCommand, BaseCommandResponse<Guid>> _deleteGroup;
+    private readonly ICommandHandler<UpdateGroupApprovalStatusCommand, BaseCommandResponse<Guid>> _updateApproval;
+    private readonly IQueryHandler<GetGroupDetailsRequest, GroupDto?> _groupDetails;
+    private readonly IQueryHandler<GetGroupListRequest, PaginatedResult<GroupListDto>> _groupList;
+    private readonly IQueryHandler<GetMyGroupsRequest, PaginatedResult<GroupListDto>> _myGroups;
     private readonly IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> _identityQuery;
     private readonly IResourceAssembler<GroupDto, GroupListDto> _resourceAssembler;
     private readonly IResourceAssembler<NotificationPreferenceMatrixDto> _preferenceAssembler;
 
     public GroupController(
         IMediator mediator,
+        ICommandHandler<CreateGroupCommand, BaseCommandResponse<Guid>> createGroup,
+        ICommandHandler<UpdateGroupCommand, BaseCommandResponse<Guid>> updateGroup,
+        ICommandHandler<DeleteGroupCommand, BaseCommandResponse<Guid>> deleteGroup,
+        ICommandHandler<UpdateGroupApprovalStatusCommand, BaseCommandResponse<Guid>> updateApproval,
+        IQueryHandler<GetGroupDetailsRequest, GroupDto?> groupDetails,
+        IQueryHandler<GetGroupListRequest, PaginatedResult<GroupListDto>> groupList,
+        IQueryHandler<GetMyGroupsRequest, PaginatedResult<GroupListDto>> myGroups,
         IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
         IResourceAssembler<GroupDto, GroupListDto> resourceAssembler,
         IResourceAssembler<NotificationPreferenceMatrixDto> preferenceAssembler)
     {
         _mediator = mediator;
+        _createGroup = createGroup;
+        _updateGroup = updateGroup;
+        _deleteGroup = deleteGroup;
+        _updateApproval = updateApproval;
+        _groupDetails = groupDetails;
+        _groupList = groupList;
+        _myGroups = myGroups;
         _identityQuery = identityQuery;
         _resourceAssembler = resourceAssembler;
         _preferenceAssembler = preferenceAssembler;
@@ -90,7 +111,7 @@ public class GroupController : EventControllerBase
         [FromQuery] PaginationQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new GetGroupListRequest
+        var result = await _groupList.QueryAsync(new GetGroupListRequest
         {
             PageNumber = query.PageNumber,
             PageSize = query.PageSize
@@ -123,7 +144,7 @@ public class GroupController : EventControllerBase
             return this.ToAuthenticationRequiredProblem();
         }
 
-        var result = await _mediator.Send(new GetMyGroupsRequest
+        var result = await _myGroups.QueryAsync(new GetMyGroupsRequest
         {
             UserId = userId,
             PageNumber = query.PageNumber,
@@ -149,7 +170,7 @@ public class GroupController : EventControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<HalResource<GroupDto>>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var group = await _mediator.Send(new GetGroupDetailsRequest { Id = id }, cancellationToken);
+        var group = await _groupDetails.QueryAsync(new GetGroupDetailsRequest { Id = id }, cancellationToken);
 
         if (group == null)
         {
@@ -257,7 +278,7 @@ public class GroupController : EventControllerBase
                 detail: "The authenticated principal could not be resolved to an application user.");
         }
 
-        var response = await _mediator.Send(new CreateGroupCommand
+        var response = await _createGroup.ExecuteAsync(new CreateGroupCommand
         {
             GroupDto = group,
             CreatorUserId = userId.Value
@@ -310,7 +331,7 @@ public class GroupController : EventControllerBase
             UpdateGroupDto = updateDto
         };
 
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _updateGroup.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -338,7 +359,7 @@ public class GroupController : EventControllerBase
         [FromBody] UpdateGroupApprovalStatusDto approvalStatus,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new UpdateGroupApprovalStatusCommand
+        var response = await _updateApproval.ExecuteAsync(new UpdateGroupApprovalStatusCommand
         {
             Id = id,
             GroupApprovalStatusDto = approvalStatus
@@ -367,7 +388,7 @@ public class GroupController : EventControllerBase
             return this.ToAuthenticationRequiredProblem();
         }
 
-        var response = await _mediator.Send(new DeleteGroupCommand
+        var response = await _deleteGroup.ExecuteAsync(new DeleteGroupCommand
         {
             Id = id,
             UserId = userId

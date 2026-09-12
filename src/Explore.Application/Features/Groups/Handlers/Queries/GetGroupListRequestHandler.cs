@@ -5,12 +5,12 @@ using Explore.Application.DTOs.Group;
 using Explore.Application.Features.Groups.Requests.Queries;
 using Explore.Application.Responses;
 using Explore.Application.Services;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.Groups.Handlers.Queries;
 
-public class GetGroupListRequestHandler : IRequestHandler<GetGroupListRequest, PaginatedResult<GroupListDto>>
+public class GetGroupListRequestHandler : IQueryHandler<GetGroupListRequest, PaginatedResult<GroupListDto>>
 {
     private readonly IGroupRepository _groupRepository;
     private readonly IObjectStorageService _objectStorageService;
@@ -26,7 +26,7 @@ public class GetGroupListRequestHandler : IRequestHandler<GetGroupListRequest, P
         _logger = logger;
     }
 
-    public async Task<PaginatedResult<GroupListDto>> Handle(GetGroupListRequest request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<GroupListDto>> QueryAsync(GetGroupListRequest request, CancellationToken cancellationToken)
     {
         var (groups, totalCount) = await _groupRepository.GetGroupsWithDetailsPaged(request.PageNumber, request.PageSize);
         var groupDtos = groups.Select(OrganizationMapper.ToGroupListItem).ToList();

@@ -1,6 +1,6 @@
 using Explore.Application.DTOs.Group;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Groups.Requests.Queries;
 
-public sealed record GetGroupDetailsRequest(Guid Id = default) : IRequest<GroupDto>;
+public sealed record GetGroupDetailsRequest(Guid Id = default) : IQuery<GroupDto?>;

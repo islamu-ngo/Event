@@ -6,12 +6,12 @@ using Explore.Application.Features.Groups.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Groups.Handlers.Commands;
 
-public class DeleteGroupCommandHandler : IRequestHandler<DeleteGroupCommand, BaseCommandResponse<Guid>>
+public class DeleteGroupCommandHandler : ICommandHandler<DeleteGroupCommand, BaseCommandResponse<Guid>>
 {
     private readonly IGroupRepository _groupRepository;
     private readonly IGroupMemberRepository _groupMemberRepository;
@@ -33,7 +33,7 @@ public class DeleteGroupCommandHandler : IRequestHandler<DeleteGroupCommand, Bas
         _cache = cache;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(DeleteGroupCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteGroupCommand request, CancellationToken cancellationToken)
     {
         var currentUserId = _userContext.GetRequiredUserId();
 

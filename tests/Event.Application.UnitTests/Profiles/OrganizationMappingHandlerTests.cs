@@ -48,16 +48,18 @@ public sealed class OrganizationMappingHandlerTests
         var list = new GetGroupListRequestHandler(store, null!, NullLogger<GetGroupListRequestHandler>.Instance);
         var mine = new GetMyGroupsRequestHandler(store, members, null!, NullLogger<GetMyGroupsRequestHandler>.Instance);
         var detail = new GetGroupDetailsRequestHandler(store, null!, NullLogger<GetGroupDetailsRequestHandler>.Instance, new InlineCache());
-        var page = await list.Handle(new GetGroupListRequest { PageNumber = 1, PageSize = 10 }, default);
+        var page = await list.QueryAsync(new GetGroupListRequest { PageNumber = 1, PageSize = 10 }, default);
         await Assert.That(page.Items.Select(item => item.Id).SequenceEqual(new[] { Stamp, Id })).IsTrue();
         await Assert.That(page.TotalCount).IsEqualTo(2);
         await Assert.That(page.PageNumber).IsEqualTo(1);
         await Assert.That(page.PageSize).IsEqualTo(10);
-        var own = await mine.Handle(new GetMyGroupsRequest { UserId = ActorId.ToString() }, default);
+        var own = await mine.QueryAsync(new GetMyGroupsRequest { UserId = ActorId.ToString() }, default);
         await Assert.That(own.Items.Single().CurrentUserRoleId).IsEqualTo((int)RoleEnum.GroupAdmin);
-        await Assert.That(await detail.Handle(new GetGroupDetailsRequest { Id = TenantId }, default)).IsNull();
-        await Assert.That((await detail.Handle(new GetGroupDetailsRequest { Id = Id }, default)).ActorDisplayName).IsEqualTo("Public actor");
-        await Assert.That((await mine.Handle(new GetMyGroupsRequest { UserId = "invalid" }, default)).Items).IsEmpty();
+        await Assert.That(await detail.QueryAsync(new GetGroupDetailsRequest { Id = TenantId }, default)).IsNull();
+        var found = await detail.QueryAsync(new GetGroupDetailsRequest { Id = Id }, default)
+            ?? throw new InvalidOperationException("Expected the seeded group.");
+        await Assert.That(found.ActorDisplayName).IsEqualTo("Public actor");
+        await Assert.That((await mine.QueryAsync(new GetMyGroupsRequest { UserId = "invalid" }, default)).Items).IsEmpty();
         store.Items.Clear();
         first.FullName = "Changed after publication";
         first.Actor!.Pii.DisplayName = "Changed actor";
@@ -76,7 +78,7 @@ public sealed class OrganizationMappingHandlerTests
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
         var handler = new CreateGroupCommandHandler(groups, participations, null!, members, actors, null!,
             new CacheInvalidator(), new TenantContext(TenantId), new InlineCache(), metrics);
-        var result = await handler.Handle(new CreateGroupCommand
+        var result = await handler.ExecuteAsync(new CreateGroupCommand
         {
             CreatorUserId = ActorId,
             GroupDto = new CreateGroupDto { FullName = "New group", Description = "New description" }

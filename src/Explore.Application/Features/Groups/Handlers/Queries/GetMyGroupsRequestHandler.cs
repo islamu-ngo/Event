@@ -6,12 +6,12 @@ using Explore.Application.Features.Groups.Requests.Queries;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.Groups.Handlers.Queries;
 
-public class GetMyGroupsRequestHandler : IRequestHandler<GetMyGroupsRequest, PaginatedResult<GroupListDto>>
+public class GetMyGroupsRequestHandler : IQueryHandler<GetMyGroupsRequest, PaginatedResult<GroupListDto>>
 {
     private readonly IGroupRepository _groupRepository;
     private readonly IGroupMemberRepository _groupMemberRepository;
@@ -30,7 +30,7 @@ public class GetMyGroupsRequestHandler : IRequestHandler<GetMyGroupsRequest, Pag
         _logger = logger;
     }
 
-    public async Task<PaginatedResult<GroupListDto>> Handle(GetMyGroupsRequest request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<GroupListDto>> QueryAsync(GetMyGroupsRequest request, CancellationToken cancellationToken)
     {
         if (!Guid.TryParse(request.UserId, out Guid userGuid))
         {

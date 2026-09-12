@@ -4,11 +4,11 @@ using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventStatus;
 using Explore.Application.Features.EventStatuses.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventStatuses.Handlers.Queries;
 
-public class GetEventStatusDetailsRequestHandler : IRequestHandler<GetEventStatusDetailsRequest, EventStatusDto>
+public class GetEventStatusDetailsRequestHandler : IQueryHandler<GetEventStatusDetailsRequest, EventStatusDto?>
 {
     private readonly IEventStatusRepository _eventStatusRepository;
 
@@ -17,9 +17,9 @@ public class GetEventStatusDetailsRequestHandler : IRequestHandler<GetEventStatu
         _eventStatusRepository = eventStatusRepository;
     }
 
-    public async Task<EventStatusDto> Handle(GetEventStatusDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<EventStatusDto?> QueryAsync(GetEventStatusDetailsRequest request, CancellationToken cancellationToken)
     {
         var eventStatus = await _eventStatusRepository.GetById(request.Id);
-        return EventStatusMapper.ToDetail(eventStatus)!;
+        return EventStatusMapper.ToDetail(eventStatus);
     }
 }

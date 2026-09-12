@@ -5,7 +5,7 @@ using Explore.API.Attributes;
 using Explore.API.Hateoas;
 using Explore.Application.DTOs.EventStatus;
 using Explore.Application.Features.EventStatuses.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -17,7 +17,9 @@ namespace Explore.API.Controllers;
 [Route("api/[controller]")]
 [ApiController]
 [EndpointClassification(EndpointClass.Public)]
-public class EventStatusController(IMediator mediator) : ControllerBase
+public class EventStatusController(
+    IQueryHandler<GetEventStatusListRequest, List<EventStatusListDto>> eventStatusList,
+    IQueryHandler<GetEventStatusDetailsRequest, EventStatusDto?> eventStatusDetails) : ControllerBase
 {
     // GET: api/eventstatus
     [HttpGet(Name = RouteNames.GetEventStatuses)]
@@ -27,7 +29,7 @@ public class EventStatusController(IMediator mediator) : ControllerBase
     [ProducesResponseType(typeof(List<EventStatusListDto>), StatusCodes.Status200OK)]
     [OutputCache(PolicyName = "LookupData")]
     public async Task<ActionResult<List<EventStatusListDto>>> GetAll(CancellationToken cancellationToken = default) =>
-        Ok(await mediator.Send(new GetEventStatusListRequest(), cancellationToken));
+        Ok(await eventStatusList.QueryAsync(new GetEventStatusListRequest(), cancellationToken));
 
     // GET: api/eventstatus/{id}
     [HttpGet("{id}", Name = RouteNames.GetEventStatusById)]
@@ -38,5 +40,5 @@ public class EventStatusController(IMediator mediator) : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<EventStatusDto>> GetById(int id, CancellationToken cancellationToken = default) =>
-        Ok(await mediator.Send(new GetEventStatusDetailsRequest { Id = id }, cancellationToken));
+        Ok(await eventStatusDetails.QueryAsync(new GetEventStatusDetailsRequest { Id = id }, cancellationToken));
 }

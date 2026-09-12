@@ -3,6 +3,7 @@ using Explore.API.Hateoas;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Settings;
 using Explore.Application.Features.Settings.Requests.Commands;
 using Explore.Application.Features.Settings.Requests.Queries;
@@ -23,22 +24,22 @@ public sealed class InstanceSettingGroupApiTests
     [Test]
     public async Task GetInstanceSettings_WhenInstanceAdmin_ReturnsAuthorizedHalResource()
     {
-        var mediator = Substitute.For<IMediator>();
+        var ports = new SettingsPorts();
         var adminContext = Substitute.For<IAdminContext>();
         var assembler = Substitute.For<IResourceAssembler<SettingGroupResponseDto, SettingGroupResponseDto>>();
         var settings = CreateAtprotoSettings();
         var resource = new HalResource<SettingGroupResponseDto>(settings);
         adminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(true);
-        mediator.Send(Arg.Any<ResolveSettingGroupQuery>(), Arg.Any<CancellationToken>()).Returns(settings);
+        ports.Query.QueryAsync(Arg.Any<ResolveSettingGroupQuery>(), Arg.Any<CancellationToken>()).Returns(settings);
         assembler.ToResource(settings, Arg.Any<HttpContext>()).Returns(resource);
-        var controller = CreateController(mediator, adminContext, assembler);
+        var controller = CreateController(ports, adminContext, assembler);
 
         var result = await controller.GetInstanceSettings(CancellationToken.None);
 
         var ok = result.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsEqualTo(resource);
-        await mediator.Received(1).Send(
+        await ports.Query.Received(1).QueryAsync(
             Arg.Is<ResolveSettingGroupQuery>(query =>
                 query.Category == AtprotoFederationSettingDefinitions.Category
                 && query.Scope == SettingScope.Instance
@@ -51,26 +52,26 @@ public sealed class InstanceSettingGroupApiTests
     [Test]
     public async Task GetInstanceSettings_WhenNotInstanceAdmin_ReturnsForbiddenWithoutReadingSettings()
     {
-        var mediator = Substitute.For<IMediator>();
+        var ports = new SettingsPorts();
         var adminContext = Substitute.For<IAdminContext>();
         adminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(false);
-        var controller = CreateController(mediator, adminContext);
+        var controller = CreateController(ports, adminContext);
 
         var result = await controller.GetInstanceSettings(CancellationToken.None);
 
         var forbidden = result.Result as ObjectResult;
         await Assert.That(forbidden).IsNotNull();
         await Assert.That(forbidden!.StatusCode).IsEqualTo(StatusCodes.Status403Forbidden);
-        await mediator.DidNotReceive().Send(Arg.Any<ResolveSettingGroupQuery>(), Arg.Any<CancellationToken>());
+        await ports.Query.DidNotReceive().QueryAsync(Arg.Any<ResolveSettingGroupQuery>(), Arg.Any<CancellationToken>());
     }
 
     [Test]
-    public async Task UpdateInstanceSetting_DispatchesGenericCommandAtInstanceScope()
+    public async Task UpdateInstanceSetting_DispatchesNativeCommandAtInstanceScope()
     {
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<UpdateSettingCommand>(), Arg.Any<CancellationToken>())
+        var ports = new SettingsPorts();
+        ports.Update.ExecuteAsync(Arg.Any<UpdateSettingCommand>(), Arg.Any<CancellationToken>())
             .Returns(SuccessfulResponse());
-        var controller = CreateController(mediator, Substitute.For<IAdminContext>());
+        var controller = CreateController(ports, Substitute.For<IAdminContext>());
 
         var result = await controller.UpdateInstanceSetting(
             GovernanceSettingKeys.Federation.AtprotoEventsEnabled,
@@ -78,7 +79,7 @@ public sealed class InstanceSettingGroupApiTests
             CancellationToken.None);
 
         await Assert.That(result.Result).IsTypeOf<OkObjectResult>();
-        await mediator.Received(1).Send(
+        await ports.Update.Received(1).ExecuteAsync(
             Arg.Is<UpdateSettingCommand>(command =>
                 command.Key == GovernanceSettingKeys.Federation.AtprotoEventsEnabled
                 && command.Value == "true"
@@ -89,12 +90,12 @@ public sealed class InstanceSettingGroupApiTests
     [Test]
     [Arguments("federation.atproto_events_backfill_enabled", "true")]
     [Arguments("federation.atproto_events_backfill_mode", "full")]
-    public async Task BackfillSettingUpdate_UsesGenericInstanceCommand(string key, string value)
+    public async Task BackfillSettingUpdate_UsesNativeInstanceCommand(string key, string value)
     {
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<UpdateSettingCommand>(), Arg.Any<CancellationToken>())
+        var ports = new SettingsPorts();
+        ports.Update.ExecuteAsync(Arg.Any<UpdateSettingCommand>(), Arg.Any<CancellationToken>())
             .Returns(SuccessfulResponse());
-        var controller = CreateController(mediator, Substitute.For<IAdminContext>());
+        var controller = CreateController(ports, Substitute.For<IAdminContext>());
 
         var result = await controller.UpdateInstanceSetting(
             key,
@@ -102,7 +103,7 @@ public sealed class InstanceSettingGroupApiTests
             CancellationToken.None);
 
         await Assert.That(result.Result).IsTypeOf<OkObjectResult>();
-        await mediator.Received(1).Send(
+        await ports.Update.Received(1).ExecuteAsync(
             Arg.Is<UpdateSettingCommand>(command =>
                 command.Key == key
                 && command.Value == value
@@ -113,10 +114,10 @@ public sealed class InstanceSettingGroupApiTests
     [Test]
     public async Task LockAndUnlockInstanceSetting_DispatchGenericCommandsAtInstanceScope()
     {
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<LockSettingCommand>(), Arg.Any<CancellationToken>()).Returns(SuccessfulResponse());
-        mediator.Send(Arg.Any<UnlockSettingCommand>(), Arg.Any<CancellationToken>()).Returns(SuccessfulResponse());
-        var controller = CreateController(mediator, Substitute.For<IAdminContext>());
+        var ports = new SettingsPorts();
+        ports.Lock.ExecuteAsync(Arg.Any<LockSettingCommand>(), Arg.Any<CancellationToken>()).Returns(SuccessfulResponse());
+        ports.Unlock.ExecuteAsync(Arg.Any<UnlockSettingCommand>(), Arg.Any<CancellationToken>()).Returns(SuccessfulResponse());
+        var controller = CreateController(ports, Substitute.For<IAdminContext>());
         var key = GovernanceSettingKeys.Federation.AtprotoEventValidationProfile;
 
         var lockResult = await controller.LockInstanceSetting(key, CancellationToken.None);
@@ -124,10 +125,10 @@ public sealed class InstanceSettingGroupApiTests
 
         await Assert.That(lockResult.Result).IsTypeOf<OkObjectResult>();
         await Assert.That(unlockResult.Result).IsTypeOf<OkObjectResult>();
-        await mediator.Received(1).Send(
+        await ports.Lock.Received(1).ExecuteAsync(
             Arg.Is<LockSettingCommand>(command => command.Key == key && command.Scope == SettingScope.Instance),
             Arg.Any<CancellationToken>());
-        await mediator.Received(1).Send(
+        await ports.Unlock.Received(1).ExecuteAsync(
             Arg.Is<UnlockSettingCommand>(command => command.Key == key && command.Scope == SettingScope.Instance),
             Arg.Any<CancellationToken>());
     }
@@ -135,8 +136,8 @@ public sealed class InstanceSettingGroupApiTests
     [Test]
     public async Task Mutations_WhenKeyIsOutsideAtprotoAdministratorAllowlist_ReturnNotFoundWithoutDispatch()
     {
-        var mediator = Substitute.For<IMediator>();
-        var controller = CreateController(mediator, Substitute.For<IAdminContext>());
+        var ports = new SettingsPorts();
+        var controller = CreateController(ports, Substitute.For<IAdminContext>());
         const string unrelatedKey = "storage.provider";
 
         var update = await controller.UpdateInstanceSetting(
@@ -149,9 +150,9 @@ public sealed class InstanceSettingGroupApiTests
         await Assert.That((update.Result as ObjectResult)?.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
         await Assert.That((lockResult.Result as ObjectResult)?.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
         await Assert.That((unlockResult.Result as ObjectResult)?.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
-        await mediator.DidNotReceive().Send(Arg.Any<UpdateSettingCommand>(), Arg.Any<CancellationToken>());
-        await mediator.DidNotReceive().Send(Arg.Any<LockSettingCommand>(), Arg.Any<CancellationToken>());
-        await mediator.DidNotReceive().Send(Arg.Any<UnlockSettingCommand>(), Arg.Any<CancellationToken>());
+        await ports.Update.DidNotReceive().ExecuteAsync(Arg.Any<UpdateSettingCommand>(), Arg.Any<CancellationToken>());
+        await ports.Lock.DidNotReceive().ExecuteAsync(Arg.Any<LockSettingCommand>(), Arg.Any<CancellationToken>());
+        await ports.Unlock.DidNotReceive().ExecuteAsync(Arg.Any<UnlockSettingCommand>(), Arg.Any<CancellationToken>());
     }
 
     [Test]
@@ -178,11 +179,17 @@ public sealed class InstanceSettingGroupApiTests
     }
 
     private static SettingsController CreateController(
-        IMediator mediator,
+        SettingsPorts ports,
         IAdminContext adminContext,
         IResourceAssembler<SettingGroupResponseDto, SettingGroupResponseDto>? assembler = null) =>
         new(
-            mediator,
+            Substitute.For<IMediator>(),
+            ports.Query,
+            ports.Update,
+            Substitute.For<ICommandHandler<UpdateSettingBatchCommand, BatchUpdateResponseDto>>(),
+            Substitute.For<ICommandHandler<ResetSettingCommand, BaseCommandResponse<Guid>>>(),
+            ports.Lock,
+            ports.Unlock,
             adminContext,
             assembler ?? Substitute.For<IResourceAssembler<SettingGroupResponseDto, SettingGroupResponseDto>>())
         {
@@ -191,6 +198,18 @@ public sealed class InstanceSettingGroupApiTests
                 HttpContext = new DefaultHttpContext()
             }
         };
+
+    private sealed class SettingsPorts
+    {
+        public IQueryHandler<ResolveSettingGroupQuery, SettingGroupResponseDto> Query { get; } =
+            Substitute.For<IQueryHandler<ResolveSettingGroupQuery, SettingGroupResponseDto>>();
+        public ICommandHandler<UpdateSettingCommand, BaseCommandResponse<Guid>> Update { get; } =
+            Substitute.For<ICommandHandler<UpdateSettingCommand, BaseCommandResponse<Guid>>>();
+        public ICommandHandler<LockSettingCommand, BaseCommandResponse<Guid>> Lock { get; } =
+            Substitute.For<ICommandHandler<LockSettingCommand, BaseCommandResponse<Guid>>>();
+        public ICommandHandler<UnlockSettingCommand, BaseCommandResponse<Guid>> Unlock { get; } =
+            Substitute.For<ICommandHandler<UnlockSettingCommand, BaseCommandResponse<Guid>>>();
+    }
 
     private static SettingGroupResponseDto CreateAtprotoSettings() =>
         new()

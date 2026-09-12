@@ -6,6 +6,7 @@ using Explore.API.Hateoas;
 using Explore.API.Filters;
 using Explore.API.Models;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EmailDispatch;
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using Explore.Application.Features.EmailDispatch.Requests.Queries;
@@ -30,98 +31,45 @@ namespace Explore.API.Controllers;
 [ApiController]
 [Authorize]
 [EndpointClassification(EndpointClass.Authenticated)]
-public class SettingsController : ControllerBase
+public class SettingsController : SettingsCapabilityControllerBase
 {
-    private static readonly ApiValidationProblemDescriptor SettingsValidationProblem = new(
-        "settings",
-        "Settings validation failed",
-        "Settings update failed.");
-
     private static readonly ApiNotFoundProblemDescriptor AtprotoAdministratorSettingNotFoundProblem = new(
         "ATProto administrator setting not found",
         "The requested ATProto administrator setting is not available.");
 
     private readonly IMediator _mediator;
+    private readonly IQueryHandler<ResolveSettingGroupQuery, SettingGroupResponseDto> _resolveSettings;
+    private readonly ICommandHandler<UpdateSettingCommand, BaseCommandResponse<Guid>> _updateSetting;
+    private readonly ICommandHandler<UpdateSettingBatchCommand, BatchUpdateResponseDto> _updateSettings;
+    private readonly ICommandHandler<ResetSettingCommand, BaseCommandResponse<Guid>> _resetSetting;
+    private readonly ICommandHandler<LockSettingCommand, BaseCommandResponse<Guid>> _lockSetting;
+    private readonly ICommandHandler<UnlockSettingCommand, BaseCommandResponse<Guid>> _unlockSetting;
     private readonly IAdminContext _adminContext;
     private readonly IResourceAssembler<SettingGroupResponseDto, SettingGroupResponseDto> _instanceSettingGroupAssembler;
 
     public SettingsController(
         IMediator mediator,
+        IQueryHandler<ResolveSettingGroupQuery, SettingGroupResponseDto> resolveSettings,
+        ICommandHandler<UpdateSettingCommand, BaseCommandResponse<Guid>> updateSetting,
+        ICommandHandler<UpdateSettingBatchCommand, BatchUpdateResponseDto> updateSettings,
+        ICommandHandler<ResetSettingCommand, BaseCommandResponse<Guid>> resetSetting,
+        ICommandHandler<LockSettingCommand, BaseCommandResponse<Guid>> lockSetting,
+        ICommandHandler<UnlockSettingCommand, BaseCommandResponse<Guid>> unlockSetting,
         IAdminContext adminContext,
         IResourceAssembler<SettingGroupResponseDto, SettingGroupResponseDto> instanceSettingGroupAssembler)
     {
         _mediator = mediator;
+        _resolveSettings = resolveSettings;
+        _updateSetting = updateSetting;
+        _updateSettings = updateSettings;
+        _resetSetting = resetSetting;
+        _lockSetting = lockSetting;
+        _unlockSetting = unlockSetting;
         _adminContext = adminContext;
         _instanceSettingGroupAssembler = instanceSettingGroupAssembler;
     }
 
-    // ── User Scope Endpoints ────────────────────────────────────────────
-
-    [HttpGet("user/{category}", Name = RouteNames.GetUserSettings)]
-    [EndpointSummary("Get User Settings")]
-    [EndpointDescription("Returns effective settings for the given category, resolved through the full hierarchy for the authenticated user.")]
-    [ProducesResponseType(typeof(SettingGroupResponseDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<SettingGroupResponseDto>> GetUserSettings(
-        string category, CancellationToken cancellationToken = default)
-    {
-        var result = await _mediator.Send(new ResolveSettingGroupQuery
-        {
-            Category = category,
-            Scope = SettingScope.User
-        }, cancellationToken);
-
-        return Ok(result);
-    }
-
-    [HttpPut("user/{category}", Name = RouteNames.UpdateUserSettingsBatch)]
-    [EndpointSummary("Batch Update User Settings")]
-    [EndpointDescription("Applies multiple user preference updates for a category. Defaults to best-effort mode (skips locked settings, applies rest).")]
-    [ProducesResponseType(typeof(BatchUpdateResponseDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<BatchUpdateResponseDto>> UpdateUserSettingsBatch(
-        string category,
-        [FromBody] UpdateSettingBatchDto body,
-        CancellationToken cancellationToken = default)
-    {
-        var result = await _mediator.Send(new UpdateSettingBatchCommand
-        {
-            Category = category,
-            Values = body.Values,
-            Scope = SettingScope.User,
-            Mode = body.Mode ?? BatchUpdateMode.BestEffort
-        }, cancellationToken);
-
-        if (!result.Success)
-        {
-            return this.ToValidationProblem(
-                SettingsValidationProblem,
-                result.Message ?? "User settings batch update failed.");
-        }
-        return Ok(result);
-    }
-
-    [HttpPut("user/keys/{key}", Name = RouteNames.UpdateUserSetting)]
-    [EndpointSummary("Update Single User Setting")]
-    [EndpointDescription("Updates a single user preference by key. Key must be a registered setting key.")]
-    [ProducesResponseType(typeof(BaseCommandResponse<Guid>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<BaseCommandResponse<Guid>>> UpdateUserSetting(
-        string key,
-        [FromBody] UpdateSettingValueDto body,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await _mediator.Send(new UpdateSettingCommand
-        {
-            Key = key,
-            Value = body.Value,
-            Scope = SettingScope.User
-        }, cancellationToken);
-
-        return HandleCommandResponse(response);
-    }
+    // Tenant override reset.
 
     [HttpDelete("tenant/keys/{key}", Name = RouteNames.ResetTenantSetting)]
     [EndpointSummary("Reset Tenant Setting")]
@@ -134,28 +82,10 @@ public class SettingsController : ControllerBase
     public async Task<ActionResult<BaseCommandResponse<Guid>>> ResetTenantSetting(
         string key, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new ResetSettingCommand
+        var response = await _resetSetting.ExecuteAsync(new ResetSettingCommand
         {
             Key = key,
             Scope = SettingScope.Tenant
-        }, cancellationToken);
-
-        return HandleCommandResponse(response);
-    }
-
-    [HttpDelete("user/keys/{key}", Name = RouteNames.ResetUserSetting)]
-    [EndpointSummary("Reset User Setting")]
-    [EndpointDescription("Removes the user's override for a setting, restoring it to the next higher scope's value.")]
-    [ProducesResponseType(typeof(BaseCommandResponse<Guid>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<BaseCommandResponse<Guid>>> ResetUserSetting(
-        string key, CancellationToken cancellationToken = default)
-    {
-        var response = await _mediator.Send(new ResetSettingCommand
-        {
-            Key = key,
-            Scope = SettingScope.User
         }, cancellationToken);
 
         return HandleCommandResponse(response);
@@ -218,7 +148,7 @@ public class SettingsController : ControllerBase
     public async Task<ActionResult<HalResource<SettingGroupResponseDto>>> GetTenantSettings(
         string category, CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new ResolveSettingGroupQuery
+        var result = await _resolveSettings.QueryAsync(new ResolveSettingGroupQuery
         {
             Category = category,
             Scope = SettingScope.Tenant
@@ -241,7 +171,7 @@ public class SettingsController : ControllerBase
         [FromServices] IOutputCacheStore outputCacheStore,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new UpdateSettingBatchCommand
+        var result = await _updateSettings.ExecuteAsync(new UpdateSettingBatchCommand
         {
             Category = category,
             Values = body.Values,
@@ -284,7 +214,7 @@ public class SettingsController : ControllerBase
         [FromServices] IOutputCacheStore outputCacheStore,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new UpdateSettingCommand
+        var response = await _updateSetting.ExecuteAsync(new UpdateSettingCommand
         {
             Key = key,
             Value = body.Value,
@@ -310,7 +240,7 @@ public class SettingsController : ControllerBase
     public async Task<ActionResult<BaseCommandResponse<Guid>>> LockTenantSetting(
         string key, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new LockSettingCommand
+        var response = await _lockSetting.ExecuteAsync(new LockSettingCommand
         {
             Key = key,
             Scope = SettingScope.Tenant
@@ -330,7 +260,7 @@ public class SettingsController : ControllerBase
     public async Task<ActionResult<BaseCommandResponse<Guid>>> UnlockTenantSetting(
         string key, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new UnlockSettingCommand
+        var response = await _unlockSetting.ExecuteAsync(new UnlockSettingCommand
         {
             Key = key,
             Scope = SettingScope.Tenant
@@ -354,7 +284,7 @@ public class SettingsController : ControllerBase
             return this.ToForbiddenProblem(detail: "Instance administrator authority is required to view instance settings.");
         }
 
-        var result = await _mediator.Send(new ResolveSettingGroupQuery
+        var result = await _resolveSettings.QueryAsync(new ResolveSettingGroupQuery
         {
             Category = AtprotoFederationSettingDefinitions.Category,
             Scope = SettingScope.Instance,
@@ -383,7 +313,7 @@ public class SettingsController : ControllerBase
             return this.ToNotFoundProblem(AtprotoAdministratorSettingNotFoundProblem);
         }
 
-        var response = await _mediator.Send(new UpdateSettingCommand
+        var response = await _updateSetting.ExecuteAsync(new UpdateSettingCommand
         {
             Key = key,
             Value = body.Value,
@@ -410,7 +340,7 @@ public class SettingsController : ControllerBase
             return this.ToNotFoundProblem(AtprotoAdministratorSettingNotFoundProblem);
         }
 
-        var response = await _mediator.Send(new ResetSettingCommand
+        var response = await _resetSetting.ExecuteAsync(new ResetSettingCommand
         {
             Key = key,
             Scope = SettingScope.Instance
@@ -436,7 +366,7 @@ public class SettingsController : ControllerBase
             return this.ToNotFoundProblem(AtprotoAdministratorSettingNotFoundProblem);
         }
 
-        var response = await _mediator.Send(new LockSettingCommand
+        var response = await _lockSetting.ExecuteAsync(new LockSettingCommand
         {
             Key = key,
             Scope = SettingScope.Instance
@@ -462,7 +392,7 @@ public class SettingsController : ControllerBase
             return this.ToNotFoundProblem(AtprotoAdministratorSettingNotFoundProblem);
         }
 
-        var response = await _mediator.Send(new UnlockSettingCommand
+        var response = await _unlockSetting.ExecuteAsync(new UnlockSettingCommand
         {
             Key = key,
             Scope = SettingScope.Instance
@@ -472,19 +402,5 @@ public class SettingsController : ControllerBase
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────
-
-    private ActionResult<BaseCommandResponse<Guid>> HandleCommandResponse(BaseCommandResponse<Guid> response)
-    {
-        if (response.IsSuccess) return Ok(response);
-
-        if (response.FailureCode == FailureCodes.AdminRequired)
-        {
-            return this.ToForbiddenProblem(detail: response.Message);
-        }
-
-        return response.FailureCode == CommandResponseResultMapper.VisitorAccessAccountRequiredConflict
-            ? this.MapCommandResponse(response)
-            : this.ToCommandValidationProblem(response, SettingsValidationProblem);
-    }
 
 }

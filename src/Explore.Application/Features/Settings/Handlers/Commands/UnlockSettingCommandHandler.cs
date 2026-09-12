@@ -9,11 +9,11 @@ using Explore.Application.Notifications;
 using Explore.Application.Responses;
 using Explore.Application.Settings;
 using Explore.Domain.Settings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Logging;
 
 public class UnlockSettingCommandHandler
-    : IRequestHandler<UnlockSettingCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UnlockSettingCommand, BaseCommandResponse<Guid>>
 {
     private readonly IHierarchicalSettingsResolver _resolver;
     private readonly ITenantContext _tenantContext;
@@ -53,7 +53,7 @@ public class UnlockSettingCommandHandler
         _visitorSettings = visitorSettings;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UnlockSettingCommand request, CancellationToken cancellationToken)
     {
         // Validate key exists

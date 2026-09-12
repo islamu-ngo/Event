@@ -2,13 +2,13 @@ namespace Explore.Application.Features.Settings.Requests.Queries;
 
 using Explore.Application.DTOs.Settings;
 using Explore.Domain.Settings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 /// <summary>
 /// Resolves all settings for a category through the hierarchical cascade at the requested scope.
 /// The scope determines context depth: User sees full cascade, Tenant sees instance+tenant only.
 /// </summary>
-public sealed record ResolveSettingGroupQuery : IRequest<SettingGroupResponseDto>
+public sealed record ResolveSettingGroupQuery : IQuery<SettingGroupResponseDto>
 {
     /// <summary>
     /// Setting category (e.g., "EventList", "Appearance"). Must exist in SettingRegistry.

@@ -167,7 +167,7 @@ public sealed class VisitorAccessSettingsWriterTests
         var entity = await fixture.SeedEventAsync(accountRequired: true);
         if (surface == "batch")
         {
-            var result = await fixture.ExecuteAsync<UpdateSettingBatchCommand, BatchUpdateResponseDto>(new()
+            var result = await fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.ICommandHandler<UpdateSettingBatchCommand, BatchUpdateResponseDto>>().ExecuteAsync(new()
             {
                 Category = SettingRegistry.Get(ModeKey)!.Category,
                 Scope = SettingScope.Instance,
@@ -177,7 +177,7 @@ public sealed class VisitorAccessSettingsWriterTests
                     [ModeKey] = "AnonymousOnly",
                     [GovernanceSettingKeys.PublicExperience.EventCatalogLabel] = "Uncommitted label"
                 }
-            });
+            }, CancellationToken.None);
             await Assert.That(result.Success).IsFalse();
             await Assert.That(result.Results.All(item => !item.Applied)).IsTrue();
             await Assert.That(await fixture.Services.GetRequiredService<ISystemSettingRepository>()
@@ -186,8 +186,8 @@ public sealed class VisitorAccessSettingsWriterTests
         else
         {
             BaseCommandResponse<Guid> result = surface == "scalar"
-                ? await fixture.ExecuteAsync<UpdateSettingCommand, BaseCommandResponse<Guid>>(new()
-                { Key = ModeKey, Value = "AnonymousOnly", Scope = SettingScope.Instance })
+                ? await fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.ICommandHandler<UpdateSettingCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(new()
+                { Key = ModeKey, Value = "AnonymousOnly", Scope = SettingScope.Instance }, CancellationToken.None)
                 : await fixture.ExecuteAsync<SetControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>>(
                     new(fixture.TenantId, ModeKey, "AnonymousOnly"));
             await Assert.That(result.FailureCode).IsEqualTo(Conflict);
@@ -216,12 +216,12 @@ public sealed class VisitorAccessSettingsWriterTests
         await fixture.SeedEventAsync(accountRequired: true);
         BaseCommandResponse<Guid> result = operation switch
         {
-            "reset" => await fixture.ExecuteAsync<ResetSettingCommand, BaseCommandResponse<Guid>>(new()
-            { Key = ModeKey, Scope = SettingScope.Tenant }),
-            "lock" => await fixture.ExecuteAsync<LockSettingCommand, BaseCommandResponse<Guid>>(new()
-            { Key = ModeKey, Scope = SettingScope.Instance }),
-            _ => await fixture.ExecuteAsync<UnlockSettingCommand, BaseCommandResponse<Guid>>(new()
-            { Key = ModeKey, Scope = SettingScope.Instance })
+            "reset" => await fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.ICommandHandler<ResetSettingCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(new()
+            { Key = ModeKey, Scope = SettingScope.Tenant }, CancellationToken.None),
+            "lock" => await fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.ICommandHandler<LockSettingCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(new()
+            { Key = ModeKey, Scope = SettingScope.Instance }, CancellationToken.None),
+            _ => await fixture.Services.GetRequiredService<Explore.Application.Contracts.Operations.ICommandHandler<UnlockSettingCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(new()
+            { Key = ModeKey, Scope = SettingScope.Instance }, CancellationToken.None)
         };
         await Assert.That(result.FailureCode).IsEqualTo(Conflict);
         await Assert.That((await fixture.Services.GetRequiredService<IVisitorAccessCapabilityResolver>()
@@ -447,7 +447,7 @@ public sealed class VisitorAccessSettingsWriterTests
             commands.CurrentUserService, commands.AdminContext, commands.NotificationHandlers, NullLogger<UpdateSettingBatchCommandHandler>.Instance,
             commands.PublicationPolicyBoundary, commands.UnitOfWork, commands.MutationLock, commands.EmailDeliverySettingsWriter,
             commands.VisitorSettings);
-        await Assert.ThrowsAsync<RejectedStorageWriteException>(() => handler.Handle(new()
+        await Assert.ThrowsAsync<RejectedStorageWriteException>(() => handler.ExecuteAsync(new()
         {
             Category = SettingRegistry.Get(ModeKey)!.Category,
             Scope = SettingScope.Instance,

@@ -2,14 +2,14 @@ namespace Explore.Application.Features.Settings.Requests.Commands;
 
 using Explore.Application.DTOs.Settings;
 using Explore.Domain.Settings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 /// <summary>
 /// Batch-updates multiple setting values within a category. In BestEffort mode (default, for autosave),
 /// locked keys are skipped and the rest applied. In Strict mode (admin), the entire batch is rejected
 /// if any key is locked.
 /// </summary>
-public sealed record UpdateSettingBatchCommand : IRequest<BatchUpdateResponseDto>
+public sealed record UpdateSettingBatchCommand : ICommand<BatchUpdateResponseDto>
 {
     /// <summary>
     /// Setting category to scope the update (e.g., "EventList"). All keys must belong to this category.

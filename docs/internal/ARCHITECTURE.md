@@ -326,6 +326,21 @@ The API and standalone shared host composition validate final descriptors after 
 
 Normal and Testing startup perform cached constructor-parameter availability checks without constructing the operation graph before shared API setup, workers or traffic. Standalone-owned migrations and administrator bootstrap precede this shared runtime preflight; final descriptor validation still runs during Build, before standalone bootstrap. OpenAPI validates descriptors only because its runtime dependencies are intentionally absent. CI calls `ValidateNativeOperationsDeepAsync` against the actual final provider in a disposable scope, resolving every closed native handler without calling business operations. Constructors must remain free of network and business side effects.
 
+## Settings Capability Dispatch
+
+The shared settings family uses five native result commands and one native query.
+`UserSettingsController` owns the four existing personal-preference routes and
+depends only on their four closed operation ports. The remaining settings HTTP
+owners call the same native ports while their capability extraction proceeds;
+only the separately tracked email-disable workflow still uses legacy dispatch.
+
+Handler-owned scope authorization, manual validation, mutation locks and dedicated
+publication/visitor/SMTP transactional boundaries are unchanged. Cache eviction
+still follows successful mutation, and typed notification delivery remains
+post-commit. `SettingsCapabilityControllerBase` shares only HTTP problem mapping;
+it is not an operation dispatcher. Routes, operation IDs, response contracts,
+authentication classification and the `Settings` OpenAPI tag are preserved.
+
 ## Tenant Role-Grant Projections
 
 `TenantUserRoleGrantMapper` emits separate detail and list disclosures without

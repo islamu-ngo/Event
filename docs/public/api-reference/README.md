@@ -32,6 +32,14 @@ Do not send both. Browser users normally reach the API through the BFF. Direct i
 
 Tenant context is resolved from the request host or `X-Tenant-Slug`; a scoped API key may finalize binding. The server validates this against trusted/persisted authority. Never put an authoritative user or tenant identity in a request body and expect it to override the authenticated context.
 
+## Settings scopes
+
+Personal preferences use the existing `/api/settings/user` routes. Tenant and
+instance settings retain their separate administrator checks; selecting a route
+does not grant authority to change a higher scope. The settings implementation
+uses dedicated capability handlers without changing URLs, operation IDs,
+response formats or the `Settings` client group.
+
 ## Role-grant identity labels
 
 Role-grant detail and list responses can contain null `userEmail` and

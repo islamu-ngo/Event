@@ -10,11 +10,11 @@ using Explore.Application.Notifications;
 using Explore.Application.Responses;
 using Explore.Application.Settings;
 using Explore.Domain.Settings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Logging;
 
 public class ResetSettingCommandHandler
-    : IRequestHandler<ResetSettingCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<ResetSettingCommand, BaseCommandResponse<Guid>>
 {
     private readonly IHierarchicalSettingsResolver _resolver;
     private readonly IUserPreferenceRepository _userPreferenceRepository;
@@ -60,7 +60,7 @@ public class ResetSettingCommandHandler
         _visitorSettings = visitorSettings;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         ResetSettingCommand request, CancellationToken cancellationToken)
     {
         // Validate key exists

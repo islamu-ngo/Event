@@ -59,11 +59,11 @@ public sealed class EmailDeliverySettingBatchTests
                 }
             };
             if (rejectPort)
-                await Assert.That(async () => await CreateHandler(fixture).Handle(request, CancellationToken.None))
+                await Assert.That(async () => await CreateHandler(fixture).ExecuteAsync(request, CancellationToken.None))
                     .Throws<DbUpdateException>();
             else
             {
-                var result = await CreateHandler(fixture).Handle(request, CancellationToken.None);
+                var result = await CreateHandler(fixture).ExecuteAsync(request, CancellationToken.None);
                 await Assert.That(result.Success).IsTrue();
                 await Assert.That(result.Results.All(result => result.Applied)).IsTrue();
             }
@@ -95,7 +95,7 @@ public sealed class EmailDeliverySettingBatchTests
             await using ExploreDbContext context = CreateContext(databasePath);
             Guid administratorId = await InstanceSettingsCommandFixture.SeedAdministratorAsync(context);
             using var fixture = new InstanceSettingsCommandFixture(context, administratorId);
-            var result = await CreateHandler(fixture).Handle(new UpdateSettingBatchCommand
+            var result = await CreateHandler(fixture).ExecuteAsync(new UpdateSettingBatchCommand
             {
                 Category = EmailSettingDefinitions.SmtpHost.Category,
                 Scope = SettingScope.Instance,
@@ -135,7 +135,7 @@ public sealed class EmailDeliverySettingBatchTests
             long revision = await context.EmailDispatchProcessorStates.AsNoTracking()
                 .Select(row => row.DeliveryPolicyRevision).SingleAsync();
 
-            var result = await CreateHandler(fixture).Handle(new UpdateSettingBatchCommand
+            var result = await CreateHandler(fixture).ExecuteAsync(new UpdateSettingBatchCommand
             {
                 Category = EventSettingDefinitions.RequireApproval.Category,
                 Scope = SettingScope.Instance,

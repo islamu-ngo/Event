@@ -14,11 +14,11 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings;
 using Explore.Domain.Settings.Definitions;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Logging;
 
 public class UpdateSettingBatchCommandHandler
-    : IRequestHandler<UpdateSettingBatchCommand, BatchUpdateResponseDto>
+    : ICommandHandler<UpdateSettingBatchCommand, BatchUpdateResponseDto>
 {
     private readonly IHierarchicalSettingsResolver _resolver;
     private readonly IUserPreferenceRepository _userPreferenceRepository;
@@ -67,7 +67,7 @@ public class UpdateSettingBatchCommandHandler
         _visitorSettings = visitorSettings;
     }
 
-    public async Task<BatchUpdateResponseDto> Handle(
+    public async Task<BatchUpdateResponseDto> ExecuteAsync(
         UpdateSettingBatchCommand request, CancellationToken cancellationToken)
     {
         if (request.Values.Count == 0)

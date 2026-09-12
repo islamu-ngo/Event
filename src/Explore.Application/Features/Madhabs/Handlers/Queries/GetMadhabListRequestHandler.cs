@@ -5,11 +5,11 @@ using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Madhab;
 using Explore.Application.Features.Madhabs.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Madhabs.Handlers.Queries;
 
-public class GetMadhabListRequestHandler : IRequestHandler<GetMadhabListRequest, List<MadhabListDto>>
+public class GetMadhabListRequestHandler : IQueryHandler<GetMadhabListRequest, List<MadhabListDto>>
 {
     private readonly IMadhabRepository _madhabRepository;
 
@@ -18,7 +18,7 @@ public class GetMadhabListRequestHandler : IRequestHandler<GetMadhabListRequest,
         _madhabRepository = madhabRepository;
     }
 
-    public async Task<List<MadhabListDto>> Handle(GetMadhabListRequest request, CancellationToken cancellationToken)
+    public async Task<List<MadhabListDto>> QueryAsync(GetMadhabListRequest request, CancellationToken cancellationToken)
     {
         var madhabs = await _madhabRepository.GetAll();
         return madhabs.Select(MadhabMapper.ToListItem).ToList();

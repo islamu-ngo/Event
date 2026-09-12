@@ -5,7 +5,7 @@ using Explore.API.Attributes;
 using Explore.API.Hateoas;
 using Explore.Application.DTOs.Madhab;
 using Explore.Application.Features.Madhabs.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -17,7 +17,9 @@ namespace Explore.API.Controllers;
 [Route("api/[controller]")]
 [ApiController]
 [EndpointClassification(EndpointClass.Public)]
-public class MadhabController(IMediator mediator) : ControllerBase
+public class MadhabController(
+    IQueryHandler<GetMadhabListRequest, List<MadhabListDto>> listQuery,
+    IQueryHandler<GetMadhabDetailsRequest, MadhabDto?> detailQuery) : ControllerBase
 {
 
     // GET: api/madhab
@@ -29,7 +31,7 @@ public class MadhabController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "LookupData")]
     public async Task<ActionResult<List<MadhabListDto>>> GetAll(CancellationToken cancellationToken = default)
     {
-        var madhabs = await mediator.Send(new GetMadhabListRequest(), cancellationToken);
+        var madhabs = await listQuery.QueryAsync(new GetMadhabListRequest(), cancellationToken);
         return Ok(madhabs);
     }
 
@@ -43,7 +45,7 @@ public class MadhabController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<MadhabDto>> GetById(int id, CancellationToken cancellationToken = default)
     {
-        var madhab = await mediator.Send(new GetMadhabDetailsRequest { Id = id }, cancellationToken);
+        var madhab = await detailQuery.QueryAsync(new GetMadhabDetailsRequest { Id = id }, cancellationToken);
         return Ok(madhab);
     }
 }

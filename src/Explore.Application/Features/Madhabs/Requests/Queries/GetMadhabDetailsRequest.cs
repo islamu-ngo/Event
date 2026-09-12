@@ -1,6 +1,6 @@
 using Explore.Application.DTOs.Madhab;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Madhabs.Requests.Queries;
 
-public sealed record GetMadhabDetailsRequest(int Id = default) : IRequest<MadhabDto>;
+public sealed record GetMadhabDetailsRequest(int Id = default) : IQuery<MadhabDto?>;

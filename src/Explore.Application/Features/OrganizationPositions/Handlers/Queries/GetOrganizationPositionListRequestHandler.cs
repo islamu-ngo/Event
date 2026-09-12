@@ -5,11 +5,11 @@ using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.OrganizationPosition;
 using Explore.Application.Features.OrganizationPositions.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.OrganizationPositions.Handlers.Queries;
 
-public class GetOrganizationPositionListRequestHandler : IRequestHandler<GetOrganizationPositionListRequest, List<OrganizationPositionListDto>>
+public class GetOrganizationPositionListRequestHandler : IQueryHandler<GetOrganizationPositionListRequest, List<OrganizationPositionListDto>>
 {
     private readonly IOrganizationPositionRepository _organizationPositionRepository;
 
@@ -18,7 +18,7 @@ public class GetOrganizationPositionListRequestHandler : IRequestHandler<GetOrga
         _organizationPositionRepository = organizationPositionRepository;
     }
 
-    public async Task<List<OrganizationPositionListDto>> Handle(GetOrganizationPositionListRequest request, CancellationToken cancellationToken)
+    public async Task<List<OrganizationPositionListDto>> QueryAsync(GetOrganizationPositionListRequest request, CancellationToken cancellationToken)
     {
         var organizationPositions = await _organizationPositionRepository.GetAll();
         return organizationPositions.Select(OrganizationPositionMapper.ToListItem).ToList();

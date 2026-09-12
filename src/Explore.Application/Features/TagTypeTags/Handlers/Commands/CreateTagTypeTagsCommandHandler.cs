@@ -4,11 +4,11 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.TagTypeTags.Validators;
 using Explore.Application.Features.TagTypeTags.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.TagTypeTags.Handlers.Commands;
 
-public class CreateTagTypeTagsCommandHandler : IRequestHandler<CreateTagTypeTagsCommand, BaseCommandResponse<Guid>>
+public class CreateTagTypeTagsCommandHandler : ICommandHandler<CreateTagTypeTagsCommand, BaseCommandResponse<Guid>>
 {
     private readonly ITagTypeTagsRepository _repository;
     private readonly ITagRepository _tagRepository;
@@ -27,7 +27,7 @@ public class CreateTagTypeTagsCommandHandler : IRequestHandler<CreateTagTypeTags
         _tenantContext = tenantContext;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateTagTypeTagsCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateTagTypeTagsCommand request, CancellationToken cancellationToken)
     {
         var validator = new CreateTagTypeTagsDtoValidator(_tagRepository, _tagTypeRepository, _repository);
         var validationResult = await validator.ValidateAsync(request.TagTypeTagsDto, cancellationToken);

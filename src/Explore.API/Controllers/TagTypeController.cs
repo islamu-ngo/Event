@@ -5,7 +5,6 @@ using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.TagType;
 using Explore.Application.Features.TagTypes.Requests.Queries;
 using Explore.Application.Features.TagTypeTags.Requests.Queries;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -19,7 +18,7 @@ namespace Explore.API.Controllers;
 public class TagTypeController(
     IQueryHandler<GetTagTypeListRequest, List<TagTypeListDto>> tagTypeList,
     IQueryHandler<GetTagTypeDetailsRequest, TagTypeDto?> tagTypeDetails,
-    IMediator mediator) : ControllerBase
+    IQueryHandler<GetTagsGroupedByTagTypeRequest, List<TagTypeWithTagsDto>> groupedTags) : ControllerBase
 {
 
     // GET: api/tagtype
@@ -51,7 +50,7 @@ public class TagTypeController(
     [ProducesResponseType(typeof(List<TagTypeWithTagsDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<List<TagTypeWithTagsDto>>> GetWithTags(CancellationToken cancellationToken = default)
     {
-        var result = await mediator.Send(new GetTagsGroupedByTagTypeRequest(), cancellationToken);
+        var result = await groupedTags.QueryAsync(new GetTagsGroupedByTagTypeRequest(), cancellationToken);
         return Ok(result);
     }
 }

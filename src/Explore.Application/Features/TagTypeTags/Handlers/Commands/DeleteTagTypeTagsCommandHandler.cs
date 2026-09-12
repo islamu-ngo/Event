@@ -1,10 +1,10 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.TagTypeTags.Requests.Commands;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.TagTypeTags.Handlers.Commands;
 
-public class DeleteTagTypeTagsCommandHandler : IRequestHandler<DeleteTagTypeTagsCommand, bool>
+public class DeleteTagTypeTagsCommandHandler : ICommandHandler<DeleteTagTypeTagsCommand, bool>
 {
     private readonly ITagTypeTagsRepository _repository;
 
@@ -13,7 +13,7 @@ public class DeleteTagTypeTagsCommandHandler : IRequestHandler<DeleteTagTypeTags
         _repository = repository;
     }
 
-    public async Task<bool> Handle(DeleteTagTypeTagsCommand request, CancellationToken cancellationToken)
+    public async Task<bool> ExecuteAsync(DeleteTagTypeTagsCommand request, CancellationToken cancellationToken)
     {
         var tagTypeTags = await _repository.GetById(request.Id);
         if (tagTypeTags == null)

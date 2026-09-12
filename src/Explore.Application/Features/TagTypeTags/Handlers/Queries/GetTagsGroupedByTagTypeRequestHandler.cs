@@ -4,12 +4,12 @@ using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.TagType;
 using Explore.Application.Features.TagTypeTags.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.TagTypeTags.Handlers.Queries;
 
 public class GetTagsGroupedByTagTypeRequestHandler
-    : IRequestHandler<GetTagsGroupedByTagTypeRequest, List<TagTypeWithTagsDto>>
+    : IQueryHandler<GetTagsGroupedByTagTypeRequest, List<TagTypeWithTagsDto>>
 {
     private readonly ITagTypeTagsRepository _repository;
 
@@ -18,7 +18,7 @@ public class GetTagsGroupedByTagTypeRequestHandler
         _repository = repository;
     }
 
-    public async Task<List<TagTypeWithTagsDto>> Handle(
+    public async Task<List<TagTypeWithTagsDto>> QueryAsync(
         GetTagsGroupedByTagTypeRequest request, CancellationToken cancellationToken)
     {
         var groups = await _repository.GetAllTagsGroupedByTagType();

@@ -3,11 +3,11 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.TagTypeTags.Validators;
 using Explore.Application.Features.TagTypeTags.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.TagTypeTags.Handlers.Commands;
 
-public class UpdateTagTypeTagsCommandHandler : IRequestHandler<UpdateTagTypeTagsCommand, BaseCommandResponse<Guid>>
+public class UpdateTagTypeTagsCommandHandler : ICommandHandler<UpdateTagTypeTagsCommand, BaseCommandResponse<Guid>>
 {
     private readonly ITagTypeTagsRepository _repository;
     private readonly ITagRepository _tagRepository;
@@ -26,7 +26,7 @@ public class UpdateTagTypeTagsCommandHandler : IRequestHandler<UpdateTagTypeTags
         _tenantContext = tenantContext;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateTagTypeTagsCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateTagTypeTagsCommand request, CancellationToken cancellationToken)
     {
         var validator = new UpdateTagTypeTagsDtoValidator();
         var validationResult = await validator.ValidateAsync(request.TagTypeTagsDto, cancellationToken);

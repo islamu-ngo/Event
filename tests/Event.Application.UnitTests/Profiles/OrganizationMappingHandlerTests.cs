@@ -273,7 +273,7 @@ public sealed class OrganizationMappingHandlerTests
         var second = new ApprovalStatus { Id = 2, MasterCode = "PENDING", FullName = "Pending", Description = null };
         var store = new ApprovalStatusStore([first, second]);
         var handler = new Explore.Application.Features.StatusTypes.Handlers.Queries.GetStatusTypeListRequestHandler(store);
-        var items = await handler.Handle(new Explore.Application.Features.StatusTypes.Requests.Queries.GetStatusTypeListRequest { FullName = "Not a filter", Id = 999 }, default);
+        var items = await handler.QueryAsync(new Explore.Application.Features.StatusTypes.Requests.Queries.GetStatusTypeListRequest(), default);
         await Assert.That(items.Select(item => item.Id).SequenceEqual(new[] { 7, 2 })).IsTrue();
         await Assert.That(items[0].MasterCode).IsEqualTo("APPROVED");
         await Assert.That(items[0].FullName).IsEqualTo("Approved");
@@ -285,7 +285,7 @@ public sealed class OrganizationMappingHandlerTests
         store.Items.Clear();
         first.FullName = "Changed";
         await Assert.That(items[0].FullName).IsEqualTo("Approved");
-        await Assert.That(await handler.Handle(new Explore.Application.Features.StatusTypes.Requests.Queries.GetStatusTypeListRequest { FullName = "" }, default)).IsEmpty();
+        await Assert.That(await handler.QueryAsync(new Explore.Application.Features.StatusTypes.Requests.Queries.GetStatusTypeListRequest(), default)).IsEmpty();
     }
 
     internal sealed class ApprovalStatusStore(List<ApprovalStatus> items) : Store<ApprovalStatus, int>, IApprovalStatusRepository

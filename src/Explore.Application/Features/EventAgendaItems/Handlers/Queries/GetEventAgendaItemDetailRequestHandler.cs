@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventAgendaItem;
@@ -13,16 +13,13 @@ namespace Explore.Application.Features.EventAgendaItems.Handlers.Queries;
 public class GetEventAgendaItemDetailRequestHandler : IRequestHandler<GetEventAgendaItemDetailRequest, EventAgendaItemDto?>
 {
     private readonly IEventAgendaItemRepository _eventAgendaItemRepository;
-    private readonly IMapper _mapper;
     private readonly IEventLocationDisclosureService _disclosureService;
 
     public GetEventAgendaItemDetailRequestHandler(
         IEventAgendaItemRepository eventAgendaItemRepository,
-        IMapper mapper,
         IEventLocationDisclosureService disclosureService)
     {
         _eventAgendaItemRepository = eventAgendaItemRepository;
-        _mapper = mapper;
         _disclosureService = disclosureService;
     }
 
@@ -31,7 +28,6 @@ public class GetEventAgendaItemDetailRequestHandler : IRequestHandler<GetEventAg
         var agendaItem = await _eventAgendaItemRepository.GetPublicByIdAsync(request.Id, cancellationToken);
         return await PublicEventAgendaItemLocationProjector.ProjectAsync(
             agendaItem,
-            _mapper,
             _disclosureService,
             cancellationToken);
     }
@@ -41,7 +37,6 @@ internal static class PublicEventAgendaItemLocationProjector
 {
     public static async Task<EventAgendaItemDto?> ProjectAsync(
         EventAgendaItem? item,
-        IMapper mapper,
         IEventLocationDisclosureService disclosureService,
         CancellationToken cancellationToken)
     {
@@ -55,7 +50,7 @@ internal static class PublicEventAgendaItemLocationProjector
                 disclosureService,
                 [Placement(item)],
                 cancellationToken);
-        EventAgendaItemDto dto = mapper.Map<EventAgendaItemDto>(item);
+        EventAgendaItemDto dto = EventMapper.ToDetail(item);
         dto.LocationId = null;
         dto.RoomId = null;
         dto.EventLocation = item.EventLocationId is { } eventLocationId
@@ -66,7 +61,6 @@ internal static class PublicEventAgendaItemLocationProjector
 
     public static async Task<List<EventAgendaItemListDto>> ProjectAsync(
         IReadOnlyCollection<EventAgendaItem> items,
-        IMapper mapper,
         IEventLocationDisclosureService disclosureService,
         CancellationToken cancellationToken)
     {
@@ -75,7 +69,7 @@ internal static class PublicEventAgendaItemLocationProjector
                 disclosureService,
                 items.Select(Placement),
                 cancellationToken);
-        List<EventAgendaItemListDto> dtos = mapper.Map<List<EventAgendaItemListDto>>(items);
+        List<EventAgendaItemListDto> dtos = items.Select(EventMapper.ToListItem).ToList();
         IReadOnlyDictionary<Guid, EventAgendaItem> itemById = items.ToDictionary(item => item.Id);
         foreach (EventAgendaItemListDto dto in dtos)
         {

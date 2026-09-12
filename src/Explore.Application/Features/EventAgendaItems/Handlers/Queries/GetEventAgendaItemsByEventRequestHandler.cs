@@ -1,4 +1,3 @@
-using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventAgendaItem;
@@ -10,16 +9,13 @@ namespace Explore.Application.Features.EventAgendaItems.Handlers.Queries;
 public class GetEventAgendaItemsByEventRequestHandler : IRequestHandler<GetEventAgendaItemsByEventRequest, List<EventAgendaItemListDto>>
 {
     private readonly IEventAgendaItemRepository _eventAgendaItemRepository;
-    private readonly IMapper _mapper;
     private readonly IEventLocationDisclosureService _disclosureService;
 
     public GetEventAgendaItemsByEventRequestHandler(
         IEventAgendaItemRepository eventAgendaItemRepository,
-        IMapper mapper,
         IEventLocationDisclosureService disclosureService)
     {
         _eventAgendaItemRepository = eventAgendaItemRepository;
-        _mapper = mapper;
         _disclosureService = disclosureService;
     }
 
@@ -28,7 +24,6 @@ public class GetEventAgendaItemsByEventRequestHandler : IRequestHandler<GetEvent
         var items = await _eventAgendaItemRepository.GetPublicByEventAsync(request.EventId, cancellationToken);
         return await PublicEventAgendaItemLocationProjector.ProjectAsync(
             items,
-            _mapper,
             _disclosureService,
             cancellationToken);
     }

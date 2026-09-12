@@ -1,4 +1,3 @@
-using AutoMapper;
 using Event.Application.UnitTests.Common;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.LocationPrivacy;
@@ -29,6 +28,7 @@ namespace Event.Application.UnitTests.Features.EventLocations.Queries;
 
 [Category("EventLocationPrivacy")]
 [Category("EventSessionMapping")]
+[Category("EventAgendaMapping")]
 public sealed class PublicEventLocationProjectionTests
 {
     private const string PublicVenueName = "Purpose-limited venue";
@@ -116,34 +116,17 @@ public sealed class PublicEventLocationProjectionTests
     public async Task EventAgendaResponses_MaterializePublicLocationAndRedactLegacyFields()
     {
         var repository = Substitute.For<IEventAgendaItemRepository>();
-        var mapper = Substitute.For<IMapper>();
         var disclosureService = new RecordingDisclosureService();
-        Guid tenantId = Guid.NewGuid();
-        Guid eventId = Guid.NewGuid();
-        EventAgendaItem item = CreateEventAgendaItem(tenantId, eventId, Guid.NewGuid());
+        Guid tenantId = Guid.Parse("01900000-0000-7000-8000-000000000001");
+        Guid eventId = Guid.Parse("01900000-0000-7000-8000-000000000002");
+        EventAgendaItem item = CreateEventAgendaItem(tenantId, eventId, Guid.Parse("01900000-0000-7000-8000-000000000003"));
         Guid eventLocationId = item.EventLocationId!.Value;
-        var detailDto = new EventAgendaItemDto
-        {
-            Id = item.Id,
-            EventId = eventId,
-            Title = item.Title,
-            LocationId = Guid.NewGuid(),
-            RoomId = Guid.NewGuid()
-        };
-        var listDto = new EventAgendaItemListDto
-        {
-            Id = item.Id,
-            EventId = eventId,
-            Title = item.Title
-        };
         repository.GetPublicByIdAsync(item.Id, Arg.Any<CancellationToken>()).Returns(item);
         repository.GetPublicByEventAsync(eventId, Arg.Any<CancellationToken>()).Returns([item]);
-        mapper.Map<EventAgendaItemDto>(item).Returns(detailDto);
-        mapper.Map<List<EventAgendaItemListDto>>(Arg.Any<List<EventAgendaItem>>()).Returns([listDto]);
 
-        EventAgendaItemDto? detail = await new GetEventAgendaItemDetailRequestHandler(repository, mapper, disclosureService)
+        EventAgendaItemDto? detail = await new GetEventAgendaItemDetailRequestHandler(repository, disclosureService)
             .Handle(new GetEventAgendaItemDetailRequest(item.Id), CancellationToken.None);
-        EventAgendaItemListDto byEvent = (await new GetEventAgendaItemsByEventRequestHandler(repository, mapper, disclosureService)
+        EventAgendaItemListDto byEvent = (await new GetEventAgendaItemsByEventRequestHandler(repository, disclosureService)
             .Handle(new GetEventAgendaItemsByEventRequest(eventId), CancellationToken.None)).Single();
 
         await AssertPublicLocationAsync(detail!.EventLocation, eventLocationId, expectRoom: true);
@@ -355,11 +338,11 @@ public sealed class PublicEventLocationProjectionTests
         Guid roomId,
         EventLocation? eventLocation = null)
     {
-        EventAgendaItem item = DataBuilder.EventAgendaItem.Generate();
-        item.EventId = eventId;
-        item.TenantId = tenantId;
-        item.Event = null!;
-        item.Tenant = null!;
+        var item = new EventAgendaItem
+        {
+            Id = Guid.Parse("01900000-0000-7000-8000-000000000013"),
+            EventId = eventId, TenantId = tenantId, Event = null!, Tenant = null!, Title = "Event agenda"
+        };
         item.StartTime = new DateTimeOffset(2026, 7, 20, 10, 30, 0, TimeSpan.Zero);
         item.EndTime = item.StartTime.AddMinutes(30);
         item.ReprojectLocalTimes("UTC", new EventScheduleProjectionCalculator());

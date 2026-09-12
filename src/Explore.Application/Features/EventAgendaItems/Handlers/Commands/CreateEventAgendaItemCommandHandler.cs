@@ -1,4 +1,3 @@
-using AutoMapper;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventAgendaItem.Validators;
 using Explore.Application.Features.EventAgendaItems.Requests.Commands;
@@ -19,7 +18,6 @@ public class CreateEventAgendaItemCommandHandler : IRequestHandler<CreateEventAg
     private readonly IEventScheduleProjectionCalculator _scheduleProjectionCalculator;
     private readonly IUnitOfWork _unitOfWork;
     private readonly EventLocationAttachmentService _eventLocationAttachmentService;
-    private readonly IMapper _mapper;
 
     public CreateEventAgendaItemCommandHandler(
         IEventAgendaItemRepository eventAgendaItemRepository,
@@ -27,8 +25,7 @@ public class CreateEventAgendaItemCommandHandler : IRequestHandler<CreateEventAg
         IEventDayRepository eventDayRepository,
         IEventScheduleProjectionCalculator scheduleProjectionCalculator,
         IUnitOfWork unitOfWork,
-        EventLocationAttachmentService eventLocationAttachmentService,
-        IMapper mapper)
+        EventLocationAttachmentService eventLocationAttachmentService)
     {
         _eventAgendaItemRepository = eventAgendaItemRepository;
         _eventRepository = eventRepository;
@@ -36,7 +33,6 @@ public class CreateEventAgendaItemCommandHandler : IRequestHandler<CreateEventAg
         _scheduleProjectionCalculator = scheduleProjectionCalculator;
         _unitOfWork = unitOfWork;
         _eventLocationAttachmentService = eventLocationAttachmentService;
-        _mapper = mapper;
     }
 
     public async Task<BaseCommandResponse<Guid>> Handle(CreateEventAgendaItemCommand request, CancellationToken cancellationToken)
@@ -59,7 +55,18 @@ public class CreateEventAgendaItemCommandHandler : IRequestHandler<CreateEventAg
                 "Event not found in the current tenant.");
         }
 
-        var agendaItem = _mapper.Map<EventAgendaItem>(request.EventAgendaItemDto);
+        var agendaItem = new EventAgendaItem
+        {
+            EventId = request.EventAgendaItemDto.EventId,
+            Title = request.EventAgendaItemDto.Title,
+            Description = request.EventAgendaItemDto.Description,
+            LocationId = request.EventAgendaItemDto.LocationId,
+            RoomId = request.EventAgendaItemDto.RoomId,
+            KindId = request.EventAgendaItemDto.KindId,
+            SortOrder = request.EventAgendaItemDto.SortOrder,
+            Event = null!,
+            Tenant = null!
+        };
         agendaItem.TenantId = parentEvent.TenantId;
 
         agendaItem.Reschedule(

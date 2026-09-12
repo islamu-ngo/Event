@@ -1,8 +1,6 @@
 using AutoMapper;
 using Explore.Application.DTOs.Event;
-using Explore.Application.DTOs.EventAgendaItem;
 using Explore.Application.DTOs.EventAspects;
-using Explore.Application.DTOs.EventSessionGroup;
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -151,22 +149,6 @@ public class EventMappingProfile : Profile
             .ForMember(dest => dest.CreatedAtUtc, opt => opt.MapFrom(src => new DateTimeOffset(DateTime.SpecifyKind(src.CreatedAt, DateTimeKind.Utc))))
             .ForMember(dest => dest.IsPast, opt => opt.MapFrom(src => src.LastSessionEndUtc != null && src.LastSessionEndUtc <= DateTimeOffset.UtcNow));
 
-        // EventSessionGroup → DTOs (tracks/devrooms/program sections)
-        CreateMap<EventSessionGroup, EventSessionGroupDto>()
-            .ForMember(dest => dest.EventTitle, opt => opt.MapFrom(src => src.Event != null ? src.Event.Title : null))
-            .ForMember(dest => dest.LocationId, opt => opt.Ignore())
-            .ForMember(dest => dest.LocationName, opt => opt.Ignore())
-            .ForMember(dest => dest.RoomId, opt => opt.Ignore())
-            .ForMember(dest => dest.RoomName, opt => opt.Ignore())
-            .ForMember(dest => dest.EventLocation, opt => opt.Ignore());
-
-        CreateMap<EventSessionGroup, EventSessionGroupListDto>()
-            .ForMember(dest => dest.LocationId, opt => opt.Ignore())
-            .ForMember(dest => dest.LocationName, opt => opt.Ignore())
-            .ForMember(dest => dest.RoomId, opt => opt.Ignore())
-            .ForMember(dest => dest.RoomName, opt => opt.Ignore())
-            .ForMember(dest => dest.EventLocation, opt => opt.Ignore());
-
         // Event Series
         CreateMap<EventSeries, EventSeriesNS.EventSeriesListDto>()
             .ForMember(d => d.FeaturedImageUri, opt => opt.MapFrom(s => s.FeaturedImage != null ? s.FeaturedImage.Uri : null))
@@ -189,20 +171,6 @@ public class EventMappingProfile : Profile
             .ForMember(dest => dest.Actor, opt => opt.Ignore())
             .ForMember(dest => dest.FeaturedImage, opt => opt.Ignore())
             .ForMember(dest => dest.Tenant, opt => opt.Ignore());
-
-        // Event Agenda Item
-        CreateMap<EventAgendaItem, EventAgendaItemDto>()
-            .ForMember(dest => dest.EventTitle, opt => opt.MapFrom(src => src.Event != null ? src.Event.Title : null))
-            .ForMember(dest => dest.KindFullName, opt => opt.MapFrom(src => src.Kind != null ? src.Kind.FullName : null))
-            .ForMember(dest => dest.LocationId, opt => opt.Ignore())
-            .ForMember(dest => dest.RoomId, opt => opt.Ignore())
-            .ForMember(dest => dest.EventLocation, opt => opt.Ignore());
-        CreateMap<EventAgendaItem, EventAgendaItemListDto>()
-            .ForMember(dest => dest.KindFullName, opt => opt.MapFrom(src => src.Kind != null ? src.Kind.FullName : null))
-            .ForMember(dest => dest.EventLocation, opt => opt.Ignore());
-        CreateMap<CreateEventAgendaItemDto, EventAgendaItem>()
-            .ForMember(dest => dest.StartTime, opt => opt.Ignore())
-            .ForMember(dest => dest.EndTime, opt => opt.Ignore());
 
         // Aspects
         CreateMap<EventIslamicAspect, EventIslamicAspectDto>()

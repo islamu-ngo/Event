@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.ActorSubscription;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ActorSubscriptions.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.ActorSubscription, AuthorizationActions.ActorSubscriptions.Update)]
-public sealed record UpdateActorSubscriptionNotificationLevelCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record UpdateActorSubscriptionNotificationLevelCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid TargetActorId { get; init; }
     public required UpdateActorSubscriptionNotificationLevelDto Patch { get; init; }

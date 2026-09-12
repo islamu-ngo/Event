@@ -4,11 +4,11 @@ using Explore.Application.DTOs.ActorSubscription;
 using Explore.Application.Features.ActorSubscriptions.Requests.Queries;
 using Explore.Application.Mappings;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ActorSubscriptions.Handlers.Queries;
 
-public class GetActorSubscriptionsRequestHandler : IRequestHandler<GetActorSubscriptionsRequest, PaginatedResult<ActorSubscriptionListDto>>
+public class GetActorSubscriptionsRequestHandler : IQueryHandler<GetActorSubscriptionsRequest, PaginatedResult<ActorSubscriptionListDto>>
 {
     private readonly IActorSubscriptionRepository _actorSubscriptionRepository;
     private readonly ITenantUserRepository _tenantUserRepository;
@@ -27,7 +27,7 @@ public class GetActorSubscriptionsRequestHandler : IRequestHandler<GetActorSubsc
         _currentUserService = currentUserService;
     }
 
-    public async Task<PaginatedResult<ActorSubscriptionListDto>> Handle(GetActorSubscriptionsRequest request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<ActorSubscriptionListDto>> QueryAsync(GetActorSubscriptionsRequest request, CancellationToken cancellationToken)
     {
         var (pageNumber, pageSize) = PaginatedResult<ActorSubscriptionListDto>.NormalizeParameters(request.PageNumber, request.PageSize);
         var tenantUser = await GetCurrentTenantUserAsync(cancellationToken);

@@ -5,11 +5,11 @@ using Explore.Application.Features.ActorSubscriptions.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ActorSubscriptions.Handlers.Commands;
 
-public class UnsubscribeFromActorCommandHandler : IRequestHandler<UnsubscribeFromActorCommand, BaseCommandResponse<Guid>>
+public class UnsubscribeFromActorCommandHandler : ICommandHandler<UnsubscribeFromActorCommand, BaseCommandResponse<Guid>>
 {
     private readonly IActorSubscriptionRepository _actorSubscriptionRepository;
     private readonly ITenantUserRepository _tenantUserRepository;
@@ -28,7 +28,7 @@ public class UnsubscribeFromActorCommandHandler : IRequestHandler<UnsubscribeFro
         _currentUserService = currentUserService;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UnsubscribeFromActorCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UnsubscribeFromActorCommand request, CancellationToken cancellationToken)
     {
         var validator = new UnsubscribeFromActorDtoValidator();
         var validationResult = await validator.ValidateAsync(request.Subscription, cancellationToken);

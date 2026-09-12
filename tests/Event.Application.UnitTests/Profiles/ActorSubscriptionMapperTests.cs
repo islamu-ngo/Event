@@ -1,12 +1,17 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Event.Application.UnitTests.Operations;
+using Explore.Application;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ActorSubscription;
 using Explore.Application.Features.ActorSubscriptions.Handlers.Queries;
 using Explore.Application.Features.ActorSubscriptions.Requests.Queries;
 using Explore.Application.Mappings;
+using Explore.Application.Responses;
 using Explore.Domain;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.Application.UnitTests.Profiles;
 
@@ -123,8 +128,12 @@ public sealed class ActorSubscriptionMapperTests
         var context = new RequestContext(
             identity == "other-tenant" ? Stamp : TenantId,
             identity == "anonymous" ? null : identity == "other-user" ? Stamp : UserId);
-        var detail = await DetailHandler(subscriptions, memberships, context).Handle(new GetActorSubscriptionRequest { TargetActorId = ActorId }, default);
-        var page = await ListHandler(subscriptions, memberships, context).Handle(new GetActorSubscriptionsRequest { PageNumber = -4, PageSize = 500 }, default);
+        using var provider = QueryProvider(subscriptions, memberships, context);
+        using var scope = provider.CreateScope();
+        var detail = await scope.ServiceProvider.GetRequiredService<IQueryHandler<GetActorSubscriptionRequest, ActorSubscriptionDto?>>()
+            .QueryAsync(new GetActorSubscriptionRequest { TargetActorId = ActorId }, default);
+        var page = await scope.ServiceProvider.GetRequiredService<IQueryHandler<GetActorSubscriptionsRequest, PaginatedResult<ActorSubscriptionListDto>>>()
+            .QueryAsync(new GetActorSubscriptionsRequest { PageNumber = -4, PageSize = 500 }, default);
 
         await Assert.That(detail).IsNull();
         await Assert.That(page.Items).IsEmpty();
@@ -139,10 +148,12 @@ public sealed class ActorSubscriptionMapperTests
         var source = CreateSubscription();
         var subscriptions = new SubscriptionStore([source]);
         var memberships = new MembershipStore([source.SubscriberTenantUser]);
-        var handler = DetailHandler(subscriptions, memberships, new RequestContext(TenantId, UserId));
+        using var provider = QueryProvider(subscriptions, memberships, new RequestContext(TenantId, UserId));
+        using var scope = provider.CreateScope();
+        var handler = scope.ServiceProvider.GetRequiredService<IQueryHandler<GetActorSubscriptionRequest, ActorSubscriptionDto?>>();
 
-        await AssertContract(await handler.Handle(new GetActorSubscriptionRequest { TargetActorId = ActorId }, default), ExpectedDetail());
-        await Assert.That(await handler.Handle(new GetActorSubscriptionRequest { TargetActorId = Stamp }, default)).IsNull();
+        await AssertContract(await handler.QueryAsync(new GetActorSubscriptionRequest { TargetActorId = ActorId }, default), ExpectedDetail());
+        await Assert.That(await handler.QueryAsync(new GetActorSubscriptionRequest { TargetActorId = Stamp }, default)).IsNull();
     }
 
     [Test]
@@ -165,8 +176,10 @@ public sealed class ActorSubscriptionMapperTests
         otherSubscriber.SubscriberTenantUserId = Stamp;
         var subscriptions = new SubscriptionStore([oldest, newest, foreign, middle, otherSubscriber]);
         var memberships = new MembershipStore([newest.SubscriberTenantUser]);
-        var page = await ListHandler(subscriptions, memberships, new RequestContext(TenantId, UserId))
-            .Handle(new GetActorSubscriptionsRequest { PageNumber = requestedPage, PageSize = requestedSize }, default);
+        using var provider = QueryProvider(subscriptions, memberships, new RequestContext(TenantId, UserId));
+        using var scope = provider.CreateScope();
+        var page = await scope.ServiceProvider.GetRequiredService<IQueryHandler<GetActorSubscriptionsRequest, PaginatedResult<ActorSubscriptionListDto>>>()
+            .QueryAsync(new GetActorSubscriptionsRequest { PageNumber = requestedPage, PageSize = requestedSize }, default);
 
         await Assert.That(page.PageNumber).IsEqualTo(expectedPage);
         await Assert.That(page.PageSize).IsEqualTo(expectedSize);
@@ -246,8 +259,23 @@ public sealed class ActorSubscriptionMapperTests
 
     private static ActorSubscriptionDto MapDetail(ActorSubscription source) => ActorSubscriptionMapper.ToDetail(source);
     private static ActorSubscriptionListDto MapListItem(ActorSubscription source) => ActorSubscriptionMapper.ToListItem(source);
-    private static GetActorSubscriptionRequestHandler DetailHandler(SubscriptionStore subscriptions, MembershipStore memberships, RequestContext context) => new(subscriptions, memberships, context, context);
-    private static GetActorSubscriptionsRequestHandler ListHandler(SubscriptionStore subscriptions, MembershipStore memberships, RequestContext context) => new(subscriptions, memberships, context, context);
+    private static ServiceProvider QueryProvider(SubscriptionStore subscriptions, MembershipStore memberships, RequestContext context)
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<IActorSubscriptionRepository>(subscriptions);
+        services.AddSingleton<ITenantUserRepository>(memberships);
+        services.AddSingleton<ITenantContext>(context);
+        services.AddSingleton<ICurrentUserService>(context);
+        services.AddSingleton<IAuthorizationProvider>(new OperationAuthorizationTests.Policy(
+            AuthorizationDecision.Allow(AuthorizationProviderMetadata.Local)));
+        services.AddNativeOperations(
+        [
+            typeof(GetActorSubscriptionRequest), typeof(GetActorSubscriptionRequestHandler),
+            typeof(GetActorSubscriptionsRequest), typeof(GetActorSubscriptionsRequestHandler)
+        ]);
+        return services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
+    }
 
     private sealed record RequestContext(Guid TenantId, Guid? UserId) : ITenantContext, ICurrentUserService
     {

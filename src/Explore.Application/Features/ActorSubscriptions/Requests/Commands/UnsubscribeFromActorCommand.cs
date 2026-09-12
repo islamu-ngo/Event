@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.ActorSubscription;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ActorSubscriptions.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.ActorSubscription, AuthorizationActions.ActorSubscriptions.Delete)]
-public sealed record UnsubscribeFromActorCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record UnsubscribeFromActorCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public required UnsubscribeFromActorDto Subscription { get; init; }
 

@@ -3,11 +3,11 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ActorSubscription;
 using Explore.Application.Features.ActorSubscriptions.Requests.Queries;
 using Explore.Application.Mappings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ActorSubscriptions.Handlers.Queries;
 
-public class GetActorSubscriptionRequestHandler : IRequestHandler<GetActorSubscriptionRequest, ActorSubscriptionDto?>
+public class GetActorSubscriptionRequestHandler : IQueryHandler<GetActorSubscriptionRequest, ActorSubscriptionDto?>
 {
     private readonly IActorSubscriptionRepository _actorSubscriptionRepository;
     private readonly ITenantUserRepository _tenantUserRepository;
@@ -26,7 +26,7 @@ public class GetActorSubscriptionRequestHandler : IRequestHandler<GetActorSubscr
         _currentUserService = currentUserService;
     }
 
-    public async Task<ActorSubscriptionDto?> Handle(GetActorSubscriptionRequest request, CancellationToken cancellationToken)
+    public async Task<ActorSubscriptionDto?> QueryAsync(GetActorSubscriptionRequest request, CancellationToken cancellationToken)
     {
         var tenantUser = await GetCurrentTenantUserAsync(cancellationToken);
         if (tenantUser is null)

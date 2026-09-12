@@ -2,11 +2,11 @@ using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.CategoryType;
 using Explore.Application.Features.CategoryTypes.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.CategoryTypes.Handlers.Queries;
 
-public class GetCategoryTypeDetailsRequestHandler : IRequestHandler<GetCategoryTypeDetailsRequest, CategoryTypeDto>
+public class GetCategoryTypeDetailsRequestHandler : IQueryHandler<GetCategoryTypeDetailsRequest, CategoryTypeDto?>
 {
     private readonly ICategoryTypeRepository _repository;
 
@@ -15,9 +15,9 @@ public class GetCategoryTypeDetailsRequestHandler : IRequestHandler<GetCategoryT
         _repository = repository;
     }
 
-    public async Task<CategoryTypeDto> Handle(GetCategoryTypeDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<CategoryTypeDto?> QueryAsync(GetCategoryTypeDetailsRequest request, CancellationToken cancellationToken)
     {
         var categoryType = await _repository.GetCategoryTypeWithDetails(request.Id);
-        return CategoryTypeMapper.ToDetail(categoryType)!;
+        return CategoryTypeMapper.ToDetail(categoryType);
     }
 }

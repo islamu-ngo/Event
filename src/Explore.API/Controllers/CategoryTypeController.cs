@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.CategoryType;
 using Explore.Application.Features.CategoryTypeCategories.Requests.Queries;
 using Explore.Application.Features.CategoryTypes.Requests.Queries;
@@ -15,7 +16,10 @@ namespace Explore.API.Controllers;
 [Route("api/[controller]")]
 [ApiController]
 [EndpointClassification(EndpointClass.Public)]
-public class CategoryTypeController(IMediator mediator) : ControllerBase
+public class CategoryTypeController(
+    IQueryHandler<GetCategoryTypeListRequest, List<CategoryTypeListDto>> categoryTypes,
+    IQueryHandler<GetCategoryTypeDetailsRequest, CategoryTypeDto?> categoryTypeDetails,
+    IMediator mediator) : ControllerBase
 {
 
     // GET: api/categorytype
@@ -24,8 +28,8 @@ public class CategoryTypeController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "LookupData")]
     public async Task<ActionResult<List<CategoryTypeListDto>>> GetAll(CancellationToken cancellationToken = default)
     {
-        var categoryTypes = await mediator.Send(new GetCategoryTypeListRequest(), cancellationToken);
-        return Ok(categoryTypes);
+        var result = await categoryTypes.QueryAsync(new GetCategoryTypeListRequest(), cancellationToken);
+        return Ok(result);
     }
 
     // GET: api/categorytype/{id}
@@ -34,7 +38,7 @@ public class CategoryTypeController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<CategoryTypeDto>> GetById(int id, CancellationToken cancellationToken = default)
     {
-        var categoryType = await mediator.Send(new GetCategoryTypeDetailsRequest { Id = id }, cancellationToken);
+        var categoryType = await categoryTypeDetails.QueryAsync(new GetCategoryTypeDetailsRequest { Id = id }, cancellationToken);
         return Ok(categoryType);
     }
 

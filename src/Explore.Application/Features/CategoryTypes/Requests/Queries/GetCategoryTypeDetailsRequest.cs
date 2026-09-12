@@ -1,6 +1,6 @@
 using Explore.Application.DTOs.CategoryType;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.CategoryTypes.Requests.Queries;
 
-public sealed record GetCategoryTypeDetailsRequest(int Id = default) : IRequest<CategoryTypeDto>;
+public sealed record GetCategoryTypeDetailsRequest(int Id = default) : IQuery<CategoryTypeDto?>;

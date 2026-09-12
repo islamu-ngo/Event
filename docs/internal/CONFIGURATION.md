@@ -671,7 +671,7 @@ retained authority rows there because the primary database is its sole sink.
 | `Database:Erasure:Runtime:Username`, `Password` | none | API-only function-execution credential for `ExternalDatabase`; its username must differ from the migrator username. |
 | `Database:Erasure:Migrator:Username`, `Password` | none | MigrationService-only schema/grant credential for `ExternalDatabase`; role collapse with runtime fails startup/provisioning. |
 
-Compose and Infisical map `ERASURE_TOPOLOGY` (or `PRIVACY_ERASURE_AUTHORITY_TOPOLOGY`),
+Compose and Infisical map `ERASURE_DATABASE_TOPOLOGY`,
 `ERASURE_EMBEDDED_PATH`, `ERASURE_WRITER_REPLICA_COUNT`, and
 `ERASURE_BUSY_TIMEOUT_SECONDS` to the embedded .NET keys.
 For the external topology they map `ERASURE_DATABASE_HOST` (or Infisical `/database/erasure/ERASURE_DATABASE_HOST`),

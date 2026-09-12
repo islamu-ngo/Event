@@ -105,6 +105,30 @@ public sealed class InfisicalConfigurationProviderTests
         await Assert.That(key).IsEqualTo("AiProvider:ToolProposalsEnabled");
     }
 
+    [Test]
+    public async Task ConvertToConfigurationKey_WhenDatabaseErasureTopologySecretsProvided_MapsToPrivacyErasureTopology()
+    {
+        var canonical = await ConvertToConfigurationKey("ERASURE_DATABASE_TOPOLOGY", "/database");
+        var subfolder = await ConvertToConfigurationKey("ERASURE_DATABASE_TOPOLOGY", "/database/erasure");
+
+        await Assert.That(canonical).IsEqualTo("PrivacyErasure:Authority:Topology");
+        await Assert.That(subfolder).IsEqualTo("PrivacyErasure:Authority:Topology");
+    }
+
+    [Test]
+    public async Task ConvertToConfigurationKey_WhenIdentityTopologySecretsProvided_MapsToIdentityDatabaseTopology()
+    {
+        var inDatabaseFolder = await ConvertToConfigurationKey("IDENTITY_DATABASE_TOPOLOGY", "/database");
+        var inSubfolder = await ConvertToConfigurationKey("IDENTITY_DATABASE_TOPOLOGY", "/database/identity");
+        var host = await ConvertToConfigurationKey("IDENTITY_DATABASE_HOST", "/database/identity");
+        var password = await ConvertToConfigurationKey("IDENTITY_DATABASE_RUNTIME_PASSWORD", "/database/identity");
+
+        await Assert.That(inDatabaseFolder).IsEqualTo("IdentityDatabase:Topology");
+        await Assert.That(inSubfolder).IsEqualTo("IdentityDatabase:Topology");
+        await Assert.That(host).IsEqualTo("IdentityDatabase:Host");
+        await Assert.That(password).IsEqualTo("IdentityDatabase:Runtime:Password");
+    }
+
     private static async Task<string> ConvertToConfigurationKey(string secretKey, string path)
     {
         var method = typeof(InfisicalConfigurationProvider).GetMethod(

@@ -61,11 +61,8 @@ var privacyErasureTopology = ParsePrivacyErasureTopology(
         "PrivacyErasure:Authority:Topology",
         ConfiguredValue(
             builder.Configuration,
-            "ERASURE_TOPOLOGY",
-            ConfiguredValue(
-                builder.Configuration,
-                "PRIVACY_ERASURE_AUTHORITY_TOPOLOGY",
-                nameof(PrivacyErasureAuthorityTopology.EmbeddedSqlite)))));
+            "ERASURE_DATABASE_TOPOLOGY",
+            nameof(PrivacyErasureAuthorityTopology.EmbeddedSqlite))));
 var usesEmbeddedPrivacyErasureAuthority =
     privacyErasureTopology == PrivacyErasureAuthorityTopology.EmbeddedSqlite;
 var usesExternalPrivacyErasureAuthority =
@@ -1600,7 +1597,7 @@ static PrivacyErasureAuthorityTopology ParsePrivacyErasureTopology(string value)
     }
 
     throw new InvalidOperationException(
-        "PRIVACY_ERASURE_AUTHORITY_TOPOLOGY must be EmbeddedSqlite, CoLocated, or ExternalDatabase.");
+        "ERASURE_DATABASE_TOPOLOGY must be EmbeddedSqlite, CoLocated, or ExternalDatabase.");
 }
 
 static HostingTopology ParseHostingTopology(string? rawValue)

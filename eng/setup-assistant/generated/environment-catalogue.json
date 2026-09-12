@@ -20,7 +20,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 0,
-        "composeOrder": 123,
+        "composeOrder": 122,
         "composeRequired": false
       },
       "documentation": {
@@ -46,7 +46,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 1,
-        "composeOrder": 258,
+        "composeOrder": 257,
         "composeRequired": false
       },
       "documentation": {
@@ -72,7 +72,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 2,
-        "composeOrder": 260,
+        "composeOrder": 259,
         "composeRequired": false
       },
       "documentation": {
@@ -98,7 +98,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 3,
-        "composeOrder": 231,
+        "composeOrder": 230,
         "composeRequired": false
       },
       "documentation": {
@@ -124,7 +124,7 @@
       "generation": {
         "surfaces": 3,
         "dotenvOrder": 4,
-        "composeOrder": 225,
+        "composeOrder": 224,
         "composeRequired": false
       },
       "documentation": {
@@ -150,7 +150,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 5,
-        "composeOrder": 82,
+        "composeOrder": 81,
         "composeRequired": false
       },
       "documentation": {
@@ -514,7 +514,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 19,
-        "composeOrder": 88,
+        "composeOrder": 87,
         "composeRequired": false
       },
       "documentation": {
@@ -540,7 +540,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 20,
-        "composeOrder": 89,
+        "composeOrder": 88,
         "composeRequired": false
       },
       "documentation": {
@@ -566,7 +566,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 21,
-        "composeOrder": 90,
+        "composeOrder": 89,
         "composeRequired": false
       },
       "documentation": {
@@ -592,7 +592,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 22,
-        "composeOrder": 91,
+        "composeOrder": 90,
         "composeRequired": false
       },
       "documentation": {
@@ -618,7 +618,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 23,
-        "composeOrder": 92,
+        "composeOrder": 91,
         "composeRequired": false
       },
       "documentation": {
@@ -644,7 +644,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 24,
-        "composeOrder": 93,
+        "composeOrder": 92,
         "composeRequired": false
       },
       "documentation": {
@@ -670,7 +670,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 25,
-        "composeOrder": 94,
+        "composeOrder": 93,
         "composeRequired": false
       },
       "documentation": {
@@ -904,7 +904,7 @@
       "generation": {
         "surfaces": 3,
         "dotenvOrder": 34,
-        "composeOrder": 228,
+        "composeOrder": 227,
         "composeRequired": false
       },
       "documentation": {
@@ -930,7 +930,7 @@
       "generation": {
         "surfaces": 3,
         "dotenvOrder": 35,
-        "composeOrder": 226,
+        "composeOrder": 225,
         "composeRequired": false
       },
       "documentation": {
@@ -956,7 +956,7 @@
       "generation": {
         "surfaces": 3,
         "dotenvOrder": 36,
-        "composeOrder": 227,
+        "composeOrder": 226,
         "composeRequired": false
       },
       "documentation": {
@@ -982,7 +982,7 @@
       "generation": {
         "surfaces": 3,
         "dotenvOrder": 37,
-        "composeOrder": 229,
+        "composeOrder": 228,
         "composeRequired": false
       },
       "documentation": {
@@ -1008,7 +1008,7 @@
       "generation": {
         "surfaces": 3,
         "dotenvOrder": 38,
-        "composeOrder": 230,
+        "composeOrder": 229,
         "composeRequired": false
       },
       "documentation": {
@@ -1034,7 +1034,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 39,
-        "composeOrder": 215,
+        "composeOrder": 214,
         "composeRequired": false
       },
       "documentation": {
@@ -1060,7 +1060,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 40,
-        "composeOrder": 158,
+        "composeOrder": 157,
         "composeRequired": false
       },
       "documentation": {
@@ -1075,7 +1075,7 @@
       }
     },
     {
-      "key": "ERASURE_TOPOLOGY",
+      "key": "ERASURE_DATABASE_TOPOLOGY",
       "category": "platform",
       "sensitivity": "public",
       "requirement": "optional",
@@ -1090,8 +1090,8 @@
         "composeRequired": false
       },
       "documentation": {
-        "localizationKey": "environment.platform.erasure_topology",
-        "helpKey": "environment.help.erasure_topology",
+        "localizationKey": "environment.platform.erasure_database_topology",
+        "helpKey": "environment.help.erasure_database_topology",
         "anchor": "environment-platform"
       },
       "activation": {
@@ -1112,7 +1112,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 42,
-        "composeOrder": 52,
+        "composeOrder": 51,
         "composeRequired": false
       },
       "documentation": {
@@ -1138,7 +1138,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 43,
-        "composeOrder": 84,
+        "composeOrder": 83,
         "composeRequired": false
       },
       "documentation": {
@@ -1164,7 +1164,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 44,
-        "composeOrder": 87,
+        "composeOrder": 86,
         "composeRequired": false
       },
       "documentation": {
@@ -1190,7 +1190,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 45,
-        "composeOrder": 102,
+        "composeOrder": 101,
         "composeRequired": false
       },
       "documentation": {
@@ -1216,7 +1216,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 46,
-        "composeOrder": 103,
+        "composeOrder": 102,
         "composeRequired": false
       },
       "documentation": {
@@ -1242,7 +1242,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 47,
-        "composeOrder": 104,
+        "composeOrder": 103,
         "composeRequired": false
       },
       "documentation": {
@@ -1268,7 +1268,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 48,
-        "composeOrder": 105,
+        "composeOrder": 104,
         "composeRequired": false
       },
       "documentation": {
@@ -1294,7 +1294,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 49,
-        "composeOrder": 106,
+        "composeOrder": 105,
         "composeRequired": false
       },
       "documentation": {
@@ -1320,7 +1320,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 50,
-        "composeOrder": 107,
+        "composeOrder": 106,
         "composeRequired": false
       },
       "documentation": {
@@ -1346,7 +1346,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 51,
-        "composeOrder": 108,
+        "composeOrder": 107,
         "composeRequired": false
       },
       "documentation": {
@@ -1372,7 +1372,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 52,
-        "composeOrder": 110,
+        "composeOrder": 109,
         "composeRequired": false
       },
       "documentation": {
@@ -1398,7 +1398,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 53,
-        "composeOrder": 111,
+        "composeOrder": 110,
         "composeRequired": false
       },
       "documentation": {
@@ -1424,7 +1424,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 54,
-        "composeOrder": 112,
+        "composeOrder": 111,
         "composeRequired": false
       },
       "documentation": {
@@ -1450,7 +1450,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 55,
-        "composeOrder": 113,
+        "composeOrder": 112,
         "composeRequired": false
       },
       "documentation": {
@@ -1476,7 +1476,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 56,
-        "composeOrder": 114,
+        "composeOrder": 113,
         "composeRequired": false
       },
       "documentation": {
@@ -1502,7 +1502,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 57,
-        "composeOrder": 222,
+        "composeOrder": 221,
         "composeRequired": false
       },
       "documentation": {
@@ -1528,7 +1528,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 58,
-        "composeOrder": 223,
+        "composeOrder": 222,
         "composeRequired": false
       },
       "documentation": {
@@ -1554,7 +1554,7 @@
       "generation": {
         "surfaces": 7,
         "dotenvOrder": 59,
-        "composeOrder": 224,
+        "composeOrder": 223,
         "composeRequired": false
       },
       "documentation": {
@@ -1627,7 +1627,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 150,
+        "composeOrder": 149,
         "composeRequired": false
       },
       "documentation": {
@@ -1652,7 +1652,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 151,
+        "composeOrder": 150,
         "composeRequired": false
       },
       "documentation": {
@@ -1677,7 +1677,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 155,
+        "composeOrder": 154,
         "composeRequired": false
       },
       "documentation": {
@@ -1702,7 +1702,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 156,
+        "composeOrder": 155,
         "composeRequired": false
       },
       "documentation": {
@@ -1727,7 +1727,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 152,
+        "composeOrder": 151,
         "composeRequired": false
       },
       "documentation": {
@@ -1752,7 +1752,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 153,
+        "composeOrder": 152,
         "composeRequired": false
       },
       "documentation": {
@@ -1777,7 +1777,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 154,
+        "composeOrder": 153,
         "composeRequired": false
       },
       "documentation": {
@@ -1802,7 +1802,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 261,
+        "composeOrder": 260,
         "composeRequired": false
       },
       "documentation": {
@@ -1827,7 +1827,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 262,
+        "composeOrder": 261,
         "composeRequired": false
       },
       "documentation": {
@@ -1852,7 +1852,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 267,
+        "composeOrder": 266,
         "composeRequired": false
       },
       "documentation": {
@@ -1877,7 +1877,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 268,
+        "composeOrder": 267,
         "composeRequired": false
       },
       "documentation": {
@@ -1902,7 +1902,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 278,
+        "composeOrder": 277,
         "composeRequired": false
       },
       "documentation": {
@@ -1927,7 +1927,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 287,
+        "composeOrder": 286,
         "composeRequired": false
       },
       "documentation": {
@@ -1952,7 +1952,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 303,
+        "composeOrder": 302,
         "composeRequired": false
       },
       "documentation": {
@@ -1977,7 +1977,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 306,
+        "composeOrder": 305,
         "composeRequired": false
       },
       "documentation": {
@@ -2002,7 +2002,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 311,
+        "composeOrder": 310,
         "composeRequired": false
       },
       "documentation": {
@@ -2027,7 +2027,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 312,
+        "composeOrder": 311,
         "composeRequired": false
       },
       "documentation": {
@@ -2052,7 +2052,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 307,
+        "composeOrder": 306,
         "composeRequired": false
       },
       "documentation": {
@@ -2452,7 +2452,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 232,
+        "composeOrder": 231,
         "composeRequired": false
       },
       "documentation": {
@@ -2477,7 +2477,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 233,
+        "composeOrder": 232,
         "composeRequired": false
       },
       "documentation": {
@@ -2502,7 +2502,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 234,
+        "composeOrder": 233,
         "composeRequired": false
       },
       "documentation": {
@@ -2527,7 +2527,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 235,
+        "composeOrder": 234,
         "composeRequired": false
       },
       "documentation": {
@@ -2552,7 +2552,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 236,
+        "composeOrder": 235,
         "composeRequired": false
       },
       "documentation": {
@@ -2577,7 +2577,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 237,
+        "composeOrder": 236,
         "composeRequired": false
       },
       "documentation": {
@@ -2602,7 +2602,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 238,
+        "composeOrder": 237,
         "composeRequired": false
       },
       "documentation": {
@@ -2627,7 +2627,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 239,
+        "composeOrder": 238,
         "composeRequired": false
       },
       "documentation": {
@@ -2652,7 +2652,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 240,
+        "composeOrder": 239,
         "composeRequired": false
       },
       "documentation": {
@@ -2677,7 +2677,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 241,
+        "composeOrder": 240,
         "composeRequired": false
       },
       "documentation": {
@@ -2702,7 +2702,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 242,
+        "composeOrder": 241,
         "composeRequired": false
       },
       "documentation": {
@@ -2727,7 +2727,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 243,
+        "composeOrder": 242,
         "composeRequired": false
       },
       "documentation": {
@@ -2752,7 +2752,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 244,
+        "composeOrder": 243,
         "composeRequired": false
       },
       "documentation": {
@@ -2777,7 +2777,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 245,
+        "composeOrder": 244,
         "composeRequired": false
       },
       "documentation": {
@@ -2802,7 +2802,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 246,
+        "composeOrder": 245,
         "composeRequired": false
       },
       "documentation": {
@@ -2827,7 +2827,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 247,
+        "composeOrder": 246,
         "composeRequired": false
       },
       "documentation": {
@@ -3177,7 +3177,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 86,
+        "composeOrder": 85,
         "composeRequired": false
       },
       "documentation": {
@@ -3202,7 +3202,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 95,
+        "composeOrder": 94,
         "composeRequired": false
       },
       "documentation": {
@@ -3227,7 +3227,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 96,
+        "composeOrder": 95,
         "composeRequired": false
       },
       "documentation": {
@@ -3252,7 +3252,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 97,
+        "composeOrder": 96,
         "composeRequired": false
       },
       "documentation": {
@@ -3511,7 +3511,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 98,
+        "composeOrder": 97,
         "composeRequired": false
       },
       "documentation": {
@@ -3536,7 +3536,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 99,
+        "composeOrder": 98,
         "composeRequired": false
       },
       "documentation": {
@@ -3561,7 +3561,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 100,
+        "composeOrder": 99,
         "composeRequired": false
       },
       "documentation": {
@@ -3586,7 +3586,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 101,
+        "composeOrder": 100,
         "composeRequired": false
       },
       "documentation": {
@@ -3611,7 +3611,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 134,
+        "composeOrder": 133,
         "composeRequired": false
       },
       "documentation": {
@@ -3636,7 +3636,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 135,
+        "composeOrder": 134,
         "composeRequired": false
       },
       "documentation": {
@@ -3661,7 +3661,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 136,
+        "composeOrder": 135,
         "composeRequired": false
       },
       "documentation": {
@@ -3686,7 +3686,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 137,
+        "composeOrder": 136,
         "composeRequired": false
       },
       "documentation": {
@@ -3711,7 +3711,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 139,
+        "composeOrder": 138,
         "composeRequired": false
       },
       "documentation": {
@@ -3736,7 +3736,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 140,
+        "composeOrder": 139,
         "composeRequired": false
       },
       "documentation": {
@@ -3761,7 +3761,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 138,
+        "composeOrder": 137,
         "composeRequired": false
       },
       "documentation": {
@@ -3786,7 +3786,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 141,
+        "composeOrder": 140,
         "composeRequired": false
       },
       "documentation": {
@@ -3811,7 +3811,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 142,
+        "composeOrder": 141,
         "composeRequired": false
       },
       "documentation": {
@@ -3836,7 +3836,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 143,
+        "composeOrder": 142,
         "composeRequired": false
       },
       "documentation": {
@@ -3861,7 +3861,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 144,
+        "composeOrder": 143,
         "composeRequired": false
       },
       "documentation": {
@@ -3886,7 +3886,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 145,
+        "composeOrder": 144,
         "composeRequired": false
       },
       "documentation": {
@@ -4007,7 +4007,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 259,
+        "composeOrder": 258,
         "composeRequired": false
       },
       "documentation": {
@@ -4032,7 +4032,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 83,
+        "composeOrder": 82,
         "composeRequired": false
       },
       "documentation": {
@@ -4072,7 +4072,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 109,
+        "composeOrder": 108,
         "composeRequired": false
       },
       "documentation": {
@@ -4097,7 +4097,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 124,
+        "composeOrder": 123,
         "composeRequired": false
       },
       "documentation": {
@@ -4122,7 +4122,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 125,
+        "composeOrder": 124,
         "composeRequired": false
       },
       "documentation": {
@@ -4147,7 +4147,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 126,
+        "composeOrder": 125,
         "composeRequired": false
       },
       "documentation": {
@@ -4172,7 +4172,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 115,
+        "composeOrder": 114,
         "composeRequired": false
       },
       "documentation": {
@@ -4197,7 +4197,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 116,
+        "composeOrder": 115,
         "composeRequired": false
       },
       "documentation": {
@@ -4222,7 +4222,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 117,
+        "composeOrder": 116,
         "composeRequired": false
       },
       "documentation": {
@@ -4247,7 +4247,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 118,
+        "composeOrder": 117,
         "composeRequired": false
       },
       "documentation": {
@@ -4272,7 +4272,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 119,
+        "composeOrder": 118,
         "composeRequired": false
       },
       "documentation": {
@@ -4297,7 +4297,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 120,
+        "composeOrder": 119,
         "composeRequired": false
       },
       "documentation": {
@@ -4322,7 +4322,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 121,
+        "composeOrder": 120,
         "composeRequired": false
       },
       "documentation": {
@@ -4347,7 +4347,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 122,
+        "composeOrder": 121,
         "composeRequired": false
       },
       "documentation": {
@@ -4372,7 +4372,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 127,
+        "composeOrder": 126,
         "composeRequired": false
       },
       "documentation": {
@@ -4397,7 +4397,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 128,
+        "composeOrder": 127,
         "composeRequired": false
       },
       "documentation": {
@@ -5142,7 +5142,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 250,
+        "composeOrder": 249,
         "composeRequired": false
       },
       "documentation": {
@@ -5167,7 +5167,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 251,
+        "composeOrder": 250,
         "composeRequired": false
       },
       "documentation": {
@@ -5192,7 +5192,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 252,
+        "composeOrder": 251,
         "composeRequired": false
       },
       "documentation": {
@@ -5217,7 +5217,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 253,
+        "composeOrder": 252,
         "composeRequired": false
       },
       "documentation": {
@@ -5242,7 +5242,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 254,
+        "composeOrder": 253,
         "composeRequired": false
       },
       "documentation": {
@@ -5267,7 +5267,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 256,
+        "composeOrder": 255,
         "composeRequired": false
       },
       "documentation": {
@@ -5292,7 +5292,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 255,
+        "composeOrder": 254,
         "composeRequired": false
       },
       "documentation": {
@@ -5317,7 +5317,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 257,
+        "composeOrder": 256,
         "composeRequired": false
       },
       "documentation": {
@@ -5342,7 +5342,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 266,
+        "composeOrder": 265,
         "composeRequired": false
       },
       "documentation": {
@@ -5367,7 +5367,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 263,
+        "composeOrder": 262,
         "composeRequired": false
       },
       "documentation": {
@@ -5392,7 +5392,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 264,
+        "composeOrder": 263,
         "composeRequired": false
       },
       "documentation": {
@@ -5417,7 +5417,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 265,
+        "composeOrder": 264,
         "composeRequired": false
       },
       "documentation": {
@@ -5442,7 +5442,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 76,
+        "composeOrder": 75,
         "composeRequired": false
       },
       "documentation": {
@@ -5467,7 +5467,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 77,
+        "composeOrder": 76,
         "composeRequired": false
       },
       "documentation": {
@@ -5492,7 +5492,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 78,
+        "composeOrder": 77,
         "composeRequired": false
       },
       "documentation": {
@@ -5517,7 +5517,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 79,
+        "composeOrder": 78,
         "composeRequired": false
       },
       "documentation": {
@@ -5542,7 +5542,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 80,
+        "composeOrder": 79,
         "composeRequired": false
       },
       "documentation": {
@@ -5567,7 +5567,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 81,
+        "composeOrder": 80,
         "composeRequired": false
       },
       "documentation": {
@@ -5592,7 +5592,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 216,
+        "composeOrder": 215,
         "composeRequired": false
       },
       "documentation": {
@@ -5617,7 +5617,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 217,
+        "composeOrder": 216,
         "composeRequired": false
       },
       "documentation": {
@@ -5642,7 +5642,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 218,
+        "composeOrder": 217,
         "composeRequired": false
       },
       "documentation": {
@@ -5667,7 +5667,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 219,
+        "composeOrder": 218,
         "composeRequired": false
       },
       "documentation": {
@@ -5692,7 +5692,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 220,
+        "composeOrder": 219,
         "composeRequired": false
       },
       "documentation": {
@@ -5717,7 +5717,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 221,
+        "composeOrder": 220,
         "composeRequired": false
       },
       "documentation": {
@@ -5742,7 +5742,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 129,
+        "composeOrder": 128,
         "composeRequired": false
       },
       "documentation": {
@@ -5767,7 +5767,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 130,
+        "composeOrder": 129,
         "composeRequired": false
       },
       "documentation": {
@@ -5792,7 +5792,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 131,
+        "composeOrder": 130,
         "composeRequired": false
       },
       "documentation": {
@@ -5817,7 +5817,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 132,
+        "composeOrder": 131,
         "composeRequired": false
       },
       "documentation": {
@@ -5842,7 +5842,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 133,
+        "composeOrder": 132,
         "composeRequired": false
       },
       "documentation": {
@@ -5867,7 +5867,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 146,
+        "composeOrder": 145,
         "composeRequired": false
       },
       "documentation": {
@@ -5892,7 +5892,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 147,
+        "composeOrder": 146,
         "composeRequired": false
       },
       "documentation": {
@@ -5917,7 +5917,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 148,
+        "composeOrder": 147,
         "composeRequired": false
       },
       "documentation": {
@@ -5942,7 +5942,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 149,
+        "composeOrder": 148,
         "composeRequired": false
       },
       "documentation": {
@@ -5967,7 +5967,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 179,
+        "composeOrder": 178,
         "composeRequired": false
       },
       "documentation": {
@@ -5992,7 +5992,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 180,
+        "composeOrder": 179,
         "composeRequired": false
       },
       "documentation": {
@@ -6017,7 +6017,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 181,
+        "composeOrder": 180,
         "composeRequired": false
       },
       "documentation": {
@@ -6042,7 +6042,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 182,
+        "composeOrder": 181,
         "composeRequired": false
       },
       "documentation": {
@@ -6067,7 +6067,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 157,
+        "composeOrder": 156,
         "composeRequired": false
       },
       "documentation": {
@@ -6092,7 +6092,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 159,
+        "composeOrder": 158,
         "composeRequired": false
       },
       "documentation": {
@@ -6117,7 +6117,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 160,
+        "composeOrder": 159,
         "composeRequired": false
       },
       "documentation": {
@@ -6142,7 +6142,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 161,
+        "composeOrder": 160,
         "composeRequired": false
       },
       "documentation": {
@@ -6167,7 +6167,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 162,
+        "composeOrder": 161,
         "composeRequired": false
       },
       "documentation": {
@@ -6192,7 +6192,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 163,
+        "composeOrder": 162,
         "composeRequired": false
       },
       "documentation": {
@@ -6217,7 +6217,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 164,
+        "composeOrder": 163,
         "composeRequired": false
       },
       "documentation": {
@@ -6242,7 +6242,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 165,
+        "composeOrder": 164,
         "composeRequired": false
       },
       "documentation": {
@@ -6267,7 +6267,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 166,
+        "composeOrder": 165,
         "composeRequired": false
       },
       "documentation": {
@@ -6292,7 +6292,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 167,
+        "composeOrder": 166,
         "composeRequired": false
       },
       "documentation": {
@@ -6317,7 +6317,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 168,
+        "composeOrder": 167,
         "composeRequired": false
       },
       "documentation": {
@@ -6342,7 +6342,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 169,
+        "composeOrder": 168,
         "composeRequired": false
       },
       "documentation": {
@@ -6367,7 +6367,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 170,
+        "composeOrder": 169,
         "composeRequired": false
       },
       "documentation": {
@@ -6392,7 +6392,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 171,
+        "composeOrder": 170,
         "composeRequired": false
       },
       "documentation": {
@@ -6417,7 +6417,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 172,
+        "composeOrder": 171,
         "composeRequired": false
       },
       "documentation": {
@@ -6442,7 +6442,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 173,
+        "composeOrder": 172,
         "composeRequired": false
       },
       "documentation": {
@@ -6467,7 +6467,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 174,
+        "composeOrder": 173,
         "composeRequired": false
       },
       "documentation": {
@@ -6492,7 +6492,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 175,
+        "composeOrder": 174,
         "composeRequired": false
       },
       "documentation": {
@@ -6517,7 +6517,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 176,
+        "composeOrder": 175,
         "composeRequired": false
       },
       "documentation": {
@@ -6542,7 +6542,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 177,
+        "composeOrder": 176,
         "composeRequired": false
       },
       "documentation": {
@@ -6567,7 +6567,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 178,
+        "composeOrder": 177,
         "composeRequired": false
       },
       "documentation": {
@@ -6592,7 +6592,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 198,
+        "composeOrder": 197,
         "composeRequired": false
       },
       "documentation": {
@@ -6617,7 +6617,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 199,
+        "composeOrder": 198,
         "composeRequired": false
       },
       "documentation": {
@@ -6642,7 +6642,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 200,
+        "composeOrder": 199,
         "composeRequired": false
       },
       "documentation": {
@@ -6667,7 +6667,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 201,
+        "composeOrder": 200,
         "composeRequired": false
       },
       "documentation": {
@@ -6692,7 +6692,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 202,
+        "composeOrder": 201,
         "composeRequired": false
       },
       "documentation": {
@@ -6717,7 +6717,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 203,
+        "composeOrder": 202,
         "composeRequired": false
       },
       "documentation": {
@@ -6742,7 +6742,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 204,
+        "composeOrder": 203,
         "composeRequired": false
       },
       "documentation": {
@@ -6767,7 +6767,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 205,
+        "composeOrder": 204,
         "composeRequired": false
       },
       "documentation": {
@@ -6792,7 +6792,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 206,
+        "composeOrder": 205,
         "composeRequired": false
       },
       "documentation": {
@@ -6817,7 +6817,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 207,
+        "composeOrder": 206,
         "composeRequired": false
       },
       "documentation": {
@@ -6842,7 +6842,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 272,
+        "composeOrder": 271,
         "composeRequired": false
       },
       "documentation": {
@@ -6867,7 +6867,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 271,
+        "composeOrder": 270,
         "composeRequired": false
       },
       "documentation": {
@@ -6892,7 +6892,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 269,
+        "composeOrder": 268,
         "composeRequired": false
       },
       "documentation": {
@@ -6917,7 +6917,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 270,
+        "composeOrder": 269,
         "composeRequired": false
       },
       "documentation": {
@@ -6942,7 +6942,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 273,
+        "composeOrder": 272,
         "composeRequired": false
       },
       "documentation": {
@@ -6967,7 +6967,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 274,
+        "composeOrder": 273,
         "composeRequired": false
       },
       "documentation": {
@@ -6992,7 +6992,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 275,
+        "composeOrder": 274,
         "composeRequired": false
       },
       "documentation": {
@@ -7017,7 +7017,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 276,
+        "composeOrder": 275,
         "composeRequired": false
       },
       "documentation": {
@@ -7042,7 +7042,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 277,
+        "composeOrder": 276,
         "composeRequired": false
       },
       "documentation": {
@@ -7067,7 +7067,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 282,
+        "composeOrder": 281,
         "composeRequired": false
       },
       "documentation": {
@@ -7092,7 +7092,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 283,
+        "composeOrder": 282,
         "composeRequired": false
       },
       "documentation": {
@@ -7117,7 +7117,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 284,
+        "composeOrder": 283,
         "composeRequired": false
       },
       "documentation": {
@@ -7142,7 +7142,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 285,
+        "composeOrder": 284,
         "composeRequired": false
       },
       "documentation": {
@@ -7167,7 +7167,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 286,
+        "composeOrder": 285,
         "composeRequired": false
       },
       "documentation": {
@@ -7192,7 +7192,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 279,
+        "composeOrder": 278,
         "composeRequired": false
       },
       "documentation": {
@@ -7217,7 +7217,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 280,
+        "composeOrder": 279,
         "composeRequired": false
       },
       "documentation": {
@@ -7242,7 +7242,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 281,
+        "composeOrder": 280,
         "composeRequired": false
       },
       "documentation": {
@@ -7267,7 +7267,7 @@
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 183,
+        "composeOrder": 182,
         "composeRequired": false
       },
       "documentation": {
@@ -7292,7 +7292,7 @@
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 184,
+        "composeOrder": 183,
         "composeRequired": false
       },
       "documentation": {
@@ -7317,7 +7317,7 @@
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 185,
+        "composeOrder": 184,
         "composeRequired": false
       },
       "documentation": {
@@ -7342,7 +7342,7 @@
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 186,
+        "composeOrder": 185,
         "composeRequired": false
       },
       "documentation": {
@@ -7367,7 +7367,7 @@
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 187,
+        "composeOrder": 186,
         "composeRequired": false
       },
       "documentation": {
@@ -7392,7 +7392,7 @@
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 188,
+        "composeOrder": 187,
         "composeRequired": false
       },
       "documentation": {
@@ -7465,7 +7465,7 @@
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 189,
+        "composeOrder": 188,
         "composeRequired": false
       },
       "documentation": {
@@ -7490,7 +7490,7 @@
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 190,
+        "composeOrder": 189,
         "composeRequired": false
       },
       "documentation": {
@@ -7515,7 +7515,7 @@
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 191,
+        "composeOrder": 190,
         "composeRequired": false
       },
       "documentation": {
@@ -7540,7 +7540,7 @@
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 192,
+        "composeOrder": 191,
         "composeRequired": false
       },
       "documentation": {
@@ -7565,7 +7565,7 @@
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 193,
+        "composeOrder": 192,
         "composeRequired": false
       },
       "documentation": {
@@ -7590,7 +7590,7 @@
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 194,
+        "composeOrder": 193,
         "composeRequired": false
       },
       "documentation": {
@@ -7615,7 +7615,7 @@
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 195,
+        "composeOrder": 194,
         "composeRequired": false
       },
       "documentation": {
@@ -7640,7 +7640,7 @@
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 196,
+        "composeOrder": 195,
         "composeRequired": false
       },
       "documentation": {
@@ -7665,7 +7665,7 @@
       "restartBehavior": "none",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 197,
+        "composeOrder": 196,
         "composeRequired": false
       },
       "documentation": {
@@ -7690,7 +7690,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 288,
+        "composeOrder": 287,
         "composeRequired": false
       },
       "documentation": {
@@ -7715,7 +7715,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 304,
+        "composeOrder": 303,
         "composeRequired": false
       },
       "documentation": {
@@ -7740,7 +7740,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 305,
+        "composeOrder": 304,
         "composeRequired": false
       },
       "documentation": {
@@ -7765,7 +7765,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 289,
+        "composeOrder": 288,
         "composeRequired": false
       },
       "documentation": {
@@ -7790,7 +7790,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 290,
+        "composeOrder": 289,
         "composeRequired": false
       },
       "documentation": {
@@ -7815,7 +7815,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 291,
+        "composeOrder": 290,
         "composeRequired": false
       },
       "documentation": {
@@ -7840,7 +7840,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 292,
+        "composeOrder": 291,
         "composeRequired": false
       },
       "documentation": {
@@ -7865,7 +7865,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 293,
+        "composeOrder": 292,
         "composeRequired": false
       },
       "documentation": {
@@ -7890,7 +7890,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 294,
+        "composeOrder": 293,
         "composeRequired": false
       },
       "documentation": {
@@ -7915,7 +7915,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 295,
+        "composeOrder": 294,
         "composeRequired": false
       },
       "documentation": {
@@ -7940,7 +7940,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 296,
+        "composeOrder": 295,
         "composeRequired": false
       },
       "documentation": {
@@ -7965,7 +7965,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 297,
+        "composeOrder": 296,
         "composeRequired": false
       },
       "documentation": {
@@ -7990,7 +7990,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 298,
+        "composeOrder": 297,
         "composeRequired": false
       },
       "documentation": {
@@ -8015,7 +8015,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 299,
+        "composeOrder": 298,
         "composeRequired": false
       },
       "documentation": {
@@ -8040,7 +8040,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 300,
+        "composeOrder": 299,
         "composeRequired": false
       },
       "documentation": {
@@ -8065,7 +8065,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 301,
+        "composeOrder": 300,
         "composeRequired": false
       },
       "documentation": {
@@ -8090,7 +8090,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 302,
+        "composeOrder": 301,
         "composeRequired": false
       },
       "documentation": {
@@ -8115,7 +8115,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 308,
+        "composeOrder": 307,
         "composeRequired": false
       },
       "documentation": {
@@ -8140,7 +8140,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 309,
+        "composeOrder": 308,
         "composeRequired": false
       },
       "documentation": {
@@ -8165,7 +8165,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 310,
+        "composeOrder": 309,
         "composeRequired": false
       },
       "documentation": {
@@ -8190,7 +8190,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 208,
+        "composeOrder": 207,
         "composeRequired": false
       },
       "documentation": {
@@ -8215,7 +8215,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 209,
+        "composeOrder": 208,
         "composeRequired": false
       },
       "documentation": {
@@ -8240,7 +8240,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 210,
+        "composeOrder": 209,
         "composeRequired": false
       },
       "documentation": {
@@ -8265,7 +8265,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 211,
+        "composeOrder": 210,
         "composeRequired": false
       },
       "documentation": {
@@ -8290,7 +8290,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 212,
+        "composeOrder": 211,
         "composeRequired": false
       },
       "documentation": {
@@ -8315,7 +8315,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 213,
+        "composeOrder": 212,
         "composeRequired": false
       },
       "documentation": {
@@ -8340,7 +8340,7 @@
       "restartBehavior": "capability",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 214,
+        "composeOrder": 213,
         "composeRequired": false
       },
       "documentation": {
@@ -8365,7 +8365,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 54,
+        "composeOrder": 53,
         "composeRequired": false
       },
       "documentation": {
@@ -8390,7 +8390,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 56,
+        "composeOrder": 55,
         "composeRequired": false
       },
       "documentation": {
@@ -8415,7 +8415,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 58,
+        "composeOrder": 57,
         "composeRequired": false
       },
       "documentation": {
@@ -8440,7 +8440,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 60,
+        "composeOrder": 59,
         "composeRequired": false
       },
       "documentation": {
@@ -8465,7 +8465,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 62,
+        "composeOrder": 61,
         "composeRequired": false
       },
       "documentation": {
@@ -8490,7 +8490,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 68,
+        "composeOrder": 67,
         "composeRequired": false
       },
       "documentation": {
@@ -8515,7 +8515,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 70,
+        "composeOrder": 69,
         "composeRequired": false
       },
       "documentation": {
@@ -8540,7 +8540,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 72,
+        "composeOrder": 71,
         "composeRequired": false
       },
       "documentation": {
@@ -8565,7 +8565,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 74,
+        "composeOrder": 73,
         "composeRequired": false
       },
       "documentation": {
@@ -8590,7 +8590,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 64,
+        "composeOrder": 63,
         "composeRequired": false
       },
       "documentation": {
@@ -8615,7 +8615,7 @@
       "restartBehavior": "process",
       "generation": {
         "surfaces": 6,
-        "composeOrder": 66,
+        "composeOrder": 65,
         "composeRequired": false
       },
       "documentation": {
@@ -8655,7 +8655,7 @@
       }
     },
     {
-      "key": "PRIVACY_ERASURE_AUTHORITY_TOPOLOGY",
+      "key": "PRIVACY_ERASURE_AUTHORITY_EMBEDDED_PATH",
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
@@ -8665,32 +8665,7 @@
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 51,
-        "composeRequired": false
-      },
-      "documentation": {
-        "localizationKey": "environment.integration.privacy_erasure_authority_topology",
-        "helpKey": "environment.help.privacy_erasure_authority_topology",
-        "anchor": "environment-integration"
-      },
-      "activation": {
-        "kind": "feature",
-        "identifier": "external-compose-config",
-        "operands": []
-      }
-    },
-    {
-      "key": "PRIVACY_ERASURE_AUTHORITY_EMBEDDED_PATH",
-      "category": "integration",
-      "sensitivity": "public",
-      "requirement": "optional",
-      "order": 342,
-      "hasSafeDefault": false,
-      "validatorId": "compose-interpolation",
-      "restartBehavior": "deployment",
-      "generation": {
-        "surfaces": 2,
-        "composeOrder": 53,
+        "composeOrder": 52,
         "composeRequired": false
       },
       "documentation": {
@@ -8709,13 +8684,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 343,
+      "order": 342,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 55,
+        "composeOrder": 54,
         "composeRequired": false
       },
       "documentation": {
@@ -8734,13 +8709,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 344,
+      "order": 343,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 57,
+        "composeOrder": 56,
         "composeRequired": false
       },
       "documentation": {
@@ -8759,13 +8734,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 345,
+      "order": 344,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 59,
+        "composeOrder": 58,
         "composeRequired": false
       },
       "documentation": {
@@ -8784,13 +8759,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 346,
+      "order": 345,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 61,
+        "composeOrder": 60,
         "composeRequired": false
       },
       "documentation": {
@@ -8809,13 +8784,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 347,
+      "order": 346,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 63,
+        "composeOrder": 62,
         "composeRequired": false
       },
       "documentation": {
@@ -8834,13 +8809,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 348,
+      "order": 347,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 65,
+        "composeOrder": 64,
         "composeRequired": false
       },
       "documentation": {
@@ -8859,13 +8834,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 349,
+      "order": 348,
       "hasSafeDefault": false,
       "validatorId": "boolean",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 67,
+        "composeOrder": 66,
         "composeRequired": false
       },
       "documentation": {
@@ -8884,13 +8859,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 350,
+      "order": 349,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 69,
+        "composeOrder": 68,
         "composeRequired": false
       },
       "documentation": {
@@ -8909,13 +8884,13 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 351,
+      "order": 350,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 71,
+        "composeOrder": 70,
         "composeRequired": false
       },
       "documentation": {
@@ -8934,13 +8909,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 352,
+      "order": 351,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 73,
+        "composeOrder": 72,
         "composeRequired": false
       },
       "documentation": {
@@ -8959,13 +8934,13 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 353,
+      "order": 352,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 75,
+        "composeOrder": 74,
         "composeRequired": false
       },
       "documentation": {
@@ -8984,13 +8959,13 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 354,
+      "order": 353,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 85,
+        "composeOrder": 84,
         "composeRequired": false
       },
       "documentation": {
@@ -9009,13 +8984,13 @@
       "category": "integration",
       "sensitivity": "public",
       "requirement": "optional",
-      "order": 355,
+      "order": 354,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 248,
+        "composeOrder": 247,
         "composeRequired": false
       },
       "documentation": {
@@ -9034,13 +9009,13 @@
       "category": "integration",
       "sensitivity": "sensitive",
       "requirement": "optional",
-      "order": 356,
+      "order": 355,
       "hasSafeDefault": false,
       "validatorId": "compose-interpolation",
       "restartBehavior": "deployment",
       "generation": {
         "surfaces": 2,
-        "composeOrder": 249,
+        "composeOrder": 248,
         "composeRequired": false
       },
       "documentation": {
@@ -9059,7 +9034,7 @@
       "category": "security",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 357,
+      "order": 356,
       "hasSafeDefault": false,
       "validatorId": "security-setting",
       "restartBehavior": "process",
@@ -9083,7 +9058,7 @@
       "category": "identity",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 358,
+      "order": 357,
       "hasSafeDefault": false,
       "validatorId": "identity-setting",
       "restartBehavior": "process",
@@ -9107,7 +9082,7 @@
       "category": "identity",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 359,
+      "order": 358,
       "hasSafeDefault": false,
       "validatorId": "identity-setting",
       "restartBehavior": "process",
@@ -9131,7 +9106,7 @@
       "category": "platform",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 360,
+      "order": 359,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
@@ -9155,7 +9130,7 @@
       "category": "platform",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 361,
+      "order": 360,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
@@ -9179,7 +9154,7 @@
       "category": "platform",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 362,
+      "order": 361,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
@@ -9203,7 +9178,7 @@
       "category": "platform",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 363,
+      "order": 362,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
@@ -9227,7 +9202,7 @@
       "category": "platform",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 364,
+      "order": 363,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
@@ -9251,7 +9226,7 @@
       "category": "database",
       "sensitivity": "secret",
       "requirement": "required",
-      "order": 365,
+      "order": 364,
       "hasSafeDefault": false,
       "validatorId": "database-setting",
       "restartBehavior": "process",
@@ -9275,7 +9250,7 @@
       "category": "database",
       "sensitivity": "secret",
       "requirement": "required",
-      "order": 366,
+      "order": 365,
       "hasSafeDefault": false,
       "validatorId": "port-number",
       "restartBehavior": "process",
@@ -9299,7 +9274,7 @@
       "category": "database",
       "sensitivity": "secret",
       "requirement": "required",
-      "order": 367,
+      "order": 366,
       "hasSafeDefault": false,
       "validatorId": "database-setting",
       "restartBehavior": "process",
@@ -9323,7 +9298,7 @@
       "category": "database",
       "sensitivity": "secret",
       "requirement": "required",
-      "order": 368,
+      "order": 367,
       "hasSafeDefault": false,
       "validatorId": "database-setting",
       "restartBehavior": "process",
@@ -9347,7 +9322,7 @@
       "category": "database",
       "sensitivity": "secret",
       "requirement": "required",
-      "order": 369,
+      "order": 368,
       "hasSafeDefault": false,
       "validatorId": "database-setting",
       "restartBehavior": "process",
@@ -9371,7 +9346,7 @@
       "category": "observability",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 370,
+      "order": 369,
       "hasSafeDefault": false,
       "validatorId": "observability-setting",
       "restartBehavior": "none",
@@ -9395,7 +9370,7 @@
       "category": "observability",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 371,
+      "order": 370,
       "hasSafeDefault": false,
       "validatorId": "observability-setting",
       "restartBehavior": "none",
@@ -9419,7 +9394,7 @@
       "category": "observability",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 372,
+      "order": 371,
       "hasSafeDefault": false,
       "validatorId": "observability-setting",
       "restartBehavior": "none",
@@ -9443,7 +9418,7 @@
       "category": "platform",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 373,
+      "order": 372,
       "hasSafeDefault": false,
       "validatorId": "platform-setting",
       "restartBehavior": "process",
@@ -9467,7 +9442,7 @@
       "category": "deployment",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 374,
+      "order": 373,
       "hasSafeDefault": false,
       "validatorId": "managed-deployment-setting",
       "restartBehavior": "deployment",
@@ -9506,7 +9481,7 @@
       "category": "integration",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 375,
+      "order": 374,
       "hasSafeDefault": false,
       "validatorId": "integration-setting",
       "restartBehavior": "capability",
@@ -9530,7 +9505,7 @@
       "category": "integration",
       "sensitivity": "secret",
       "requirement": "optional",
-      "order": 376,
+      "order": 375,
       "hasSafeDefault": false,
       "validatorId": "integration-setting",
       "restartBehavior": "capability",
@@ -9652,7 +9627,7 @@
     "KEYCLOAK_ADMIN_PASSWORD",
     "LOCAL_STORAGE_ROOT_PATH",
     "EMAIL_DISPATCH_RABBITMQ_ENABLED",
-    "ERASURE_TOPOLOGY",
+    "ERASURE_DATABASE_TOPOLOGY",
     "ERASURE_EMBEDDED_PATH",
     "SETUP_SECRET",
     "INSTANCE_BOOTSTRAP_MODE",
@@ -9723,8 +9698,7 @@
     "DATABASE_SERVER_VERSION",
     "DATABASE_RUNTIME_USERNAME",
     "DATABASE_RUNTIME_PASSWORD",
-    "ERASURE_TOPOLOGY",
-    "PRIVACY_ERASURE_AUTHORITY_TOPOLOGY",
+    "ERASURE_DATABASE_TOPOLOGY",
     "ERASURE_EMBEDDED_PATH",
     "PRIVACY_ERASURE_AUTHORITY_EMBEDDED_PATH",
     "ERASURE_WRITER_REPLICA_COUNT",
@@ -10026,7 +10000,7 @@
     "KEYCLOAK_BLAZOR_CLIENT_SECRET",
     "LOCAL_STORAGE_ROOT_PATH",
     "EMAIL_DISPATCH_RABBITMQ_ENABLED",
-    "ERASURE_TOPOLOGY",
+    "ERASURE_DATABASE_TOPOLOGY",
     "ERASURE_EMBEDDED_PATH",
     "SETUP_SECRET",
     "INSTANCE_BOOTSTRAP_MODE",

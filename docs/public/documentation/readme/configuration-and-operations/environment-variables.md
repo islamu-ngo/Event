@@ -175,8 +175,8 @@ providers retain their own verification and recovery delivery configuration.
 
 | Variable | Status | Default | Description |
 |---|---|---|---|
-| `ERASURE_TOPOLOGY` | **Baseline** | `EmbeddedSqlite` | Storage topology: `EmbeddedSqlite` (dedicated local file), `CoLocated`, or `ExternalDatabase`. |
-| `ERASURE_EMBEDDED_PATH` | **Baseline** | `/app/data/privacy_erasure_authority.db` | File path when `ERASURE_TOPOLOGY=EmbeddedSqlite`. |
+| `ERASURE_DATABASE_TOPOLOGY` | **Baseline** | `EmbeddedSqlite` | Storage topology: `EmbeddedSqlite` (dedicated local file), `CoLocated`, or `ExternalDatabase`. |
+| `ERASURE_EMBEDDED_PATH` | **Baseline** | `/app/data/privacy_erasure_authority.db` | File path when `ERASURE_DATABASE_TOPOLOGY=EmbeddedSqlite`. |
 | `ERASURE_WRITER_REPLICA_COUNT` | Advanced | `1` | Maximum write concurrency for the embedded authority database. |
 | `ERASURE_BUSY_TIMEOUT_SECONDS` | Advanced | `30` | SQLite busy timeout before serializable retry. |
 | `ERASURE_DATABASE_HOST` | Advanced | None | Hostname if using `ExternalDatabase` topology. |
@@ -370,7 +370,7 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `KEYCLOAK_ADMIN_PASSWORD` | integration | secret | None (secret) | optional | deployment |
 | `LOCAL_STORAGE_ROOT_PATH` | storage | public | None | optional | capability |
 | `EMAIL_DISPATCH_RABBITMQ_ENABLED` | messaging | public | false | defaulted | capability |
-| `ERASURE_TOPOLOGY` | platform | public | None | optional | process |
+| `ERASURE_DATABASE_TOPOLOGY` | platform | public | None | optional | process |
 | `ERASURE_EMBEDDED_PATH` | platform | public | None | optional | process |
 | `SETUP_SECRET` | platform | secret | None (secret) | required | process |
 | `INSTANCE_BOOTSTRAP_MODE` | identity | public | None | required | process |
@@ -670,7 +670,6 @@ Defaults below are declared metadata, never values read from a deployment or sec
 | `ERASURE_DATABASE_TLS_MODE` | database | public | None | optional | process |
 | `ERASURE_DATABASE_TRUST_SERVER_CERTIFICATE` | database | public | None | optional | process |
 | `DATABASE_SERVER_VERSION` | integration | public | None | optional | deployment |
-| `PRIVACY_ERASURE_AUTHORITY_TOPOLOGY` | integration | public | None | optional | deployment |
 | `PRIVACY_ERASURE_AUTHORITY_EMBEDDED_PATH` | integration | public | None | optional | deployment |
 | `PRIVACY_ERASURE_AUTHORITY_WRITER_REPLICA_COUNT` | integration | public | None | optional | deployment |
 | `PRIVACY_ERASURE_AUTHORITY_BUSY_TIMEOUT_SECONDS` | integration | public | None | optional | deployment |

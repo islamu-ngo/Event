@@ -404,7 +404,7 @@ public static class ConfigurationExtensions
         // Deployment
         TrySet(mappedConfig, config, "Deployment:Mode", deploymentMode);
         TrySet(mappedConfig, config, "PrivacyErasure:Authority:Topology",
-            ReadFirst(config, "PRIVACY_ERASURE_AUTHORITY_TOPOLOGY", "ERASURE_TOPOLOGY", "PrivacyErasure:Authority:Topology"));
+            ReadFirst(config, "PrivacyErasure:Authority:Topology", "ERASURE_DATABASE_TOPOLOGY"));
         TrySet(mappedConfig, config, "ManagedControlPlane:Enabled", managedControlPlaneEnabled);
         TrySet(mappedConfig, config, "ManagedControlPlane:ControlPlaneUrl", managedControlPlaneUrl);
         TrySet(mappedConfig, config, "ManagedControlPlane:ManagedInstanceId", managedInstanceId);

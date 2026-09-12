@@ -263,11 +263,34 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
                 "ERASURE_DATABASE_MIGRATOR_PASSWORD" => "Database:Erasure:Migrator:Password",
                 "ERASURE_DATABASE_TLS_MODE" => "Database:Erasure:TlsMode",
                 "ERASURE_DATABASE_TRUST_SERVER_CERTIFICATE" => "Database:Erasure:TrustServerCertificate",
+                "ERASURE_DATABASE_TOPOLOGY" => "PrivacyErasure:Authority:Topology",
                 _ => $"Database:Erasure:{ToPascalCase(secretKey)}"
             };
         }
 
-        // 2. Primary Database (/database)
+        // 2. Identity Database (/database/identity) -> IdentityDatabase:*
+        if (normalizedPath.Equals("database/identity", StringComparison.OrdinalIgnoreCase))
+        {
+            return secretKey.ToUpperInvariant() switch
+            {
+                "IDENTITY_DATABASE_TOPOLOGY" => "IdentityDatabase:Topology",
+                "IDENTITY_DATABASE_PROVIDER" or "PROVIDER" => "IdentityDatabase:Provider",
+                "IDENTITY_DATABASE_CONNECTION_STRING" or "CONNECTION_STRING" => "IdentityDatabase:ConnectionString",
+                "IDENTITY_DATABASE_HOST" or "HOST" => "IdentityDatabase:Host",
+                "IDENTITY_DATABASE_PORT" or "PORT" => "IdentityDatabase:Port",
+                "IDENTITY_DATABASE_NAME" or "DATABASE" or "NAME" => "IdentityDatabase:Name",
+                "IDENTITY_DATABASE_SCHEMA" or "SCHEMA" => "IdentityDatabase:Schema",
+                "IDENTITY_DATABASE_RUNTIME_USERNAME" or "RUNTIME_USERNAME" => "IdentityDatabase:Runtime:Username",
+                "IDENTITY_DATABASE_RUNTIME_PASSWORD" or "RUNTIME_PASSWORD" => "IdentityDatabase:Runtime:Password",
+                "IDENTITY_DATABASE_MIGRATOR_USERNAME" or "MIGRATOR_USERNAME" => "IdentityDatabase:Migrator:Username",
+                "IDENTITY_DATABASE_MIGRATOR_PASSWORD" or "MIGRATOR_PASSWORD" => "IdentityDatabase:Migrator:Password",
+                "IDENTITY_DATABASE_TLS_MODE" or "TLS_MODE" => "IdentityDatabase:TlsMode",
+                "IDENTITY_DATABASE_TRUST_SERVER_CERTIFICATE" or "TRUST_SERVER_CERTIFICATE" => "IdentityDatabase:TrustServerCertificate",
+                _ => $"IdentityDatabase:{ToPascalCase(secretKey)}"
+            };
+        }
+
+        // 3. Primary Database (/database)
         if (normalizedPath.Equals("database", StringComparison.OrdinalIgnoreCase))
         {
             return secretKey.ToUpperInvariant() switch
@@ -285,18 +308,19 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
                 "DATABASE_TRUST_SERVER_CERTIFICATE" or "TRUST_SERVER_CERTIFICATE" => "Database:TrustServerCertificate",
                 "DATABASE_SERVER_FLAVOR" or "SERVER_FLAVOR" => "Database:ServerFlavor",
                 "DATABASE_SERVER_VERSION" or "SERVER_VERSION" => "Database:ServerVersion",
-                "ERASURE_TOPOLOGY" or "PRIVACY_ERASURE_AUTHORITY_TOPOLOGY" or "TOPOLOGY" => "PrivacyErasure:Authority:Topology",
+                "ERASURE_DATABASE_TOPOLOGY" => "PrivacyErasure:Authority:Topology",
+                "IDENTITY_DATABASE_TOPOLOGY" => "IdentityDatabase:Topology",
                 _ => $"Database:{ToPascalCase(secretKey)}"
             };
         }
 
-        // 3. Special mappings for common patterns
+        // 4. Special mappings for common patterns
         if (secretKey.Equals("AI_TOOL_PROPOSALS_ENABLED", StringComparison.OrdinalIgnoreCase))
         {
             return "AiProvider:ToolProposalsEnabled";
         }
 
-        // 4. Default path to section conversion
+        // 5. Default path to section conversion
         var pathSegments = normalizedPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
         var section = pathSegments.Length == 0 ? string.Empty : string.Join(":", pathSegments.Select(ToPascalCase)) + ":";
 

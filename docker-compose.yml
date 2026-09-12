@@ -94,7 +94,7 @@ x-database-migrator-env: &database-migrator-env
   Database__Migrator__Password: ${DATABASE_MIGRATOR_PASSWORD-explore}
 
 x-privacy-erasure-authority-env: &privacy-erasure-authority-env
-  PrivacyErasure__Authority__Topology: ${ERASURE_TOPOLOGY:-${PRIVACY_ERASURE_AUTHORITY_TOPOLOGY:-EmbeddedSqlite}}
+  PrivacyErasure__Authority__Topology: ${ERASURE_DATABASE_TOPOLOGY:-EmbeddedSqlite}
   PrivacyErasureAuthorityEmbedded__Path: ${ERASURE_EMBEDDED_PATH:-${PRIVACY_ERASURE_AUTHORITY_EMBEDDED_PATH:-/app/data/privacy_erasure_authority.db}}
   PrivacyErasureAuthorityEmbedded__WriterReplicaCount: ${ERASURE_WRITER_REPLICA_COUNT:-${PRIVACY_ERASURE_AUTHORITY_WRITER_REPLICA_COUNT:-1}}
   PrivacyErasureAuthorityEmbedded__BusyTimeoutSeconds: ${ERASURE_BUSY_TIMEOUT_SECONDS:-${PRIVACY_ERASURE_AUTHORITY_BUSY_TIMEOUT_SECONDS:-30}}

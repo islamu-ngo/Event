@@ -67,7 +67,7 @@ cannot fabricate consent or resurrect retired legal evidence.
 
 ## 2. Storage Topologies: `EmbeddedSqlite`, `CoLocated`, `ExternalDatabase`
 
-The platform workflow code is **100% identical** regardless of deployment choice. The configuration setting `PrivacyErasure:Authority:Topology` (`ERASURE_TOPOLOGY` or `PRIVACY_ERASURE_AUTHORITY_TOPOLOGY`) selects one of three durable persistence topologies for storing the authority ledger. The former non-durable `None` mode is rejected because its in-memory watermark could not remain consistent with the persisted replay checkpoint across restart.
+The platform workflow code is **100% identical** regardless of deployment choice. The configuration setting `PrivacyErasure:Authority:Topology` (`ERASURE_DATABASE_TOPOLOGY`) selects one of three durable persistence topologies for storing the authority ledger. The former non-durable `None` mode is rejected because its in-memory watermark could not remain consistent with the persisted replay checkpoint across restart.
 
 | Feature / Guarantee | `EmbeddedSqlite` Mode | `CoLocated` Mode | `ExternalDatabase` Mode |
 |---|---|---|---|
@@ -224,14 +224,14 @@ Set the following environment variables in `.env` (or in Infisical under `/datab
 
 ```dotenv
 # Topology Selection: EmbeddedSqlite (default) | CoLocated | ExternalDatabase
-ERASURE_TOPOLOGY=EmbeddedSqlite
+ERASURE_DATABASE_TOPOLOGY=EmbeddedSqlite
 
 ERASURE_EMBEDDED_PATH=/app/data/privacy_erasure_authority.db
 ERASURE_WRITER_REPLICA_COUNT=1
 ERASURE_BUSY_TIMEOUT_SECONDS=30
 
 # CoLocated reuses primary application credentials. External-only values are required
-# ONLY when ERASURE_TOPOLOGY=ExternalDatabase.
+# ONLY when ERASURE_DATABASE_TOPOLOGY=ExternalDatabase.
 ERASURE_DATABASE_HOST=privacy-erasure-db
 ERASURE_DATABASE_PORT=5432
 ERASURE_DATABASE_NAME=privacy_erasure

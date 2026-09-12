@@ -163,13 +163,14 @@ Primary application database. Every key maps into the structured `Database:*` co
 | `DATABASE_TLS_MODE` | `Prefer`, `Required`, or `Disabled`. |
 | `DATABASE_TRUST_SERVER_CERTIFICATE` | `false` for strict CA verification; `true` only for local self-signed certificates. |
 | `DATABASE_SERVER_VERSION` | Optional MariaDB/MySQL version override. |
-| `ERASURE_TOPOLOGY` | Privacy erasure topology: `EmbeddedSqlite`, `CoLocated`, or `ExternalDatabase`. |
+| `ERASURE_DATABASE_TOPOLOGY` | Privacy erasure topology: `EmbeddedSqlite`, `CoLocated`, or `ExternalDatabase`. |
+| `IDENTITY_DATABASE_TOPOLOGY` | Identity database topology: `colocated` or `external`. |
 
 Runtime and migrator logins must be distinct. Never give runtime services the migrator role, and never expose either to the Blazor client.
 
 ### `/database/erasure`
 
-Endpoint and credentials for the privacy-erasure authority, used only when `ERASURE_TOPOLOGY=ExternalDatabase`. The provider is fixed to PostgreSQL.
+Endpoint and credentials for the privacy-erasure authority, used only when `ERASURE_DATABASE_TOPOLOGY=ExternalDatabase`. The provider is fixed to PostgreSQL.
 
 Every key carries the `ERASURE_DATABASE_` prefix. The names are identical whether you store them here or in a flat `.env` file, so the Infisical folder and the Environment authority never diverge.
 
@@ -210,7 +211,7 @@ External Local Identity credential store, used only when `IDENTITY_DATABASE_TOPO
 | `IDENTITY_DATABASE_TLS_MODE` | `Prefer`, `Required`, or `Disabled`. |
 | `IDENTITY_DATABASE_TRUST_SERVER_CERTIFICATE` | `false` for strict CA verification. |
 
-`IDENTITY_DATABASE_TOPOLOGY` itself is non-secret deployment intent and belongs in the deployment environment, not this folder.
+Local Identity tables share the primary application database when colocated, and connect to this external store when configured with external topology.
 
 ### `/cerbos`
 

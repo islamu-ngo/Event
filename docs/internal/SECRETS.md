@@ -402,7 +402,8 @@ Infisical uses `SCREAMING_SNAKE_CASE` with path-based sections. The provider map
 | `/database/DATABASE_RUNTIME_PASSWORD` | Runtime database password |
 | `/database/DATABASE_MIGRATOR_USERNAME` | Migrator database username |
 | `/database/DATABASE_MIGRATOR_PASSWORD` | Migrator database password |
-| `/database/ERASURE_TOPOLOGY` | Privacy erasure topology: `EmbeddedSqlite`, `CoLocated`, `ExternalDatabase` |
+| `/database/ERASURE_DATABASE_TOPOLOGY` | Privacy erasure topology: `EmbeddedSqlite`, `CoLocated`, `ExternalDatabase` |
+| `/database/IDENTITY_DATABASE_TOPOLOGY` | Identity database topology: `colocated` or `external` |
 | `/database/erasure/ERASURE_DATABASE_PROVIDER` | External authority provider (fixed to `PostgreSql`) |
 | `/database/erasure/ERASURE_DATABASE_HOST` | External authority PostgreSQL host |
 | `/database/erasure/ERASURE_DATABASE_PORT` | External authority PostgreSQL port (default: `5432`) |

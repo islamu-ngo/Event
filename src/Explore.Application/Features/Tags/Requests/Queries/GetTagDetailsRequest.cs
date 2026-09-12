@@ -1,7 +1,7 @@
 using System;
 using Explore.Application.DTOs.Tag;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Tags.Requests.Queries;
 
-public sealed record GetTagDetailsRequest(Guid Id = default) : IRequest<TagDto>;
+public sealed record GetTagDetailsRequest(Guid Id = default) : IQuery<TagDto?>;

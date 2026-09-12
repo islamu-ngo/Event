@@ -346,6 +346,12 @@ lock transitions through those same native ports. It retains the HAL assembler,
 private/no-store reads, strict batch default and successful-write shell eviction.
 No instance or email workflow dependency is injected into this capability.
 
+`InstanceAtprotoSettingsController` owns the five ATProto instance actions through
+five closed native ports, the admin context and HAL assembler. Reads require
+instance-administrator authority and filter the registered administrator keys;
+writes reject unknown keys before dispatch. This capability does not inherit the
+setup-authority exception used by other instance settings controllers.
+
 ## Tenant Role-Grant Projections
 
 `TenantUserRoleGrantMapper` emits separate detail and list disclosures without

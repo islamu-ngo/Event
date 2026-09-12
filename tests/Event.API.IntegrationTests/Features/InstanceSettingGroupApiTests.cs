@@ -12,7 +12,6 @@ using Explore.Application.Responses;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings;
 using Explore.Domain.Settings.Definitions;
-using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using NSubstitute;
@@ -21,6 +20,28 @@ namespace Event.Api.IntegrationTests.Features;
 
 public sealed class InstanceSettingGroupApiTests
 {
+    [Test]
+    public async Task ResetInstanceSetting_PreservesScopeAndRejectsUnknownKeys()
+    {
+        var ports = new SettingsPorts();
+        ports.Reset.ExecuteAsync(Arg.Any<ResetSettingCommand>(), Arg.Any<CancellationToken>())
+            .Returns(SuccessfulResponse());
+        var controller = CreateController(ports, Substitute.For<IAdminContext>());
+        var key = GovernanceSettingKeys.Federation.AtprotoEventsEnabled;
+
+        var result = await controller.ResetInstanceSetting(key, CancellationToken.None);
+        var unknown = await controller.ResetInstanceSetting("outside.instance.capability", CancellationToken.None);
+
+        await Assert.That(result.Result).IsTypeOf<OkObjectResult>();
+        await Assert.That((unknown.Result as ObjectResult)!.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
+        await ports.Reset.Received(1).ExecuteAsync(
+            Arg.Is<ResetSettingCommand>(command => command.Key == key && command.Scope == SettingScope.Instance),
+            Arg.Any<CancellationToken>());
+        await ports.Reset.DidNotReceive().ExecuteAsync(
+            Arg.Is<ResetSettingCommand>(command => command.Key == "outside.instance.capability"),
+            Arg.Any<CancellationToken>());
+    }
+
     [Test]
     public async Task GetInstanceSettings_WhenInstanceAdmin_ReturnsAuthorizedHalResource()
     {
@@ -112,7 +133,7 @@ public sealed class InstanceSettingGroupApiTests
     }
 
     [Test]
-    public async Task LockAndUnlockInstanceSetting_DispatchGenericCommandsAtInstanceScope()
+    public async Task LockAndUnlockInstanceSetting_DispatchNativeCommandsAtInstanceScope()
     {
         var ports = new SettingsPorts();
         ports.Lock.ExecuteAsync(Arg.Any<LockSettingCommand>(), Arg.Any<CancellationToken>()).Returns(SuccessfulResponse());
@@ -178,15 +199,14 @@ public sealed class InstanceSettingGroupApiTests
             .IsTrue();
     }
 
-    private static SettingsController CreateController(
+    private static InstanceAtprotoSettingsController CreateController(
         SettingsPorts ports,
         IAdminContext adminContext,
         IResourceAssembler<SettingGroupResponseDto, SettingGroupResponseDto>? assembler = null) =>
         new(
-            Substitute.For<IMediator>(),
             ports.Query,
             ports.Update,
-            Substitute.For<ICommandHandler<ResetSettingCommand, BaseCommandResponse<Guid>>>(),
+            ports.Reset,
             ports.Lock,
             ports.Unlock,
             adminContext,
@@ -204,6 +224,8 @@ public sealed class InstanceSettingGroupApiTests
             Substitute.For<IQueryHandler<ResolveSettingGroupQuery, SettingGroupResponseDto>>();
         public ICommandHandler<UpdateSettingCommand, BaseCommandResponse<Guid>> Update { get; } =
             Substitute.For<ICommandHandler<UpdateSettingCommand, BaseCommandResponse<Guid>>>();
+        public ICommandHandler<ResetSettingCommand, BaseCommandResponse<Guid>> Reset { get; } =
+            Substitute.For<ICommandHandler<ResetSettingCommand, BaseCommandResponse<Guid>>>();
         public ICommandHandler<LockSettingCommand, BaseCommandResponse<Guid>> Lock { get; } =
             Substitute.For<ICommandHandler<LockSettingCommand, BaseCommandResponse<Guid>>>();
         public ICommandHandler<UnlockSettingCommand, BaseCommandResponse<Guid>> Unlock { get; } =

@@ -41,6 +41,9 @@ uses dedicated capability handlers without changing URLs, operation IDs,
 response formats or the `Settings` client group.
 Tenant setting reads remain private/no-store and retain server-provided HAL
 affordances; batch writes retain their strict default and existing conflict rules.
+The `/api/settings/instance/atproto-federation` routes require instance-administrator
+authority and expose only the registered ATProto administrator settings. Setup
+authority does not grant access to this capability.
 
 ## Role-grant identity labels
 

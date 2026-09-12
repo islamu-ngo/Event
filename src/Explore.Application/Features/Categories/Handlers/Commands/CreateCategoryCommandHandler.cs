@@ -8,12 +8,12 @@ using Explore.Application.DTOs.Category.Validators;
 using Explore.Application.Features.Categories.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Categories.Handlers.Commands;
 
-public class CreateCategoryCommandHandler : IRequestHandler<CreateCategoryCommand, BaseCommandResponse<Guid>>
+public class CreateCategoryCommandHandler : ICommandHandler<CreateCategoryCommand, BaseCommandResponse<Guid>>
 {
     private readonly ICategoryRepository _categoryRepository;
     private readonly ITenantContext _tenantContext;
@@ -29,7 +29,7 @@ public class CreateCategoryCommandHandler : IRequestHandler<CreateCategoryComman
         _cache = cache;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateCategoryCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateCategoryCommand request, CancellationToken cancellationToken)
     {
         var validator = new CreateCategoryDtoValidator(_categoryRepository);
         var validationResult = await validator.ValidateAsync(request.CategoryDto, cancellationToken);

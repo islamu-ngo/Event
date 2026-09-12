@@ -4,11 +4,11 @@ using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Category;
 using Explore.Application.Features.Categories.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Categories.Handlers.Queries;
 
-public class GetCategoryDetailsRequestHandler : IRequestHandler<GetCategoryDetailsRequest, CategoryDto>
+public class GetCategoryDetailsRequestHandler : IQueryHandler<GetCategoryDetailsRequest, CategoryDto?>
 {
     private readonly ICategoryRepository _categoryRepository;
 
@@ -18,9 +18,9 @@ public class GetCategoryDetailsRequestHandler : IRequestHandler<GetCategoryDetai
         _categoryRepository = categoryRepository;
     }
 
-    public async Task<CategoryDto> Handle(GetCategoryDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<CategoryDto?> QueryAsync(GetCategoryDetailsRequest request, CancellationToken cancellationToken)
     {
         var category = await _categoryRepository.GetCategoryWithDetails(request.Id);
-        return category is null ? null! : CustomPropertyMapper.ToDetail(category);
+        return category is null ? null : CustomPropertyMapper.ToDetail(category);
     }
 }

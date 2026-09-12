@@ -3,12 +3,12 @@ using System.Threading;
 using System.Threading.Tasks;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Categories.Requests.Commands;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Categories.Handlers.Commands;
 
-public class DeleteCategoryCommandHandler : IRequestHandler<DeleteCategoryCommand, bool>
+public class DeleteCategoryCommandHandler : ICommandHandler<DeleteCategoryCommand, bool>
 {
     private readonly ICategoryRepository _categoryRepository;
     private readonly HybridCache _cache;
@@ -19,7 +19,7 @@ public class DeleteCategoryCommandHandler : IRequestHandler<DeleteCategoryComman
         _cache = cache;
     }
 
-    public async Task<bool> Handle(DeleteCategoryCommand request, CancellationToken cancellationToken)
+    public async Task<bool> ExecuteAsync(DeleteCategoryCommand request, CancellationToken cancellationToken)
     {
         var category = await _categoryRepository.GetById(request.Id);
 

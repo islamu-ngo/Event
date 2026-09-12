@@ -6,12 +6,12 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Category;
 using Explore.Application.Features.Categories.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Categories.Handlers.Queries;
 
-public class GetCategoryListRequestHandler : IRequestHandler<GetCategoryListRequest, PaginatedResult<CategoryListDto>>
+public class GetCategoryListRequestHandler : IQueryHandler<GetCategoryListRequest, PaginatedResult<CategoryListDto>>
 {
     private readonly ICategoryRepository _categoryRepository;
     private readonly HybridCache _cache;
@@ -24,7 +24,7 @@ public class GetCategoryListRequestHandler : IRequestHandler<GetCategoryListRequ
         _cache = cache;
     }
 
-    public async Task<PaginatedResult<CategoryListDto>> Handle(GetCategoryListRequest request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<CategoryListDto>> QueryAsync(GetCategoryListRequest request, CancellationToken cancellationToken)
     {
         var (pageNumber, pageSize) = PaginatedResult<CategoryListDto>.NormalizeParameters(request.PageNumber, request.PageSize);
         var cacheKey = $"categories:list:{pageNumber}:{pageSize}";

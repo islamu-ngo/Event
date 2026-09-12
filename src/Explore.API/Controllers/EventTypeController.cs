@@ -3,7 +3,7 @@ using Explore.API.Attributes;
 using Explore.API.Hateoas;
 using Explore.Application.DTOs.EventType;
 using Explore.Application.Features.EventTypes.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -14,7 +14,8 @@ namespace Explore.API.Controllers;
 [Route("api/[controller]")]
 [ApiController]
 [EndpointClassification(EndpointClass.Public)]
-public class EventTypeController(IMediator mediator) : ControllerBase
+public class EventTypeController(
+    IQueryHandler<GetEventTypeListRequest, List<EventTypeListDto>> eventTypeList) : ControllerBase
 {
 
     [HttpGet(Name = RouteNames.GetEventTypes)]
@@ -24,7 +25,7 @@ public class EventTypeController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "LookupData")]
     public async Task<ActionResult<List<EventTypeListDto>>> GetAll(CancellationToken cancellationToken = default)
     {
-        var eventTypes = await mediator.Send(new GetEventTypeListRequest { FullName = string.Empty }, cancellationToken);
+        var eventTypes = await eventTypeList.QueryAsync(new GetEventTypeListRequest(), cancellationToken);
         return Ok(eventTypes);
     }
 }

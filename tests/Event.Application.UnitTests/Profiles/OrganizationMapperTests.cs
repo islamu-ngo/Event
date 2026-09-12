@@ -176,7 +176,7 @@ public sealed class OrganizationMapperTests
         var store = new OrganizationMappingHandlerTests.GroupMemberStore([member]);
         var detail = new Explore.Application.Features.GroupMembers.Handlers.Queries.GetGroupMemberDetailsRequestHandler(store);
         var list = new Explore.Application.Features.GroupMembers.Handlers.Queries.GetGroupMembersRequestHandler(store);
-        var dto = (await detail.Handle(new Explore.Application.Features.GroupMembers.Requests.Queries.GetGroupMemberDetailsRequest { Id = Id }, default))!;
+        var dto = (await detail.QueryAsync(new Explore.Application.Features.GroupMembers.Requests.Queries.GetGroupMemberDetailsRequest { Id = Id }, default))!;
         await Assert.That(dto.Id).IsEqualTo(Id);
         // The old profile did not infer GroupId across GroupTenant. Do not invent an authority change here.
         await Assert.That(dto.GroupId).IsEqualTo(Guid.Empty);
@@ -189,9 +189,9 @@ public sealed class OrganizationMapperTests
         await Assert.That(dto.GroupPositionId).IsEqualTo(4);
         await Assert.That(dto.GroupPositionFullName).IsEqualTo("Coordinator");
         await AssertFields(dto, "id", "groupId", "groupFullName", "userId", "userEmail", "userFullName", "roleId", "roleName", "groupPositionId", "groupPositionFullName");
-        var items = await list.Handle(new Explore.Application.Features.GroupMembers.Requests.Queries.GetGroupMembersRequest { GroupId = Id }, default);
+        var items = await list.QueryAsync(new Explore.Application.Features.GroupMembers.Requests.Queries.GetGroupMembersRequest { GroupId = Id }, default);
         await Assert.That(items.Single()).IsEqualTo(dto);
-        await Assert.That(await detail.Handle(new Explore.Application.Features.GroupMembers.Requests.Queries.GetGroupMemberDetailsRequest { Id = TenantId }, default)).IsNull();
+        await Assert.That(await detail.QueryAsync(new Explore.Application.Features.GroupMembers.Requests.Queries.GetGroupMemberDetailsRequest { Id = TenantId }, default)).IsNull();
         store.Items.Clear();
         member.User.Pii = null!;
         member.GroupTenant = null!;

@@ -5,11 +5,11 @@ using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.GroupMember;
 using Explore.Application.Features.GroupMembers.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.GroupMembers.Handlers.Queries;
 
-public class GetGroupMembersRequestHandler : IRequestHandler<GetGroupMembersRequest, List<GroupMemberDto>>
+public class GetGroupMembersRequestHandler : IQueryHandler<GetGroupMembersRequest, List<GroupMemberDto>>
 {
     private readonly IGroupMemberRepository _groupMemberRepository;
 
@@ -18,7 +18,7 @@ public class GetGroupMembersRequestHandler : IRequestHandler<GetGroupMembersRequ
         _groupMemberRepository = groupMemberRepository;
     }
 
-    public async Task<List<GroupMemberDto>> Handle(GetGroupMembersRequest request, CancellationToken cancellationToken)
+    public async Task<List<GroupMemberDto>> QueryAsync(GetGroupMembersRequest request, CancellationToken cancellationToken)
     {
         var members = await _groupMemberRepository.GetMembersByGroupId(request.GroupId);
         return members.Select(OrganizationMapper.ToGroupMember).ToList();

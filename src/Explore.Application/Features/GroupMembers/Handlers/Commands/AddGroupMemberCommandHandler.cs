@@ -10,11 +10,11 @@ using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.GroupMembers.Handlers.Commands;
 
-public class AddGroupMemberCommandHandler : IRequestHandler<AddGroupMemberCommand, BaseCommandResponse<Guid>>
+public class AddGroupMemberCommandHandler : ICommandHandler<AddGroupMemberCommand, BaseCommandResponse<Guid>>
 {
     private readonly IGroupRepository _groupRepository;
     private readonly IGroupTenantRepository _groupTenantRepository;
@@ -39,7 +39,7 @@ public class AddGroupMemberCommandHandler : IRequestHandler<AddGroupMemberComman
         _tenantContext = tenantContext;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(AddGroupMemberCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(AddGroupMemberCommand request, CancellationToken cancellationToken)
     {
         var dto = request.AddGroupMemberDto;
 

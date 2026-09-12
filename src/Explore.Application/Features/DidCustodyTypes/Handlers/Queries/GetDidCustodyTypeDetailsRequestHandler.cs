@@ -4,11 +4,11 @@ using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.DidCustodyType;
 using Explore.Application.Features.DidCustodyTypes.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.DidCustodyTypes.Handlers.Queries;
 
-public class GetDidCustodyTypeDetailsRequestHandler : IRequestHandler<GetDidCustodyTypeDetailsRequest, DidCustodyTypeDto>
+public class GetDidCustodyTypeDetailsRequestHandler : IQueryHandler<GetDidCustodyTypeDetailsRequest, DidCustodyTypeDto?>
 {
     private readonly IDidCustodyTypeRepository _didCustodyTypeRepository;
 
@@ -17,9 +17,9 @@ public class GetDidCustodyTypeDetailsRequestHandler : IRequestHandler<GetDidCust
         _didCustodyTypeRepository = didCustodyTypeRepository;
     }
 
-    public async Task<DidCustodyTypeDto> Handle(GetDidCustodyTypeDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<DidCustodyTypeDto?> QueryAsync(GetDidCustodyTypeDetailsRequest request, CancellationToken cancellationToken)
     {
         var didCustodyType = await _didCustodyTypeRepository.GetById(request.Id);
-        return DidCustodyTypeMapper.ToDetail(didCustodyType)!;
+        return DidCustodyTypeMapper.ToDetail(didCustodyType);
     }
 }

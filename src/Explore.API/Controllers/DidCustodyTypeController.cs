@@ -5,7 +5,7 @@ using Explore.API.Attributes;
 using Explore.API.Hateoas;
 using Explore.Application.DTOs.DidCustodyType;
 using Explore.Application.Features.DidCustodyTypes.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -17,7 +17,9 @@ namespace Explore.API.Controllers;
 [Route("api/[controller]")]
 [ApiController]
 [EndpointClassification(EndpointClass.Public)]
-public class DidCustodyTypeController(IMediator mediator) : ControllerBase
+public class DidCustodyTypeController(
+    IQueryHandler<GetDidCustodyTypeListRequest, List<DidCustodyTypeListDto>> listQuery,
+    IQueryHandler<GetDidCustodyTypeDetailsRequest, DidCustodyTypeDto?> detailQuery) : ControllerBase
 {
 
     // GET: api/didcustodytype
@@ -29,7 +31,7 @@ public class DidCustodyTypeController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "LookupData")]
     public async Task<ActionResult<List<DidCustodyTypeListDto>>> GetAll(CancellationToken cancellationToken = default)
     {
-        var didCustodyTypes = await mediator.Send(new GetDidCustodyTypeListRequest(), cancellationToken);
+        var didCustodyTypes = await listQuery.QueryAsync(new GetDidCustodyTypeListRequest(), cancellationToken);
         return Ok(didCustodyTypes);
     }
 
@@ -43,7 +45,7 @@ public class DidCustodyTypeController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<DidCustodyTypeDto>> GetById(int id, CancellationToken cancellationToken = default)
     {
-        var didCustodyType = await mediator.Send(new GetDidCustodyTypeDetailsRequest { Id = id }, cancellationToken);
+        var didCustodyType = await detailQuery.QueryAsync(new GetDidCustodyTypeDetailsRequest { Id = id }, cancellationToken);
         return Ok(didCustodyType);
     }
 }

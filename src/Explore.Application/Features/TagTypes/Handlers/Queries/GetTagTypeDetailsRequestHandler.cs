@@ -2,11 +2,11 @@ using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.TagType;
 using Explore.Application.Features.TagTypes.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.TagTypes.Handlers.Queries;
 
-public class GetTagTypeDetailsRequestHandler : IRequestHandler<GetTagTypeDetailsRequest, TagTypeDto>
+public class GetTagTypeDetailsRequestHandler : IQueryHandler<GetTagTypeDetailsRequest, TagTypeDto?>
 {
     private readonly ITagTypeRepository _repository;
 
@@ -15,9 +15,9 @@ public class GetTagTypeDetailsRequestHandler : IRequestHandler<GetTagTypeDetails
         _repository = repository;
     }
 
-    public async Task<TagTypeDto> Handle(GetTagTypeDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<TagTypeDto?> QueryAsync(GetTagTypeDetailsRequest request, CancellationToken cancellationToken)
     {
         var tagType = await _repository.GetTagTypeWithDetails(request.Id);
-        return TagTypeMapper.ToDetail(tagType)!;
+        return TagTypeMapper.ToDetail(tagType);
     }
 }

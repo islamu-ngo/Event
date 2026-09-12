@@ -1,0 +1,33 @@
+# MCP Event descriptor optional-label metadata.
+Change-Id: CHG-01M2A8SATTEZQM3RW83MV6T70H
+Title: "Preserve nullable event labels in MCP descriptors"
+Type: fix
+Scope: events
+Summary: "MCP event search and detail descriptor metadata now acknowledges the same absent actor and lookup labels as the event DTOs, without changing authority or serialized values."
+Group: event-mcp-nullability
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/api-reference/README.md
+    Disposition: not-applicable
+    Detail: Existing MCP response values and field names remain unchanged.
+  Security:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: documented
+    Detail: Absent labels remain absent without changing ownership, discovery filtering or action authority.
+  Migration:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: No database migration.
+  Configuration:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: No configuration changes.
+  OpenAPI:
+    Reference: docs/public/api-reference/README.md
+    Disposition: not-applicable
+    Detail: Corrects MCP descriptor metadata, not HTTP OpenAPI routes or schemas.
+  Operator:
+    Reference: docs/public/api-reference/README.md
+    Disposition: documented
+    Detail: MCP consumers render optional actor and lookup labels without inferring authority changes.

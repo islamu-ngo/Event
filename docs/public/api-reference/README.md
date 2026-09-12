@@ -47,6 +47,7 @@ when that related data is absent. OpenAPI and generated clients now describe
 those existing null values accurately; required property presence is unchanged.
 Render an optional label without treating it as a change in event ownership,
 permissions or publication state. HAL links remain the action authority.
+MCP event search and detail outputs preserve the same optional-label semantics.
 
 ## Version negotiation
 

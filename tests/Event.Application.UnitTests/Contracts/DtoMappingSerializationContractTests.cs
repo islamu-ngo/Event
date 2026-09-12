@@ -2,7 +2,6 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using AutoMapper;
 using Explore.Application.DTOs.Ai;
 using Explore.Application.DTOs.Analytics;
 using Explore.Application.DTOs.ContactShareConsent;
@@ -13,7 +12,7 @@ using Explore.Application.DTOs.PublicExperience;
 using Explore.Application.DTOs.Settings;
 using Explore.Application.DTOs.Studio;
 using Explore.Application.Hateoas;
-using Explore.Application.Profiles;
+using Explore.Application.Mappings;
 using Explore.Application.Responses;
 using Explore.Application.Serialization;
 using Explore.Domain;
@@ -125,7 +124,7 @@ public sealed class DtoMappingSerializationContractTests
     }
 
     [Test]
-    public async Task AutoMapper_MapsOrganizationFactsIntoTheNominalSnapshot()
+    public async Task Mapper_MapsOrganizationFactsIntoTheNominalSnapshot()
     {
         Guid id = Guid.CreateVersion7();
         Guid concurrencyStamp = Guid.CreateVersion7();
@@ -145,7 +144,7 @@ public sealed class DtoMappingSerializationContractTests
             }
         };
 
-        OrganizationDto mapped = CreateMapper().Map<OrganizationDto>(source);
+        OrganizationDto mapped = OrganizationMapper.ToOrganizationDetail(source);
 
         await Assert.That(mapped.Id).IsEqualTo(id);
         await Assert.That(mapped.ConcurrencyStamp).IsEqualTo(concurrencyStamp);
@@ -431,15 +430,4 @@ public sealed class DtoMappingSerializationContractTests
         ApprovalStatusFullName = "Approved"
     };
 
-    private static IMapper CreateMapper()
-    {
-#if USE_COMMERCIAL_LUCKYPENNY_LIBS
-        var configuration = new MapperConfiguration(
-            cfg => cfg.AddProfile<OrganizationMappingProfile>(),
-            Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
-#else
-        var configuration = new MapperConfiguration(cfg => cfg.AddProfile<OrganizationMappingProfile>());
-#endif
-        return configuration.CreateMapper();
-    }
 }

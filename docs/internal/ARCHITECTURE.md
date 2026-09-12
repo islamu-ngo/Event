@@ -361,6 +361,14 @@ authority; authorized tenant participation overrides still take precedence.
 validation and image eligibility checks, avoiding the uninitialized proxy setter.
 This is an Application handler guarantee, not a new public creation endpoint.
 
+## Organization Projections
+
+`OrganizationMapper` reads contact PII explicitly rather than invoking the
+organization's PII-backed proxy getters. Missing PII now produces null base name
+and contact fields instead of a mapping exception. It never reconstructs PII.
+Existing repository visibility, handler-owned participation overrides, identity
+enrichment and creation authority remain unchanged.
+
 ## AT Protocol Ownership
 
 1. `Explore.Blazor` owns CarpaNet confidential-client OAuth, protected single-use state, canonical callback/handoff, and the server cookie. PDS credentials and private key material never enter the browser.

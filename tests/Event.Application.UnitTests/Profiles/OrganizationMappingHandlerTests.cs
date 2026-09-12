@@ -2,6 +2,15 @@ using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Group;
+using Explore.Application.DTOs.Organization;
+using Explore.Application.Features.Organizations.Handlers.Commands;
+using Explore.Application.Features.Organizations.Handlers.Queries;
+using Explore.Application.Features.Organizations.Requests.Commands;
+using Explore.Application.Features.Organizations.Requests.Queries;
+using Explore.Application.Features.Users.Handlers.Queries;
+using Explore.Application.Features.Users.Requests.Queries;
+using Explore.Application.Exceptions;
+using NSubstitute;
 using Explore.Application.Features.Groups.Handlers.Commands;
 using Explore.Application.Features.Groups.Handlers.Queries;
 using Explore.Application.Features.Groups.Requests.Commands;
@@ -85,6 +94,146 @@ public sealed class OrganizationMappingHandlerTests
         await Assert.That(members.Items.Single().RoleId).IsEqualTo((int)RoleEnum.GroupAdmin);
         await Assert.That(actors.Items.Single().DisplayName).IsEqualTo("New group");
         await Assert.That(actors.Items.Single().GroupId).IsEqualTo(Id);
+    }
+
+    [Test]
+    public async Task OrganizationQueries_KeepActorFallbackPageSnapshotsRolesAndSelfOnlyAuthority()
+    {
+        var first = CreateOrganization();
+        var second = CreateOrganization();
+        second.Id = Stamp;
+        var store = new OrganizationStore([second, first]);
+        var members = new OrganizationMemberStore([new OrganizationMember
+        {
+            Id = ActorId, OrganizationTenant = first.TenantParticipations.Single(), UserId = ActorId, User = CreateUser(),
+            RoleId = (int)RoleEnum.OrgAdmin, Role = null!, Tenant = null!, TenantId = TenantId
+        }]);
+        var list = new GetOrganizationListRequestHandler(store, null!, NullLogger<GetOrganizationListRequestHandler>.Instance);
+        var mine = new GetMyOrganizationsRequestHandler(store, members, null!, NullLogger<GetMyOrganizationsRequestHandler>.Instance);
+        var detail = new GetOrganizationDetailsRequestHandler(store, null!, NullLogger<GetOrganizationDetailsRequestHandler>.Instance, new InlineCache());
+        var page = await list.Handle(new GetOrganizationListRequest { PageNumber = 1, PageSize = 10 }, default);
+        await Assert.That(page.Items.Select(item => item.Id).SequenceEqual(new[] { Stamp, Id })).IsTrue();
+        await Assert.That(page.TotalCount).IsEqualTo(2);
+        await Assert.That(page.PageSize).IsEqualTo(10);
+        await Assert.That(page.PageNumber).IsEqualTo(1);
+        await Assert.That(await detail.Handle(new GetOrganizationDetailsRequest(TenantId), default)).IsNull();
+        await Assert.That((await detail.Handle(new GetOrganizationDetailsRequest(Id), default))!.ActorDisplayName).IsEqualTo("Public actor");
+        await Assert.That((await detail.Handle(new GetOrganizationDetailsRequest(ActorId), default))!.FullName).IsEqualTo("Community organization");
+        var own = await mine.Handle(new GetMyOrganizationsRequest { UserId = ActorId.ToString() }, default);
+        await Assert.That(own.Items.Single().CurrentUserRoleId).IsEqualTo((int)RoleEnum.OrgAdmin);
+        await Assert.That((await mine.Handle(new GetMyOrganizationsRequest { UserId = "invalid" }, default)).Items).IsEmpty();
+        var userOrganizations = new GetUserOrganizationsRequestHandler(members, new CurrentUser(ActorId));
+        await Assert.That((await userOrganizations.Handle(new GetUserOrganizationsRequest(ActorId), default)).Single().CurrentUserRoleId).IsEqualTo((int)RoleEnum.OrgAdmin);
+        await Assert.That(async () => await userOrganizations.Handle(new GetUserOrganizationsRequest(TenantId), default)).Throws<AuthorizationException>();
+        var anonymous = new GetUserOrganizationsRequestHandler(members, new CurrentUser(null));
+        await Assert.That(async () => await anonymous.Handle(new GetUserOrganizationsRequest(ActorId), default)).Throws<AuthorizationException>();
+        store.Items.Clear();
+        first.Pii.FullName = "Changed after publication";
+        await Assert.That(page.Items[1].FullName).IsEqualTo("Community organization");
+        await Assert.That(own.Items.Single().FullName).IsEqualTo("Community organization");
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task OrganizationCreation_KeepsInputAllowlistAndTenantApprovalAuthority(bool administrator)
+    {
+        var organizations = new OrganizationStore([]);
+        var participations = new OrganizationTenantStore();
+        var members = new OrganizationMemberStore([]);
+        var actors = new ActorStore();
+        var authority = Substitute.For<IAdminContext>();
+        authority.IsTenantAdminAsync(TenantId, Arg.Any<CancellationToken>()).Returns(administrator);
+        using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
+        using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
+        var handler = new CreateOrganizationCommandHandler(organizations, participations, members, actors, null!, authority,
+            new CacheInvalidator(), new TenantContext(TenantId), new InlineCache(), metrics, new InlineUnitOfWork());
+        var result = await handler.Handle(new CreateOrganizationCommand
+        {
+            CreatorUserId = ActorId,
+            OrganizationDto = new CreateOrganizationDto
+            {
+                FullName = "New organization", WebsiteUrl = "https://new.example.test", Email = "office@example.test",
+                Country = "BE", City = "Brussels", Postcode = 1000, Address = "Square 1"
+            }
+        }, default);
+        await Assert.That(result.IsSuccess).IsTrue();
+        var organization = organizations.Items.Single();
+        await Assert.That(organization.FullName).IsEqualTo("New organization");
+        await Assert.That(organization.WebsiteUrl).IsEqualTo("https://new.example.test");
+        await Assert.That(organization.Email).IsEqualTo("office@example.test");
+        await Assert.That(organization.Country).IsEqualTo("BE");
+        await Assert.That(organization.City).IsEqualTo("Brussels");
+        await Assert.That(organization.Postcode).IsEqualTo("1000");
+        await Assert.That(organization.Address).IsEqualTo("Square 1");
+        await Assert.That(organization.IsDeleted).IsFalse();
+        await Assert.That(organization.ConcurrencyStamp).IsEqualTo(Guid.Empty);
+        await Assert.That(organization.CreatedBy).IsNull();
+        await Assert.That(organization.TenantParticipations).IsEmpty();
+        var participation = participations.Items.Single();
+        await Assert.That(participation.TenantId).IsEqualTo(TenantId);
+        await Assert.That(participation.OrganizationId).IsEqualTo(Id);
+        await Assert.That(participation.ApprovalStatusId).IsEqualTo(administrator ? (int)ApprovalStatusEnum.Approved : (int)ApprovalStatusEnum.Pending);
+        await Assert.That(participation.IsVisible).IsEqualTo(administrator);
+        await Assert.That(participation.IsOrganizerEligible).IsEqualTo(administrator);
+        await Assert.That(participation.ApprovedBy).IsEqualTo(administrator ? ActorId : (Guid?)null);
+        await Assert.That(participation.ProfilePictureId).IsNull();
+        await Assert.That(members.Items.Single().UserId).IsEqualTo(ActorId);
+        await Assert.That(members.Items.Single().TenantId).IsEqualTo(TenantId);
+        await Assert.That(members.Items.Single().OrganizationTenantId).IsEqualTo(Stamp);
+        await Assert.That(members.Items.Single().RoleId).IsEqualTo((int)RoleEnum.OrgAdmin);
+        await Assert.That(actors.Items.Single().DisplayName).IsEqualTo("New organization");
+        await Assert.That(actors.Items.Single().OrganizationId).IsEqualTo(Id);
+    }
+
+    internal sealed class OrganizationStore(List<Organization> items) : Store<Organization, Guid>, IOrganizationRepository
+    {
+        public List<Organization> Items { get; } = items;
+        public override Task<Organization> Create(Organization entity) { entity.Id = Id; Items.Add(entity); return Task.FromResult(entity); }
+        public Task<Organization?> GetOrganizationWithDetails(Guid id, CancellationToken cancellationToken = default) => Task.FromResult(Items.FirstOrDefault(item => item.Id == id));
+        public Task<Organization?> GetOrganizationWithDetailsByActorId(Guid actorId, CancellationToken cancellationToken = default) => Task.FromResult(Items.FirstOrDefault(item => item.Actor?.Id == actorId));
+        public Task<(List<Organization> Items, int TotalCount)> GetOrganizationsWithDetailsPaged(int pageNumber, int pageSize, CancellationToken cancellationToken = default) => Task.FromResult((Items.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToList(), Items.Count));
+        public Task<(List<Organization> Items, int TotalCount)> GetMyOrganizationsPaged(Guid userId, int pageNumber, int pageSize, CancellationToken cancellationToken = default) => Task.FromResult((userId == ActorId ? Items.Where(item => item.Id == Id).ToList() : [], userId == ActorId ? 1 : 0));
+        public Task<List<Organization>> GetOrganizationsWithDetails(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<List<Organization>> GetMyOrganizations(Guid userId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<int> ForgetPiiAsync(Guid organizationId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    }
+
+    internal sealed class OrganizationTenantStore : Store<OrganizationTenant, Guid>, IOrganizationTenantRepository
+    {
+        public List<OrganizationTenant> Items { get; } = [];
+        public override Task<OrganizationTenant> Create(OrganizationTenant entity) { entity.Id = Stamp; Items.Add(entity); return Task.FromResult(entity); }
+        public Task<OrganizationTenant?> GetByOrganizationAndTenant(Guid organizationId, Guid tenantId, CancellationToken cancellationToken = default) => Task.FromResult(Items.FirstOrDefault(item => item.OrganizationId == organizationId && item.TenantId == tenantId));
+    }
+
+    internal sealed class OrganizationMemberStore(List<OrganizationMember> items) : Store<OrganizationMember, Guid>, IOrganizationMemberRepository
+    {
+        public List<OrganizationMember> Items { get; } = items;
+        public override Task<OrganizationMember> Create(OrganizationMember entity) { Items.Add(entity); return Task.FromResult(entity); }
+        public Task<OrganizationMember?> GetOrganizationMemberWithDetails(Guid id) => Task.FromResult(Items.FirstOrDefault(item => item.Id == id));
+        public Task<List<OrganizationMember>> GetMembersByOrganizationId(Guid organizationId) => Task.FromResult(Items.Where(item => item.OrganizationTenant.OrganizationId == organizationId).ToList());
+        public Task<List<OrganizationMember>> GetMembershipsByUser(Guid userId, CancellationToken cancellationToken = default) => Task.FromResult(Items.Where(item => item.UserId == userId).ToList());
+        public Task<List<OrganizationMember>> GetInvitesByEmail(string email) => Task.FromResult(Items.Where(item => item.User?.Pii?.Email == email).ToList());
+        public Task<List<User>> GetUsersByOrganization(Guid organizationId) => throw new NotSupportedException();
+        public Task<List<Organization>> GetOrganizationsByUser(Guid userId) => throw new NotSupportedException();
+        public Task<bool> Exists(Guid organizationId, Guid userId) => throw new NotSupportedException();
+        public Task<List<OrganizationMember>> GetOrganizationMembersWithDetails() => throw new NotSupportedException();
+        public Task<OrganizationMember?> GetByOrganizationAndUser(Guid organizationId, Guid userId) => throw new NotSupportedException();
+        public Task<bool> HasPermissionInOrganization(Guid organizationId, Guid userId, string permissionMasterCode) => throw new NotSupportedException();
+        public Task<List<Guid>> GetOrganizationIdsWhereUserHasPermission(Guid userId, string permissionMasterCode, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    }
+
+    internal sealed record CurrentUser(Guid? UserId) : ICurrentUserService
+    {
+        public bool IsAuthenticated => UserId.HasValue;
+    }
+
+    internal sealed class InlineUnitOfWork : IUnitOfWork
+    {
+        public Task ExecuteInTransactionAsync(Func<CancellationToken, Task> operation, CancellationToken ct = default) => operation(ct);
+        public Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) => operation(ct);
+        public Task<T> ExecuteSerializableAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) => operation(ct);
+        public Task<T> ExecuteReadCommittedAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) => operation(ct);
     }
 
     internal abstract class Store<T, TKey> : IGenericRepository<T, TKey> where T : class

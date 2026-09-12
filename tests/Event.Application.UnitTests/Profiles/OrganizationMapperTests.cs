@@ -174,6 +174,82 @@ public sealed class OrganizationMapperTests
         await Assert.That(OrganizationMapper.ToGroupMember(member).UserFullName).IsNull();
     }
 
+    [Test]
+    public async Task OrganizationProjections_PreserveContactAppearanceAndUnresolvedTenantMetadata()
+    {
+        var source = CreateOrganization();
+        var detail = OrganizationMapper.ToOrganizationDetail(source);
+        var list = OrganizationMapper.ToOrganizationListItem(source);
+        foreach (var dto in new JsonObject[]
+        {
+            JsonSerializer.SerializeToNode(detail, JsonOptions)!.AsObject(),
+            JsonSerializer.SerializeToNode(list, JsonOptions)!.AsObject()
+        })
+        {
+            await Assert.That(dto["id"]!.GetValue<Guid>()).IsEqualTo(Id);
+            await Assert.That(dto["concurrencyStamp"]!.GetValue<Guid>()).IsEqualTo(Stamp);
+            await Assert.That(dto["fullName"]!.GetValue<string>()).IsEqualTo("Community organization");
+            await Assert.That(dto["email"]!.GetValue<string>()).IsEqualTo("office@example.test");
+            await Assert.That(dto["websiteUrl"]!.GetValue<string>()).IsEqualTo("https://community.example.test");
+            await Assert.That(dto["country"]!.GetValue<string>()).IsEqualTo("BE");
+            await Assert.That(dto["city"]!.GetValue<string>()).IsEqualTo("Brussels");
+            await Assert.That(dto["postcode"]!.GetValue<string>()).IsEqualTo("1000");
+            await Assert.That(dto["address"]!.GetValue<string>()).IsEqualTo("Square 1");
+            await Assert.That(dto["tenantId"]!.GetValue<Guid>()).IsEqualTo(Guid.Empty);
+            await Assert.That(dto["approvalStatusId"]!.GetValue<int>()).IsEqualTo(0);
+            await Assert.That(dto["approvalStatusFullName"]).IsNull();
+            await Assert.That(dto["actorProfilePictureUri"]!.GetValue<string>()).IsEqualTo("https://images.example.test/public.png");
+            await Assert.That(dto["actorBackgroundColor"]!.GetValue<string>()).IsEqualTo("blue");
+            await Assert.That(dto["actorBackgroundEffect"]!.GetValue<string>()).IsEqualTo("glow");
+            await Assert.That(dto["actorBannerColor"]!.GetValue<string>()).IsEqualTo("green");
+            foreach (var field in new[] { "actorProfilePictureId", "actorBannerPictureId", "actorBannerPictureUri", "actorBackgroundImageId", "actorBackgroundImageUri" })
+                await Assert.That(dto[field]).IsNull();
+        }
+        await Assert.That(detail.ActorId).IsEqualTo(ActorId);
+        await Assert.That(detail.ActorDisplayName).IsEqualTo("Public actor");
+        await Assert.That(detail.ActorHandle).IsEqualTo("first.example.test");
+        await Assert.That(detail.TenantFullName).IsNull();
+        await Assert.That(detail.ApprovalStatusMasterCode).IsNull();
+        await Assert.That(list.CreatedAt).IsEqualTo(CreatedAt);
+        await Assert.That(list.CurrentUserRoleId).IsNull();
+        await Assert.That(list.StatusTypeFullName).IsNull();
+        await AssertFields(detail, "id", "concurrencyStamp", "fullName", "websiteUrl", "email", "country", "city", "postcode", "address", "approvalStatusId", "approvalStatusFullName", "approvalStatusMasterCode", "tenantId", "tenantFullName", "actorId", "actorDisplayName", "actorHandle", "actorProfilePictureId", "actorProfilePictureUri", "actorBackgroundColor", "actorBackgroundEffect", "actorBannerColor", "actorBannerPictureId", "actorBannerPictureUri", "actorBackgroundImageId", "actorBackgroundImageUri");
+        await AssertFields(list, "id", "concurrencyStamp", "tenantId", "fullName", "websiteUrl", "email", "country", "city", "postcode", "address", "approvalStatusId", "approvalStatusFullName", "statusTypeFullName", "createdAt", "currentUserRoleId", "actorProfilePictureId", "actorProfilePictureUri", "actorBackgroundColor", "actorBackgroundEffect", "actorBannerColor", "actorBannerPictureId", "actorBannerPictureUri", "actorBackgroundImageId", "actorBackgroundImageUri");
+        source.Pii = null!;
+        source.Actor!.Pii = null!;
+        source.Actor.AtprotoIdentities.First().Handle = null;
+        var erased = OrganizationMapper.ToOrganizationDetail(source);
+        await Assert.That(erased.FullName).IsNull();
+        await Assert.That(erased.Email).IsNull();
+        await Assert.That(erased.Country).IsNull();
+        await Assert.That(erased.City).IsNull();
+        await Assert.That(erased.Postcode).IsNull();
+        await Assert.That(erased.Address).IsNull();
+        await Assert.That(erased.ActorDisplayName).IsNull();
+        await Assert.That(erased.ActorProfilePictureUri).IsNull();
+        await Assert.That(erased.ActorHandle).IsNull();
+        source.Actor = null;
+        await Assert.That(OrganizationMapper.ToOrganizationDetail(source).ActorId).IsNull();
+        await Assert.That(OrganizationMapper.ToOrganizationListItem(source).ActorBackgroundColor).IsNull();
+    }
+
+    internal static Organization CreateOrganization()
+    {
+        var organization = new Organization
+        {
+            Id = Id, ConcurrencyStamp = Stamp, CreatedAt = CreatedAt, CreatedBy = TenantId, IsDeleted = true,
+            WebsiteUrl = "https://community.example.test", Actor = CreateActor(),
+            Pii = new OrganizationPii { FullName = "Community organization", Email = "office@example.test", Country = "BE", City = "Brussels", Postcode = "1000", Address = "Square 1" }
+        };
+        organization.Actor.Organization = organization;
+        organization.TenantParticipations.Add(new OrganizationTenant
+        {
+            Id = Stamp, OrganizationId = Id, Organization = organization, TenantId = TenantId, Tenant = null!, ApprovalStatusId = 7, ApprovalStatus = null!,
+            ContactEmailOverride = "private-tenant@example.test", DisplayNameOverride = "Private tenant display", ProfilePictureId = Stamp
+        });
+        return organization;
+    }
+
     internal static User CreateUser() => new()
     {
         Id = ActorId, Pii = new UserPii { Email = "member@example.test", FirstName = "Member", LastName = "Name" },

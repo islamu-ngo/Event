@@ -60,4 +60,11 @@ Existing tenant-specific profile overrides still take precedence.
 This does not restore erased data or make a hidden actor visible. Existing profile
 values, including an anonymized display name, remain unchanged.
 
+## Missing organization profile data
+
+When an organization's contact profile is absent, its base name and contact fields
+can be null instead of causing a response failure. Existing authorized
+tenant-participation overrides still apply. Do not infer erasure status or a change
+in access rights from a missing field; no erased profile is recreated.
+
 Continue with [HAL/REST Contract](readme/hal-rest.md) and [API Cookbook](readme/api-cookbook.md).

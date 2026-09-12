@@ -1,5 +1,6 @@
 using Explore.Application.DTOs.Group;
 using Explore.Application.DTOs.GroupMember;
+using Explore.Application.DTOs.Organization;
 using Explore.Domain;
 using Riok.Mapperly.Abstractions;
 
@@ -78,6 +79,89 @@ public static partial class OrganizationMapper
     [MapProperty(nameof(GroupMember.Role), nameof(GroupMemberDto.RoleName), Use = nameof(RoleName))]
     [MapProperty(nameof(GroupMember.GroupPosition), nameof(GroupMemberDto.GroupPositionFullName), Use = nameof(GroupPositionName))]
     public static partial GroupMemberDto ToGroupMember(GroupMember source);
+
+    // Absent contact PII projects to null without invoking proxy getters or reconstructing erased data.
+    [MapperIgnoreSource(nameof(Organization.FullName))]
+    [MapperIgnoreSource(nameof(Organization.Email))]
+    [MapperIgnoreSource(nameof(Organization.Country))]
+    [MapperIgnoreSource(nameof(Organization.City))]
+    [MapperIgnoreSource(nameof(Organization.Postcode))]
+    [MapperIgnoreSource(nameof(Organization.Address))]
+    [MapperIgnoreSource(nameof(Organization.TenantParticipations))]
+    [MapperIgnoreSource(nameof(Organization.CreatedAt))]
+    [MapperIgnoreSource(nameof(Organization.CreatedBy))]
+    [MapperIgnoreSource(nameof(Organization.UpdatedAt))]
+    [MapperIgnoreSource(nameof(Organization.UpdatedBy))]
+    [MapperIgnoreSource(nameof(Organization.IsDeleted))]
+    [MapperIgnoreSource(nameof(Organization.DeletedAt))]
+    [MapperIgnoreSource(nameof(Organization.DeletedBy))]
+    [MapperIgnoreTarget(nameof(OrganizationDto.TenantId))]
+    [MapperIgnoreTarget(nameof(OrganizationDto.TenantFullName))]
+    [MapperIgnoreTarget(nameof(OrganizationDto.ApprovalStatusId))]
+    [MapperIgnoreTarget(nameof(OrganizationDto.ApprovalStatusFullName))]
+    [MapperIgnoreTarget(nameof(OrganizationDto.ApprovalStatusMasterCode))]
+    [MapperIgnoreTarget(nameof(OrganizationDto.ActorProfilePictureId))]
+    [MapperIgnoreTarget(nameof(OrganizationDto.ActorBannerPictureId))]
+    [MapperIgnoreTarget(nameof(OrganizationDto.ActorBannerPictureUri))]
+    [MapperIgnoreTarget(nameof(OrganizationDto.ActorBackgroundImageId))]
+    [MapperIgnoreTarget(nameof(OrganizationDto.ActorBackgroundImageUri))]
+    [MapProperty(nameof(Organization.Pii), nameof(OrganizationDto.FullName), Use = nameof(OrganizationName))]
+    [MapProperty(nameof(Organization.Pii), nameof(OrganizationDto.Email), Use = nameof(OrganizationEmail))]
+    [MapProperty(nameof(Organization.Pii), nameof(OrganizationDto.Country), Use = nameof(OrganizationCountry))]
+    [MapProperty(nameof(Organization.Pii), nameof(OrganizationDto.City), Use = nameof(OrganizationCity))]
+    [MapProperty(nameof(Organization.Pii), nameof(OrganizationDto.Postcode), Use = nameof(OrganizationPostcode))]
+    [MapProperty(nameof(Organization.Pii), nameof(OrganizationDto.Address), Use = nameof(OrganizationAddress))]
+    [MapProperty(nameof(Organization.Actor), nameof(OrganizationDto.ActorId), Use = nameof(ProfileId))]
+    [MapProperty(nameof(Organization.Actor), nameof(OrganizationDto.ActorDisplayName), Use = nameof(ProfileName))]
+    [MapProperty(nameof(Organization.Actor), nameof(OrganizationDto.ActorHandle), Use = nameof(ProfileHandle))]
+    [MapProperty(nameof(Organization.Actor), nameof(OrganizationDto.ActorProfilePictureUri), Use = nameof(ProfilePicture))]
+    [MapProperty(nameof(Organization.Actor), nameof(OrganizationDto.ActorBackgroundColor), Use = nameof(BackgroundColor))]
+    [MapProperty(nameof(Organization.Actor), nameof(OrganizationDto.ActorBackgroundEffect), Use = nameof(BackgroundEffect))]
+    [MapProperty(nameof(Organization.Actor), nameof(OrganizationDto.ActorBannerColor), Use = nameof(BannerColor))]
+    public static partial OrganizationDto ToOrganizationDetail(Organization source);
+
+    // List creation time is public; membership role enrichment and tenant/approval authority are not inferred from navigations.
+    [MapperIgnoreSource(nameof(Organization.FullName))]
+    [MapperIgnoreSource(nameof(Organization.Email))]
+    [MapperIgnoreSource(nameof(Organization.Country))]
+    [MapperIgnoreSource(nameof(Organization.City))]
+    [MapperIgnoreSource(nameof(Organization.Postcode))]
+    [MapperIgnoreSource(nameof(Organization.Address))]
+    [MapperIgnoreSource(nameof(Organization.TenantParticipations))]
+    [MapperIgnoreSource(nameof(Organization.CreatedBy))]
+    [MapperIgnoreSource(nameof(Organization.UpdatedAt))]
+    [MapperIgnoreSource(nameof(Organization.UpdatedBy))]
+    [MapperIgnoreSource(nameof(Organization.IsDeleted))]
+    [MapperIgnoreSource(nameof(Organization.DeletedAt))]
+    [MapperIgnoreSource(nameof(Organization.DeletedBy))]
+    [MapperIgnoreTarget(nameof(OrganizationListDto.TenantId))]
+    [MapperIgnoreTarget(nameof(OrganizationListDto.ApprovalStatusId))]
+    [MapValue(nameof(OrganizationListDto.ApprovalStatusFullName), Use = nameof(UnresolvedApprovalName))]
+    [MapperIgnoreTarget(nameof(OrganizationListDto.CurrentUserRoleId))]
+    [MapperIgnoreTarget(nameof(OrganizationListDto.ActorProfilePictureId))]
+    [MapperIgnoreTarget(nameof(OrganizationListDto.ActorBannerPictureId))]
+    [MapperIgnoreTarget(nameof(OrganizationListDto.ActorBannerPictureUri))]
+    [MapperIgnoreTarget(nameof(OrganizationListDto.ActorBackgroundImageId))]
+    [MapperIgnoreTarget(nameof(OrganizationListDto.ActorBackgroundImageUri))]
+    [MapProperty(nameof(Organization.Pii), nameof(OrganizationListDto.FullName), Use = nameof(OrganizationName))]
+    [MapProperty(nameof(Organization.Pii), nameof(OrganizationListDto.Email), Use = nameof(OrganizationEmail))]
+    [MapProperty(nameof(Organization.Pii), nameof(OrganizationListDto.Country), Use = nameof(OrganizationCountry))]
+    [MapProperty(nameof(Organization.Pii), nameof(OrganizationListDto.City), Use = nameof(OrganizationCity))]
+    [MapProperty(nameof(Organization.Pii), nameof(OrganizationListDto.Postcode), Use = nameof(OrganizationPostcode))]
+    [MapProperty(nameof(Organization.Pii), nameof(OrganizationListDto.Address), Use = nameof(OrganizationAddress))]
+    [MapProperty(nameof(Organization.Actor), nameof(OrganizationListDto.ActorProfilePictureUri), Use = nameof(ProfilePicture))]
+    [MapProperty(nameof(Organization.Actor), nameof(OrganizationListDto.ActorBackgroundColor), Use = nameof(BackgroundColor))]
+    [MapProperty(nameof(Organization.Actor), nameof(OrganizationListDto.ActorBackgroundEffect), Use = nameof(BackgroundEffect))]
+    [MapProperty(nameof(Organization.Actor), nameof(OrganizationListDto.ActorBannerColor), Use = nameof(BannerColor))]
+    public static partial OrganizationListDto ToOrganizationListItem(Organization source);
+
+    // Preserve runtime nulls despite the DTO's required non-nullable declarations.
+    private static string OrganizationName(OrganizationPii? pii) => (pii?.FullName)!;
+    private static string OrganizationEmail(OrganizationPii? pii) => (pii?.Email)!;
+    private static string OrganizationCountry(OrganizationPii? pii) => (pii?.Country)!;
+    private static string OrganizationCity(OrganizationPii? pii) => (pii?.City)!;
+    private static string OrganizationPostcode(OrganizationPii? pii) => (pii?.Postcode)!;
+    private static string OrganizationAddress(OrganizationPii? pii) => (pii?.Address)!;
 
     private static string? GroupName(GroupTenant? participation) => participation?.Group?.FullName;
     private static string? MemberEmail(User? user) => user?.Pii?.Email;

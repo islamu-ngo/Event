@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
@@ -17,16 +17,13 @@ namespace Explore.Application.Features.Users.Handlers.Queries;
 public class GetUserOrganizationsRequestHandler : IRequestHandler<GetUserOrganizationsRequest, List<OrganizationListDto>>
 {
     private readonly IOrganizationMemberRepository _organizationMemberRepository;
-    private readonly IMapper _mapper;
     private readonly ICurrentUserService _currentUserService;
 
     public GetUserOrganizationsRequestHandler(
         IOrganizationMemberRepository organizationMemberRepository,
-        IMapper mapper,
         ICurrentUserService currentUserService)
     {
         _organizationMemberRepository = organizationMemberRepository;
-        _mapper = mapper;
         _currentUserService = currentUserService;
     }
 
@@ -46,7 +43,7 @@ public class GetUserOrganizationsRequestHandler : IRequestHandler<GetUserOrganiz
 
         foreach (var membership in memberships)
         {
-            var dto = _mapper.Map<OrganizationListDto>(membership.OrganizationTenant.Organization);
+            var dto = OrganizationMapper.ToOrganizationListItem(membership.OrganizationTenant.Organization);
             dto.CurrentUserRoleId = membership.RoleId;
             dtos.Add(dto);
         }

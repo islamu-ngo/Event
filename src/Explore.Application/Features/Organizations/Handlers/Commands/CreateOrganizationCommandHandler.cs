@@ -1,5 +1,5 @@
 using System.Linq;
-using AutoMapper;
+using System.Globalization;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
@@ -24,7 +24,6 @@ public class CreateOrganizationCommandHandler : IRequestHandler<CreateOrganizati
     private readonly IStorageObjectRepository _storageObjectRepository;
     private readonly IAdminContext _adminContext;
     private readonly IAdminCacheInvalidator _adminCacheInvalidator;
-    private readonly IMapper _mapper;
     private readonly ITenantContext _tenantContext;
     private readonly HybridCache _cache;
     private readonly BusinessMetrics _metrics;
@@ -38,7 +37,6 @@ public class CreateOrganizationCommandHandler : IRequestHandler<CreateOrganizati
         IStorageObjectRepository storageObjectRepository,
         IAdminContext adminContext,
         IAdminCacheInvalidator adminCacheInvalidator,
-        IMapper mapper,
         ITenantContext tenantContext,
         HybridCache cache,
         BusinessMetrics metrics,
@@ -51,7 +49,6 @@ public class CreateOrganizationCommandHandler : IRequestHandler<CreateOrganizati
         _storageObjectRepository = storageObjectRepository;
         _adminContext = adminContext;
         _adminCacheInvalidator = adminCacheInvalidator;
-        _mapper = mapper;
         _tenantContext = tenantContext;
         _cache = cache;
         _metrics = metrics;
@@ -81,7 +78,19 @@ public class CreateOrganizationCommandHandler : IRequestHandler<CreateOrganizati
 
         var currentUserId = request.CreatorUserId;
 
-        var organization = _mapper.Map<Organization>(request.OrganizationDto);
+        var organization = new Organization
+        {
+            WebsiteUrl = request.OrganizationDto.WebsiteUrl,
+            Pii = new OrganizationPii
+            {
+                FullName = request.OrganizationDto.FullName,
+                Email = request.OrganizationDto.Email,
+                Country = request.OrganizationDto.Country,
+                City = request.OrganizationDto.City,
+                Postcode = request.OrganizationDto.Postcode.ToString(CultureInfo.CurrentCulture),
+                Address = request.OrganizationDto.Address
+            }
+        };
         var tenantId = _tenantContext.TenantId;
         var createdAt = DateTime.UtcNow;
         var isTenantAdmin = await _adminContext.IsTenantAdminAsync(tenantId, cancellationToken);

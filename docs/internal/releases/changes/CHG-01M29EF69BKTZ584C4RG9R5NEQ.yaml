@@ -1,0 +1,33 @@
+# Organization contact projection correction and reviewed release impacts.
+Change-Id: CHG-01M29EF69BKTZ584C4RG9R5NEQ
+Title: "Project organizations with absent contact profiles"
+Type: fix
+Scope: access
+Summary: "Organization projections preserve absent contact data instead of failing when profile PII is missing."
+Group: organization-profile-mapping
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/api-reference/README.md
+    Disposition: not-applicable
+    Detail: Supported successful response shapes and values are unchanged; missing contact profiles no longer cause these mapping failures.
+  Security:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: documented
+    Detail: Missing PII is not reconstructed. Repository visibility and participation override authority remain unchanged.
+  Migration:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: No schema or persisted-data migration.
+  Configuration:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: No configuration or secret changes.
+  OpenAPI:
+    Reference: docs/public/api-reference/README.md
+    Disposition: documented
+    Detail: Absent contact PII produces null base organization name and contact fields; existing authorized participation overrides still apply. Routes and schema shapes are unchanged.
+  Operator:
+    Reference: docs/public/api-reference/README.md
+    Disposition: documented
+    Detail: Integrators should support missing contact values without treating them as erasure status or changed access rights.

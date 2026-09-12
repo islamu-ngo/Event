@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Organization;
@@ -15,20 +15,17 @@ public class GetMyOrganizationsRequestHandler : IRequestHandler<GetMyOrganizatio
 {
     private readonly IOrganizationRepository _organizationRepository;
     private readonly IOrganizationMemberRepository _organizationMemberRepository;
-    private readonly IMapper _mapper;
     private readonly IObjectStorageService _objectStorageService;
     private readonly ILogger<GetMyOrganizationsRequestHandler> _logger;
 
     public GetMyOrganizationsRequestHandler(
         IOrganizationRepository organizationRepository,
         IOrganizationMemberRepository organizationMemberRepository,
-        IMapper mapper,
         IObjectStorageService objectStorageService,
         ILogger<GetMyOrganizationsRequestHandler> logger)
     {
         _organizationRepository = organizationRepository;
         _organizationMemberRepository = organizationMemberRepository;
-        _mapper = mapper;
         _objectStorageService = objectStorageService;
         _logger = logger;
     }
@@ -51,7 +48,7 @@ public class GetMyOrganizationsRequestHandler : IRequestHandler<GetMyOrganizatio
         var dtos = new List<OrganizationListDto>();
         foreach (var org in organizations)
         {
-            var dto = _mapper.Map<OrganizationListDto>(org);
+            var dto = OrganizationMapper.ToOrganizationListItem(org);
             if (membershipDict.TryGetValue(org.Id, out var roleId))
             {
                 dto.CurrentUserRoleId = roleId;

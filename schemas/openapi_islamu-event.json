@@ -121696,7 +121696,10 @@
             "format": "uuid"
           },
           "eventTitle": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "parentEventStatusId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -122711,7 +122714,10 @@
             "format": "uuid"
           },
           "eventTitle": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "parentEventStatusId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -136647,7 +136653,10 @@
             "format": "uuid"
           },
           "eventTitle": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "parentEventStatusId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -137639,7 +137648,10 @@
             "format": "uuid"
           },
           "eventTitle": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "parentEventStatusId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",

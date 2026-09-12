@@ -1,4 +1,7 @@
 using System.Text.Json;
+using System.Reflection;
+using Explore.Application.DTOs.EventSession;
+using Explore.Application.DTOs.EventSessionGroup;
 using Explore.Application.Mappings;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -14,6 +17,17 @@ public sealed class EventSessionMapperTests
     private static readonly Guid TenantId = Guid.Parse("01900000-0000-7000-8000-000000000003");
     private static readonly Guid Stamp = Guid.Parse("01900000-0000-7000-8000-000000000004");
     private static readonly DateTimeOffset Start = new(2026, 6, 15, 10, 0, 0, TimeSpan.Zero);
+
+    [Test]
+    [Arguments(typeof(EventSessionDto))]
+    [Arguments(typeof(EventSessionListDto))]
+    [Arguments(typeof(EventSessionGroupDto))]
+    public async Task ParentTitle_DeclaresTheExistingNullableOutputContract(Type contract)
+    {
+        var property = contract.GetProperty(nameof(EventSessionDto.EventTitle))!;
+        await Assert.That(new NullabilityInfoContext().Create(property).ReadState)
+            .IsEqualTo(NullabilityState.Nullable);
+    }
 
     [Test]
     public async Task DetailMapping_ProjectsParentEventStatusId()

@@ -13,7 +13,7 @@ public sealed record EventSessionDto
 
     // Event relationship
     public Guid EventId { get; init; }
-    public required string EventTitle { get; init; }
+    public required string? EventTitle { get; init; }
     public int ParentEventStatusId { get; init; }
 
     // Day assignment (auto-linked from session start date)

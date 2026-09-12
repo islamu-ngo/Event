@@ -351,6 +351,9 @@ existing null values explicitly while retaining required property presence.
 Nullable source identifiers retain their existing empty/zero response defaults.
 `EventMcpSummaryDescriptor` and `EventMcpDetailDescriptor` carry the same nullable
 labels through the MCP output contract without adding display-text fallbacks.
+`EventSessionMapper` likewise preserves a null parent title for unloaded event
+navigation; session DTOs, schemas and clients declare that title nullable while
+retaining the parent identity and status fields.
 No profile data is reconstructed, and this mapping change does not alter
 repository tenant filtering, authorization, transactions or cache ownership.
 

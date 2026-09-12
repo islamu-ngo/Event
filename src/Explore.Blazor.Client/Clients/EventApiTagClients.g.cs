@@ -160178,8 +160178,7 @@ namespace Explore.Blazor.Client.Clients
         public System.Guid? EventId { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("eventTitle")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string EventTitle { get; init; } = default!;
+        public string? EventTitle { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("parentEventStatusId")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
@@ -160675,8 +160674,7 @@ namespace Explore.Blazor.Client.Clients
         public System.Guid? EventId { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("eventTitle")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string EventTitle { get; set; } = default!;
+        public string? EventTitle { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("parentEventStatusId")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
@@ -171246,8 +171244,7 @@ namespace Explore.Blazor.Client.Clients
         public System.Guid? EventId { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("eventTitle")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string EventTitle { get; set; } = default!;
+        public string? EventTitle { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("parentEventStatusId")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
@@ -171684,8 +171681,7 @@ namespace Explore.Blazor.Client.Clients
         public System.Guid? EventId { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("eventTitle")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string EventTitle { get; set; } = default!;
+        public string? EventTitle { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("parentEventStatusId")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]

@@ -1,0 +1,33 @@
+# Session parent-title output nullability.
+Change-Id: CHG-01M2A9TYKRH8BPS1CRASXDHMGZ
+Title: "Reflect nullable session parent titles"
+Type: fix
+Scope: events
+Summary: "Session detail and list metadata acknowledges the existing null parent title for unloaded event navigation while preserving shared identity, parent status and disclosure."
+Group: session-projection-nullability
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/api-reference/README.md
+    Disposition: not-applicable
+    Detail: Existing JSON values and required property presence remain unchanged.
+  Security:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: documented
+    Detail: Missing parent labels do not alter event identity, parent status or disclosure authority.
+  Migration:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: No database migration.
+  Configuration:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: No configuration changes.
+  OpenAPI:
+    Reference: docs/public/api-reference/README.md
+    Disposition: documented
+    Detail: Session detail/list raw and HAL schemas and generated clients acknowledge nullable eventTitle values.
+  Operator:
+    Reference: docs/public/api-reference/README.md
+    Disposition: documented
+    Detail: Render an optional parent title without inferring missing event identity.

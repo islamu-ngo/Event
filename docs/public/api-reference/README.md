@@ -48,6 +48,8 @@ those existing null values accurately; required property presence is unchanged.
 Render an optional label without treating it as a change in event ownership,
 permissions or publication state. HAL links remain the action authority.
 MCP event search and detail outputs preserve the same optional-label semantics.
+Session detail and list responses also permit a null parent `eventTitle` when
+the related event data is absent; this does not change the parent identifier.
 
 ## Version negotiation
 

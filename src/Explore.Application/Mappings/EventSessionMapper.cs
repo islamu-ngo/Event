@@ -247,9 +247,8 @@ public static partial class EventSessionMapper
             .Select(MapAssignment).ToArray();
 
     // Required entity navigation annotations do not imply that a query loaded the navigation.
-    // Transport historically emits null for an unloaded parent despite EventTitle's required annotation.
-    // Keep that contract instead of letting the generator insert a null-mismatch exception.
-    private static string EventTitle(Event? parent) => parent?.Title!;
+    // An unloaded parent has no display title; identity and status remain separate fields.
+    private static string? EventTitle(Event? parent) => parent?.Title;
     private static int ParentStatus(Event? parent) => parent?.EventStatusId ?? 0;
     private static string? KindName(EventSessionKind? kind) => kind?.FullName;
     private static string? KindCode(EventSessionKind? kind) => kind?.MasterCode;

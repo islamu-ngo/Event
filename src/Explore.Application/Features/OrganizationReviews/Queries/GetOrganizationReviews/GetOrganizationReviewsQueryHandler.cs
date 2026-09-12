@@ -1,11 +1,11 @@
 using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.OrganizationReview;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.OrganizationReviews.Queries.GetOrganizationReviews;
 
-public class GetOrganizationReviewsQueryHandler : IRequestHandler<GetOrganizationReviewsQuery, List<OrganizationReviewDto>>
+public class GetOrganizationReviewsQueryHandler : IQueryHandler<GetOrganizationReviewsQuery, List<OrganizationReviewDto>>
 {
     private readonly IOrganizationReviewRepository _organizationReviewRepository;
 
@@ -14,7 +14,7 @@ public class GetOrganizationReviewsQueryHandler : IRequestHandler<GetOrganizatio
         _organizationReviewRepository = organizationReviewRepository;
     }
 
-    public async Task<List<OrganizationReviewDto>> Handle(GetOrganizationReviewsQuery request, CancellationToken cancellationToken)
+    public async Task<List<OrganizationReviewDto>> QueryAsync(GetOrganizationReviewsQuery request, CancellationToken cancellationToken)
     {
         var reviews = await _organizationReviewRepository.GetByOrganizationId(request.OrganizationId);
         return reviews.Select(OrganizationMapper.ToOrganizationReview).ToList();

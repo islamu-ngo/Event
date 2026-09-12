@@ -208,7 +208,7 @@ public sealed class OrganizationMappingHandlerTests
               "userId":"01900000-0000-7000-8000-000000000004", "isDeleted":true
             }
             """, JsonOptions)!;
-        var result = await handler.Handle(new CreateOrganizationReviewCommand { CreateOrganizationReviewDto = input, ReviewerUserId = ActorId }, default);
+        var result = await handler.ExecuteAsync(new CreateOrganizationReviewCommand { CreateOrganizationReviewDto = input, ReviewerUserId = ActorId }, default);
         await Assert.That(result.IsSuccess).IsTrue();
         var review = store.Items.Single();
         await Assert.That(review.OrganizationId).IsEqualTo(Id);
@@ -222,10 +222,10 @@ public sealed class OrganizationMappingHandlerTests
         await Assert.That(review.UpdatedBy).IsEqualTo(ActorId);
         await Assert.That(review.IsDeleted).IsFalse();
         await Assert.That(review.DeletedBy).IsNull();
-        var mine = await new GetMyReviewsQueryHandler(store).Handle(new GetMyReviewsQuery(ActorId), default);
+        var mine = await new GetMyReviewsQueryHandler(store).QueryAsync(new GetMyReviewsQuery(ActorId), default);
         await Assert.That(mine.Single().UserFullName).IsNull();
         await Assert.That(mine.Single().Rating).IsEqualTo(4);
-        await Assert.That(await new GetMyReviewsQueryHandler(store).Handle(new GetMyReviewsQuery(TenantId), default)).IsEmpty();
+        await Assert.That(await new GetMyReviewsQueryHandler(store).QueryAsync(new GetMyReviewsQuery(TenantId), default)).IsEmpty();
         await AssertFields(mine.Single(), "id", "organizationId", "organizationFullName", "userId", "userFullName", "rating", "comment", "createdAt");
     }
 
@@ -244,7 +244,7 @@ public sealed class OrganizationMappingHandlerTests
             ReviewerName = "Do not use as fallback", Rating = 1, Tenant = null!, Comment = null
         };
         var store = new ReviewStore([second, first]);
-        var items = await new GetOrganizationReviewsQueryHandler(store).Handle(new GetOrganizationReviewsQuery(Id), default);
+        var items = await new GetOrganizationReviewsQueryHandler(store).QueryAsync(new GetOrganizationReviewsQuery(Id), default);
         await Assert.That(items.Select(item => item.Id).SequenceEqual(new[] { Stamp, Id })).IsTrue();
         await Assert.That(items[0].Comment).IsNull();
         await Assert.That(items[0].UserFullName).IsNull();

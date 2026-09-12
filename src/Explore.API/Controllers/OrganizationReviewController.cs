@@ -1,13 +1,13 @@
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.OrganizationReview;
 using Explore.Application.Features.OrganizationReviews.Commands.CreateOrganizationReview;
 using Explore.Application.Features.OrganizationReviews.Queries.GetMyReviews;
 using Explore.Application.Features.OrganizationReviews.Queries.GetOrganizationReviews;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -20,12 +20,20 @@ namespace Explore.API.Controllers;
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 public class OrganizationReviewController : EventControllerBase
 {
-    private readonly IMediator _mediator;
+    private readonly ICommandHandler<CreateOrganizationReviewCommand, BaseCommandResponse<Guid>> _createReview;
+    private readonly IQueryHandler<GetMyReviewsQuery, List<OrganizationReviewDto>> _userReviews;
+    private readonly IQueryHandler<GetOrganizationReviewsQuery, List<OrganizationReviewDto>> _organizationReviews;
     private readonly IResourceAssembler<OrganizationReviewDto, OrganizationReviewDto> _resourceAssembler;
 
-    public OrganizationReviewController(IMediator mediator, IResourceAssembler<OrganizationReviewDto, OrganizationReviewDto> resourceAssembler)
+    public OrganizationReviewController(
+        ICommandHandler<CreateOrganizationReviewCommand, BaseCommandResponse<Guid>> createReview,
+        IQueryHandler<GetMyReviewsQuery, List<OrganizationReviewDto>> userReviews,
+        IQueryHandler<GetOrganizationReviewsQuery, List<OrganizationReviewDto>> organizationReviews,
+        IResourceAssembler<OrganizationReviewDto, OrganizationReviewDto> resourceAssembler)
     {
-        _mediator = mediator;
+        _createReview = createReview;
+        _userReviews = userReviews;
+        _organizationReviews = organizationReviews;
         _resourceAssembler = resourceAssembler;
     }
 
@@ -36,7 +44,7 @@ public class OrganizationReviewController : EventControllerBase
     [OutputCache(PolicyName = "ListData")]
     public async Task<ActionResult<HalCollectionResource<OrganizationReviewDto>>> GetAll(CancellationToken cancellationToken = default)
     {
-        var reviews = await _mediator.Send(new GetOrganizationReviewsQuery(), cancellationToken);
+        var reviews = await _organizationReviews.QueryAsync(new GetOrganizationReviewsQuery(), cancellationToken);
         var halResource = await _resourceAssembler.ToCollectionResource(
             reviews,
             RouteNames.GetOrganizationReviews,
@@ -50,7 +58,7 @@ public class OrganizationReviewController : EventControllerBase
     [OutputCache(PolicyName = "ListData")]
     public async Task<ActionResult<List<OrganizationReviewDto>>> Get(Guid organizationId, CancellationToken cancellationToken = default)
     {
-        var reviews = await _mediator.Send(new GetOrganizationReviewsQuery { OrganizationId = organizationId }, cancellationToken);
+        var reviews = await _organizationReviews.QueryAsync(new GetOrganizationReviewsQuery { OrganizationId = organizationId }, cancellationToken);
         return Ok(reviews);
     }
 
@@ -59,7 +67,7 @@ public class OrganizationReviewController : EventControllerBase
     [HttpGet("user/{userId:guid}", Name = RouteNames.GetOrganizationReviewsByUser)]
     public async Task<ActionResult<List<OrganizationReviewDto>>> GetByUserId(Guid userId, CancellationToken cancellationToken = default)
     {
-        var reviews = await _mediator.Send(new GetMyReviewsQuery { UserId = userId }, cancellationToken);
+        var reviews = await _userReviews.QueryAsync(new GetMyReviewsQuery { UserId = userId }, cancellationToken);
         return Ok(reviews);
     }
 
@@ -73,7 +81,7 @@ public class OrganizationReviewController : EventControllerBase
             CreateOrganizationReviewDto = createOrganizationReviewDto,
             ReviewerUserId = RequiredUserId
         };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _createReview.ExecuteAsync(command, cancellationToken);
         return Ok(response);
     }
 }

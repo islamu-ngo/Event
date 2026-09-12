@@ -3,11 +3,11 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.OrganizationReview;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.OrganizationReviews.Commands.CreateOrganizationReview;
 
-public class CreateOrganizationReviewCommandHandler : IRequestHandler<CreateOrganizationReviewCommand, BaseCommandResponse<Guid>>
+public class CreateOrganizationReviewCommandHandler : ICommandHandler<CreateOrganizationReviewCommand, BaseCommandResponse<Guid>>
 {
     private readonly IOrganizationReviewRepository _organizationReviewRepository;
     private readonly ITenantContext _tenantContext;
@@ -18,7 +18,7 @@ public class CreateOrganizationReviewCommandHandler : IRequestHandler<CreateOrga
         _tenantContext = tenantContext;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateOrganizationReviewCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateOrganizationReviewCommand request, CancellationToken cancellationToken)
     {
         var organizationReview = new OrganizationReview
         {

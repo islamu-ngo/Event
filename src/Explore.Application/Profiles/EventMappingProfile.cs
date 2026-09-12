@@ -2,7 +2,6 @@ using AutoMapper;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.EventAgendaItem;
 using Explore.Application.DTOs.EventAspects;
-using Explore.Application.DTOs.EventDay;
 using Explore.Application.DTOs.EventSessionGroup;
 using Explore.Application.Services;
 using Explore.Domain;
@@ -190,12 +189,6 @@ public class EventMappingProfile : Profile
             .ForMember(dest => dest.Actor, opt => opt.Ignore())
             .ForMember(dest => dest.FeaturedImage, opt => opt.Ignore())
             .ForMember(dest => dest.Tenant, opt => opt.Ignore());
-
-        // Event Day
-        CreateMap<EventDay, EventDayDto>()
-            .ForMember(dest => dest.EventTitle, opt => opt.MapFrom(src => src.Event != null ? src.Event.Title : null));
-        CreateMap<EventDay, EventDayListDto>();
-        CreateMap<CreateEventDayDto, EventDay>();
 
         // Event Agenda Item
         CreateMap<EventAgendaItem, EventAgendaItemDto>()

@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventDay;
 using Explore.Application.Features.EventDays.Requests.Queries;
@@ -11,16 +11,13 @@ public class GetEventDaysByEventRequestHandler :
 {
     private readonly IEventRepository _eventRepository;
     private readonly IEventDayRepository _eventDayRepository;
-    private readonly IMapper _mapper;
 
     public GetEventDaysByEventRequestHandler(
         IEventRepository eventRepository,
-        IEventDayRepository eventDayRepository,
-        IMapper mapper)
+        IEventDayRepository eventDayRepository)
     {
         _eventRepository = eventRepository;
         _eventDayRepository = eventDayRepository;
-        _mapper = mapper;
     }
 
     public async Task<List<EventDayListDto>> Handle(GetEventDaysByEventRequest request, CancellationToken cancellationToken)
@@ -33,14 +30,13 @@ public class GetEventDaysByEventRequestHandler :
             return [];
 
         var eventDays = await _eventDayRepository.GetByEventAsync(request.EventId, cancellationToken);
-        return _mapper.Map<List<EventDayListDto>>(eventDays);
+        return eventDays.Select(EventMapper.ToListItem).ToList();
     }
 
 }
 
 public sealed class GetManagedEventDaysByEventRequestHandler(
-    IEventDayRepository eventDayRepository,
-    IMapper mapper)
+    IEventDayRepository eventDayRepository)
     : IRequestHandler<GetManagedEventDaysByEventRequest, List<EventDayListDto>>
 {
     public async Task<List<EventDayListDto>> Handle(
@@ -48,6 +44,6 @@ public sealed class GetManagedEventDaysByEventRequestHandler(
         CancellationToken cancellationToken)
     {
         var eventDays = await eventDayRepository.GetByEventAsync(request.EventId, cancellationToken);
-        return mapper.Map<List<EventDayListDto>>(eventDays);
+        return eventDays.Select(EventMapper.ToListItem).ToList();
     }
 }

@@ -1,4 +1,5 @@
 using Explore.Application;
+using System.Reflection;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.AudienceAge;
 using Explore.Application.Features.AudienceAges.Handlers.Queries;
@@ -9,6 +10,17 @@ namespace Event.Application.UnitTests.Operations;
 
 public sealed class NativeAudienceAgeOperationTests
 {
+    [Test]
+    public async Task MissingDetail_DeclaresNullableNativeQueryResult()
+    {
+        var method = typeof(GetAudienceAgeDetailsRequestHandler)
+            .GetMethod(nameof(GetAudienceAgeDetailsRequestHandler.QueryAsync))!;
+        var result = new NullabilityInfoContext().Create(method.ReturnParameter)
+            .GenericTypeArguments.Single();
+
+        await Assert.That(result.ReadState).IsEqualTo(NullabilityState.Nullable);
+    }
+
     [Test]
     public async Task AudienceAgeReads_RegisterBothClosedNativeQueryPorts()
     {

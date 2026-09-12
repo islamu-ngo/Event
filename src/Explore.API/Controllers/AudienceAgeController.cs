@@ -19,7 +19,7 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Public)]
 public class AudienceAgeController(
     IQueryHandler<GetAudienceAgeListRequest, List<AudienceAgeListDto>> listQuery,
-    IQueryHandler<GetAudienceAgeDetailsRequest, AudienceAgeDto> detailQuery) : ControllerBase
+    IQueryHandler<GetAudienceAgeDetailsRequest, AudienceAgeDto?> detailQuery) : ControllerBase
 {
     // GET: api/audienceage
     [HttpGet(Name = RouteNames.GetAudienceAgeOptions)]

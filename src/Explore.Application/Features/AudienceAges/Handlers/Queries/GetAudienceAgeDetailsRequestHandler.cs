@@ -6,7 +6,7 @@ using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.AudienceAges.Handlers.Queries;
 
-public class GetAudienceAgeDetailsRequestHandler : IQueryHandler<GetAudienceAgeDetailsRequest, AudienceAgeDto>
+public class GetAudienceAgeDetailsRequestHandler : IQueryHandler<GetAudienceAgeDetailsRequest, AudienceAgeDto?>
 {
     private readonly IAudienceAgeRepository _audienceAgeRepository;
 
@@ -15,7 +15,7 @@ public class GetAudienceAgeDetailsRequestHandler : IQueryHandler<GetAudienceAgeD
         _audienceAgeRepository = audienceAgeRepository;
     }
 
-    public async Task<AudienceAgeDto> QueryAsync(GetAudienceAgeDetailsRequest query, CancellationToken cancellationToken)
+    public async Task<AudienceAgeDto?> QueryAsync(GetAudienceAgeDetailsRequest query, CancellationToken cancellationToken)
     {
         var audienceAge = await _audienceAgeRepository.GetById(query.Id);
         if (audienceAge == null)

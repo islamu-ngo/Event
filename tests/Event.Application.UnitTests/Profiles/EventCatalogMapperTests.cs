@@ -41,9 +41,9 @@ public sealed class EventCatalogMapperTests
         await using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         await using var scope = provider.CreateAsyncScope();
         var listQuery = scope.ServiceProvider.GetRequiredService<IQueryHandler<GetAudienceAgeListRequest, List<AudienceAgeListDto>>>();
-        var detailQuery = scope.ServiceProvider.GetRequiredService<IQueryHandler<GetAudienceAgeDetailsRequest, AudienceAgeDto>>();
+        var detailQuery = scope.ServiceProvider.GetRequiredService<IQueryHandler<GetAudienceAgeDetailsRequest, AudienceAgeDto?>>();
         await Assert.That(listQuery).IsTypeOf<AuthorizationQueryHandlerDecorator<GetAudienceAgeListRequest, List<AudienceAgeListDto>>>();
-        await Assert.That(detailQuery).IsTypeOf<AuthorizationQueryHandlerDecorator<GetAudienceAgeDetailsRequest, AudienceAgeDto>>();
+        await Assert.That(detailQuery).IsTypeOf<AuthorizationQueryHandlerDecorator<GetAudienceAgeDetailsRequest, AudienceAgeDto?>>();
         var list = await listQuery.QueryAsync(new GetAudienceAgeListRequest(), CancellationToken.None);
         var detail = await detailQuery.QueryAsync(new GetAudienceAgeDetailsRequest { Id = 8 }, CancellationToken.None);
         var missing = await detailQuery.QueryAsync(new GetAudienceAgeDetailsRequest { Id = 999 }, CancellationToken.None);

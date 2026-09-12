@@ -1,6 +1,6 @@
 using Explore.Application.DTOs.AudienceGender;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.AudienceGenders.Requests.Queries;
 
-public sealed record GetAudienceGenderDetailsRequest(int Id = default) : IRequest<AudienceGenderDto>;
+public sealed record GetAudienceGenderDetailsRequest(int Id = default) : IQuery<AudienceGenderDto?>;

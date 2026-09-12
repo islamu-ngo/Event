@@ -2,11 +2,11 @@ using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.AudienceGender;
 using Explore.Application.Features.AudienceGenders.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.AudienceGenders.Handlers.Queries;
 
-public class GetAudienceGenderDetailsRequestHandler : IRequestHandler<GetAudienceGenderDetailsRequest, AudienceGenderDto>
+public class GetAudienceGenderDetailsRequestHandler : IQueryHandler<GetAudienceGenderDetailsRequest, AudienceGenderDto?>
 {
     private readonly IAudienceGenderRepository _audienceGenderRepository;
 
@@ -15,7 +15,7 @@ public class GetAudienceGenderDetailsRequestHandler : IRequestHandler<GetAudienc
         _audienceGenderRepository = audienceGenderRepository;
     }
 
-    public async Task<AudienceGenderDto> Handle(GetAudienceGenderDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<AudienceGenderDto?> QueryAsync(GetAudienceGenderDetailsRequest request, CancellationToken cancellationToken)
     {
         var audienceGender = await _audienceGenderRepository.GetById(request.Id);
         if (audienceGender == null)

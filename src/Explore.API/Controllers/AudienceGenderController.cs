@@ -5,7 +5,7 @@ using Explore.API.Attributes;
 using Explore.API.Hateoas;
 using Explore.Application.DTOs.AudienceGender;
 using Explore.Application.Features.AudienceGenders.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -17,7 +17,9 @@ namespace Explore.API.Controllers;
 [Route("api/[controller]")]
 [ApiController]
 [EndpointClassification(EndpointClass.Public)]
-public class AudienceGenderController(IMediator mediator) : ControllerBase
+public class AudienceGenderController(
+    IQueryHandler<GetAudienceGenderListRequest, List<AudienceGenderListDto>> listQuery,
+    IQueryHandler<GetAudienceGenderDetailsRequest, AudienceGenderDto?> detailQuery) : ControllerBase
 {
 
     // GET: api/audiencegender
@@ -29,7 +31,7 @@ public class AudienceGenderController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "LookupData")]
     public async Task<ActionResult<List<AudienceGenderListDto>>> GetAll(CancellationToken cancellationToken = default)
     {
-        var audienceGenders = await mediator.Send(new GetAudienceGenderListRequest(), cancellationToken);
+        var audienceGenders = await listQuery.QueryAsync(new GetAudienceGenderListRequest(), cancellationToken);
         return Ok(audienceGenders);
     }
 
@@ -43,7 +45,7 @@ public class AudienceGenderController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<AudienceGenderDto>> GetById(int id, CancellationToken cancellationToken = default)
     {
-        var audienceGender = await mediator.Send(new GetAudienceGenderDetailsRequest { Id = id }, cancellationToken);
+        var audienceGender = await detailQuery.QueryAsync(new GetAudienceGenderDetailsRequest { Id = id }, cancellationToken);
 
         return Ok(audienceGender);
     }

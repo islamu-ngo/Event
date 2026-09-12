@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Features.EventPublicActions.Requests.Queries;
@@ -10,8 +10,7 @@ namespace Explore.Application.Features.EventPublicActions.Handlers.Queries;
 
 public sealed class GetEventPublicActionRequestHandler(
     IEventRepository eventRepository,
-    IEventPublicActionRepository actionRepository,
-    IMapper mapper)
+    IEventPublicActionRepository actionRepository)
     : IRequestHandler<GetEventPublicActionRequest, EventPublicActionDto?>
 {
     public async Task<EventPublicActionDto?> Handle(
@@ -45,7 +44,7 @@ public sealed class GetEventPublicActionRequestHandler(
             && EventAuthorityRules.IsPublicActionAllowed(
                 @event.ParticipationConfiguration.ParticipationHandlingModeId,
                 action.EventPublicActionKindId)
-                ? mapper.Map<EventPublicActionDto>(action)
+                ? EventMapper.ToDetail(action)
                 : null;
     }
 }

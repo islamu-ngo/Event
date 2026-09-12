@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Event;
@@ -16,18 +16,15 @@ namespace Explore.Application.Features.EventTags.Handlers.Queries;
 public class GetEventsByTagRequestHandler : IRequestHandler<GetEventsByTagRequest, List<EventListDto>>
 {
     private readonly IEventTagsRepository _eventTagsRepository;
-    private readonly IMapper _mapper;
     private readonly IObjectStorageService _objectStorageService;
     private readonly ILogger<GetEventsByTagRequestHandler> _logger;
 
     public GetEventsByTagRequestHandler(
         IEventTagsRepository eventTagsRepository,
-        IMapper mapper,
         IObjectStorageService objectStorageService,
         ILogger<GetEventsByTagRequestHandler> logger)
     {
         _eventTagsRepository = eventTagsRepository;
-        _mapper = mapper;
         _objectStorageService = objectStorageService;
         _logger = logger;
     }
@@ -35,7 +32,7 @@ public class GetEventsByTagRequestHandler : IRequestHandler<GetEventsByTagReques
     public async Task<List<EventListDto>> Handle(GetEventsByTagRequest request, CancellationToken cancellationToken)
     {
         var events = await _eventTagsRepository.GetEventsByTag(request.TagId);
-        var eventDtos = _mapper.Map<List<EventListDto>>(events);
+        var eventDtos = events.Select(EventMapper.ToListItem).ToList();
 
         // Resolve presigned URLs for images
         foreach (var dto in eventDtos)

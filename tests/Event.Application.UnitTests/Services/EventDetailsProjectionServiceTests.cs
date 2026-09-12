@@ -1,8 +1,6 @@
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Category;
-using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.Tag;
 using Explore.Application.Services;
 using Explore.Domain;
@@ -18,7 +16,6 @@ public sealed class EventDetailsProjectionServiceTests
     private readonly IEventModerationRecordRepository _eventModerationRecordRepository = Substitute.For<IEventModerationRecordRepository>();
     private readonly IEventTagsRepository _eventTagsRepository = Substitute.For<IEventTagsRepository>();
     private readonly IEventCategoriesRepository _eventCategoriesRepository = Substitute.For<IEventCategoriesRepository>();
-    private readonly IMapper _mapper = Substitute.For<IMapper>();
     private readonly IObjectStorageService _objectStorageService = Substitute.For<IObjectStorageService>();
     private readonly EventDetailsProjectionService _service;
 
@@ -29,7 +26,6 @@ public sealed class EventDetailsProjectionServiceTests
             _eventModerationRecordRepository,
             _eventTagsRepository,
             _eventCategoriesRepository,
-            _mapper,
             _objectStorageService,
             Substitute.For<ILogger<EventDetailsProjectionService>>());
     }
@@ -39,7 +35,7 @@ public sealed class EventDetailsProjectionServiceTests
     {
         var tenantId = Guid.Parse("01900000-0000-7000-8000-000000000102");
         var eventId = Guid.Parse("01900000-0000-7000-8000-000000000104");
-        var eventEntity = new Explore.Domain.Event
+        var eventEntity = new Explore.Domain.Event(EventStatusEnum.Moderated)
         {
             Id = eventId,
             TenantId = tenantId,
@@ -47,23 +43,8 @@ public sealed class EventDetailsProjectionServiceTests
             Actor = null!,
             Tenant = null!,
             VisibilityType = null!,
-            EventStatus = null!,
+            EventStatus = new EventStatus { FullName = "Moderated", MasterCode = "MODERATED" },
             EventFormat = null!
-        };
-        var eventDto = new EventDto
-        {
-            Id = eventId,
-            TenantId = tenantId,
-            Title = "Moderated Event",
-            ActorDisplayName = string.Empty,
-            ActorTypeFullName = string.Empty,
-            EventStatusId = (int)EventStatusEnum.Moderated,
-            EventStatusFullName = "Moderated",
-            EventStatusMasterCode = "MODERATED",
-            VisibilityTypeFullName = string.Empty,
-            VisibilityTypeMasterCode = string.Empty,
-            EventFormatFullName = string.Empty,
-            EventFormatMasterCode = string.Empty
         };
         var latestModerationRecord = EventModerationRecord.CreateLightModeration(
             Guid.Parse("01900000-0000-7000-8000-000000000106"),
@@ -117,7 +98,6 @@ public sealed class EventDetailsProjectionServiceTests
         var expectedCategoryDtos = categoryDtos.ToArray();
 
         _eventRepository.GetEventWithDetails(eventId).Returns(eventEntity);
-        _mapper.Map<EventDto>(eventEntity).Returns(eventDto);
         _eventModerationRecordRepository.GetLatestByEventAsync(tenantId, eventId, Arg.Any<CancellationToken>())
             .Returns(latestModerationRecord);
         _eventTagsRepository.GetTagsByEvent(eventId).Returns(tags);

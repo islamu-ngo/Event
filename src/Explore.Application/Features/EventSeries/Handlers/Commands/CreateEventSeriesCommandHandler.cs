@@ -1,6 +1,5 @@
 using System.Linq;
 using System.Text.RegularExpressions;
-using AutoMapper;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
@@ -20,20 +19,17 @@ public class CreateEventSeriesCommandHandler : IRequestHandler<CreateEventSeries
     private readonly ITenantContext _tenantContext;
     private readonly IAdminContext _adminContext;
     private readonly IStorageObjectRepository _storageObjectRepository;
-    private readonly IMapper _mapper;
 
     public CreateEventSeriesCommandHandler(
         IEventSeriesRepository eventSeriesRepository,
         ITenantContext tenantContext,
         IAdminContext adminContext,
-        IStorageObjectRepository storageObjectRepository,
-        IMapper mapper)
+        IStorageObjectRepository storageObjectRepository)
     {
         _eventSeriesRepository = eventSeriesRepository;
         _tenantContext = tenantContext;
         _adminContext = adminContext;
         _storageObjectRepository = storageObjectRepository;
-        _mapper = mapper;
     }
 
     public async Task<BaseCommandResponse<Guid>> Handle(CreateEventSeriesCommand request, CancellationToken cancellationToken)
@@ -68,7 +64,16 @@ public class CreateEventSeriesCommandHandler : IRequestHandler<CreateEventSeries
                 "Event series creation failed due to validation errors.");
         }
 
-        var series = _mapper.Map<Domain.EventSeries>(request.EventSeriesDto);
+        var series = new Domain.EventSeries
+        {
+            Title = request.EventSeriesDto.Title,
+            Description = request.EventSeriesDto.Description,
+            Slug = request.EventSeriesDto.Slug,
+            FeaturedImageId = request.EventSeriesDto.FeaturedImageId,
+            ActorId = request.EventSeriesDto.ActorId,
+            IsPublished = request.EventSeriesDto.IsPublished,
+            VisibilityType = null!
+        };
         series.TenantId = tenantId;
         series.TotalViews = 0;
         series.VisibilityTypeId = 1; // Default: Public

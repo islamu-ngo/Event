@@ -2,7 +2,7 @@ namespace Explore.Application.Features.EventAspects.Handlers.Queries;
 
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventAspects;
 using Explore.Application.Features.EventAspects.Requests.Queries;
@@ -16,16 +16,13 @@ public class GetEventTechAspectRequestHandler :
 {
     private readonly IEventRepository _eventRepository;
     private readonly IEventTechAspectRepository _techAspectRepository;
-    private readonly IMapper _mapper;
 
     public GetEventTechAspectRequestHandler(
         IEventRepository eventRepository,
-        IEventTechAspectRepository techAspectRepository,
-        IMapper mapper)
+        IEventTechAspectRepository techAspectRepository)
     {
         _eventRepository = eventRepository;
         _techAspectRepository = techAspectRepository;
-        _mapper = mapper;
     }
 
     public async Task<EventTechAspectDto?> Handle(GetEventTechAspectRequest request, CancellationToken cancellationToken)
@@ -49,13 +46,12 @@ public class GetEventTechAspectRequestHandler :
             return null;
         }
 
-        return _mapper.Map<EventTechAspectDto>(aspect);
+        return EventMapper.ToDetail(aspect);
     }
 }
 
 public sealed class GetManagedEventTechAspectRequestHandler(
-    IEventTechAspectRepository techAspectRepository,
-    IMapper mapper)
+    IEventTechAspectRepository techAspectRepository)
     : IRequestHandler<GetManagedEventTechAspectRequest, EventTechAspectDto?>
 {
     public async Task<EventTechAspectDto?> Handle(
@@ -63,6 +59,6 @@ public sealed class GetManagedEventTechAspectRequestHandler(
         CancellationToken cancellationToken)
     {
         var aspect = await techAspectRepository.GetByEventId(request.EventId);
-        return aspect is null ? null : mapper.Map<EventTechAspectDto>(aspect);
+        return EventMapper.ToDetail(aspect);
     }
 }

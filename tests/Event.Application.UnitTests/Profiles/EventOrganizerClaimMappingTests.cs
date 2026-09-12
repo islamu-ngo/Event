@@ -1,8 +1,6 @@
 using System.Text.Json;
-using AutoMapper;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.EventOrganizerClaim;
-using Explore.Application.Profiles;
 using Explore.Application.Mappings;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -16,14 +14,6 @@ public sealed class EventOrganizerClaimMappingTests
     [Test]
     public async Task EventListMapping_ProjectsProvenanceCode()
     {
-#if USE_COMMERCIAL_LUCKYPENNY_LIBS
-        var configuration = new MapperConfiguration(
-            cfg => cfg.AddProfile<EventMappingProfile>(),
-            Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
-#else
-        var configuration = new MapperConfiguration(cfg => cfg.AddProfile<EventMappingProfile>());
-#endif
-        var mapper = configuration.CreateMapper();
         var eventEntity = new Explore.Domain.Event
         {
             Title = "Community program",
@@ -49,7 +39,7 @@ public sealed class EventOrganizerClaimMappingTests
             }
         };
 
-        var dto = mapper.Map<Explore.Application.DTOs.Event.EventListDto>(eventEntity);
+        var dto = EventMapper.ToListItem(eventEntity);
 
         await Assert.That(dto.ProvenanceTypeCode).IsEqualTo("COMMUNITY_REPORTED");
     }
@@ -87,14 +77,6 @@ public sealed class EventOrganizerClaimMappingTests
     [Test]
     public async Task EventMapping_ProjectsOrganizerAuthorityWithoutSerializingIt()
     {
-#if USE_COMMERCIAL_LUCKYPENNY_LIBS
-        var configuration = new MapperConfiguration(
-            cfg => cfg.AddProfile<EventMappingProfile>(),
-            Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
-#else
-        var configuration = new MapperConfiguration(cfg => cfg.AddProfile<EventMappingProfile>());
-#endif
-        var mapper = configuration.CreateMapper();
         var organizerActorId = Guid.NewGuid();
         var organizerGroupId = Guid.NewGuid();
         var eventEntity = new Explore.Domain.Event
@@ -119,7 +101,7 @@ public sealed class EventOrganizerClaimMappingTests
             EventFormat = new EventFormat { MasterCode = "LOCAL", FullName = "Local" }
         };
 
-        var dto = mapper.Map<EventDto>(eventEntity);
+        var dto = EventMapper.ToDetail(eventEntity)!;
         var json = JsonSerializer.Serialize(dto, new JsonSerializerOptions(JsonSerializerDefaults.Web));
 
         await Assert.That(dto.OrganizerActorGroupId).IsEqualTo(organizerGroupId);
@@ -177,14 +159,7 @@ public sealed class EventOrganizerClaimMappingTests
         action.SetDestination(ExternalActionUrl.Create("https://registration.example.test/event"));
         eventEntity.PublicActions.Add(action);
 
-#if USE_COMMERCIAL_LUCKYPENNY_LIBS
-        var configuration = new MapperConfiguration(
-            cfg => cfg.AddProfile<EventMappingProfile>(),
-            Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
-#else
-        var configuration = new MapperConfiguration(cfg => cfg.AddProfile<EventMappingProfile>());
-#endif
-        var dto = configuration.CreateMapper().Map<EventDto>(eventEntity);
+        var dto = EventMapper.ToDetail(eventEntity)!;
 
         await Assert.That(dto.PublicActions.Count).IsEqualTo(expectedVisible ? 1 : 0);
     }

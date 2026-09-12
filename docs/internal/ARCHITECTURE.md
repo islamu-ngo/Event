@@ -336,6 +336,22 @@ OpenAPI schemas and the NSwag client. Required property presence remains intact;
 this corrects metadata to match existing JSON rather than adding empty strings or
 reconstructing erased PII. Repository filtering and handler authority are unchanged.
 
+## Event Response Projections
+
+`EventMapper` generates separate bounded event detail, list, series, aspect and
+public-action DTOs. Series children are event-list snapshots, never recursive
+domain graphs. Public actions retain the active-state and participation-mode
+filter, stable ordering and hidden authority scalars; location disclosure remains
+in its existing service. Handlers construct new series/aspects through explicit
+input allowlists after their existing authorization and manual validation.
+
+Absent actor PII or lookup navigations preserve null labels. Event detail/list
+label annotations, OpenAPI schemas and generated clients now represent those
+existing null values explicitly while retaining required property presence.
+Nullable source identifiers retain their existing empty/zero response defaults.
+No profile data is reconstructed, and this mapping change does not alter
+repository tenant filtering, authorization, transactions or cache ownership.
+
 ## Contract Value Semantics
 
 Handwritten immutable contracts follow the [canonical record-selection policy](GOVERNANCE.md#canonical-record-selection-policy); [RECORD_CONTRACTS.md](RECORD_CONTRACTS.md) is the contributor implementation guide. Concrete Application native and remaining MediatR requests, immutable DTO/payload snapshots, valid-state command results, and structurally eligible generated browser response/value contracts use record semantics. EF entities, persisted outbox lifecycle rows, generated protocol inputs and HAL/inherited/file/exception shapes, and Blazor edit/component state remain classes. This is a shallow immutability boundary: every published collection-bearing handwritten record exposes a read-only/immutable shape and copies mutable input, while generated records preserve NSwag collection shapes and keep only System.Text.Json extension data settable.

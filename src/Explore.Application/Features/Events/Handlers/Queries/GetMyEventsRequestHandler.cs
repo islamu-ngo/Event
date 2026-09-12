@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Event;
@@ -18,7 +18,6 @@ namespace Explore.Application.Features.Events.Handlers.Queries;
 public class GetMyEventsRequestHandler : IRequestHandler<GetMyEventsRequest, PaginatedResult<EventListDto>>
 {
     private readonly IEventRepository _eventRepository;
-    private readonly IMapper _mapper;
     private readonly IObjectStorageService _objectStorageService;
     private readonly ILogger<GetMyEventsRequestHandler> _logger;
     private readonly IPdsSyncOutboxRepository _outboxRepository;
@@ -26,14 +25,12 @@ public class GetMyEventsRequestHandler : IRequestHandler<GetMyEventsRequest, Pag
 
     public GetMyEventsRequestHandler(
         IEventRepository eventRepository,
-        IMapper mapper,
         IObjectStorageService objectStorageService,
         ILogger<GetMyEventsRequestHandler> logger,
         IPdsSyncOutboxRepository outboxRepository,
         ITenantContext tenantContext)
     {
         _eventRepository = eventRepository;
-        _mapper = mapper;
         _objectStorageService = objectStorageService;
         _logger = logger;
         _outboxRepository = outboxRepository;
@@ -43,7 +40,7 @@ public class GetMyEventsRequestHandler : IRequestHandler<GetMyEventsRequest, Pag
     public async Task<PaginatedResult<EventListDto>> Handle(GetMyEventsRequest request, CancellationToken cancellationToken)
     {
         var (events, totalCount) = await _eventRepository.GetMyEventsWithDetailsPaged(request.UserId, request.PageNumber, request.PageSize);
-        var eventDtos = _mapper.Map<List<EventListDto>>(events);
+        var eventDtos = events.Select(EventMapper.ToListItem).ToList();
         IReadOnlyList<PdsSyncOutbox> deliveryRows = await _outboxRepository.GetCurrentEventDeliveryStatesAsync(
             _tenantContext.TenantId,
             eventDtos.Select(dto => dto.Id).ToArray(),

@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSeries;
 using Explore.Application.Features.EventSeries.Requests.Queries;
@@ -10,12 +10,10 @@ namespace Explore.Application.Features.EventSeries.Handlers.Queries;
 public class GetTopEventSeriesRequestHandler : IRequestHandler<GetTopEventSeriesRequest, EventSeriesDto?>
 {
     private readonly IEventSeriesRepository _eventSeriesRepository;
-    private readonly IMapper _mapper;
 
-    public GetTopEventSeriesRequestHandler(IEventSeriesRepository eventSeriesRepository, IMapper mapper)
+    public GetTopEventSeriesRequestHandler(IEventSeriesRepository eventSeriesRepository)
     {
         _eventSeriesRepository = eventSeriesRepository;
-        _mapper = mapper;
     }
 
     public async Task<EventSeriesDto?> Handle(GetTopEventSeriesRequest request, CancellationToken cancellationToken)
@@ -26,6 +24,6 @@ public class GetTopEventSeriesRequestHandler : IRequestHandler<GetTopEventSeries
             return null;
         }
 
-        return _mapper.Map<EventSeriesDto>(series);
+        return EventMapper.ToDetail(series);
     }
 }

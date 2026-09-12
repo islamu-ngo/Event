@@ -1,4 +1,3 @@
-using AutoMapper;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -14,7 +13,6 @@ public sealed class EventDetailsProjectionService : IEventDetailsProjectionServi
     private readonly IEventModerationRecordRepository _eventModerationRecordRepository;
     private readonly IEventTagsRepository _eventTagsRepository;
     private readonly IEventCategoriesRepository _eventCategoriesRepository;
-    private readonly IMapper _mapper;
     private readonly IObjectStorageService _objectStorageService;
     private readonly ILogger<EventDetailsProjectionService> _logger;
 
@@ -23,7 +21,6 @@ public sealed class EventDetailsProjectionService : IEventDetailsProjectionServi
         IEventModerationRecordRepository eventModerationRecordRepository,
         IEventTagsRepository eventTagsRepository,
         IEventCategoriesRepository eventCategoriesRepository,
-        IMapper mapper,
         IObjectStorageService objectStorageService,
         ILogger<EventDetailsProjectionService> logger)
     {
@@ -31,7 +28,6 @@ public sealed class EventDetailsProjectionService : IEventDetailsProjectionServi
         _eventModerationRecordRepository = eventModerationRecordRepository;
         _eventTagsRepository = eventTagsRepository;
         _eventCategoriesRepository = eventCategoriesRepository;
-        _mapper = mapper;
         _objectStorageService = objectStorageService;
         _logger = logger;
     }
@@ -50,7 +46,7 @@ public sealed class EventDetailsProjectionService : IEventDetailsProjectionServi
 
     private async Task<EventDto?> BuildAsync(Explore.Domain.Event? @event, CancellationToken cancellationToken)
     {
-        var dto = _mapper.Map<EventDto>(@event);
+        var dto = EventMapper.ToDetail(@event);
 
         if (dto is null)
             return null;

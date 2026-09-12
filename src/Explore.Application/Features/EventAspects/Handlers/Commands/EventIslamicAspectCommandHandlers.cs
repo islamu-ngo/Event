@@ -1,4 +1,3 @@
-using AutoMapper;
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventAspects;
@@ -16,7 +15,6 @@ public sealed class CreateEventIslamicAspectCommandHandler(
     IEventIslamicAspectRepository aspectRepository,
     IMadhabRepository madhabRepository,
     ILanguageRepository languageRepository,
-    IMapper mapper,
     HybridCache cache)
     : IRequestHandler<CreateEventIslamicAspectCommand, BaseCommandResponse<Guid>>
 {
@@ -36,8 +34,16 @@ public sealed class CreateEventIslamicAspectCommandHandler(
         if (!validation.IsValid)
             return Failure(request.EventId, "event_islamic_aspect_validation_failed", "Validation failed.", validation.Errors.Select(error => error.ErrorMessage));
 
-        EventIslamicAspect aspect = mapper.Map<EventIslamicAspect>(request.AspectDto);
-        aspect.Id = request.EventId;
+        EventIslamicAspect aspect = new()
+        {
+            Id = request.EventId,
+            MadhabId = request.AspectDto.MadhabId,
+            ReferencePrayer = request.AspectDto.ReferencePrayer,
+            PrayerTimeOffset = request.AspectDto.PrayerTimeOffset,
+            GenderMode = request.AspectDto.GenderMode,
+            IncludesQuranRecitation = request.AspectDto.IncludesQuranRecitation,
+            PrimaryLanguageId = request.AspectDto.PrimaryLanguageId
+        };
         await aspectRepository.Create(aspect);
         await InvalidateAsync(cache, request.EventId, parentEvent.TenantId, cancellationToken);
         return Success(aspect.Id, "Islamic aspect created successfully.");

@@ -40,6 +40,14 @@ describe that existing behavior accurately. Grant and user identifiers remain
 available under the same access rules; a missing label is not an erasure-status
 signal or a change in authority.
 
+## Optional event labels
+
+Event detail and list responses can contain null actor and lookup display labels
+when that related data is absent. OpenAPI and generated clients now describe
+those existing null values accurately; required property presence is unchanged.
+Render an optional label without treating it as a change in event ownership,
+permissions or publication state. HAL links remain the action authority.
+
 ## Version negotiation
 
 Use one of:

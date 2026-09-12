@@ -299,7 +299,7 @@ public sealed partial class GuestRegistrationStatusHttpTests
         scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(PlatformDefaults.DefaultTenantId);
         var target = await scope.ServiceProvider.GetRequiredService<IEventRepository>()
             .GetEventWithDetails(host.EventId);
-        EventDto cached = scope.ServiceProvider.GetRequiredService<AutoMapper.IMapper>().Map<EventDto>(target) with
+        EventDto cached = Explore.Application.Mappings.EventMapper.ToDetail(target)! with
         {
             IsPubliclyEligible = await scope.ServiceProvider.GetRequiredService<IEventRepository>()
                 .IsPubliclyEligibleAsync(PlatformDefaults.DefaultTenantId, host.EventId, CancellationToken.None)

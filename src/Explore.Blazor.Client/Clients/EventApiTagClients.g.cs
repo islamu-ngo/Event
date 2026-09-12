@@ -157624,8 +157624,7 @@ namespace Explore.Blazor.Client.Clients
         public System.Guid? ActorId { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("actorDisplayName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string ActorDisplayName { get; init; } = default!;
+        public string? ActorDisplayName { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("actorHandle")]
         public string? ActorHandle { get; init; } = default!;
@@ -157638,8 +157637,7 @@ namespace Explore.Blazor.Client.Clients
         public int? ActorTypeId { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("actorTypeFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string ActorTypeFullName { get; init; } = default!;
+        public string? ActorTypeFullName { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("actorUserId")]
         public System.Guid? ActorUserId { get; init; } = default!;
@@ -157708,12 +157706,10 @@ namespace Explore.Blazor.Client.Clients
         public int? EventStatusId { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("eventStatusFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string EventStatusFullName { get; init; } = default!;
+        public string? EventStatusFullName { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("eventStatusMasterCode")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string EventStatusMasterCode { get; init; } = default!;
+        public string? EventStatusMasterCode { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("isUnmoderationEligible")]
         public bool? IsUnmoderationEligible { get; init; } = default!;
@@ -157723,24 +157719,20 @@ namespace Explore.Blazor.Client.Clients
         public int? VisibilityTypeId { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("visibilityTypeFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string VisibilityTypeFullName { get; init; } = default!;
+        public string? VisibilityTypeFullName { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("visibilityTypeMasterCode")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string VisibilityTypeMasterCode { get; init; } = default!;
+        public string? VisibilityTypeMasterCode { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("eventFormatId")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
         public int? EventFormatId { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("eventFormatFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string EventFormatFullName { get; init; } = default!;
+        public string? EventFormatFullName { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("eventFormatMasterCode")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string EventFormatMasterCode { get; init; } = default!;
+        public string? EventFormatMasterCode { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("madhabId")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
@@ -158008,24 +158000,21 @@ namespace Explore.Blazor.Client.Clients
         public int? EventTypeId { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("eventTypeFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string EventTypeFullName { get; init; } = default!;
+        public string? EventTypeFullName { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("audienceGenderId")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
         public int? AudienceGenderId { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("audienceGenderFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string AudienceGenderFullName { get; init; } = default!;
+        public string? AudienceGenderFullName { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("audienceAgeId")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
         public int? AudienceAgeId { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("audienceAgeFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string AudienceAgeFullName { get; init; } = default!;
+        public string? AudienceAgeFullName { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("audienceAgeMinAge")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
@@ -158039,16 +158028,14 @@ namespace Explore.Blazor.Client.Clients
         public System.Guid? ActorId { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("actorDisplayName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string ActorDisplayName { get; init; } = default!;
+        public string? ActorDisplayName { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("actorTypeId")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
         public int? ActorTypeId { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("actorTypeFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string ActorTypeFullName { get; init; } = default!;
+        public string? ActorTypeFullName { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("actorUserId")]
         public System.Guid? ActorUserId { get; init; } = default!;
@@ -158092,24 +158079,21 @@ namespace Explore.Blazor.Client.Clients
         public int? EventStatusId { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("eventStatusFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string EventStatusFullName { get; init; } = default!;
+        public string? EventStatusFullName { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("visibilityTypeId")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
         public int? VisibilityTypeId { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("visibilityTypeFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string VisibilityTypeFullName { get; init; } = default!;
+        public string? VisibilityTypeFullName { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("eventFormatId")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
         public int? EventFormatId { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("eventFormatFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string EventFormatFullName { get; init; } = default!;
+        public string? EventFormatFullName { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("madhabId")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
@@ -170209,8 +170193,7 @@ namespace Explore.Blazor.Client.Clients
         public System.Guid? ActorId { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("actorDisplayName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string ActorDisplayName { get; set; } = default!;
+        public string? ActorDisplayName { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("actorHandle")]
         public string? ActorHandle { get; set; } = default!;
@@ -170223,8 +170206,7 @@ namespace Explore.Blazor.Client.Clients
         public int? ActorTypeId { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("actorTypeFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string ActorTypeFullName { get; set; } = default!;
+        public string? ActorTypeFullName { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("actorUserId")]
         public System.Guid? ActorUserId { get; set; } = default!;
@@ -170293,12 +170275,10 @@ namespace Explore.Blazor.Client.Clients
         public int? EventStatusId { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("eventStatusFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string EventStatusFullName { get; set; } = default!;
+        public string? EventStatusFullName { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("eventStatusMasterCode")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string EventStatusMasterCode { get; set; } = default!;
+        public string? EventStatusMasterCode { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("isUnmoderationEligible")]
         public bool? IsUnmoderationEligible { get; set; } = default!;
@@ -170308,24 +170288,20 @@ namespace Explore.Blazor.Client.Clients
         public int? VisibilityTypeId { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("visibilityTypeFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string VisibilityTypeFullName { get; set; } = default!;
+        public string? VisibilityTypeFullName { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("visibilityTypeMasterCode")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string VisibilityTypeMasterCode { get; set; } = default!;
+        public string? VisibilityTypeMasterCode { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("eventFormatId")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
         public int? EventFormatId { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("eventFormatFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string EventFormatFullName { get; set; } = default!;
+        public string? EventFormatFullName { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("eventFormatMasterCode")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string EventFormatMasterCode { get; set; } = default!;
+        public string? EventFormatMasterCode { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("madhabId")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
@@ -170446,24 +170422,21 @@ namespace Explore.Blazor.Client.Clients
         public int? EventTypeId { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("eventTypeFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string EventTypeFullName { get; set; } = default!;
+        public string? EventTypeFullName { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("audienceGenderId")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
         public int? AudienceGenderId { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("audienceGenderFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string AudienceGenderFullName { get; set; } = default!;
+        public string? AudienceGenderFullName { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("audienceAgeId")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
         public int? AudienceAgeId { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("audienceAgeFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string AudienceAgeFullName { get; set; } = default!;
+        public string? AudienceAgeFullName { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("audienceAgeMinAge")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
@@ -170477,16 +170450,14 @@ namespace Explore.Blazor.Client.Clients
         public System.Guid? ActorId { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("actorDisplayName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string ActorDisplayName { get; set; } = default!;
+        public string? ActorDisplayName { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("actorTypeId")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
         public int? ActorTypeId { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("actorTypeFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string ActorTypeFullName { get; set; } = default!;
+        public string? ActorTypeFullName { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("actorUserId")]
         public System.Guid? ActorUserId { get; set; } = default!;
@@ -170530,24 +170501,21 @@ namespace Explore.Blazor.Client.Clients
         public int? EventStatusId { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("eventStatusFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string EventStatusFullName { get; set; } = default!;
+        public string? EventStatusFullName { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("visibilityTypeId")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
         public int? VisibilityTypeId { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("visibilityTypeFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string VisibilityTypeFullName { get; set; } = default!;
+        public string? VisibilityTypeFullName { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("eventFormatId")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
         public int? EventFormatId { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("eventFormatFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string EventFormatFullName { get; set; } = default!;
+        public string? EventFormatFullName { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("madhabId")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]

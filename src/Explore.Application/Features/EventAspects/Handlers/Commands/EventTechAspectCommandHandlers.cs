@@ -1,4 +1,3 @@
-using AutoMapper;
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventAspects;
@@ -14,7 +13,6 @@ namespace Explore.Application.Features.EventAspects.Handlers.Commands;
 public sealed class CreateEventTechAspectCommandHandler(
     IEventRepository eventRepository,
     IEventTechAspectRepository aspectRepository,
-    IMapper mapper,
     HybridCache cache)
     : IRequestHandler<CreateEventTechAspectCommand, BaseCommandResponse<Guid>>
 {
@@ -34,8 +32,19 @@ public sealed class CreateEventTechAspectCommandHandler(
         if (!validation.IsValid)
             return Failure(request.EventId, "event_tech_aspect_validation_failed", "Validation failed.", validation.Errors.Select(error => error.ErrorMessage));
 
-        EventTechAspect aspect = mapper.Map<EventTechAspect>(request.AspectDto);
-        aspect.Id = request.EventId;
+        EventTechAspect aspect = new()
+        {
+            Id = request.EventId,
+            GithubRepoUrl = request.AspectDto.GithubRepoUrl,
+            HackathonTrack = request.AspectDto.HackathonTrack,
+            SkillLevel = request.AspectDto.SkillLevel,
+            TechStackTags = request.AspectDto.TechStackTags,
+            RequiresLaptop = request.AspectDto.RequiresLaptop,
+            IsCodingCompetition = request.AspectDto.IsCodingCompetition,
+            MaxTeamSize = request.AspectDto.MaxTeamSize,
+            PrizePool = request.AspectDto.PrizePool,
+            PrizeCurrencyCode = request.AspectDto.PrizeCurrencyCode
+        };
         await aspectRepository.Create(aspect);
         await cache.RemoveAsync($"event:detail:{request.EventId}", cancellationToken);
         await cache.RemoveByTagAsync(CacheTags.EventListByTenant(parentEvent.TenantId), cancellationToken);

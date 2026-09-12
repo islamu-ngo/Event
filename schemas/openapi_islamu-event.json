@@ -118394,7 +118394,10 @@
             "format": "uuid"
           },
           "actorDisplayName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "actorHandle": {
             "type": [
@@ -118417,7 +118420,10 @@
             "format": "int32"
           },
           "actorTypeFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "actorUserId": {
             "type": [
@@ -118659,10 +118665,16 @@
             "format": "int32"
           },
           "eventStatusFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "eventStatusMasterCode": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "isUnmoderationEligible": {
             "type": "boolean"
@@ -118676,10 +118688,16 @@
             "format": "int32"
           },
           "visibilityTypeFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "visibilityTypeMasterCode": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "eventFormatId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -118690,10 +118708,16 @@
             "format": "int32"
           },
           "eventFormatFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "eventFormatMasterCode": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "madhabId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -119023,7 +119047,10 @@
             "format": "int32"
           },
           "eventTypeFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "audienceGenderId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -119034,7 +119061,10 @@
             "format": "int32"
           },
           "audienceGenderFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "audienceAgeId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -119045,7 +119075,10 @@
             "format": "int32"
           },
           "audienceAgeFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "audienceAgeMinAge": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -119070,7 +119103,10 @@
             "format": "uuid"
           },
           "actorDisplayName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "actorTypeId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -119081,7 +119117,10 @@
             "format": "int32"
           },
           "actorTypeFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "actorUserId": {
             "type": [
@@ -119177,7 +119216,10 @@
             "format": "int32"
           },
           "eventStatusFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "visibilityTypeId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -119188,7 +119230,10 @@
             "format": "int32"
           },
           "visibilityTypeFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "eventFormatId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -119199,7 +119244,10 @@
             "format": "int32"
           },
           "eventFormatFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "madhabId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -134710,7 +134758,10 @@
             "format": "uuid"
           },
           "actorDisplayName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "actorHandle": {
             "type": [
@@ -134733,7 +134784,10 @@
             "format": "int32"
           },
           "actorTypeFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "actorUserId": {
             "type": [
@@ -134975,10 +135029,16 @@
             "format": "int32"
           },
           "eventStatusFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "eventStatusMasterCode": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "isUnmoderationEligible": {
             "type": "boolean"
@@ -134992,10 +135052,16 @@
             "format": "int32"
           },
           "visibilityTypeFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "visibilityTypeMasterCode": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "eventFormatId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -135006,10 +135072,16 @@
             "format": "int32"
           },
           "eventFormatFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "eventFormatMasterCode": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "madhabId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -135211,7 +135283,10 @@
             "format": "int32"
           },
           "eventTypeFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "audienceGenderId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -135222,7 +135297,10 @@
             "format": "int32"
           },
           "audienceGenderFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "audienceAgeId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -135233,7 +135311,10 @@
             "format": "int32"
           },
           "audienceAgeFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "audienceAgeMinAge": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -135258,7 +135339,10 @@
             "format": "uuid"
           },
           "actorDisplayName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "actorTypeId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -135269,7 +135353,10 @@
             "format": "int32"
           },
           "actorTypeFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "actorUserId": {
             "type": [
@@ -135462,7 +135549,10 @@
             "format": "int32"
           },
           "eventStatusFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "visibilityTypeId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -135473,7 +135563,10 @@
             "format": "int32"
           },
           "visibilityTypeFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "eventFormatId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -135484,7 +135577,10 @@
             "format": "int32"
           },
           "eventFormatFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "madhabId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",

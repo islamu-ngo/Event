@@ -1,4 +1,4 @@
-using AutoMapper;
+using Explore.Application.Mappings;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
@@ -17,20 +17,17 @@ public class GetManagedEventsByActorRequestHandler : IRequestHandler<GetManagedE
 
     private readonly IEventRepository _eventRepository;
     private readonly IAuthorizationProvider _authorizationProvider;
-    private readonly IMapper _mapper;
     private readonly IObjectStorageService _objectStorageService;
     private readonly ILogger<GetManagedEventsByActorRequestHandler> _logger;
 
     public GetManagedEventsByActorRequestHandler(
         IEventRepository eventRepository,
         IAuthorizationProvider authorizationProvider,
-        IMapper mapper,
         IObjectStorageService objectStorageService,
         ILogger<GetManagedEventsByActorRequestHandler> logger)
     {
         _eventRepository = eventRepository;
         _authorizationProvider = authorizationProvider;
-        _mapper = mapper;
         _objectStorageService = objectStorageService;
         _logger = logger;
     }
@@ -46,7 +43,7 @@ public class GetManagedEventsByActorRequestHandler : IRequestHandler<GetManagedE
         }
 
         var events = await _eventRepository.GetEventsByActorWithDetails(request.ActorId, cancellationToken);
-        var eventDtos = _mapper.Map<List<EventListDto>>(events);
+        var eventDtos = events.Select(EventMapper.ToListItem).ToList();
         var authorizedEvents = await FilterViewManagementAuthorizedAsync(eventDtos, cancellationToken);
 
         var pageItems = authorizedEvents

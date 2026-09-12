@@ -3,6 +3,7 @@ using Explore.Application;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Users.Handlers.Queries;
 using Explore.Application.Features.Users.Requests.Queries;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain;
@@ -136,7 +137,11 @@ public sealed class IdentityResolutionQueryTests
         services.AddLogging();
         services.AddScoped<IUserExternalLoginRepository>(_ => new LoginStore());
         services.AddSingleton<IAuthorizationProvider, UnexpectedPolicy>();
-        services.AddNativeOperations();
+        services.AddNativeOperations(
+        [
+            typeof(ResolveCurrentUserIdByIdentityRequest),
+            typeof(ResolveCurrentUserIdByIdentityRequestHandler)
+        ]);
         return services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
     }
 

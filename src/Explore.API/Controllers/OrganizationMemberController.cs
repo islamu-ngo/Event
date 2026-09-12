@@ -4,12 +4,12 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Hateoas;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.OrganizationMember;
 using Explore.Application.Features.OrganizationMembers.Requests.Commands;
 using Explore.Application.Features.OrganizationMembers.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -26,16 +26,37 @@ public class OrganizationMemberController : EventControllerBase
         "Organization member not found",
         "Organization member not found.");
 
-    private readonly IMediator _mediator;
+    private readonly ICommandHandler<AddOrganizationMemberCommand, BaseCommandResponse<Guid>> _addMember;
+    private readonly ICommandHandler<UpdateOrganizationMemberRoleCommand, BaseCommandResponse<Guid>> _updateRole;
+    private readonly ICommandHandler<DeleteOrganizationMemberCommand, BaseCommandResponse<Guid>> _deleteMember;
+    private readonly ICommandHandler<DeclineInvitationCommand, BaseCommandResponse<Guid>> _declineInvitation;
+    private readonly IQueryHandler<ValidateOrganizationInvitationQuery, BaseCommandResponse<Guid>> _validateInvitation;
+    private readonly IQueryHandler<GetMyInvitationsRequest, List<OrganizationInvitationDto>> _invitations;
+    private readonly IQueryHandler<GetOrganizationMemberDetailsRequest, OrganizationMemberDto?> _memberDetails;
+    private readonly IQueryHandler<GetOrganizationMembersRequest, List<OrganizationMemberDto>> _members;
     private readonly ITenantContext _tenantContext;
     private readonly IResourceAssembler<OrganizationMemberDto, OrganizationMemberDto> _resourceAssembler;
 
     public OrganizationMemberController(
-        IMediator mediator,
+        ICommandHandler<AddOrganizationMemberCommand, BaseCommandResponse<Guid>> addMember,
+        ICommandHandler<UpdateOrganizationMemberRoleCommand, BaseCommandResponse<Guid>> updateRole,
+        ICommandHandler<DeleteOrganizationMemberCommand, BaseCommandResponse<Guid>> deleteMember,
+        ICommandHandler<DeclineInvitationCommand, BaseCommandResponse<Guid>> declineInvitation,
+        IQueryHandler<ValidateOrganizationInvitationQuery, BaseCommandResponse<Guid>> validateInvitation,
+        IQueryHandler<GetMyInvitationsRequest, List<OrganizationInvitationDto>> invitations,
+        IQueryHandler<GetOrganizationMemberDetailsRequest, OrganizationMemberDto?> memberDetails,
+        IQueryHandler<GetOrganizationMembersRequest, List<OrganizationMemberDto>> members,
         ITenantContext tenantContext,
         IResourceAssembler<OrganizationMemberDto, OrganizationMemberDto> resourceAssembler)
     {
-        _mediator = mediator;
+        _addMember = addMember;
+        _updateRole = updateRole;
+        _deleteMember = deleteMember;
+        _declineInvitation = declineInvitation;
+        _validateInvitation = validateInvitation;
+        _invitations = invitations;
+        _memberDetails = memberDetails;
+        _members = members;
         _tenantContext = tenantContext;
         _resourceAssembler = resourceAssembler;
     }
@@ -47,7 +68,7 @@ public class OrganizationMemberController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<HalCollectionResource<OrganizationMemberDto>>> Get(Guid organizationId, CancellationToken cancellationToken = default)
     {
-        var members = await _mediator.Send(
+        var members = await _members.QueryAsync(
             new GetOrganizationMembersRequest
             {
                 OrganizationId = organizationId,
@@ -71,7 +92,7 @@ public class OrganizationMemberController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<HalResource<OrganizationMemberDto>>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var member = await _mediator.Send(
+        var member = await _memberDetails.QueryAsync(
             new GetOrganizationMemberDetailsRequest
             {
                 Id = id,
@@ -103,7 +124,7 @@ public class OrganizationMemberController : EventControllerBase
             RequesterUserId = userId,
             TenantId = _tenantContext.TenantId
         };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _addMember.ExecuteAsync(command, cancellationToken);
         return Ok(response);
     }
 
@@ -118,7 +139,7 @@ public class OrganizationMemberController : EventControllerBase
         }
 
         var command = new UpdateOrganizationMemberRoleCommand { UpdateOrganizationMemberRoleDto = dto, RequesterUserId = userId };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _updateRole.ExecuteAsync(command, cancellationToken);
         return Ok(response);
     }
 
@@ -134,7 +155,7 @@ public class OrganizationMemberController : EventControllerBase
                 detail: "The authenticated principal does not include an email claim required to list invitations.");
         }
 
-        var response = await _mediator.Send(new GetMyInvitationsRequest { Email = email }, cancellationToken);
+        var response = await _invitations.QueryAsync(new GetMyInvitationsRequest { Email = email }, cancellationToken);
         return Ok(response);
     }
 
@@ -148,8 +169,8 @@ public class OrganizationMemberController : EventControllerBase
             return this.ToAuthenticationRequiredProblem();
         }
 
-        var command = new AcceptInvitationCommand { InvitationId = id, UserId = userGuid.Value };
-        var response = await _mediator.Send(command, cancellationToken);
+        var query = new ValidateOrganizationInvitationQuery { InvitationId = id, UserId = userGuid.Value };
+        var response = await _validateInvitation.QueryAsync(query, cancellationToken);
         return Ok(response);
     }
 
@@ -163,7 +184,7 @@ public class OrganizationMemberController : EventControllerBase
             return this.ToAuthenticationRequiredProblem();
         }
         var command = new DeclineInvitationCommand { InvitationId = id, UserId = userGuid.Value };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _declineInvitation.ExecuteAsync(command, cancellationToken);
         return Ok(response);
     }
 
@@ -178,7 +199,7 @@ public class OrganizationMemberController : EventControllerBase
         }
 
         var command = new DeleteOrganizationMemberCommand { MemberId = id, RequesterUserId = userId };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _deleteMember.ExecuteAsync(command, cancellationToken);
         return Ok(response);
     }
 

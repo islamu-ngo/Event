@@ -2,22 +2,22 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Explore.Application.Contracts.Persistence;
-using Explore.Application.Features.OrganizationMembers.Requests.Commands;
+using Explore.Application.Features.OrganizationMembers.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
-namespace Explore.Application.Features.OrganizationMembers.Handlers.Commands;
+namespace Explore.Application.Features.OrganizationMembers.Handlers.Queries;
 
-public class AcceptInvitationCommandHandler : IRequestHandler<AcceptInvitationCommand, BaseCommandResponse<Guid>>
+public class ValidateOrganizationInvitationQueryHandler : IQueryHandler<ValidateOrganizationInvitationQuery, BaseCommandResponse<Guid>>
 {
     private readonly IOrganizationMemberRepository _organizationMemberRepository;
 
-    public AcceptInvitationCommandHandler(IOrganizationMemberRepository organizationMemberRepository)
+    public ValidateOrganizationInvitationQueryHandler(IOrganizationMemberRepository organizationMemberRepository)
     {
         _organizationMemberRepository = organizationMemberRepository;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(AcceptInvitationCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> QueryAsync(ValidateOrganizationInvitationQuery request, CancellationToken cancellationToken)
     {
         var invitation = await _organizationMemberRepository.GetById(request.InvitationId);
 

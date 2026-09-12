@@ -4,11 +4,11 @@ using System.Threading.Tasks;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.OrganizationMembers.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.OrganizationMembers.Handlers.Commands;
 
-public class DeclineInvitationCommandHandler : IRequestHandler<DeclineInvitationCommand, BaseCommandResponse<Guid>>
+public class DeclineInvitationCommandHandler : ICommandHandler<DeclineInvitationCommand, BaseCommandResponse<Guid>>
 {
     private readonly IOrganizationMemberRepository _organizationMemberRepository;
 
@@ -17,7 +17,7 @@ public class DeclineInvitationCommandHandler : IRequestHandler<DeclineInvitation
         _organizationMemberRepository = organizationMemberRepository;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(DeclineInvitationCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeclineInvitationCommand request, CancellationToken cancellationToken)
     {
         var invitation = await _organizationMemberRepository.GetById(request.InvitationId);
 

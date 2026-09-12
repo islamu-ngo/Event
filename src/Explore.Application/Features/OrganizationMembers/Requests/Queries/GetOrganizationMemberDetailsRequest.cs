@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.OrganizationMember;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.OrganizationMembers.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.OrganizationMember, AuthorizationActions.OrganizationMembers.View)]
-public sealed record GetOrganizationMemberDetailsRequest : IRequest<OrganizationMemberDto?>, ISecureRequest
+public sealed record GetOrganizationMemberDetailsRequest : IQuery<OrganizationMemberDto?>, ISecureRequest
 {
     public Guid Id { get; init; }
 

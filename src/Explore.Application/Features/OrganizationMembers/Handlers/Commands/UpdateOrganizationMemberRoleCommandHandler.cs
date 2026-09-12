@@ -6,11 +6,11 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.OrganizationMembers.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.OrganizationMembers.Handlers.Commands;
 
-public class UpdateOrganizationMemberRoleCommandHandler : IRequestHandler<UpdateOrganizationMemberRoleCommand, BaseCommandResponse<Guid>>
+public class UpdateOrganizationMemberRoleCommandHandler : ICommandHandler<UpdateOrganizationMemberRoleCommand, BaseCommandResponse<Guid>>
 {
     private readonly IOrganizationMemberRepository _organizationMemberRepository;
     private readonly IOrganizationRepository _organizationRepository;
@@ -23,11 +23,11 @@ public class UpdateOrganizationMemberRoleCommandHandler : IRequestHandler<Update
         _organizationRepository = organizationRepository;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateOrganizationMemberRoleCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateOrganizationMemberRoleCommand request, CancellationToken cancellationToken)
     {
         var dto = request.UpdateOrganizationMemberRoleDto;
 
-        var memberToUpdate = await _organizationMemberRepository.GetById(dto.Id);
+        var memberToUpdate = await _organizationMemberRepository.GetOrganizationMemberWithDetails(dto.Id);
         if (memberToUpdate == null)
         {
             return BaseCommandResponse.Validation<Guid>(["Member not found"], "Member not found");

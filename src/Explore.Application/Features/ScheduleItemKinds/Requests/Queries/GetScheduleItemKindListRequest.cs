@@ -1,8 +1,8 @@
 using Explore.Application.DTOs.ScheduleItemKind;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ScheduleItemKinds.Requests.Queries;
 
-public sealed record GetScheduleItemKindListRequest : IRequest<List<ScheduleItemKindListDto>>
+public sealed record GetScheduleItemKindListRequest : IQuery<List<ScheduleItemKindListDto>>
 {
 }

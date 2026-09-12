@@ -88,7 +88,7 @@ public class RegistrationMapperTests
             new() { Id = 2, MasterCode = "SECOND", FullName = "Second", Description = null }
         };
         var handler = new GetScheduleItemKindListRequestHandler(new ScheduleKindStore(items));
-        var result = await handler.Handle(new GetScheduleItemKindListRequest(), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetScheduleItemKindListRequest(), CancellationToken.None);
         items[0].FullName = "Changed";
         items[0].Description = "Changed";
         items.Clear();
@@ -154,7 +154,7 @@ public class RegistrationMapperTests
         await AssertJson(await new GetEventSessionKindListRequestHandler(new SessionKindStore([]))
             .Handle(new GetEventSessionKindListRequest(), CancellationToken.None), new JsonArray());
         await AssertJson(await new GetScheduleItemKindListRequestHandler(new ScheduleKindStore([]))
-            .Handle(new GetScheduleItemKindListRequest(), CancellationToken.None), new JsonArray());
+            .QueryAsync(new GetScheduleItemKindListRequest(), CancellationToken.None), new JsonArray());
         await AssertJson(await new GetRegistrationModeListRequestHandler(new ModeStore([]))
             .QueryAsync(new GetRegistrationModeListRequest(), CancellationToken.None), new JsonArray());
     }

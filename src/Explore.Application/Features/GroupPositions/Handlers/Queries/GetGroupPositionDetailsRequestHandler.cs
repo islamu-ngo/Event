@@ -4,11 +4,11 @@ using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.GroupPosition;
 using Explore.Application.Features.GroupPositions.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.GroupPositions.Handlers.Queries;
 
-public class GetGroupPositionDetailsRequestHandler : IRequestHandler<GetGroupPositionDetailsRequest, GroupPositionDto>
+public class GetGroupPositionDetailsRequestHandler : IQueryHandler<GetGroupPositionDetailsRequest, GroupPositionDto?>
 {
     private readonly IGroupPositionRepository _groupPositionRepository;
 
@@ -17,9 +17,9 @@ public class GetGroupPositionDetailsRequestHandler : IRequestHandler<GetGroupPos
         _groupPositionRepository = groupPositionRepository;
     }
 
-    public async Task<GroupPositionDto> Handle(GetGroupPositionDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<GroupPositionDto?> QueryAsync(GetGroupPositionDetailsRequest request, CancellationToken cancellationToken)
     {
         var groupPosition = await _groupPositionRepository.GetById(request.Id);
-        return GroupPositionMapper.ToDetail(groupPosition)!;
+        return GroupPositionMapper.ToDetail(groupPosition);
     }
 }

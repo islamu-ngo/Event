@@ -5,11 +5,11 @@ using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.VisibilityType;
 using Explore.Application.Features.VisibilityTypes.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.VisibilityTypes.Handlers.Queries;
 
-public class GetVisibilityTypeListRequestHandler : IRequestHandler<GetVisibilityTypeListRequest, List<VisibilityTypeListDto>>
+public class GetVisibilityTypeListRequestHandler : IQueryHandler<GetVisibilityTypeListRequest, List<VisibilityTypeListDto>>
 {
     private readonly IVisibilityTypeRepository _visibilityTypeRepository;
 
@@ -18,7 +18,7 @@ public class GetVisibilityTypeListRequestHandler : IRequestHandler<GetVisibility
         _visibilityTypeRepository = visibilityTypeRepository;
     }
 
-    public async Task<List<VisibilityTypeListDto>> Handle(GetVisibilityTypeListRequest request, CancellationToken cancellationToken)
+    public async Task<List<VisibilityTypeListDto>> QueryAsync(GetVisibilityTypeListRequest request, CancellationToken cancellationToken)
     {
         var visibilityTypes = await _visibilityTypeRepository.GetAll();
         return visibilityTypes.Select(VisibilityTypeMapper.ToListItem).ToList();

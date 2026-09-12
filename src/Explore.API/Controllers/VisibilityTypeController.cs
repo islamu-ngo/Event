@@ -5,7 +5,7 @@ using Explore.API.Attributes;
 using Explore.API.Hateoas;
 using Explore.Application.DTOs.VisibilityType;
 using Explore.Application.Features.VisibilityTypes.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -17,7 +17,9 @@ namespace Explore.API.Controllers;
 [Route("api/[controller]")]
 [ApiController]
 [EndpointClassification(EndpointClass.Public)]
-public class VisibilityTypeController(IMediator mediator) : ControllerBase
+public class VisibilityTypeController(
+    IQueryHandler<GetVisibilityTypeListRequest, List<VisibilityTypeListDto>> visibilityTypeList,
+    IQueryHandler<GetVisibilityTypeDetailsRequest, VisibilityTypeDto?> visibilityTypeDetails) : ControllerBase
 {
 
     // GET: api/visibilitytype
@@ -29,7 +31,7 @@ public class VisibilityTypeController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "LookupData")]
     public async Task<ActionResult<List<VisibilityTypeListDto>>> GetAll(CancellationToken cancellationToken = default)
     {
-        var visibilityTypes = await mediator.Send(new GetVisibilityTypeListRequest(), cancellationToken);
+        var visibilityTypes = await visibilityTypeList.QueryAsync(new GetVisibilityTypeListRequest(), cancellationToken);
         return Ok(visibilityTypes);
     }
 
@@ -43,7 +45,7 @@ public class VisibilityTypeController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<VisibilityTypeDto>> GetById(int id, CancellationToken cancellationToken = default)
     {
-        var visibilityType = await mediator.Send(new GetVisibilityTypeDetailsRequest { Id = id }, cancellationToken);
+        var visibilityType = await visibilityTypeDetails.QueryAsync(new GetVisibilityTypeDetailsRequest { Id = id }, cancellationToken);
         return Ok(visibilityType);
     }
 }

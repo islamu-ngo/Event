@@ -181,6 +181,22 @@ Current caller/tenant authority never comes from a request body. Controllers der
 
 Tenant navigation and footer-link URLs accept relative paths or HTTPS URLs by default. The instance-only `security.require_https_external_urls` setting defaults to `true`; setting it to `false` permits HTTP only for deployments that explicitly trust an HTTP-only private network.
 
+### Guest Registration HTTP Capabilities
+
+The guest routes under `api/events/{eventId:guid}/registration-orders` have five
+concrete owners: `GuestRegistrationOrderController` for start, read and lifecycle;
+`GuestRegistrationOrderRequirementsController` for native/provider requirements;
+`GuestRegistrationOrderParticipantsController` for participants and ticket assignments;
+`GuestRegistrationOrderPromotionsController` for promotions; and
+`GuestRegistrationOrderClaimController` for authenticated account claim.
+
+All use the existing `RegistrationOrderControllerBase` protocol helpers and retain
+the `GuestRegistrationOrder` tag. Only the lifecycle owner needs `TimeProvider`.
+Capability headers, challenge admission, idempotency/replay protections, per-action
+authorization, rate limits and HAL mapping retain their original contracts.
+The participant helper still constructs one concrete guest mutation command;
+Application operation migration remains owned by its corresponding cohort.
+
 ### Event Provenance, Public Actions, And Organizer Claims
 
 Event reads expose typed provenance plus reviewed `Active` public actions. External destinations are stored as `EventPublicAction` records rather than caller-supplied redirect URLs.

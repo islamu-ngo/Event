@@ -75,3 +75,12 @@ Treat `type`/problem code and HTTP status as the stable machine-facing signal. P
 ## Privacy and caching
 
 Private account, commerce, refund, and erasure responses are `no-store`. Never persist provider IDs, admission bearer material, idempotency material, erasure receipts, raw provider errors, or PII from diagnostic responses. Health and metrics are operational surfaces, not data-export APIs.
+
+## Guest registration capabilities
+
+Guest order start/read/lifecycle, requirements, participants, promotions and account
+claim keep their existing URLs and `GuestRegistrationOrder` API/SDK group.
+Keep order and attempt capabilities in their dedicated headers, not URLs.
+Follow the returned HAL actions and retain the required idempotency/challenge
+proofs for writes. Account claim remains authenticated; an order capability alone
+does not establish account authority.

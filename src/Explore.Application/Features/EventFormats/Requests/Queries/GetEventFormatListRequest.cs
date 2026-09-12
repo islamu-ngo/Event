@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using Explore.Application.DTOs.EventFormat;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventFormats.Requests.Queries;
 
-public sealed record GetEventFormatListRequest : IRequest<List<EventFormatListDto>>
+public sealed record GetEventFormatListRequest : IQuery<List<EventFormatListDto>>
 {
 }

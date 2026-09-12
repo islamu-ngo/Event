@@ -5,7 +5,7 @@ using Explore.API.Attributes;
 using Explore.API.Hateoas;
 using Explore.Application.DTOs.EventFormat;
 using Explore.Application.Features.EventFormats.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -17,7 +17,9 @@ namespace Explore.API.Controllers;
 [Route("api/[controller]")]
 [ApiController]
 [EndpointClassification(EndpointClass.Public)]
-public class EventFormatController(IMediator mediator) : ControllerBase
+public class EventFormatController(
+    IQueryHandler<GetEventFormatListRequest, List<EventFormatListDto>> eventFormatList,
+    IQueryHandler<GetEventFormatDetailsRequest, EventFormatDto?> eventFormatDetails) : ControllerBase
 {
 
     // GET: api/eventformat
@@ -29,7 +31,7 @@ public class EventFormatController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "LookupData")]
     public async Task<ActionResult<List<EventFormatListDto>>> GetAll(CancellationToken cancellationToken = default)
     {
-        var eventFormats = await mediator.Send(new GetEventFormatListRequest(), cancellationToken);
+        var eventFormats = await eventFormatList.QueryAsync(new GetEventFormatListRequest(), cancellationToken);
         return Ok(eventFormats);
     }
 
@@ -43,7 +45,7 @@ public class EventFormatController(IMediator mediator) : ControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<EventFormatDto>> GetById(int id, CancellationToken cancellationToken = default)
     {
-        var eventFormat = await mediator.Send(new GetEventFormatDetailsRequest(id), cancellationToken);
+        var eventFormat = await eventFormatDetails.QueryAsync(new GetEventFormatDetailsRequest(id), cancellationToken);
         return Ok(eventFormat);
     }
 }

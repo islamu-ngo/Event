@@ -1,4 +1,9 @@
 using System.Text.Json;
+using Explore.Application;
+using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Operations.Decorators;
+using Microsoft.Extensions.DependencyInjection;
 using Explore.Application.DTOs.AudienceAge;
 using Explore.Application.DTOs.AudienceGender;
 using Explore.Application.DTOs.EventType;
@@ -23,10 +28,29 @@ public sealed class EventCatalogMapperTests
             new() { Id = 2, MasterCode = "ALL", FullName = "All" }
         };
         repository.GetAll().Returns(sources);
-        var list = await new GetAudienceAgeListRequestHandler(repository).Handle(new GetAudienceAgeListRequest(), CancellationToken.None);
-        var missing = await new GetAudienceAgeDetailsRequestHandler(repository).Handle(new GetAudienceAgeDetailsRequest { Id = 999 }, CancellationToken.None);
+        repository.GetById(8).Returns(sources[0]);
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton(repository);
+        services.AddSingleton(Substitute.For<IAuthorizationProvider>());
+        services.AddNativeOperations(
+        [
+            typeof(GetAudienceAgeListRequest), typeof(GetAudienceAgeListRequestHandler),
+            typeof(GetAudienceAgeDetailsRequest), typeof(GetAudienceAgeDetailsRequestHandler)
+        ]);
+        await using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+        await using var scope = provider.CreateAsyncScope();
+        var listQuery = scope.ServiceProvider.GetRequiredService<IQueryHandler<GetAudienceAgeListRequest, List<AudienceAgeListDto>>>();
+        var detailQuery = scope.ServiceProvider.GetRequiredService<IQueryHandler<GetAudienceAgeDetailsRequest, AudienceAgeDto>>();
+        await Assert.That(listQuery).IsTypeOf<AuthorizationQueryHandlerDecorator<GetAudienceAgeListRequest, List<AudienceAgeListDto>>>();
+        await Assert.That(detailQuery).IsTypeOf<AuthorizationQueryHandlerDecorator<GetAudienceAgeDetailsRequest, AudienceAgeDto>>();
+        var list = await listQuery.QueryAsync(new GetAudienceAgeListRequest(), CancellationToken.None);
+        var detail = await detailQuery.QueryAsync(new GetAudienceAgeDetailsRequest { Id = 8 }, CancellationToken.None);
+        var missing = await detailQuery.QueryAsync(new GetAudienceAgeDetailsRequest { Id = 999 }, CancellationToken.None);
+        sources[0].MinAge = 21;
         sources.Clear();
-        await Assert.That(list.Select(item => item.Id).ToArray()).IsEquivalentTo(new[] { 8, 2 });
+        await Assert.That(detail).IsEqualTo(new AudienceAgeDto { Id = 8, MasterCode = "ADULT", FullName = "Adults", MinAge = 18 });
+        await Assert.That(list.Select(item => item.Id).SequenceEqual([8, 2])).IsTrue();
         await Assert.That(list[0].MinAge).IsEqualTo(18);
         await Assert.That(list[1].MaxAge).IsNull();
         await Assert.That(missing).IsNull();

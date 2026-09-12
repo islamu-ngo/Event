@@ -2,11 +2,11 @@ using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.AudienceAge;
 using Explore.Application.Features.AudienceAges.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.AudienceAges.Handlers.Queries;
 
-public class GetAudienceAgeDetailsRequestHandler : IRequestHandler<GetAudienceAgeDetailsRequest, AudienceAgeDto>
+public class GetAudienceAgeDetailsRequestHandler : IQueryHandler<GetAudienceAgeDetailsRequest, AudienceAgeDto>
 {
     private readonly IAudienceAgeRepository _audienceAgeRepository;
 
@@ -15,9 +15,9 @@ public class GetAudienceAgeDetailsRequestHandler : IRequestHandler<GetAudienceAg
         _audienceAgeRepository = audienceAgeRepository;
     }
 
-    public async Task<AudienceAgeDto> Handle(GetAudienceAgeDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<AudienceAgeDto> QueryAsync(GetAudienceAgeDetailsRequest query, CancellationToken cancellationToken)
     {
-        var audienceAge = await _audienceAgeRepository.GetById(request.Id);
+        var audienceAge = await _audienceAgeRepository.GetById(query.Id);
         if (audienceAge == null)
         {
             return null;

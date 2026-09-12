@@ -1,8 +1,8 @@
 using Explore.Application.DTOs.AudienceAge;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.AudienceAges.Requests.Queries;
 
-public sealed record GetAudienceAgeListRequest : IRequest<List<AudienceAgeListDto>>
+public sealed record GetAudienceAgeListRequest : IQuery<List<AudienceAgeListDto>>
 {
 }

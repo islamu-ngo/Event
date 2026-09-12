@@ -1,0 +1,33 @@
+# Member and invitation projection correction and reviewed release impacts.
+Change-Id: CHG-01M29EMWZDGE9TPEC8J83EKZE0
+Title: "Preserve member labels when organization profiles are missing"
+Type: fix
+Scope: access
+Summary: "Member and invitation projections return an absent organization name instead of failing when organization PII is missing."
+Group: organization-profile-mapping
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/api-reference/README.md
+    Disposition: not-applicable
+    Detail: Supported successful DTO shapes and values are unchanged.
+  Security:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: documented
+    Detail: Missing organization PII remains absent. Participation-derived invitation identity, role values and membership authority are preserved.
+  Migration:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: No schema or persisted-data migration.
+  Configuration:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: No configuration or secret changes.
+  OpenAPI:
+    Reference: docs/public/api-reference/README.md
+    Disposition: documented
+    Detail: Member and invitation organization names can be null instead of causing a mapping failure when the organization profile is absent. Routes and schema shapes are unchanged.
+  Operator:
+    Reference: docs/public/api-reference/README.md
+    Disposition: documented
+    Detail: Integrators should render missing organization labels without inferring revoked membership or restored profile data.

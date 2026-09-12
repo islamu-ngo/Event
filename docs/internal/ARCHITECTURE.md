@@ -369,6 +369,11 @@ and contact fields instead of a mapping exception. It never reconstructs PII.
 Existing repository visibility, handler-owned participation overrides, identity
 enrichment and creation authority remain unchanged.
 
+Organization-member and invitation projections use the same absent-PII rule for
+organization names. Participation-derived invitation identity and role values
+remain intact; projecting a missing name neither reconstructs PII nor changes
+membership authority.
+
 ## AT Protocol Ownership
 
 1. `Explore.Blazor` owns CarpaNet confidential-client OAuth, protected single-use state, canonical callback/handoff, and the server cookie. PDS credentials and private key material never enter the browser.

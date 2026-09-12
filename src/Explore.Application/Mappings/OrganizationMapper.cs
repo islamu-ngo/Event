@@ -1,6 +1,8 @@
 using Explore.Application.DTOs.Group;
 using Explore.Application.DTOs.GroupMember;
 using Explore.Application.DTOs.Organization;
+using Explore.Application.DTOs.OrganizationMember;
+using Explore.Domain.Enums;
 using Explore.Domain;
 using Riok.Mapperly.Abstractions;
 
@@ -154,6 +156,53 @@ public static partial class OrganizationMapper
     [MapProperty(nameof(Organization.Actor), nameof(OrganizationListDto.ActorBackgroundEffect), Use = nameof(BackgroundEffect))]
     [MapProperty(nameof(Organization.Actor), nameof(OrganizationListDto.ActorBannerColor), Use = nameof(BannerColor))]
     public static partial OrganizationListDto ToOrganizationListItem(Organization source);
+
+    // Member detail retains tenant identity but not participation identifiers, navigation graphs or audit state.
+    [MapperIgnoreSource(nameof(OrganizationMember.OrganizationTenantId))]
+    [MapperIgnoreSource(nameof(OrganizationMember.Tenant))]
+    [MapperIgnoreSource(nameof(OrganizationMember.CreatedAt))]
+    [MapperIgnoreSource(nameof(OrganizationMember.CreatedBy))]
+    [MapperIgnoreSource(nameof(OrganizationMember.UpdatedAt))]
+    [MapperIgnoreSource(nameof(OrganizationMember.UpdatedBy))]
+    [MapperIgnoreSource(nameof(OrganizationMember.IsDeleted))]
+    [MapperIgnoreSource(nameof(OrganizationMember.DeletedAt))]
+    [MapperIgnoreSource(nameof(OrganizationMember.DeletedBy))]
+    // Unlike invitations, the old member detail did not populate OrganizationId.
+    [MapperIgnoreTarget(nameof(OrganizationMemberDto.OrganizationId))]
+    [MapProperty(nameof(OrganizationMember.OrganizationTenant), nameof(OrganizationMemberDto.OrganizationFullName), Use = nameof(ParticipationOrganizationName))]
+    [MapProperty(nameof(OrganizationMember.User), nameof(OrganizationMemberDto.UserEmail), Use = nameof(MemberEmail))]
+    [MapProperty(nameof(OrganizationMember.User), nameof(OrganizationMemberDto.UserFullName), Use = nameof(MemberName))]
+    [MapProperty(nameof(OrganizationMember.Role), nameof(OrganizationMemberDto.RoleName), Use = nameof(RoleName))]
+    [MapProperty(nameof(OrganizationMember.OrganizationPosition), nameof(OrganizationMemberDto.OrganizationPositionFullName), Use = nameof(OrganizationPositionName))]
+    public static partial OrganizationMemberDto ToOrganizationMember(OrganizationMember source);
+
+    // Invitations have a separate minimal disclosure contract and take the organization identity from participation.
+    [MapperIgnoreSource(nameof(OrganizationMember.OrganizationTenantId))]
+    [MapperIgnoreSource(nameof(OrganizationMember.UserId))]
+    [MapperIgnoreSource(nameof(OrganizationMember.Role))]
+    [MapperIgnoreSource(nameof(OrganizationMember.OrganizationPositionId))]
+    [MapperIgnoreSource(nameof(OrganizationMember.OrganizationPosition))]
+    [MapperIgnoreSource(nameof(OrganizationMember.TenantId))]
+    [MapperIgnoreSource(nameof(OrganizationMember.Tenant))]
+    [MapperIgnoreSource(nameof(OrganizationMember.CreatedAt))]
+    [MapperIgnoreSource(nameof(OrganizationMember.CreatedBy))]
+    [MapperIgnoreSource(nameof(OrganizationMember.UpdatedAt))]
+    [MapperIgnoreSource(nameof(OrganizationMember.UpdatedBy))]
+    [MapperIgnoreSource(nameof(OrganizationMember.IsDeleted))]
+    [MapperIgnoreSource(nameof(OrganizationMember.DeletedAt))]
+    [MapperIgnoreSource(nameof(OrganizationMember.DeletedBy))]
+    [MapProperty(nameof(OrganizationMember.OrganizationTenant), nameof(OrganizationInvitationDto.OrganizationId), Use = nameof(ParticipationOrganizationId))]
+    [MapProperty(nameof(OrganizationMember.OrganizationTenant), nameof(OrganizationInvitationDto.OrganizationName), Use = nameof(InvitationOrganizationName))]
+    [MapProperty(nameof(OrganizationMember.User), nameof(OrganizationInvitationDto.Email), Use = nameof(InvitationEmail))]
+    [MapProperty(nameof(OrganizationMember.RoleId), nameof(OrganizationInvitationDto.Role), Use = nameof(InvitationRole))]
+    public static partial OrganizationInvitationDto ToOrganizationInvitation(OrganizationMember source);
+
+    private static string? ParticipationOrganizationName(OrganizationTenant? participation) => participation?.Organization?.Pii?.FullName;
+    private static string? OrganizationPositionName(OrganizationPosition? position) => position?.FullName;
+    private static Guid ParticipationOrganizationId(OrganizationTenant? participation) => participation?.OrganizationId ?? Guid.Empty;
+    private static string InvitationOrganizationName(OrganizationTenant? participation) => ParticipationOrganizationName(participation)!;
+    private static string InvitationEmail(User? user) => MemberEmail(user)!;
+    private static RoleEnum InvitationRole(int roleId) => (RoleEnum)roleId;
 
     // Preserve runtime nulls despite the DTO's required non-nullable declarations.
     private static string OrganizationName(OrganizationPii? pii) => (pii?.FullName)!;

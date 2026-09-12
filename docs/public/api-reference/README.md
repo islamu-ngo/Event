@@ -67,4 +67,8 @@ can be null instead of causing a response failure. Existing authorized
 tenant-participation overrides still apply. Do not infer erasure status or a change
 in access rights from a missing field; no erased profile is recreated.
 
+Organization names in member and invitation responses can likewise be null when
+that organization's profile is absent. Invitation identity and role values remain
+available under the existing access rules.
+
 Continue with [HAL/REST Contract](readme/hal-rest.md) and [API Cookbook](readme/api-cookbook.md).

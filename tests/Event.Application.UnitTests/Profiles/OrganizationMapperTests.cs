@@ -250,6 +250,68 @@ public sealed class OrganizationMapperTests
         return organization;
     }
 
+    [Test]
+    public async Task OrganizationMembersAndInvitations_KeepDistinctDisclosureAndParticipationAuthority()
+    {
+        var member = new OrganizationMember
+        {
+            Id = ActorId, OrganizationTenantId = Stamp, OrganizationTenant = CreateOrganization().TenantParticipations.Single(),
+            UserId = ActorId, User = CreateUser(), RoleId = 7, Role = new Role { FullName = "Administrator", MasterCode = "PRIVATE_ROLE_CODE" },
+            OrganizationPositionId = 4, OrganizationPosition = new OrganizationPosition { FullName = "Coordinator", MasterCode = "PRIVATE_POSITION_CODE" },
+            TenantId = TenantId, Tenant = null!, CreatedBy = Stamp, IsDeleted = true
+        };
+        var store = new OrganizationMappingHandlerTests.OrganizationMemberStore([member]);
+        var detail = new Explore.Application.Features.OrganizationMembers.Handlers.Queries.GetOrganizationMemberDetailsRequestHandler(store);
+        var list = new Explore.Application.Features.OrganizationMembers.Handlers.Queries.GetOrganizationMembersRequestHandler(store);
+        var invites = new Explore.Application.Features.OrganizationMembers.Handlers.Queries.GetMyInvitationsRequestHandler(store);
+        var dto = (await detail.Handle(new Explore.Application.Features.OrganizationMembers.Requests.Queries.GetOrganizationMemberDetailsRequest { Id = ActorId }, default))!;
+        await Assert.That(dto.Id).IsEqualTo(ActorId);
+        await Assert.That(dto.TenantId).IsEqualTo(TenantId);
+        await Assert.That(dto.OrganizationId).IsEqualTo(Guid.Empty);
+        await Assert.That(dto.OrganizationFullName).IsEqualTo("Community organization");
+        await Assert.That(dto.UserId).IsEqualTo(ActorId);
+        await Assert.That(dto.UserEmail).IsEqualTo("member@example.test");
+        await Assert.That(dto.UserFullName).IsEqualTo("Member Name");
+        await Assert.That(dto.RoleId).IsEqualTo(7);
+        await Assert.That(dto.RoleName).IsEqualTo("Administrator");
+        await Assert.That(dto.OrganizationPositionId).IsEqualTo(4);
+        await Assert.That(dto.OrganizationPositionFullName).IsEqualTo("Coordinator");
+        await AssertFields(dto, "id", "tenantId", "organizationId", "organizationFullName", "userId", "userEmail", "userFullName", "roleId", "roleName", "organizationPositionId", "organizationPositionFullName");
+        var items = await list.Handle(new Explore.Application.Features.OrganizationMembers.Requests.Queries.GetOrganizationMembersRequest { OrganizationId = Id }, default);
+        await Assert.That(items.Single()).IsEqualTo(dto);
+        await Assert.That(await detail.Handle(new Explore.Application.Features.OrganizationMembers.Requests.Queries.GetOrganizationMemberDetailsRequest { Id = TenantId }, default)).IsNull();
+        var invitations = await invites.Handle(new Explore.Application.Features.OrganizationMembers.Requests.Queries.GetMyInvitationsRequest { Email = "member@example.test" }, default);
+        var invitation = invitations.Single();
+        await Assert.That(invitation.Id).IsEqualTo(ActorId);
+        await Assert.That(invitation.OrganizationId).IsEqualTo(Id);
+        await Assert.That(invitation.OrganizationName).IsEqualTo("Community organization");
+        await Assert.That((int)invitation.Role).IsEqualTo(7);
+        await Assert.That(invitation.Email).IsEqualTo("member@example.test");
+        await AssertFields(invitation, "id", "organizationId", "organizationName", "role", "email");
+        await Assert.That(await invites.Handle(new Explore.Application.Features.OrganizationMembers.Requests.Queries.GetMyInvitationsRequest { Email = "other@example.test" }, default)).IsEmpty();
+        store.Items.Clear();
+        member.OrganizationTenant.Organization.Pii = null!;
+        member.User.Pii = null!;
+        member.Role = null!;
+        member.OrganizationPosition = null;
+        member.RoleId = 999;
+        var erased = OrganizationMapper.ToOrganizationMember(member);
+        await Assert.That(erased.OrganizationFullName).IsNull();
+        await Assert.That(erased.UserEmail).IsNull();
+        await Assert.That(erased.UserFullName).IsNull();
+        await Assert.That(erased.RoleName).IsNull();
+        await Assert.That(erased.OrganizationPositionFullName).IsNull();
+        await Assert.That(OrganizationMapper.ToOrganizationInvitation(member).Email).IsNull();
+        await Assert.That(OrganizationMapper.ToOrganizationInvitation(member).OrganizationName).IsNull();
+        await Assert.That((int)OrganizationMapper.ToOrganizationInvitation(member).Role).IsEqualTo(999);
+        member.OrganizationTenant = null!;
+        member.User = null!;
+        await Assert.That(OrganizationMapper.ToOrganizationInvitation(member).OrganizationId).IsEqualTo(Guid.Empty);
+        await Assert.That(OrganizationMapper.ToOrganizationMember(member).UserFullName).IsNull();
+        await Assert.That(items.Single().UserFullName).IsEqualTo("Member Name");
+        await Assert.That(invitations.Single().OrganizationName).IsEqualTo("Community organization");
+    }
+
     internal static User CreateUser() => new()
     {
         Id = ActorId, Pii = new UserPii { Email = "member@example.test", FirstName = "Member", LastName = "Name" },

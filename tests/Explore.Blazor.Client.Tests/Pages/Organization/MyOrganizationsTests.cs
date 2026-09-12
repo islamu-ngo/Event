@@ -43,7 +43,7 @@ public class MyOrganizationsTests : IDisposable
         await Assert.That(cut.Markup).Contains("Loading your organizations...");
 
         // Cleanup
-        pending.TrySetResult(new List<OrganizationListDto>());
+        await cut.InvokeAsync(() => pending.TrySetResult(new List<OrganizationListDto>()));
     }
 
     [Test]
@@ -55,7 +55,6 @@ public class MyOrganizationsTests : IDisposable
 
         // Act
         var cut = _ctx.RenderMudComponent<MyOrganizations>();
-        cut.WaitForState(() => cut.Markup.Contains("No organizations yet", StringComparison.OrdinalIgnoreCase), TimeSpan.FromSeconds(3));
 
         // Assert
         await Assert.That(cut.Markup).Contains("No organizations yet");
@@ -72,7 +71,6 @@ public class MyOrganizationsTests : IDisposable
 
         // Act
         var cut = _ctx.RenderMudComponent<MyOrganizations>();
-        cut.WaitForState(() => cut.Markup.Contains("Unable to load your organizations", StringComparison.OrdinalIgnoreCase), TimeSpan.FromSeconds(3));
 
         // Assert
         await Assert.That(cut.Markup).Contains("Unable to load your organizations. Please try again.");
@@ -101,10 +99,27 @@ public class MyOrganizationsTests : IDisposable
 
         // Act
         var cut = _ctx.RenderMudComponent<MyOrganizations>();
-        cut.WaitForState(() => cut.Markup.Contains("Community Hub", StringComparison.OrdinalIgnoreCase), TimeSpan.FromSeconds(3));
 
         // Assert
         await Assert.That(cut.Markup).Contains("Community Hub");
         await Assert.That(cut.Markup).Contains("1 organization(s)");
+    }
+
+    [Test]
+    public async Task Search_WithAbsentProfileLabels_FiltersWithoutThrowing()
+    {
+        _organizationService.GetMyOrganizationsAsync().Returns(new List<OrganizationListDto>
+        {
+            new() { Id = Guid.CreateVersion7(), FullName = null, Email = null },
+            new() { Id = Guid.CreateVersion7(), FullName = "Search match", Email = "match@example.test" }
+        });
+        var cut = _ctx.RenderMudComponent<MyOrganizations>();
+        var search = cut.FindComponent<MudTextField<string>>();
+
+        await cut.InvokeAsync(() => search.Instance.ValueChanged.InvokeAsync("Search match"));
+        cut.Render();
+
+        await Assert.That(cut.FindComponents<MudCard>().Count).IsEqualTo(1);
+        await Assert.That(cut.Markup).Contains("Search match");
     }
 }

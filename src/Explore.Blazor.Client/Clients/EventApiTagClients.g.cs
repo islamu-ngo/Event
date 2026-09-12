@@ -162576,8 +162576,7 @@ namespace Explore.Blazor.Client.Clients
         public int? ApprovalStatusId { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("approvalStatusFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string ApprovalStatusFullName { get; init; } = default!;
+        public string? ApprovalStatusFullName { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("createdAt")]
         public System.DateTimeOffset? CreatedAt { get; init; } = default!;
@@ -172498,8 +172497,7 @@ namespace Explore.Blazor.Client.Clients
         public int? ApprovalStatusId { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("approvalStatusFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string ApprovalStatusFullName { get; set; } = default!;
+        public string? ApprovalStatusFullName { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("createdAt")]
         public System.DateTimeOffset? CreatedAt { get; set; } = default!;
@@ -174172,31 +174170,25 @@ namespace Explore.Blazor.Client.Clients
         public System.Guid? ConcurrencyStamp { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("fullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string FullName { get; set; } = default!;
+        public string? FullName { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("websiteUrl")]
         public string? WebsiteUrl { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("email")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Email { get; set; } = default!;
+        public string? Email { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("country")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Country { get; set; } = default!;
+        public string? Country { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("city")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string City { get; set; } = default!;
+        public string? City { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("postcode")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Postcode { get; set; } = default!;
+        public string? Postcode { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("address")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Address { get; set; } = default!;
+        public string? Address { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("approvalStatusId")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
@@ -174287,39 +174279,32 @@ namespace Explore.Blazor.Client.Clients
         public System.Guid? TenantId { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("fullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string FullName { get; set; } = default!;
+        public string? FullName { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("websiteUrl")]
         public string? WebsiteUrl { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("email")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Email { get; set; } = default!;
+        public string? Email { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("country")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Country { get; set; } = default!;
+        public string? Country { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("city")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string City { get; set; } = default!;
+        public string? City { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("postcode")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Postcode { get; set; } = default!;
+        public string? Postcode { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("address")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Address { get; set; } = default!;
+        public string? Address { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("approvalStatusId")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
         public int? ApprovalStatusId { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("approvalStatusFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string ApprovalStatusFullName { get; set; } = default!;
+        public string? ApprovalStatusFullName { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("statusTypeFullName")]
         public string? StatusTypeFullName { get; set; } = default!;
@@ -185262,31 +185247,25 @@ namespace Explore.Blazor.Client.Clients
         public System.Guid? ConcurrencyStamp { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("fullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string FullName { get; init; } = default!;
+        public string? FullName { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("websiteUrl")]
         public string? WebsiteUrl { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("email")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Email { get; init; } = default!;
+        public string? Email { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("country")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Country { get; init; } = default!;
+        public string? Country { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("city")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string City { get; init; } = default!;
+        public string? City { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("postcode")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Postcode { get; init; } = default!;
+        public string? Postcode { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("address")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Address { get; init; } = default!;
+        public string? Address { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("approvalStatusId")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
@@ -185367,16 +185346,14 @@ namespace Explore.Blazor.Client.Clients
         public System.Guid? OrganizationId { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("organizationName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string OrganizationName { get; init; } = default!;
+        public string? OrganizationName { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("role")]
         [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<RoleEnum>))]
         public RoleEnum? Role { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("email")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Email { get; init; } = default!;
+        public string? Email { get; init; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -185408,39 +185385,32 @@ namespace Explore.Blazor.Client.Clients
         public System.Guid? TenantId { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("fullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string FullName { get; init; } = default!;
+        public string? FullName { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("websiteUrl")]
         public string? WebsiteUrl { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("email")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Email { get; init; } = default!;
+        public string? Email { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("country")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Country { get; init; } = default!;
+        public string? Country { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("city")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string City { get; init; } = default!;
+        public string? City { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("postcode")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Postcode { get; init; } = default!;
+        public string? Postcode { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("address")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Address { get; init; } = default!;
+        public string? Address { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("approvalStatusId")]
         [System.ComponentModel.DataAnnotations.RegularExpression(@"^-?(?:0|[1-9]\d*)$")]
         public int? ApprovalStatusId { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("approvalStatusFullName")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string ApprovalStatusFullName { get; init; } = default!;
+        public string? ApprovalStatusFullName { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("statusTypeFullName")]
         public string? StatusTypeFullName { get; init; } = default!;

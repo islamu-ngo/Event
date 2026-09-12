@@ -97,7 +97,7 @@
             <div class="pa-6 border-b-1 mud-border-lines-default bg-surface">
                 <div class="d-flex align-center gap-4">
                     <MudAvatar Color="Color.Primary" Size="Size.Large" Variant="Variant.Filled" Rounded="true">
-                        @organization.FullName.Substring(0, 1).ToUpper()
+                        @(string.IsNullOrEmpty(organization.FullName) ? "O" : organization.FullName[..1].ToUpper())
                     </MudAvatar>
                     <div>
                         <div class="d-flex align-center gap-3">

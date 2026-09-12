@@ -97,4 +97,10 @@ Organization names in member and invitation responses can likewise be null when
 that organization's profile is absent. Invitation identity and role values remain
 available under the existing access rules.
 
+The schema and generated clients explicitly represent these optional contact and
+invitation labels, as well as unresolved organization/group approval names, as
+nullable. Required field presence and existing values are unchanged.
+Organization pages handle missing labels in search, avatars and edit forms;
+the existing validation and server-provided action links still apply.
+
 Continue with [HAL/REST Contract](readme/hal-rest.md) and [API Cookbook](readme/api-cookbook.md).

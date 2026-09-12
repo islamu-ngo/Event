@@ -194,8 +194,8 @@ public static partial class OrganizationMapper
     [MapperIgnoreSource(nameof(OrganizationMember.DeletedAt))]
     [MapperIgnoreSource(nameof(OrganizationMember.DeletedBy))]
     [MapProperty(nameof(OrganizationMember.OrganizationTenant), nameof(OrganizationInvitationDto.OrganizationId), Use = nameof(ParticipationOrganizationId))]
-    [MapProperty(nameof(OrganizationMember.OrganizationTenant), nameof(OrganizationInvitationDto.OrganizationName), Use = nameof(InvitationOrganizationName))]
-    [MapProperty(nameof(OrganizationMember.User), nameof(OrganizationInvitationDto.Email), Use = nameof(InvitationEmail))]
+    [MapProperty(nameof(OrganizationMember.OrganizationTenant), nameof(OrganizationInvitationDto.OrganizationName), Use = nameof(ParticipationOrganizationName))]
+    [MapProperty(nameof(OrganizationMember.User), nameof(OrganizationInvitationDto.Email), Use = nameof(MemberEmail))]
     [MapProperty(nameof(OrganizationMember.RoleId), nameof(OrganizationInvitationDto.Role), Use = nameof(InvitationRole))]
     public static partial OrganizationInvitationDto ToOrganizationInvitation(OrganizationMember source);
 
@@ -222,17 +222,15 @@ public static partial class OrganizationMapper
     private static string? ParticipationOrganizationName(OrganizationTenant? participation) => participation?.Organization?.Pii?.FullName;
     private static string? OrganizationPositionName(OrganizationPosition? position) => position?.FullName;
     private static Guid ParticipationOrganizationId(OrganizationTenant? participation) => participation?.OrganizationId ?? Guid.Empty;
-    private static string InvitationOrganizationName(OrganizationTenant? participation) => ParticipationOrganizationName(participation)!;
-    private static string InvitationEmail(User? user) => MemberEmail(user)!;
     private static RoleEnum InvitationRole(int roleId) => (RoleEnum)roleId;
 
-    // Preserve runtime nulls despite the DTO's required non-nullable declarations.
-    private static string OrganizationName(OrganizationPii? pii) => (pii?.FullName)!;
-    private static string OrganizationEmail(OrganizationPii? pii) => (pii?.Email)!;
-    private static string OrganizationCountry(OrganizationPii? pii) => (pii?.Country)!;
-    private static string OrganizationCity(OrganizationPii? pii) => (pii?.City)!;
-    private static string OrganizationPostcode(OrganizationPii? pii) => (pii?.Postcode)!;
-    private static string OrganizationAddress(OrganizationPii? pii) => (pii?.Address)!;
+    // Absent PII remains absent in every contact projection.
+    private static string? OrganizationName(OrganizationPii? pii) => pii?.FullName;
+    private static string? OrganizationEmail(OrganizationPii? pii) => pii?.Email;
+    private static string? OrganizationCountry(OrganizationPii? pii) => pii?.Country;
+    private static string? OrganizationCity(OrganizationPii? pii) => pii?.City;
+    private static string? OrganizationPostcode(OrganizationPii? pii) => pii?.Postcode;
+    private static string? OrganizationAddress(OrganizationPii? pii) => pii?.Address;
 
     private static string? GroupName(GroupTenant? participation) => participation?.Group?.FullName;
     private static string? MemberEmail(User? user) => user?.Pii?.Email;
@@ -247,6 +245,6 @@ public static partial class OrganizationMapper
     private static string? BackgroundColor(Actor? actor) => actor?.BackgroundColor;
     private static string? BackgroundEffect(Actor? actor) => actor?.BackgroundEffect;
     private static string? BannerColor(Actor? actor) => actor?.BannerColor;
-    // Existing transport contract has a required CLR string whose unresolved runtime value is null.
-    private static string UnresolvedApprovalName() => null!;
+    // Approval labels are unresolved in these base projections.
+    private static string? UnresolvedApprovalName() => null;
 }

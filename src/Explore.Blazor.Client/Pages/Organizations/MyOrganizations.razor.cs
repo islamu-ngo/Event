@@ -30,8 +30,8 @@ public partial class MyOrganizations : ComponentBase
     private IEnumerable<OrganizationListDto> FilteredOrganizations =>
         _organizations?
             .Where(x => string.IsNullOrWhiteSpace(_searchString) ||
-                        x.FullName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
-                        x.Email.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+                        x.FullName?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true ||
+                        x.Email?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true)
         ?? Enumerable.Empty<OrganizationListDto>();
 
     protected override async Task OnInitializedAsync()

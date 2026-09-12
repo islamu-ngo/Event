@@ -125290,7 +125290,10 @@
             "format": "int32"
           },
           "approvalStatusFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "createdAt": {
             "type": "string",
@@ -139298,7 +139301,10 @@
             "format": "int32"
           },
           "approvalStatusFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "createdAt": {
             "type": "string",
@@ -143632,7 +143638,10 @@
             "format": "uuid"
           },
           "fullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "websiteUrl": {
             "type": [
@@ -143641,19 +143650,34 @@
             ]
           },
           "email": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "country": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "city": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "postcode": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "address": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "approvalStatusId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -143802,7 +143826,10 @@
             "format": "uuid"
           },
           "fullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "websiteUrl": {
             "type": [
@@ -143811,19 +143838,34 @@
             ]
           },
           "email": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "country": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "city": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "postcode": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "address": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "approvalStatusId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -143834,7 +143876,10 @@
             "format": "int32"
           },
           "approvalStatusFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "statusTypeFullName": {
             "type": [
@@ -158908,7 +158953,10 @@
             "format": "uuid"
           },
           "fullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "websiteUrl": {
             "type": [
@@ -158917,19 +158965,34 @@
             ]
           },
           "email": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "country": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "city": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "postcode": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "address": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "approvalStatusId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -159055,13 +159118,19 @@
             "format": "uuid"
           },
           "organizationName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "role": {
             "$ref": "#/components/schemas/RoleEnum"
           },
           "email": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -159090,7 +159159,10 @@
             "format": "uuid"
           },
           "fullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "websiteUrl": {
             "type": [
@@ -159099,19 +159171,34 @@
             ]
           },
           "email": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "country": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "city": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "postcode": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "address": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "approvalStatusId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -159122,7 +159209,10 @@
             "format": "int32"
           },
           "approvalStatusFullName": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "statusTypeFullName": {
             "type": [

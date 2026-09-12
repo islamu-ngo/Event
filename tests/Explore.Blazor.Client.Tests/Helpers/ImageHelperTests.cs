@@ -5,6 +5,17 @@ namespace Explore.Blazor.Client.Tests.Helpers;
 public class ImageHelperTests
 {
     [Test]
+    public async Task OrganizationPlaceholder_WithAbsentName_RemainsAValidLocalImage()
+    {
+        var result = ImageHelper.GetOrganizationPlaceholder(null, null);
+        var image = System.Xml.Linq.XDocument.Parse(DecodeSvg(result));
+
+        await Assert.That(result).StartsWith("data:image/svg+xml;utf8,");
+        await Assert.That(image.Root!.Name.LocalName).IsEqualTo("svg");
+        await Assert.That(string.IsNullOrWhiteSpace(image.Root.Attribute("aria-label")?.Value)).IsFalse();
+    }
+
+    [Test]
     public async Task GetEventImageUrl_ReturnsFeaturedImage_WhenProvided()
     {
         const string featuredImageUri = "https://cdn.example.test/event.jpg";

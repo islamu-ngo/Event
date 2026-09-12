@@ -415,6 +415,16 @@ organization names. Participation-derived invitation identity and role values
 remain intact; projecting a missing name neither reconstructs PII nor changes
 membership authority.
 
+Contact, invitation and unresolved list-approval labels are explicitly nullable
+in the DTOs and generated contracts. The organization list's existing approval
+alias carries the same nullable value. These annotations preserve the existing
+response values without mapper null-forgiving conversions or reconstructed PII.
+
+Organization client search treats absent names/emails as non-matches. Avatars use
+existing organization fallback labels, and editable text models use their normal
+empty-field defaults. HAL still controls edit affordances; empty form values must
+pass the existing validation before any write.
+
 ## AT Protocol Ownership
 
 1. `Explore.Blazor` owns CarpaNet confidential-client OAuth, protected single-use state, canonical callback/handoff, and the server cookie. PDS credentials and private key material never enter the browser.

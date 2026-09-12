@@ -11,17 +11,17 @@ public sealed record OrganizationListDto
     public Guid Id { get; init; }
     public Guid ConcurrencyStamp { get; init; }
     public Guid TenantId { get; init; }
-    public required string FullName { get; init; }
+    public required string? FullName { get; init; }
     public string? WebsiteUrl { get; init; }
-    public required string Email { get; init; }
-    public required string Country { get; init; }
-    public required string City { get; init; }
-    public required string Postcode { get; init; }
-    public required string Address { get; init; }
+    public required string? Email { get; init; }
+    public required string? Country { get; init; }
+    public required string? City { get; init; }
+    public required string? Postcode { get; init; }
+    public required string? Address { get; init; }
 
     public int ApprovalStatusId { get; init; }
-    public required string ApprovalStatusFullName { get; init; }
-    public string StatusTypeFullName => ApprovalStatusFullName; // Alias for backward compatibility
+    public required string? ApprovalStatusFullName { get; init; }
+    public string? StatusTypeFullName => ApprovalStatusFullName; // Alias for backward compatibility
     public DateTime CreatedAt { get; init; }
     public int? CurrentUserRoleId { get; set; }
 

@@ -11,7 +11,7 @@ public sealed record GroupListDto
     public string? Description { get; init; }
 
     public int ApprovalStatusId { get; init; }
-    public required string ApprovalStatusFullName { get; init; }
+    public required string? ApprovalStatusFullName { get; init; }
     public DateTime CreatedAt { get; init; }
     public int? CurrentUserRoleId { get; set; }
 

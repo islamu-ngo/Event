@@ -1,7 +1,10 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Reflection;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Group;
+using Explore.Application.DTOs.Organization;
+using Explore.Application.DTOs.OrganizationMember;
 using Explore.Application.Mappings;
 using Explore.Domain;
 using Explore.Domain.ValueObjects;
@@ -16,6 +19,37 @@ public sealed class OrganizationMapperTests
     internal static readonly Guid Stamp = Guid.Parse("01900000-0000-7000-8000-000000000004");
     internal static readonly DateTime CreatedAt = new(2026, 9, 1, 12, 0, 0, DateTimeKind.Utc);
     internal static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    [Test]
+    [Arguments(typeof(OrganizationDto))]
+    [Arguments(typeof(OrganizationListDto))]
+    public async Task ContactLabels_DeclareTheirExistingNullableOutputContract(Type contract)
+    {
+        string[] labels =
+        [
+            nameof(OrganizationDto.FullName), nameof(OrganizationDto.Email),
+            nameof(OrganizationDto.Country), nameof(OrganizationDto.City),
+            nameof(OrganizationDto.Postcode), nameof(OrganizationDto.Address)
+        ];
+        var nullability = new NullabilityInfoContext();
+        foreach (var label in labels)
+        {
+            await Assert.That(nullability.Create(contract.GetProperty(label)!).ReadState)
+                .IsEqualTo(NullabilityState.Nullable);
+        }
+    }
+
+    [Test]
+    [Arguments(typeof(OrganizationInvitationDto), nameof(OrganizationInvitationDto.OrganizationName))]
+    [Arguments(typeof(OrganizationInvitationDto), nameof(OrganizationInvitationDto.Email))]
+    [Arguments(typeof(OrganizationListDto), nameof(OrganizationListDto.ApprovalStatusFullName))]
+    [Arguments(typeof(OrganizationListDto), nameof(OrganizationListDto.StatusTypeFullName))]
+    [Arguments(typeof(GroupListDto), nameof(GroupListDto.ApprovalStatusFullName))]
+    public async Task OptionalLabels_DeclareTheirExistingNullableOutputContract(Type contract, string label)
+    {
+        await Assert.That(new NullabilityInfoContext().Create(contract.GetProperty(label)!).ReadState)
+            .IsEqualTo(NullabilityState.Nullable);
+    }
 
     [Test]
     public async Task GroupDetail_PreservesDisclosureWithoutTraversingTenantCycles()

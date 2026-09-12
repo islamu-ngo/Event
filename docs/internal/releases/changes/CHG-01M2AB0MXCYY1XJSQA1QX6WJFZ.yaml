@@ -1,0 +1,33 @@
+# Organization contact and approval-label nullability.
+Change-Id: CHG-01M2AB0MXCYY1XJSQA1QX6WJFZ
+Title: "Reflect nullable organization projection labels"
+Type: fix
+Scope: access
+Summary: "Organization contracts describe existing null profile values, and client search, avatars and edit initialization handle missing labels without restoring PII or changing authority."
+Group: organization-projection-nullability
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/api-reference/README.md
+    Disposition: not-applicable
+    Detail: Existing response values, field names and required property presence remain unchanged.
+  Security:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: documented
+    Detail: Missing PII remains absent without changing identity, membership authority or tenant visibility.
+  Migration:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: No database migration.
+  Configuration:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: No configuration changes.
+  OpenAPI:
+    Reference: docs/public/api-reference/README.md
+    Disposition: documented
+    Detail: Organization contact, invitation and unresolved approval labels are nullable in raw and HAL schemas and generated clients.
+  Operator:
+    Reference: docs/public/api-reference/README.md
+    Disposition: documented
+    Detail: Organization search, avatars and edit forms tolerate absent labels without inferring erasure status or changed access rights.

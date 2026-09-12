@@ -3,13 +3,11 @@ using System.Net.Http.Json;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;
-using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Settings;
 using Explore.Application.Features.Settings.Requests.Commands;
 using Explore.Application.Features.Settings.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -433,18 +431,16 @@ public class SettingsControllerAuthenticatedTests
         await store.DidNotReceiveWithAnyArgs().EvictByTagAsync(default!, default);
     }
 
-    private static SettingsController CreateSettingsController(
+    private static TenantSettingsController CreateSettingsController(
         ICommandHandler<UpdateSettingCommand, BaseCommandResponse<Guid>>? update = null,
         ICommandHandler<UpdateSettingBatchCommand, BatchUpdateResponseDto>? batch = null) =>
-        new SettingsController(
-            Substitute.For<IMediator>(),
+        new TenantSettingsController(
             Substitute.For<IQueryHandler<ResolveSettingGroupQuery, SettingGroupResponseDto>>(),
             update ?? Substitute.For<ICommandHandler<UpdateSettingCommand, BaseCommandResponse<Guid>>>(),
             batch ?? Substitute.For<ICommandHandler<UpdateSettingBatchCommand, BatchUpdateResponseDto>>(),
             Substitute.For<ICommandHandler<ResetSettingCommand, BaseCommandResponse<Guid>>>(),
             Substitute.For<ICommandHandler<LockSettingCommand, BaseCommandResponse<Guid>>>(),
             Substitute.For<ICommandHandler<UnlockSettingCommand, BaseCommandResponse<Guid>>>(),
-            Substitute.For<IAdminContext>(),
             Substitute.For<IResourceAssembler<SettingGroupResponseDto, SettingGroupResponseDto>>())
         {
             ControllerContext = new ControllerContext

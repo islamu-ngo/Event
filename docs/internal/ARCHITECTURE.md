@@ -341,6 +341,11 @@ post-commit. `SettingsCapabilityControllerBase` shares only HTTP problem mapping
 it is not an operation dispatcher. Routes, operation IDs, response contracts,
 authentication classification and the `Settings` OpenAPI tag are preserved.
 
+`TenantSettingsController` owns tenant resolution, scalar/batch writes, reset and
+lock transitions through those same native ports. It retains the HAL assembler,
+private/no-store reads, strict batch default and successful-write shell eviction.
+No instance or email workflow dependency is injected into this capability.
+
 ## Tenant Role-Grant Projections
 
 `TenantUserRoleGrantMapper` emits separate detail and list disclosures without

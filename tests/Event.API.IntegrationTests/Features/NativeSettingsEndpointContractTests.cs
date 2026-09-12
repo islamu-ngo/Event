@@ -1,11 +1,13 @@
 using System.Reflection;
 using Explore.API.Attributes;
 using Explore.API.Controllers;
+using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Settings;
 using Explore.Application.Features.Settings.Requests.Commands;
 using Explore.Application.Features.Settings.Requests.Queries;
+using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -16,6 +18,64 @@ namespace Event.Api.IntegrationTests.Features;
 
 public sealed class NativeSettingsEndpointContractTests
 {
+    [Test]
+    public async Task TenantCapability_DeclaresOnlyNativeSettingsAndHalPorts()
+    {
+        Type[] expected =
+        [
+            typeof(IQueryHandler<ResolveSettingGroupQuery, SettingGroupResponseDto>),
+            typeof(ICommandHandler<UpdateSettingCommand, BaseCommandResponse<Guid>>),
+            typeof(ICommandHandler<UpdateSettingBatchCommand, BatchUpdateResponseDto>),
+            typeof(ICommandHandler<ResetSettingCommand, BaseCommandResponse<Guid>>),
+            typeof(ICommandHandler<LockSettingCommand, BaseCommandResponse<Guid>>),
+            typeof(ICommandHandler<UnlockSettingCommand, BaseCommandResponse<Guid>>),
+            typeof(IResourceAssembler<SettingGroupResponseDto, SettingGroupResponseDto>)
+        ];
+        var actual = typeof(TenantSettingsController).GetConstructors().Single()
+            .GetParameters().Select(parameter => parameter.ParameterType).ToArray();
+
+        await Assert.That(actual.SequenceEqual(expected)).IsTrue();
+    }
+
+    [Test]
+    public async Task TenantCapability_PreservesRoutesNamesAndPrivateReadMetadata()
+    {
+        var controller = typeof(TenantSettingsController);
+        await Assert.That(controller.GetCustomAttribute<RouteAttribute>()!.Template).IsEqualTo("api/settings");
+        await Assert.That(controller.GetCustomAttribute<AuthorizeAttribute>()).IsNotNull();
+        await Assert.That(controller.GetCustomAttribute<AllowAnonymousAttribute>()).IsNull();
+        await Assert.That(controller.GetCustomAttribute<EndpointClassificationAttribute>()).IsNotNull();
+        await Assert.That(controller.GetCustomAttribute<TagsAttribute>()!.Tags.SequenceEqual(["Settings"])).IsTrue();
+        await Assert.That(controller.GetMethod(nameof(TenantSettingsController.GetTenantSettings))!
+            .GetCustomAttribute<PrivateNoStoreAttribute>()).IsNotNull();
+
+        (string Method, string Verb, string Template, string Name)[] routes =
+        [
+            (nameof(TenantSettingsController.GetTenantSettings), "GET", "tenant/{category}", RouteNames.GetTenantScopedSettings),
+            (nameof(TenantSettingsController.UpdateTenantSettingsBatch), "PUT", "tenant/{category}", RouteNames.UpdateTenantSettingsBatch),
+            (nameof(TenantSettingsController.UpdateTenantSetting), "PUT", "tenant/keys/{key}", RouteNames.UpdateTenantSetting),
+            (nameof(TenantSettingsController.ResetTenantSetting), "DELETE", "tenant/keys/{key}", RouteNames.ResetTenantSetting),
+            (nameof(TenantSettingsController.LockTenantSetting), "POST", "tenant/keys/{key}/lock", RouteNames.LockTenantSetting),
+            (nameof(TenantSettingsController.UnlockTenantSetting), "DELETE", "tenant/keys/{key}/lock", RouteNames.UnlockTenantSetting)
+        ];
+        await Assert.That(controller.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly).Length)
+            .IsEqualTo(routes.Length);
+        foreach (var route in routes)
+        {
+            var method = controller.GetMethod(route.Method)!;
+            var attribute = method.GetCustomAttribute<HttpMethodAttribute>()!;
+            await Assert.That(attribute.HttpMethods.Single()).IsEqualTo(route.Verb);
+            await Assert.That(attribute.Template).IsEqualTo(route.Template);
+            await Assert.That(attribute.Name).IsEqualTo(route.Name);
+            int[] expectedStatuses = route.Verb == "GET"
+                ? [200, 401, 403]
+                : [200, 400, 401, 403, 409];
+            var statuses = method.GetCustomAttributes<ProducesResponseTypeAttribute>()
+                .Select(response => response.StatusCode).Order().ToArray();
+            await Assert.That(statuses.SequenceEqual(expectedStatuses)).IsTrue();
+        }
+    }
+
     [Test]
     public async Task UserCapability_DeclaresOnlyItsFourClosedNativePorts()
     {

@@ -1,7 +1,6 @@
 using System.Reflection;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;
-using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Settings;
 using Explore.Application.Features.Settings.Requests.Commands;
@@ -10,7 +9,6 @@ using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -44,24 +42,22 @@ public sealed class EventLocationGovernanceTests
     }
 
     [Test]
-    public async Task SettingsController_RemainsAuthenticatedForLocationGovernanceWrites()
+    public async Task TenantSettingsController_RemainsAuthenticatedForLocationGovernanceWrites()
     {
-        AuthorizeAttribute? authorize = typeof(SettingsController)
+        AuthorizeAttribute? authorize = typeof(TenantSettingsController)
             .GetCustomAttribute<AuthorizeAttribute>();
 
         await Assert.That(authorize).IsNotNull();
-        await Assert.That(typeof(SettingsController).GetCustomAttribute<AllowAnonymousAttribute>()).IsNull();
+        await Assert.That(typeof(TenantSettingsController).GetCustomAttribute<AllowAnonymousAttribute>()).IsNull();
     }
 
-    private static SettingsController CreateController(ICommandHandler<UpdateSettingCommand, BaseCommandResponse<Guid>> handler) => new(
-        Substitute.For<IMediator>(),
+    private static TenantSettingsController CreateController(ICommandHandler<UpdateSettingCommand, BaseCommandResponse<Guid>> handler) => new(
         Substitute.For<IQueryHandler<ResolveSettingGroupQuery, SettingGroupResponseDto>>(),
         handler,
         Substitute.For<ICommandHandler<UpdateSettingBatchCommand, BatchUpdateResponseDto>>(),
         Substitute.For<ICommandHandler<ResetSettingCommand, BaseCommandResponse<Guid>>>(),
         Substitute.For<ICommandHandler<LockSettingCommand, BaseCommandResponse<Guid>>>(),
         Substitute.For<ICommandHandler<UnlockSettingCommand, BaseCommandResponse<Guid>>>(),
-        Substitute.For<IAdminContext>(),
         Substitute.For<IResourceAssembler<SettingGroupResponseDto, SettingGroupResponseDto>>())
     {
         ControllerContext = new ControllerContext

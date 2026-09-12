@@ -186,7 +186,6 @@ public sealed class InstanceSettingGroupApiTests
             Substitute.For<IMediator>(),
             ports.Query,
             ports.Update,
-            Substitute.For<ICommandHandler<UpdateSettingBatchCommand, BatchUpdateResponseDto>>(),
             Substitute.For<ICommandHandler<ResetSettingCommand, BaseCommandResponse<Guid>>>(),
             ports.Lock,
             ports.Unlock,

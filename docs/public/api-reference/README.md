@@ -39,6 +39,8 @@ instance settings retain their separate administrator checks; selecting a route
 does not grant authority to change a higher scope. The settings implementation
 uses dedicated capability handlers without changing URLs, operation IDs,
 response formats or the `Settings` client group.
+Tenant setting reads remain private/no-store and retain server-provided HAL
+affordances; batch writes retain their strict default and existing conflict rules.
 
 ## Role-grant identity labels
 

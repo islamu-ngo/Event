@@ -24,7 +24,7 @@ public class CompleteTenantOnboardingCommandHandler : IRequestHandler<CompleteTe
     private readonly ITypedSettingsDocumentResolver _typedSettingsDocumentResolver;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IHierarchicalSettingsResolver _hierarchicalSettingsResolver;
-    private readonly IMediator _mediator;
+    private readonly IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> _notificationHandlers;
 
     public CompleteTenantOnboardingCommandHandler(
         ITenantContext tenantContext,
@@ -36,7 +36,7 @@ public class CompleteTenantOnboardingCommandHandler : IRequestHandler<CompleteTe
         ITypedSettingsDocumentResolver typedSettingsDocumentResolver,
         IUnitOfWork unitOfWork,
         IHierarchicalSettingsResolver hierarchicalSettingsResolver,
-        IMediator mediator)
+        IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers)
     {
         _tenantContext = tenantContext;
         _tenantOnboardingStateRepository = tenantOnboardingStateRepository;
@@ -47,7 +47,7 @@ public class CompleteTenantOnboardingCommandHandler : IRequestHandler<CompleteTe
         _typedSettingsDocumentResolver = typedSettingsDocumentResolver;
         _unitOfWork = unitOfWork;
         _hierarchicalSettingsResolver = hierarchicalSettingsResolver;
-        _mediator = mediator;
+        _notificationHandlers = notificationHandlers;
     }
 
     public async Task<BaseCommandResponse<Guid>> Handle(CompleteTenantOnboardingCommand request, CancellationToken cancellationToken)
@@ -133,7 +133,7 @@ public class CompleteTenantOnboardingCommandHandler : IRequestHandler<CompleteTe
             SettingsDocumentKeys.Tenant.DirectoryOperatorIdentity);
         foreach (SettingChangedNotification notification in outcome.Notifications)
         {
-            await _mediator.Publish(notification, cancellationToken);
+            await _notificationHandlers.HandleAsync(notification, cancellationToken);
         }
 
         return BaseCommandResponse.Success(

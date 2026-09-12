@@ -1,6 +1,7 @@
 
 using System.Collections.Immutable;
 using Explore.Application.Notifications;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Contracts.Services;
 
@@ -32,14 +33,15 @@ public sealed record VisitorAccessSettingsWriteResult(
 
     public async Task<Explore.Application.Responses.BaseCommandResponse<Guid>> CompleteAsync(
         Explore.Application.Contracts.Infrastructure.IHierarchicalSettingsResolver resolver,
-        MediatR.IMediator mediator, Explore.Domain.Settings.SettingScope scope, Guid scopeId)
+        IEnumerable<INotificationHandler<SettingChangedNotification>> notificationHandlers,
+        Explore.Domain.Settings.SettingScope scope, Guid scopeId)
     {
         if (!Success)
             return Explore.Application.Responses.BaseCommandResponse.Failure<Guid>(FailureCode!,
                 "The visitor policy change conflicts with the current participation configuration.");
         resolver.InvalidateCache(scope, scopeId);
         foreach (var notification in DeferredNotifications)
-            await mediator.Publish(notification, CancellationToken.None);
+            await notificationHandlers.HandleAsync(notification, CancellationToken.None);
         return Explore.Application.Responses.BaseCommandResponse.Success(scopeId, "Visitor policy updated.");
     }
 }

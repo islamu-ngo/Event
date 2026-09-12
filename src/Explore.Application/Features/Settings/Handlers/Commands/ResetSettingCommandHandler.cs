@@ -22,7 +22,7 @@ public class ResetSettingCommandHandler
     private readonly ICurrentUserService _currentUserService;
     private readonly IAdminContext _adminContext;
     private readonly ICerbosConfigResolver? _cerbosConfigResolver;
-    private readonly IMediator _mediator;
+    private readonly IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> _notificationHandlers;
     private readonly ILogger<ResetSettingCommandHandler> _logger;
     private readonly ILocationPrivacyGovernanceMutationService? _locationPrivacyMutations;
     private readonly IPublicationPolicyMutationBoundary _publicationPolicyMutationBoundary;
@@ -36,7 +36,7 @@ public class ResetSettingCommandHandler
         ITenantContext tenantContext,
         ICurrentUserService currentUserService,
         IAdminContext adminContext,
-        IMediator mediator,
+        IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers,
         ILogger<ResetSettingCommandHandler> logger,
         IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary,
         IUnitOfWork unitOfWork,
@@ -51,7 +51,7 @@ public class ResetSettingCommandHandler
         _currentUserService = currentUserService;
         _adminContext = adminContext;
         _cerbosConfigResolver = cerbosConfigResolver;
-        _mediator = mediator;
+        _notificationHandlers = notificationHandlers;
         _logger = logger;
         _locationPrivacyMutations = locationPrivacyMutations;
         _publicationPolicyMutationBoundary = publicationPolicyMutationBoundary;
@@ -97,7 +97,7 @@ public class ResetSettingCommandHandler
             Guid? actor = await SettingCommandHelper.ResolveCurrentUserIdAsync(_adminContext, _currentUserService, cancellationToken);
             var result = await _visitorSettings.ApplyAsync(
                 [new(_tenantContext.TenantId, request.Key, VisitorAccessSettingMutationKind.Remove)], actor, cancellationToken);
-            return await result.CompleteAsync(_resolver, _mediator, request.Scope, _tenantContext.TenantId);
+            return await result.CompleteAsync(_resolver, _notificationHandlers, request.Scope, _tenantContext.TenantId);
         }
 
         if (EmailDeliverySettingKeys.Contains(request.Key))
@@ -109,7 +109,7 @@ public class ResetSettingCommandHandler
                 actorUserId: actor, cancellationToken: cancellationToken);
             if (result.IsAccepted())
                 foreach (var notification in result.ToNotifications(actor))
-                    await _mediator.Publish(notification, CancellationToken.None);
+                    await _notificationHandlers.HandleAsync(notification, CancellationToken.None);
             return result.ToCommandResponse(_tenantContext.TenantId, "SMTP override reset.");
         }
 
@@ -157,7 +157,7 @@ public class ResetSettingCommandHandler
             _resolver.InvalidateCache(request.Scope, scopeId);
             foreach (SettingChangedNotification notification in mutationResult.DeferredNotifications)
             {
-                await _mediator.Publish(notification, CancellationToken.None);
+                await _notificationHandlers.HandleAsync(notification, CancellationToken.None);
             }
 
             _logger.LogInformation(
@@ -211,7 +211,7 @@ public class ResetSettingCommandHandler
             "Setting reset: {SettingKey} at {Scope} scope. Actor: {ActorId}",
             request.Key, request.Scope, actorId);
 
-        await _mediator.Publish(new SettingChangedNotification(
+        await _notificationHandlers.HandleAsync(new SettingChangedNotification(
             request.Key, oldValue, null,
             SettingCommandHelper.MapScopeToSource(request.Scope),
             _tenantContext.TenantId, actorId, DateTime.UtcNow), CancellationToken.None);

@@ -17,7 +17,7 @@ public sealed class UpdateTenantReportingIntakePolicyCommandHandler(
     IPublicationPolicyMutationBoundary mutationBoundary,
     IUnitOfWork unitOfWork,
     IHierarchicalSettingsResolver settingsResolver,
-    IMediator mediator)
+    IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers)
     : IRequestHandler<UpdateTenantReportingIntakePolicyCommand, BaseCommandResponse<Guid>>
 {
     private const string TenantContextMismatchCode = "tenant_context_mismatch";
@@ -80,7 +80,7 @@ public sealed class UpdateTenantReportingIntakePolicyCommandHandler(
             settingsResolver.InvalidateCache(SettingScope.Tenant, request.TenantId);
             foreach (SettingChangedNotification notification in mutation.DeferredNotifications)
             {
-                await mediator.Publish(notification, CancellationToken.None);
+                await notificationHandlers.HandleAsync(notification, CancellationToken.None);
             }
         }
 

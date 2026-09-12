@@ -23,7 +23,7 @@ public sealed class ApplyControlPlaneTenantPlanAssignmentCommandHandler(
     ISettingMutationLock mutationLock,
     IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary,
     IHierarchicalSettingsResolver settingsResolver,
-    IMediator mediator,
+    IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers,
     IEmailDeliverySettingsWriter emailDeliverySettingsWriter,
     IVisitorAccessSettingsWriter visitorSettingsWriter)
     : IRequestHandler<ApplyControlPlaneTenantPlanAssignmentCommand, BaseCommandResponse<Guid>>
@@ -142,7 +142,7 @@ public sealed class ApplyControlPlaneTenantPlanAssignmentCommandHandler(
             settingsResolver.InvalidateCache(SettingScope.Tenant, request.TenantId);
             foreach (SettingChangedNotification notification in outcome.Notifications)
             {
-                await mediator.Publish(notification, CancellationToken.None);
+                await notificationHandlers.HandleAsync(notification, CancellationToken.None);
             }
         }
 

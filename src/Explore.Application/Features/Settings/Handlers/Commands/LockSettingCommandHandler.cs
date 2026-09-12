@@ -20,7 +20,7 @@ public class LockSettingCommandHandler
     private readonly ICurrentUserService _currentUserService;
     private readonly IAdminContext _adminContext;
     private readonly ICerbosConfigResolver? _cerbosConfigResolver;
-    private readonly IMediator _mediator;
+    private readonly IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> _notificationHandlers;
     private readonly ILogger<LockSettingCommandHandler> _logger;
     private readonly IPublicationPolicyMutationBoundary _publicationPolicyMutationBoundary;
     private readonly IUnitOfWork _unitOfWork;
@@ -33,7 +33,7 @@ public class LockSettingCommandHandler
         ITenantContext tenantContext,
         ICurrentUserService currentUserService,
         IAdminContext adminContext,
-        IMediator mediator,
+        IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers,
         ILogger<LockSettingCommandHandler> logger,
         IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary,
         IUnitOfWork unitOfWork,
@@ -47,7 +47,7 @@ public class LockSettingCommandHandler
         _currentUserService = currentUserService;
         _adminContext = adminContext;
         _cerbosConfigResolver = cerbosConfigResolver;
-        _mediator = mediator;
+        _notificationHandlers = notificationHandlers;
         _logger = logger;
         _publicationPolicyMutationBoundary = publicationPolicyMutationBoundary;
         _unitOfWork = unitOfWork;
@@ -97,7 +97,7 @@ public class LockSettingCommandHandler
             var result = await _visitorSettings.ApplyAsync(
                 [new(request.Scope == SettingScope.Tenant ? scopeId : null, request.Key,
                     VisitorAccessSettingMutationKind.SetLock, IsLocked: true)], actorId, cancellationToken);
-            return await result.CompleteAsync(_resolver, _mediator, request.Scope, scopeId);
+            return await result.CompleteAsync(_resolver, _notificationHandlers, request.Scope, scopeId);
         }
 
         if (EmailDeliverySettingKeys.Contains(request.Key))
@@ -108,7 +108,7 @@ public class LockSettingCommandHandler
                 actorUserId: actorId, cancellationToken: cancellationToken);
             if (result.IsAccepted())
                 foreach (var notification in result.ToNotifications(actorId))
-                    await _mediator.Publish(notification, CancellationToken.None);
+                    await _notificationHandlers.HandleAsync(notification, CancellationToken.None);
             return result.ToCommandResponse(scopeId, "SMTP setting locked.");
         }
 
@@ -156,7 +156,7 @@ public class LockSettingCommandHandler
             _resolver.InvalidateCache(request.Scope, scopeId);
             foreach (SettingChangedNotification notification in mutationResult.DeferredNotifications)
             {
-                await _mediator.Publish(notification, CancellationToken.None);
+                await _notificationHandlers.HandleAsync(notification, CancellationToken.None);
             }
 
             return BaseCommandResponse.Success(
@@ -190,7 +190,7 @@ public class LockSettingCommandHandler
             "Setting locked: {SettingKey} at {Scope} scope. Actor: {ActorId}",
             request.Key, request.Scope, actorId);
 
-        await _mediator.Publish(new SettingChangedNotification(
+        await _notificationHandlers.HandleAsync(new SettingChangedNotification(
             request.Key, null, null, lockSource,
             _tenantContext.TenantId, actorId, DateTime.UtcNow), CancellationToken.None);
 

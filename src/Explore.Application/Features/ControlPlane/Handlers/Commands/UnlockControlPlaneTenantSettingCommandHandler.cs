@@ -17,7 +17,7 @@ public sealed class UnlockControlPlaneTenantSettingCommandHandler(
     ISettingMutationLock mutationLock,
     ICurrentUserService currentUserService,
     IHierarchicalSettingsResolver settingsResolver,
-    IMediator mediator,
+    IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers,
     IEmailDeliverySettingsWriter emailDeliverySettingsWriter,
     IUnitOfWork unitOfWork,
     IVisitorAccessSettingsWriter visitorSettings)
@@ -73,7 +73,7 @@ public sealed class UnlockControlPlaneTenantSettingCommandHandler(
         if (outcome.Notification is not null)
         {
             settingsResolver.InvalidateCache(SettingScope.Tenant, request.TenantId);
-            await mediator.Publish(outcome.Notification, CancellationToken.None);
+            await notificationHandlers.HandleAsync(outcome.Notification, CancellationToken.None);
         }
 
         return outcome.Response;

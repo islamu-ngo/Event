@@ -26,8 +26,6 @@ using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.Extensions.DependencyInjection;
-using MediatR;
 using NSubstitute;
 using NSubstitute.Extensions;
 
@@ -42,7 +40,6 @@ internal sealed class SmtpSettingsDatabase : IAsyncDisposable, ITenantContext
     private readonly TenantSettingRepository _tenantSettings;
     private readonly SecretBindingRepository _bindings;
     private readonly Dictionary<Guid, string> _bindingKeys = [];
-    private readonly ServiceProvider _provider = new ServiceCollection().BuildServiceProvider();
     private readonly EmailDeliveryDisableTokenService _tokens = new(new EphemeralDataProtectionProvider());
 
     private SmtpSettingsDatabase(SqliteConnection connection, ExploreDbContext context)
@@ -61,7 +58,7 @@ internal sealed class SmtpSettingsDatabase : IAsyncDisposable, ITenantContext
             MutationLock, _cache, NullLogger<HierarchicalSettingsResolver>.Instance, Writer);
         Capabilities = new EmailDeliveryCapabilityResolver(Settings, Secrets, _bindings);
         Smtp = new SmtpConfigResolver(Capabilities, this, Settings);
-        InstanceSmtp = new InstanceSmtpSettingService(_systemSettings, Writer, new Mediator(_provider));
+        InstanceSmtp = new InstanceSmtpSettingService(_systemSettings, Writer, []);
         Secrets.ResolveAsync(Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns(SecretResolutionResult.Unconfigured);
         Secrets.ResolveTenantBindingAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
@@ -268,7 +265,6 @@ internal sealed class SmtpSettingsDatabase : IAsyncDisposable, ITenantContext
     {
         var databasePath = _connection.DataSource;
         _cache.Dispose();
-        await _provider.DisposeAsync();
         await _context.DisposeAsync();
         await _connection.DisposeAsync();
         File.Delete(databasePath);

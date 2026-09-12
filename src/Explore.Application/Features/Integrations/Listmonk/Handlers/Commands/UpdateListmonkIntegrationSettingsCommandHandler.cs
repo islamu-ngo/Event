@@ -18,7 +18,7 @@ public sealed class UpdateListmonkIntegrationSettingsCommandHandler(
     IAdminContext adminContext,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService,
-    IPublisher publisher)
+    IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers)
     : IRequestHandler<UpdateListmonkIntegrationSettingsCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> Handle(
@@ -105,7 +105,7 @@ public sealed class UpdateListmonkIntegrationSettingsCommandHandler(
                 tenantContext.TenantId,
                 actorId.Value,
                 cancellationToken);
-            await publisher.Publish(
+            await notificationHandlers.HandleAsync(
                 new SettingChangedNotification(
                     key,
                     current?.Value,

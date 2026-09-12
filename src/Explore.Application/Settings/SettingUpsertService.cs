@@ -5,7 +5,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Notifications;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 /// <summary>
 /// Centralized service for upserting SystemSetting records.
@@ -14,20 +14,20 @@ using MediatR;
 public class SettingUpsertService
 {
     private readonly ISystemSettingRepository _systemSettingRepository;
-    private readonly IMediator _mediator;
+    private readonly IEnumerable<INotificationHandler<SettingChangedNotification>> _notificationHandlers;
     private readonly IPublicationPolicyMutationBoundary _publicationPolicyMutationBoundary;
     private readonly ILocationPrivacyGovernanceMutationService? _locationPrivacyMutations;
     private readonly IEmailDeliverySettingsWriter _emailSettingsWriter;
 
     public SettingUpsertService(
         ISystemSettingRepository systemSettingRepository,
-        IMediator mediator,
+        IEnumerable<INotificationHandler<SettingChangedNotification>> notificationHandlers,
         IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary,
         IEmailDeliverySettingsWriter emailSettingsWriter,
         ILocationPrivacyGovernanceMutationService? locationPrivacyMutations = null)
     {
         _systemSettingRepository = systemSettingRepository;
-        _mediator = mediator;
+        _notificationHandlers = notificationHandlers;
         _publicationPolicyMutationBoundary = publicationPolicyMutationBoundary;
         _locationPrivacyMutations = locationPrivacyMutations;
         _emailSettingsWriter = emailSettingsWriter;
@@ -69,7 +69,7 @@ public class SettingUpsertService
         }, actorId, cancellationToken);
 
         await InvalidateCommittedMutationAsync(persistence.Mutation);
-        await _mediator.Publish(new SettingChangedNotification(
+        await _notificationHandlers.HandleAsync(new SettingChangedNotification(
             settingKey, EmailDeliverySettingsWriteResultExtensions.AuditValue(settingKey, persistence.PreviousStoredValue),
             EmailDeliverySettingsWriteResultExtensions.AuditValue(settingKey, value),
             SettingSource.SystemDefault, null, actorId, DateTime.UtcNow), CancellationToken.None);
@@ -264,7 +264,7 @@ public class SettingUpsertService
         if (invalidateAfterCommit)
         {
             await InvalidateCommittedMutationAsync(persistence.Mutation);
-            await _mediator.Publish(notification, CancellationToken.None);
+            await _notificationHandlers.HandleAsync(notification, CancellationToken.None);
         }
 
         return new(notification, persistence.Mutation);

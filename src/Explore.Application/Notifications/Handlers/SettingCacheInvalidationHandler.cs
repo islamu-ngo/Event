@@ -1,7 +1,7 @@
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Notifications.Handlers;
 
@@ -21,7 +21,7 @@ public sealed class SettingCacheInvalidationHandler : INotificationHandler<Setti
         _eventReportingOutputCacheInvalidators = eventReportingOutputCacheInvalidators;
     }
 
-    public async Task Handle(SettingChangedNotification notification, CancellationToken cancellationToken)
+    public async Task HandleAsync(SettingChangedNotification notification, CancellationToken cancellationToken)
     {
         _resolver.InvalidateCache(SettingScope.Instance);
 

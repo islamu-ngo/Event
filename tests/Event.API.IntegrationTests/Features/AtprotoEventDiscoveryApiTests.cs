@@ -168,7 +168,7 @@ public sealed class AtprotoEventDiscoveryApiTests
         var invalidator = Substitute.For<IAtprotoDiscoveryCacheInvalidator>();
         var handler = new SettingCacheInvalidationHandler(resolver, [invalidator], []);
 
-        await handler.Handle(new SettingChangedNotification(
+        await handler.HandleAsync(new SettingChangedNotification(
             GovernanceSettingKeys.Federation.AtprotoEventsEnabled,
             "true",
             "false",
@@ -187,7 +187,7 @@ public sealed class AtprotoEventDiscoveryApiTests
         var invalidator = Substitute.For<IAtprotoDiscoveryCacheInvalidator>();
         var handler = new SettingCacheInvalidationHandler(resolver, [invalidator], []);
 
-        await handler.Handle(new SettingChangedNotification(
+        await handler.HandleAsync(new SettingChangedNotification(
             GovernanceSettingKeys.LocationPrivacy.AllowHomeLocations,
             "true",
             "false",

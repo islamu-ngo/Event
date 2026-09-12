@@ -301,7 +301,7 @@ public sealed class EmailDeliveryDisableCommitTests
                 adminContext: fixture.AdminContext, tenantContext: tenantContext,
                 emailSettingsWriter: CreateEmailSettingsWriter(fixture.Context, fixture.MutationLock, tokenService),
                 mutationLock: fixture.MutationLock, unitOfWork: fixture.UnitOfWork,
-                publisher: fixture.Mediator, platformRoles: platformRoles, tenantRoles: tenantRoles));
+                notificationHandlers: fixture.NotificationHandlers, platformRoles: platformRoles, tenantRoles: tenantRoles));
     }
 
     private static async Task<EmailDeliveryDisablePreviewDto> PreviewAsync(PreviewEmailDeliveryDisableQueryHandler handler, Guid? target)

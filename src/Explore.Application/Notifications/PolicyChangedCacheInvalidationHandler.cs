@@ -1,5 +1,5 @@
 using Explore.Domain.Settings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 
@@ -18,7 +18,7 @@ public class PolicyChangedCacheInvalidationHandler : INotificationHandler<Policy
         _logger = logger;
     }
 
-    public async Task Handle(PolicyChangedNotification notification, CancellationToken cancellationToken)
+    public async Task HandleAsync(PolicyChangedNotification notification, CancellationToken cancellationToken)
     {
         var cacheKey = BuildCacheKey(notification.Scope, notification.ScopeId);
 

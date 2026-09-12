@@ -7,7 +7,7 @@ using Explore.Application.Notifications;
 using Explore.Domain;
 using Explore.Domain.Settings;
 using Explore.Domain.Settings.Documents;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 public static class ConfigurationManifestEffectOutbox
 {
@@ -54,7 +54,7 @@ public sealed class ConfigurationManifestEffectDispatcher(
     IConfigurationManifestOperationRepository operationRepository,
     IHierarchicalSettingsResolver settingsResolver,
     ITypedSettingsDocumentResolver typedSettingsDocumentResolver,
-    IPublisher publisher)
+    IEnumerable<INotificationHandler<SettingChangedNotification>> notificationHandlers)
     : IConfigurationManifestEffectDispatcher
 {
     public async Task DispatchAsync(
@@ -123,7 +123,7 @@ public sealed class ConfigurationManifestEffectDispatcher(
         {
             try
             {
-                await publisher.Publish(notification, cancellationToken);
+                await notificationHandlers.HandleAsync(notification, cancellationToken);
             }
             catch (Exception exception)
             {

@@ -21,7 +21,7 @@ using Explore.Persistence;
 using Explore.Persistence.QueryFilters;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Services;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -425,6 +425,44 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
         await session.AssertNoEffectsAsync();
     }
 
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task PostCommitAuditFailurePreservesDisabledPolicyAndInvalidatedCacheAfterDisconnect(bool tenantTarget)
+    {
+        await using var scenario = await Scenario.CreateAsync();
+        using var session = scenario.Open(tenantActor: tenantTarget);
+        Guid? target = tenantTarget ? scenario.TenantId : null;
+        var command = Command(await session.PreviewAsync(target));
+        await session.PrimeStaleCacheAsync();
+        using var cancellation = new CancellationTokenSource();
+        var committed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        session.Fixture.Notifications.OnPublishing = async (_, token) =>
+        {
+            await using var observer = CreateContext(scenario.Path);
+            await Assert.That((await ReadSettingAsync(observer, target)).Value).IsEqualTo("false");
+            await Assert.That(token.CanBeCanceled).IsFalse();
+            cancellation.Cancel();
+            committed.SetResult();
+        };
+        var failure = new InvalidOperationException("Post-commit audit failed.");
+        session.Audit.Failure = failure;
+
+        Exception? observed = null;
+        try { await session.Disable.Handle(command, cancellation.Token); }
+        catch (Exception exception) { observed = exception; }
+
+        await Assert.That(observed).IsSameReferenceAs(failure);
+        await committed.Task.WaitAsync(TimeSpan.FromSeconds(15));
+        await Assert.That(cancellation.IsCancellationRequested).IsTrue();
+        await Assert.That(await session.CachedSentinelAsync()).IsFalse();
+        await using var verification = CreateContext(scenario.Path);
+        await Assert.That((await ReadSettingAsync(verification, target)).Value).IsEqualTo("false");
+        await Assert.That((await ReadSettingAsync(verification, tenantTarget ? null : scenario.TenantId)).Value).IsEqualTo("true");
+        await Assert.That(session.Fixture.Notifications.Published.Count).IsEqualTo(1);
+        await Assert.That(session.Audit.Entries.Count).IsEqualTo(1);
+    }
+
     private static DisableEmailDeliveryCommand Command(EmailDeliveryDisablePreviewDto preview) =>
         new(preview.TenantId, preview.ExpectedRevision, DisableEmailDeliveryCommand.RequiredAcknowledgement, preview.ConfirmationToken);
 
@@ -639,7 +677,8 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
             Preview = new(Fixture.AdminContext, tenantContext, new EmailDeliveryDisableImpactReader(context), scenario.Tokens,
                 mutationLock, Fixture.UnitOfWork, platformRoles, tenantRoles);
             Disable = new(Fixture.AdminContext, tenantContext, CreateEmailSettingsWriter(context, mutationLock, scenario.Tokens),
-                mutationLock, Fixture.UnitOfWork, new Mediator(_provider), platformRoles, tenantRoles);
+                mutationLock, Fixture.UnitOfWork,
+                _provider.GetServices<INotificationHandler<SettingChangedNotification>>(), platformRoles, tenantRoles);
         }
 
         internal async Task<EmailDeliveryDisablePreviewDto> PreviewAsync(Guid? target)
@@ -717,6 +756,7 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
     private sealed class AuditSink(ExploreDbContext context) : ILogger<SettingAuditLogHandler>
     {
         internal List<Dictionary<string, object?>> Entries { get; } = [];
+        internal Exception? Failure { get; set; }
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
         public bool IsEnabled(LogLevel logLevel) => true;
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
@@ -724,6 +764,7 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
             if (context.Database.CurrentTransaction is not null)
                 throw new InvalidOperationException("Audit escaped before commit.");
             Entries.Add(((IEnumerable<KeyValuePair<string, object?>>)state!).ToDictionary(pair => pair.Key, pair => pair.Value));
+            if (Failure is not null) throw Failure;
         }
     }
 

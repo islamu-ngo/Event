@@ -140,7 +140,7 @@ public sealed class InstanceSmtpSettingsMutationTests
 
     private static UpdateInstanceSmtpSettingsCommandHandler CreateHandler(InstanceSettingsCommandFixture fixture) =>
         new(fixture.AdminContext,
-            new InstanceSmtpSettingService(fixture.SystemSettings, fixture.EmailDeliverySettingsWriter, fixture.Mediator),
+            new InstanceSmtpSettingService(fixture.SystemSettings, fixture.EmailDeliverySettingsWriter, fixture.NotificationHandlers),
             new SmtpConfigResolver(new EmailDeliveryCapabilityResolver(fixture.Settings,
                     Substitute.For<ISecretResolver>(), new SecretBindingRepository(fixture.Context)),
                 fixture, fixture.Settings));

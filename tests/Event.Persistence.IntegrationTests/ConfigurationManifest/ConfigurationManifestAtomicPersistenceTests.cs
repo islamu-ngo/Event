@@ -8,7 +8,8 @@ using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Persistence.Repositories;
 using Explore.Persistence.Seed;
-using MediatR;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Notifications;
 using Microsoft.EntityFrameworkCore;
 
 namespace Event.Persistence.IntegrationTests.ConfigurationManifest;
@@ -318,7 +319,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
                         new TenantRepository(firstContext)),
                     repository,
                     new ConfigurationManifestFailureRepository(factory),
-                    effectPublisher: new ThrowingPublisher());
+                    effectConsumer: new ThrowingConsumer());
                 await Assert.That(() => handler.Handle(
                         new ApplyConfigurationManifestCommand(source),
                         CancellationToken.None))
@@ -574,17 +575,11 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
         }
     }
 
-    private sealed class ThrowingPublisher : IPublisher
+    private sealed class ThrowingConsumer : INotificationHandler<SettingChangedNotification>
     {
-        public Task Publish<TNotification>(
-            TNotification notification,
-            CancellationToken cancellationToken = default)
-            where TNotification : INotification =>
-            throw new InvalidOperationException("Simulated post-commit effect failure.");
-
-        public Task Publish(
-            object notification,
-            CancellationToken cancellationToken = default) =>
+        public Task HandleAsync(
+            SettingChangedNotification notification,
+            CancellationToken cancellationToken) =>
             throw new InvalidOperationException("Simulated post-commit effect failure.");
     }
 }

@@ -173,7 +173,7 @@ public sealed class EmailDeliverySettingBatchTests
 
     private static UpdateSettingBatchCommandHandler CreateHandler(InstanceSettingsCommandFixture fixture) =>
         new(fixture.Settings, new UserPreferenceRepository(fixture.Context), fixture,
-            fixture.CurrentUserService, fixture.AdminContext, fixture.Mediator,
+            fixture.CurrentUserService, fixture.AdminContext, fixture.NotificationHandlers,
             NullLogger<UpdateSettingBatchCommandHandler>.Instance,
             fixture.PublicationPolicyBoundary, fixture.UnitOfWork, fixture.MutationLock, fixture.EmailDeliverySettingsWriter,
             fixture.VisitorSettings);

@@ -444,7 +444,7 @@ public sealed class VisitorAccessSettingsWriterTests
         await using var context = EmailDispatchSqliteFixture.CreateContext(fixture.DatabasePath, new RejectCatalogLabelSave());
         using var commands = new InstanceSettingsCommandFixture(context, fixture.UserId);
         var handler = new UpdateSettingBatchCommandHandler(commands.Settings, new UserPreferenceRepository(context), commands,
-            commands.CurrentUserService, commands.AdminContext, commands.Mediator, NullLogger<UpdateSettingBatchCommandHandler>.Instance,
+            commands.CurrentUserService, commands.AdminContext, commands.NotificationHandlers, NullLogger<UpdateSettingBatchCommandHandler>.Instance,
             commands.PublicationPolicyBoundary, commands.UnitOfWork, commands.MutationLock, commands.EmailDeliverySettingsWriter,
             commands.VisitorSettings);
         await Assert.ThrowsAsync<RejectedStorageWriteException>(() => handler.Handle(new()
@@ -487,7 +487,8 @@ public sealed class VisitorAccessSettingsWriterTests
         var writer = new VisitorAccessSettingsWriter(fixture.Context, mutationLock, unitOfWork,
             new EventParticipationConfigurationRepository(fixture.Context), configuration);
         return new AuthProviderConfigurationService(new SystemSettingRepository(fixture.Context, mutationLock), configuration,
-            unitOfWork, mutationLock, writer, fixture.Services.GetRequiredService<MediatR.IMediator>());
+            unitOfWork, mutationLock, writer,
+            fixture.Services.GetServices<Explore.Application.Contracts.Operations.INotificationHandler<Explore.Application.Notifications.SettingChangedNotification>>());
     }
 
     private static IVisitorAccessSettingsWriter Writer(EventVisitorCapabilitySqliteFixture fixture) =>

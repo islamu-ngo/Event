@@ -18,7 +18,7 @@ public sealed class SetControlPlaneTenantSettingCommandHandler(
     ISettingMutationLock mutationLock,
     ICurrentUserService currentUserService,
     IHierarchicalSettingsResolver settingsResolver,
-    IMediator mediator,
+    IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers,
     IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary,
     IUnitOfWork unitOfWork,
     IEmailDeliverySettingsWriter emailDeliverySettingsWriter,
@@ -63,7 +63,7 @@ public sealed class SetControlPlaneTenantSettingCommandHandler(
             var result = await visitorSettings.ApplyAsync(
                 [new(request.TenantId, request.Key, VisitorAccessSettingMutationKind.SetValue, serializedValue)],
                 actorUserId, cancellationToken);
-            return await result.CompleteAsync(settingsResolver, mediator, SettingScope.Tenant, request.TenantId);
+            return await result.CompleteAsync(settingsResolver, notificationHandlers, SettingScope.Tenant, request.TenantId);
         }
 
         if (EmailDeliverySettingKeys.Contains(request.Key))
@@ -80,7 +80,7 @@ public sealed class SetControlPlaneTenantSettingCommandHandler(
             {
                 settingsResolver.InvalidateCache(SettingScope.Tenant, request.TenantId);
                 foreach (SettingChangedNotification notification in result.ToNotifications(actorUserId))
-                    await mediator.Publish(notification, CancellationToken.None);
+                    await notificationHandlers.HandleAsync(notification, CancellationToken.None);
             }
 
             return result.ToCommandResponse(request.TenantId, "Tenant setting updated.");
@@ -133,7 +133,7 @@ public sealed class SetControlPlaneTenantSettingCommandHandler(
                 settingsResolver.InvalidateCache(SettingScope.Tenant, request.TenantId);
                 foreach (SettingChangedNotification notification in outcome.Notifications)
                 {
-                    await mediator.Publish(notification, cancellationToken);
+                    await notificationHandlers.HandleAsync(notification, cancellationToken);
                 }
             }
 
@@ -177,7 +177,7 @@ public sealed class SetControlPlaneTenantSettingCommandHandler(
         if (unguardedOutcome.Notification is not null)
         {
             settingsResolver.InvalidateCache(SettingScope.Tenant, request.TenantId);
-            await mediator.Publish(unguardedOutcome.Notification, cancellationToken);
+            await notificationHandlers.HandleAsync(unguardedOutcome.Notification, cancellationToken);
         }
 
         return unguardedOutcome.Response;

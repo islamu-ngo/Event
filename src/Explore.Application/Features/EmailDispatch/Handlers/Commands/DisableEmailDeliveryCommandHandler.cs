@@ -17,7 +17,7 @@ public sealed class DisableEmailDeliveryCommandHandler(
     IEmailDeliverySettingsWriter emailSettingsWriter,
     ISettingMutationLock mutationLock,
     IUnitOfWork unitOfWork,
-    IPublisher publisher,
+    IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers,
     IPlatformUserRoleRepository platformRoles,
     ITenantUserRoleGrantRepository tenantRoles) : IRequestHandler<DisableEmailDeliveryCommand, BaseCommandResponse<Guid>>
 {
@@ -37,7 +37,7 @@ public sealed class DisableEmailDeliveryCommandHandler(
                 transactionToken => DisableAsync(request, transactionToken), token), cancellationToken);
 
         foreach (var notification in outcome.Notifications)
-            await publisher.Publish(notification, CancellationToken.None);
+            await notificationHandlers.HandleAsync(notification, CancellationToken.None);
         return outcome.Response;
     }
 

@@ -60,6 +60,7 @@ using Explore.Application.Features.StorageObjects.Requests.Commands;
 using Explore.Application.Features.ConfigurationManifest.Preflight;
 using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Notifications;
+using Explore.Application.Notifications.Handlers;
 using Explore.Application.Services;
 using Explore.Application.Services.Federation;
 using Explore.Application.Services.Lifecycle;
@@ -139,6 +140,10 @@ public static class ApplicationServicesRegistration
 #endif
             cfg.RegisterServicesFromAssembly(typeof(ApplicationServicesRegistration).Assembly);
         });
+
+        services.AddScoped<Contracts.Operations.INotificationHandler<SettingChangedNotification>, SettingCacheInvalidationHandler>();
+        services.AddScoped<Contracts.Operations.INotificationHandler<SettingChangedNotification>, SettingAuditLogHandler>();
+        services.AddScoped<Contracts.Operations.INotificationHandler<PolicyChangedNotification>, PolicyChangedCacheInvalidationHandler>();
 
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(PerformanceBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(AuthorizationBehavior<,>));

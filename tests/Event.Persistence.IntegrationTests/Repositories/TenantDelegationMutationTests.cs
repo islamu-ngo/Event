@@ -187,7 +187,7 @@ public sealed class TenantDelegationMutationTests
     }
 
     private static UpdateTenantDelegationSettingsCommandHandler CreateHandler(InstanceSettingsCommandFixture fixture) =>
-        new(fixture.AdminContext, fixture.Governance, fixture.UnitOfWork, fixture.Mediator, fixture.MutationLock);
+        new(fixture.AdminContext, fixture.Governance, fixture.UnitOfWork, fixture.NotificationHandlers, fixture.MutationLock);
 
     private static Task SetDeploymentAsync(ExploreDbContext context, RelationalSettingMutationLock mutationLock,
         string value, CancellationToken cancellationToken = default) =>

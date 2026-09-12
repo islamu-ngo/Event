@@ -26,7 +26,7 @@ public class UpdateSettingBatchCommandHandler
     private readonly ICurrentUserService _currentUserService;
     private readonly IAdminContext _adminContext;
     private readonly ICerbosConfigResolver? _cerbosConfigResolver;
-    private readonly IMediator _mediator;
+    private readonly IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> _notificationHandlers;
     private readonly ILogger<UpdateSettingBatchCommandHandler> _logger;
     private readonly ILocationPrivacyGovernanceMutationService? _locationPrivacyMutations;
     private readonly IPublicationPolicyMutationBoundary _publicationPolicyMutationBoundary;
@@ -41,7 +41,7 @@ public class UpdateSettingBatchCommandHandler
         ITenantContext tenantContext,
         ICurrentUserService currentUserService,
         IAdminContext adminContext,
-        IMediator mediator,
+        IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers,
         ILogger<UpdateSettingBatchCommandHandler> logger,
         IPublicationPolicyMutationBoundary publicationPolicyMutationBoundary,
         IUnitOfWork unitOfWork,
@@ -57,7 +57,7 @@ public class UpdateSettingBatchCommandHandler
         _currentUserService = currentUserService;
         _adminContext = adminContext;
         _cerbosConfigResolver = cerbosConfigResolver;
-        _mediator = mediator;
+        _notificationHandlers = notificationHandlers;
         _logger = logger;
         _locationPrivacyMutations = locationPrivacyMutations;
         _publicationPolicyMutationBoundary = publicationPolicyMutationBoundary;
@@ -123,7 +123,7 @@ public class UpdateSettingBatchCommandHandler
                 _resolver.InvalidateCache(request.Scope,
                     request.Scope == SettingScope.Tenant ? _tenantContext.TenantId : Guid.Empty);
             foreach (var notification in mutation.Notifications)
-                await _mediator.Publish(notification, CancellationToken.None);
+                await _notificationHandlers.HandleAsync(notification, CancellationToken.None);
             LogCompletedBatch(request, appliedCount, mutation.Response.Results.Count - appliedCount);
             return mutation.Response;
         }
@@ -350,7 +350,7 @@ public class UpdateSettingBatchCommandHandler
                 foreach (var notification in smtpResult.ToNotifications(resolvedUserId))
                 {
                     if (deferredNotifications is null)
-                        await _mediator.Publish(notification, CancellationToken.None);
+                        await _notificationHandlers.HandleAsync(notification, CancellationToken.None);
                     else
                         deferredNotifications.Add(notification);
                 }
@@ -446,7 +446,7 @@ public class UpdateSettingBatchCommandHandler
                 SettingCommandHelper.MapScopeToSource(request.Scope),
                 _tenantContext.TenantId, actorId, DateTime.UtcNow);
             if (deferredNotifications is null)
-                await _mediator.Publish(notification, CancellationToken.None);
+                await _notificationHandlers.HandleAsync(notification, CancellationToken.None);
             else
                 deferredNotifications.Add(notification);
 
@@ -644,7 +644,7 @@ public class UpdateSettingBatchCommandHandler
 
         foreach (SettingChangedNotification notification in outcome.Notifications)
         {
-            await _mediator.Publish(notification, CancellationToken.None);
+            await _notificationHandlers.HandleAsync(notification, CancellationToken.None);
         }
 
         int skippedCount = outcome.Results.Count - appliedCount;

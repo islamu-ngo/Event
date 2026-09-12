@@ -3,7 +3,7 @@ using Explore.API.Attributes;
 using Explore.API.Hateoas;
 using Explore.Application.DTOs.EventRegistrationPolicy;
 using Explore.Application.Features.EventRegistrationPolicies.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -14,7 +14,8 @@ namespace Explore.API.Controllers;
 [Route("api/[controller]")]
 [ApiController]
 [EndpointClassification(EndpointClass.Public)]
-public class EventRegistrationPolicyController(IMediator mediator) : ControllerBase
+public class EventRegistrationPolicyController(
+    IQueryHandler<GetEventRegistrationPolicyListRequest, List<EventRegistrationPolicyListDto>> registrationPolicies) : ControllerBase
 {
 
     // GET: api/eventregistrationpolicy
@@ -26,7 +27,7 @@ public class EventRegistrationPolicyController(IMediator mediator) : ControllerB
     [OutputCache(PolicyName = "LookupData")]
     public async Task<ActionResult<List<EventRegistrationPolicyListDto>>> GetAll(CancellationToken cancellationToken = default)
     {
-        var policies = await mediator.Send(new GetEventRegistrationPolicyListRequest(), cancellationToken);
+        var policies = await registrationPolicies.QueryAsync(new GetEventRegistrationPolicyListRequest(), cancellationToken);
         return Ok(policies);
     }
 }

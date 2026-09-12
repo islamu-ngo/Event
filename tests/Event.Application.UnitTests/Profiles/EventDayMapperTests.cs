@@ -48,7 +48,7 @@ public sealed class EventDayMapperTests
         events.Exists(EventId).Returns(true);
         events.GetById(EventId).Returns(Parent());
         EventDay? saved = null;
-        days.Create(Arg.Any<EventDay>()).Returns(call => { saved = call.Arg<EventDay>(); return saved; });
+        days.Create(Arg.Any<EventDay>()).Returns(call => { var entity = call.Arg<EventDay>(); saved = entity; return entity; });
         await new CreateEventDayCommandHandler(days, events, Substitute.For<IStorageObjectRepository>()).Handle(new CreateEventDayCommand { EventDayDto = new CreateEventDayDto { EventId = EventId, LocalDate = new DateOnly(2026, 7, 20), Label = "Day one", Description = "", BannerText = "Welcome", IsPublished = true, SortOrder = 4, AllowsDayScopeRegistration = true } }, CancellationToken.None);
         await Assert.That(saved).IsNotNull();
         await Assert.That(saved!.TenantId).IsEqualTo(TenantId);

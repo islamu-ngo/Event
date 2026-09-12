@@ -8,7 +8,7 @@ public static partial class EventMapper
 {
     public static EventOrganizerClaimDto ToDetail(EventOrganizerClaim source) => MapClaim(source) with
     {
-        ClaimantActorDisplayName = source.ClaimantActor?.DisplayName,
+        ClaimantActorDisplayName = source.ClaimantActor?.Pii?.DisplayName,
         ClaimantActorUserId = source.ClaimantActor?.UserId,
         ClaimantActorOrganizationId = source.ClaimantActor?.OrganizationId,
         ClaimantActorGroupId = source.ClaimantActor?.GroupId,

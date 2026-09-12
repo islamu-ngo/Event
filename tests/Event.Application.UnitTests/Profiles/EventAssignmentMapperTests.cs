@@ -60,8 +60,8 @@ public sealed class EventAssignmentMapperTests
         categories.Exists(ClassificationId).Returns(true);
         EventTags? savedTag = null;
         EventCategories? savedCategory = null;
-        tagAssignments.Create(Arg.Any<EventTags>()).Returns(call => { savedTag = call.Arg<EventTags>(); return savedTag; });
-        categoryAssignments.Create(Arg.Any<EventCategories>()).Returns(call => { savedCategory = call.Arg<EventCategories>(); return savedCategory; });
+        tagAssignments.Create(Arg.Any<EventTags>()).Returns(call => { var entity = call.Arg<EventTags>(); savedTag = entity; return entity; });
+        categoryAssignments.Create(Arg.Any<EventCategories>()).Returns(call => { var entity = call.Arg<EventCategories>(); savedCategory = entity; return entity; });
         var tagResult = await new CreateEventTagsCommandHandler(tagAssignments, events, tags, tenant).Handle(new CreateEventTagsCommand { EventTagsDto = new CreateEventTagsDto { EventId = EventId, TagId = ClassificationId, TenantId = ClassificationId } }, CancellationToken.None);
         var categoryResult = await new CreateEventCategoriesCommandHandler(categoryAssignments, events, categories, tenant).Handle(new CreateEventCategoriesCommand { EventCategoriesDto = new CreateEventCategoriesDto { EventId = EventId, CategoryId = ClassificationId, TenantId = ClassificationId } }, CancellationToken.None);
         await Assert.That(savedTag).IsNotNull();

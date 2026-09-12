@@ -12,7 +12,9 @@ namespace Event.Application.UnitTests.Profiles;
 public sealed class EventClaimMapperTests
 {
     [Test]
-    public async Task ClaimProjection_PreservesAuthorityButDoesNotSerializeItOrRecurse()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ClaimProjection_PreservesAuthorityButDoesNotSerializeItOrRecurse(bool unloadedPii)
     {
         var eventId = Guid.Parse("01900000-0000-7000-8000-000000000011");
         var tenantId = Guid.Parse("01900000-0000-7000-8000-000000000012");
@@ -25,6 +27,8 @@ public sealed class EventClaimMapperTests
             Tenant = null!, VisibilityType = null!, EventStatus = null!, EventFormat = null!,
             EventProvenanceTypeId = 2, EventProvenanceType = new EventProvenanceType { MasterCode = "COMMUNITY_REPORTED", FullName = "Community reported" }
         };
+        if (unloadedPii)
+            parent.Actor.Pii = null!;
         parent.OrganizerClaims.Add(claim);
         typeof(EventOrganizerClaim).GetProperty(nameof(EventOrganizerClaim.Event))!.SetValue(claim, parent);
         typeof(EventOrganizerClaim).GetProperty(nameof(EventOrganizerClaim.ClaimantActor))!.SetValue(claim, parent.Actor);
@@ -39,7 +43,7 @@ public sealed class EventClaimMapperTests
         await Assert.That(dto.EventActorId).IsEqualTo(groupId);
         await Assert.That(dto.EventActorGroupId).IsEqualTo(groupId);
         await Assert.That(dto.EventProvenanceTypeCode).IsEqualTo("COMMUNITY_REPORTED");
-        await Assert.That(dto.ClaimantActorDisplayName).IsEqualTo("Publisher");
+        await Assert.That(dto.ClaimantActorDisplayName).IsEqualTo(unloadedPii ? null : "Publisher");
         await Assert.That(dto.EvidenceReference).IsEqualTo("bounded-reference");
         await Assert.That(dto.CreatedAt).IsEqualTo(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
         await Assert.That(dto.ConcurrencyStamp).IsEqualTo(claim.ConcurrencyStamp);

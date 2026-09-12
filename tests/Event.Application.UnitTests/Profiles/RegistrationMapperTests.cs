@@ -107,7 +107,7 @@ public class RegistrationMapperTests
             new() { Id = 2, MasterCode = "SECOND", FullName = "Second", Description = null }
         };
         var handler = new GetRegistrationModeListRequestHandler(new ModeStore(items));
-        var result = await handler.Handle(new GetRegistrationModeListRequest(), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetRegistrationModeListRequest(), CancellationToken.None);
         items[0].FullName = "Changed";
         items[0].Description = "Changed";
         items.Clear();
@@ -124,7 +124,7 @@ public class RegistrationMapperTests
         var handler = new GetRegistrationModeDetailsRequestHandler(new ModeStore([
             new() { Id = 2, MasterCode = "SECOND", FullName = "Second" }, selected]));
 
-        var result = await handler.Handle(new GetRegistrationModeDetailsRequest(7), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetRegistrationModeDetailsRequest(7), CancellationToken.None);
         selected.FullName = "Changed";
         selected.Description = "Changed";
 
@@ -139,7 +139,7 @@ public class RegistrationMapperTests
         var handler = new GetRegistrationModeDetailsRequestHandler(new ModeStore([
             new() { Id = 2, MasterCode = "SECOND", FullName = "Second" }]));
 
-        var result = await handler.Handle(new GetRegistrationModeDetailsRequest(7), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetRegistrationModeDetailsRequest(7), CancellationToken.None);
 
         await Assert.That(result).IsNull();
     }
@@ -156,7 +156,7 @@ public class RegistrationMapperTests
         await AssertJson(await new GetScheduleItemKindListRequestHandler(new ScheduleKindStore([]))
             .Handle(new GetScheduleItemKindListRequest(), CancellationToken.None), new JsonArray());
         await AssertJson(await new GetRegistrationModeListRequestHandler(new ModeStore([]))
-            .Handle(new GetRegistrationModeListRequest(), CancellationToken.None), new JsonArray());
+            .QueryAsync(new GetRegistrationModeListRequest(), CancellationToken.None), new JsonArray());
     }
 
     private static async Task AssertList(object result, string? description)

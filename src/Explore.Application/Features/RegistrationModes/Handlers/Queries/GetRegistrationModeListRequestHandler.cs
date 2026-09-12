@@ -5,11 +5,11 @@ using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.RegistrationMode;
 using Explore.Application.Features.RegistrationModes.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.RegistrationModes.Handlers.Queries;
 
-public class GetRegistrationModeListRequestHandler : IRequestHandler<GetRegistrationModeListRequest, List<RegistrationModeListDto>>
+public class GetRegistrationModeListRequestHandler : IQueryHandler<GetRegistrationModeListRequest, List<RegistrationModeListDto>>
 {
     private readonly IRegistrationModeRepository _registrationModeRepository;
 
@@ -18,7 +18,7 @@ public class GetRegistrationModeListRequestHandler : IRequestHandler<GetRegistra
         _registrationModeRepository = registrationModeRepository;
     }
 
-    public async Task<List<RegistrationModeListDto>> Handle(GetRegistrationModeListRequest request, CancellationToken cancellationToken)
+    public async Task<List<RegistrationModeListDto>> QueryAsync(GetRegistrationModeListRequest request, CancellationToken cancellationToken)
     {
         var registrationModes = await _registrationModeRepository.GetAll();
         return registrationModes.Select(RegistrationMapper.ToListItem).ToList();

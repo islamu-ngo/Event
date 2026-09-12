@@ -32,8 +32,6 @@ public static partial class LocationMapper
     [MapperIgnoreSource(nameof(Location.CreatedBy))]
     [MapperIgnoreSource(nameof(Location.UpdatedAt))]
     [MapperIgnoreSource(nameof(Location.UpdatedBy))]
-    [MapProperty(nameof(Location.Address), nameof(LocationDto.Address), Use = nameof(PreserveOptionalText))]
-    [MapProperty(nameof(Location.Postcode), nameof(LocationDto.Postcode), Use = nameof(PreserveOptionalText))]
     [MapProperty(nameof(Location.Pii), nameof(LocationDto.Latitude), Use = nameof(Latitude))]
     [MapProperty(nameof(Location.Pii), nameof(LocationDto.Longitude), Use = nameof(Longitude))]
     public static partial LocationDto? ToDetail(Location? source);
@@ -64,11 +62,8 @@ public static partial class LocationMapper
     [MapperIgnoreSource(nameof(Location.CreatedBy))]
     [MapperIgnoreSource(nameof(Location.UpdatedAt))]
     [MapperIgnoreSource(nameof(Location.UpdatedBy))]
-    [MapProperty(nameof(Location.Address), nameof(LocationListDto.Address), Use = nameof(PreserveOptionalText))]
     public static partial LocationListDto ToListItem(Location source);
 
-    // Existing required DTO strings serialize null when PII is absent or erased, not empty text.
-    private static string PreserveOptionalText(string? value) => value!;
     private static double? Latitude(LocationPii? pii) => pii?.GetCoordinate()?.Latitude;
     private static double? Longitude(LocationPii? pii) => pii?.GetCoordinate()?.Longitude;
 }

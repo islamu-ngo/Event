@@ -51,6 +51,13 @@ MCP event search and detail outputs preserve the same optional-label semantics.
 Session detail and list responses also permit a null parent `eventTitle` when
 the related event data is absent; this does not change the parent identifier.
 
+## Optional location addresses
+
+Location detail and list responses can contain a null `address`; location detail
+can also contain a null `postcode`. The schema and generated clients acknowledge
+those existing values when address data is absent. Missing address text is not an
+erasure-status signal and does not grant access to private location data.
+
 ## Version negotiation
 
 Use one of:

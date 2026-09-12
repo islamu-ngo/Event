@@ -1,0 +1,33 @@
+# Location address output nullability.
+Change-Id: CHG-01M2AA9VEJ6TFD1TTZVG7ZAXB1
+Title: "Reflect nullable location address labels"
+Type: fix
+Scope: events
+Summary: "Location detail and list contracts now declare already-possible null address and postcode values when address PII is absent or erased, without changing disclosure authority."
+Group: location-projection-nullability
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/public/api-reference/README.md
+    Disposition: not-applicable
+    Detail: Existing response values and required property presence remain unchanged.
+  Security:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: documented
+    Detail: Missing address PII remains absent; ownership, consent, coordinates and disclosure authority are unchanged.
+  Migration:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: No database migration.
+  Configuration:
+    Reference: docs/internal/ARCHITECTURE.md
+    Disposition: not-applicable
+    Detail: No configuration changes.
+  OpenAPI:
+    Reference: docs/public/api-reference/README.md
+    Disposition: documented
+    Detail: Raw and HAL location contracts and generated clients permit existing null address and postcode values.
+  Operator:
+    Reference: docs/public/api-reference/README.md
+    Disposition: documented
+    Detail: Render optional address text without inferring erasure status or access permission.

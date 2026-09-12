@@ -4,8 +4,8 @@ public sealed record LocationDto
 {
     public Guid Id { get; init; }
     public required string FullName { get; init; }
-    public required string Address { get; init; }
-    public required string Postcode { get; init; }
+    public required string? Address { get; init; }
+    public required string? Postcode { get; init; }
     public required string Country { get; init; }
     public required string City { get; init; }
     public double? Latitude { get; init; }

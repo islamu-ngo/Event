@@ -357,6 +357,14 @@ retaining the parent identity and status fields.
 No profile data is reconstructed, and this mapping change does not alter
 repository tenant filtering, authorization, transactions or cache ownership.
 
+## Location Response Nullability
+
+`LocationMapper` preserves absent address PII as null `Address` and `Postcode`
+values. The detail/list DTO annotations, generated schemas and client types
+represent those existing values directly, without a null-forgiving identity
+conversion. This does not change location classification, ownership, consent,
+coordinate extraction or the existing location disclosure service.
+
 ## Contract Value Semantics
 
 Handwritten immutable contracts follow the [canonical record-selection policy](GOVERNANCE.md#canonical-record-selection-policy); [RECORD_CONTRACTS.md](RECORD_CONTRACTS.md) is the contributor implementation guide. Concrete Application native and remaining MediatR requests, immutable DTO/payload snapshots, valid-state command results, and structurally eligible generated browser response/value contracts use record semantics. EF entities, persisted outbox lifecycle rows, generated protocol inputs and HAL/inherited/file/exception shapes, and Blazor edit/component state remain classes. This is a shallow immutability boundary: every published collection-bearing handwritten record exposes a read-only/immutable shape and copies mutable input, while generated records preserve NSwag collection shapes and keep only System.Text.Json extension data settable.

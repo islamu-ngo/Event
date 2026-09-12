@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Reflection;
+using Explore.Application.DTOs.Location;
 using Explore.Application.Mappings;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -13,6 +15,17 @@ public sealed class LocationMapperTests
     private static readonly Guid TenantId = Guid.Parse("01900000-0000-7000-8000-000000000082");
     private static readonly Guid Stamp = Guid.Parse("01900000-0000-7000-8000-000000000083");
     private static readonly Guid OwnerId = Guid.Parse("01900000-0000-7000-8000-000000000084");
+
+    [Test]
+    [Arguments(typeof(LocationDto), nameof(LocationDto.Address))]
+    [Arguments(typeof(LocationDto), nameof(LocationDto.Postcode))]
+    [Arguments(typeof(LocationListDto), nameof(LocationListDto.Address))]
+    public async Task AddressLabels_DeclareTheirExistingNullableOutputContract(Type contract, string label)
+    {
+        var property = contract.GetProperty(label)!;
+        await Assert.That(new NullabilityInfoContext().Create(property).ReadState)
+            .IsEqualTo(NullabilityState.Nullable);
+    }
 
     [Test]
     [Arguments(false, "provider")]

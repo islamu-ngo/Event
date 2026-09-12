@@ -173261,12 +173261,10 @@ namespace Explore.Blazor.Client.Clients
         public string FullName { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("address")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Address { get; set; } = default!;
+        public string? Address { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("postcode")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Postcode { get; set; } = default!;
+        public string? Postcode { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("country")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
@@ -173332,8 +173330,7 @@ namespace Explore.Blazor.Client.Clients
         public string FullName { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("address")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Address { get; set; } = default!;
+        public string? Address { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("city")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
@@ -181974,12 +181971,10 @@ namespace Explore.Blazor.Client.Clients
         public string FullName { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("address")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Address { get; init; } = default!;
+        public string? Address { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("postcode")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Postcode { get; init; } = default!;
+        public string? Postcode { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("country")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
@@ -182038,8 +182033,7 @@ namespace Explore.Blazor.Client.Clients
         public string FullName { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("address")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        public string Address { get; init; } = default!;
+        public string? Address { get; init; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("city")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]

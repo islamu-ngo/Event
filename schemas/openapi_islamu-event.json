@@ -140650,10 +140650,16 @@
             "type": "string"
           },
           "address": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "postcode": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "country": {
             "type": "string"
@@ -140734,7 +140740,10 @@
             "type": "string"
           },
           "address": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "city": {
             "type": "string"
@@ -153535,10 +153544,16 @@
             "type": "string"
           },
           "address": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "postcode": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "country": {
             "type": "string"
@@ -153605,7 +153620,10 @@
             "type": "string"
           },
           "address": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "city": {
             "type": "string"

@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Security.Claims;
 using Explore.API.Hateoas;
 using Explore.API.Hateoas.Assemblers;
@@ -278,8 +279,7 @@ public sealed class RegistrationFormEventLinkPolicyTests
     [Test]
     public async Task ProviderMappingRouteAndDtosAreStructuredWithoutRawJsonArtifact()
     {
-        var route = typeof(RegistrationProviderManagementController)
-            .GetMethod(nameof(RegistrationProviderManagementController.ReplaceMappings))!
+        var route = ProviderFamilyAction(nameof(RegistrationProviderBindingsController.ReplaceMappings))
             .GetCustomAttributes(typeof(HttpPutAttribute), inherit: true)
             .Cast<HttpPutAttribute>()
             .Single();
@@ -385,8 +385,7 @@ public sealed class RegistrationFormEventLinkPolicyTests
     [Test]
     public async Task LaunchDescriptorRouteContract_IncludesChannelLineageBeforeBinding()
     {
-        var route = typeof(RegistrationProviderManagementController)
-            .GetMethod(nameof(RegistrationProviderManagementController.GetLaunchDescriptor))!
+        var route = ProviderFamilyAction(nameof(RegistrationProviderChannelsController.GetLaunchDescriptor))
             .GetCustomAttributes(typeof(HttpGetAttribute), inherit: true)
             .Cast<HttpGetAttribute>()
             .Single();
@@ -398,23 +397,36 @@ public sealed class RegistrationFormEventLinkPolicyTests
     [Test]
     public async Task ProviderManagementController_IsAuthenticatedPrivateNoStoreSurface()
     {
-        Type controller = typeof(RegistrationProviderManagementController);
+        Type[] controllers = typeof(EventControllerBase).Assembly.GetTypes()
+            .Where(type => !type.IsAbstract && typeof(EventControllerBase).IsAssignableFrom(type) && type.GetCustomAttributes<RouteAttribute>().Any(route => route.Template == "api/tenants/{tenantId:guid}/events/{eventId:guid}/registration-providers"))
+            .ToArray();
 
-        await Assert.That(controller.GetCustomAttributes(typeof(AuthorizeAttribute), inherit: true)).HasSingleItem();
-        await Assert.That(controller.GetCustomAttributes(typeof(RouteAttribute), inherit: true)
-            .Cast<RouteAttribute>()
-            .Single()
-            .Template).IsEqualTo("api/tenants/{tenantId:guid}/events/{eventId:guid}/registration-providers");
-        foreach (string actionName in new[] { "GetHealth", "GetQueue", "PollReconciliation", "QueueManualImport", "RetryQueueItem", "ResolveQueueItem" })
+        await Assert.That(controllers).IsNotEmpty();
+        foreach (Type controller in controllers)
         {
-            var method = controller.GetMethod(actionName)!;
-            await Assert.That(method.GetCustomAttributes(typeof(PrivateNoStoreAttribute), inherit: true)).HasSingleItem();
-            await Assert.That(method.GetCustomAttributes(typeof(ProducesResponseTypeAttribute), inherit: true)
-                .Cast<ProducesResponseTypeAttribute>()
-                .Select(attribute => attribute.StatusCode)).Contains(StatusCodes.Status401Unauthorized);
-            await Assert.That(method.GetCustomAttributes(typeof(ProducesResponseTypeAttribute), inherit: true)
-                .Cast<ProducesResponseTypeAttribute>()
-                .Select(attribute => attribute.StatusCode)).Contains(StatusCodes.Status403Forbidden);
+            await Assert.That(controller.GetCustomAttributes(typeof(AuthorizeAttribute), inherit: true)).HasSingleItem();
+            await Assert.That(controller.GetCustomAttributes(typeof(RouteAttribute), inherit: true)
+                .Cast<RouteAttribute>()
+                .Single()
+                .Template).IsEqualTo("api/tenants/{tenantId:guid}/events/{eventId:guid}/registration-providers");
+            MethodInfo[] actions = controller.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+            await Assert.That(actions).IsNotEmpty();
+            foreach (MethodInfo method in actions)
+            {
+                await Assert.That(method.GetCustomAttributes(typeof(PrivateNoStoreAttribute), inherit: true)).HasSingleItem();
+                await Assert.That(method.GetCustomAttributes(typeof(ProducesResponseTypeAttribute), inherit: true)
+                    .Cast<ProducesResponseTypeAttribute>()
+                    .Select(attribute => attribute.StatusCode)).Contains(StatusCodes.Status401Unauthorized);
+                await Assert.That(method.GetCustomAttributes(typeof(ProducesResponseTypeAttribute), inherit: true)
+                    .Cast<ProducesResponseTypeAttribute>()
+                    .Select(attribute => attribute.StatusCode)).Contains(StatusCodes.Status403Forbidden);
+            }
         }
     }
+
+    private static MethodInfo ProviderFamilyAction(string actionName) =>
+        typeof(EventControllerBase).Assembly.GetTypes()
+            .Where(type => !type.IsAbstract && typeof(EventControllerBase).IsAssignableFrom(type) && type.GetCustomAttributes<RouteAttribute>().Any(route => route.Template == "api/tenants/{tenantId:guid}/events/{eventId:guid}/registration-providers"))
+            .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+            .Single(method => method.Name == actionName);
 }

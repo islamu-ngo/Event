@@ -22,6 +22,18 @@ A resource or collection may expose relations such as `self`, `edit`, `delete`, 
 
 Do not construct mutation URLs from naming conventions or enable controls from local roles/claims. A link may disappear after state, tenant, policy, concurrency, or provider changes. Refresh the representation after a mutation or authorization-relevant event.
 
+## Registration provider administration
+
+Registration provider management remains one `RegistrationProviderManagement` API/SDK
+group under `/api/tenants/{tenantId}/events/{eventId}/registration-providers`. It covers
+connections and approved origins; external schema imports, bindings and mappings;
+channels and launch descriptors; and health, queue and reconciliation.
+
+All of these endpoints require authentication, including reads, and use private,
+no-store responses. Follow the permission-checked HAL links for available actions.
+The server's capability split does not change endpoint URLs, operation names, API
+version `0.1`, or JSON/HAL media types; no client routing or SDK-group migration is required.
+
 ## Pagination
 
 List operations use 1-based pages:

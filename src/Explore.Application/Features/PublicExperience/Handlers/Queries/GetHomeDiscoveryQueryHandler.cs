@@ -459,7 +459,7 @@ public sealed partial class GetHomeDiscoveryQueryHandler(
         Federation = source.Federation
     };
 
-    private static string Bound(string value, int maximumLength) =>
+    private static string Bound(string? value, int maximumLength) =>
         BoundNullable(value, maximumLength) ?? string.Empty;
 
     private static string? BoundNullable(string? value, int maximumLength)

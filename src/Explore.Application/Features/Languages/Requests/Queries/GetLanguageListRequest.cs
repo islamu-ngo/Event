@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using Explore.Application.DTOs.Language;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Languages.Requests.Queries;
 
-public sealed record GetLanguageListRequest : IRequest<List<LanguageListDto>>
+public sealed record GetLanguageListRequest : IQuery<List<LanguageListDto>>
 {
 }

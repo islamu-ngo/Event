@@ -5,7 +5,7 @@ using Explore.API.Attributes;
 using Explore.API.Hateoas;
 using Explore.Application.DTOs.ActorType;
 using Explore.Application.Features.ActorTypes.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -17,7 +17,9 @@ namespace Explore.API.Controllers;
 [Route("api/[controller]")]
 [ApiController]
 [EndpointClassification(EndpointClass.Public)]
-public class ActorTypeController(IMediator mediator) : ControllerBase
+public class ActorTypeController(
+    IQueryHandler<GetActorTypeListRequest, List<ActorTypeListDto>> listQuery,
+    IQueryHandler<GetActorTypeDetailsRequest, ActorTypeDto?> detailQuery) : ControllerBase
 {
     // GET: api/actortype
     [HttpGet(Name = RouteNames.GetActorTypes)]
@@ -27,7 +29,7 @@ public class ActorTypeController(IMediator mediator) : ControllerBase
     [ProducesResponseType(typeof(List<ActorTypeListDto>), StatusCodes.Status200OK)]
     [OutputCache(PolicyName = "LookupData")]
     public async Task<ActionResult<List<ActorTypeListDto>>> GetAll(CancellationToken cancellationToken = default) =>
-        Ok(await mediator.Send(new GetActorTypeListRequest(), cancellationToken));
+        Ok(await listQuery.QueryAsync(new GetActorTypeListRequest(), cancellationToken));
 
     // GET: api/actortype/{id}
     [HttpGet("{id}", Name = RouteNames.GetActorTypeById)]
@@ -38,5 +40,5 @@ public class ActorTypeController(IMediator mediator) : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<ActorTypeDto>> GetById(int id, CancellationToken cancellationToken = default) =>
-        Ok(await mediator.Send(new GetActorTypeDetailsRequest { Id = id }, cancellationToken));
+        Ok(await detailQuery.QueryAsync(new GetActorTypeDetailsRequest { Id = id }, cancellationToken));
 }

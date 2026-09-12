@@ -4,11 +4,11 @@ using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ActorType;
 using Explore.Application.Features.ActorTypes.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ActorTypes.Handlers.Queries;
 
-public class GetActorTypeDetailsRequestHandler : IRequestHandler<GetActorTypeDetailsRequest, ActorTypeDto>
+public class GetActorTypeDetailsRequestHandler : IQueryHandler<GetActorTypeDetailsRequest, ActorTypeDto?>
 {
     private readonly IActorTypeRepository _actorTypeRepository;
 
@@ -17,9 +17,9 @@ public class GetActorTypeDetailsRequestHandler : IRequestHandler<GetActorTypeDet
         _actorTypeRepository = actorTypeRepository;
     }
 
-    public async Task<ActorTypeDto> Handle(GetActorTypeDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<ActorTypeDto?> QueryAsync(GetActorTypeDetailsRequest request, CancellationToken cancellationToken)
     {
         var actorType = await _actorTypeRepository.GetById(request.Id);
-        return ActorTypeMapper.ToDetail(actorType)!;
+        return ActorTypeMapper.ToDetail(actorType);
     }
 }

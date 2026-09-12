@@ -5,11 +5,11 @@ using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ActorType;
 using Explore.Application.Features.ActorTypes.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ActorTypes.Handlers.Queries;
 
-public class GetActorTypeListRequestHandler : IRequestHandler<GetActorTypeListRequest, List<ActorTypeListDto>>
+public class GetActorTypeListRequestHandler : IQueryHandler<GetActorTypeListRequest, List<ActorTypeListDto>>
 {
     private readonly IActorTypeRepository _actorTypeRepository;
 
@@ -18,7 +18,7 @@ public class GetActorTypeListRequestHandler : IRequestHandler<GetActorTypeListRe
         _actorTypeRepository = actorTypeRepository;
     }
 
-    public async Task<List<ActorTypeListDto>> Handle(GetActorTypeListRequest request, CancellationToken cancellationToken)
+    public async Task<List<ActorTypeListDto>> QueryAsync(GetActorTypeListRequest request, CancellationToken cancellationToken)
     {
         var actorTypes = await _actorTypeRepository.GetAll();
         return actorTypes.Select(ActorTypeMapper.ToListItem).ToList();

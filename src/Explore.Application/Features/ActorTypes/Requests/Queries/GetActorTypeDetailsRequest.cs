@@ -1,6 +1,6 @@
 using Explore.Application.DTOs.ActorType;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ActorTypes.Requests.Queries;
 
-public sealed record GetActorTypeDetailsRequest(int Id = default) : IRequest<ActorTypeDto>;
+public sealed record GetActorTypeDetailsRequest(int Id = default) : IQuery<ActorTypeDto?>;

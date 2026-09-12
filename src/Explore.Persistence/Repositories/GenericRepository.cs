@@ -5,6 +5,7 @@ using System.Linq.Expressions;
 using Explore.Application.Contracts.Persistence;
 using Explore.Domain.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Npgsql;
 
 namespace Explore.Persistence.Repositories;
@@ -46,9 +47,18 @@ public class GenericRepository<T, TKey> : IGenericRepository<T, TKey> where T : 
         // Check if entity supports soft delete
         if (entity is ISoftDeletable)
         {
-            // Soft delete: Mark entity as deleted (SaveChangesAsync override handles the rest)
-            _dbContext.Entry(entity).State = EntityState.Deleted;
-            await _dbContext.SaveChangesAsync();
+            var cascadeTiming = _dbContext.ChangeTracker.CascadeDeleteTiming;
+            try
+            {
+                // Convert to a soft delete before EF processes required relationships.
+                _dbContext.ChangeTracker.CascadeDeleteTiming = CascadeTiming.OnSaveChanges;
+                _dbContext.Entry(entity).State = EntityState.Deleted;
+                await _dbContext.SaveChangesAsync();
+            }
+            finally
+            {
+                _dbContext.ChangeTracker.CascadeDeleteTiming = cascadeTiming;
+            }
         }
         else
         {

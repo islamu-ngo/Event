@@ -1,0 +1,32 @@
+# Trusted parent authority for group notification preferences.
+Change-Id: CHG-01M2D90AQFYY124ZJ1MJKYMKD3
+Title: "Restore parent organization administration of group notification preferences"
+Type: fix
+Scope: notifications
+Summary: "Restore group notification preference management and HAL actions for parent organization administrators using trusted tenant-scoped participation facts, without granting GroupAdmin-only mutation rights."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/NOTIFICATIONS.md
+    Disposition: not-applicable
+    Detail: No route, DTO, or bundled role-policy change.
+  Security:
+    Reference: docs/internal/NOTIFICATIONS.md
+    Disposition: documented
+    Detail: Persisted group and parent participation facts restore existing parent administrator rights; missing or foreign participation fails before provider shortcuts, and group IDs cannot substitute for organization IDs.
+  Migration:
+    Reference: docs/internal/NOTIFICATIONS.md
+    Disposition: not-applicable
+    Detail: No schema or data migration.
+  Configuration:
+    Reference: docs/internal/NOTIFICATIONS.md
+    Disposition: not-applicable
+    Detail: No configuration changes or new provider requirements.
+  OpenAPI:
+    Reference: docs/internal/NOTIFICATIONS.md
+    Disposition: not-applicable
+    Detail: HTTP schemas and generated client contracts remain unchanged.
+  Operator:
+    Reference: docs/public/documentation/readme/communications-and-notifications/in-app-notifications.md
+    Disposition: documented
+    Detail: Parent organization administrators regain group preference save and mute actions; GroupAdmin-only users receive no new mutation rights.

@@ -2,6 +2,8 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Webhooks;
 using Explore.Application.Exceptions;
+using Explore.Application.Features.Notifications.Requests.Commands;
+using Explore.Application.Features.Notifications.Requests.Queries;
 using Explore.Domain;
 
 namespace Explore.Application.Authorization;
@@ -23,7 +25,9 @@ public sealed class AuthorizationResourceContextResolver(
     IEventSessionRepository? eventSessionRepository = null,
     IRegistrationInventoryRepository? registrationInventoryRepository = null,
     IWebhookOwnershipScopeResolver? webhookOwnershipScopeResolver = null,
-    ITenantContext? tenantContext = null)
+    ITenantContext? tenantContext = null,
+    IGroupTenantRepository? groupTenantRepository = null,
+    IOrganizationTenantRepository? organizationTenantRepository = null)
 {
     public async Task<AuthorizationContext> ResolveAsync<TRequest>(
         TRequest request,
@@ -50,6 +54,19 @@ public sealed class AuthorizationResourceContextResolver(
                 WebhookOwnershipAuthorizationFacts.From(ownership));
         }
 
+        Guid? preferenceGroupId = request switch
+        {
+            GetGroupNotificationPreferenceMatrixQuery query => query.GroupId,
+            UpdateGroupNotificationPreferenceMatrixCommand command => command.GroupId,
+            SetGroupNotificationPreferenceMuteCommand command => command.GroupId,
+            _ => null
+        };
+        if (resourceKind == ResourceKinds.Group && preferenceGroupId is { } groupId)
+        {
+            var groupFacts = await ResolveGroupPreferenceFactsAsync(groupId, action, cancellationToken);
+            return new AuthorizationContext(groupId.ToString("D"), groupFacts);
+        }
+
         var facts = await ResolveTrustedFactsAsync(resourceKind, resourceId, declaredFacts, cancellationToken);
 
         if (resourceKind is ResourceKinds.RegistrationForm or ResourceKinds.RegistrationOrder && facts is null)
@@ -58,6 +75,31 @@ public sealed class AuthorizationResourceContextResolver(
         }
 
         return new AuthorizationContext(resourceId, facts);
+    }
+
+    private async Task<GroupAuthorizationFacts> ResolveGroupPreferenceFactsAsync(
+        Guid groupId,
+        string action,
+        CancellationToken cancellationToken)
+    {
+        if (tenantContext is null || groupTenantRepository is null || organizationTenantRepository is null)
+            throw new AuthorizationException(ResourceKinds.Group, action);
+
+        var tenantId = tenantContext.TenantId;
+        var group = await groupTenantRepository.GetByGroupAndTenant(groupId, tenantId, cancellationToken);
+        if (group is null || group.TenantId != tenantId || group.IsDeleted || group.Group.IsDeleted)
+            throw new AuthorizationException(ResourceKinds.Group, action);
+
+        OrganizationTenant? parent = null;
+        if (group.ParentOrganizationTenantId is { } parentId)
+        {
+            parent = await organizationTenantRepository.GetById(parentId);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (parent is null || parent.TenantId != tenantId || parent.IsDeleted)
+                throw new AuthorizationException(ResourceKinds.Group, action);
+        }
+
+        return new GroupAuthorizationFacts(tenantId, groupId, parent?.OrganizationId);
     }
 
     private async Task<IAuthorizationFacts?> ResolveTrustedFactsAsync(

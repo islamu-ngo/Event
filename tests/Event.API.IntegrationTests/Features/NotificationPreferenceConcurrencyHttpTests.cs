@@ -19,7 +19,7 @@ public sealed class NotificationPreferenceConcurrencyHttpTests
     private const string Path = "/api/notification/preferences/me";
 
     [Test]
-    public async Task OverlappingValidatedUpsertsConvergeOnOneCellInsideSerializableTransactions()
+    public async Task OverlappingTransactionAdmissionsConvergeOnOneCellWithSerializableIsolation()
     {
         var gate = new NotificationTransactionGate();
         await using var factory = await NotificationHttpFixture.CreateAsync(gate);
@@ -47,7 +47,7 @@ public sealed class NotificationPreferenceConcurrencyHttpTests
     }
 
     [Test]
-    public async Task ErasureFenceArrivingAfterValidationPreventsPreferenceRematerialization()
+    public async Task ErasureFenceArrivingBeforeTransactionAdmissionLeavesEffectivePreferenceDisabled()
     {
         var gate = new NotificationTransactionGate();
         await using var factory = await NotificationHttpFixture.CreateAsync(gate);
@@ -81,7 +81,7 @@ public sealed class NotificationPreferenceConcurrencyHttpTests
     }
 
     [Test]
-    public async Task RequestAbortedBeforeCommitCannotApplyAnAlreadyValidatedPreferencePatch()
+    public async Task RequestAbortedBeforeTransactionAdmissionLeavesEffectivePreferenceDisabled()
     {
         var gate = new NotificationTransactionGate();
         await using var factory = await NotificationHttpFixture.CreateAsync(gate);

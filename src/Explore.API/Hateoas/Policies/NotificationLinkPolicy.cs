@@ -153,6 +153,10 @@ public sealed class NotificationPreferenceMatrixLinkPolicy :
                 (string?)null)
         };
 
+        IAuthorizationFacts? permissionFacts = dto.Scope == "group" && dto.GroupId is { } groupId
+            ? new GroupAuthorizationFacts(dto.TenantId, groupId, dto.OrganizationId)
+            : null;
+
         yield return new LinkDefinition(
             LinkRelations.Self,
             selfRoute,
@@ -170,7 +174,8 @@ public sealed class NotificationPreferenceMatrixLinkPolicy :
             RequiresAuth: true,
             PermissionResourceKind: permissionResourceKind,
             PermissionAction: permissionResourceKind is null ? null : AuthorizationActions.Update,
-            PermissionResourceId: permissionResourceId);
+            PermissionResourceId: permissionResourceId,
+            PermissionFacts: permissionFacts);
 
         yield return new LinkDefinition(
             "set-mute",
@@ -181,7 +186,8 @@ public sealed class NotificationPreferenceMatrixLinkPolicy :
             RequiresAuth: true,
             PermissionResourceKind: permissionResourceKind,
             PermissionAction: permissionResourceKind is null ? null : AuthorizationActions.Update,
-            PermissionResourceId: permissionResourceId);
+            PermissionResourceId: permissionResourceId,
+            PermissionFacts: permissionFacts);
 
         if (dto.Scope == "user")
         {

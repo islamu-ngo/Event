@@ -51,9 +51,12 @@ public sealed class NotificationControllerTests
     public async Task ScopedPreferenceMutationLinksRequireUpdatePermission(string scope, string expectedResourceKind)
     {
         var resourceId = Guid.CreateVersion7();
+        var tenantId = Guid.CreateVersion7();
+        var parentOrganizationId = Guid.CreateVersion7();
         var links = new NotificationPreferenceMatrixLinkPolicy().GetLinks(new NotificationPreferenceMatrixDto
         {
-            Scope = scope, OrganizationId = scope == "organization" ? resourceId : null,
+            TenantId = tenantId,
+            Scope = scope, OrganizationId = scope == "organization" ? resourceId : parentOrganizationId,
             GroupId = scope == "group" ? resourceId : null
         }, user: null).Where(link => link.Rel is "save" or "set-mute").ToArray();
         await Assert.That(links.Length).IsEqualTo(2);
@@ -62,6 +65,8 @@ public sealed class NotificationControllerTests
             await Assert.That(link.PermissionResourceKind).IsEqualTo(expectedResourceKind);
             await Assert.That(link.PermissionAction).IsEqualTo(AuthorizationActions.Update);
             await Assert.That(link.PermissionResourceId).IsEqualTo(resourceId.ToString());
+            if (scope == "group")
+                await Assert.That(link.PermissionFacts).IsEqualTo(new GroupAuthorizationFacts(tenantId, resourceId, parentOrganizationId));
         }
     }
 
@@ -180,6 +185,7 @@ public sealed class NotificationControllerTests
     [Test]
     [Arguments("organization", false)]
     [Arguments("organization", true)]
+    [Arguments("group", false)]
     [Arguments("group", true)]
     public async Task ScopedPreferencesUsePersistedAdminFactsAndRejectForeignTenantAndNonmemberWrites(string scopeName, bool useCerbos)
     {
@@ -196,6 +202,14 @@ public sealed class NotificationControllerTests
         await PatchAsync(admin, $"/api/{scopeName}/{foreignId}/notification-preferences", HttpStatusCode.Forbidden, Cell("marketing", "email", true));
         using (var foreignMute = await admin.PutAsJsonAsync($"/api/{scopeName}/{foreignId}/notification-preferences/mute", new SetNotificationPreferenceMuteDto { IsMuted = true }))
             await Assert.That(foreignMute.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+        using (var detail = await admin.GetAsync(path))
+        {
+            await Assert.That(detail.StatusCode).IsEqualTo(HttpStatusCode.OK);
+            using var document = JsonDocument.Parse(await detail.Content.ReadAsStringAsync());
+            var links = document.RootElement.GetProperty("_links");
+            await Assert.That(links.TryGetProperty("save", out _)).IsTrue();
+            await Assert.That(links.TryGetProperty("set-mute", out _)).IsTrue();
+        }
         await PatchAsync(admin, path, HttpStatusCode.OK, Cell("marketing", "email", true));
         await PatchAsync(admin, path, HttpStatusCode.BadRequest, Cell("marketing", "email", false), Cell("account-security", "email", false));
         var matrix = (await admin.GetFromJsonAsync<NotificationPreferenceMatrixDto>(path))!;
@@ -211,15 +225,40 @@ public sealed class NotificationControllerTests
     }
 
     [Test]
-    public async Task LocalProviderRetainsItsExistingGroupAdminOnlyMutationDenial()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task GroupAdminWithoutParentOrganizationAuthorityCannotManagePreferences(bool useCerbos)
     {
-        await using var factory = await NotificationHttpFixture.CreateAsync();
-        using var client = factory.Client(factory.UserId);
+        await using var factory = await NotificationHttpFixture.CreateAsync(useCerbos: useCerbos);
+        using var client = factory.Client(factory.GroupAdminOnlyId);
         string path = $"/api/group/{factory.GroupId}/notification-preferences";
         await PatchAsync(client, path, HttpStatusCode.Forbidden, Cell("marketing", "email", true));
         using var mute = await client.PutAsJsonAsync(path + "/mute", new SetNotificationPreferenceMuteDto { IsMuted = true });
         await Assert.That(mute.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
         await Assert.That(FindCell((await client.GetFromJsonAsync<NotificationPreferenceMatrixDto>(path))!, "marketing", "email").IsEnabled).IsFalse();
+        using var detail = await client.GetAsync(path);
+        using var document = JsonDocument.Parse(await detail.Content.ReadAsStringAsync());
+        var links = document.RootElement.GetProperty("_links");
+        await Assert.That(links.TryGetProperty("save", out _)).IsFalse();
+        await Assert.That(links.TryGetProperty("set-mute", out _)).IsFalse();
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task MissingOrForeignGroupParticipationDeniesReadsAndMutations(bool useCerbos)
+    {
+        await using var factory = await NotificationHttpFixture.CreateAsync(useCerbos: useCerbos);
+        using var client = factory.Client(factory.UserId);
+        foreach (Guid groupId in new[] { factory.ForeignGroupId, Guid.CreateVersion7() })
+        {
+            string path = $"/api/group/{groupId}/notification-preferences";
+            using var detail = await client.GetAsync(path);
+            await Assert.That(detail.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+            await PatchAsync(client, path, HttpStatusCode.Forbidden, Cell("marketing", "email", true));
+            using var mute = await client.PutAsJsonAsync(path + "/mute", new SetNotificationPreferenceMuteDto { IsMuted = true });
+            await Assert.That(mute.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+        }
     }
 
     [Test]
@@ -337,6 +376,8 @@ public sealed class NotificationControllerTests
             await Assert.That(response.Content.Headers.ContentType!.MediaType).IsEqualTo(mediaType);
             using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
             await Assert.That(problem.RootElement.GetProperty("status").GetInt32()).IsEqualTo(400);
+            await Assert.That(problem.RootElement.TryGetProperty("traceId", out _)).IsTrue();
+            await Assert.That(problem.RootElement.TryGetProperty("timestamp", out _)).IsTrue();
             await Assert.That(problem.RootElement.GetProperty("errors").EnumerateObject().Any()).IsTrue();
         }
     }

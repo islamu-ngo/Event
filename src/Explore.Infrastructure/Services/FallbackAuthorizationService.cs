@@ -342,6 +342,10 @@ public partial class FallbackAuthorizationService : IAuthorizationProvider
             if (orgIdObj is string s && Guid.TryParse(s, out var parsed)) return parsed;
         }
 
+        // An unparented group has no organization authority, even if identifiers coincide.
+        if (resourceAttributes?.ContainsKey("groupId") == true)
+            return null;
+
         return Guid.TryParse(resourceId, out var fromId) ? fromId : null;
     }
 

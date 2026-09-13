@@ -30,6 +30,7 @@ internal sealed class NotificationHttpFixture : AuthenticatedWebApplicationFacto
     public NotificationTransactionGate? TransactionGate { get; private init; }
     public Guid UserId { get; private set; }
     public Guid StrangerId { get; private set; }
+    public Guid GroupAdminOnlyId { get; private set; }
     public Guid OtherTenantId { get; private set; }
     public Guid OrganizationId { get; private set; }
     public Guid GroupId { get; private set; }
@@ -56,10 +57,11 @@ internal sealed class NotificationHttpFixture : AuthenticatedWebApplicationFacto
             factory.UserId = organization.UserId;
             factory.OrganizationId = organization.OrganizationId;
             factory.StrangerId = (await TenantScenarioSeed.SeedActiveTenantWithUserAsync(context)).UserId;
+            factory.GroupAdminOnlyId = (await TenantScenarioSeed.SeedActiveTenantWithUserAsync(context)).UserId;
             factory.OtherTenantId = (await TenantScenarioSeed.SeedSecondaryTenantWithUserAsync(context)).TenantId;
             var parent = await context.OrganizationTenants.SingleAsync(row => row.OrganizationId == factory.OrganizationId);
-            factory.GroupId = AddGroup(context, factory.UserId, PlatformDefaults.DefaultTenantId, parent.Id);
-            factory.ForeignGroupId = AddGroup(context, factory.UserId, factory.OtherTenantId, null);
+            factory.GroupId = AddGroup(context, factory.GroupAdminOnlyId, PlatformDefaults.DefaultTenantId, parent.Id);
+            factory.ForeignGroupId = AddGroup(context, factory.GroupAdminOnlyId, factory.OtherTenantId, null);
             var foreignOrganization = new Organization
             {
                 Id = Guid.CreateVersion7(), ConcurrencyStamp = Guid.CreateVersion7(),
@@ -173,16 +175,14 @@ internal sealed class NotificationHttpFixture : AuthenticatedWebApplicationFacto
                 var response = new Cerbos.Api.V1.Response.CheckResourcesResponse();
                 foreach (var entry in request.Resources)
                 {
-                    string? membership = entry.Resource.Kind switch
-                    {
-                        ResourceKinds.Organization => "orgMemberships",
-                        ResourceKinds.Group => "groupMemberships",
-                        _ => null
-                    };
-                    bool allowed = membership is not null
-                        && request.Principal.Attr[membership].StructValue.Fields.TryGetValue(entry.Resource.Id, out var role)
-                        && role.StringValue == "admin"
-                        && entry.Resource.Attr["tenantId"].StringValue == PlatformDefaults.DefaultTenantId.ToString();
+                    string? organizationId = entry.Resource.Kind == ResourceKinds.Organization
+                        ? entry.Resource.Id
+                        : entry.Resource.Attr.TryGetValue("organizationId", out var parent) ? parent.StringValue : null;
+                    bool instanceAdmin = request.Principal.Attr["isInstanceAdmin"].BoolValue;
+                    bool tenantAdmin = request.Principal.Attr["tenantMemberships"].StructValue.Fields
+                        .ContainsKey(entry.Resource.Attr["tenantId"].StringValue);
+                    bool parentAdmin = organizationId is not null
+                        && request.Principal.Attr["orgMemberships"].StructValue.Fields.ContainsKey(organizationId);
                     var result = new Cerbos.Api.V1.Response.CheckResourcesResponse.Types.ResultEntry
                     {
                         Resource = new Cerbos.Api.V1.Response.CheckResourcesResponse.Types.ResultEntry.Types.Resource
@@ -190,8 +190,16 @@ internal sealed class NotificationHttpFixture : AuthenticatedWebApplicationFacto
                             Id = entry.Resource.Id, Kind = entry.Resource.Kind
                         }
                     };
+                    // Bounded provider-boundary model of the bundled organization/group policies:
+                    // authenticated view; administrative CRUD; never GroupAdmin-only management.
                     foreach (string action in entry.Actions)
+                    {
+                        bool allowed = entry.Resource.Kind is ResourceKinds.Organization or ResourceKinds.Group
+                            && (instanceAdmin || action == AuthorizationActions.View
+                                || (action is AuthorizationActions.Create or AuthorizationActions.Update or AuthorizationActions.Delete
+                                    && (tenantAdmin || parentAdmin)));
                         result.Actions.Add(action, allowed ? Effect.Allow : Effect.Deny);
+                    }
                     response.Results.Add(result);
                 }
                 return new CheckResourcesResponse(response);

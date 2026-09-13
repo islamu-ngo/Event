@@ -63,6 +63,36 @@ All notification endpoints require an authenticated user. Handler and repository
 | Organization preference matrix | `GET|PATCH /api/organization/{id}/notification-preferences` and `PUT /api/organization/{id}/notification-preferences/mute` |
 | Group preference matrix | `GET|PATCH /api/group/{id}/notification-preferences` and `PUT /api/group/{id}/notification-preferences/mute` |
 
+### Group preference authorization facts
+
+The three group preference operations resolve the selected `GroupTenant` in the
+current tenant before provider evaluation. When a parent organization participation
+is present, it must also exist in that tenant. Missing, deleted, or foreign
+participations fail with `403`, including for instance administrators; provider
+shortcuts cannot bypass this resource boundary.
+
+`AuthorizationResourceContextResolver` supplies persisted
+`GroupAuthorizationFacts(TenantId, GroupId, OrganizationId)` for these exact
+notification query/patch/mute requests. Caller-declared facts cannot replace the
+loaded parent. Other Group operations retain their existing resolution paths.
+`NotificationPreferenceMatrixLinkPolicy` supplies equivalent facts from the
+server-produced matrix for `save` and `set-mute`. Local authorization and Cerbos
+therefore evaluate the same parent organization for execution and HAL affordances.
+An unparented group has no organization authority: a group identifier must not be
+reinterpreted as an organization identifier.
+
+This restores the bundled policy, not a new role grant: parent OrgAdmin,
+current-tenant TenantAdmin, and InstanceAdmin can manage valid group preferences.
+GroupAdmin-only and unrelated users cannot patch or mute. Authenticated view
+permission remains unchanged, subject to the tenant participation boundary.
+
+The HTTP tests use real SQLite repositories and local authorization. Their Cerbos
+lane substitutes only the remote PDP client and verifies the emitted principal,
+action, tenant, and parent facts against a bounded model of the bundled rules; it
+is not evidence of live Cerbos policy execution. Concurrency tests gate transaction
+admission, not simultaneous active transactions or rollback after writes. The
+erasure-fence test observes effective preference state, not zero persisted rows.
+
 When documenting filters, use the source API names. For notification type filtering, use `notificationTypeId`; do not copy stale shorthand such as `type` unless the controller changes.
 
 Actor-subscription state and mutations are separate authenticated endpoints under `/api/actor-subscriptions`. `PATCH /api/actor-subscriptions/actors/{targetActorId}/notification-level` uses the route actor ID plus a body-owned concurrency stamp and nullable `notificationLevel` group; the body cannot select another actor. The API also exposes current-user subscription state, subscribe, and unsubscribe flows. UI affordances for subscription actions must be gated from HAL `_links` on actor, event organizer, and actor-subscription resources; clients must not infer those actions from local roles or claims.

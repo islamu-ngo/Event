@@ -376,11 +376,14 @@ Before executing or resuming, the agent discovers the active execution topology 
 | **Case A: Isolated Worktree In-Flight** | `.worktrees/<task>` exists (`git worktree list`) | `.worktrees/<task>` | `.worktrees/<task>/dev/active/<task>/` | **Resume in-place**: Skip setup steps and resume directly inside existing worktree on `feat/<task>`. If `AGENTS.local.md` exists in root and is missing in worktree, copy it: `cp AGENTS.local.md .worktrees/<task>/`. |
 | **Case B: In-Tree / Develop In-Flight** | `dev/active/<task>` exists in repo root with work already in progress (`[x]` tasks, commits, or explicit develop mandate) | Repository root (`.`) | `dev/active/<task>/` | **Respect in-tree execution**: Resume directly in the root workspace on the active branch. Do NOT create a worktree or move files. |
 | **Case C: Fresh Worktree Setup (Default New)** | Brand-new plan; `dev/active/<task>` at root; `.worktrees/<task>` does not exist | `.worktrees/<task>` | `.worktrees/<task>/dev/active/<task>/` | **Canonical worktree isolation**: Add branch and worktree, move the plan directory, and copy developer overrides:<br>`git fetch origin develop && git worktree add -b feat/<task> .worktrees/<task> origin/develop`<br>`mkdir -p .worktrees/<task>/dev/active && mv dev/active/<task> .worktrees/<task>/dev/active/`<br>`[ -f AGENTS.local.md ] && cp AGENTS.local.md .worktrees/<task>/` |
+| **Case D: Grand Multi-Cohort Execution (Hub-and-Spoke)** | Whole-codebase migrations spanning dozens of cohorts (e.g. 100+ entities) | `.worktrees/<task>` (Lead Hub)<br>`.worktrees/<task>--<cohort>` (Spokes) | `.worktrees/<task>/dev/active/<task>/` | **Hub-and-Spoke with Hyphenated Namespacing & Bounded Pooling**: Lead hub worktree acts as orchestrator and commit aggregator on `feat/<task>`. Spoke cohorts execute in temporary worktrees namespaced as `.worktrees/<task>--<cohort>` on `feat/<task>--<cohort>` with strict `*-ownership.md` disjoint paths.<br>**Prune-As-You-Go Rule**: Active worktrees are bounded to $\le 3–5$. Once a spoke cohort is verified and integrated into the hub branch, the agent **immediately prunes** the spoke worktree (`git worktree remove` and `git branch -d`). |
 
 > [!IMPORTANT]
 > **Single Source of Truth via `plan mv`**: Moving the triad from `dev/active/<task>` into `.worktrees/<task>/dev/active/<task>` guarantees a single source of truth, eliminates split-brain task lists, and ensures automatic garbage collection upon worktree removal.
 >
 > **Local Overrides Mirroring (`AGENTS.local.md`)**: `AGENTS.local.md` is **copied, never moved**. Because it contains machine-specific paths and flags, copying preserves developer overrides inside the isolated worktree while keeping the repository root intact for concurrent sessions.
+>
+> **Concurrent Multi-Agent Task Isolation & Boundary Blindness**: When multiple independent agents work on different tasks concurrently (e.g. Agent 1 on `mapping-and-cqs-migration`, Agent 2 on `ticket-transfers`), each agent is **strictly confined to its own task namespace** (`.worktrees/<task-name>*`). When listing or checking worktrees, agents must filter by their task name (`git worktree list | grep "/<task-name>"`). Agents are **strictly forbidden** from inspecting, reading, modifying, or pruning any worktree belonging to another task.
 
 #### 2. Resume Protocol & Working Memory Discipline
 
@@ -390,11 +393,16 @@ When cold-starting or resuming an in-flight workstream:
 3. **Re-Orientation Triggers**: The agent re-reads the full plan or downstream phases immediately if an unexpected blocker arises, domain model friction occurs, cross-phase contracts conflict, or the developer redirects requirements.
 4. **Inner Loop Baseline Sanity**: Run a fast Ring 1 sliced test in the target execution context (`Cwd`) before modifying code to verify the baseline is green.
 
-#### 3. Anti-Sprawl Task Ledger Guardrail
+#### 3. Anti-Sprawl Task Ledger & Rolling Context Compaction Guardrails
 
 - Active plan files live inside the resolved task folder (`.worktrees/<task>/dev/active/<task>/` or `dev/active/<task>/`).
 - **Permitted Mutations**: Executing agents check off completed tasks (`[x]`) and append atomic verification sub-bullets under an active task.
 - **Strictly Forbidden Sprawl**: Agents are strictly FORBIDDEN from creating new phase headings or inflating `tasks.md` with runtime finding tasks (which causes runaway 50+ item sprawls). New findings, bugs, or ideas belong in `context.md` notes or `dev/backlog/` graduation—never dynamically injected as feature scope without explicit developer alignment via a Decision Brief.
+- **Rolling Context Compaction Invariant (< 200–300 lines / < 15KB)**:
+  `*-context.md` is strictly **ephemeral working memory**, NOT a permanent historical log. In multi-phase or multi-cohort migrations, agents must NEVER accumulate dozens of pages of detailed commit logs, compiler traces, or test output digests in `context.md` (which exhausts token budgets upon cold resume). Once a phase or cohort is integrated and committed to Git:
+  1. Summarize the completed milestone into a concise 1-line checkpoint under `## Quick Resume`.
+  2. Archive detailed findings or lessons to `dev/_journal/` or the PR description.
+  3. Prune old ephemeral session logs from `context.md`. The Git commit history (`git log`) is the sole durable source of truth for commits, never markdown text dumps.
 
 #### 4. Phase-by-Phase Execution Cadence & Three-Tier Failure Triage
 
@@ -419,11 +427,12 @@ Representative `tasks.md` declarative commit contract:
 - **Files:** `src/Registration/HoldConfirmation.cs`, `tests/Registration/HoldConfirmationTests.cs`
 ```
 
-#### 5. Mid-Flight Workstream Slicing Trigger
+#### 5. Mid-Flight Workstream Slicing & Grand Migration Slicing Trigger
 
-If an approved plan spans > 3 functional domains or integration repairs reveal that downstream phases will trigger wide structural refactoring, the agent MUST proactively propose slicing the workstream via a Decision Brief:
-- **Ship Completed Phases**: Open a PR for completed, verified, green phases now to lock in value.
-- **Follow-up Worktree**: Spin off remaining phases into a clean follow-up worktree and plan.
+- **Mid-Flight Slicing Trigger**: If an approved plan spans > 3 functional domains or integration repairs reveal that downstream phases will trigger wide structural refactoring, the agent MUST proactively propose slicing the workstream via a Decision Brief:
+  - **Ship Completed Phases**: Open a PR for completed, verified, green phases now to lock in value.
+  - **Follow-up Worktree**: Spin off remaining phases into a clean follow-up worktree and plan.
+- **Grand Migration Staged Slicing**: When executing whole-framework or whole-codebase migrations spanning > 20 capability cohorts (e.g. `mapping-and-cqs-migration`), agents and architects must proactively structure the initiative into **Staged Vertical PRs** (e.g., *PR 1: Foundation & Lookups*, *PR 2: Core Domain*, *PR 3: System & Special Consumers*). This prevents massive 100+ commit mega-PRs that overwhelm reviewer capacity and risk deployment stalls.
 
 #### 6. Knowledge Graduation Gate (Mandatory Before PR)
 
@@ -694,6 +703,9 @@ git worktree remove .worktrees/<task-name>
 > - ❌ **NO Cryptic Shorthand or Plan-Opening Overhead**: Agents must never prompt the developer with bare phase/task IDs or gates (e.g., *"Proceed with P04/P06 while keeping P03 gates open?"*). All prompts and reports must be self-contained Decision Briefs so the developer never has to open `dev/active/<task>/...` to understand a question or decision.
 > - ❌ **NO Moving of `AGENTS.local.md`**: When establishing an isolated worktree, `AGENTS.local.md` must be copied, never moved. The root machine configuration must remain intact across multiple worktrees and tasks.
 > - ❌ **NO Deleting Worktrees Upon PR Creation**: The worktree `.worktrees/<task-name>` must remain parked and intact so bot reviews (Copilot, CodeQL) or CI check failures can be resolved immediately in-place with zero setup overhead. Teardown is strictly deferred until PR merge or explicit user confirmation.
+> - ❌ **NO Unbounded Worktree Accumulation**: In multi-cohort or Hub-and-Spoke tasks, agents must never leave dozens of inactive spoke worktrees sitting on disk. Prune spoke worktrees immediately upon successful integration into the hub branch, bounding active worktrees to $\le 3–5$.
+> - ❌ **NO Cross-Task Worktree Tampering**: Agents must never inspect, modify, or delete worktrees or branches outside their assigned `<task-name>` prefix. `git worktree list` commands must strictly grep for their own task prefix (`git worktree list | grep "/<task-name>"`).
+> - ❌ **NO Context Ledger Inflation**: Agents must never allow `*-context.md` to balloon into a multi-megabyte or hundreds-of-lines log of every commit. Use rolling checkpoints (< 200–300 lines) and delegate durable records to `dev/_journal/` or the Git commit graph.
 > - ❌ **NO Dynamic Scope Creep in `tasks.md`**: Executing agents must never create new phase headings or add runtime finding tasks to `tasks.md` (which causes runaway 50+ item sprawls). New findings belong in `context.md` notes or `dev/backlog/` graduation.
 > - ❌ **NO Yak-Shaving Unrelated Test Rot**: Never derail feature tasks to fix pre-existing failures in unrelated test suites. Isolate on clean base, log under `*-context.md` / `dev/backlog/`, and quarantine.
 

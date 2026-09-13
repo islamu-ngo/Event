@@ -41,6 +41,14 @@ priority: high
        ```
      - Moving preserves strict single-source-of-truth, eliminates split-brain checklists, and ensures clean garbage collection on worktree removal.
      - **Copy `AGENTS.local.md` (Never Move)**: If `AGENTS.local.md` exists in the repository root, copy it into `.worktrees/<task-name>/AGENTS.local.md`. It must be **copied (never moved)** so that local developer overrides and environment constraints remain in effect inside the isolated worktree while preserving the root configuration for subsequent sessions or tasks. (Because `AGENTS.local.md` is gitignored, it will not be staged or committed).
+   - **Case D: Grand Multi-Cohort Execution (Hub-and-Spoke Topology & Bounded Worker Pooling)**:
+     When a grand migration or refactoring spans dozens of cohorts (e.g. cross-cutting library cutovers), execution uses a **Lead Hub Worktree** (`.worktrees/<task-name>` on `feat/<task-name>`) and **Ephemeral Spoke Workers** (`.worktrees/<task-name>--<cohort>` on `feat/<task-name>--<cohort>`):
+     - **Hyphenated Task-Namespacing**: To eliminate collisions and human confusion across concurrent tasks, all spoke worktrees and branches MUST use the strict hyphenated prefix format: `.worktrees/<task-name>--<cohort>` on `feat/<task-name>--<cohort>`. Bare unprefixed worktree names (e.g. `.worktrees/<cohort>`) are strictly forbidden.
+     - **Cross-Task Blindness & Task-Bound Confinement**: An agent invoked for `<task-name>` is strictly confined to its own namespace (`.worktrees/<task-name>*`). When listing or checking worktrees, agents must filter by their task name (`git worktree list | grep "/<task-name>"`). Agents are **strictly forbidden** from reading, modifying, or pruning any worktree or branch outside their `<task-name>` boundary.
+     - **Bounded Worker Pool & Prune-As-You-Go Rule**: Agents must bound active worktrees to $\le 3-5$ across the task at any time. Agents are strictly FORBIDDEN from accumulating dozens of idle worktrees on disk (which causes massive `bin/`/`obj/` disk bloat and human cognitive alarm). As soon as a spoke cohort's commits are verified and integrated into the hub branch, the agent MUST immediately prune the spoke worktree (`git worktree remove .worktrees/<task-name>--<cohort>` and `git branch -d feat/<task-name>--<cohort>`).
+     - **Literal Ownership Packets (`*-ownership.md`)**: Every spoke cohort must author an explicit, disjoint file list. No two spokes may ever touch or edit the same file.
+     - **Leaf-First DAG Sequencing**: Handlers with zero internal callers (leaves) are migrated before upstream dependents to prevent cascading merge conflicts.
+     - **Single Hub PR**: The lead hub worktree (`.worktrees/<task-name>`) accumulates all verified commits from the spokes, runs Ring 3 whole-solution assurance, and issues the single pull request to `develop`. Only the hub worktree remains parked upon PR creation.
 3. **Resume Protocol & Working Memory Discipline**:
    When instructed to `resume <task>`, or when auto-detecting an in-flight plan:
    - **Holistic Orientation (Read Once per Session)**: On session start or cold resume, read `*-context.md` (`## Quick Resume`, current milestone, blockers), `*-tasks.md` (identify active phase and unchecked `[ ]` tasks), and read `*-plan.md` to establish the holistic mental model (system architecture, cross-cutting invariants, and downstream phase contracts). Never implement blind to future phase dependencies.
@@ -49,9 +57,14 @@ priority: high
    - **Inner Loop Baseline Sanity**: Run a fast Ring 1 sliced test (`--treenode-filter`) in the target execution context (`Cwd`) to verify the previous session's green baseline before modifying code.
    - **Quarantine Rot & Differential Baseline Attribution**: If an unexpected failure occurs outside touched paths (e.g. in Persistence or Architecture tests), do NOT debug or absorb it into this task. Run a differential baseline check against clean `origin/develop` (`git -C <repo-root> test --project <project> --filter "<FailingTest>"`). If it reproduces on `develop`, it is Class C baseline rot: log the failure signature under `## Quarantined Baseline Failures` in `*-context.md` and quarantine it immediately. Never derail the task to fix pre-existing baseline rot.
    - **Continue the Phased Loop**: Pick up execution directly at the first unchecked task `[ ]` in the active phase.
-4. **Dev-Doc Working Memory & Task Ledger Mutation Guardrails**:
+4. **Dev-Doc Working Memory, Task Ledger & Rolling Context Compaction**:
    - Active plan files (`tasks.md`, `context.md`) live inside the resolved task folder (`.worktrees/<task>/dev/active/<task>/` or `dev/active/<task>/`). Read and edit them using native harness file tools by deterministic path. Do not use ad-hoc shell scripts (`cat`, `sed`, `awk`) for file manipulation (Critical Rule #9).
    - **Anti-Sprawl Task Ledger Guardrail**: Executing agents may check off tasks `[x]` and append atomic verification sub-bullets under an active task. Agents are strictly FORBIDDEN from creating new phase headings or inflating `tasks.md` with runtime finding tasks (which causes runaway 50+ item sprawls). New findings, bugs, or ideas belong in `context.md` notes or `dev/backlog/` graduation—never dynamically injected as feature scope without explicit user alignment via a Decision Brief.
+   - **Rolling Context Compaction Invariant (< 200–300 lines / < 15KB)**:
+     `*-context.md` is strictly **ephemeral working memory**, NOT a permanent historical log. In multi-phase or multi-cohort migrations, agents must NEVER accumulate dozens of pages of detailed commit logs or test output digests in `context.md` (which exhausts token budgets upon cold resume). Once a phase or cohort is integrated and committed to Git:
+     1. Summarize the completed milestone into a concise 1-line checkpoint under `## Quick Resume`.
+     2. Archive detailed findings or lessons to `dev/_journal/` or the PR description.
+     3. Prune old ephemeral session logs from `context.md`. The Git commit history (`git log`) is the sole durable source of truth for commits, never markdown text dumps.
 5. **Phase-by-Phase Execution Cadence & Progressive Verification**:
    - **Red**: Author failing invariant/specification tests first for core domain, concurrency, state machines, and security boundaries. Shift pure domain invariants to `Event.Domain.UnitTests`. Scaffold compilable stub types/interfaces so the project builds cleanly while the test fails at runtime.
    - **Green**: Implement production code to satisfy invariants.
@@ -122,6 +135,7 @@ priority: high
 ```text
 1. Topology & Execution Context Discovery:
    Resolve target task directory and execution context (Worktree vs In-Tree):
+   - Always filter worktrees by task name: git worktree list | grep "/<task>" (never touch or inspect sibling worktrees).
    - Check if .worktrees/<task> exists (or git worktree list):
      -> FOUND: Topology = Worktree. Set Cwd = .worktrees/<task>, PlanPath = .worktrees/<task>/dev/active/<task>/.
         Skip worktree creation and plan mv. If AGENTS.local.md exists in root and is missing in worktree, copy it:
@@ -150,8 +164,9 @@ priority: high
       - Apply Three-Tier Failure Triage (Class A: fix, Class B: align or brief, Class C: quarantine)
       - Differential Baseline Check: verify unexpected failures against clean origin/develop
    d. Commit: git add -A && git commit using semantic phase contract from tasks.md
-   e. Update: batch checkbox updates in tasks.md (obey anti-sprawl ledger cap; never add dynamic finding tasks)
-   f. Pause / Slice: If phase boundary requires user decision or blast radius expands, output Decision Brief (propose Mid-Flight PR Slice if scope ballooned).
+   e. Update: batch checkbox updates in tasks.md (obey anti-sprawl ledger cap; never add dynamic finding tasks); apply Rolling Context Compaction to context.md (keep < 200–300 lines; summarize completed cohorts to 1-line checkpoints)
+   f. (If Hub-and-Spoke): author spoke in .worktrees/<task>--<cohort> on feat/<task>--<cohort>. Once spoke cohort commits integrate into hub branch, immediately prune spoke worktree: git worktree remove .worktrees/<task>--<cohort> && git branch -d feat/<task>--<cohort> (bound active worktrees <= 3–5)
+   g. Pause / Slice: If phase boundary requires user decision or blast radius expands, output Decision Brief (propose Mid-Flight PR Slice if scope ballooned).
 
 4. Knowledge Graduation (in resolved Cwd):
    a. Any deferred items? -> write dev/backlog/<slug>.md

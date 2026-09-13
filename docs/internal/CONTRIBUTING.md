@@ -35,7 +35,7 @@ For code changes, first prove the local stack can start from a clean checkout:
 
 ```bash
 cp .env.example .env
-aspire run --apphost Explore.AppHost/Explore.AppHost.csproj
+aspire run --apphost src/Explore.AppHost/Explore.AppHost.csproj
 ```
 
 This starts the full local Aspire topology by default. Contributors should use this path unless they intentionally need the Docker-only stack or a maintainer-specific external-infrastructure profile.
@@ -148,22 +148,22 @@ dotnet build --configuration Release --verbosity quiet
 Run each standard project individually — never use solution-level `dotnet test`:
 
 ```bash
-dotnet test --project Event.Domain.UnitTests/Event.Domain.UnitTests.csproj --configuration Release --verbosity quiet
-dotnet test --project Event.Application.UnitTests/Event.Application.UnitTests.csproj --configuration Release --verbosity quiet
-dotnet test --project Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --verbosity quiet
-dotnet test --project Explore.Secrets.UnitTests/Explore.Secrets.UnitTests.csproj --configuration Release --verbosity quiet
-dotnet test --project Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration Release --verbosity quiet -- --treenode-filter "/*/*/*/*[Category!=Runtime]" --minimum-expected-tests 1
-dotnet test --project Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --verbosity quiet
-dotnet test --project Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --verbosity quiet
-dotnet test --project Explore.Blazor.IntegrationTests/Explore.Blazor.IntegrationTests.csproj --configuration Release --verbosity quiet
-dotnet test --project Explore.Blazor.Client.Tests/Explore.Blazor.Client.Tests.csproj --configuration Release --verbosity quiet
+dotnet test --project tests/Event.Domain.UnitTests/Event.Domain.UnitTests.csproj --configuration Release --verbosity quiet
+dotnet test --project tests/Event.Application.UnitTests/Event.Application.UnitTests.csproj --configuration Release --verbosity quiet
+dotnet test --project tests/Event.Architecture.Tests/Event.Architecture.Tests.csproj --configuration Release --verbosity quiet
+dotnet test --project tests/Explore.Secrets.UnitTests/Explore.Secrets.UnitTests.csproj --configuration Release --verbosity quiet
+dotnet test --project tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration Release --verbosity quiet -- --treenode-filter "/*/*/*/*[Category!=Runtime]" --minimum-expected-tests 1
+dotnet test --project tests/Event.Persistence.IntegrationTests/Event.Persistence.IntegrationTests.csproj --configuration Release --verbosity quiet
+dotnet test --project tests/Event.API.IntegrationTests/Event.API.IntegrationTests.csproj --configuration Release --verbosity quiet
+dotnet test --project tests/Explore.Blazor.IntegrationTests/Explore.Blazor.IntegrationTests.csproj --configuration Release --verbosity quiet
+dotnet test --project tests/Explore.Blazor.Client.Tests/Explore.Blazor.Client.Tests.csproj --configuration Release --verbosity quiet
 ```
 
 When a change touches SMTP, EmailDispatch, or optional RabbitMQ transport, also run the focused runtime category that matches the change:
 
 ```bash
-dotnet test --project Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration Release --verbosity quiet -- --treenode-filter "/*/*/*/*[Category=Email]" --minimum-expected-tests 1
-dotnet test --project Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration Release --verbosity quiet -- --treenode-filter "/*/*/*/*[Category=RabbitMQ]" --minimum-expected-tests 1
+dotnet test --project tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration Release --verbosity quiet -- --treenode-filter "/*/*/*/*[Category=Email]" --minimum-expected-tests 1
+dotnet test --project tests/Explore.Infrastructure.Tests/Explore.Infrastructure.Tests.csproj --configuration Release --verbosity quiet -- --treenode-filter "/*/*/*/*[Category=RabbitMQ]" --minimum-expected-tests 1
 ```
 
 ### Step 3: Verify Architecture Tests
@@ -176,7 +176,7 @@ Architecture tests are CI gates — not optional. They enforce:
 - **Authorization parity** — every `ResourceKinds` constant has a Cerbos policy, a `FallbackAuthorizationService` case, and a JSON schema
 - **Descriptor coverage** — every `ResourceDescriptors` kind is a valid `ResourceKinds` constant
 - **Schema coverage** — every Cerbos policy YAML references both principal and resource schemas
-- **ABOUTME headers** — all C# files start with `ABOUTME:` comments
+- **Documentation & XML comments** — public symbols and classes have clear XML doc comments where non-inferable (legacy synthetic `ABOUTME:` headers in source code are retired)
 
 See [TESTING.md](TESTING.md) for the full list of architecture convention tests.
 
@@ -194,7 +194,7 @@ Every non-trivial PR must record one documentation impact outcome:
 
 ### File Conventions
 
-- Every file starts with a two-line `ABOUTME:` header
+- Source code is self-documenting through Clean Architecture naming, folder structure, and standard XML doc comments (`/// <summary>`) where non-inferable (synthetic `ABOUTME:` headers in `.cs` source code are retired; documentation files in `docs/internal/` and `.agents/` use natural Markdown metadata blocks or standard frontmatter)
 - File-scoped namespaces for all new C# files
 - No `as any`, `@ts-ignore`, or type error suppression equivalents
 - No empty catch blocks
@@ -273,7 +273,7 @@ Before submitting:
 - [ ] All 9 standard PR test projects pass individually
 - [ ] Architecture tests pass (layer deps, naming, accessibility, auth parity)
 - [ ] Documentation impact is recorded: `Updated`, `Not needed`, or `Deferred` with reason
-- [ ] New C# files have `ABOUTME:` headers
+- [ ] New C# files use self-documenting naming and XML doc comments (`/// <summary>`) where non-inferable
 - [ ] New CSS follows layer architecture and uses design tokens
 - [ ] API contract changes include docs updates (`docs/API.md`, `docs/API_CHANGELOG.md`)
 - [ ] Configuration portability changes regenerate both v1alpha2 JSON Schemas,

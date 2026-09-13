@@ -1,36 +1,38 @@
-using Explore.Application.Authorization;
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.DTOs.EventSeries;
 using Explore.Application.DTOs.EventSeries.Validators;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.EventSeries.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Services;
-using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 using DomainEventSeries = Explore.Domain.EventSeries;
 
 namespace Explore.Application.Features.EventSeries.Handlers.Commands;
 
-public class UpdateEventSeriesCommandHandler : IRequestHandler<UpdateEventSeriesCommand, BaseCommandResponse<Guid>>
+public class UpdateEventSeriesCommandHandler : ICommandHandler<UpdateEventSeriesCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventSeriesRepository _eventSeriesRepository;
     private readonly IStorageObjectRepository _storageObjectRepository;
     private readonly HybridCache _cache;
+    private readonly ITenantContext _tenantContext;
 
     public UpdateEventSeriesCommandHandler(
         IEventSeriesRepository eventSeriesRepository,
         IStorageObjectRepository storageObjectRepository,
-        HybridCache cache)
+        HybridCache cache,
+        ITenantContext tenantContext)
     {
         _eventSeriesRepository = eventSeriesRepository;
         _storageObjectRepository = storageObjectRepository;
         _cache = cache;
+        _tenantContext = tenantContext;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateEventSeriesCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateEventSeriesCommand request, CancellationToken cancellationToken)
     {
         var validator = new UpdateEventSeriesDtoValidator();
         var validationResult = await validator.ValidateAsync(request.EventSeriesDto, cancellationToken);
@@ -41,17 +43,14 @@ public class UpdateEventSeriesCommandHandler : IRequestHandler<UpdateEventSeries
                 "Event series update failed due to validation errors.");
         }
 
-        var series = await _eventSeriesRepository.GetEventSeriesWithEvents(request.EventSeriesId);
+        var series = await _eventSeriesRepository.GetForUpdateAsync(request.EventSeriesId, _tenantContext.TenantId, cancellationToken);
         if (series == null)
         {
             return BaseCommandResponse.NotFound<Guid>("Event series not found.");
         }
 
-        if (series.ActorId != request.ActorId || series.TenantId != request.TenantId)
-        {
-            throw new AuthorizationException(ResourceKinds.Actor, AuthorizationActions.Update);
-        }
-
+        // The enricher resolves persisted ownership before policy evaluation. Reloading
+        // and checking the revision also rejects ownership changes during that decision.
         if (series.ConcurrencyStamp != request.ExpectedConcurrencyStamp)
         {
             throw new ConcurrencyConflictException(

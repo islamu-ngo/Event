@@ -1,10 +1,10 @@
 using Explore.Application.DTOs.EventSeries;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventSeries.Requests.Queries;
 
-public sealed record GetEventSeriesListRequest : IRequest<PaginatedResult<EventSeriesListDto>>
+public sealed record GetEventSeriesListRequest : IQuery<PaginatedResult<EventSeriesListDto>>
 {
     public int PageNumber { get; init; } = 1;
     public int PageSize { get; init; } = 10;

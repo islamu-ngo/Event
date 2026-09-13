@@ -9,11 +9,11 @@ using Explore.Application.Exceptions;
 using Explore.Application.Features.EventSeries.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Services;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventSeries.Handlers.Commands;
 
-public class CreateEventSeriesCommandHandler : IRequestHandler<CreateEventSeriesCommand, BaseCommandResponse<Guid>>
+public class CreateEventSeriesCommandHandler : ICommandHandler<CreateEventSeriesCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventSeriesRepository _eventSeriesRepository;
     private readonly ITenantContext _tenantContext;
@@ -32,7 +32,7 @@ public class CreateEventSeriesCommandHandler : IRequestHandler<CreateEventSeries
         _storageObjectRepository = storageObjectRepository;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateEventSeriesCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateEventSeriesCommand request, CancellationToken cancellationToken)
     {
         Guid tenantId = _tenantContext.TenantId;
         Guid? userId = await _adminContext.ResolveUserIdAsync(cancellationToken);

@@ -9,7 +9,7 @@ using Explore.Application.Features.EventSeries.Requests.Commands;
 using Explore.Application.Features.EventSeries.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -35,14 +35,33 @@ public class EventSeriesController : EventControllerBase
         "Event series not found",
         "The requested event series could not be found.");
 
-    private readonly IMediator _mediator;
+    private static readonly CommandFailurePolicy CreateFailurePolicy = CommandFailurePolicy.ValidatedBy(CreateValidationProblem);
+    private static readonly CommandFailurePolicy UpdateFailurePolicy = CommandFailurePolicy.ValidatedBy(UpdateValidationProblem)
+        .NotFound(NotFoundProblem, FailureCodes.NotFound);
+
+    private readonly ICommandHandler<CreateEventSeriesCommand, BaseCommandResponse<Guid>> _create;
+    private readonly ICommandHandler<UpdateEventSeriesCommand, BaseCommandResponse<Guid>> _update;
+    private readonly ICommandHandler<DeleteEventSeriesCommand, BaseCommandResponse<bool>> _delete;
+    private readonly IQueryHandler<GetEventSeriesDetailRequest, EventSeriesDto?> _detail;
+    private readonly IQueryHandler<GetEventSeriesListRequest, PaginatedResult<EventSeriesListDto>> _list;
+    private readonly IQueryHandler<GetTopEventSeriesRequest, EventSeriesDto?> _top;
     private readonly IResourceAssembler<EventSeriesDto, EventSeriesListDto> _resourceAssembler;
 
     public EventSeriesController(
-        IMediator mediator,
+        ICommandHandler<CreateEventSeriesCommand, BaseCommandResponse<Guid>> create,
+        ICommandHandler<UpdateEventSeriesCommand, BaseCommandResponse<Guid>> update,
+        ICommandHandler<DeleteEventSeriesCommand, BaseCommandResponse<bool>> delete,
+        IQueryHandler<GetEventSeriesDetailRequest, EventSeriesDto?> detail,
+        IQueryHandler<GetEventSeriesListRequest, PaginatedResult<EventSeriesListDto>> list,
+        IQueryHandler<GetTopEventSeriesRequest, EventSeriesDto?> top,
         IResourceAssembler<EventSeriesDto, EventSeriesListDto> resourceAssembler)
     {
-        _mediator = mediator;
+        _create = create;
+        _update = update;
+        _delete = delete;
+        _detail = detail;
+        _list = list;
+        _top = top;
         _resourceAssembler = resourceAssembler;
     }
 
@@ -55,7 +74,7 @@ public class EventSeriesController : EventControllerBase
         [FromQuery] EventSeriesListQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new GetEventSeriesListRequest
+        var response = await _list.QueryAsync(new GetEventSeriesListRequest
         {
             PageNumber = query.PageNumber,
             PageSize = query.PageSize,
@@ -78,7 +97,7 @@ public class EventSeriesController : EventControllerBase
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new GetEventSeriesDetailRequest { Id = id }, cancellationToken);
+        var response = await _detail.QueryAsync(new GetEventSeriesDetailRequest { Id = id }, cancellationToken);
         if (response is null)
         {
             return this.ToNotFoundProblem(NotFoundProblem);
@@ -95,7 +114,7 @@ public class EventSeriesController : EventControllerBase
     public async Task<ActionResult<HalResource<EventSeriesDto>>> GetTop(
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new GetTopEventSeriesRequest(), cancellationToken);
+        var response = await _top.QueryAsync(new GetTopEventSeriesRequest(), cancellationToken);
         if (response == null)
         {
             return NoContent();
@@ -108,12 +127,13 @@ public class EventSeriesController : EventControllerBase
     [HttpPost(Name = RouteNames.CreateEventSeries)]
     [ProducesResponseType(typeof(BaseCommandResponse<Guid>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<BaseCommandResponse<Guid>>> Create([FromBody] CreateEventSeriesDto dto)
+    public async Task<ActionResult<BaseCommandResponse<Guid>>> Create(
+        [FromBody] CreateEventSeriesDto dto, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new CreateEventSeriesCommand { EventSeriesDto = dto });
+        var response = await _create.ExecuteAsync(new CreateEventSeriesCommand { EventSeriesDto = dto }, cancellationToken);
         if (!response.IsSuccess)
         {
-            return this.ToCommandValidationProblem(response, CreateValidationProblem);
+            return CreateFailurePolicy.Map(this, response);
         }
         return CreatedAtAction(nameof(GetById), new { id = response.Id }, response);
     }
@@ -140,26 +160,16 @@ public class EventSeriesController : EventControllerBase
                 "If-Match header is required and must contain the current event series concurrency stamp.");
         }
 
-        var existing = await _mediator.Send(new GetEventSeriesDetailRequest { Id = id }, cancellationToken);
-        if (existing is null)
-        {
-            return this.ToNotFoundProblem(NotFoundProblem);
-        }
-
-        var response = await _mediator.Send(new UpdateEventSeriesCommand
+        var response = await _update.ExecuteAsync(new UpdateEventSeriesCommand
         {
             EventSeriesId = id,
-            ActorId = existing.ActorId,
-            TenantId = existing.TenantId,
             ExpectedConcurrencyStamp = expectedConcurrencyStamp,
             EventSeriesDto = dto
         }, cancellationToken);
 
         if (!response.IsSuccess)
         {
-            return response.FailureCode == FailureCodes.NotFound
-                ? this.ToNotFoundProblem(NotFoundProblem)
-                : this.ToCommandValidationProblem(response, UpdateValidationProblem);
+            return UpdateFailurePolicy.Map(this, response);
         }
         return Ok(response);
     }
@@ -169,9 +179,9 @@ public class EventSeriesController : EventControllerBase
     [HttpDelete("{id:guid}", Name = RouteNames.DeleteEventSeries)]
     [ProducesResponseType(typeof(BaseCommandResponse<bool>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<BaseCommandResponse<bool>>> Delete(Guid id)
+    public async Task<ActionResult<BaseCommandResponse<bool>>> Delete(Guid id, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new DeleteEventSeriesCommand { Id = id });
+        var response = await _delete.ExecuteAsync(new DeleteEventSeriesCommand { Id = id }, cancellationToken);
         if (!response.IsSuccess)
         {
             return this.ToNotFoundProblem(NotFoundProblem);

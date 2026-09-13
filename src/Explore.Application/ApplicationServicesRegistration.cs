@@ -130,6 +130,7 @@ public static class ApplicationServicesRegistration
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(PerformanceBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(AuthorizationBehavior<,>));
         services.AddTransient<AuthorizationResourceContextResolver>();
+        services.AddTransient<IAuthorizationContextEnricher<Features.EventSeries.Requests.Commands.UpdateEventSeriesCommand>, Features.EventSeries.Authorization.UpdateEventSeriesAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<CreateEventDayCommand>, EventDayAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<UpdateEventDayCommand>, EventDayAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<DeleteEventDayCommand>, EventDayAuthorizationContextEnricher>();

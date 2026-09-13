@@ -3,11 +3,11 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSeries;
 using Explore.Application.Features.EventSeries.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventSeries.Handlers.Queries;
 
-public class GetEventSeriesListRequestHandler : IRequestHandler<GetEventSeriesListRequest, PaginatedResult<EventSeriesListDto>>
+public class GetEventSeriesListRequestHandler : IQueryHandler<GetEventSeriesListRequest, PaginatedResult<EventSeriesListDto>>
 {
     private readonly IEventSeriesRepository _eventSeriesRepository;
 
@@ -16,9 +16,9 @@ public class GetEventSeriesListRequestHandler : IRequestHandler<GetEventSeriesLi
         _eventSeriesRepository = eventSeriesRepository;
     }
 
-    public async Task<PaginatedResult<EventSeriesListDto>> Handle(GetEventSeriesListRequest request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<EventSeriesListDto>> QueryAsync(GetEventSeriesListRequest request, CancellationToken cancellationToken)
     {
-        var (items, totalCount) = await _eventSeriesRepository.GetEventSeriesPaged(request.PageNumber, request.PageSize, request.ActorId);
+        var (items, totalCount) = await _eventSeriesRepository.GetEventSeriesPaged(request.PageNumber, request.PageSize, request.ActorId, cancellationToken);
         var dtos = items.Select(EventMapper.ToListItem).ToList();
 
         return PaginatedResult<EventSeriesListDto>.Create(

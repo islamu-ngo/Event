@@ -153,6 +153,23 @@ Three-reader non-URL versioning — clients may use any of the following; all th
    - **Domain-Family Base Classes**: Permitted only when two or more split controllers share an exact, multi-step domain protocol or security check (e.g. `RegistrationOrderControllerBase` for guest vs. authenticated checkout; `InstanceSettingsControllerBase` for setup-secret vs. admin).
    - **Composition Over Inheritance**: Shared mechanics belong in `CommandFailurePolicy`, `IResourceAssembler`, MediatR commands/queries, and extension methods (`ToCommandValidationProblem`, `ToNotFoundProblem`), leaving controller actions explicit, declarative, and independent.
 
+### Event Session Status Lookup Absence
+
+`GetEventSessionStatusDetailsQuery` and its native handler/closed controller port
+return `EventSessionStatusDto?`: absence is a query result, not a fabricated DTO
+or a mapping exception. `EventSessionStatusController.GetById` maps null through
+`ApiNotFoundProblemDescriptor` and `ToNotFoundProblem`, producing the existing
+404 ProblemDetails convention (`resource_not_found`, request instance and tracing
+extensions). Present rows still return the unchanged 200 DTO.
+
+This repairs the former `Ok(null)` -> 204 mismatch without changing the declared
+OpenAPI paths, response schemas, operation IDs, or generated client. Both reads
+remain anonymous global lookups; list contents (IDs 1-10) and LookupData/DetailData
+cache policies are unchanged. The supplied cancellation token continues through
+the native decorators to the handler; `IEventSessionStatusRepository.GetById(int)`
+and `GetAll()` have no token parameter, so database-read interruption is not
+claimed or introduced by this repair.
+
 ### Registration Provider Management Capabilities
 
 The 25 actions under `api/tenants/{tenantId:guid}/events/{eventId:guid}/registration-providers`

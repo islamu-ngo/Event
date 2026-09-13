@@ -96,6 +96,17 @@ or `?api-version=0.1`. Requests without an explicit version default to `0.1`. UR
 * Retryable documented writes use a stable per-operation UUIDv7 `Idempotency-Key`.
 * Operational `/alive`, `/health`, and `/metrics` endpoints are outside generated controller operations.
 
+## Unknown session status IDs
+
+`GET /api/eventsessionstatus/{id}` returns `404` with an
+`application/problem+json` body and `code: resource_not_found` when the integer
+ID is unknown. This corrects the former empty `204` response to match the
+published contract; integrations should handle the documented not-found result.
+Known IDs still return the same `200` DTO. The anonymous catalogue at
+`GET /api/eventsessionstatus`, all ten global lifecycle IDs, and existing cache
+policies are unchanged. No configuration, migration, or client regeneration is
+required.
+
 ## Missing actor profile data
 
 When a visible actor has no profile PII, actor responses default to an empty display

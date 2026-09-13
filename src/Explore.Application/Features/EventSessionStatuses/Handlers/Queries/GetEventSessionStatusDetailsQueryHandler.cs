@@ -7,7 +7,7 @@ using Explore.Application.Contracts.Operations;
 namespace Explore.Application.Features.EventSessionStatuses.Handlers.Queries;
 
 public class GetEventSessionStatusDetailsQueryHandler
-    : IQueryHandler<GetEventSessionStatusDetailsQuery, EventSessionStatusDto>
+    : IQueryHandler<GetEventSessionStatusDetailsQuery, EventSessionStatusDto?>
 {
     private readonly IEventSessionStatusRepository _eventSessionStatusRepository;
 
@@ -17,11 +17,11 @@ public class GetEventSessionStatusDetailsQueryHandler
         _eventSessionStatusRepository = eventSessionStatusRepository;
     }
 
-    public async Task<EventSessionStatusDto> QueryAsync(
+    public async Task<EventSessionStatusDto?> QueryAsync(
         GetEventSessionStatusDetailsQuery query,
         CancellationToken cancellationToken)
     {
         var status = await _eventSessionStatusRepository.GetById(query.Id);
-        return EventSessionStatusMapper.ToDetail(status)!;
+        return EventSessionStatusMapper.ToDetail(status);
     }
 }

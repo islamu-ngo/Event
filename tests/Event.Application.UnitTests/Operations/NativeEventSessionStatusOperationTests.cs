@@ -1,3 +1,4 @@
+using System.Reflection;
 using Explore.Application;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventSessionStatus;
@@ -25,6 +26,17 @@ public sealed class NativeEventSessionStatusOperationTests
         await Assert.That(ports.All(port => port.Lifetime == ServiceLifetime.Scoped)).IsTrue();
         await Assert.That(ports.Select(port => port.ServiceType.GetGenericArguments()[0]))
             .IsEquivalentTo(new[] { typeof(GetEventSessionStatusDetailsQuery), typeof(GetEventSessionStatusListQuery) });
+    }
+
+    [Test]
+    public async Task MissingDetail_DeclaresNullableHandlerResult()
+    {
+        var method = typeof(GetEventSessionStatusDetailsQueryHandler)
+            .GetMethod(nameof(GetEventSessionStatusDetailsQueryHandler.QueryAsync))
+            ?? throw new InvalidOperationException("Expected the detail query handler entry point.");
+        var result = new NullabilityInfoContext().Create(method.ReturnParameter).GenericTypeArguments.Single();
+
+        await Assert.That(result.ReadState).IsEqualTo(NullabilityState.Nullable);
     }
 
     [Test]

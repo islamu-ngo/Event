@@ -3,6 +3,16 @@ ABOUTME: Keeps release notes short and focused on externally observable API beha
 
 # API Changelog
 
+## 2026-09-13
+
+- **Session status not-found contract repair.** Unknown integer IDs at
+  `GET /api/eventsessionstatus/{id}` now return the declared 404 ProblemDetails
+  (`resource_not_found`) instead of an empty 204. Existing 200 DTOs, all ten
+  global catalogue IDs, routes, anonymous access and cache policies are unchanged.
+  The native detail query explicitly returns a nullable DTO; the controller owns
+  HTTP failure mapping. OpenAPI and generated clients already declare 404 and
+  require no regeneration. No configuration or database migration is required.
+
 ## 2026-09-08
 
 - **SQLite directory temporal queries.** The existing event directory keeps

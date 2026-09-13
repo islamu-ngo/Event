@@ -81,10 +81,16 @@ public sealed class NativeEventSessionStatusHttpTests
         await Assert.That(payload.RootElement.EnumerateObject().Select(property => property.Name))
             .IsEquivalentTo(new[] { "fullName", "id", "masterCode" });
 
-        // Existing Ok(null) produces 204 despite advertised 404; dispatch migration does not repair that mismatch.
         using var missing = await client.GetAsync("/api/eventsessionstatus/2147483647");
-        await Assert.That(missing.StatusCode).IsEqualTo(HttpStatusCode.NoContent);
-        await Assert.That(await missing.Content.ReadAsStringAsync()).IsEqualTo(string.Empty);
+        await Assert.That(missing.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        await Assert.That(missing.Content.Headers.ContentType?.MediaType).IsEqualTo("application/problem+json");
+        using var problem = JsonDocument.Parse(await missing.Content.ReadAsStringAsync());
+        await Assert.That(problem.RootElement.GetProperty("status").GetInt32()).IsEqualTo(404);
+        await Assert.That(problem.RootElement.GetProperty("type").GetString())
+            .IsEqualTo("https://tools.ietf.org/html/rfc9110#section-15.5.5");
+        await Assert.That(problem.RootElement.GetProperty("code").GetString()).IsEqualTo("resource_not_found");
+        await Assert.That(problem.RootElement.GetProperty("instance").GetString()).IsEqualTo("/api/eventsessionstatus/2147483647");
+        await Assert.That(problem.RootElement.GetProperty("traceId").GetString()).IsNotNullOrEmpty();
     }
 
     [Test]
@@ -95,24 +101,24 @@ public sealed class NativeEventSessionStatusHttpTests
         using var first = factory.Services.CreateScope();
         using var second = factory.Services.CreateScope();
         var list = first.ServiceProvider.GetRequiredService<IQueryHandler<GetEventSessionStatusListQuery, List<EventSessionStatusListDto>>>();
-        var detail = first.ServiceProvider.GetRequiredService<IQueryHandler<GetEventSessionStatusDetailsQuery, EventSessionStatusDto>>();
+        var detail = first.ServiceProvider.GetRequiredService<IQueryHandler<GetEventSessionStatusDetailsQuery, EventSessionStatusDto?>>();
         var otherList = second.ServiceProvider.GetRequiredService<IQueryHandler<GetEventSessionStatusListQuery, List<EventSessionStatusListDto>>>();
-        var otherDetail = second.ServiceProvider.GetRequiredService<IQueryHandler<GetEventSessionStatusDetailsQuery, EventSessionStatusDto>>();
+        var otherDetail = second.ServiceProvider.GetRequiredService<IQueryHandler<GetEventSessionStatusDetailsQuery, EventSessionStatusDto?>>();
         await Assert.That(list).IsTypeOf<AuthorizationQueryHandlerDecorator<GetEventSessionStatusListQuery, List<EventSessionStatusListDto>>>();
-        await Assert.That(detail).IsTypeOf<AuthorizationQueryHandlerDecorator<GetEventSessionStatusDetailsQuery, EventSessionStatusDto>>();
+        await Assert.That(detail).IsTypeOf<AuthorizationQueryHandlerDecorator<GetEventSessionStatusDetailsQuery, EventSessionStatusDto?>>();
         await Assert.That(ReferenceEquals(list, first.ServiceProvider.GetRequiredService<IQueryHandler<GetEventSessionStatusListQuery, List<EventSessionStatusListDto>>>())).IsTrue();
-        await Assert.That(ReferenceEquals(detail, first.ServiceProvider.GetRequiredService<IQueryHandler<GetEventSessionStatusDetailsQuery, EventSessionStatusDto>>())).IsTrue();
+        await Assert.That(ReferenceEquals(detail, first.ServiceProvider.GetRequiredService<IQueryHandler<GetEventSessionStatusDetailsQuery, EventSessionStatusDto?>>())).IsTrue();
         await Assert.That(ReferenceEquals(list, otherList)).IsFalse();
         await Assert.That(ReferenceEquals(detail, otherDetail)).IsFalse();
         await Assert.That((await list.QueryAsync(new GetEventSessionStatusListQuery(), CancellationToken.None)).Count).IsEqualTo(10);
-        await Assert.That((await otherDetail.QueryAsync(new GetEventSessionStatusDetailsQuery { Id = 5 }, CancellationToken.None)).MasterCode)
+        await Assert.That((await otherDetail.QueryAsync(new GetEventSessionStatusDetailsQuery { Id = 5 }, CancellationToken.None))?.MasterCode)
             .IsEqualTo("PUBLISHED");
         await Assert.That(await detail.QueryAsync(new GetEventSessionStatusDetailsQuery { Id = int.MaxValue }, CancellationToken.None)).IsNull();
         await Assert.That(typeof(EventSessionStatusController).GetConstructors().Single().GetParameters().Select(parameter => parameter.ParameterType))
             .IsEquivalentTo(new[]
             {
                 typeof(IQueryHandler<GetEventSessionStatusListQuery, List<EventSessionStatusListDto>>),
-                typeof(IQueryHandler<GetEventSessionStatusDetailsQuery, EventSessionStatusDto>)
+                typeof(IQueryHandler<GetEventSessionStatusDetailsQuery, EventSessionStatusDto?>)
             });
         await Assert.That(ActivatorUtilities.CreateInstance<EventSessionStatusController>(first.ServiceProvider)).IsNotNull();
     }

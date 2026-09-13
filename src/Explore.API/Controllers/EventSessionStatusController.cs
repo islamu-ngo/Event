@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Asp.Versioning;
 using Explore.API.Attributes;
+using Explore.API.ExceptionHandling;
 using Explore.API.Hateoas;
 using Explore.Application.DTOs.EventSessionStatus;
 using Explore.Application.Features.EventSessionStatuses.Requests.Queries;
@@ -19,8 +20,11 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Public)]
 public class EventSessionStatusController(
     IQueryHandler<GetEventSessionStatusListQuery, List<EventSessionStatusListDto>> listQuery,
-    IQueryHandler<GetEventSessionStatusDetailsQuery, EventSessionStatusDto> detailsQuery) : ControllerBase
+    IQueryHandler<GetEventSessionStatusDetailsQuery, EventSessionStatusDto?> detailsQuery) : ControllerBase
 {
+    private static readonly ApiNotFoundProblemDescriptor StatusNotFoundProblem = new(
+        "Event session status not found",
+        "Event session status not found.");
 
     [HttpGet(Name = RouteNames.GetEventSessionStatuses)]
     [EndpointSummary("Get all Event Session Statuses")]
@@ -44,6 +48,6 @@ public class EventSessionStatusController(
     public async Task<ActionResult<EventSessionStatusDto>> GetById(int id, CancellationToken cancellationToken = default)
     {
         var status = await detailsQuery.QueryAsync(new GetEventSessionStatusDetailsQuery { Id = id }, cancellationToken);
-        return Ok(status);
+        return status is null ? this.ToNotFoundProblem(StatusNotFoundProblem) : Ok(status);
     }
 }

@@ -16,11 +16,17 @@
          making static lock files non-portable across dev and CI runners. -->
     <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
     <GeneratedApiClientFile>$(MSBuildProjectDirectory)\Clients\EventApiTagClients.g.cs</GeneratedApiClientFile>
+    <GeneratedApiSchemaFile Condition="'$(GeneratedApiSchemaFile)' == ''">$(MSBuildProjectDirectory)/../../schemas/openapi_islamu-event.json</GeneratedApiSchemaFile>
+    <GeneratedContractCaptureDirectory>$([System.IO.Path]::GetFullPath('$(BaseIntermediateOutputPath)$(Configuration)/$(TargetFramework)/generated-contracts', '$(MSBuildProjectDirectory)'))</GeneratedContractCaptureDirectory>
+    <CapturedApiClientFile>$(GeneratedContractCaptureDirectory)/EventApiTagClients.g.cs</CapturedApiClientFile>
+    <CapturedApiSchemaFile>$(GeneratedContractCaptureDirectory)/openapi_islamu-event.json</CapturedApiSchemaFile>
+    <CapturedMutablePolicyFile>$(GeneratedContractCaptureDirectory)/mutable-generated-contracts.txt</CapturedMutablePolicyFile>
     <DotNetToolManifest>$(MSBuildProjectDirectory)\..\..\dotnet-tools.json</DotNetToolManifest>
-    <GeneratedRecordTransformerProject>$(MSBuildProjectDirectory)\..\..\eng\tools\Explore.GeneratedContracts\Explore.GeneratedContracts.csproj</GeneratedRecordTransformerProject>
     <GeneratedRecordMutablePolicy>$(MSBuildProjectDirectory)\..\..\eng\tools\Explore.GeneratedContracts\mutable-generated-contracts.txt</GeneratedRecordMutablePolicy>
     <GeneratedRecordTransformerStamp>$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\generated-api-client-records.stamp</GeneratedRecordTransformerStamp>
   </PropertyGroup>
+
+  <Import Project="../../eng/tools/Explore.GeneratedContracts/GeneratedContractTool.targets" />
 
   <ItemGroup>
     <ProjectReference Include="..\Event.Wire.Contracts\Event.Wire.Contracts.csproj" />
@@ -56,9 +62,11 @@
     The openapi.json is checked into source control for CI/CD builds and is not written by API runtime startup.
 
     To manually regenerate (bypasses build):
-      dotnet nswag run nswag.pertag.json
+      dotnet msbuild -t:GenerateApiClient
 
-    INPUTS/OUTPUTS: MSBuild skips generation if openapi.json hasn't changed
+    NSwag and all repairs run on private files. Only the completed client is
+    atomically published; compilation uses its exact intermediate capture.
+    INPUTS/OUTPUTS: MSBuild skips only the completed generation pipeline.
   -->
 
   <!-- Custom inline task for regex text replacement (avoids PowerShell escaping issues) -->
@@ -89,48 +97,72 @@
 
   <ItemGroup>
     <GeneratedRecordTransformerInput Include="$(MSBuildProjectDirectory)\..\..\eng\tools\Explore.GeneratedContracts\*.cs" />
-    <GeneratedRecordTransformerInput Include="$(GeneratedRecordTransformerProject)" />
+    <GeneratedRecordTransformerInput Include="$(GeneratedContractToolProject)" />
+    <GeneratedRecordTransformerInput Include="../../eng/tools/Explore.GeneratedContracts/GeneratedContractTool.targets" />
     <GeneratedRecordTransformerInput Include="$(GeneratedRecordMutablePolicy)" />
   </ItemGroup>
 
   <!-- NSwag emits per-tag clients and canonical DTOs before repository-owned policy is applied. -->
-  <Target Name="GenerateApiClientSource" Inputs="..\..\schemas\openapi_islamu-event.json;nswag.pertag.json;$(DotNetToolManifest)" Outputs="$(GeneratedApiClientFile)" Condition="Exists('..\..\schemas\openapi_islamu-event.json')">
-    <Message Importance="high" Text="NSwag: Regenerating API clients from openapi_islamu-event.json..." />
-    <Exec Command="dotnet nswag run nswag.pertag.json" WorkingDirectory="$(ProjectDir)" ConsoleToMSBuild="true" />
-    <Error Condition="!Exists('$(GeneratedApiClientFile)')" Text="NSwag completed without producing $(GeneratedApiClientFile)." />
+  <Target Name="GenerateApiClientSource" DependsOnTargets="BuildGeneratedContractTool">
+    <PropertyGroup>
+      <GeneratedContractStagingDirectory>$(GeneratedContractCaptureDirectory)/staging/$([System.Guid]::NewGuid())</GeneratedContractStagingDirectory>
+      <GeneratedApiClientCandidate>$(GeneratedContractStagingDirectory)/EventApiTagClients.g.cs</GeneratedApiClientCandidate>
+      <GeneratedApiSchemaCandidate>$(GeneratedContractStagingDirectory)/openapi.json</GeneratedApiSchemaCandidate>
+      <GeneratedMutablePolicyCandidate>$(GeneratedContractStagingDirectory)/mutable-generated-contracts.txt</GeneratedMutablePolicyCandidate>
+    </PropertyGroup>
+    <MakeDir Directories="$(GeneratedContractStagingDirectory)" />
+    <Copy SourceFiles="$(GeneratedApiSchemaFile);$(GeneratedRecordMutablePolicy)" DestinationFiles="$(GeneratedApiSchemaCandidate);$(GeneratedMutablePolicyCandidate)" />
+    <Message Importance="high" Text="NSwag: Preparing API clients privately..." />
+    <Exec Command="dotnet nswag run nswag.pertag.json &quot;/variables:SchemaInput=$(GeneratedApiSchemaCandidate),ClientOutput=$(GeneratedApiClientCandidate)&quot;" WorkingDirectory="$(ProjectDir)" ConsoleToMSBuild="true" />
+    <Error Condition="!Exists('$(GeneratedApiClientCandidate)')" Text="NSwag completed without producing $(GeneratedApiClientCandidate)." />
   </Target>
 
   <!-- Fix the NSwag 204-response bug in generated client surfaces. -->
   <Target Name="FixNSwagVoidReturns" DependsOnTargets="GenerateApiClientSource">
-    <ReplaceFileText InputFilename="$(GeneratedApiClientFile)" MatchExpression="return default\(void\)!;" ReplacementText="return;" />
+    <ReplaceFileText InputFilename="$(GeneratedApiClientCandidate)" MatchExpression="return default\(void\)!;" ReplacementText="return;" />
   </Target>
 
   <!-- Convert structurally eligible contracts in the generated client. -->
-  <Target Name="TransformGeneratedApiClientRecords"
-          DependsOnTargets="FixNSwagVoidReturns"
-          Inputs="$(GeneratedApiClientFile);@(GeneratedRecordTransformerInput)"
-          Outputs="$(GeneratedRecordTransformerStamp)">
-    <Exec Command="dotnet run --project &quot;$(GeneratedRecordTransformerProject)&quot; --configuration Release --no-launch-profile -- &quot;$(GeneratedApiClientFile)&quot; &quot;$(GeneratedRecordMutablePolicy)&quot;" WorkingDirectory="$(MSBuildProjectDirectory)" ConsoleToMSBuild="true" />
-    <Touch Files="$(GeneratedRecordTransformerStamp)" AlwaysCreate="true" />
+  <Target Name="TransformGeneratedApiClientRecords" DependsOnTargets="FixNSwagVoidReturns">
+    <Exec Command="dotnet &quot;$(GeneratedContractToolAssembly)&quot; &quot;$(GeneratedApiClientCandidate)&quot; &quot;$(GeneratedMutablePolicyCandidate)&quot;" WorkingDirectory="$(MSBuildProjectDirectory)" ConsoleToMSBuild="true" />
   </Target>
 
   <!-- Final byte normalization runs after semantic syntax transformation. -->
   <Target Name="NormalizeGeneratedApiClient"
           DependsOnTargets="TransformGeneratedApiClientRecords">
-    <ReplaceFileText InputFilename="$(GeneratedApiClientFile)" MatchExpression="[ \t]+(\r?\n)" ReplacementText="$1" />
+    <ReplaceFileText InputFilename="$(GeneratedApiClientCandidate)" MatchExpression="[ \t]+(\r?\n)" ReplacementText="$1" />
   </Target>
 
-  <!-- Canonical client preparation - runs before every compilation and remains incremental. -->
-  <Target Name="GenerateApiClient"
-          BeforeTargets="CoreCompile"
-          DependsOnTargets="NormalizeGeneratedApiClient"
-          Condition="Exists('..\..\schemas\openapi_islamu-event.json')">
-    <Message Importance="high" Text="NSwag: API clients generated, record-transformed where applicable, and normalized successfully." />
+  <Target Name="CheckGeneratedContractCapture" BeforeTargets="PrepareGeneratedApiClient">
+    <Error Condition="!Exists('$(GeneratedApiSchemaFile)')" Text="Missing OpenAPI input: $(GeneratedApiSchemaFile)." />
+    <Delete Files="$(GeneratedRecordTransformerStamp)" Condition="!Exists('$(GeneratedApiClientFile)') Or !Exists('$(CapturedApiClientFile)') Or !Exists('$(CapturedApiSchemaFile)') Or !Exists('$(CapturedMutablePolicyFile)')" />
+  </Target>
+
+  <Target Name="PrepareGeneratedApiClient"
+          Inputs="$(GeneratedApiSchemaFile);nswag.pertag.json;$(DotNetToolManifest);$(MSBuildProjectFullPath);@(GeneratedRecordTransformerInput)"
+          Outputs="$(GeneratedRecordTransformerStamp)">
+    <CallTarget Targets="CompleteGeneratedApiClient" />
+  </Target>
+
+  <Target Name="CompleteGeneratedApiClient" DependsOnTargets="NormalizeGeneratedApiClient">
+    <Exec Command="dotnet &quot;$(GeneratedContractToolAssembly)&quot; complete-client &quot;$(GeneratedApiClientCandidate)&quot; &quot;$(GeneratedApiSchemaCandidate)&quot; &quot;$(GeneratedMutablePolicyCandidate)&quot; &quot;$(GeneratedContractCaptureDirectory)&quot; &quot;$(GeneratedApiClientFile)&quot;" WorkingDirectory="$(MSBuildProjectDirectory)" />
+    <Touch Files="$(GeneratedRecordTransformerStamp)" AlwaysCreate="true" />
+    <RemoveDir Directories="$(GeneratedContractStagingDirectory)" />
+  </Target>
+
+  <Target Name="GenerateApiClient" BeforeTargets="CoreCompile" DependsOnTargets="PrepareGeneratedApiClient" />
+
+  <Target Name="GetGeneratedContractInputs" Returns="@(GeneratedContractInput)">
+    <ItemGroup>
+      <GeneratedContractInput Include="$(CapturedApiSchemaFile);$(CapturedApiClientFile);$(CapturedMutablePolicyFile)" />
+    </ItemGroup>
+    <Error Condition="!Exists('%(GeneratedContractInput.Identity)')" Text="Missing build-captured contract: %(GeneratedContractInput.Identity). Build the client before collecting its inputs." />
   </Target>
 
   <!-- Exclude generated files from source analysis (they're auto-generated). -->
   <ItemGroup>
-    <Compile Update="Clients\EventApiTagClients.g.cs">
+    <Compile Remove="Clients\EventApiTagClients.g.cs" />
+    <Compile Include="$(CapturedApiClientFile)">
       <AutoGen>true</AutoGen>
       <DependentUpon>nswag.pertag.json</DependentUpon>
     </Compile>

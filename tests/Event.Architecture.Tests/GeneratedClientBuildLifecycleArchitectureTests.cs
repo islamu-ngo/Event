@@ -15,6 +15,10 @@ public sealed class GeneratedClientBuildLifecycleArchitectureTests
         XElement generate = Target(project, "GenerateApiClient");
 
         await Assert.That((string?)generate.Attribute("DependsOnTargets"))
+            .IsEqualTo("PrepareGeneratedApiClient");
+        await Assert.That((string?)Target(project, "PrepareGeneratedApiClient").Element("CallTarget")?.Attribute("Targets"))
+            .IsEqualTo("CompleteGeneratedApiClient");
+        await Assert.That((string?)Target(project, "CompleteGeneratedApiClient").Attribute("DependsOnTargets"))
             .IsEqualTo("NormalizeGeneratedApiClient");
         await Assert.That((string?)normalize.Attribute("DependsOnTargets"))
             .IsEqualTo("TransformGeneratedApiClientRecords");
@@ -27,7 +31,7 @@ public sealed class GeneratedClientBuildLifecycleArchitectureTests
 
         XElement outputGuard = source.Elements("Error").Single();
         await Assert.That((string?)outputGuard.Attribute("Condition"))
-            .IsEqualTo("!Exists('$(GeneratedApiClientFile)')");
+            .IsEqualTo("!Exists('$(GeneratedApiClientCandidate)')");
     }
 
     private static XElement Target(XDocument project, string name) =>

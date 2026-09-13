@@ -2,7 +2,7 @@
   "runtime": "Net100",
   "documentGenerator": {
     "fromDocument": {
-      "json": "../../schemas/openapi_islamu-event.json",
+      "json": "$(SchemaInput)",
       "url": "",
       "output": null
     }
@@ -89,7 +89,7 @@
       "enumNameGeneratorType": null,
       "serviceHost": null,
       "serviceSchemes": null,
-      "output": "Clients/EventApiTagClients.g.cs",
+      "output": "$(ClientOutput)",
       "newLineBehavior": "Auto"
     }
   }

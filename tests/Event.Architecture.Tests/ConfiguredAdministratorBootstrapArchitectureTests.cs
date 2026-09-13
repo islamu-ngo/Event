@@ -264,14 +264,14 @@ public sealed class ConfiguredAdministratorBootstrapArchitectureTests
         XElement generatedCompile = project.Descendants()
             .Single(element => element.Name.LocalName == "Compile"
                 && string.Equals(
-                    element.Attribute("Update")?.Value,
-                    "Clients\\EventApiTagClients.g.cs",
+                    element.Attribute("Include")?.Value,
+                    "$(CapturedApiClientFile)",
                     StringComparison.Ordinal));
 
         await Assert.That(generationTarget.Attribute("BeforeTargets")?.Value)
             .IsEqualTo("CoreCompile");
         await Assert.That(generationTarget.Attribute("DependsOnTargets")?.Value)
-            .IsEqualTo("NormalizeGeneratedApiClient");
+            .IsEqualTo("PrepareGeneratedApiClient");
         await Assert.That(generatedCompile.Elements()
             .Single(element => element.Name.LocalName == "AutoGen").Value)
             .IsEqualTo("true");

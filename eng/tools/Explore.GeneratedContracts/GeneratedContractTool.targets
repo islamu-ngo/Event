@@ -1,0 +1,14 @@
+<Project>
+  <PropertyGroup>
+    <GeneratedContractToolProject>$(MSBuildThisFileDirectory)Explore.GeneratedContracts.csproj</GeneratedContractToolProject>
+  </PropertyGroup>
+
+  <!-- Keep helper compilation in the owning MSBuild graph, not concurrent dotnet run builds. -->
+  <Target Name="BuildGeneratedContractTool">
+    <MSBuild Projects="$(GeneratedContractToolProject)" Targets="Restore;Build"
+             Properties="Configuration=Release"
+             RemoveProperties="GeneratedApiSchemaFile;OpenApiGenerateDocumentsOnBuild;ForceOpenApiGeneration;GeneratedRecordMutablePolicy;GeneratedRecordTransformerStamp;GeneratedContractCaptureDirectory;GeneratedApiClientFile">
+      <Output TaskParameter="TargetOutputs" PropertyName="GeneratedContractToolAssembly" />
+    </MSBuild>
+  </Target>
+</Project>

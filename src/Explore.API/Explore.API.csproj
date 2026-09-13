@@ -8,9 +8,12 @@
     <OpenApiGenerateDocuments>true</OpenApiGenerateDocuments>
     <OpenApiGenerateDocumentsOnBuild Condition="'$(Configuration)' == 'Release'">true</OpenApiGenerateDocumentsOnBuild>
     <OpenApiGenerateDocumentsOnBuild Condition="'$(Configuration)' != 'Release'">false</OpenApiGenerateDocumentsOnBuild>
-    <OpenApiDocumentsDirectory>$(MSBuildProjectDirectory)/../../schemas</OpenApiDocumentsDirectory>
+    <OpenApiDocumentsDirectory>$([System.IO.Path]::GetFullPath('$(BaseIntermediateOutputPath)$(Configuration)/$(TargetFramework)/openapi', '$(MSBuildProjectDirectory)'))</OpenApiDocumentsDirectory>
+    <CanonicalOpenApiDocument>$(MSBuildProjectDirectory)/../../schemas/openapi_islamu-event.json</CanonicalOpenApiDocument>
     <OpenApiGenerateDocumentsOptions>--document-name islamu-event --file-name openapi</OpenApiGenerateDocumentsOptions>
   </PropertyGroup>
+
+  <Import Project="../../eng/tools/Explore.GeneratedContracts/GeneratedContractTool.targets" />
 
   <ItemGroup>
     <InternalsVisibleTo Include="Event.API.IntegrationTests" />
@@ -91,8 +94,23 @@
     <None Include="../../schemas/openapi_islamu-event.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('../../schemas/openapi_islamu-event.json')" />
   </ItemGroup>
 
-  <Target Name="InvalidateOpenApiDocumentCacheWhenCanonicalDocumentIsMissing" BeforeTargets="GenerateOpenApiDocuments" Condition="!Exists('$(MSBuildProjectDirectory)/../../schemas/openapi_islamu-event.json') And Exists('$(BaseIntermediateOutputPath)$(MSBuildProjectName).OpenApiFiles.cache')">
-    <Delete Files="$(BaseIntermediateOutputPath)$(MSBuildProjectName).OpenApiFiles.cache" />
+  <Target Name="PrepareOpenApiPublication" BeforeTargets="GenerateOpenApiDocuments">
+    <PropertyGroup>
+      <_OpenApiDocumentsCache>$(OpenApiDocumentsDirectory)/OpenApiFiles.cache</_OpenApiDocumentsCache>
+    </PropertyGroup>
+    <MakeDir Directories="$(OpenApiDocumentsDirectory)" />
+    <Delete Files="$(_OpenApiDocumentsCache)" Condition="'$(ForceOpenApiGeneration)' == 'true' Or !Exists('$(OpenApiDocumentsDirectory)/openapi_islamu-event.json')" />
+  </Target>
+
+  <Target Name="PublishOpenApiDocument" AfterTargets="GenerateOpenApiDocuments" DependsOnTargets="BuildGeneratedContractTool">
+    <Exec Command="dotnet &quot;$(GeneratedContractToolAssembly)&quot; publish-schema &quot;$(OpenApiDocumentsDirectory)/openapi_islamu-event.json&quot; &quot;$(CanonicalOpenApiDocument)&quot;" />
+  </Target>
+
+  <Target Name="GetOpenApiContractInput" DependsOnTargets="GenerateOpenApiDocuments" Returns="@(OpenApiContractInput)">
+    <ItemGroup>
+      <OpenApiContractInput Include="$(OpenApiDocumentsDirectory)/openapi_islamu-event.json" />
+    </ItemGroup>
+    <Error Condition="!Exists('%(OpenApiContractInput.Identity)')" Text="Missing exported OpenAPI contract: %(OpenApiContractInput.Identity)." />
   </Target>
 
 </Project>

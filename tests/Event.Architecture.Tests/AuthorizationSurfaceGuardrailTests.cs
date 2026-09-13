@@ -22,6 +22,10 @@ public sealed class AuthorizationSurfaceGuardrailTests
     private static readonly InventoryEntry[] NamedMediatRExceptions =
     [
         new(
+            "Explore.Application.Features.TenantStorageSettings.Requests.Commands.TestTenantStorageProviderCommand",
+            "handler-contained-admin",
+            "The provider write/delete probe checks persisted administrator authority for the ambient tenant or instance before resolving storage. NativeTenantStorageHttpTests verifies forged grants, wrong-tenant denial without probing, instance grants, safe provider failures and cancellation."),
+        new(
             "Explore.Application.Features.Authentication.Atproto.Requests.Commands.ProbeAtprotoTransientCommand",
             "private-pre-authentication-machine",
             "Approved instance-owned health authority: the exact private probe route accepts only the dedicated ES256 scheme, exact signed health_probe body and durable replay admission. The no-input handler generates tenantless non-secret synthetic data with thirty-second expiry and verifies create/read/conditional consumption; it accepts no caller tenant or locator and exposes no row. AtprotoTransientProbeTests proves purpose isolation, caller-field rejection and failed-probe expiry through real API/PostgreSQL."),

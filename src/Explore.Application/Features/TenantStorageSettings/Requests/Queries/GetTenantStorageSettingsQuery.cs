@@ -1,8 +1,8 @@
 using Explore.Application.DTOs.Tenant;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.TenantStorageSettings.Requests.Queries;
 
-public sealed record GetTenantStorageSettingsQuery : IRequest<TenantStorageSettingsDto>
+public sealed record GetTenantStorageSettingsQuery : IQuery<TenantStorageSettingsDto>
 {
 }

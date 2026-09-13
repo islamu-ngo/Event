@@ -12,7 +12,6 @@ using Explore.Application.Features.TenantStorageSettings.Requests.Commands;
 using Explore.Application.Features.TenantStorageSettings.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -25,7 +24,9 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Authenticated)]
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 public sealed class TenantStorageSettingsController(
-    IMediator mediator,
+    IQueryHandler<GetTenantStorageSettingsQuery, TenantStorageSettingsDto> settingsQuery,
+    ICommandHandler<PatchTenantStorageSettingsCommand, BaseCommandResponse<Guid>> patchSettings,
+    ICommandHandler<TestTenantStorageProviderCommand, InstanceStorageProviderStatusDto> testProvider,
     IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
     IResourceAssembler<TenantStorageSettingsDto, TenantStorageSettingsDto> storageSettingsAssembler)
     : EventControllerBase
@@ -44,7 +45,7 @@ public sealed class TenantStorageSettingsController(
     public async Task<ActionResult<HalResource<TenantStorageSettingsDto>>> GetStorageSettings(
         CancellationToken cancellationToken = default)
     {
-        var settings = await mediator.Send(new GetTenantStorageSettingsQuery(), cancellationToken);
+        var settings = await settingsQuery.QueryAsync(new GetTenantStorageSettingsQuery(), cancellationToken);
         var halResource = await storageSettingsAssembler.ToResource(settings, HttpContext);
         return Ok(halResource);
     }
@@ -68,7 +69,7 @@ public sealed class TenantStorageSettingsController(
                 detail: "The authenticated principal could not be resolved to an application user.");
         }
 
-        var response = await mediator.Send(
+        var response = await patchSettings.ExecuteAsync(
             new PatchTenantStorageSettingsCommand
             {
                 UserId = userId.Value,
@@ -99,7 +100,7 @@ public sealed class TenantStorageSettingsController(
     public async Task<ActionResult<InstanceStorageProviderStatusDto>> TestStorageConnection(
         CancellationToken cancellationToken = default)
     {
-        var status = await mediator.Send(new TestTenantStorageProviderQuery(), cancellationToken);
+        var status = await testProvider.ExecuteAsync(new TestTenantStorageProviderCommand(), cancellationToken);
         return Ok(status);
     }
 }

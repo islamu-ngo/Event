@@ -4,12 +4,12 @@ using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Tenant;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.TenantStorageSettings.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.TenantStorageSettings.Handlers.Queries;
 
 public sealed class GetTenantStorageSettingsQueryHandler
-    : IRequestHandler<GetTenantStorageSettingsQuery, TenantStorageSettingsDto>
+    : IQueryHandler<GetTenantStorageSettingsQuery, TenantStorageSettingsDto>
 {
     private readonly ITenantContext _tenantContext;
     private readonly IAdminContext _adminContext;
@@ -25,7 +25,7 @@ public sealed class GetTenantStorageSettingsQueryHandler
         _storageSettingService = storageSettingService;
     }
 
-    public async Task<TenantStorageSettingsDto> Handle(
+    public async Task<TenantStorageSettingsDto> QueryAsync(
         GetTenantStorageSettingsQuery request,
         CancellationToken cancellationToken)
     {

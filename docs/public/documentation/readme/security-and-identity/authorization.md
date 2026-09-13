@@ -37,7 +37,7 @@ graph TD
 |---|---|---|
 | **Ideal For** | Single-tenant communities, standard organizations, minimal resource footprint | Enterprise operators, dynamic policy authoring, audit-heavy deployments |
 | **Infrastructure** | **Zero extra containers**; runs in-process using primary database | Dedicated Cerbos container or external PDP cluster over gRPC |
-| **Latency** | Sub-millisecond (in-memory & direct database query) | 1–3 ms network round-trip via HTTP/2 cleartext (`h2c`) |
+| **Latency** | Database-query latency; one authority profile per optimized batch | 1–3 ms network round-trip via HTTP/2 cleartext (`h2c`) |
 | **Policy Updates** | Governed via software releases and database migrations | Decoupled policy file uploads via `cerbosctl` without rebuilding the app |
 | **Failure Mode** | Database down = app down | PDP down = **fails closed** (access strictly denied; no silent fallback) |
 
@@ -53,11 +53,26 @@ graph TD
 When `AUTHORIZATION_PROVIDER=local` is set:
 - Evaluates permissions against user roles (`InstanceAdmin`, `TenantAdmin`, `OrganizationOwner`, `Member`, `Attendee`).
 - Automatically enforces multi-tenant boundaries via EF Core global query filters.
-- Fast, lightweight, and requires no external network calls or gRPC configuration.
+- Requires no external policy service or gRPC configuration; authority reads use the primary database.
 
 ### Tenant administrator membership eligibility
 
-When tenant administrator authority is resolved, suspended, banned, removed, or deleted memberships do not contribute administrator tenant IDs, even if an unrevoked role grant remains in inventory. This applies to Cerbos principals, user-owned API-key authority, and administrator UI authority responses. Other tenants' active memberships remain independent. Grant inventory and tenant lifecycle behavior are unchanged; no database migration or configuration change is required. This correction does not change existing authority-cache freshness guarantees.
+When tenant administrator authority is resolved, suspended, banned, removed, or deleted memberships do not contribute administrator tenant IDs, even if an unrevoked role grant remains in inventory. This applies to Cerbos principals, user-owned API-key authority, and administrator UI authority responses. Other tenants' active memberships remain independent. Grant inventory and tenant lifecycle behavior are unchanged; no database migration or configuration change is required. Eligibility is separate from the next-request freshness guarantee below.
+
+### Administrator role changes take effect on the next request
+
+After a role grant or revocation commits, new API requests read current administrator
+authority from the database, even when the caller's authentication claims are unchanged.
+No cache flush or sign-in refresh is required. This applies to Local RBAC and the
+administrator attributes sent to Cerbos, across nodes reading the same authoritative
+database and for changes committed by external administration tools.
+
+Requests or database snapshots already in progress may finish using their earlier
+view. Independent databases or lagging read replicas are not covered by this guarantee.
+Browser display claims can still lag; server-issued HAL links and server authorization
+remain the action boundary. Existing role permissions and tenant isolation are unchanged.
+The development-only administrator cache-invalidation endpoint is removed; the identity
+snapshot diagnostic remains available. No database migration or new configuration is required.
 
 ### Organization evidence actions
 

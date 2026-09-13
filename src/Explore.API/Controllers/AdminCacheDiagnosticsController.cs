@@ -4,7 +4,6 @@ using Explore.Application.Authentication;
 using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
-using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Users.Requests.Queries;
 using Microsoft.AspNetCore.Authorization;
@@ -48,23 +47,6 @@ public sealed class AdminCacheDiagnosticsController : EventControllerBase
             providerIdentity?.Provider,
             providerIdentity?.ProviderId,
             resolvedUserId));
-    }
-
-    [Authorize]
-    [HttpPost("users/{userId:guid}/invalidate")]
-    public ActionResult InvalidateUser(
-        Guid userId,
-        [FromServices] IAdminCacheInvalidator adminCacheInvalidator,
-        [FromServices] IHostEnvironment hostEnvironment,
-        [FromServices] IConfiguration configuration)
-    {
-        if (!IsEnabled(configuration, hostEnvironment))
-        {
-            return this.ToNotFoundProblem(AdminCacheDiagnosticsNotFoundProblem);
-        }
-
-        adminCacheInvalidator.InvalidateUser(userId);
-        return NoContent();
     }
 
     private static bool IsEnabled(IConfiguration configuration, IHostEnvironment hostEnvironment)

@@ -194,13 +194,13 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
     [Arguments(true, false)]
     [Arguments(false, true)]
     [Arguments(false, false)]
-    public async Task CachedAdministrationCannotOverrideRevokedGrant(bool preview, bool tenantTarget)
+    public async Task EarlierAdministrationCannotOverrideRevokedGrant(bool preview, bool tenantTarget)
     {
         await using var scenario = await Scenario.CreateAsync();
         using var session = scenario.Open(tenantActor: tenantTarget);
-        await Assert.That(await session.CachedAdminAsync(tenantTarget)).IsTrue();
+        await Assert.That(await session.CurrentAdminAsync(tenantTarget)).IsTrue();
         await scenario.RevokeAsync(tenantTarget);
-        await Assert.That(await session.CachedAdminAsync(tenantTarget)).IsTrue();
+        await Assert.That(await session.CurrentAdminAsync(tenantTarget)).IsFalse();
         string before = await scenario.StateAsync();
 
         string? failure = await session.FailureAsync(preview,
@@ -232,11 +232,11 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
     {
         await using var scenario = await Scenario.CreateAsync();
         using var session = scenario.Open(tenantActor: tenantTarget);
-        // A real cached denial must not override a newly granted database role.
+        // An earlier denial must not override a newly granted database role.
         await scenario.RevokeAsync(tenantTarget);
-        await Assert.That(await session.CachedAdminAsync(tenantTarget)).IsFalse();
+        await Assert.That(await session.CurrentAdminAsync(tenantTarget)).IsFalse();
         await scenario.RestoreAsync(tenantTarget);
-        await Assert.That(await session.CachedAdminAsync(tenantTarget)).IsFalse();
+        await Assert.That(await session.CurrentAdminAsync(tenantTarget)).IsTrue();
         Guid? target = tenantTarget ? scenario.TenantId : null;
         Guid actor = tenantTarget ? scenario.TenantActorId : scenario.PlatformActorId;
         var preview = await session.PreviewAsync(target);
@@ -693,7 +693,7 @@ public sealed class EmailDeliveryDisableCommandHandlerTests
             preview ? (await Preview.ExecuteAsync(new(command.TenantId), token)).FailureCode
                 : (await Disable.ExecuteAsync(command, token)).FailureCode;
 
-        internal Task<bool> CachedAdminAsync(bool tenantTarget) => tenantTarget
+        internal Task<bool> CurrentAdminAsync(bool tenantTarget) => tenantTarget
             ? Fixture.AdminContext.IsTenantAdminAsync(_scenario.TenantId) : Fixture.AdminContext.IsInstanceAdminAsync();
 
         internal Task<bool> CachedSentinelAsync() => Fixture.Settings.ResolveAsync<bool>(

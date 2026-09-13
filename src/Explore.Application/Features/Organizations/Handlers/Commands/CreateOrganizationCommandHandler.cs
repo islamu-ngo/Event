@@ -23,7 +23,6 @@ public class CreateOrganizationCommandHandler : ICommandHandler<CreateOrganizati
     private readonly IActorRepository _actorRepository;
     private readonly IStorageObjectRepository _storageObjectRepository;
     private readonly IAdminContext _adminContext;
-    private readonly IAdminCacheInvalidator _adminCacheInvalidator;
     private readonly ITenantContext _tenantContext;
     private readonly HybridCache _cache;
     private readonly BusinessMetrics _metrics;
@@ -36,7 +35,6 @@ public class CreateOrganizationCommandHandler : ICommandHandler<CreateOrganizati
         IActorRepository actorRepository,
         IStorageObjectRepository storageObjectRepository,
         IAdminContext adminContext,
-        IAdminCacheInvalidator adminCacheInvalidator,
         ITenantContext tenantContext,
         HybridCache cache,
         BusinessMetrics metrics,
@@ -48,7 +46,6 @@ public class CreateOrganizationCommandHandler : ICommandHandler<CreateOrganizati
         _actorRepository = actorRepository;
         _storageObjectRepository = storageObjectRepository;
         _adminContext = adminContext;
-        _adminCacheInvalidator = adminCacheInvalidator;
         _tenantContext = tenantContext;
         _cache = cache;
         _metrics = metrics;
@@ -142,7 +139,6 @@ public class CreateOrganizationCommandHandler : ICommandHandler<CreateOrganizati
             organizationMember.OrganizationTenantId = participation.Id;
             await _organizationMemberRepository.Create(organizationMember);
         }, cancellationToken);
-        _adminCacheInvalidator.InvalidateUser(currentUserId);
 
         _metrics.RecordOrganizationCreated(_tenantContext.TenantId.ToString());
 

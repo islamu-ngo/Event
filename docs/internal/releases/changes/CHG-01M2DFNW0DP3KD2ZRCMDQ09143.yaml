@@ -1,0 +1,32 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M2DFNW0DP3KD2ZRCMDQ09143
+Title: "Read current administrator authority after committed role changes"
+Type: fix
+Scope: access
+Summary: "Administrator role grants and revocations take effect on new API requests without cache invalidation or refreshed claims when nodes read the same authoritative database."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Detail: "Removes IAdminCacheInvalidator and the internal diagnostic users/{userId}/invalidate action; the identity snapshot action remains. No compatibility shim is retained."
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: "Administrator authority is read from existing database predicates instead of shared positive/negative caches. New reads after commit observe role changes on the same authoritative store; older snapshots and in-flight decisions are not retroactively cancelled."
+  Migration:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/public/documentation/readme/security-and-identity/authorization.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: not-applicable
+    Detail: "The removed diagnostic action is excluded from API discovery; published OpenAPI and generated clients are unchanged."
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authorization.md
+    Disposition: documented
+    Detail: "No migration, new configuration, manual cache flush, or claims refresh is required. Nodes must read the same authoritative database; lagging replicas and separate stores are outside the freshness guarantee. BFF display claims and permission-registry caching are unchanged."

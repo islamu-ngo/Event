@@ -37,7 +37,6 @@ public sealed class InstanceOnboardingCompletionOperation(
     IEnumerable<IConfiguredAdministratorBootstrapProvider> configuredProviders,
     ISetupSecretProvider setupSecretProvider,
     IInstanceBootstrapAuditLogger auditLogger,
-    IAdminCacheInvalidator cacheInvalidator,
     IDeploymentModeProvider deploymentModeProvider,
     IJwtAuthorityRefreshNotifier jwtRefreshNotifier,
     ITenantBrandingSettingsDocumentProvisioningService brandingProvisioner,
@@ -98,7 +97,6 @@ public sealed class InstanceOnboardingCompletionOperation(
         }
 
         setupSecretProvider.Lock();
-        cacheInvalidator.InvalidateUser(input.UserId);
         await deploymentModeProvider.InvalidateCacheAsync();
         await jwtRefreshNotifier.ReloadAsync(CancellationToken.None);
         auditLogger.Log(new InstanceBootstrapAuditEvent(

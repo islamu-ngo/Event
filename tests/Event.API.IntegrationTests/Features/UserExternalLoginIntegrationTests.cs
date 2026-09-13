@@ -642,7 +642,6 @@ public class UserExternalLoginIntegrationTests
             unitOfWork,
             Substitute.For<ISettingMutationLock>(),
             Substitute.For<IVisitorAccessCapabilityResolver>(),
-            Substitute.For<IAdminCacheInvalidator>(),
             tenantContext,
             configuration,
             TimeProvider.System);

@@ -52,7 +52,7 @@ public sealed class ConfiguredAdministratorClaimInvariantTests
         await Assert.That(scenario.CommittedWrites).IsEmpty();
         await Assert.That(scenario.Users).IsEquivalentTo([scenario.UserId]);
         await Assert.That(scenario.PostCommitEffects)
-            .IsEquivalentTo(["secret-lock", "admin-cache", "deployment-cache", "jwt-reload", "audit"]);
+            .IsEquivalentTo(["secret-lock", "deployment-cache", "jwt-reload", "audit"]);
     }
 
     [Test]
@@ -128,7 +128,7 @@ public sealed class ConfiguredAdministratorClaimInvariantTests
         await Assert.That(response.Id).IsEqualTo(bootstrapId);
         await Assert.That(scenario.CommittedWrites).IsEmpty();
         await Assert.That(scenario.PostCommitEffects)
-            .IsEquivalentTo(["secret-lock", "admin-cache", "deployment-cache", "jwt-reload", "audit"]);
+            .IsEquivalentTo(["secret-lock", "deployment-cache", "jwt-reload", "audit"]);
     }
 
     [Test]

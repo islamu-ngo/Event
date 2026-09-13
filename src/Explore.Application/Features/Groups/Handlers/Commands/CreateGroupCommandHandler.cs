@@ -1,4 +1,3 @@
-using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Group.Validators;
@@ -21,7 +20,6 @@ public class CreateGroupCommandHandler : ICommandHandler<CreateGroupCommand, Bas
     private readonly IGroupMemberRepository _groupMemberRepository;
     private readonly IActorRepository _actorRepository;
     private readonly IStorageObjectRepository _storageObjectRepository;
-    private readonly IAdminCacheInvalidator _adminCacheInvalidator;
     private readonly ITenantContext _tenantContext;
     private readonly HybridCache _cache;
     private readonly BusinessMetrics _metrics;
@@ -33,7 +31,6 @@ public class CreateGroupCommandHandler : ICommandHandler<CreateGroupCommand, Bas
         IGroupMemberRepository groupMemberRepository,
         IActorRepository actorRepository,
         IStorageObjectRepository storageObjectRepository,
-        IAdminCacheInvalidator adminCacheInvalidator,
         ITenantContext tenantContext,
         HybridCache cache,
         BusinessMetrics metrics)
@@ -44,7 +41,6 @@ public class CreateGroupCommandHandler : ICommandHandler<CreateGroupCommand, Bas
         _groupMemberRepository = groupMemberRepository;
         _actorRepository = actorRepository;
         _storageObjectRepository = storageObjectRepository;
-        _adminCacheInvalidator = adminCacheInvalidator;
         _tenantContext = tenantContext;
         _cache = cache;
         _metrics = metrics;
@@ -157,11 +153,6 @@ public class CreateGroupCommandHandler : ICommandHandler<CreateGroupCommand, Bas
                     "Group created successfully. You are now the creator and admin of this group.");
             },
             cancellationToken);
-
-        if (result.IsSuccess)
-        {
-            _adminCacheInvalidator.InvalidateUser(request.CreatorUserId);
-        }
 
         return result;
     }

@@ -30,7 +30,6 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
     IUnitOfWork unitOfWork,
     ISettingMutationLock settingMutationLock,
     IVisitorAccessCapabilityResolver visitorAccessCapabilityResolver,
-    IAdminCacheInvalidator adminCacheInvalidator,
     ITenantContext tenantContext,
     IConfiguration configuration,
     TimeProvider timeProvider)
@@ -212,10 +211,9 @@ public sealed class BootstrapAtprotoSessionCommandHandler(
                 persistence.FailureCode);
         }
 
-        adminCacheInvalidator.InvalidateUser(persistence.UserId!.Value);
         var issued = await tokenIssuer
             .IssueAsync(
-                persistence.UserId.Value,
+                persistence.UserId!.Value,
                 tenantId,
                 verified.Did,
                 cancellationToken).ConfigureAwait(false);

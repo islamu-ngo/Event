@@ -77,7 +77,7 @@ public sealed class OrganizationMappingHandlerTests
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
         var handler = new CreateGroupCommandHandler(groups, participations, null!, members, actors, null!,
-            new CacheInvalidator(), new TenantContext(TenantId), new InlineCache(), metrics);
+            new TenantContext(TenantId), new InlineCache(), metrics);
         var result = await handler.ExecuteAsync(new CreateGroupCommand
         {
             CreatorUserId = ActorId,
@@ -155,7 +155,7 @@ public sealed class OrganizationMappingHandlerTests
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         using var metrics = new BusinessMetrics(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
         var handler = new CreateOrganizationCommandHandler(organizations, participations, members, actors, null!, authority,
-            new CacheInvalidator(), new TenantContext(TenantId), new InlineCache(), metrics, new InlineUnitOfWork());
+            new TenantContext(TenantId), new InlineCache(), metrics, new InlineUnitOfWork());
         var result = await handler.ExecuteAsync(new CreateOrganizationCommand
         {
             CreatorUserId = ActorId,
@@ -427,11 +427,6 @@ public sealed class OrganizationMappingHandlerTests
     }
 
     internal sealed record TenantContext(Guid TenantId) : ITenantContext;
-    internal sealed class CacheInvalidator : IAdminCacheInvalidator
-    {
-        public void InvalidateUser(Guid userId) { }
-        public void InvalidateAll() => throw new NotSupportedException();
-    }
     internal sealed class InlineCache : HybridCache
     {
         public override ValueTask<T> GetOrCreateAsync<TState, T>(string key, TState state, Func<TState, CancellationToken, ValueTask<T>> factory,

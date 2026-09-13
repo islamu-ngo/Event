@@ -151,7 +151,6 @@ public sealed class AtprotoOAuthSecurityGatewayTests
                 systemSettings,
                 new TenantSettingRepository(visitorSettings.Context, visitorSettings.MutationLock),
                 new VisitorAccessProviderReader(systemSettings, configuration)),
-            Substitute.For<IAdminCacheInvalidator>(),
             tenantContext,
             configuration,
             TimeProvider.System);

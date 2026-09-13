@@ -48,11 +48,10 @@ public sealed class TenantAuthorityMembershipParityTests
         await Assert.That(inventory.Any(g => g.TenantId == database.TenantId)).IsEqualTo(expectedInventory);
         await Assert.That(await grants.IsTenantAdmin(database.TenantId, database.UserId)).IsEqualTo(expectedAuthority);
 
-        // Each overload gets a cold cache; neither can be rescued by the other's cached result.
+        // Each overload independently reads authority from the persisted memberships.
         foreach (var explicitUser in new[] { false, true })
         {
-            using var cache = new MemoryCache(new MemoryCacheOptions());
-            var admin = database.CreateAdmin(cache);
+            var admin = database.CreateAdmin();
             var ids = explicitUser
                 ? await admin.GetAdminTenantIdsAsync(database.UserId)
                 : await admin.GetAdminTenantIdsAsync();
@@ -76,8 +75,7 @@ public sealed class TenantAuthorityMembershipParityTests
     {
         await using var database = new AuthorityDatabase();
         await database.InitializeAsync(MembershipState.Active, status);
-        using var cache = new MemoryCache(new MemoryCacheOptions());
-        var admin = database.CreateAdmin(cache);
+        var admin = database.CreateAdmin();
         await Assert.That(await admin.IsTenantAdminAsync(database.TenantId)).IsTrue();
         await Assert.That(await admin.GetAdminTenantIdsAsync()).Contains(database.TenantId);
     }
@@ -279,16 +277,16 @@ public sealed class TenantAuthorityMembershipParityTests
                 });
         }
 
-        public AdminContext CreateAdmin(IMemoryCache cache) => new(
+        public AdminContext CreateAdmin() => new(
             new HttpContextAccessor { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, UserId.ToString())], "test")) } },
             new PlatformUserRoleRepository(Context), new TenantUserRoleGrantRepository(Context),
             new OrganizationMemberRepository(Context), new GroupMemberRepository(Context),
-            new UserExternalLoginRepository(Context), cache, NullLogger<AdminContext>.Instance);
+            new UserExternalLoginRepository(Context), NullLogger<AdminContext>.Instance);
 
         public RuntimeAuthorizationProvider CreateProvider(string providerName, IMemoryCache cache,
             IMachinePrincipalAccessor machine, CategoryPolicyBoundary remote)
         {
-            var admin = CreateAdmin(cache);
+            var admin = CreateAdmin();
             var organizations = new OrganizationMemberRepository(Context);
             var groups = new GroupMemberRepository(Context);
             var events = new EventAuthoritySnapshotService(Context);

@@ -236,7 +236,7 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
         { HttpContext = PrincipalContext(_currentUserId) },
             new PlatformUserRoleRepository(Application(scope)), new TenantUserRoleGrantRepository(Application(scope)),
             new OrganizationMemberRepository(Application(scope)), new GroupMemberRepository(Application(scope)),
-            new UserExternalLoginRepository(Application(scope)), scope.ServiceProvider.GetRequiredService<IMemoryCache>(),
+            new UserExternalLoginRepository(Application(scope)),
             NullLogger<AdminContext>.Instance);
 
         internal ManagementTenantProvisioningRequestDto Request() => ManagedTenantProvisioningRequestCodec.Deserialize($$$"""

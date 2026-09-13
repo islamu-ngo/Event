@@ -335,7 +335,6 @@ public sealed partial class NativeStorageObjectHttpTests
             });
         }
         await db.SaveChangesAsync();
-        scope.ServiceProvider.GetRequiredService<IAdminCacheInvalidator>().InvalidateUser(userId);
         await scope.ServiceProvider.GetRequiredService<IHierarchicalSettingsResolver>().SetValueAsync(
             GovernanceSettingKeys.Storage.DefaultTenantQuotaBytes, "1048576", SettingScope.Tenant, PlatformDefaults.DefaultTenantId, userId);
     }

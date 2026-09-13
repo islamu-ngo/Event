@@ -143,7 +143,7 @@ public sealed class LocalCredentialBindingTests
     [Arguments(IdentityDatabaseTopology.External, RejectedAuthority.TenantAdministrator)]
     [Arguments(IdentityDatabaseTopology.Colocated, RejectedAuthority.RevokedPlatformAdministrator)]
     [Arguments(IdentityDatabaseTopology.External, RejectedAuthority.RevokedPlatformAdministrator)]
-    public async Task ReconciliationRequiresCurrentPlatformRoleDespiteTenantAuthorityOrCachedApproval(
+    public async Task ReconciliationRequiresCurrentPlatformRoleDespiteTenantAuthorityOrEarlierApproval(
         IdentityDatabaseTopology topology, RejectedAuthority authority)
     {
         await using Fixture fixture = await Fixture.CreateAsync(topology);
@@ -161,7 +161,7 @@ public sealed class LocalCredentialBindingTests
         }
         else
         {
-            await Assert.That(await admin.IsInstanceAdminAsync(fixture.CancellationToken)).IsTrue();
+            await Assert.That(await admin.IsInstanceAdminAsync(fixture.CancellationToken)).IsFalse();
         }
 
         BaseCommandResponse<Guid> result = await fixture.Handler(request, admin).Handle(
@@ -459,7 +459,6 @@ public sealed class LocalCredentialBindingTests
         private readonly string _applicationPath = Path.Combine(Path.GetTempPath(), $"binding-app-{Guid.CreateVersion7():N}.db");
         private readonly string _identityPath = Path.Combine(Path.GetTempPath(), $"binding-identity-{Guid.CreateVersion7():N}.db");
         private readonly CancellationTokenSource _timeout = new(TimeSpan.FromSeconds(30));
-        private readonly MemoryCache _cache = new(new MemoryCacheOptions());
         private readonly MemoryCache _metadataCache = new(new MemoryCacheOptions());
         private ServiceProvider? _provider;
         private IdentityDatabaseTopology _topology;
@@ -510,7 +509,6 @@ public sealed class LocalCredentialBindingTests
                 orgMemberRepo: new OrganizationMemberRepository(application),
                 groupMemberRepo: new GroupMemberRepository(application),
                 userExternalLoginRepository: new UserExternalLoginRepository(application),
-                cache: _cache,
                 logger: NullLogger<AdminContext>.Instance);
         }
 
@@ -765,7 +763,6 @@ public sealed class LocalCredentialBindingTests
             }
             finally
             {
-                _cache.Dispose();
                 _metadataCache.Dispose();
                 foreach (string path in new[] { _applicationPath, _identityPath })
                 {

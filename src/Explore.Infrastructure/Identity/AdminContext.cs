@@ -1,12 +1,8 @@
-using System.Security.Claims;
 using Explore.Application.Authentication;
-using Explore.Application.Constants;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Persistence;
-using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Infrastructure.Identity;
@@ -16,7 +12,7 @@ namespace Explore.Infrastructure.Identity;
 /// Identity is read from authenticated claims (sub/nameidentifier/sid) and authority
 /// is resolved from platform role assignments, tenant user role grants, OrganizationMembers, and GroupMembers.
 /// </summary>
-public class AdminContext : IAdminContext, IAdminCacheInvalidator
+public class AdminContext : IAdminContext
 {
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly IPlatformUserRoleRepository _platformUserRoleRepository;
@@ -24,11 +20,7 @@ public class AdminContext : IAdminContext, IAdminCacheInvalidator
     private readonly IOrganizationMemberRepository _orgMemberRepo;
     private readonly IGroupMemberRepository _groupMemberRepo;
     private readonly IUserExternalLoginRepository _userExternalLoginRepository;
-    private readonly IMemoryCache _cache;
     private readonly ILogger<AdminContext> _logger;
-
-    private static readonly TimeSpan CacheExpiration = TimeSpan.FromMinutes(5);
-    private const string CacheKeyPrefix = "AdminContext_";
 
     public AdminContext(
         IHttpContextAccessor httpContextAccessor,
@@ -37,7 +29,6 @@ public class AdminContext : IAdminContext, IAdminCacheInvalidator
         IOrganizationMemberRepository orgMemberRepo,
         IGroupMemberRepository groupMemberRepo,
         IUserExternalLoginRepository userExternalLoginRepository,
-        IMemoryCache cache,
         ILogger<AdminContext> logger)
     {
         _httpContextAccessor = httpContextAccessor;
@@ -46,7 +37,6 @@ public class AdminContext : IAdminContext, IAdminCacheInvalidator
         _orgMemberRepo = orgMemberRepo;
         _groupMemberRepo = groupMemberRepo;
         _userExternalLoginRepository = userExternalLoginRepository;
-        _cache = cache;
         _logger = logger;
     }
 
@@ -86,28 +76,22 @@ public class AdminContext : IAdminContext, IAdminCacheInvalidator
 
     public async Task<bool> IsInstanceAdminAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        // DB-first authority: resolve from database only.
-        var cacheKey = $"{CacheKeyPrefix}Instance_{userId}";
-        return await _cache.GetOrCreateAsync(cacheKey, async entry =>
+        try
         {
-            entry.SlidingExpiration = CacheExpiration;
-            try
+            var isRoleAdmin = await _platformUserRoleRepository.IsUserPlatformAdmin(userId);
+            if (isRoleAdmin)
             {
-                var isRoleAdmin = await _platformUserRoleRepository.IsUserPlatformAdmin(userId);
-                if (isRoleAdmin)
-                {
-                    _logger.LogInformation("AdminContext: IsInstanceAdmin=true (platform.admin role detected in database)");
-                    return true;
-                }
+                _logger.LogInformation("AdminContext: IsInstanceAdmin=true (platform.admin role detected in database)");
+                return true;
             }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "AdminContext: failed role-based instance admin check");
-            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "AdminContext: failed role-based instance admin check");
+        }
 
-            _logger.LogWarning("AdminContext: IsInstanceAdmin=false (platform.admin role not found)");
-            return false;
-        });
+        _logger.LogWarning("AdminContext: IsInstanceAdmin=false (platform.admin role not found)");
+        return false;
     }
 
     public async Task<bool> IsTenantAdminAsync(Guid tenantId, CancellationToken cancellationToken = default)
@@ -116,23 +100,18 @@ public class AdminContext : IAdminContext, IAdminCacheInvalidator
         if (uid == null)
             return false;
 
-        var cacheKey = $"{CacheKeyPrefix}Tenant_{uid}_{tenantId}";
-        return await _cache.GetOrCreateAsync(cacheKey, async entry =>
+        var isAdmin = await _tenantAdminRepo.IsTenantAdmin(tenantId, uid.Value);
+
+        if (isAdmin)
         {
-            entry.SlidingExpiration = CacheExpiration;
-            var isAdmin = await _tenantAdminRepo.IsTenantAdmin(tenantId, uid.Value);
+            _logger.LogInformation("AdminContext: IsTenantAdmin=true");
+        }
+        else
+        {
+            _logger.LogDebug("AdminContext: IsTenantAdmin=false");
+        }
 
-            if (isAdmin)
-            {
-                _logger.LogInformation("AdminContext: IsTenantAdmin=true");
-            }
-            else
-            {
-                _logger.LogDebug("AdminContext: IsTenantAdmin=false");
-            }
-
-            return isAdmin;
-        });
+        return isAdmin;
     }
 
     public async Task<bool> IsOrganizationAdminAsync(Guid organizationId, CancellationToken cancellationToken = default)
@@ -141,13 +120,8 @@ public class AdminContext : IAdminContext, IAdminCacheInvalidator
         if (uid == null)
             return false;
 
-        var cacheKey = $"{CacheKeyPrefix}Org_{uid}_{organizationId}";
-        return await _cache.GetOrCreateAsync(cacheKey, async entry =>
-        {
-            entry.SlidingExpiration = CacheExpiration;
-            var membership = await _orgMemberRepo.GetByOrganizationAndUser(organizationId, uid.Value);
-            return membership != null && IsOrganizationAdminRole(membership.RoleId);
-        });
+        var membership = await _orgMemberRepo.GetByOrganizationAndUser(organizationId, uid.Value);
+        return membership != null && IsOrganizationAdminRole(membership.RoleId);
     }
 
     public async Task<IReadOnlyList<Guid>> GetAdminTenantIdsAsync(CancellationToken cancellationToken = default)
@@ -160,21 +134,15 @@ public class AdminContext : IAdminContext, IAdminCacheInvalidator
 
     public async Task<IReadOnlyList<Guid>> GetAdminTenantIdsAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var cacheKey = $"{CacheKeyPrefix}TenantIds_{userId}";
-        return await _cache.GetOrCreateAsync(cacheKey, async entry =>
-        {
-            entry.SlidingExpiration = CacheExpiration;
-            var admins = await _tenantAdminRepo.GetByUserId(userId);
-            var adminTenantIds = admins
-                .Where(a => a.RoleId == (int)RoleEnum.TenantAdmin
-                    && a.TenantUser.StatusId == (int)TenantUserStatusEnum.Active
-                    && !a.TenantUser.IsDeleted)
-                .Select(a => a.TenantId)
-                .Distinct()
-                .ToList();
-
-            return (IReadOnlyList<Guid>)adminTenantIds.AsReadOnly();
-        }) ?? Array.Empty<Guid>();
+        var admins = await _tenantAdminRepo.GetByUserId(userId);
+        return admins
+            .Where(a => a.RoleId == (int)RoleEnum.TenantAdmin
+                && a.TenantUser.StatusId == (int)TenantUserStatusEnum.Active
+                && !a.TenantUser.IsDeleted)
+            .Select(a => a.TenantId)
+            .Distinct()
+            .ToList()
+            .AsReadOnly();
     }
 
     public async Task<IReadOnlyList<Guid>> GetAdminOrganizationIdsAsync(CancellationToken cancellationToken = default)
@@ -187,20 +155,13 @@ public class AdminContext : IAdminContext, IAdminCacheInvalidator
 
     public async Task<IReadOnlyList<Guid>> GetAdminOrganizationIdsAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var cacheKey = $"{CacheKeyPrefix}OrgIds_{userId}";
-        return await _cache.GetOrCreateAsync(cacheKey, async entry =>
-        {
-            entry.SlidingExpiration = CacheExpiration;
-            var memberships = await _orgMemberRepo.GetMembershipsByUser(userId, cancellationToken);
-            var adminOrgIds = memberships
-                .Where(m => IsOrganizationAdminRole(m.RoleId))
-                .Select(m => m.OrganizationTenant.OrganizationId)
-                .Distinct()
-                .ToList()
-                .AsReadOnly();
-
-            return (IReadOnlyList<Guid>)adminOrgIds;
-        }) ?? Array.Empty<Guid>();
+        var memberships = await _orgMemberRepo.GetMembershipsByUser(userId, cancellationToken);
+        return memberships
+            .Where(m => IsOrganizationAdminRole(m.RoleId))
+            .Select(m => m.OrganizationTenant.OrganizationId)
+            .Distinct()
+            .ToList()
+            .AsReadOnly();
     }
 
     public async Task<IReadOnlyList<Guid>> GetAdminOrganizationIdsAsync(
@@ -208,13 +169,13 @@ public class AdminContext : IAdminContext, IAdminCacheInvalidator
         Guid tenantId,
         CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<Guid> allIds = await GetAdminOrganizationIdsAsync(userId, cancellationToken);
         var memberships = await _orgMemberRepo.GetMembershipsByUser(userId, cancellationToken);
-        HashSet<Guid> tenantIds = memberships
-            .Where(membership => membership.TenantId == tenantId)
+        return memberships
+            .Where(membership => membership.TenantId == tenantId && IsOrganizationAdminRole(membership.RoleId))
             .Select(membership => membership.OrganizationTenant.OrganizationId)
-            .ToHashSet();
-        return allIds.Where(tenantIds.Contains).ToList();
+            .Distinct()
+            .ToList()
+            .AsReadOnly();
     }
 
     public async Task<bool> IsGroupAdminAsync(Guid groupId, CancellationToken cancellationToken = default)
@@ -223,13 +184,8 @@ public class AdminContext : IAdminContext, IAdminCacheInvalidator
         if (uid == null)
             return false;
 
-        var cacheKey = $"{CacheKeyPrefix}Group_{uid}_{groupId}";
-        return await _cache.GetOrCreateAsync(cacheKey, async entry =>
-        {
-            entry.SlidingExpiration = CacheExpiration;
-            var membership = await _groupMemberRepo.GetByGroupAndUser(groupId, uid.Value);
-            return membership != null && IsGroupAdminRole(membership.RoleId);
-        });
+        var membership = await _groupMemberRepo.GetByGroupAndUser(groupId, uid.Value);
+        return membership != null && IsGroupAdminRole(membership.RoleId);
     }
 
     public async Task<IReadOnlyList<Guid>> GetAdminGroupIdsAsync(CancellationToken cancellationToken = default)
@@ -242,20 +198,13 @@ public class AdminContext : IAdminContext, IAdminCacheInvalidator
 
     public async Task<IReadOnlyList<Guid>> GetAdminGroupIdsAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var cacheKey = $"{CacheKeyPrefix}GroupIds_{userId}";
-        return await _cache.GetOrCreateAsync(cacheKey, async entry =>
-        {
-            entry.SlidingExpiration = CacheExpiration;
-            var memberships = await _groupMemberRepo.GetMembershipsByUser(userId, cancellationToken);
-            var adminGroupIds = memberships
-                .Where(m => IsGroupAdminRole(m.RoleId))
-                .Select(m => m.GroupTenant.GroupId)
-                .Distinct()
-                .ToList()
-                .AsReadOnly();
-
-            return (IReadOnlyList<Guid>)adminGroupIds;
-        }) ?? Array.Empty<Guid>();
+        var memberships = await _groupMemberRepo.GetMembershipsByUser(userId, cancellationToken);
+        return memberships
+            .Where(m => IsGroupAdminRole(m.RoleId))
+            .Select(m => m.GroupTenant.GroupId)
+            .Distinct()
+            .ToList()
+            .AsReadOnly();
     }
 
     public async Task<IReadOnlyList<Guid>> GetAdminGroupIdsAsync(
@@ -263,13 +212,13 @@ public class AdminContext : IAdminContext, IAdminCacheInvalidator
         Guid tenantId,
         CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<Guid> allIds = await GetAdminGroupIdsAsync(userId, cancellationToken);
         var memberships = await _groupMemberRepo.GetMembershipsByUser(userId, cancellationToken);
-        HashSet<Guid> tenantIds = memberships
-            .Where(membership => membership.TenantId == tenantId)
+        return memberships
+            .Where(membership => membership.TenantId == tenantId && IsGroupAdminRole(membership.RoleId))
             .Select(membership => membership.GroupTenant.GroupId)
-            .ToHashSet();
-        return allIds.Where(tenantIds.Contains).ToList();
+            .Distinct()
+            .ToList()
+            .AsReadOnly();
     }
 
     private static bool IsOrganizationAdminRole(int roleId)
@@ -280,32 +229,5 @@ public class AdminContext : IAdminContext, IAdminCacheInvalidator
     private static bool IsGroupAdminRole(int roleId)
     {
         return roleId == (int)RoleEnum.GroupAdmin;
-    }
-
-
-    /// <inheritdoc />
-    public void InvalidateUser(Guid userId)
-    {
-        _cache.Remove($"{CacheKeyPrefix}Instance_{userId}");
-        _cache.Remove($"{CacheKeyPrefix}TenantIds_{userId}");
-        _cache.Remove($"{CacheKeyPrefix}OrgIds_{userId}");
-        _cache.Remove($"{CacheKeyPrefix}GroupIds_{userId}");
-
-        // For single-tenant mode, we can proactively clear the default tenant admin cache
-        _cache.Remove($"{CacheKeyPrefix}Tenant_{userId}_{PlatformDefaults.DefaultTenantId}");
-
-        _logger.LogInformation("AdminContext: Invalidated authority cache for one user");
-    }
-
-    /// <inheritdoc />
-    public void InvalidateAll()
-    {
-        // IMemoryCache has no "clear all" method. We track known keys for targeted eviction.
-        // For bulk invalidation, we swap to a new CancellationTokenSource-based approach.
-        // However, since AdminContext is scoped per-request and cache keys are user-specific,
-        // the practical approach is to let entries expire naturally (5-min sliding window).
-        // PolicySyncService should call InvalidateUser for specific affected users when known.
-        _logger.LogInformation("AdminContext: Full cache invalidation requested. " +
-            "User-specific entries will expire via 5-minute sliding window");
     }
 }

@@ -39,7 +39,7 @@ public sealed class InstanceOnboardingCompletionOperationTests
         await Assert.That(scenario.CommittedWrites).Contains("bootstrap");
         await Assert.That(scenario.Users).Contains(scenario.UserId);
         await Assert.That(scenario.PostCommitEffects)
-            .IsEquivalentTo(["secret-lock", "admin-cache", "deployment-cache", "jwt-reload", "audit"]);
+            .IsEquivalentTo(["secret-lock", "deployment-cache", "jwt-reload", "audit"]);
     }
 
     [Test]
@@ -73,7 +73,7 @@ public sealed class InstanceOnboardingCompletionOperationTests
 
         await Assert.That(response.IsSuccess).IsTrue();
         await Assert.That(scenario.EventSequence[scenario.EventSequence.IndexOf("commit")..])
-            .IsEquivalentTo(["commit", "secret-lock", "admin-cache", "deployment-cache", "jwt-reload", "audit"]);
+            .IsEquivalentTo(["commit", "secret-lock", "deployment-cache", "jwt-reload", "audit"]);
     }
 
     [Test]
@@ -90,7 +90,7 @@ public sealed class InstanceOnboardingCompletionOperationTests
         await Assert.That(replay.Id).IsEqualTo(first.Id);
         await Assert.That(scenario.CommittedWrites).IsEmpty();
         await Assert.That(scenario.PostCommitEffects)
-            .IsEquivalentTo(["secret-lock", "admin-cache", "deployment-cache", "jwt-reload", "audit"]);
+            .IsEquivalentTo(["secret-lock", "deployment-cache", "jwt-reload", "audit"]);
     }
 
     [Test]
@@ -360,7 +360,6 @@ internal sealed class OnboardingCompletionScenario
         });
 
         var setupSecret = new EffectSetupSecret(EventSequence);
-        var cache = new EffectAdminCache(EventSequence);
         DeploymentModeProvider = new EffectDeploymentModeProvider(EventSequence);
         var jwt = new EffectJwtNotifier(this, EventSequence);
         var audit = new EffectAuditLogger(EventSequence);
@@ -381,7 +380,6 @@ internal sealed class OnboardingCompletionScenario
             [_provider],
             setupSecret,
             audit,
-            cache,
             DeploymentModeProvider,
             jwt,
             branding,
@@ -658,12 +656,6 @@ internal sealed class OnboardingCompletionScenario
         public Task InitializeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public bool ValidateSecret(string? secret) => true;
         public void Lock() => events.Add("secret-lock");
-    }
-
-    private sealed class EffectAdminCache(List<string> events) : IAdminCacheInvalidator
-    {
-        public void InvalidateUser(Guid userId) => events.Add("admin-cache");
-        public void InvalidateAll() => throw new NotSupportedException();
     }
 
     internal sealed class EffectDeploymentModeProvider(List<string> events) : IDeploymentModeProvider

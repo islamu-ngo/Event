@@ -402,9 +402,7 @@ public sealed class LocalBootstrapConvergenceTests
                 new ActorRepository(application), logins, tenants, new TenantCreationService(tenants, documents), documents,
                 new SystemSettingRepository(application, new RelationalSettingMutationLock(application, unitOfWork)),
                 [provider], setup, new InstanceBootstrapAuditLogger(NullLogger<InstanceBootstrapAuditLogger>.Instance),
-                new AdminContext(new HttpContextAccessor(), platformRoles, tenantRoles,
-                    new OrganizationMemberRepository(application), new GroupMemberRepository(application), logins, cache,
-                    NullLogger<AdminContext>.Instance), deployment, new RuntimeMetadataRefresh(),
+                deployment, new RuntimeMetadataRefresh(),
                 new TenantBrandingSettingsDocumentProvisioningService(tenants, documents, new TypedSettingsDocumentResolver(documents, cache)),
                 NullLogger<InstanceOnboardingCompletionOperation>.Instance, unitOfWork);
             return new LocalAdministratorBootstrapOperation(bootstrap, provider, Store(scope), Secrets, completion,

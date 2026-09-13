@@ -182,6 +182,30 @@ existing registration access retain their own authority.
     -   **Fallback (Local)**: Resolves the user's **Authority Profile** (admin status, tenant membership) once for profiled batch checks. Organization evidence actions (`submit-evidence`, `view-evidence`, `review-evidence`) instead reuse the single-request evaluator with the original immutable facts and scope: OrgAdmin can submit/view, TenantAdmin can review/view, and combined authority permits both. Batch size and neighboring capabilities cannot confer submission on a tenant-only reviewer or review on an organization-only submitter. Other organization actions retain their existing batch evaluation.
 -   **Collection Support**: For "Get All" endpoints, all link definitions for all items in the paginated result are flattened into a single massive batch, ensuring high-scale efficiency.
 
+### Committed administrator-authority freshness
+
+`AdminContext` reads platform roles, tenant grants, organization memberships, and group
+memberships from their existing no-tracking repositories on every authority call.
+It does not cache positive or negative authority results across calls or requests.
+Local authorization and Cerbos principal construction therefore observe committed
+role changes without mutation hooks, cache invalidation, or revised claims. The
+optimized local batch still resolves one immutable `AuthorityProfile` for its checks;
+small batches, machine callers, and evidence actions retain their existing paths.
+
+The guarantee applies when a new request's database read/snapshot starts after the
+mutation commits and every node reads the same authoritative primary database. It
+also covers out-of-process writes. An already-running read, batch, or older transaction
+snapshot may retain its earlier view; this does not promise retroactive cancellation
+or solve authorization/write races. Rollback creates no reusable cached grant or denial.
+Existing role predicates, tenant filters, and provider-identity binding resolution
+remain authoritative; missing provider bindings are re-read after same-scope onboarding.
+BFF display claims, permission-registry caching, and unrelated content caches are unchanged.
+
+The obsolete `IAdminCacheInvalidator` contract and diagnostic
+`POST /api/_internal/admin-cache/users/{userId}/invalidate` action are removed.
+`POST /api/_internal/admin-cache/current-user/snapshot` remains available under its
+existing Development/Testing configuration gate; it diagnoses identity, not cached authority.
+
 Registration-form authoring uses the scoped `islamuevent_registration_form` resource with `view`, `create`, `update`, `delete`, `preflight`, `publish`, and `manage-requirements` actions. Its trusted resource context is enriched from the persisted parent Event; request bodies cannot author tenant or organizer identity. The event-level `manage-registration-workflow` entry relation and all form-level actions share the same authority: a verified organizer controller or exact tenant/event `event.registration_manager` assignment carrying `event_registration:manage`. Contributors, listing submitters, tenant-only curators, instance administrators, machine principals, missing/ambiguous organizer state, and unrelated tenant/event assignments fail closed in both Cerbos and fallback authorization.
 
 Paid-event commerce is an exact event authority, not administrative fallback authority. `manage-paid-event-commerce` is evaluated with the persisted event and organizer actor context for payment-connection, hosted onboarding, commercial disclosures, and paid publication. A current user must control that exact organizer actor in the ambient tenant; instance and tenant administrators, unrelated actor controllers, machines, historical recipients, and ambiguous organizer state do not substitute. The same decision controls the corresponding `payment-connection`, `start-onboarding`, `commercial-disclosures`, and paid `publish` HAL relations.

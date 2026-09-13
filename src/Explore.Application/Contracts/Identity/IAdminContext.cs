@@ -6,7 +6,8 @@ namespace Explore.Application.Contracts.Identity;
 /// Resolves the current user's administrative authority across the Instance > Tenant > Organization > Group hierarchy.
 /// Uses a DB-first authority model where identity comes from authenticated claims and
 /// authorization comes from database relationships.
-/// Implementations should cache the "Authority Profile" for performance (5-minute sliding window).
+/// Authority results are read from the database on each call, under its current transaction isolation.
+/// A caller may reuse an immutable authority profile within one batch, never across requests.
 /// </summary>
 public interface IAdminContext
 {
@@ -16,10 +17,10 @@ public interface IAdminContext
     Guid? UserId { get; }
 
     /// <summary>
-    /// Resolves the current user's internal ID.
-    /// If the token has an internal_user_id claim, it returns that.
-    /// Otherwise, it performs a database lookup via external login or email.
-    /// Result is cached for the duration of the request.
+    /// Resolves the current user's platform ID through canonical authenticated identity semantics.
+    /// Provider identities require an exact external-login binding; other principals use canonical claims.
+    /// Provider bindings, including missing results, are not cached: onboarding may create a binding
+    /// between calls in the same scope. Email and administrator claims are not identity fallbacks.
     /// </summary>
     Task<Guid?> ResolveUserIdAsync(CancellationToken cancellationToken = default);
 

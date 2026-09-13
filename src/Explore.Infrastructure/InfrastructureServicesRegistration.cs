@@ -482,7 +482,6 @@ public static class InfrastructureServicesRegistration
         // Admin context (hybrid JWT + database identity resolution)
         services.AddScoped<AdminContext>();
         services.AddScoped<IAdminContext>(sp => sp.GetRequiredService<AdminContext>());
-        services.AddScoped<IAdminCacheInvalidator>(sp => sp.GetRequiredService<AdminContext>());
 
         // Machine principal accessor: reads API-key-derived principal context from the current HttpContext.
         // Required so authorization providers (Cerbos + fallback) treat external API-key callers consistently with human users.

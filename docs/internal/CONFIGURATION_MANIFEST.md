@@ -716,6 +716,13 @@ administrators import a v1alpha2 `TenantConfigurationPackage` into the tenant
 selected by the authenticated route. Source tenant names and instance metadata
 are provenance only and never select target authority.
 
+`TenantConfigurationPackageSerializer` retains tenant-only authority and emits
+the canonical `PaidEventPolicyAuthorityMetadata.SovereignLockedFields` omission
+list in both export views. The tenant-package validator requires that same
+list; an empty list makes an otherwise valid exported package non-importable.
+These metadata names describe excluded authority, not portable credentials or
+permission to change sovereign fields.
+
 The administration workspace follows one server-owned state machine:
 
 1. Upload an artifact of at most 4 MiB to create an expiring session. Keep the

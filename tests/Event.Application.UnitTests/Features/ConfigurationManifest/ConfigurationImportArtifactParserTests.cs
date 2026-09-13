@@ -9,6 +9,44 @@ using Explore.Application.Features.ConfigurationManifest.Importing;
 public sealed class ConfigurationImportArtifactParserTests
 {
     [Test]
+    [Arguments(ConfigurationManifestExportMetadataValues.OverridesView, false)]
+    [Arguments(ConfigurationManifestExportMetadataValues.PortableView, true)]
+    public async Task ExportedTenantPackage_RoundTripsWithTenantAuthorityAndSovereignOmissions(
+        string view,
+        bool flattened)
+    {
+        ConfigurationManifestV1Alpha2 source = ConfigurationManifestTestData.Valid();
+        source = source with
+        {
+            Metadata = source.Metadata with
+            {
+                Export = new ConfigurationManifestExportMetadataV1Alpha2
+                {
+                    View = view,
+                    EffectiveValuesFlattened = flattened,
+                    SensitiveValuesOmitted = true,
+                    AuthorityScope = ConfigurationManifestExportMetadataValues.InstanceAndTenantsAuthorityScope,
+                    SovereignValuesOmitted = true,
+                    SovereignLockedFields = PaidEventPolicyAuthorityMetadata.SovereignLockedFields
+                }
+            }
+        };
+        TenantConfigurationPackageV1Alpha2 package =
+            TenantConfigurationPackageSerializer.Create(source, source.Spec.Tenants[0]);
+
+        ConfigurationImportParsedTenantPackage imported = new ConfigurationImportArtifactParser()
+            .ParseTenantPackage(TenantConfigurationPackageSerializer.Serialize(package));
+
+        await Assert.That(imported.Package.Spec.DisplayName).IsEqualTo(source.Spec.Tenants[0].Spec.DisplayName);
+        await Assert.That(imported.Package.Metadata.Export!.AuthorityScope)
+            .IsEqualTo(ConfigurationManifestExportMetadataValues.TenantAuthorityScope);
+        await Assert.That(imported.Package.Metadata.Export.View).IsEqualTo(view);
+        await Assert.That(imported.Package.Metadata.Export.EffectiveValuesFlattened).IsEqualTo(flattened);
+        await Assert.That(imported.Package.Metadata.Export.SovereignLockedFields)
+            .IsEquivalentTo(PaidEventPolicyAuthorityMetadata.SovereignLockedFields);
+    }
+
+    [Test]
     public async Task Parse_ValidManifestReturnsExactByteDigest()
     {
         byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(

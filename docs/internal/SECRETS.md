@@ -87,12 +87,17 @@ phase; never reuse the Photon configuration surface.
 
 Copy `.env.example` to the ignored repository-root `.env`. Select exactly one
 `SECRET_PROVIDER`: `Environment`, `Infisical`, or `UserSecrets`. Environment mode
-reads the documented process variables. Infisical mode uses only `INFISICAL_*`
-secret-zero bootstrap credentials. User Secrets mode reads the shared store owned
-by `src/Explore.Secrets/Explore.Secrets.csproj`; populate it with the same documented
-environment-style keys (for example `MAIL_SMTP_PASSWORD`) through your IDE or the
-`dotnet user-secrets --project src/Explore.Secrets` CLI. It is rejected unless the
-host environment is Development or Testing.
+reads the documented process variables. Infisical mode uses `INFISICAL_*` process
+environment variables or, in Development and Testing environments, can read bootstrap
+Universal Auth credentials (`Infisical:Url`, `Infisical:ProjectId`, `Infisical:ClientId`,
+`Infisical:ClientSecret`, `Infisical:Environment`) directly from the shared User Secrets store
+owned by `src/Explore.Secrets/Explore.Secrets.csproj`. In Development/Testing, if `SECRET_PROVIDER`
+is omitted from process variables or `.env`, it also falls back to `SECRET_PROVIDER` configured in
+User Secrets. User Secrets mode reads all application secrets directly from the shared store
+through your IDE or the `dotnet user-secrets --project src/Explore.Secrets` CLI.
+Both User Secrets mode and Infisical bootstrap via User Secrets are rejected unless the
+host environment is Development or Testing. In Production, Infisical bootstrap credentials
+must strictly come from process environment variables.
 
 AppHost loads the repository `.env`, so Aspire profiles honor
 `SECRET_PROVIDER=UserSecrets` directly. Direct project launches do not load that
@@ -273,7 +278,7 @@ file with filesystem permissions. Its nonsecret deployment fields are
 
 There is one Infisical bootstrap schema: `SecretProvider:Provider=Infisical`
 selects the authority and `SecretProvider:Infisical:*` (projected from the documented
-`INFISICAL_*` deployment inputs) supplies secret-zero Universal Auth credentials.
+`INFISICAL_*` deployment inputs, or in Development/Testing loaded from User Secrets) supplies secret-zero Universal Auth credentials.
 
 For full local runs, keep `SECRET_PROVIDER=Environment` and leave `INFISICAL_*` blank
 so local structured `DATABASE_*`, Keycloak, Cerbos, and storage values remain

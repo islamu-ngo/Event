@@ -7,11 +7,32 @@ namespace Explore.Secrets.Configuration;
 
 public static class SecretAuthorityConfiguration
 {
-    public static SecretProviderType GetRequiredProvider(IConfiguration configuration)
+    public static SecretProviderType GetRequiredProvider(
+        IConfiguration configuration,
+        string? environmentName = null)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         string? configured = configuration[$"{SecretProviderOptions.SectionName}:Provider"]
             ?? configuration["SECRET_PROVIDER"];
+
+        string env = environmentName ?? GetEnvironmentName(configuration);
+        if (string.IsNullOrEmpty(configured) && IsDevelopmentOrTesting(env))
+        {
+            var userSecrets = BuildUserSecrets();
+            configured = userSecrets[$"{SecretProviderOptions.SectionName}:Provider"]
+                ?? userSecrets["SECRET_PROVIDER"];
+
+            if (string.IsNullOrEmpty(configured)
+                && (!string.IsNullOrEmpty(userSecrets["Infisical:ClientId"])
+                    || !string.IsNullOrEmpty(userSecrets["SecretProvider:Infisical:ClientId"])
+                    || !string.IsNullOrEmpty(userSecrets["INFISICAL_CLIENT_ID"])
+                    || !string.IsNullOrEmpty(configuration["Infisical:ClientId"])
+                    || !string.IsNullOrEmpty(configuration["SecretProvider:Infisical:ClientId"])
+                    || !string.IsNullOrEmpty(configuration["INFISICAL_CLIENT_ID"])))
+            {
+                configured = nameof(SecretProviderType.Infisical);
+            }
+        }
 
         if (!Enum.TryParse(configured, ignoreCase: true, out SecretProviderType provider)
             || provider is not (
@@ -31,7 +52,7 @@ public static class SecretAuthorityConfiguration
         string environmentName,
         params string[] infisicalPaths)
     {
-        SecretProviderType provider = GetRequiredProvider(bootstrapConfiguration);
+        SecretProviderType provider = GetRequiredProvider(bootstrapConfiguration, environmentName);
         if (provider == SecretProviderType.Environment)
         {
             IConfiguration environment = new ConfigurationBuilder()
@@ -52,7 +73,7 @@ public static class SecretAuthorityConfiguration
             source.Paths.Clear();
             source.Paths.AddRange(infisicalPaths);
             source.ThrowOnFirstLoadFailure = true;
-        });
+        }, environmentName);
         return PreserveProviderSelection(builder.Build(), provider);
     }
 
@@ -80,10 +101,13 @@ public static class SecretAuthorityConfiguration
 
     internal static void EnsureUserSecretsEnvironment(string environmentName)
     {
-        if (!string.Equals(environmentName, Environments.Development, StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(environmentName, "Testing", StringComparison.OrdinalIgnoreCase))
+        if (!IsDevelopmentOrTesting(environmentName))
         {
             throw new InvalidOperationException("secret_authority_user_secrets_environment_invalid");
         }
     }
+
+    public static bool IsDevelopmentOrTesting(string environmentName) =>
+        string.Equals(environmentName, Environments.Development, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(environmentName, "Testing", StringComparison.OrdinalIgnoreCase);
 }

@@ -19,9 +19,13 @@ var dotenvPath = Path.Combine(repositoryRoot, ".env");
 if (File.Exists(dotenvPath))
     Env.NoClobber().Load(dotenvPath);
 var builder = DistributedApplication.CreateBuilder(args);
+if (SecretAuthorityConfiguration.IsDevelopmentOrTesting(builder.Environment.EnvironmentName))
+{
+    builder.Configuration.AddUserSecrets(typeof(SecretAuthorityConfiguration).Assembly, optional: true, reloadOnChange: false);
+}
 var runMode = AspireRunModeExtensions.Parse(builder.Configuration["ISLAMU_ASPIRE_MODE"]);
 SecretProviderType configuredSecretProvider =
-    SecretAuthorityConfiguration.GetRequiredProvider(builder.Configuration);
+    SecretAuthorityConfiguration.GetRequiredProvider(builder.Configuration, builder.Environment.EnvironmentName);
 IConfiguration authorityBootstrap = runMode == AspireRunMode.FullLocal
     && configuredSecretProvider == SecretProviderType.Infisical
     ? new ConfigurationBuilder()
@@ -1686,6 +1690,7 @@ static InfisicalBootstrapSettings ReadInfisicalBootstrap(IConfiguration configur
             _ => $"INFISICAL_{key.ToUpperInvariant()}",
         };
         return configuration[$"SecretProvider:Infisical:{key}"]
+            ?? configuration[$"Infisical:{key}"]
             ?? configuration[environmentKey]
             ?? fallback
             ?? string.Empty;

@@ -98,6 +98,73 @@ public sealed class InfisicalConfigurationProviderTests
     }
 
     [Test]
+    public async Task AddInfisical_WhenCredentialsInBootstrapConfiguration_InDevelopmentEnvironment_Succeeds()
+    {
+        string clientSecret = SecretsTestValues.CreateSecret();
+        var previous = CaptureBootstrapEnvironment();
+        ClearBootstrapEnvironment();
+        var bootstrapConfiguration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["SecretProvider:Infisical:Url"] = "https://secrets.dev.example.test",
+                ["SecretProvider:Infisical:ProjectId"] = "dev-project-id",
+                ["SecretProvider:Infisical:ClientId"] = "dev-client-id",
+                ["SecretProvider:Infisical:ClientSecret"] = clientSecret,
+                ["SecretProvider:Infisical:Environment"] = "development",
+            })
+            .Build();
+        var builder = new ConfigurationBuilder();
+
+        try
+        {
+            builder.AddInfisical(bootstrapConfiguration, environmentName: "Development");
+
+            await Assert.That(builder.Sources).Count().IsEqualTo(1);
+            var source = builder.Sources.Single();
+            await Assert.That(source).IsTypeOf<InfisicalConfigurationSource>();
+            var infisicalSource = (InfisicalConfigurationSource)source;
+            await Assert.That(infisicalSource.Url).IsEqualTo("https://secrets.dev.example.test");
+            await Assert.That(infisicalSource.ProjectId).IsEqualTo("dev-project-id");
+            await Assert.That(infisicalSource.ClientId).IsEqualTo("dev-client-id");
+            await Assert.That(infisicalSource.ClientSecret).IsEqualTo(clientSecret);
+            await Assert.That(infisicalSource.Environment).IsEqualTo("development");
+        }
+        finally
+        {
+            RestoreBootstrapEnvironment(previous);
+        }
+    }
+
+    [Test]
+    public async Task AddInfisical_WhenCredentialsInBootstrapConfiguration_InProductionEnvironment_FailsClosed()
+    {
+        var previous = CaptureBootstrapEnvironment();
+        ClearBootstrapEnvironment();
+        var bootstrapConfiguration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["SecretProvider:Infisical:Url"] = "https://attacker.example.test",
+                ["SecretProvider:Infisical:ProjectId"] = "project-id",
+                ["SecretProvider:Infisical:ClientId"] = "client-id",
+                ["SecretProvider:Infisical:ClientSecret"] = SecretsTestValues.CreateSecret(),
+                ["SecretProvider:Infisical:Environment"] = "production",
+            })
+            .Build();
+        var builder = new ConfigurationBuilder();
+
+        try
+        {
+            Action act = () => builder.AddInfisical(bootstrapConfiguration, environmentName: "Production");
+
+            await Assert.That(act).Throws<InvalidOperationException>();
+        }
+        finally
+        {
+            RestoreBootstrapEnvironment(previous);
+        }
+    }
+
+    [Test]
     public async Task ConvertToConfigurationKey_WhenAiToolProposalsSecretProvided_MapsToAiProviderSetting()
     {
         var key = await ConvertToConfigurationKey("AI_TOOL_PROPOSALS_ENABLED", "/");

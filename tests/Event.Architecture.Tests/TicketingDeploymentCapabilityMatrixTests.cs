@@ -130,21 +130,13 @@ public sealed class TicketingDeploymentCapabilityMatrixTests
     [Test]
     public async Task OpenApiGeneratedClientAndReleaseFragmentConverge()
     {
-        string openApi = await File.ReadAllTextAsync(Path.Combine(
-            RepositoryRoot,
-            "schemas",
-            "openapi_islamu-event.json"));
+        string openApi = GeneratedContractInputs.Schema;
         await Assert.That(openApi).Contains(
             "/api/deployment/ticketing-capabilities");
         await Assert.That(openApi).DoesNotContain(
             "/api/deployment/protected-delayed-payout");
 
-        string client = await File.ReadAllTextAsync(Path.Combine(
-            RepositoryRoot,
-            "src",
-            "Explore.Blazor.Client",
-            "Clients",
-            "EventApiTagClients.g.cs"));
+        string client = GeneratedContractInputs.Client;
         await Assert.That(client).Contains(
             "GetTicketingDeploymentCapabilitiesAsync");
         await Assert.That(client).DoesNotContain(

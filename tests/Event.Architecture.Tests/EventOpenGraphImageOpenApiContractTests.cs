@@ -12,9 +12,7 @@ public sealed class EventOpenGraphImageOpenApiContractTests
     [Test]
     public async Task EventOpenGraphImage_MustDeclarePngBinarySuccessResponse()
     {
-        var repositoryRoot = ResolveRepositoryRoot();
-        var schemaPath = Path.Combine(repositoryRoot, "schemas", "openapi_islamu-event.json");
-        await using var schemaStream = File.OpenRead(schemaPath);
+        await using var schemaStream = GeneratedContractInputs.OpenSchema();
         using var document = await JsonDocument.ParseAsync(schemaStream);
 
         var operation = document.RootElement
@@ -50,14 +48,7 @@ public sealed class EventOpenGraphImageOpenApiContractTests
     [Test]
     public async Task GeneratedClient_EventOpenGraphImage_UsesPngFileResponse()
     {
-        var repositoryRoot = ResolveRepositoryRoot();
-        var generatedClientPath = Path.Combine(
-            repositoryRoot,
-            "src",
-            "Explore.Blazor.Client",
-            "Clients",
-            "EventApiTagClients.g.cs");
-        var generatedClient = await File.ReadAllTextAsync(generatedClientPath);
+        var generatedClient = GeneratedContractInputs.Client;
 
         var methodStart = generatedClient.IndexOf(
             "public virtual async System.Threading.Tasks.Task<FileResponse> GetEventOpenGraphImageAsync",

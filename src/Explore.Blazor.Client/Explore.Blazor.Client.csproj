@@ -133,9 +133,20 @@
     <ReplaceFileText InputFilename="$(GeneratedApiClientCandidate)" MatchExpression="[ \t]+(\r?\n)" ReplacementText="$1" />
   </Target>
 
+  <!-- Order solution consumers without changing standalone schema-driven client builds. -->
+  <Target Name="BuildApiContractForClient" BeforeTargets="PrepareForBuild" Condition="'$(BuildingSolutionFile)' == 'true' And '$(DesignTimeBuild)' != 'true'">
+    <MSBuild Projects="../Explore.API/Explore.API.csproj" Targets="GetOpenApiContractInput" />
+  </Target>
+
   <Target Name="CheckGeneratedContractCapture" BeforeTargets="PrepareGeneratedApiClient">
     <Error Condition="!Exists('$(GeneratedApiSchemaFile)')" Text="Missing OpenAPI input: $(GeneratedApiSchemaFile)." />
-    <Delete Files="$(GeneratedRecordTransformerStamp)" Condition="!Exists('$(GeneratedApiClientFile)') Or !Exists('$(CapturedApiClientFile)') Or !Exists('$(CapturedApiSchemaFile)') Or !Exists('$(CapturedMutablePolicyFile)')" />
+    <GetFileHash Files="$(GeneratedApiSchemaFile)">
+      <Output TaskParameter="Hash" PropertyName="SelectedApiSchemaHash" />
+    </GetFileHash>
+    <GetFileHash Files="$(CapturedApiSchemaFile)" Condition="Exists('$(CapturedApiSchemaFile)')">
+      <Output TaskParameter="Hash" PropertyName="CapturedApiSchemaHash" />
+    </GetFileHash>
+    <Delete Files="$(GeneratedRecordTransformerStamp)" Condition="!Exists('$(GeneratedApiClientFile)') Or !Exists('$(CapturedApiClientFile)') Or !Exists('$(CapturedApiSchemaFile)') Or !Exists('$(CapturedMutablePolicyFile)') Or '$(SelectedApiSchemaHash)' != '$(CapturedApiSchemaHash)'" />
   </Target>
 
   <Target Name="PrepareGeneratedApiClient"

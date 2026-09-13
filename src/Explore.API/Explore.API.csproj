@@ -106,7 +106,7 @@
     <Exec Command="dotnet &quot;$(GeneratedContractToolAssembly)&quot; publish-schema &quot;$(OpenApiDocumentsDirectory)/openapi_islamu-event.json&quot; &quot;$(CanonicalOpenApiDocument)&quot;" />
   </Target>
 
-  <Target Name="GetOpenApiContractInput" DependsOnTargets="GenerateOpenApiDocuments" Returns="@(OpenApiContractInput)">
+  <Target Name="GetOpenApiContractInput" DependsOnTargets="Build;GenerateOpenApiDocuments" Returns="@(OpenApiContractInput)">
     <ItemGroup>
       <OpenApiContractInput Include="$(OpenApiDocumentsDirectory)/openapi_islamu-event.json" />
     </ItemGroup>

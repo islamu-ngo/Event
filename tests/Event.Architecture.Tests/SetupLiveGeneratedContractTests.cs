@@ -19,11 +19,7 @@ public sealed class SetupLiveGeneratedContractTests
     [Test]
     public async Task OpenApiAndGeneratedClientCloseTheWriteOnlySetupContract()
     {
-        string repositoryRoot = ResolveRepositoryRoot();
-        await using FileStream schema = File.OpenRead(Path.Combine(
-            repositoryRoot,
-            "schemas",
-            "openapi_islamu-event.json"));
+        await using Stream schema = GeneratedContractInputs.OpenSchema();
         using JsonDocument document = await JsonDocument.ParseAsync(schema);
         JsonElement operation = document.RootElement.GetProperty("paths")
             .GetProperty(WritePath)

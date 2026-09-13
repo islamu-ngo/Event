@@ -27,4 +27,20 @@
     <ProjectReference Include="..\..\eng\configuration-manifest-schema\src\ISLAMU.ConfigurationManifest.SchemaGenerator\ISLAMU.ConfigurationManifest.SchemaGenerator.csproj" />
   </ItemGroup>
 
+  <!-- The standalone test-project entry point needs the same ordering as a solution build. -->
+  <Target Name="PrepareArchitectureContractInputs" BeforeTargets="AssignProjectConfiguration" Condition="'$(DesignTimeBuild)' != 'true'">
+    <MSBuild Projects="../../src/Explore.API/Explore.API.csproj" Targets="GetOpenApiContractInput" />
+  </Target>
+
+  <Target Name="EmbedArchitectureContractInputs" AfterTargets="ResolveProjectReferences" BeforeTargets="PrepareResources" Condition="'$(DesignTimeBuild)' != 'true'">
+    <MSBuild Projects="../../src/Explore.Blazor.Client/Explore.Blazor.Client.csproj" Targets="GetGeneratedContractInputs">
+      <Output TaskParameter="TargetOutputs" ItemName="ArchitectureContractInput" />
+    </MSBuild>
+    <ItemGroup>
+      <EmbeddedResource Include="@(ArchitectureContractInput)">
+        <LogicalName>GeneratedContracts.%(Filename)%(Extension)</LogicalName>
+      </EmbeddedResource>
+    </ItemGroup>
+  </Target>
+
 </Project>

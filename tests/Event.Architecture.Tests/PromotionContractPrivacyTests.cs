@@ -132,12 +132,7 @@ public sealed class PromotionContractPrivacyTests
         await AssertNullableQuotaExceededReference(safeCommand.GetProperty("quotaExceeded"));
         await AssertNullableQuotaExceededReference(issuedCodeCommand.GetProperty("quotaExceeded"));
 
-        var generated = await File.ReadAllTextAsync(Path.Combine(
-            ResolveRepositoryRoot(),
-            "src",
-            "Explore.Blazor.Client",
-            "Clients",
-            "EventApiTagClients.g.cs"));
+        var generated = GeneratedContractInputs.Client;
 
         await Assert.That(ExtractGeneratedType(generated, "QuotaExceededDetails")).DoesNotContain("TenantId");
         await Assert.That(ExtractGeneratedType(generated, "PromotionManagementCommandResponseDto"))
@@ -151,12 +146,7 @@ public sealed class PromotionContractPrivacyTests
     [Test]
     public async Task GeneratedClient_ExposesPromotionMethodsWithoutSecretOrCapabilityStorageProperties()
     {
-        var generated = await File.ReadAllTextAsync(Path.Combine(
-            ResolveRepositoryRoot(),
-            "src",
-            "Explore.Blazor.Client",
-            "Clients",
-            "EventApiTagClients.g.cs"));
+        var generated = GeneratedContractInputs.Client;
 
         foreach (var method in new[]
                  {
@@ -315,8 +305,7 @@ public sealed class PromotionContractPrivacyTests
 
     private static async Task<JsonDocument> ReadOpenApiAsync()
     {
-        FileStream stream = File.OpenRead(Path.Combine(
-            ResolveRepositoryRoot(), "schemas", "openapi_islamu-event.json"));
+        Stream stream = GeneratedContractInputs.OpenSchema();
         await using (stream)
         {
             return await JsonDocument.ParseAsync(stream);

@@ -111,11 +111,7 @@ public sealed class BlazorIsolationArchitectureTests
     public async Task BlazorProductionBackendContracts_ShouldComeFromGeneratedApiClient()
     {
         var repositoryRoot = ResolveRepositoryRoot();
-        var generatedClient = Path.Combine(
-            ResolveProjectPath(repositoryRoot, "Explore.Blazor.Client"),
-            "Clients",
-            "EventApiTagClients.g.cs");
-        var generatedContractNames = FindDeclaredTypeNames(await File.ReadAllTextAsync(generatedClient))
+        var generatedContractNames = FindDeclaredTypeNames(GeneratedContractInputs.Client)
             .Select(NormalizeContractName)
             .ToHashSet(StringComparer.Ordinal);
         var violations = new List<string>();

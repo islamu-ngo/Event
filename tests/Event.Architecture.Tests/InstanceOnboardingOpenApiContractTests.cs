@@ -24,9 +24,7 @@ public sealed class InstanceOnboardingOpenApiContractTests
     [Test]
     public async Task InstanceProbeOperations_MustDeclareConcreteSuccessSchemas()
     {
-        var repositoryRoot = ResolveRepositoryRoot();
-        var schemaPath = Path.Combine(repositoryRoot, "schemas", "openapi_islamu-event.json");
-        await using var schemaStream = File.OpenRead(schemaPath);
+        await using var schemaStream = GeneratedContractInputs.OpenSchema();
         using var document = await JsonDocument.ParseAsync(schemaStream);
 
         foreach (var (path, method, expectedSchema) in Operations)
@@ -53,9 +51,7 @@ public sealed class InstanceOnboardingOpenApiContractTests
     [Test]
     public async Task SaveInstanceOnboardingProfile_MustExposeTheGeneratedPatchContract()
     {
-        var repositoryRoot = ResolveRepositoryRoot();
-        var schemaPath = Path.Combine(repositoryRoot, "schemas", "openapi_islamu-event.json");
-        await using var schemaStream = File.OpenRead(schemaPath);
+        await using var schemaStream = GeneratedContractInputs.OpenSchema();
         using var document = await JsonDocument.ParseAsync(schemaStream);
 
         JsonElement operation = document.RootElement
@@ -77,13 +73,7 @@ public sealed class InstanceOnboardingOpenApiContractTests
             .GetProperty("schema")
             .GetProperty("$ref")
             .GetString();
-        var generatedClientPath = Path.Combine(
-            repositoryRoot,
-            "src",
-            "Explore.Blazor.Client",
-            "Clients",
-            "EventApiTagClients.g.cs");
-        var generatedClient = await File.ReadAllTextAsync(generatedClientPath);
+        var generatedClient = GeneratedContractInputs.Client;
 
         await Assert.That(operation.GetProperty("operationId").GetString()).IsEqualTo("SaveInstanceOnboardingProfile");
         await Assert.That(requestSchema).IsEqualTo("#/components/schemas/SelfHostOnboardingProfileDto");
@@ -178,9 +168,7 @@ public sealed class InstanceOnboardingOpenApiContractTests
         await Assert.That(serializedDocument.RootElement.TryGetProperty("decentralizationEnabled", out _)).IsFalse();
         await Assert.That(serializedDocument.RootElement.TryGetProperty("lockDecentralizationEnabled", out _)).IsFalse();
 
-        var repositoryRoot = ResolveRepositoryRoot();
-        var schemaPath = Path.Combine(repositoryRoot, "schemas", "openapi_islamu-event.json");
-        await using var schemaStream = File.OpenRead(schemaPath);
+        await using var schemaStream = GeneratedContractInputs.OpenSchema();
         using var schemaDocument = await JsonDocument.ParseAsync(schemaStream);
         var properties = schemaDocument.RootElement
             .GetProperty("components")
@@ -191,13 +179,7 @@ public sealed class InstanceOnboardingOpenApiContractTests
         await Assert.That(properties.TryGetProperty("decentralizationEnabled", out _)).IsFalse();
         await Assert.That(properties.TryGetProperty("lockDecentralizationEnabled", out _)).IsFalse();
 
-        var generatedClientPath = Path.Combine(
-            repositoryRoot,
-            "src",
-            "Explore.Blazor.Client",
-            "Clients",
-            "EventApiTagClients.g.cs");
-        var generatedClient = await File.ReadAllTextAsync(generatedClientPath);
+        var generatedClient = GeneratedContractInputs.Client;
 
         await Assert.That(generatedClient).DoesNotContain("DecentralizationEnabled", StringComparison.Ordinal);
         await Assert.That(generatedClient).DoesNotContain("decentralizationEnabled", StringComparison.Ordinal);
@@ -206,14 +188,7 @@ public sealed class InstanceOnboardingOpenApiContractTests
     [Test]
     public async Task GeneratedClient_MustUse_GuestRecoveryPolicyEnum_Contract()
     {
-        var repositoryRoot = ResolveRepositoryRoot();
-        var generatedClientPath = Path.Combine(
-            repositoryRoot,
-            "src",
-            "Explore.Blazor.Client",
-            "Clients",
-            "EventApiTagClients.g.cs");
-        var generatedClient = await File.ReadAllTextAsync(generatedClientPath);
+        var generatedClient = GeneratedContractInputs.Client;
 
         await Assert.That(generatedClient).Contains("public GuestRecoveryPolicyEnum? GuestRecoveryPolicy", StringComparison.Ordinal)
             .Because("the generated NSwag client must preserve the OpenAPI string-enum contract for guest recovery policy.");
@@ -235,8 +210,7 @@ public sealed class InstanceOnboardingOpenApiContractTests
         await Assert.That(smtpJson).DoesNotContain("password", StringComparison.OrdinalIgnoreCase);
         await Assert.That(aiJson).DoesNotContain("secret-api-key", StringComparison.Ordinal);
 
-        var repositoryRoot = ResolveRepositoryRoot();
-        await using var schemaStream = File.OpenRead(Path.Combine(repositoryRoot, "schemas", "openapi_islamu-event.json"));
+        await using var schemaStream = GeneratedContractInputs.OpenSchema();
         using var schemaDocument = await JsonDocument.ParseAsync(schemaStream);
         JsonElement schemas = schemaDocument.RootElement.GetProperty("components").GetProperty("schemas");
         JsonElement smtpProperties = schemas.GetProperty(nameof(InstanceSmtpSettingsDto)).GetProperty("properties");
@@ -252,15 +226,4 @@ public sealed class InstanceOnboardingOpenApiContractTests
         await Assert.That(aiProviderWriteProperties.TryGetProperty("apiKey", out _)).IsTrue();
     }
 
-    private static string ResolveRepositoryRoot()
-    {
-        var current = new DirectoryInfo(AppContext.BaseDirectory);
-        while (current is not null && !File.Exists(Path.Combine(current.FullName, "Explore.slnx")))
-        {
-            current = current.Parent;
-        }
-
-        return current?.FullName
-            ?? throw new DirectoryNotFoundException("Could not locate the repository root from the architecture test output directory.");
-    }
 }

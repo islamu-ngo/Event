@@ -15,7 +15,6 @@ public sealed class CoordinateWriteAuthorityArchitectureTests
 {
     private const string GeneratedClientNamespace = "Explore.Blazor.Client.Clients";
     private const string GeneratedCodeMarker = "[System.CodeDom.Compiler.GeneratedCode(";
-    private const string GeneratedTagClientsPath = "src/Explore.Blazor.Client/Clients/EventApiTagClients.g.cs";
 
     private static readonly Assembly ApplicationAssembly = typeof(CreateLocationDto).Assembly;
     private static readonly Lazy<GeneratedClientModel> GeneratedClient = new(CreateGeneratedClientModel);
@@ -234,8 +233,7 @@ public sealed class CoordinateWriteAuthorityArchitectureTests
 
     private static GeneratedClientModel CreateGeneratedClientModel()
     {
-        string root = ResolveRepositoryRoot();
-        string tagSource = File.ReadAllText(Path.Combine(root, GeneratedTagClientsPath));
+        string tagSource = GeneratedContractInputs.Client;
         GeneratedClientContract[] contracts = ParseGeneratedClientContracts(tagSource);
 
         return new GeneratedClientModel(

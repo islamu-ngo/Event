@@ -16,10 +16,6 @@ public sealed class PublishedCollectionContractArchitectureTests
 {
     private const string BaselinePath =
         "tests/Event.Architecture.Tests/Baselines/published-collection-contract-dispositions.json";
-    private const string GeneratedClientPath =
-        "src/Explore.Blazor.Client/Clients/EventApiTagClients.g.cs";
-    private const string MutableGeneratedContractsPath =
-        "eng/tools/Explore.GeneratedContracts/mutable-generated-contracts.txt";
     private const string GeneratedRecordDeclaration =
         "public partial record class ";
 
@@ -163,10 +159,7 @@ public sealed class PublishedCollectionContractArchitectureTests
 
     private static HashSet<string> ReadGeneratedClientRecordNames()
     {
-        string path = Path.Combine(
-            FindRepositoryRoot(),
-            GeneratedClientPath);
-        return File.ReadLines(path)
+        return GeneratedContractInputs.Client.Split('\n')
             .Select(line => line.Trim())
             .Where(line => line.StartsWith(
                 GeneratedRecordDeclaration,
@@ -181,14 +174,10 @@ public sealed class PublishedCollectionContractArchitectureTests
     private static IReadOnlyCollection<string>
         ReadPolicyDerivedGeneratedClientRecordNames()
     {
-        string root = FindRepositoryRoot();
-        string source = File.ReadAllText(Path.Combine(
-            root,
-            GeneratedClientPath));
+        string source = GeneratedContractInputs.Client;
         HashSet<string> mutableTypes =
-            GeneratedContractPolicy.LoadMutableStateTypes(Path.Combine(
-                root,
-                MutableGeneratedContractsPath));
+            GeneratedContractPolicy.ParseMutableStateTypes(
+                GeneratedContractInputs.MutablePolicy.Split('\n'));
         return GeneratedContractTransformer.Classify(source, mutableTypes)
             .RecordTypeNames;
     }

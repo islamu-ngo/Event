@@ -21,8 +21,8 @@ public sealed class AdmissionCheckInOpenApiContractTests
     [Test]
     public async Task AdmissionEnums_AreStringComponentsReferencedByDtosAndGeneratedAsEnums()
     {
-        using JsonDocument document = JsonDocument.Parse(await File.ReadAllTextAsync(
-            ContextSystemHelpers.RepoPath("schemas", "openapi_islamu-event.json")));
+        using Stream stream = GeneratedContractInputs.OpenSchema();
+        using JsonDocument document = JsonDocument.Parse(stream);
         JsonElement schemas = document.RootElement
             .GetProperty("components")
             .GetProperty("schemas");

@@ -48,8 +48,7 @@ public sealed class SemanticUpdateExceptionArchitectureTests
     [Test]
     public async Task PublicSemanticExceptionsMustMatchExactRegistry()
     {
-        string root = ResolveRepositoryRoot();
-        await using FileStream stream = File.OpenRead(Path.Combine(root, "schemas", "openapi_islamu-event.json"));
+        await using Stream stream = GeneratedContractInputs.OpenSchema();
         using JsonDocument document = await JsonDocument.ParseAsync(stream);
         JsonElement paths = document.RootElement.GetProperty("paths");
 

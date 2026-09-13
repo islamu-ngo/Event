@@ -31,6 +31,15 @@ Visual branding is not legal identity:
 
 ---
 
+## First Access to Tenant Branding
+
+Opening tenant branding initializes a missing default branding document. Two
+signed-in callers opening it simultaneously receive the same saved document and
+revision; the later insert does not replace the winner's name or assets.
+Repeated reads do not reset customized branding. Editing still requires the
+existing tenant permissions, governance checks, and current concurrency stamp.
+This initialization does not create a missing tenant or supply legal identity.
+
 ## Standard Operational Workflow
 
 1. Establish tenant ownership and bind approved domains (see [Custom Domains & SEO](custom-domains-and-seo.md)).

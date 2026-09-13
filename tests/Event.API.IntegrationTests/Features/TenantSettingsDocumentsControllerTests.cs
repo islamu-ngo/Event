@@ -137,7 +137,7 @@ public sealed class TenantSettingsDocumentsControllerTests
     }
 
     [Test]
-    public async Task ConcurrentProvisioning_UniqueConstraintPreventsDuplicatesAndRetryReadsWinner()
+    public async Task ConcurrentProvisioning_BothMissingDocumentCallersReadTheUnchangedWinner()
     {
         await using var factory = await DocumentFactory.CreateAsync();
         var seed = await SeedAsync(factory);
@@ -150,11 +150,11 @@ public sealed class TenantSettingsDocumentsControllerTests
         factory.SaveBoundary.ReleaseProvisioners.TrySetResult();
         using var firstResponse = await firstRequest.WaitAsync(TimeSpan.FromSeconds(15));
         using var secondResponse = await secondRequest.WaitAsync(TimeSpan.FromSeconds(15));
-        // Existing provisioning is check-then-insert, not an upsert: the losing initial request fails.
-        await Assert.That(new[] { firstResponse.StatusCode, secondResponse.StatusCode })
-            .IsEquivalentTo(new[] { HttpStatusCode.OK, HttpStatusCode.InternalServerError });
-        var winner = firstResponse.IsSuccessStatusCode ? firstResponse : secondResponse;
-        var created = (await winner.Content.ReadFromJsonAsync<TenantBrandingSettingsDocumentDto>())!;
+        await Assert.That(firstResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(secondResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        var created = (await firstResponse.Content.ReadFromJsonAsync<TenantBrandingSettingsDocumentDto>())!;
+        var converged = (await secondResponse.Content.ReadFromJsonAsync<TenantBrandingSettingsDocumentDto>())!;
+        await Assert.That(converged).IsEqualTo(created);
         factory.SaveBoundary.RaceProvisioning = false;
         var retried = await ReadAsync<TenantBrandingSettingsDocumentDto>(second, Branding);
         await Assert.That(retried).IsEqualTo(created);

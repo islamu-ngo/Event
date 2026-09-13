@@ -1,10 +1,10 @@
 using Explore.Application.DTOs.Localization;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Localization.Requests.Commands;
 
-public sealed record UpdateLocalizationGovernanceCommand : IRequest<BaseCommandResponse<Guid>>
+public sealed record UpdateLocalizationGovernanceCommand : ICommand<BaseCommandResponse<Guid>>
 {
     public UpdateLocalizationGovernanceDto Dto { get; init; } = new();
 }

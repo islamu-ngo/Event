@@ -1,17 +1,17 @@
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Identity;
-using Explore.Application.Features.Localization.Requests.Commands;
+using Explore.Application.Features.Localization.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
-namespace Explore.Application.Features.Localization.Handlers.Commands;
+namespace Explore.Application.Features.Localization.Handlers.Queries;
 
-public class TestTmsConnectionCommandHandler : IRequestHandler<TestTmsConnectionCommand, BaseCommandResponse<Guid>>
+public class TestTmsConnectionQueryHandler : IQueryHandler<TestTmsConnectionQuery, BaseCommandResponse<Guid>>
 {
     private readonly IAdminContext _adminContext;
     private readonly ITranslationManagementProvider _translationProvider;
 
-    public TestTmsConnectionCommandHandler(
+    public TestTmsConnectionQueryHandler(
         IAdminContext adminContext,
         ITranslationManagementProvider translationProvider)
     {
@@ -19,7 +19,7 @@ public class TestTmsConnectionCommandHandler : IRequestHandler<TestTmsConnection
         _translationProvider = translationProvider;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(TestTmsConnectionCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> QueryAsync(TestTmsConnectionQuery request, CancellationToken cancellationToken)
     {
         var actor = await _adminContext.ResolveUserIdAsync(cancellationToken);
         if (!actor.HasValue || !await _adminContext.IsInstanceAdminAsync(actor.Value, cancellationToken))

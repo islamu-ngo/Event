@@ -3,11 +3,11 @@ using Explore.Application.Features.Localization.Requests.Queries;
 using Explore.Domain.Common.Localization;
 using FluentValidation;
 using FluentValidation.Results;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Localization.Handlers.Queries;
 
-public class GetTranslationsQueryHandler : IRequestHandler<GetTranslationsQuery, Dictionary<string, string>>
+public class GetTranslationsQueryHandler : IQueryHandler<GetTranslationsQuery, Dictionary<string, string>>
 {
     private readonly ITranslationManagementProvider _translationProvider;
 
@@ -16,7 +16,7 @@ public class GetTranslationsQueryHandler : IRequestHandler<GetTranslationsQuery,
         _translationProvider = translationProvider;
     }
 
-    public async Task<Dictionary<string, string>> Handle(GetTranslationsQuery request, CancellationToken cancellationToken)
+    public async Task<Dictionary<string, string>> QueryAsync(GetTranslationsQuery request, CancellationToken cancellationToken)
     {
         if (!CultureRegistry.TryGetEntry(request.LanguageCode, out var culture))
         {

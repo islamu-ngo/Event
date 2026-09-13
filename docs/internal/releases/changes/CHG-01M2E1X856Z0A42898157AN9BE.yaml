@@ -1,0 +1,36 @@
+Change-Id: CHG-01M2E1X856Z0A42898157AN9BE
+Title: "Enforce parent and destination authority for event categories"
+Type: fix
+Scope: events
+Summary: "Authorize category-assignment deletion against its persisted parent event and require update permission on both events before relocation."
+Group: event-categories
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md#event-category-assignment-authority
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Deletion evaluates the persisted parent event rather than treating an
+      assignment ID as an event. Relocation requires update authority on both
+      source and destination events before mutation. Missing or tenant-invisible
+      assignments fail closed; policy denial and provider outage remain distinct.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authorization.md#event-category-assignment-permissions
+    Disposition: documented
+    Detail: >-
+      Upgrade the application normally. Event owners with update permission can
+      remove category assignments; moving one requires destination permission too.
+      No new policy grants, migration, configuration, or endpoint are required.

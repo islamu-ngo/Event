@@ -7,11 +7,11 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventCategories.Validators;
 using Explore.Application.Features.EventCategories.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventCategories.Handlers.Commands;
 
-public class CreateEventCategoriesCommandHandler : IRequestHandler<CreateEventCategoriesCommand, BaseCommandResponse<Guid>>
+public class CreateEventCategoriesCommandHandler : ICommandHandler<CreateEventCategoriesCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventCategoriesRepository _eventCategoriesRepository;
     private readonly IEventRepository _eventRepository;
@@ -30,7 +30,7 @@ public class CreateEventCategoriesCommandHandler : IRequestHandler<CreateEventCa
         _tenantContext = tenantContext;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateEventCategoriesCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateEventCategoriesCommand request, CancellationToken cancellationToken)
     {
         var validator = new CreateEventCategoriesDtoValidator(_eventRepository, _categoryRepository, _eventCategoriesRepository);
         var validationResult = await validator.ValidateAsync(request.EventCategoriesDto, cancellationToken);

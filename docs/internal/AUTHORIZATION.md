@@ -94,6 +94,36 @@ The same resource authority protects native operations and the remaining MediatR
 - **Failure behavior:** ordinary denial throws `AuthorizationException` (HTTP 403); provider-unavailable decisions throw `AuthorizationProviderUnavailableException` with the existing distinct unavailable response. Neither reaches the business operation.
 - **Composition:** final descriptor validation rejects raw native replacements; runtime startup checks cached parameter metadata, while CI deeply resolves the actual provider in disposable scopes. See [Protected Native Operations](ARCHITECTURE.md#protected-native-operations).
 
+### Event Category Assignment Authority
+
+The seven EventCategories operations use protected native command/query ports.
+`DeleteEventCategoriesAuthorizationContextEnricher`, registered in
+`ApplicationServicesRegistration`, loads the tenant-visible assignment and supplies
+its persisted `EventId` to `RequestAuthorization`. The shared resource resolver
+then loads event facts for the existing `Event:update` capability; an assignment
+ID is not an event authority. Missing or tenant-invisible assignments throw
+`AuthorizationException` before provider evaluation, even with an allowing provider.
+
+Update retains source-event enrichment. When the event changes,
+`UpdateEventCategoriesCommandHandler` resolves persisted destination event facts
+and asks `IAuthorizationProvider` for the same `Event:update` capability before
+assigning any entity field. Source authority never transfers to the destination;
+both event checks must allow. Denial throws `AuthorizationException`; a
+provider-unavailable decision throws `AuthorizationProviderUnavailableException`.
+Neither changes assignment fields, concurrency stamps, or persisted readback.
+Same-tenant validation, duplicate checks, optimistic concurrency, repositories and
+cache invalidation remain in their existing handler-owned order. These checks do
+not introduce atomic authorization-revocation/mutation fencing or cancellation
+support inside tokenless repositories.
+
+`NativeEventCategoriesOperationTests` exercises production-registered ports in a
+real SQLite host, including owner deletion, missing/foreign assignments,
+unauthorized same-tenant relocation, an explicit persisted destination grant,
+and source/destination denial versus provider outage with unchanged readback.
+This changes neither category-definition administration nor EventTags policy,
+and adds no HTTP endpoint, schema migration, policy grant, or configuration.
+See the [operator guide](../public/documentation/readme/security-and-identity/authorization.md#event-category-assignment-permissions).
+
 ### Reviewed Handler And Worker Authorities
 
 Not every authority is a resource role or an ordinary login. The exact reasoned

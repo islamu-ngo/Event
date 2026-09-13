@@ -140,6 +140,7 @@ public static class ApplicationServicesRegistration
         services.AddTransient<IAuthorizationContextEnricher<UpdateEventSessionTemplateCommand>, UpdateEventSessionTemplateAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<UpdateEventSessionLanguageCommand>, UpdateEventSessionLanguageAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<UpdateEventCategoriesCommand>, UpdateEventCategoriesAuthorizationContextEnricher>();
+        services.AddTransient<IAuthorizationContextEnricher<DeleteEventCategoriesCommand>, DeleteEventCategoriesAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<UpdateEventTagsCommand>, UpdateEventTagsAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<UpdateEventSessionAgendaItemCommand>, UpdateEventSessionAgendaItemAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<UpdateEventSessionGroupCommand>, UpdateEventSessionGroupAuthorizationContextEnricher>();

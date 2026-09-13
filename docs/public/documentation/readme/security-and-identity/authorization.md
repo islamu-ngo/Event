@@ -31,6 +31,23 @@ graph TD
 
 ---
 
+## Event category assignment permissions
+
+Category assignments are governed by permission to update their event, not by
+permission to administer category definitions. An event owner with update
+permission can remove its category assignments. Moving an assignment between
+events requires update permission on **both** the source and destination, even
+when both events belong to the same tenant. Permission on the source alone does
+not authorize writing into another organizer's event.
+
+Missing or tenant-invisible assignments cannot be deleted. Denied authorization
+and authorization-provider outages both prevent writes, while remaining distinct
+failure outcomes; neither silently falls back or changes the assignment. These
+rules apply with Local RBAC and with Cerbos selected. No policy grants, database
+migration, new configuration, or new category-assignment API endpoint accompany
+this repair. Upgrade the application normally; EventTags and category-definition
+administration are unchanged.
+
 ## Choosing Your Authorization Provider
 
 | Decision Factor | Local RBAC (`AUTHORIZATION_PROVIDER=local`) | Cerbos PDP (`AUTHORIZATION_PROVIDER=cerbos`) |

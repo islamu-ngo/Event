@@ -36,6 +36,8 @@ With local authorization, an organization administrator can reserve an evidence 
 
 This repair does not broadly grant storage creation or change the selected authorization provider. Non-OrganizationTenant uploads retain their existing Cerbos authorization for images, documents, attachments and system assets; generic local finalization is not a newly granted right. OrganizationTenant reservation and finalization remain denied with instance or tenant-managed Cerbos until the required typed policies are securely supported. Those unsupported checks stay denied during provider outages or configuration-resolution failure, including for instance-administrator owners; unrelated safe-mode exceptions are unchanged. No new storage credentials or database migration are required.
 
+Exact content downloads at `/api/storageobject/{id}/content` use the stored object's tenant, creator, visibility and lifecycle, not a caller's ownership claims. An uploader retains PrivateOwner access after losing an organization role, subject to the selected authorization provider and existing privacy/lifecycle checks. Tenant reviewers can review evidence metadata, but that role alone does not grant another account's PrivateOwner bytes. PDFs remain attachments with sanitized filenames; anonymous public-image access and other storage visibility rules are unchanged. This restores owner downloads without granting generic download access.
+
 ## 3. Disaster Recovery & Backup Integrity
 
 Always back up storage bytes concurrently with the primary database snapshot (see [Backup, Restore & Upgrade](../configuration-and-operations/backup-restore-upgrade.md)):

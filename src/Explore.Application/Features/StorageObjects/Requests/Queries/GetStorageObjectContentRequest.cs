@@ -12,9 +12,4 @@ public sealed record GetStorageObjectContentRequest : IQuery<StorageObjectConten
     public Guid TenantId { get; init; }
 
     string? ISecureRequest.ResourceId => StorageObjectId == Guid.Empty ? null : StorageObjectId.ToString("D");
-
-    IAuthorizationFacts? ISecureRequest.AuthorizationFacts =>
-        TenantId == Guid.Empty
-        ? null
-        : new StorageObjectCollectionAuthorizationFacts(TenantId);
 }

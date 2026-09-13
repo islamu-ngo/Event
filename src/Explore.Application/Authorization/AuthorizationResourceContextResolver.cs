@@ -5,6 +5,7 @@ using Explore.Application.Exceptions;
 using Explore.Application.Features.Notifications.Requests.Commands;
 using Explore.Application.Features.Notifications.Requests.Queries;
 using Explore.Application.Features.StorageObjects.Requests.Commands;
+using Explore.Application.Features.StorageObjects.Requests.Queries;
 using Explore.Domain;
 
 namespace Explore.Application.Authorization;
@@ -75,6 +76,15 @@ public sealed class AuthorizationResourceContextResolver(
         {
             return new AuthorizationContext(finalization.UploadSessionId.ToString("D"),
                 await ResolveStorageUploadFinalizationFactsAsync(finalization.UploadSessionId, cancellationToken));
+        }
+
+        if (request is GetStorageObjectContentRequest download
+            && resourceKind == ResourceKinds.StorageObject
+            && action == AuthorizationActions.StorageObjects.Download)
+        {
+            var objectId = download.StorageObjectId.ToString("D");
+            return new AuthorizationContext(objectId, tenantContext is null ? null :
+                await ResolveStorageObjectFactsAsync(objectId, declaredFacts: null, cancellationToken));
         }
 
         var facts = await ResolveTrustedFactsAsync(resourceKind, resourceId, declaredFacts, cancellationToken);

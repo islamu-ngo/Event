@@ -31,21 +31,22 @@ public sealed class StorageObjectQueryAuthorizationMetadataTests
         await Assert.That(typeof(ISecureRequest).IsAssignableFrom(testCase.RequestType)).IsTrue();
     }
 
-    public static IEnumerable<(ISecureRequest Request, string ExpectedResourceId)> AuthorizedStorageObjectRequests()
+    public static IEnumerable<(ISecureRequest Request, string ExpectedResourceId, IAuthorizationFacts? ExpectedFacts)> AuthorizedStorageObjectRequests()
     {
-        yield return (new GetStorageObjectListRequest { TenantId = TenantId }, TenantId.ToString("D"));
-        yield return (new GetStorageObjectDetailsRequest { Id = StorageObjectId, TenantId = TenantId }, StorageObjectId.ToString("D"));
-        yield return (new GetStorageObjectContentRequest { StorageObjectId = StorageObjectId, TenantId = TenantId }, StorageObjectId.ToString("D"));
-        yield return (new IssuePresignedDownloadUrlCommand { Id = StorageObjectId, TenantId = TenantId }, StorageObjectId.ToString("D"));
+        var collection = new StorageObjectCollectionAuthorizationFacts(TenantId);
+        yield return (new GetStorageObjectListRequest { TenantId = TenantId }, TenantId.ToString("D"), collection);
+        yield return (new GetStorageObjectDetailsRequest { Id = StorageObjectId, TenantId = TenantId }, StorageObjectId.ToString("D"), collection);
+        yield return (new GetStorageObjectContentRequest { StorageObjectId = StorageObjectId, TenantId = TenantId }, StorageObjectId.ToString("D"), null);
+        yield return (new IssuePresignedDownloadUrlCommand { Id = StorageObjectId, TenantId = TenantId }, StorageObjectId.ToString("D"), collection);
     }
 
     [Test]
     [MethodDataSource(nameof(AuthorizedStorageObjectRequests))]
     public async Task StorageObjectOperationsExposeTenantAuthorizationContext(
-        (ISecureRequest Request, string ExpectedResourceId) testCase)
+        (ISecureRequest Request, string ExpectedResourceId, IAuthorizationFacts? ExpectedFacts) testCase)
     {
         await Assert.That(testCase.Request.ResourceId).IsEqualTo(testCase.ExpectedResourceId);
         await Assert.That(testCase.Request.AuthorizationFacts)
-            .IsEqualTo(new StorageObjectCollectionAuthorizationFacts(TenantId));
+            .IsEqualTo(testCase.ExpectedFacts);
     }
 }

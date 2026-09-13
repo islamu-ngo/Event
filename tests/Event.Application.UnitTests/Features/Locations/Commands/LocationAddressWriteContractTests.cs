@@ -74,7 +74,7 @@ public sealed class LocationAddressWriteContractTests
 
         try
         {
-            await handler.Handle(new CreateLocationCommand
+            await handler.ExecuteAsync(new CreateLocationCommand
             {
                 TenantId = tenantId,
                 LocationDto = ManualCreateDto()
@@ -113,7 +113,7 @@ public sealed class LocationAddressWriteContractTests
             ?? throw new InvalidOperationException("The location repository received a null entity."));
         var handler = CreateLocationHandler(locations, tenantContext);
 
-        var response = await handler.Handle(new CreateLocationCommand
+        var response = await handler.ExecuteAsync(new CreateLocationCommand
         {
             TenantId = Guid.CreateVersion7(),
             LocationDto = ManualCreateDto()
@@ -273,7 +273,7 @@ public sealed class LocationAddressWriteContractTests
         locations.GetById(location.Id, Arg.Any<CancellationToken>()).Returns(location);
         var handler = CreateUpdateLocationHandler(locations, location.TenantId);
 
-        var response = await handler.Handle(new UpdateLocationCommand
+        var response = await handler.ExecuteAsync(new UpdateLocationCommand
         {
             LocationId = location.Id,
             ExpectedConcurrencyStamp = location.ConcurrencyStamp,

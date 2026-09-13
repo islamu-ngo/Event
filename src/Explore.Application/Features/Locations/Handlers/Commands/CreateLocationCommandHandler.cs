@@ -10,11 +10,11 @@ using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Locations.Handlers.Commands;
 
-public class CreateLocationCommandHandler : IRequestHandler<CreateLocationCommand, BaseCommandResponse<Guid>>
+public class CreateLocationCommandHandler : ICommandHandler<CreateLocationCommand, BaseCommandResponse<Guid>>
 {
     private readonly ILocationRepository _locationRepository;
     private readonly IAddressSelectionProtector _selectionProtector;
@@ -39,7 +39,7 @@ public class CreateLocationCommandHandler : IRequestHandler<CreateLocationComman
         _timeProvider = timeProvider;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         CreateLocationCommand request,
         CancellationToken cancellationToken)
     {

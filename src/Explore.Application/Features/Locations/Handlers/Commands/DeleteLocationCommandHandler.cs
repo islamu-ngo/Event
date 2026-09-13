@@ -3,11 +3,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Locations.Requests.Commands;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Locations.Handlers.Commands;
 
-public class DeleteLocationCommandHandler : IRequestHandler<DeleteLocationCommand, bool>
+public class DeleteLocationCommandHandler : ICommandHandler<DeleteLocationCommand, bool>
 {
     private readonly ILocationRepository _locationRepository;
 
@@ -16,7 +16,7 @@ public class DeleteLocationCommandHandler : IRequestHandler<DeleteLocationComman
         _locationRepository = locationRepository;
     }
 
-    public async Task<bool> Handle(DeleteLocationCommand request, CancellationToken cancellationToken)
+    public async Task<bool> ExecuteAsync(DeleteLocationCommand request, CancellationToken cancellationToken)
     {
         var location = await _locationRepository.GetById(request.Id);
 

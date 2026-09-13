@@ -11,11 +11,11 @@ using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Locations.Handlers.Commands;
 
-public class UpdateLocationCommandHandler : IRequestHandler<UpdateLocationCommand, BaseCommandResponse<Guid>>
+public class UpdateLocationCommandHandler : ICommandHandler<UpdateLocationCommand, BaseCommandResponse<Guid>>
 {
     private readonly ILocationRepository _locationRepository;
     private readonly IAddressSelectionProtector _selectionProtector;
@@ -40,7 +40,7 @@ public class UpdateLocationCommandHandler : IRequestHandler<UpdateLocationComman
         _timeProvider = timeProvider;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateLocationCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateLocationCommand request, CancellationToken cancellationToken)
     {
         var validator = new UpdateLocationDtoValidator();
         var validationResult = await validator.ValidateAsync(request.UpdateLocationDto, cancellationToken);

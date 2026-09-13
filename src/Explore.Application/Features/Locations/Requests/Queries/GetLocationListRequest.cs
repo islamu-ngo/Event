@@ -2,12 +2,12 @@ using System.Collections.Generic;
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Location;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Locations.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.Location, AuthorizationActions.Locations.View)]
-public sealed record GetLocationListRequest : IRequest<PaginatedResult<LocationListDto>>, ISecureRequest
+public sealed record GetLocationListRequest : IQuery<PaginatedResult<LocationListDto>>, ISecureRequest
 {
     public Guid TenantId { get; init; }
 

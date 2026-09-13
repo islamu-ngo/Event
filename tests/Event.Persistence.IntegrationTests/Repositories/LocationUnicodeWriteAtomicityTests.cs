@@ -119,7 +119,7 @@ internal static class LocationUnicodeWriteAtomicityTests
             var handler = new UpdateLocationCommandHandler(new LocationRepository(context), protector,
                 context.TenantContext!, user, governance, TimeProvider.System);
 
-            var response = await handler.Handle(new UpdateLocationCommand
+            var response = await handler.ExecuteAsync(new UpdateLocationCommand
             {
                 LocationId = location.Id,
                 ExpectedConcurrencyStamp = location.ConcurrencyStamp,

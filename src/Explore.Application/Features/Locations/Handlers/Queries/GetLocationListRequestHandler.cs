@@ -6,11 +6,11 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Location;
 using Explore.Application.Features.Locations.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Locations.Handlers.Queries;
 
-public class GetLocationListRequestHandler : IRequestHandler<GetLocationListRequest, PaginatedResult<LocationListDto>>
+public class GetLocationListRequestHandler : IQueryHandler<GetLocationListRequest, PaginatedResult<LocationListDto>>
 {
     private readonly ILocationRepository _locationRepository;
 
@@ -20,7 +20,7 @@ public class GetLocationListRequestHandler : IRequestHandler<GetLocationListRequ
         _locationRepository = locationRepository;
     }
 
-    public async Task<PaginatedResult<LocationListDto>> Handle(GetLocationListRequest request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<LocationListDto>> QueryAsync(GetLocationListRequest request, CancellationToken cancellationToken)
     {
         var (pageNumber, pageSize) = PaginatedResult<LocationListDto>.NormalizeParameters(request.PageNumber, request.PageSize);
         var (locations, totalCount) = await _locationRepository.GetLocationsWithDetailsPaged(pageNumber, pageSize, cancellationToken);

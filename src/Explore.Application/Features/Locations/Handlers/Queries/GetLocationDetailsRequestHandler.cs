@@ -4,11 +4,11 @@ using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Location;
 using Explore.Application.Features.Locations.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Locations.Handlers.Queries;
 
-public class GetLocationDetailsRequestHandler : IRequestHandler<GetLocationDetailsRequest, LocationDto>
+public class GetLocationDetailsRequestHandler : IQueryHandler<GetLocationDetailsRequest, LocationDto?>
 {
     private readonly ILocationRepository _locationRepository;
 
@@ -18,9 +18,9 @@ public class GetLocationDetailsRequestHandler : IRequestHandler<GetLocationDetai
         _locationRepository = locationRepository;
     }
 
-    public async Task<LocationDto> Handle(GetLocationDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<LocationDto?> QueryAsync(GetLocationDetailsRequest request, CancellationToken cancellationToken)
     {
         var location = await _locationRepository.GetById(request.Id);
-        return LocationMapper.ToDetail(location)!;
+        return LocationMapper.ToDetail(location);
     }
 }

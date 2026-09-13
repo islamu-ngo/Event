@@ -2,12 +2,12 @@ using System;
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Location;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Locations.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Location, AuthorizationActions.Update)]
-public sealed record UpdateLocationCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record UpdateLocationCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid LocationId { get; init; }
 

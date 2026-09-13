@@ -2,9 +2,9 @@ using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Deployment;
 using Explore.Application.Features.Deployment;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,7 +14,7 @@ namespace Explore.API.Controllers;
 [ApiController]
 [Route("api/deployment/ticketing-capabilities")]
 public sealed class TicketingDeploymentCapabilitiesController(
-    IMediator mediator) :
+    IQueryHandler<GetTicketingDeploymentCapabilitiesQuery, TicketingDeploymentCapabilityMatrixDto> queryHandler) :
     ControllerBase
 {
     [HttpGet("", Name = RouteNames.GetTicketingDeploymentCapabilities)]
@@ -26,7 +26,7 @@ public sealed class TicketingDeploymentCapabilitiesController(
         StatusCodes.Status200OK)]
     public async Task<ActionResult<TicketingDeploymentCapabilityMatrixDto>> Get(
         CancellationToken cancellationToken) =>
-        Ok(await mediator.Send(
+        Ok(await queryHandler.QueryAsync(
             new GetTicketingDeploymentCapabilitiesQuery(),
             cancellationToken));
 }

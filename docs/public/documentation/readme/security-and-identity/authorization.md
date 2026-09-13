@@ -74,6 +74,10 @@ remain the action boundary. Existing role permissions and tenant isolation are u
 The development-only administrator cache-invalidation endpoint is removed; the identity
 snapshot diagnostic remains available. No database migration or new configuration is required.
 
+### SQLite event-role permissions
+
+SQLite deployments support the same persisted event-role permissions as other primary database providers. The event-role permission lookup uses a portable query, restoring authorized session-language writes and their HAL edit links where SQLite previously reported an unsupported SQL APPLY operation. Tenant boundaries, active assignment periods, permission checks and machine-account restrictions are unchanged; this does not grant new access. Upgrade the application normally: no database migration, configuration change or policy republishing is required. Continue using server-issued HAL links rather than inferring actions from a role name.
+
 ### Organization evidence actions
 
 Organization administrators can submit and view their organization's legitimacy evidence. Tenant administrators can view and review evidence in their tenant; tenant administration alone does not grant submission, and organization administration alone does not grant review. Accounts with both roles can perform both actions. With Local RBAC, these permission decisions remain the same whether checked individually or together when building HAL links. Clients must continue using server-issued links rather than inferring authority from roles.

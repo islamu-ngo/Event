@@ -48,21 +48,21 @@ public class EventAuthoritySnapshotService : IEventAuthoritySnapshotService
             .Distinct()
             .ToArray();
 
-        var permissionCodesByRoleId = roleIds.Length == 0
-            ? new Dictionary<int, HashSet<string>>()
-            : await _dbContext.RolePermissions
+        var permissionCodesByRoleId = new Dictionary<int, HashSet<string>>();
+        if (roleIds.Length > 0)
+        {
+            var permissions = await _dbContext.RolePermissions
                 .AsNoTracking()
                 .Where(rp => roleIds.Contains(rp.RoleId) && rp.Permission.IsActive)
-                .GroupBy(rp => rp.RoleId)
-                .Select(group => new
-                {
-                    RoleId = group.Key,
-                    PermissionCodes = group.Select(rp => rp.Permission.MasterCode).Distinct().ToArray()
-                })
-                .ToDictionaryAsync(
-                    item => item.RoleId,
-                    item => item.PermissionCodes.ToHashSet(StringComparer.Ordinal),
-                    cancellationToken);
+                .Select(rp => new { rp.RoleId, PermissionCode = rp.Permission.MasterCode })
+                .ToListAsync(cancellationToken);
+
+            permissionCodesByRoleId = permissions
+                .GroupBy(permission => permission.RoleId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.Select(permission => permission.PermissionCode).ToHashSet(StringComparer.Ordinal));
+        }
 
         var events = distinctEventIds.ToDictionary(
             eventId => eventId,

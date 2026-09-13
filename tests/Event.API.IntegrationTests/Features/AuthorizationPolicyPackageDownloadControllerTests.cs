@@ -1,4 +1,8 @@
-using Event.Api.IntegrationTests.Helpers;
+using Event.Api.IntegrationTests.Fixtures;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Authentication.Local.Handlers.Queries;
+using Explore.Application.Features.Users.Requests.Queries;
+using Microsoft.Extensions.DependencyInjection;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;
 using Explore.Application.Authorization;
@@ -15,20 +19,22 @@ using NSubstitute;
 
 namespace Event.Api.IntegrationTests.Features;
 
-public sealed class AuthorizationPolicyPackageDownloadControllerTests : IDisposable
+[NotInParallel]
+public sealed class AuthorizationPolicyPackageDownloadControllerTests
 {
-    private readonly IdentityQueryTestScope _identity = new();
-    public void Dispose() => _identity.Dispose();
     [Test]
     public async Task SetupDownloadAuthorizationPolicyPackage_ReturnsZipArchiveFile()
     {
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
+        await using var scope = factory.Services.CreateAsyncScope();
         var archive = CreateArchive();
         var mediator = Substitute.For<IMediator>();
         mediator.Send(Arg.Any<DownloadAuthorizationPolicyPackageQuery>(), Arg.Any<CancellationToken>())
             .Returns(archive);
         var controller = new InstanceOnboardingController(
             mediator,
-            _identity.Query,
+            scope.ServiceProvider.GetRequiredService<IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?>>(),
+            scope.ServiceProvider.GetRequiredService<IQueryHandler<GetLocalIdentityLifecycleCapabilitiesQuery, LocalIdentityLifecycleCapabilities>>(),
             Substitute.For<ISetupSecretProvider>(),
             Substitute.For<IInstanceBootstrapAuditLogger>(),
             Substitute.For<IAuthProviderConfigurationService>(),
@@ -50,6 +56,8 @@ public sealed class AuthorizationPolicyPackageDownloadControllerTests : IDisposa
     [Test]
     public async Task AdminDownloadAuthorizationPolicyPackage_WhenInstanceAdmin_ReturnsZipArchiveFile()
     {
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
+        await using var scope = factory.Services.CreateAsyncScope();
         var archive = CreateArchive();
         var mediator = Substitute.For<IMediator>();
         mediator.Send(Arg.Any<DownloadAuthorizationPolicyPackageQuery>(), Arg.Any<CancellationToken>())
@@ -58,7 +66,7 @@ public sealed class AuthorizationPolicyPackageDownloadControllerTests : IDisposa
         adminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(true);
         var controller = new InstanceAuthorizationSettingsController(
             mediator,
-            _identity.Query,
+            scope.ServiceProvider.GetRequiredService<IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?>>(),
             Substitute.For<IAuthorizationProviderConfigurationService>(),
             adminContext,
             Substitute.For<ISetupSecretProvider>());
@@ -76,6 +84,8 @@ public sealed class AuthorizationPolicyPackageDownloadControllerTests : IDisposa
     [Test]
     public async Task AdminDownloadAuthorizationPolicyPackage_WhenNotInstanceAdmin_ReturnsForbidden()
     {
+        await using var factory = await LocalAdmissionWebApplicationFactory.CreateAsync();
+        await using var scope = factory.Services.CreateAsyncScope();
         var mediator = Substitute.For<IMediator>();
         var adminContext = Substitute.For<IAdminContext>();
         adminContext.IsInstanceAdminAsync(Arg.Any<CancellationToken>()).Returns(false);
@@ -83,7 +93,7 @@ public sealed class AuthorizationPolicyPackageDownloadControllerTests : IDisposa
         setupSecretProvider.IsSetupModeActive.Returns(false);
         var controller = new InstanceAuthorizationSettingsController(
             mediator,
-            _identity.Query,
+            scope.ServiceProvider.GetRequiredService<IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?>>(),
             Substitute.For<IAuthorizationProviderConfigurationService>(),
             adminContext,
             setupSecretProvider)

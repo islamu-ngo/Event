@@ -57,6 +57,7 @@ public class InstanceOnboardingController : EventControllerBase
 
     private readonly IMediator _mediator;
     private readonly IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> _identityQuery;
+    private readonly IQueryHandler<GetLocalIdentityLifecycleCapabilitiesQuery, LocalIdentityLifecycleCapabilities> _lifecycleCapabilities;
     private readonly ISetupSecretProvider _setupSecretProvider;
     private readonly IInstanceBootstrapAuditLogger _bootstrapAuditLogger;
     private readonly IAuthProviderConfigurationService _authProviderConfigurationService;
@@ -68,6 +69,7 @@ public class InstanceOnboardingController : EventControllerBase
     public InstanceOnboardingController(
         IMediator mediator,
         IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
+        IQueryHandler<GetLocalIdentityLifecycleCapabilitiesQuery, LocalIdentityLifecycleCapabilities> lifecycleCapabilities,
         ISetupSecretProvider setupSecretProvider,
         IInstanceBootstrapAuditLogger bootstrapAuditLogger,
         IAuthProviderConfigurationService authProviderConfigurationService,
@@ -78,6 +80,7 @@ public class InstanceOnboardingController : EventControllerBase
     {
         _mediator = mediator;
         _identityQuery = identityQuery;
+        _lifecycleCapabilities = lifecycleCapabilities;
         _setupSecretProvider = setupSecretProvider;
         _bootstrapAuditLogger = bootstrapAuditLogger;
         _authProviderConfigurationService = authProviderConfigurationService;
@@ -275,7 +278,7 @@ public class InstanceOnboardingController : EventControllerBase
             VisitorAccess = VisitorAccessCapabilityDto.From(
                 await _visitorAccessCapabilityResolver.ResolveAsync(_tenantContext.TenantId, cancellationToken))
         };
-        var capabilities = await _mediator.Send(new GetLocalIdentityLifecycleCapabilitiesQuery(PublicDiscovery: true), cancellationToken);
+        var capabilities = await _lifecycleCapabilities.QueryAsync(new GetLocalIdentityLifecycleCapabilitiesQuery(PublicDiscovery: true), cancellationToken);
         var links = LocalIdentityLifecycleLinkPolicy.GetLinks(capabilities).ToDictionary(
             definition => definition.Rel,
             definition => new HalLink

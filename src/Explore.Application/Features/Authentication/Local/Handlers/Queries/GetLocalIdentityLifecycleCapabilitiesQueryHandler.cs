@@ -1,14 +1,13 @@
-
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.Authentication.Local.Handlers.Queries;
 
 public sealed record GetLocalIdentityLifecycleCapabilitiesQuery(
-    LocalSessionAuthority? Authority = null, bool PublicDiscovery = false) : IRequest<LocalIdentityLifecycleCapabilities>;
+    LocalSessionAuthority? Authority = null, bool PublicDiscovery = false) : IQuery<LocalIdentityLifecycleCapabilities>;
 
 public sealed record LocalIdentityLifecycleCapabilities(bool VerifyEmail, bool RecoverPassword, bool ChangePassword);
 
@@ -17,9 +16,9 @@ public sealed class GetLocalIdentityLifecycleCapabilitiesQueryHandler(
     ILocalIdentityAuthService authentication,
     ILocalCredentialAdministration credentials,
     IEmailDeliveryCapabilityResolver email)
-    : IRequestHandler<GetLocalIdentityLifecycleCapabilitiesQuery, LocalIdentityLifecycleCapabilities>
+    : IQueryHandler<GetLocalIdentityLifecycleCapabilitiesQuery, LocalIdentityLifecycleCapabilities>
 {
-    public async Task<LocalIdentityLifecycleCapabilities> Handle(
+    public async Task<LocalIdentityLifecycleCapabilities> QueryAsync(
         GetLocalIdentityLifecycleCapabilitiesQuery request, CancellationToken cancellationToken)
     {
         if (request.PublicDiscovery)

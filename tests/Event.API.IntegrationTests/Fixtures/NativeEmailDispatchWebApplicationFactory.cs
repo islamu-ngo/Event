@@ -122,9 +122,28 @@ internal sealed class NativeEmailDispatchWebApplicationFactory : AuthenticatedWe
         {
             Id = Guid.CreateVersion7(), TenantId = tenant, EmailDispatchOutbox = row,
             EmailDispatchOutboxId = row.Id, PublishEventId = row.PublishEventId,
-            Status = EmailDispatchReceiptStatus.Failed, FirstSeenAt = now, FailedAt = now,
-            FailureCode = "smtp_send_failed", CreatedAt = now
+            Status = status == EmailDispatchStatus.Unknown ? EmailDispatchReceiptStatus.Unknown : EmailDispatchReceiptStatus.Failed,
+            FirstSeenAt = now, FailedAt = now, FailureCode = "smtp_send_failed", CreatedAt = now
         });
+        if (status == EmailDispatchStatus.Unknown)
+        {
+            db.EmailDispatchAttempts.Add(new EmailDispatchAttempt
+            {
+                Id = Guid.CreateVersion7(), TenantId = tenant, EmailDispatchOutboxId = row.Id,
+                AttemptNumber = row.AttemptCount, Outcome = EmailDispatchAttemptOutcome.Unknown,
+                StartedAt = now, FailureCategory = "smtp_outcome_unknown", CreatedAt = now
+            });
+            db.NotificationDeliveries.Add(new NotificationDelivery
+            {
+                Id = Guid.CreateVersion7(), TenantId = tenant, NotificationIntent = intent,
+                NotificationIntentId = intent.Id, EmailDispatchOutbox = row, EmailDispatchOutboxId = row.Id,
+                ChannelId = (int)NotificationPreferenceChannelEnum.Email,
+                DeliveryPolicyId = (int)NotificationDeliveryPolicyEnum.RegistrationStatusOptional,
+                PolicyVersion = 1, RecipientAddressSource = row.RecipientAddressSource,
+                DisclosureLevel = "standard", TemplateKey = intent.TemplateKey, TemplateVersion = 1,
+                StatusId = (int)NotificationDeliveryStatusEnum.Unknown, CreatedAt = now
+            });
+        }
         await db.SaveChangesAsync();
         return row.Id;
     }

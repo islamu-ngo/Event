@@ -11,7 +11,6 @@ using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using Explore.Application.Features.EmailDispatch.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Timeouts;
@@ -28,7 +27,10 @@ namespace Explore.API.Controllers;
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 public sealed class EmailDispatchAdminController : EventControllerBase
 {
-    private readonly IMediator _mediator;
+    private readonly ICommandHandler<SetEmailDispatchTenantPauseStateCommand, BaseCommandResponse<Guid>> _tenantPauseCommand;
+    private readonly ICommandHandler<ParkEmailDispatchCommand, BaseCommandResponse<Guid>> _parkCommand;
+    private readonly ICommandHandler<ResolveEmailDispatchWithoutReplayCommand, BaseCommandResponse<Guid>> _resolveCommand;
+    private readonly ICommandHandler<ReconcileUnknownEmailDispatchCommand, BaseCommandResponse<Guid>> _reconcileCommand;
     private readonly IQueryHandler<GetEmailDispatchStatusQuery, BaseCommandResponse<IReadOnlyList<EmailDispatchStatusDto>>> _statusQuery;
     private readonly IQueryHandler<GetEmailDispatchProcessorControlQuery, EmailDispatchProcessorControlDto> _controlQuery;
     private readonly ICommandHandler<ReplayEmailDispatchCommand, BaseCommandResponse<Guid>> _replayCommand;
@@ -38,7 +40,10 @@ public sealed class EmailDispatchAdminController : EventControllerBase
     private readonly IResourceAssembler<EmailDispatchProcessorControlDto, EmailDispatchProcessorControlDto> _processorControlAssembler;
 
     public EmailDispatchAdminController(
-        IMediator mediator,
+        ICommandHandler<SetEmailDispatchTenantPauseStateCommand, BaseCommandResponse<Guid>> tenantPauseCommand,
+        ICommandHandler<ParkEmailDispatchCommand, BaseCommandResponse<Guid>> parkCommand,
+        ICommandHandler<ResolveEmailDispatchWithoutReplayCommand, BaseCommandResponse<Guid>> resolveCommand,
+        ICommandHandler<ReconcileUnknownEmailDispatchCommand, BaseCommandResponse<Guid>> reconcileCommand,
         IQueryHandler<GetEmailDispatchStatusQuery, BaseCommandResponse<IReadOnlyList<EmailDispatchStatusDto>>> statusQuery,
         IQueryHandler<GetEmailDispatchProcessorControlQuery, EmailDispatchProcessorControlDto> controlQuery,
         ICommandHandler<ReplayEmailDispatchCommand, BaseCommandResponse<Guid>> replayCommand,
@@ -47,7 +52,10 @@ public sealed class EmailDispatchAdminController : EventControllerBase
         IResourceAssembler<EmailDispatchStatusDto, EmailDispatchStatusDto> statusAssembler,
         IResourceAssembler<EmailDispatchProcessorControlDto, EmailDispatchProcessorControlDto> processorControlAssembler)
     {
-        _mediator = mediator;
+        _tenantPauseCommand = tenantPauseCommand;
+        _parkCommand = parkCommand;
+        _resolveCommand = resolveCommand;
+        _reconcileCommand = reconcileCommand;
         _statusQuery = statusQuery;
         _controlQuery = controlQuery;
         _replayCommand = replayCommand;
@@ -106,7 +114,7 @@ public sealed class EmailDispatchAdminController : EventControllerBase
         [FromQuery] EmailDispatchPauseTenantQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(
+        var result = await _tenantPauseCommand.ExecuteAsync(
             new SetEmailDispatchTenantPauseStateCommand
             {
                 TenantId = tenantId,
@@ -133,7 +141,7 @@ public sealed class EmailDispatchAdminController : EventControllerBase
         Guid tenantId,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(
+        var result = await _tenantPauseCommand.ExecuteAsync(
             new SetEmailDispatchTenantPauseStateCommand
             {
                 TenantId = tenantId,
@@ -163,7 +171,7 @@ public sealed class EmailDispatchAdminController : EventControllerBase
         [FromQuery] EmailDispatchParkQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(
+        var result = await _parkCommand.ExecuteAsync(
             new ParkEmailDispatchCommand
             {
                 TenantId = tenantId,
@@ -223,7 +231,7 @@ public sealed class EmailDispatchAdminController : EventControllerBase
         [FromQuery] EmailDispatchResolveQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(
+        var result = await _resolveCommand.ExecuteAsync(
             new ResolveEmailDispatchWithoutReplayCommand
             {
                 TenantId = tenantId,
@@ -345,7 +353,7 @@ public sealed class EmailDispatchAdminController : EventControllerBase
         [FromQuery] EmailDispatchReconciliationQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new ReconcileUnknownEmailDispatchCommand
+        var result = await _reconcileCommand.ExecuteAsync(new ReconcileUnknownEmailDispatchCommand
         {
             TenantId = tenantId,
             OutboxId = outboxId,

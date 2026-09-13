@@ -23,7 +23,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Event.Api.IntegrationTests.Features;
 
 [NotInParallel("ApiTestFixture")]
-public sealed class NativeEmailDispatchHttpTests
+public sealed partial class NativeEmailDispatchHttpTests
 {
     private const string Root = "/api/admin/email-dispatch";
 

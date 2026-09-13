@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EmailDispatch.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.EmailDispatch, AuthorizationActions.EmailDispatches.ManageTenant)]
-public sealed record SetEmailDispatchTenantPauseStateCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record SetEmailDispatchTenantPauseStateCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid TenantId { get; init; }
     public bool IsPaused { get; init; }

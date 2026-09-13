@@ -12,11 +12,34 @@ public sealed class NativeEmailDispatchOperationTests
 {
     public static IEnumerable<(Type Request, Type Handler, Type Shape)> Operations()
     {
+        yield return (typeof(SetEmailDispatchTenantPauseStateCommand), typeof(SetEmailDispatchTenantPauseStateCommandHandler), typeof(ICommand<>));
+        yield return (typeof(ParkEmailDispatchCommand), typeof(ParkEmailDispatchCommandHandler), typeof(ICommand<>));
+        yield return (typeof(ResolveEmailDispatchWithoutReplayCommand), typeof(ResolveEmailDispatchWithoutReplayCommandHandler), typeof(ICommand<>));
+        yield return (typeof(ReconcileUnknownEmailDispatchCommand), typeof(ReconcileUnknownEmailDispatchCommandHandler), typeof(ICommand<>));
+        yield return (typeof(DisableEmailDeliveryCommand), typeof(DisableEmailDeliveryCommandHandler), typeof(ICommand<>));
+        yield return (typeof(PreviewEmailDeliveryDisableCommand), typeof(PreviewEmailDeliveryDisableCommandHandler), typeof(ICommand<>));
         yield return (typeof(GetEmailDispatchStatusQuery), typeof(GetEmailDispatchStatusQueryHandler), typeof(IQuery<>));
         yield return (typeof(GetEmailDispatchProcessorControlQuery), typeof(GetEmailDispatchProcessorControlQueryHandler), typeof(IQuery<>));
         yield return (typeof(ReplayEmailDispatchCommand), typeof(ReplayEmailDispatchCommandHandler), typeof(ICommand<>));
         yield return (typeof(SetEmailDispatchProcessorPauseStateCommand), typeof(SetEmailDispatchProcessorPauseStateCommandHandler), typeof(ICommand<>));
         yield return (typeof(SetEmailDispatchGlobalRateLimitOverrideCommand), typeof(SetEmailDispatchGlobalRateLimitOverrideCommandHandler), typeof(ICommand<>));
+    }
+
+    [Test]
+    public async Task EntireFeatureRequestSurfaceHasExclusiveNativeContracts()
+    {
+        var requests = typeof(GetEmailDispatchStatusQuery).Assembly.GetTypes()
+            .Where(type => type.IsClass && !type.IsAbstract
+                && type.Namespace?.StartsWith("Explore.Application.Features.EmailDispatch.Requests.", StringComparison.Ordinal) == true)
+            .ToArray();
+        await Assert.That(requests).IsNotEmpty();
+        foreach (var request in requests)
+        {
+            await Assert.That(typeof(MediatR.IBaseRequest).IsAssignableFrom(request)).IsFalse();
+            await Assert.That(request.GetInterfaces().Count(contract => contract.IsGenericType
+                && (contract.GetGenericTypeDefinition() == typeof(ICommand<>)
+                    || contract.GetGenericTypeDefinition() == typeof(IQuery<>)))).IsEqualTo(1);
+        }
     }
 
     [Test]

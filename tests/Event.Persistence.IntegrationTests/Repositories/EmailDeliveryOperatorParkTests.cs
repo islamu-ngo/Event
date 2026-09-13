@@ -1,5 +1,7 @@
 
 using Explore.Application.Contracts.Notifications;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Responses;
 using Explore.Application.Features.EmailDispatch;
 using Explore.Application.Features.EmailDispatch.Handlers.Commands;
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
@@ -25,7 +27,7 @@ public sealed class EmailDeliveryOperatorParkTests
             var scenario = await SeedAsync(databasePath, EmailDispatchStatus.Parked, EmailDispatchParkReason.CapabilityUnavailable);
             await using var context = CreateContext(databasePath);
 
-            var result = await Handler(context).Handle(Request(scenario), CancellationToken.None);
+            var result = await Handler(context).ExecuteAsync(Request(scenario), CancellationToken.None);
 
             await Assert.That(result.IsSuccess).IsTrue();
             await using var observer = CreateContext(databasePath);
@@ -47,11 +49,11 @@ public sealed class EmailDeliveryOperatorParkTests
         {
             var scenario = await SeedAsync(databasePath, EmailDispatchStatus.Pending);
             await using var context = CreateContext(databasePath);
-            await Assert.That((await Handler(context).Handle(Request(scenario), CancellationToken.None)).IsSuccess).IsTrue();
+            await Assert.That((await Handler(context).ExecuteAsync(Request(scenario), CancellationToken.None)).IsSuccess).IsTrue();
             var before = await ReadAsync(context, scenario);
             await Assert.That(before.ParkReason).IsEqualTo(EmailDispatchParkReason.Operator);
 
-            var repeated = await Handler(context).Handle(Request(scenario) with { Reason = "A later duplicate operator request" }, CancellationToken.None);
+            var repeated = await Handler(context).ExecuteAsync(Request(scenario) with { Reason = "A later duplicate operator request" }, CancellationToken.None);
 
             await Assert.That(repeated.IsSuccess).IsTrue();
             await using var observer = CreateContext(databasePath);
@@ -72,7 +74,7 @@ public sealed class EmailDeliveryOperatorParkTests
             var scenario = await SeedAsync(databasePath, status);
             await using var context = CreateContext(databasePath);
 
-            var result = await Handler(context).Handle(Request(scenario), CancellationToken.None);
+            var result = await Handler(context).ExecuteAsync(Request(scenario), CancellationToken.None);
 
             await Assert.That(result.IsSuccess).IsTrue();
             await using var observer = CreateContext(databasePath);
@@ -100,7 +102,7 @@ public sealed class EmailDeliveryOperatorParkTests
             var before = await ReadAsync(context, scenario);
             var request = redacted ? Request(scenario) : Request(scenario) with { TenantId = Guid.CreateVersion7() };
 
-            var result = await Handler(context).Handle(request, CancellationToken.None);
+            var result = await Handler(context).ExecuteAsync(request, CancellationToken.None);
 
             await Assert.That(result.IsSuccess).IsFalse();
             await Assert.That(result.FailureCode).IsEqualTo(redacted ? EmailDispatchFailureCodes.InvalidTransition : EmailDispatchFailureCodes.NotFound);
@@ -125,7 +127,7 @@ public sealed class EmailDeliveryOperatorParkTests
             await using var context = CreateContext(databasePath);
             var before = await ReadAsync(context, scenario);
 
-            var result = await Handler(context).Handle(Request(scenario), CancellationToken.None);
+            var result = await Handler(context).ExecuteAsync(Request(scenario), CancellationToken.None);
 
             await Assert.That(result.IsSuccess).IsFalse();
             await using var observer = CreateContext(databasePath);
@@ -152,7 +154,7 @@ public sealed class EmailDeliveryOperatorParkTests
             await Assert.That(admission.Outcome).IsEqualTo(EmailDispatchEligibilityOutcome.Eligible);
             var before = await ReadAsync(context, scenario);
 
-            var result = await Handler(context).Handle(Request(scenario), CancellationToken.None);
+            var result = await Handler(context).ExecuteAsync(Request(scenario), CancellationToken.None);
 
             await Assert.That(result.IsSuccess).IsFalse();
             await using var observer = CreateContext(databasePath);
@@ -212,8 +214,8 @@ public sealed class EmailDeliveryOperatorParkTests
         return new(Dispatch: dispatch, UserId: row.RecipientUserId);
     }
 
-    private static ParkEmailDispatchCommandHandler Handler(ExploreDbContext context) =>
-        new(repository: new EmailDispatchOutboxRepository(context));
+    private static ICommandHandler<ParkEmailDispatchCommand, BaseCommandResponse<Guid>> Handler(ExploreDbContext context) =>
+        new ParkEmailDispatchCommandHandler(repository: new EmailDispatchOutboxRepository(context));
 
     private static ParkEmailDispatchCommand Request(Scenario scenario) => new()
     {

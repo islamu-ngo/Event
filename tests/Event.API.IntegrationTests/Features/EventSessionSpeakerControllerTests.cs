@@ -109,6 +109,7 @@ public sealed class EventSessionSpeakerControllerTests
     [Arguments(null)]
     [Arguments("")]
     [Arguments("not-a-stamp")]
+    [Arguments("01900000-0000-7000-8000-000000000099")]
     public async Task Update_WhenIfMatchIsInvalid_ReturnsValidationProblemDetails(string? ifMatch)
     {
         await using var factory = new AuthenticatedWebApplicationFactory();
@@ -131,6 +132,33 @@ public sealed class EventSessionSpeakerControllerTests
             response,
             HttpStatusCode.BadRequest,
             "Event session speaker validation failed");
+    }
+
+    [Test]
+    public async Task Update_InvalidIfMatchRejectsBeforeExactNativePortIngress()
+    {
+        var controller = new EventSessionSpeakerController(
+            null!,
+            null!,
+            new RejectDispatchUpdatePort(),
+            null!,
+            null!)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+        };
+
+        var action = await controller.Update(
+            Guid.CreateVersion7(),
+            new UpdateEventSessionSpeakerDto
+            {
+                Actor = new UpdateEventSessionSpeakerActorDto { ActorId = Guid.CreateVersion7() }
+            },
+            "01900000-0000-7000-8000-000000000099",
+            CancellationToken.None);
+
+        var result = action.Result as ObjectResult;
+        await Assert.That(result).IsNotNull();
+        await Assert.That(result!.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
     }
 
     private static async Task AssertRoute(
@@ -161,5 +189,14 @@ public sealed class EventSessionSpeakerControllerTests
         };
         request.Headers.Add(TestAuthHandler.AuthHeaderName, TestAuthHandler.CreateAuthHeaderValue(Guid.NewGuid()));
         return request;
+    }
+
+    private sealed class RejectDispatchUpdatePort
+        : ICommandHandler<UpdateEventSessionSpeakerCommand, BaseCommandResponse<Guid>>
+    {
+        public Task<BaseCommandResponse<Guid>> ExecuteAsync(
+            UpdateEventSessionSpeakerCommand command,
+            CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Invalid If-Match reached the native update operation ingress.");
     }
 }

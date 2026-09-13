@@ -1,11 +1,11 @@
 namespace Explore.Application.Features.LegalDocuments.Requests.Queries;
 
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.LegalDocuments;
-using MediatR;
 
 public sealed record GetPublicLegalDocumentQuery(
     string KindCode,
-    string LanguageTag) : IRequest<PublicLegalDocumentQueryResult>;
+    string LanguageTag) : IQuery<PublicLegalDocumentQueryResult>;
 
 public sealed record PublicLegalDocumentQueryResult
 {

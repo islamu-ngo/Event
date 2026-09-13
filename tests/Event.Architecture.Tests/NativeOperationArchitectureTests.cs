@@ -140,7 +140,18 @@ public sealed class NativeOperationArchitectureTests
             ["Keycloak:Audience"] = "islamu-event-api",
             ["Database:Provider"] = "PostgreSql",
             ["Database:Host"] = "localhost",
-            ["Database:Database"] = "event_composition_test"
+            ["Database:Database"] = "event_composition_test",
+            ["Instance:OperatorIdentity:OperatorId"] = Guid.CreateVersion7().ToString(),
+            ["Instance:OperatorIdentity:PublicName"] = "Composition Test Operator",
+            ["Instance:OperatorIdentity:LegalName"] = "Composition Test Operator ASBL",
+            ["Instance:OperatorIdentity:OperatorKindCode"] = "registered_organization",
+            ["Instance:OperatorIdentity:JurisdictionCountryCode"] = "BE",
+            ["Instance:OperatorIdentity:PublicContactEmail"] = "contact@instance.example.test",
+            ["Instance:OperatorIdentity:OfficialOrigin"] = "https://instance.example.test",
+            ["Instance:OperatorIdentity:WebsiteUrl"] = "https://instance.example.test",
+            ["Instance:OperatorIdentity:LegalNoticeUrl"] = "https://instance.example.test/legal",
+            ["Instance:OperatorIdentity:TermsUrl"] = "https://instance.example.test/terms",
+            ["Instance:OperatorIdentity:PrivacyUrl"] = "https://instance.example.test/privacy"
         });
         builder.AddApiHostServices(static () => false);
         // Testing omits runtime DbContext registration. Construction-only assurance needs the real

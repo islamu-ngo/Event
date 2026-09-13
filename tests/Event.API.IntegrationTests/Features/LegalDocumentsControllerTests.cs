@@ -2,6 +2,7 @@ namespace Event.Api.IntegrationTests.Features;
 
 using Explore.API.Controllers;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.LegalDocuments;
@@ -12,7 +13,6 @@ using Explore.Domain;
 using Explore.Domain.ValueObjects;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
-using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
@@ -114,14 +114,13 @@ public sealed class LegalDocumentsControllerTests
                 new UnexpectedTenantIdentityEvaluator());
             services.AddSingleton<IInstanceOperatorIdentity>(InstanceIdentity());
             services.AddTransient<
-                IRequestHandler<
+                IQueryHandler<
                     GetPublicLegalDocumentQuery,
                     PublicLegalDocumentQueryResult>,
                 GetPublicLegalDocumentQueryHandler>();
-            services.AddTransient<IMediator>(provider => new Mediator(provider));
             ServiceProvider provider = services.BuildServiceProvider();
             var controller = new LegalDocumentsController(
-                provider.GetRequiredService<IMediator>())
+                provider.GetRequiredService<IQueryHandler<GetPublicLegalDocumentQuery, PublicLegalDocumentQueryResult>>())
             {
                 ControllerContext = new ControllerContext
                 {

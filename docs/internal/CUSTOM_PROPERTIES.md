@@ -236,8 +236,8 @@ Lifecycle:
 The three event projection reads (status, dirty-scope pages and event rows) use
 scoped `IQueryHandler` ports. Tenant rebuild, single-event refresh and dirty-scope
 drain use scoped `ICommandHandler` ports. `CustomPropertyProjectionAdminController`
-constructor-injects all six protected ports; its four session operations still
-use MediatR. Drain deliberately calls either the event or session updater service
+constructor-injects all six protected event ports and four protected session ports.
+Drain deliberately calls either the event or session updater service
 according to the validated projection name, not another operation.
 
 Authorization resolves event ownership from persisted state and requires the
@@ -261,7 +261,27 @@ do not establish PostgreSQL advisory-lock concurrency guarantees.
 Event rebuild validation now uses the existing ProblemDetails factory instead of
 returning a raw command response. Validation remains HTTP 400 and quota exhaustion
 HTTP 422 with quota metadata; successful response and route contracts are unchanged.
-The retained session rebuild failure mapping is outside this cohort.
+### Session Projection Administration
+
+Session status and row reads implement `IQuery<TResult>`; tenant rebuild and
+single-session refresh implement `ICommand<TResult>`. The controller injects their
+exact closed handler interfaces, with no remaining mediator dependency. Application
+discovery supplies authorization -> performance -> handler without feature-specific
+registration. The existing resource resolver derives session/event/tenant ownership
+from persisted state; supplied tenant IDs remain independently authorized targets.
+
+Manual validation, exposure filtering before mapping, quotas and projection metrics
+are unchanged. Full rebuild retains the session updater transaction and status/dirty
+scope settlement; single refresh retains its unit-of-work transaction without
+claiming backlog settlement. Event drain still reaches both updater service ports.
+
+Session batch validation now returns HTTP 400 ProblemDetails with `validation_failed`
+and the `eventSessionCustomPropertyProjection` error key, not a raw command result.
+Status tests retain the same session key and the event `customPropertyProjection`
+key. Quota exhaustion remains HTTP 422. Real SQLite HTTP and registered-port tests
+cover tenant denial, durable rows/status, all exposure ceilings, failure rollback
+and retry, and cancellation signalled after projection deletion reaches its value
+read. These receipts do not establish multi-provider or advisory-lock concurrency.
 
 ## Automation Condition Guardrails
 

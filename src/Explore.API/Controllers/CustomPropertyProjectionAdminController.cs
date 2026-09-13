@@ -16,7 +16,6 @@ using Explore.Application.Features.EventSessionCustomPropertyProjections.Request
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Timeouts;
@@ -48,6 +47,11 @@ public class CustomPropertyProjectionAdminController : ControllerBase
         "Custom-property projection validation failed",
         "Custom-property projection dirty-scope drain failed.");
 
+    private static readonly ApiValidationProblemDescriptor RebuildSessionsValidationProblem = new(
+        "eventSessionCustomPropertyProjection",
+        "Event session custom-property projection validation failed",
+        "Event session custom-property projection rebuild failed.");
+
     private static readonly ApiValidationProblemDescriptor RebuildSingleSessionValidationProblem = new(
         "eventSessionCustomPropertyProjection",
         "Event session custom-property projection validation failed",
@@ -73,7 +77,10 @@ public class CustomPropertyProjectionAdminController : ControllerBase
         "Event session custom-property projection validation failed",
         "Session projection status lookup failed.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetEventSessionCustomPropertyProjectionStatusQuery, BaseCommandResponse<IReadOnlyList<ProjectionStatusDto>>> _sessionStatus;
+    private readonly IQueryHandler<GetEventSessionCustomPropertyProjectionsForSessionQuery, BaseCommandResponse<IReadOnlyList<EventSessionCustomPropertyProjectionDto>>> _sessionRows;
+    private readonly ICommandHandler<RebuildEventSessionCustomPropertyProjectionCommand, BaseCommandResponse<RebuildProjectionResponseDto>> _rebuildSessions;
+    private readonly ICommandHandler<RebuildSingleEventSessionCustomPropertyProjectionCommand, BaseCommandResponse<Guid>> _rebuildSession;
     private readonly IQueryHandler<GetEventCustomPropertyProjectionStatusQuery, BaseCommandResponse<IReadOnlyList<ProjectionStatusDto>>> _eventStatus;
     private readonly IQueryHandler<GetCustomPropertyProjectionDirtyScopesQuery, PaginatedResult<ProjectionDirtyScopeDto>> _dirtyScopes;
     private readonly IQueryHandler<GetEventCustomPropertyProjectionsForEventQuery, BaseCommandResponse<IReadOnlyList<EventCustomPropertyProjectionDto>>> _eventRows;
@@ -84,7 +91,10 @@ public class CustomPropertyProjectionAdminController : ControllerBase
     private readonly IResourceAssembler<ProjectionDirtyScopeDto, ProjectionDirtyScopeDto> _dirtyScopeAssembler;
 
     public CustomPropertyProjectionAdminController(
-        IMediator mediator,
+        IQueryHandler<GetEventSessionCustomPropertyProjectionStatusQuery, BaseCommandResponse<IReadOnlyList<ProjectionStatusDto>>> sessionStatus,
+        IQueryHandler<GetEventSessionCustomPropertyProjectionsForSessionQuery, BaseCommandResponse<IReadOnlyList<EventSessionCustomPropertyProjectionDto>>> sessionRows,
+        ICommandHandler<RebuildEventSessionCustomPropertyProjectionCommand, BaseCommandResponse<RebuildProjectionResponseDto>> rebuildSessions,
+        ICommandHandler<RebuildSingleEventSessionCustomPropertyProjectionCommand, BaseCommandResponse<Guid>> rebuildSession,
         IQueryHandler<GetEventCustomPropertyProjectionStatusQuery, BaseCommandResponse<IReadOnlyList<ProjectionStatusDto>>> eventStatus,
         IQueryHandler<GetCustomPropertyProjectionDirtyScopesQuery, PaginatedResult<ProjectionDirtyScopeDto>> dirtyScopes,
         IQueryHandler<GetEventCustomPropertyProjectionsForEventQuery, BaseCommandResponse<IReadOnlyList<EventCustomPropertyProjectionDto>>> eventRows,
@@ -94,7 +104,10 @@ public class CustomPropertyProjectionAdminController : ControllerBase
         IResourceAssembler<ProjectionStatusDto, ProjectionStatusDto> statusAssembler,
         IResourceAssembler<ProjectionDirtyScopeDto, ProjectionDirtyScopeDto> dirtyScopeAssembler)
     {
-        _mediator = mediator;
+        _sessionStatus = sessionStatus;
+        _sessionRows = sessionRows;
+        _rebuildSessions = rebuildSessions;
+        _rebuildSession = rebuildSession;
         _eventStatus = eventStatus;
         _dirtyScopes = dirtyScopes;
         _eventRows = eventRows;
@@ -273,7 +286,7 @@ public class CustomPropertyProjectionAdminController : ControllerBase
         [FromQuery] Guid tenantId,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(
+        var result = await _sessionStatus.QueryAsync(
             new GetEventSessionCustomPropertyProjectionStatusQuery { TenantId = tenantId },
             cancellationToken);
 
@@ -304,11 +317,22 @@ public class CustomPropertyProjectionAdminController : ControllerBase
         [FromBody] RebuildProjectionRequestDto requestDto,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(
+        var result = await _rebuildSessions.ExecuteAsync(
             new RebuildEventSessionCustomPropertyProjectionCommand { RequestDto = requestDto },
             cancellationToken);
 
-        return result.IsSuccess ? Ok(result) : this.ToQuotaProblemOrBadRequest(result);
+        if (result.IsSuccess)
+        {
+            return Ok(result);
+        }
+
+        if (result.FailureCode == FailureCodes.QuotaExceeded && result.QuotaExceeded is not null)
+        {
+            return ApiProblemFactory.ToProblemResult(
+                QuotaProblemDetailsFactory.Create(HttpContext, result.QuotaExceeded, result.Message));
+        }
+
+        return this.ToCommandValidationProblem(result, RebuildSessionsValidationProblem);
     }
 
     /// <summary>
@@ -323,7 +347,7 @@ public class CustomPropertyProjectionAdminController : ControllerBase
         [FromBody] RebuildSingleEventSessionProjectionRequestDto requestDto,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(
+        var result = await _rebuildSession.ExecuteAsync(
             new RebuildSingleEventSessionCustomPropertyProjectionCommand { EventSessionId = requestDto.EventSessionId },
             cancellationToken);
 
@@ -343,7 +367,7 @@ public class CustomPropertyProjectionAdminController : ControllerBase
         [FromQuery] ExposureLevel? exposureCeiling = null,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(
+        var result = await _sessionRows.QueryAsync(
             new GetEventSessionCustomPropertyProjectionsForSessionQuery
             {
                 EventSessionId = eventSessionId,

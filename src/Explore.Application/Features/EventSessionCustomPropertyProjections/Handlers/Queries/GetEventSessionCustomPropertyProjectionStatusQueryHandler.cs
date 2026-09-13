@@ -1,3 +1,4 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.CustomPropertyProjection;
@@ -5,12 +6,11 @@ using Explore.Application.Features.CustomProperties;
 using Explore.Application.Features.EventSessionCustomPropertyProjections.Requests.Queries;
 using Explore.Application.Mappings;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessionCustomPropertyProjections.Handlers.Queries;
 
 public class GetEventSessionCustomPropertyProjectionStatusQueryHandler
-    : IRequestHandler<GetEventSessionCustomPropertyProjectionStatusQuery, BaseCommandResponse<IReadOnlyList<ProjectionStatusDto>>>
+    : IQueryHandler<GetEventSessionCustomPropertyProjectionStatusQuery, BaseCommandResponse<IReadOnlyList<ProjectionStatusDto>>>
 {
     private readonly ICustomPropertyProjectionStatusRepository _statusRepository;
     private readonly ICustomPropertyProjectionDirtyScopeRepository _dirtyScopeRepository;
@@ -23,7 +23,7 @@ public class GetEventSessionCustomPropertyProjectionStatusQueryHandler
         _dirtyScopeRepository = dirtyScopeRepository;
     }
 
-    public async Task<BaseCommandResponse<IReadOnlyList<ProjectionStatusDto>>> Handle(
+    public async Task<BaseCommandResponse<IReadOnlyList<ProjectionStatusDto>>> QueryAsync(
         GetEventSessionCustomPropertyProjectionStatusQuery request,
         CancellationToken cancellationToken)
     {

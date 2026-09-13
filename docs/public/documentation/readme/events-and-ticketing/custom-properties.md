@@ -43,7 +43,7 @@ already authorized before revocation.
 
 ## Projection Administration
 
-Tenant administrators can inspect event projection status, pending work and
+Tenant administrators can inspect event and session projection status, pending work and
 projected values in the current tenant. Selecting another tenant ID does not grant
 access. Unlike the governance report, projection row inspection includes collected
 values: restrict these responses to authorized administrators. A requested exposure
@@ -57,8 +57,16 @@ event does not clear the tenant backlog. Drain processes the selected event or
 session projection only. If a drain fails or is cancelled, pending work remains
 available for retry and its transaction does not leave partially replaced rows.
 
-Invalid event rebuild requests return a structured ProblemDetails error (HTTP 400);
+Full session rebuild refreshes session values, drains only session work and records
+session status. Refreshing one session does not clear pending tenant work. Failed or
+cancelled session rebuilds roll back their transaction; retry after resolving the
+failure. Event work remains independent.
+
+Invalid event or session rebuild requests return a structured ProblemDetails error (HTTP 400);
 quota exhaustion remains HTTP 422. Successful responses and routes are unchanged.
+Session validation errors use code `validation_failed` and the
+`eventSessionCustomPropertyProjection` error key; event validation retains
+`customPropertyProjection`.
 No database migration or manual data repair is required for these corrections.
 
 ## Lifecycle: Retirement vs. Hard Purge

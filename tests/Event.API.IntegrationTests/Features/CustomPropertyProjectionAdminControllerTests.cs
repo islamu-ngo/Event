@@ -25,7 +25,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Event.Api.IntegrationTests.Features;
 
 [NotInParallel("ApiTestFixture")]
-public sealed class CustomPropertyProjectionAdminControllerTests
+public sealed partial class CustomPropertyProjectionAdminControllerTests
 {
     private const string Root = "/api/admin/custom-property-projections";
     private const string EventProjection = IEventCustomPropertyProjectionUpdater.ProjectionName;
@@ -162,6 +162,11 @@ public sealed class CustomPropertyProjectionAdminControllerTests
         using var client = Client(factory, data.AdminId);
         using var invalid = await client.PostAsJsonAsync($"{Root}/rebuild", new { tenantId = PlatformDefaults.DefaultTenantId, batchSize = 0 });
         await ProblemAsync(invalid, HttpStatusCode.BadRequest);
+        using var json = JsonDocument.Parse(await invalid.Content.ReadAsStringAsync());
+        await Assert.That(json.RootElement.GetProperty("code").GetString()).IsEqualTo("validation_failed");
+        var errors = json.RootElement.GetProperty("errors");
+        await Assert.That(errors.EnumerateObject().Single().Name).IsEqualTo("customPropertyProjection");
+        await Assert.That(errors.GetProperty("customPropertyProjection").GetArrayLength()).IsEqualTo(1);
         using var unknown = await client.PostAsJsonAsync($"{Root}/drain-dirty-scopes", new { tenantId = PlatformDefaults.DefaultTenantId, projectionName = "unknown" });
         await ProblemAsync(unknown, HttpStatusCode.BadRequest);
         using var quota = await client.PostAsJsonAsync($"{Root}/rebuild", new { tenantId = PlatformDefaults.DefaultTenantId, batchSize = int.MaxValue });
@@ -241,7 +246,7 @@ public sealed class CustomPropertyProjectionAdminControllerTests
     }
 
     [Test]
-    public async Task EventAndRetainedSessionStatusValidationUseProblemDetails()
+    public async Task EventAndSessionStatusValidationUseProblemDetails()
     {
         await using var factory = await FactoryAsync();
         // Substitute the external PDP only to reach the handlers' empty-ID validation.
@@ -261,6 +266,27 @@ public sealed class CustomPropertyProjectionAdminControllerTests
             await Assert.That(errors.EnumerateObject().Single().Name).IsEqualTo(errorKey);
             await Assert.That(errors.GetProperty(errorKey).GetArrayLength()).IsEqualTo(1);
         }
+    }
+
+    [Test]
+    public async Task InvalidSessionRebuildPreservesValidationContractAndPendingWork()
+    {
+        await using var factory = await FactoryAsync();
+        var data = await SeedAsync(factory);
+        using var client = Client(factory, data.AdminId);
+        using var invalid = await client.PostAsJsonAsync($"{Root}/sessions/rebuild", new { tenantId = PlatformDefaults.DefaultTenantId, batchSize = 0 });
+        await ProblemAsync(invalid, HttpStatusCode.BadRequest);
+        using var json = JsonDocument.Parse(await invalid.Content.ReadAsStringAsync());
+        await Assert.That(json.RootElement.GetProperty("code").GetString()).IsEqualTo("validation_failed");
+        var errors = json.RootElement.GetProperty("errors");
+        await Assert.That(errors.EnumerateObject().Single().Name).IsEqualTo("eventSessionCustomPropertyProjection");
+        await Assert.That(errors.GetProperty("eventSessionCustomPropertyProjection").GetArrayLength()).IsEqualTo(1);
+        using var quota = await client.PostAsJsonAsync($"{Root}/sessions/rebuild", new { tenantId = PlatformDefaults.DefaultTenantId, batchSize = int.MaxValue });
+        await ProblemAsync(quota, HttpStatusCode.UnprocessableEntity);
+        using var pending = await client.GetAsync($"{Root}/dirty-scopes?tenantId={PlatformDefaults.DefaultTenantId}&projectionName={SessionProjection}");
+        await Assert.That(pending.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var pendingJson = JsonDocument.Parse(await pending.Content.ReadAsStringAsync());
+        await Assert.That(Embedded(pendingJson).Length).IsEqualTo(1);
     }
 
     private static async Task<NativeCustomPropertyGovernanceFactory> FactoryAsync()
@@ -335,6 +361,7 @@ public sealed class CustomPropertyProjectionAdminControllerTests
         var own = await EventScenarioSeed.SeedPublishedEventAsync(db, admin.ActorId, admin.TenantId);
         var other = await EventScenarioSeed.SeedPublishedEventAsync(db, foreign.ActorId, foreign.TenantId);
         var session = await db.EventSessions.SingleAsync(row => row.EventId == own.EventId);
+        var foreignSession = db.EventSessions.Local.Single(row => row.EventId == other.EventId);
         Guid publicValueId = default;
         foreach (var (key, exposure, text) in new[]
         {
@@ -356,7 +383,11 @@ public sealed class CustomPropertyProjectionAdminControllerTests
             db.AddRange(definition, value);
             if (exposure == ExposureLevel.Public) publicValueId = value.Id;
         }
-        foreach (var (key, exposure, text) in new[] { ("public", ExposureLevel.Public, "session-safe-public"), ("internal", ExposureLevel.Internal, "session-secret-internal") })
+        foreach (var (key, exposure, text) in new[]
+        {
+            ("public", ExposureLevel.Public, "session-safe-public"), ("internal", ExposureLevel.Internal, "session-secret-internal"),
+            ("admin", ExposureLevel.TenantAdminOnly, "session-admin-only"), ("organizer", ExposureLevel.OrganizerOnly, "session-organizer-only")
+        })
         {
             var definition = new EventSessionCustomPropertyDefinition
             {
@@ -374,7 +405,7 @@ public sealed class CustomPropertyProjectionAdminControllerTests
         AddDirty(db, admin.TenantId, own.EventId, EventProjection, CustomPropertyProjectionScopeType.Event, Guid.CreateVersion7());
         AddDirty(db, admin.TenantId, session.Id, SessionProjection, CustomPropertyProjectionScopeType.EventSession);
         await db.SaveChangesAsync();
-        return new(admin.UserId, member.UserId, own.EventId, session.Id, foreign.TenantId, other.EventId, publicValueId);
+        return new(admin.UserId, member.UserId, own.EventId, session.Id, foreign.TenantId, other.EventId, publicValueId, foreignSession.Id);
     }
 
     private static void AddDirty(ExploreDbContext db, Guid tenantId, Guid id, string projection, CustomPropertyProjectionScopeType type, Guid? definitionId = null)
@@ -384,5 +415,5 @@ public sealed class CustomPropertyProjectionAdminControllerTests
             ScopeType = type, DefinitionId = definitionId, Reason = "rebuild_in_progress", CreatedAt = DateTimeOffset.UtcNow
         });
 
-    private sealed record SeedData(Guid AdminId, Guid MemberId, Guid EventId, Guid SessionId, Guid ForeignTenantId, Guid ForeignEventId, Guid PublicValueId);
+    private sealed record SeedData(Guid AdminId, Guid MemberId, Guid EventId, Guid SessionId, Guid ForeignTenantId, Guid ForeignEventId, Guid PublicValueId, Guid ForeignSessionId);
 }

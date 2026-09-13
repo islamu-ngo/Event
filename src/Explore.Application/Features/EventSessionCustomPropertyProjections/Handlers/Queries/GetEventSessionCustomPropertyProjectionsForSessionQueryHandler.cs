@@ -1,14 +1,14 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Application.Features.EventSessionCustomPropertyProjections.Requests.Queries;
 using Explore.Application.Mappings;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessionCustomPropertyProjections.Handlers.Queries;
 
 public class GetEventSessionCustomPropertyProjectionsForSessionQueryHandler
-    : IRequestHandler<GetEventSessionCustomPropertyProjectionsForSessionQuery, BaseCommandResponse<IReadOnlyList<EventSessionCustomPropertyProjectionDto>>>
+    : IQueryHandler<GetEventSessionCustomPropertyProjectionsForSessionQuery, BaseCommandResponse<IReadOnlyList<EventSessionCustomPropertyProjectionDto>>>
 {
     private readonly IEventSessionCustomPropertyProjectionRepository _projectionRepository;
 
@@ -18,7 +18,7 @@ public class GetEventSessionCustomPropertyProjectionsForSessionQueryHandler
         _projectionRepository = projectionRepository;
     }
 
-    public async Task<BaseCommandResponse<IReadOnlyList<EventSessionCustomPropertyProjectionDto>>> Handle(
+    public async Task<BaseCommandResponse<IReadOnlyList<EventSessionCustomPropertyProjectionDto>>> QueryAsync(
         GetEventSessionCustomPropertyProjectionsForSessionQuery request,
         CancellationToken cancellationToken)
     {

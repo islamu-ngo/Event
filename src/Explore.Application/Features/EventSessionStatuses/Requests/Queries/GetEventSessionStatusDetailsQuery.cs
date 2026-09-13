@@ -1,9 +1,9 @@
 using Explore.Application.DTOs.EventSessionStatus;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventSessionStatuses.Requests.Queries;
 
-public sealed record GetEventSessionStatusDetailsRequest : IRequest<EventSessionStatusDto>
+public sealed record GetEventSessionStatusDetailsQuery : IQuery<EventSessionStatusDto>
 {
     public int Id { get; init; }
 }

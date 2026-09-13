@@ -2,26 +2,26 @@ using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionStatus;
 using Explore.Application.Features.EventSessionStatuses.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventSessionStatuses.Handlers.Queries;
 
-public class GetEventSessionStatusListRequestHandler
-    : IRequestHandler<GetEventSessionStatusListRequest, List<EventSessionStatusListDto>>
+public class GetEventSessionStatusDetailsQueryHandler
+    : IQueryHandler<GetEventSessionStatusDetailsQuery, EventSessionStatusDto>
 {
     private readonly IEventSessionStatusRepository _eventSessionStatusRepository;
 
-    public GetEventSessionStatusListRequestHandler(
+    public GetEventSessionStatusDetailsQueryHandler(
         IEventSessionStatusRepository eventSessionStatusRepository)
     {
         _eventSessionStatusRepository = eventSessionStatusRepository;
     }
 
-    public async Task<List<EventSessionStatusListDto>> Handle(
-        GetEventSessionStatusListRequest request,
+    public async Task<EventSessionStatusDto> QueryAsync(
+        GetEventSessionStatusDetailsQuery query,
         CancellationToken cancellationToken)
     {
-        var statuses = await _eventSessionStatusRepository.GetAll();
-        return statuses.Select(EventSessionStatusMapper.ToListItem).ToList();
+        var status = await _eventSessionStatusRepository.GetById(query.Id);
+        return EventSessionStatusMapper.ToDetail(status)!;
     }
 }

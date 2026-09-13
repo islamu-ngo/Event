@@ -49,7 +49,7 @@ public sealed class EventDayMapperTests
         events.GetById(EventId).Returns(Parent());
         EventDay? saved = null;
         days.Create(Arg.Any<EventDay>()).Returns(call => { var entity = call.Arg<EventDay>(); saved = entity; return entity; });
-        await new CreateEventDayCommandHandler(days, events, Substitute.For<IStorageObjectRepository>()).Handle(new CreateEventDayCommand { EventDayDto = new CreateEventDayDto { EventId = EventId, LocalDate = new DateOnly(2026, 7, 20), Label = "Day one", Description = "", BannerText = "Welcome", IsPublished = true, SortOrder = 4, AllowsDayScopeRegistration = true } }, CancellationToken.None);
+        await new CreateEventDayCommandHandler(days, events, Substitute.For<IStorageObjectRepository>()).ExecuteAsync(new CreateEventDayCommand { EventDayDto = new CreateEventDayDto { EventId = EventId, LocalDate = new DateOnly(2026, 7, 20), Label = "Day one", Description = "", BannerText = "Welcome", IsPublished = true, SortOrder = 4, AllowsDayScopeRegistration = true } }, CancellationToken.None);
         await Assert.That(saved).IsNotNull();
         await Assert.That(saved!.TenantId).IsEqualTo(TenantId);
         await Assert.That(saved.EventId).IsEqualTo(EventId);
@@ -75,11 +75,11 @@ public sealed class EventDayMapperTests
         days.GetByEventAsync(EventId, Arg.Any<CancellationToken>()).Returns([day]);
         var detail = new GetEventDayDetailRequestHandler(events, days);
         var list = new GetEventDaysByEventRequestHandler(events, days);
-        await Assert.That(await detail.Handle(new GetEventDayDetailRequest(DayId), CancellationToken.None)).IsNull();
-        await Assert.That(await list.Handle(new GetEventDaysByEventRequest(EventId), CancellationToken.None)).IsEmpty();
+        await Assert.That(await detail.QueryAsync(new GetEventDayDetailRequest(DayId), CancellationToken.None)).IsNull();
+        await Assert.That(await list.QueryAsync(new GetEventDaysByEventRequest(EventId), CancellationToken.None)).IsEmpty();
         events.IsPubliclyEligibleAsync(TenantId, EventId, Arg.Any<CancellationToken>()).Returns(true);
-        await Assert.That((await detail.Handle(new GetEventDayDetailRequest(DayId), CancellationToken.None))!.Label).IsEqualTo("First");
-        var managed = await new GetManagedEventDaysByEventRequestHandler(days).Handle(new GetManagedEventDaysByEventRequest { EventId = EventId }, CancellationToken.None);
+        await Assert.That((await detail.QueryAsync(new GetEventDayDetailRequest(DayId), CancellationToken.None))!.Label).IsEqualTo("First");
+        var managed = await new GetManagedEventDaysByEventRequestHandler(days).QueryAsync(new GetManagedEventDaysByEventRequest { EventId = EventId }, CancellationToken.None);
         await Assert.That(managed[0].Id).IsEqualTo(DayId);
     }
 

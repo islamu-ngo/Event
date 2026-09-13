@@ -6,6 +6,7 @@ using System.Text.Json.Serialization.Metadata;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.EventAgendaItem;
 using Explore.Application.DTOs.EventCustomProperty;
@@ -57,7 +58,8 @@ public sealed class EventManagementMcpTools(
     ITenantContext tenantContext,
     IResourceAssembler<EventDto, EventListDto> eventResourceAssembler,
     IHttpContextAccessor httpContextAccessor,
-    EventMcpLocationDisclosureGuard locationDisclosureGuard)
+    EventMcpLocationDisclosureGuard locationDisclosureGuard,
+    IQueryHandler<GetManagedEventDaysByEventRequest, List<EventDayListDto>> managedEventDays)
 {
 
     [McpServerTool(
@@ -889,7 +891,7 @@ public sealed class EventManagementMcpTools(
         var sessionGroups = await mediator.Send(
             new GetManagedEventSessionGroupsByEventRequest { EventId = eventDto.Id },
             cancellationToken);
-        var days = await mediator.Send(
+        var days = await managedEventDays.QueryAsync(
             new GetManagedEventDaysByEventRequest { EventId = eventDto.Id },
             cancellationToken);
         var agendaItems = await mediator.Send(

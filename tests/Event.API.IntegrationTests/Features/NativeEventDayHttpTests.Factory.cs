@@ -65,6 +65,8 @@ public sealed partial class NativeEventDayHttpTests
                 tenant.SetTenant(owner.TenantId);
                 var unownedEvent = Parent(outsider, VisibilityTypeEnum.Public);
                 context.Events.Add(unownedEvent);
+                context.EventRoleAssignments.Add(EventRoleAssignment.Create(outsider.TenantId, unownedEvent.Id, outsider.UserId,
+                    (int)RoleEnum.EventOwner, EventRoleAssignmentStatus.Active, DateTime.UtcNow.AddDays(-1), null, outsider.UserId));
                 factory.UnownedEventId = unownedEvent.Id;
                 foreach (var parent in new[] { publicEvent, privateEvent, draftEvent, deletedEvent })
                 {

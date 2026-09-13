@@ -1,6 +1,6 @@
 using Explore.Application.DTOs.EventDay;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventDays.Requests.Queries;
 
-public sealed record GetEventDayDetailRequest(Guid Id) : IRequest<EventDayDto?>;
+public sealed record GetEventDayDetailRequest(Guid Id) : IQuery<EventDayDto?>;

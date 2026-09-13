@@ -7,12 +7,12 @@ using Explore.Application.Features.EventDays.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventDays.Handlers.Commands;
 
-public class UpdateEventDayCommandHandler : IRequestHandler<UpdateEventDayCommand, BaseCommandResponse<Guid>>
+public class UpdateEventDayCommandHandler : ICommandHandler<UpdateEventDayCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventDayRepository _eventDayRepository;
     private readonly IEventRepository _eventRepository;
@@ -31,7 +31,7 @@ public class UpdateEventDayCommandHandler : IRequestHandler<UpdateEventDayComman
         _cache = cache;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateEventDayCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateEventDayCommand request, CancellationToken cancellationToken)
     {
         var validator = new UpdateEventDayDtoValidator(_eventRepository, _eventDayRepository);
         var validationResult = await validator.ValidateAsync(request.EventDayDto, cancellationToken);

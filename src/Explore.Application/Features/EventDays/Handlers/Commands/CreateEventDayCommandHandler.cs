@@ -4,11 +4,11 @@ using Explore.Application.Features.EventDays.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventDays.Handlers.Commands;
 
-public class CreateEventDayCommandHandler : IRequestHandler<CreateEventDayCommand, BaseCommandResponse<Guid>>
+public class CreateEventDayCommandHandler : ICommandHandler<CreateEventDayCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventDayRepository _eventDayRepository;
     private readonly IEventRepository _eventRepository;
@@ -24,7 +24,7 @@ public class CreateEventDayCommandHandler : IRequestHandler<CreateEventDayComman
         _storageObjectRepository = storageObjectRepository;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateEventDayCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateEventDayCommand request, CancellationToken cancellationToken)
     {
         var validator = new CreateEventDayDtoValidator(_eventRepository, _eventDayRepository);
         var validationResult = await validator.ValidateAsync(request.EventDayDto, cancellationToken);

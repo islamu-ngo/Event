@@ -2,6 +2,7 @@ using Explore.API.Hateoas;
 using Explore.API.Mcp;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.LocationPrivacy;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.EventAgendaItem;
@@ -268,8 +269,6 @@ public sealed class EventLocationPrivacyMcpContractTests
                     RoomName = "PRIVATE-MANAGEMENT-ROOM"
                 }
             });
-        mediator.Send(Arg.Any<GetManagedEventDaysByEventRequest>(), Arg.Any<CancellationToken>())
-            .Returns(new List<EventDayListDto>());
         mediator.Send(Arg.Any<GetManagedEventAgendaItemsByEventRequest>(), Arg.Any<CancellationToken>())
             .Returns(new List<EventAgendaItemListDto>());
 
@@ -309,8 +308,12 @@ public sealed class EventLocationPrivacyMcpContractTests
         IResourceAssembler<EventDto, EventListDto>? eventResourceAssembler = null,
         IHttpContextAccessor? httpContextAccessor = null)
     {
+        var days = Substitute.For<IQueryHandler<GetManagedEventDaysByEventRequest, List<EventDayListDto>>>();
+        days.QueryAsync(Arg.Any<GetManagedEventDaysByEventRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new List<EventDayListDto>());
         var dependencies = new Dictionary<Type, object>
         {
+            [typeof(IQueryHandler<GetManagedEventDaysByEventRequest, List<EventDayListDto>>)] = days,
             [typeof(IMediator)] = mediator,
             [typeof(IUserContext)] = Substitute.For<IUserContext>(),
             [typeof(ITenantContext)] = Substitute.For<ITenantContext>(),

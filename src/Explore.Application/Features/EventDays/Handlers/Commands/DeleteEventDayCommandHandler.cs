@@ -2,11 +2,11 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EventDays.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventDays.Handlers.Commands;
 
-public class DeleteEventDayCommandHandler : IRequestHandler<DeleteEventDayCommand, BaseCommandResponse<Guid>>
+public class DeleteEventDayCommandHandler : ICommandHandler<DeleteEventDayCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventDayRepository _eventDayRepository;
     private readonly IEventTicketCatalogRepository _catalogs;
@@ -22,7 +22,7 @@ public class DeleteEventDayCommandHandler : IRequestHandler<DeleteEventDayComman
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(DeleteEventDayCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(DeleteEventDayCommand request, CancellationToken cancellationToken)
     {
         var eventDay = await _eventDayRepository.GetById(request.Id);
         if (eventDay == null)

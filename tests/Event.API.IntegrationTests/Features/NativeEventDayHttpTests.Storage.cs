@@ -10,7 +10,7 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Persistence;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -116,7 +116,8 @@ public sealed partial class NativeEventDayHttpTests
                 [new Claim("sub", OwnerId.ToString())], "Test")) };
             try
             {
-                return await scope.ServiceProvider.GetRequiredService<IMediator>().Send(command, cancellationToken);
+                return await scope.ServiceProvider.GetRequiredService<ICommandHandler<CreateEventDayCommand, BaseCommandResponse<Guid>>>()
+                    .ExecuteAsync(command, cancellationToken);
             }
             finally
             {

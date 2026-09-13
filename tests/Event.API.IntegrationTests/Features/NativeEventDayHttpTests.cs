@@ -2,12 +2,45 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Explore.Domain.Constants;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Contracts.Services;
+using Explore.Application.DTOs.EventDay;
+using Explore.Application.Features.EventDays.Requests.Commands;
+using Explore.Application.Features.EventDays.Requests.Queries;
+using Explore.Application.Operations;
+using Explore.Application.Operations.Decorators;
+using Explore.Application.Responses;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Event.Api.IntegrationTests.Features;
 
 [NotInParallel("ApiTestFixture")]
 public sealed partial class NativeEventDayHttpTests
 {
+    [Test]
+    public async Task NativePorts_AreProtectedAndPreserveNullableDetails()
+    {
+        await using var factory = await DayFactory.CreateAsync();
+        using var scope = factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(PlatformDefaults.DefaultTenantId);
+        await Assert.That(scope.ServiceProvider.GetRequiredService<ICommandHandler<CreateEventDayCommand, BaseCommandResponse<Guid>>>()
+            is AuthorizationCommandHandlerDecorator<CreateEventDayCommand, BaseCommandResponse<Guid>>).IsTrue();
+        await Assert.That(scope.ServiceProvider.GetRequiredService<ICommandHandler<UpdateEventDayCommand, BaseCommandResponse<Guid>>>()
+            is AuthorizationCommandHandlerDecorator<UpdateEventDayCommand, BaseCommandResponse<Guid>>).IsTrue();
+        await Assert.That(scope.ServiceProvider.GetRequiredService<ICommandHandler<DeleteEventDayCommand, BaseCommandResponse<Guid>>>()
+            is AuthorizationCommandHandlerDecorator<DeleteEventDayCommand, BaseCommandResponse<Guid>>).IsTrue();
+        await Assert.That(scope.ServiceProvider.GetRequiredService<IQueryHandler<GetEventDaysByEventRequest, List<EventDayListDto>>>()
+            is AuthorizationQueryHandlerDecorator<GetEventDaysByEventRequest, List<EventDayListDto>>).IsTrue();
+        await Assert.That(scope.ServiceProvider.GetRequiredService<IQueryHandler<GetManagedEventDaysByEventRequest, List<EventDayListDto>>>()
+            is AuthorizationQueryHandlerDecorator<GetManagedEventDaysByEventRequest, List<EventDayListDto>>).IsTrue();
+        var detail = scope.ServiceProvider.GetRequiredService<IQueryHandler<GetEventDayDetailRequest, EventDayDto?>>();
+        await Assert.That(detail is AuthorizationQueryHandlerDecorator<GetEventDayDetailRequest, EventDayDto?>).IsTrue();
+        await Assert.That(await detail.QueryAsync(new(Guid.CreateVersion7()), default)).IsNull();
+        await Assert.That(await detail.QueryAsync(new(factory.ForeignDayId), default)).IsNull();
+        await Assert.That((await detail.QueryAsync(new(factory.PublicDayId), default))!.Id).IsEqualTo(factory.PublicDayId);
+        await factory.Services.ValidateNativeOperationsDeepAsync();
+    }
+
     [Test]
     public async Task PublicAndManagedReads_PreservePublicationTenantAndNullableDetail()
     {
@@ -85,9 +118,13 @@ public sealed partial class NativeEventDayHttpTests
             using var denied = await PatchAsync(owner, id, new { @event = new { eventId = parent } }, $"\"{stamp}\"");
             await ProblemAsync(denied, HttpStatusCode.BadRequest);
         }
-        // Destination authority cannot grant permission over an unauthorized source.
+        // Prove the outsider can write at the destination before attacking another owner's source.
+        using (var destinationCreate = await outsider.PostAsJsonAsync("/api/eventday", new
+            { eventId = factory.UnownedEventId, localDate = "2027-02-15" }))
+            await Assert.That(destinationCreate.StatusCode).IsEqualTo(HttpStatusCode.Created);
         using (var denied = await PatchAsync(outsider, id, new { @event = new { eventId = factory.UnownedEventId } }, $"\"{stamp}\""))
             await ProblemAsync(denied, HttpStatusCode.Forbidden);
+        await Assert.That(JsonElement.DeepEquals(await DetailAsync(owner, id), before)).IsTrue();
         foreach (var hidden in new[] { factory.ForeignDayId, factory.DeletedParentDayId, Guid.CreateVersion7() })
         {
             using var deniedUpdate = await PatchAsync(owner, hidden, new { sortOrder = new { value = 5 } }, $"\"{stamp}\"");

@@ -7,7 +7,7 @@ using Explore.Application.Features.EventDays.Requests.Commands;
 using Explore.Application.Features.EventDays.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -40,17 +40,29 @@ public class EventDayController : EventControllerBase
         "Event day not found",
         "Event day not found.");
 
-    private readonly IMediator _mediator;
-    private readonly ILogger<EventDayController> _logger;
+    private readonly ICommandHandler<CreateEventDayCommand, BaseCommandResponse<Guid>> _create;
+    private readonly ICommandHandler<UpdateEventDayCommand, BaseCommandResponse<Guid>> _update;
+    private readonly ICommandHandler<DeleteEventDayCommand, BaseCommandResponse<Guid>> _delete;
+    private readonly IQueryHandler<GetEventDaysByEventRequest, List<EventDayListDto>> _byEvent;
+    private readonly IQueryHandler<GetManagedEventDaysByEventRequest, List<EventDayListDto>> _managedByEvent;
+    private readonly IQueryHandler<GetEventDayDetailRequest, EventDayDto?> _detail;
     private readonly IResourceAssembler<EventDayDto, EventDayListDto> _resourceAssembler;
 
     public EventDayController(
-        IMediator mediator,
-        ILogger<EventDayController> logger,
+        ICommandHandler<CreateEventDayCommand, BaseCommandResponse<Guid>> create,
+        ICommandHandler<UpdateEventDayCommand, BaseCommandResponse<Guid>> update,
+        ICommandHandler<DeleteEventDayCommand, BaseCommandResponse<Guid>> delete,
+        IQueryHandler<GetEventDaysByEventRequest, List<EventDayListDto>> byEvent,
+        IQueryHandler<GetManagedEventDaysByEventRequest, List<EventDayListDto>> managedByEvent,
+        IQueryHandler<GetEventDayDetailRequest, EventDayDto?> detail,
         IResourceAssembler<EventDayDto, EventDayListDto> resourceAssembler)
     {
-        _mediator = mediator;
-        _logger = logger;
+        _create = create;
+        _update = update;
+        _delete = delete;
+        _byEvent = byEvent;
+        _managedByEvent = managedByEvent;
+        _detail = detail;
         _resourceAssembler = resourceAssembler;
     }
 
@@ -66,7 +78,7 @@ public class EventDayController : EventControllerBase
     [OutputCache(PolicyName = "ListData")]
     public async Task<ActionResult<HalCollectionResource<EventDayListDto>>> GetByEvent(Guid eventId, CancellationToken cancellationToken = default)
     {
-        var days = await _mediator.Send(new GetEventDaysByEventRequest(eventId), cancellationToken);
+        var days = await _byEvent.QueryAsync(new GetEventDaysByEventRequest(eventId), cancellationToken);
 
         var halResource = await _resourceAssembler.ToCollectionResource(
             days,
@@ -92,7 +104,7 @@ public class EventDayController : EventControllerBase
         Guid eventId,
         CancellationToken cancellationToken = default)
     {
-        var days = await _mediator.Send(
+        var days = await _managedByEvent.QueryAsync(
             new GetManagedEventDaysByEventRequest { EventId = eventId },
             cancellationToken);
 
@@ -118,7 +130,7 @@ public class EventDayController : EventControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<HalResource<EventDayDto>>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var day = await _mediator.Send(new GetEventDayDetailRequest(id), cancellationToken);
+        var day = await _detail.QueryAsync(new GetEventDayDetailRequest(id), cancellationToken);
         if (day == null)
             return this.ToNotFoundProblem(EventDayNotFoundProblem);
 
@@ -141,7 +153,7 @@ public class EventDayController : EventControllerBase
     public async Task<ActionResult<BaseCommandResponse<Guid>>> Create([FromBody] CreateEventDayDto eventDay, CancellationToken cancellationToken = default)
     {
         var command = new CreateEventDayCommand { EventDayDto = eventDay };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _create.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -188,7 +200,7 @@ public class EventDayController : EventControllerBase
             ExpectedConcurrencyStamp = expectedConcurrencyStamp,
             EventDayDto = eventDay
         };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _update.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -215,7 +227,7 @@ public class EventDayController : EventControllerBase
     public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
         var command = new DeleteEventDayCommand { Id = id };
-        BaseCommandResponse<Guid> response = await _mediator.Send(command, cancellationToken);
+        BaseCommandResponse<Guid> response = await _delete.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {

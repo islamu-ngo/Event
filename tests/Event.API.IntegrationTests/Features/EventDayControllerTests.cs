@@ -9,12 +9,11 @@ using Explore.Application.Features.EventDays.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Models.Common;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
-using Microsoft.Extensions.Logging;
 using NSubstitute;
 
 namespace Event.Api.IntegrationTests.Features;
@@ -76,15 +75,19 @@ public class EventDayControllerTests
     public async Task Delete_WhenPublishedTicketReferencesDay_ReturnsConflict()
     {
         Guid id = Guid.CreateVersion7();
-        IMediator mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<DeleteEventDayCommand>(), Arg.Any<CancellationToken>()).Returns(
+        var delete = Substitute.For<ICommandHandler<DeleteEventDayCommand, BaseCommandResponse<Guid>>>();
+        delete.ExecuteAsync(Arg.Any<DeleteEventDayCommand>(), Arg.Any<CancellationToken>()).Returns(
             BaseCommandResponse.Failure<Guid>(
                 "event_day_ticket_entitlement_conflict",
                 "Event day is referenced by a published ticket catalog.",
                 id: id));
         var controller = new EventDayController(
-            mediator,
-            Substitute.For<ILogger<EventDayController>>(),
+            Substitute.For<ICommandHandler<CreateEventDayCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<UpdateEventDayCommand, BaseCommandResponse<Guid>>>(),
+            delete,
+            Substitute.For<IQueryHandler<GetEventDaysByEventRequest, List<EventDayListDto>>>(),
+            Substitute.For<IQueryHandler<GetManagedEventDaysByEventRequest, List<EventDayListDto>>>(),
+            Substitute.For<IQueryHandler<GetEventDayDetailRequest, EventDayDto?>>(),
             Substitute.For<IResourceAssembler<EventDayDto, EventDayListDto>>())
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }

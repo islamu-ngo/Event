@@ -1,7 +1,9 @@
 # EventDays authorization and operation boundary
 
-> **Status:** Implemented parent-authority prerequisite; native dispatch follows separately.
+> **Status:** Implemented EventDays native operation slice.
 > **Source anchors:** `EventDayAuthorizationContextEnricher`, `UpdateEventDayDtoValidator`, `EventDayRepository`, `EventDayController`.
+
+All six operations use exact native CQS ports: three `ICommandHandler<..., BaseCommandResponse<Guid>>` writes, public and managed by-event `IQueryHandler<..., List<EventDayListDto>>` reads, and nullable detail `IQueryHandler<..., EventDayDto?>`. `EventDayController` injects these closed interfaces directly; Application scanning composes authorization outside performance timing outside each business handler. MCP's program-management context injects the same protected managed-days query port while retaining its existing HAL gate and location-disclosure ceiling. The existing typed enrichers remain registered against the same request types. No dispatcher or compatibility overload remains in the feature.
 
 Three write requests retain their exact EventDay create/update/delete capability metadata. A feature-owned typed enricher supplies `EventScopedAuthorizationFacts` from entity repositories, verifies both day and parent against the current tenant, and rejects deleted or missing contexts before the existing authorization provider evaluates the capability. Current identity and tenant never originate in the body. Public and managed queries retain their existing separate authorization and publication semantics. No shared policy grants change.
 

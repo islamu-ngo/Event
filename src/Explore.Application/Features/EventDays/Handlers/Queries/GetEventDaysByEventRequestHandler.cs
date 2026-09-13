@@ -2,12 +2,12 @@ using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventDay;
 using Explore.Application.Features.EventDays.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventDays.Handlers.Queries;
 
 public class GetEventDaysByEventRequestHandler :
-    IRequestHandler<GetEventDaysByEventRequest, List<EventDayListDto>>
+    IQueryHandler<GetEventDaysByEventRequest, List<EventDayListDto>>
 {
     private readonly IEventRepository _eventRepository;
     private readonly IEventDayRepository _eventDayRepository;
@@ -20,7 +20,7 @@ public class GetEventDaysByEventRequestHandler :
         _eventDayRepository = eventDayRepository;
     }
 
-    public async Task<List<EventDayListDto>> Handle(GetEventDaysByEventRequest request, CancellationToken cancellationToken)
+    public async Task<List<EventDayListDto>> QueryAsync(GetEventDaysByEventRequest request, CancellationToken cancellationToken)
     {
         var parentEvent = await _eventRepository.GetById(request.EventId);
         if (parentEvent is null || !await _eventRepository.IsPubliclyEligibleAsync(
@@ -37,9 +37,9 @@ public class GetEventDaysByEventRequestHandler :
 
 public sealed class GetManagedEventDaysByEventRequestHandler(
     IEventDayRepository eventDayRepository)
-    : IRequestHandler<GetManagedEventDaysByEventRequest, List<EventDayListDto>>
+    : IQueryHandler<GetManagedEventDaysByEventRequest, List<EventDayListDto>>
 {
-    public async Task<List<EventDayListDto>> Handle(
+    public async Task<List<EventDayListDto>> QueryAsync(
         GetManagedEventDaysByEventRequest request,
         CancellationToken cancellationToken)
     {

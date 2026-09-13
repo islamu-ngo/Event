@@ -1,10 +1,10 @@
 using Explore.Application.DTOs.Integrations;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Integrations.Listmonk.Requests.Commands;
 
-public sealed record UpdateListmonkIntegrationSettingsCommand : IRequest<BaseCommandResponse<Guid>>
+public sealed record UpdateListmonkIntegrationSettingsCommand : ICommand<BaseCommandResponse<Guid>>
 {
     public UpdateListmonkIntegrationSettingsDto Dto { get; init; } = new();
 }

@@ -1,9 +1,9 @@
 using Explore.Application.DTOs.Integrations;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Integrations.Listmonk.Requests.Commands;
 
 public sealed record ResolveIntegrationSyncAmbiguityCommand(
     Guid OutboxId,
-    ResolveIntegrationSyncAmbiguityDto Resolution) : IRequest<BaseCommandResponse<Guid>>;
+    ResolveIntegrationSyncAmbiguityDto Resolution) : ICommand<BaseCommandResponse<Guid>>;

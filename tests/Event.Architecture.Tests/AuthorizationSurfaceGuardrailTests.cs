@@ -194,7 +194,7 @@ public sealed class AuthorizationSurfaceGuardrailTests
         "Explore.Application.Features.InstanceOnboarding.Requests.Commands.VerifyCerbosEndpointCommand",
         "Explore.Application.Features.InstanceOnboarding.Requests.Queries.GetActiveTenantCountQuery",
         "Explore.Application.Features.InstanceOnboarding.Requests.Queries.RunKeycloakRealmDoctorQuery",
-        "Explore.Application.Features.Integrations.Listmonk.Requests.Commands.TestListmonkConnectionCommand",
+        "Explore.Application.Features.Integrations.Listmonk.Requests.Queries.TestListmonkConnectionQuery",
         "Explore.Application.Features.Integrations.Listmonk.Requests.Commands.UpdateListmonkIntegrationSettingsCommand",
         "Explore.Application.Features.Localization.Requests.Commands.ExportFromTmsCommand",
         "Explore.Application.Features.Localization.Requests.Commands.ImportLocalizationBundleCommand",

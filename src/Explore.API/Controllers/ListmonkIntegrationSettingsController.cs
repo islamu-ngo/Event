@@ -6,7 +6,7 @@ using Explore.Application.DTOs.Integrations;
 using Explore.Application.Features.Integrations.Listmonk.Requests.Commands;
 using Explore.Application.Features.Integrations.Listmonk.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -16,7 +16,11 @@ namespace Explore.API.Controllers;
 [ApiVersion("0.1")]
 [Route("api/integrations/listmonk")]
 [ApiController]
-public sealed class ListmonkIntegrationSettingsController(IMediator mediator) : ControllerBase
+public sealed class ListmonkIntegrationSettingsController(
+    IQueryHandler<GetListmonkIntegrationSettingsQuery, ListmonkIntegrationSettingsDto> settingsQuery,
+    IQueryHandler<TestListmonkConnectionQuery, BaseCommandResponse<Guid>> connectionQuery,
+    ICommandHandler<UpdateListmonkIntegrationSettingsCommand, BaseCommandResponse<Guid>> updateSettings,
+    ICommandHandler<ResolveIntegrationSyncAmbiguityCommand, BaseCommandResponse<Guid>> resolveAmbiguity) : ControllerBase
 {
     private static readonly ApiValidationProblemDescriptor SettingsValidationProblem = new(
         "listmonkIntegrationSettings",
@@ -42,7 +46,7 @@ public sealed class ListmonkIntegrationSettingsController(IMediator mediator) : 
     public async Task<ActionResult<ListmonkIntegrationSettingsDto>> GetSettings(
         CancellationToken cancellationToken = default)
     {
-        var result = await mediator.Send(new GetListmonkIntegrationSettingsQuery(), cancellationToken);
+        var result = await settingsQuery.QueryAsync(new GetListmonkIntegrationSettingsQuery(), cancellationToken);
         return Ok(result);
     }
 
@@ -58,7 +62,7 @@ public sealed class ListmonkIntegrationSettingsController(IMediator mediator) : 
         [FromBody] UpdateListmonkIntegrationSettingsDto dto,
         CancellationToken cancellationToken = default)
     {
-        var result = await mediator.Send(new UpdateListmonkIntegrationSettingsCommand { Dto = dto }, cancellationToken);
+        var result = await updateSettings.ExecuteAsync(new UpdateListmonkIntegrationSettingsCommand { Dto = dto }, cancellationToken);
         if (result.IsSuccess)
             return Ok(result);
 
@@ -76,7 +80,7 @@ public sealed class ListmonkIntegrationSettingsController(IMediator mediator) : 
     public async Task<ActionResult<BaseCommandResponse<Guid>>> TestConnection(
         CancellationToken cancellationToken = default)
     {
-        var result = await mediator.Send(new TestListmonkConnectionCommand(), cancellationToken);
+        var result = await connectionQuery.QueryAsync(new TestListmonkConnectionQuery(), cancellationToken);
         if (result.IsSuccess)
             return Ok(result);
 
@@ -95,7 +99,7 @@ public sealed class ListmonkIntegrationSettingsController(IMediator mediator) : 
         [FromBody] ResolveIntegrationSyncAmbiguityDto dto,
         CancellationToken cancellationToken = default)
     {
-        BaseCommandResponse<Guid> result = await mediator.Send(
+        BaseCommandResponse<Guid> result = await resolveAmbiguity.ExecuteAsync(
             new ResolveIntegrationSyncAmbiguityCommand(outboxId, dto),
             cancellationToken);
         return result.IsSuccess ? Ok(result) : this.ToCommandValidationProblem(result, RecoveryValidationProblem);

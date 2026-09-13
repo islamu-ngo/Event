@@ -9,7 +9,7 @@ using Explore.Application.Notifications;
 using Explore.Application.Responses;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Integrations.Listmonk.Handlers.Commands;
 
@@ -19,9 +19,9 @@ public sealed class UpdateListmonkIntegrationSettingsCommandHandler(
     ITenantContext tenantContext,
     ICurrentUserService currentUserService,
     IEnumerable<Contracts.Operations.INotificationHandler<SettingChangedNotification>> notificationHandlers)
-    : IRequestHandler<UpdateListmonkIntegrationSettingsCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateListmonkIntegrationSettingsCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UpdateListmonkIntegrationSettingsCommand request,
         CancellationToken cancellationToken)
     {

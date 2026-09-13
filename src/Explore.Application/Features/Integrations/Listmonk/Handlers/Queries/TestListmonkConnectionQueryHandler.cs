@@ -1,15 +1,15 @@
 using Explore.Application.Contracts.Infrastructure;
-using Explore.Application.Features.Integrations.Listmonk.Requests.Commands;
+using Explore.Application.Features.Integrations.Listmonk.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
-namespace Explore.Application.Features.Integrations.Listmonk.Handlers.Commands;
+namespace Explore.Application.Features.Integrations.Listmonk.Handlers.Queries;
 
-public sealed class TestListmonkConnectionCommandHandler(IListmonkConnectionTester connectionTester)
-    : IRequestHandler<TestListmonkConnectionCommand, BaseCommandResponse<Guid>>
+public sealed class TestListmonkConnectionQueryHandler(IListmonkConnectionTester connectionTester)
+    : IQueryHandler<TestListmonkConnectionQuery, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
-        TestListmonkConnectionCommand request,
+    public async Task<BaseCommandResponse<Guid>> QueryAsync(
+        TestListmonkConnectionQuery request,
         CancellationToken cancellationToken)
     {
         var connected = await connectionTester.TestConnectionAsync(cancellationToken);

@@ -279,7 +279,7 @@ Storage object metadata and general download routes are authenticated, resource-
 
 EmailDispatch admin routes live under `/api/admin/email-dispatch` and are authenticated operator APIs for Basic Dispatch Mode. They expose tenant-scoped delivery state and controls without exposing recipient email, subject, body, provider message ids, or raw provider errors.
 
-- `GET /api/admin/email-dispatch/status` requires a tenant id query value and authorizes `islamuevent_email_dispatch:view`.
+- `GET /api/admin/email-dispatch/status` requires a tenant id query value and authorizes `islamuevent_email_dispatch:view`. Its `limit` defaults to 50 and accepts 1 through 200. `EmailDispatchAdminController.GetStatus` passes cancellation to the native query and awaits `IResourceAssembler.ToCollectionResource` before constructing `Ok`, including asynchronous link authorization. The success body is the declared `HalCollectionResource<EmailDispatchStatusDto>`: root `_links` and `_embedded.items`, with sanitized rows and permission-filtered item links. It never serializes a Task or a `result` envelope. This repairs runtime conformance to the existing OpenAPI response; route names, schemas and generated clients are unchanged.
 - `PUT /api/admin/email-dispatch/tenants/{tenantId}/pause` and `DELETE /api/admin/email-dispatch/tenants/{tenantId}/pause` authorize `islamuevent_email_dispatch:manage_tenant`.
 - `PUT /api/admin/email-dispatch/tenants/{tenantId}/outbox/{outboxId}/park` authorizes `islamuevent_email_dispatch:park`.
 - `POST /api/admin/email-dispatch/tenants/{tenantId}/outbox/{outboxId}/replay` authorizes `islamuevent_email_dispatch:replay`.

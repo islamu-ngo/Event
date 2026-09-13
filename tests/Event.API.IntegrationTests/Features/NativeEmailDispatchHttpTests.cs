@@ -110,9 +110,9 @@ public sealed partial class NativeEmailDispatchHttpTests
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         string json = await response.Content.ReadAsStringAsync();
         using var document = JsonDocument.Parse(json);
-        // The existing status action serializes the assembler Task as a result envelope.
-        // This dispatch-only migration preserves that wire shape.
-        var items = document.RootElement.GetProperty("result").GetProperty("_embedded").GetProperty("items");
+        await Assert.That(document.RootElement.TryGetProperty("result", out _)).IsFalse();
+        await Assert.That(document.RootElement.GetProperty("_links").TryGetProperty("self", out _)).IsTrue();
+        var items = document.RootElement.GetProperty("_embedded").GetProperty("items");
         await Assert.That(items.GetArrayLength()).IsEqualTo(1);
         await Assert.That(items[0].GetProperty("tenantId").GetGuid()).IsEqualTo(PlatformDefaults.DefaultTenantId);
         await Assert.That(items[0].GetProperty("_links").TryGetProperty("replay", out _)).IsTrue();

@@ -90,7 +90,7 @@ public sealed class EmailDispatchAdminController : EventControllerBase
                 result.Errors);
         }
 
-        var resource = _statusAssembler.ToCollectionResource(
+        var resource = await _statusAssembler.ToCollectionResource(
             result.Id ?? [],
             RouteNames.GetEmailDispatchStatus,
             new { tenantId = query.TenantId, limit = query.Limit },

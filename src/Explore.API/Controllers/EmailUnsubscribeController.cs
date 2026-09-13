@@ -2,10 +2,11 @@ using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.Extensions;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EmailUnsubscribe;
 using Explore.Application.Features.EmailUnsubscribe.Requests.Commands;
-using MediatR;
+using Explore.Application.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -18,7 +19,7 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Public)]
 public sealed class EmailUnsubscribeController(
     IEmailUnsubscribeTokenService tokenService,
-    IMediator mediator,
+    ICommandHandler<UnsubscribeFromEmailCategoryCommand, BaseCommandResponse<Guid>> unsubscribeCommand,
     ILogger<EmailUnsubscribeController> logger) : EventControllerBase
 {
     [HttpGet(Name = RouteNames.GetEmailUnsubscribe)]
@@ -56,7 +57,7 @@ public sealed class EmailUnsubscribeController(
 
         if (validation.IsValid && validation.Payload is not null)
         {
-            await mediator.Send(new UnsubscribeFromEmailCategoryCommand
+            await unsubscribeCommand.ExecuteAsync(new UnsubscribeFromEmailCategoryCommand
             {
                 TenantId = validation.Payload.TenantId,
                 UserId = validation.Payload.UserId,

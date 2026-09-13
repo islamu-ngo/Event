@@ -27,8 +27,20 @@ Each property definition enforces strict access and privacy controls:
 ## Lifecycle: Retirement vs. Hard Purge
 
 1. **Normal Deletion (Retirement)**: Soft-deletes the field definition. Existing event registrations preserve their historical answers for auditability and financial reporting, but no new events can select the retired question.
-2. **Hard Purge**: An audited, administrator-confirmed operation that permanently deletes field definitions and scrubs all collected answers from database storage (see [Privacy Erasure & GDPR Compliance](../security-and-identity/privacy-erasure.md)).
+2. **Hard Purge**: An audited administrator operation that permanently deletes only dependency-free definitions and their options. Historical answers, audit references and other blocking dependencies prevent definition purge; account-data erasure is a separate workflow (see [Privacy Erasure & GDPR Compliance](../security-and-identity/privacy-erasure.md)).
 3. **Template Immutability**: Editing a registration template never retroactively alters published events or past tickets.
+
+---
+
+## Shared Organization and Group Definition Lists
+
+Shared definition lists are isolated by the server-resolved tenant, including cached pages. A tenant cannot select another tenant's cached definitions by supplying an ID in the request body or query string.
+
+After a successful create, update, retirement or dependency-free purge, subsequent list reads refresh all affected page sizes and page numbers. Moving a definition between Organization and Group refreshes both lists. Other tenants keep their own cached lists. A failed or rolled-back mutation leaves the committed lists unchanged; no cache-expiry wait is required.
+
+Shared-definition purge remains an audited administrator action: historical values, audit references and other blocking dependencies prevent purge. It does not erase referenced historical answers as part of this cache repair.
+
+When upgrading, replace every older API instance before considering the tenant-isolation fix deployed. Updated instances never read the previous unscoped cache keys; no database migration or manual all-tenant cache flush is needed. If a request fails after the database commit, reload the definition before retrying: a cache-service error does not roll back a committed change.
 
 ---
 

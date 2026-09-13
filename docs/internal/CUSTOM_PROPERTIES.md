@@ -325,6 +325,18 @@ Template-sync retirement is not a hard purge. Retiring a template-derived
 definition or option deactivates the runtime row, clears defaults when needed,
 and preserves historical value rows and provenance for supportability.
 
+### Shared Definition List Cache Isolation And Commit Boundary
+
+`GetCustomPropertyDefinitionListRequestHandler` keys HybridCache entries by trusted ambient `ITenantContext.TenantId`, entity type and normalized page number/page size. The tenant-namespaced key deliberately does not reuse the former tenantless key. Every entry carries the existing `CacheTags` convention's tenant-list tag and tenant/entity-scope tag. Request-body tenant values never select the cache partition.
+
+Create and delete invalidate the persisted definition's tenant/entity-scope tag after their owning `IUnitOfWork` transaction commits. Update invalidates both previous and current entity scopes after either its metadata-only or options transaction commits. Purge commits physical deletion and its audit together, then invalidates the persisted dependency summary's tenant-list tag; that summary deliberately has no entity-type field and also supports already-retired definitions. This conservative purge invalidation stays inside one tenant. Detail queries remain uncached, so no synthetic detail-key invalidation is needed.
+
+Delete now owns an explicit unit-of-work transaction rather than relying on an implicit `SaveChanges` transaction. The shared unit of work rejects nested transactions and rolls back failed commits, preventing an outer caller from rolling back a write after its handler has already invalidated caches. The only production dispatcher for these six operations remains `CustomPropertyDefinitionController`; the update authorization enricher and its explicit registration remain required and unchanged. This repair does not convert the MediatR contracts to native operations.
+
+Post-commit tag invalidation uses `CancellationToken.None`: disconnecting or cancelling the initiating request after commit must not skip coherence work. Validation failures, missing rows, dependency-blocked purge and failed commits do not invalidate. An invalidation exception is not swallowed and does not undo the database commit; callers must reload before retrying. This uses HybridCache's tag semantics, not custom locks, generation counters, a TTL workaround or all-tenant flushing.
+
+`CustomPropertyDefinitionPrerequisiteTests` uses the real API host, local persisted role grants, real handlers/repositories and a shared HybridCache over disposable SQLite. It verifies cross-tenant HTTP non-disclosure, nondefault pages across create, both update paths, delete and purge, retained option identities, rollback/audit consistency, independent foreign cache hits, a signal-coordinated pending commit and cancellation immediately after commit. Deployment must replace older API hosts: the new partition prevents reuse of old unscoped entries but cannot repair requests still handled by old binaries.
+
 ## Template Provenance And Versioning
 
 Supportability requires stronger provenance than just template identity.

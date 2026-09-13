@@ -1,3 +1,4 @@
+using Explore.Application.Caching;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -6,7 +7,6 @@ using Explore.Application.Features.CustomPropertyDefinitions.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
-using Explore.Domain.Enums;
 using Explore.Domain.Settings.Definitions;
 using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
@@ -153,7 +153,9 @@ public class CreateCustomPropertyDefinitionCommandHandler : IRequestHandler<Crea
             ct => _customPropertyDefinitionRepository.CreateWithOptions(definition, options, defaultOption?.Id, ct),
             cancellationToken);
 
-        await _cache.RemoveAsync(GetListCacheKey(request.DefinitionDto.EntityTypeName, 1, PaginatedResult<object>.DefaultPageSize), cancellationToken);
+        await _cache.RemoveByTagAsync(
+            CacheTags.CustomPropertyDefinitionListsByScope(definition.TenantId, definition.EntityTypeName),
+            CancellationToken.None);
 
         return BaseCommandResponse.Success(definition.Id, "Custom-property definition created successfully.");
     }
@@ -179,8 +181,4 @@ public class CreateCustomPropertyDefinitionCommandHandler : IRequestHandler<Crea
             .ToList();
     }
 
-    private static string GetListCacheKey(EntityTypeName entityTypeName, int pageNumber, int pageSize)
-    {
-        return $"custom-property-definitions:list:{entityTypeName}:{pageNumber}:{pageSize}";
-    }
 }

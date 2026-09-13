@@ -1,3 +1,4 @@
+using Explore.Application.Caching;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.CustomPropertyDefinition;
@@ -97,7 +98,9 @@ public sealed class PurgeCustomPropertyDefinitionCommandHandler : IRequestHandle
 
         if (purged)
         {
-            await _cache.RemoveAsync($"custom-property-definitions:detail:{request.Id}", cancellationToken);
+            await _cache.RemoveByTagAsync(
+                CacheTags.CustomPropertyDefinitionListsByTenant(summary.TenantId),
+                CancellationToken.None);
             return BaseCommandResponse.Success(result, "Custom-property definition purged successfully.");
         }
 

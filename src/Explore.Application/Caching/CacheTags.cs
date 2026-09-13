@@ -1,3 +1,5 @@
+using Explore.Domain.Enums;
+
 namespace Explore.Application.Caching;
 
 public static class CacheTags
@@ -15,6 +17,10 @@ public static class CacheTags
     public const string Organizations = "organizations";
     public const string OrganizationLists = "organizations:list";
     public const string OrganizationDetails = "organizations:detail";
+
+    public static string CustomPropertyDefinitionListsByTenant(Guid tenantId) => $"custom-property-definitions:list:tenant:{tenantId:N}";
+    public static string CustomPropertyDefinitionListsByScope(Guid tenantId, EntityTypeName entityTypeName) =>
+        $"custom-property-definitions:list:tenant:{tenantId:N}:scope:{entityTypeName}";
 
     public static string Event(Guid eventId) => $"event:{eventId}";
     public static string EventListByTenant(Guid tenantId) => $"events:list:tenant:{tenantId:N}";

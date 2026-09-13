@@ -1,3 +1,4 @@
+using Explore.Application.Caching;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
@@ -212,7 +213,7 @@ public class UpdateCustomPropertyDefinitionCommandHandler : IRequestHandler<Upda
                 cancellationToken);
         }
 
-        await InvalidateCaches(previousEntityTypeName, definition.EntityTypeName, definition.Id, cancellationToken);
+        await InvalidateCaches(definition.TenantId, previousEntityTypeName, definition.EntityTypeName);
 
         return BaseCommandResponse.Success(definition.Id, "Custom-property definition updated successfully.");
     }
@@ -270,17 +271,18 @@ public class UpdateCustomPropertyDefinitionCommandHandler : IRequestHandler<Upda
     }
 
     private async Task InvalidateCaches(
+        Guid tenantId,
         EntityTypeName previousEntityTypeName,
-        EntityTypeName currentEntityTypeName,
-        Guid definitionId,
-        CancellationToken cancellationToken)
+        EntityTypeName currentEntityTypeName)
     {
-        await _cache.RemoveAsync($"custom-property-definitions:list:{previousEntityTypeName}:1:{PaginatedResult<CustomPropertyDefinitionListDto>.DefaultPageSize}", cancellationToken);
+        await _cache.RemoveByTagAsync(
+            CacheTags.CustomPropertyDefinitionListsByScope(tenantId, previousEntityTypeName),
+            CancellationToken.None);
         if (currentEntityTypeName != previousEntityTypeName)
         {
-            await _cache.RemoveAsync($"custom-property-definitions:list:{currentEntityTypeName}:1:{PaginatedResult<CustomPropertyDefinitionListDto>.DefaultPageSize}", cancellationToken);
+            await _cache.RemoveByTagAsync(
+                CacheTags.CustomPropertyDefinitionListsByScope(tenantId, currentEntityTypeName),
+                CancellationToken.None);
         }
-
-        await _cache.RemoveAsync($"custom-property-definitions:detail:{definitionId}", cancellationToken);
     }
 }

@@ -1,3 +1,5 @@
+using Explore.Application.Caching;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.CustomPropertyDefinition;
@@ -13,19 +15,23 @@ public class GetCustomPropertyDefinitionListRequestHandler : IRequestHandler<Get
 {
     private readonly ICustomPropertyDefinitionRepository _customPropertyDefinitionRepository;
     private readonly HybridCache _cache;
+    private readonly ITenantContext _tenantContext;
 
     public GetCustomPropertyDefinitionListRequestHandler(
         ICustomPropertyDefinitionRepository customPropertyDefinitionRepository,
-        HybridCache cache)
+        HybridCache cache,
+        ITenantContext tenantContext)
     {
         _customPropertyDefinitionRepository = customPropertyDefinitionRepository;
         _cache = cache;
+        _tenantContext = tenantContext;
     }
 
     public async Task<PaginatedResult<CustomPropertyDefinitionListDto>> Handle(GetCustomPropertyDefinitionListRequest request, CancellationToken cancellationToken)
     {
         var (pageNumber, pageSize) = PaginatedResult<CustomPropertyDefinitionListDto>.NormalizeParameters(request.PageNumber, request.PageSize);
-        var cacheKey = GetCacheKey(request.EntityTypeName, pageNumber, pageSize);
+        var tenantId = _tenantContext.TenantId;
+        var cacheKey = GetCacheKey(tenantId, request.EntityTypeName, pageNumber, pageSize);
 
         return await _cache.GetOrCreateAsync(
             cacheKey,
@@ -43,11 +49,16 @@ public class GetCustomPropertyDefinitionListRequestHandler : IRequestHandler<Get
                 Expiration = TimeSpan.FromMinutes(5),
                 LocalCacheExpiration = TimeSpan.FromMinutes(1)
             },
+            tags:
+            [
+                CacheTags.CustomPropertyDefinitionListsByTenant(tenantId),
+                CacheTags.CustomPropertyDefinitionListsByScope(tenantId, request.EntityTypeName)
+            ],
             cancellationToken: cancellationToken);
     }
 
-    private static string GetCacheKey(EntityTypeName entityTypeName, int pageNumber, int pageSize)
+    private static string GetCacheKey(Guid tenantId, EntityTypeName entityTypeName, int pageNumber, int pageSize)
     {
-        return $"custom-property-definitions:list:{entityTypeName}:{pageNumber}:{pageSize}";
+        return $"custom-property-definitions:list:tenant:{tenantId:N}:{entityTypeName}:{pageNumber}:{pageSize}";
     }
 }

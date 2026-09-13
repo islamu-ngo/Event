@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using Explore.Application.DTOs.EventTags;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventTags.Requests.Queries;
 
-public sealed record GetEventTagsListRequest : IRequest<List<EventTagsListDto>>
+public sealed record GetEventTagsListRequest : IQuery<List<EventTagsListDto>>
 {
 }

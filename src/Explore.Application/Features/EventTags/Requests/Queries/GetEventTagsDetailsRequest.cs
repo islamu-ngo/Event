@@ -1,7 +1,7 @@
 using System;
 using Explore.Application.DTOs.EventTags;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventTags.Requests.Queries;
 
-public sealed record GetEventTagsDetailsRequest(Guid Id = default) : IRequest<EventTagsDto>;
+public sealed record GetEventTagsDetailsRequest(Guid Id = default) : IQuery<EventTagsDto>;

@@ -124,6 +124,36 @@ This changes neither category-definition administration nor EventTags policy,
 and adds no HTTP endpoint, schema migration, policy grant, or configuration.
 See the [operator guide](../public/documentation/readme/security-and-identity/authorization.md#event-category-assignment-permissions).
 
+### Event Tag Assignment Authority
+
+All seven EventTags operations use protected scoped native command/query ports.
+The scoped `DeleteEventTagsAuthorizationContextEnricher` resolves the tenant-visible
+assignment's persisted parent before the shared resolver evaluates `Event:update`.
+An assignment ID is not an event ID. Missing or tenant-invisible assignments fail
+closed before the provider, just as they do for the existing update enricher.
+Request-supplied `EventId` and `TenantId` do not replace persisted source authority.
+
+For relocation, `UpdateEventTagsCommandHandler` resolves persisted destination
+facts and requires the same `Event:update` capability on the destination before
+changing either the event or tag field. Source permission alone is insufficient,
+even within one tenant. Denial and provider unavailability retain distinct
+`AuthorizationException` and `AuthorizationProviderUnavailableException` outcomes;
+neither changes tracked or fresh assignment state, concurrency stamps, or caches.
+Successful updates retain source/destination detail and tenant-list cache eviction.
+Manual validators, entity repositories, grouped update semantics, immutable mapping
+snapshots, tenant filters, composite foreign keys and uniqueness remain unchanged.
+
+`NativeEventTagsOperationTests` reproduces the legacy owner-delete denial and
+source-only relocation defect, then exercises production-registered native ports
+with real Local RBAC and a controlled external-provider boundary. In-memory and
+SQLite lanes cover both-authorized relocation, missing/foreign assignments,
+source/destination denial and outage, unchanged tracked/fresh state and relational
+constraints. There is no new API, policy grant, schema or configuration. This does
+not add atomic revocation/mutation fencing or cancellation inside the existing
+tokenless repositories; validators, cache operations and the new provider check
+receive the supplied token. Live Cerbos transport is outside this cohort's tests.
+See the [operator guide](../public/documentation/readme/security-and-identity/authorization.md#event-tag-assignment-permissions).
+
 ### Reviewed Handler And Worker Authorities
 
 Not every authority is a resource role or an ordinary login. The exact reasoned

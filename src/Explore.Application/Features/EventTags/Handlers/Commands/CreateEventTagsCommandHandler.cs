@@ -7,11 +7,11 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventTags.Validators;
 using Explore.Application.Features.EventTags.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventTags.Handlers.Commands;
 
-public class CreateEventTagsCommandHandler : IRequestHandler<CreateEventTagsCommand, BaseCommandResponse<Guid>>
+public class CreateEventTagsCommandHandler : ICommandHandler<CreateEventTagsCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventTagsRepository _eventTagsRepository;
     private readonly IEventRepository _eventRepository;
@@ -30,7 +30,7 @@ public class CreateEventTagsCommandHandler : IRequestHandler<CreateEventTagsComm
         _tenantContext = tenantContext;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateEventTagsCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateEventTagsCommand request, CancellationToken cancellationToken)
     {
         var validator = new CreateEventTagsDtoValidator(_eventRepository, _tagRepository, _eventTagsRepository);
         var validationResult = await validator.ValidateAsync(request.EventTagsDto, cancellationToken);

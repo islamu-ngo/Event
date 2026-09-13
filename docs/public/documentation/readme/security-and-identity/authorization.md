@@ -48,6 +48,21 @@ migration, new configuration, or new category-assignment API endpoint accompany
 this repair. Upgrade the application normally; EventTags and category-definition
 administration are unchanged.
 
+## Event tag assignment permissions
+
+Tag assignments use permission to update their event, not permission to administer
+tag definitions. Event owners with update permission can remove their assignments.
+Moving an assignment requires update permission on **both** events, even within
+the same tenant; changing its tag at the same time does not avoid this check.
+Missing or tenant-invisible assignments cannot be changed or deleted.
+
+Denied permission and an unavailable authorization provider both prevent writes
+without changing the assignment. They remain distinct failure outcomes; provider
+outages do not silently allow a move. These checks apply with Local RBAC or Cerbos
+selected. Upgrade the application normally: this repair adds no endpoint, policy
+grant, database migration or configuration, and does not change tag-definition
+administration.
+
 ## Choosing Your Authorization Provider
 
 | Decision Factor | Local RBAC (`AUTHORIZATION_PROVIDER=local`) | Cerbos PDP (`AUTHORIZATION_PROVIDER=cerbos`) |

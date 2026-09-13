@@ -8,12 +8,12 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Event;
 using Explore.Application.Features.EventTags.Requests.Queries;
 using Explore.Application.Services;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.EventTags.Handlers.Queries;
 
-public class GetEventsByTagRequestHandler : IRequestHandler<GetEventsByTagRequest, List<EventListDto>>
+public class GetEventsByTagRequestHandler : IQueryHandler<GetEventsByTagRequest, List<EventListDto>>
 {
     private readonly IEventTagsRepository _eventTagsRepository;
     private readonly IObjectStorageService _objectStorageService;
@@ -29,7 +29,7 @@ public class GetEventsByTagRequestHandler : IRequestHandler<GetEventsByTagReques
         _logger = logger;
     }
 
-    public async Task<List<EventListDto>> Handle(GetEventsByTagRequest request, CancellationToken cancellationToken)
+    public async Task<List<EventListDto>> QueryAsync(GetEventsByTagRequest request, CancellationToken cancellationToken)
     {
         var events = await _eventTagsRepository.GetEventsByTag(request.TagId);
         var eventDtos = events.Select(EventMapper.ToListItem).ToList();

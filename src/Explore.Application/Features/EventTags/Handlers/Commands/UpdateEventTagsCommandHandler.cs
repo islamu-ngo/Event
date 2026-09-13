@@ -4,37 +4,44 @@ using System.Threading;
 using System.Threading.Tasks;
 using Explore.Application.Authorization;
 using Explore.Application.Caching;
+using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventTags.Validators;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.EventTags.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventTags.Handlers.Commands;
 
-public class UpdateEventTagsCommandHandler : IRequestHandler<UpdateEventTagsCommand, BaseCommandResponse<Guid>>
+public class UpdateEventTagsCommandHandler : ICommandHandler<UpdateEventTagsCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventTagsRepository _eventTagsRepository;
     private readonly IEventRepository _eventRepository;
     private readonly ITagRepository _tagRepository;
     private readonly HybridCache _cache;
+    private readonly AuthorizationResourceContextResolver _authorizationResourceContextResolver;
+    private readonly IAuthorizationProvider _authorizationProvider;
 
     public UpdateEventTagsCommandHandler(
         IEventTagsRepository eventTagsRepository,
         IEventRepository eventRepository,
         ITagRepository tagRepository,
-        HybridCache cache)
+        HybridCache cache,
+        AuthorizationResourceContextResolver authorizationResourceContextResolver,
+        IAuthorizationProvider authorizationProvider)
     {
         _eventTagsRepository = eventTagsRepository;
         _eventRepository = eventRepository;
         _tagRepository = tagRepository;
         _cache = cache;
+        _authorizationResourceContextResolver = authorizationResourceContextResolver;
+        _authorizationProvider = authorizationProvider;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateEventTagsCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateEventTagsCommand request, CancellationToken cancellationToken)
     {
         var validator = new UpdateEventTagsDtoValidator();
         var validationResult = await validator.ValidateAsync(request.EventTagsDto, cancellationToken);
@@ -101,6 +108,11 @@ public class UpdateEventTagsCommandHandler : IRequestHandler<UpdateEventTagsComm
         }
 
         var previousEventId = eventTags.EventId;
+        if (targetEventId != previousEventId)
+        {
+            await AuthorizeDestinationAsync(request, targetEventId, cancellationToken);
+        }
+
         ApplyEvent(eventTags, request.EventTagsDto.Event, targetEvent);
         ApplyTag(eventTags, request.EventTagsDto.Tag);
 
@@ -108,6 +120,34 @@ public class UpdateEventTagsCommandHandler : IRequestHandler<UpdateEventTagsComm
         await InvalidateCachesAsync(previousEventId, eventTags.EventId, targetEvent.TenantId, cancellationToken);
 
         return BaseCommandResponse.Success(eventTags.Id, "Event Tag updated successfully.");
+    }
+
+    private async Task AuthorizeDestinationAsync(
+        UpdateEventTagsCommand request,
+        Guid eventId,
+        CancellationToken cancellationToken)
+    {
+        var resourceId = eventId.ToString();
+        var context = await _authorizationResourceContextResolver.ResolveAsync(
+            request, ResourceKinds.Event, AuthorizationActions.Update, resourceId, null, cancellationToken);
+        if (context.Facts is null)
+        {
+            throw new AuthorizationException(ResourceKinds.Event, AuthorizationActions.Update);
+        }
+
+        var decision = await _authorizationProvider.AuthorizeAsync(new AuthorizationRequest(
+            AuthorizationCapabilityCatalog.Require(ResourceKinds.Event, AuthorizationActions.Update),
+            resourceId,
+            Facts: context.Facts), cancellationToken);
+        if (!decision.IsAllowed)
+        {
+            if (decision.ReasonCode == AuthorizationDecisionReasonCodes.ProviderUnavailable)
+            {
+                throw new AuthorizationProviderUnavailableException(ResourceKinds.Event, AuthorizationActions.Update);
+            }
+
+            throw new AuthorizationException(ResourceKinds.Event, AuthorizationActions.Update);
+        }
     }
 
     private static void ApplyEvent(Explore.Domain.EventTags entity, DTOs.EventTags.UpdateEventTagsEventDto? dto, Event targetEvent)

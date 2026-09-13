@@ -141,7 +141,8 @@ public static class ApplicationServicesRegistration
         services.AddTransient<IAuthorizationContextEnricher<UpdateEventSessionLanguageCommand>, UpdateEventSessionLanguageAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<UpdateEventCategoriesCommand>, UpdateEventCategoriesAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<DeleteEventCategoriesCommand>, DeleteEventCategoriesAuthorizationContextEnricher>();
-        services.AddTransient<IAuthorizationContextEnricher<UpdateEventTagsCommand>, UpdateEventTagsAuthorizationContextEnricher>();
+        services.AddScoped<IAuthorizationContextEnricher<UpdateEventTagsCommand>, UpdateEventTagsAuthorizationContextEnricher>();
+        services.AddScoped<IAuthorizationContextEnricher<DeleteEventTagsCommand>, DeleteEventTagsAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<UpdateEventSessionAgendaItemCommand>, UpdateEventSessionAgendaItemAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<UpdateEventSessionGroupCommand>, UpdateEventSessionGroupAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<UpdateEventSessionSpeakerCommand>, UpdateEventSessionSpeakerAuthorizationContextEnricher>();

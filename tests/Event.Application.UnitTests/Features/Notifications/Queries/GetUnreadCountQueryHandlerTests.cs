@@ -8,18 +8,18 @@ using TUnit.Core;
 
 namespace Event.Application.UnitTests.Features.Notifications.Queries;
 
-public class GetUnreadCountRequestHandlerTests
+public class GetUnreadCountQueryHandlerTests
 {
     private readonly INotificationRepository _notificationRepository;
     private readonly ICurrentUserService _currentUserService;
-    private readonly GetUnreadCountRequestHandler _handler;
+    private readonly GetUnreadCountQueryHandler _handler;
 
-    public GetUnreadCountRequestHandlerTests()
+    public GetUnreadCountQueryHandlerTests()
     {
         _notificationRepository = Substitute.For<INotificationRepository>();
         _currentUserService = Substitute.For<ICurrentUserService>();
 
-        _handler = new GetUnreadCountRequestHandler(
+        _handler = new GetUnreadCountQueryHandler(
             _notificationRepository,
             _currentUserService);
     }
@@ -33,7 +33,7 @@ public class GetUnreadCountRequestHandlerTests
         _notificationRepository.GetUnreadCount(userId, null).Returns(5);
 
         // Act
-        var result = await _handler.Handle(new GetUnreadCountRequest(), CancellationToken.None);
+        var result = await _handler.QueryAsync(new GetUnreadCountQuery(), CancellationToken.None);
 
         // Assert
         await Assert.That(result.UnreadCount).IsEqualTo(5);
@@ -46,7 +46,7 @@ public class GetUnreadCountRequestHandlerTests
         _currentUserService.UserId.Returns((Guid?)null);
 
         // Act
-        var result = await _handler.Handle(new GetUnreadCountRequest(), CancellationToken.None);
+        var result = await _handler.QueryAsync(new GetUnreadCountQuery(), CancellationToken.None);
 
         // Assert
         await Assert.That(result.UnreadCount).IsEqualTo(0);
@@ -61,7 +61,7 @@ public class GetUnreadCountRequestHandlerTests
         _notificationRepository.GetUnreadCount(userId, null).Returns(0);
 
         // Act
-        var result = await _handler.Handle(new GetUnreadCountRequest(), CancellationToken.None);
+        var result = await _handler.QueryAsync(new GetUnreadCountQuery(), CancellationToken.None);
 
         // Assert
         await Assert.That(result.UnreadCount).IsEqualTo(0);

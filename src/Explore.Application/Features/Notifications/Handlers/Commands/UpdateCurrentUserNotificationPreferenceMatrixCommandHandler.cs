@@ -3,7 +3,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.Notifications.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Notifications.Handlers.Commands;
 
@@ -14,11 +14,11 @@ public sealed class UpdateCurrentUserNotificationPreferenceMatrixCommandHandler(
     IPrivacyErasureStateRepository privacyErasureStateRepository,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService)
-    : IRequestHandler<UpdateCurrentUserNotificationPreferenceMatrixCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateCurrentUserNotificationPreferenceMatrixCommand, BaseCommandResponse<Guid>>
 {
     private const string PrivacyErasureFencedFailureCode = "privacy_erasure_fenced";
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UpdateCurrentUserNotificationPreferenceMatrixCommand request,
         CancellationToken cancellationToken)
     {

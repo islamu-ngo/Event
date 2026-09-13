@@ -1,10 +1,10 @@
 using Explore.Application.DTOs.Notification;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Notifications.Requests.Commands;
 
-public sealed record UpdateCurrentUserNotificationPreferenceMatrixCommand : IRequest<BaseCommandResponse<Guid>>
+public sealed record UpdateCurrentUserNotificationPreferenceMatrixCommand : ICommand<BaseCommandResponse<Guid>>
 {
     private IReadOnlyList<UpdateNotificationPreferenceCellDto>? _cells;
 

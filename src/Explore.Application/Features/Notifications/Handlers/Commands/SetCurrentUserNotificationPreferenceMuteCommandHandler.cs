@@ -3,7 +3,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Notifications.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Notifications.Handlers.Commands;
 
@@ -12,9 +12,9 @@ public sealed class SetCurrentUserNotificationPreferenceMuteCommandHandler(
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService)
-    : IRequestHandler<SetCurrentUserNotificationPreferenceMuteCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<SetCurrentUserNotificationPreferenceMuteCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         SetCurrentUserNotificationPreferenceMuteCommand request,
         CancellationToken cancellationToken)
     {

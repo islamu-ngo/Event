@@ -14,7 +14,6 @@ using Explore.Application.Features.Organizations.Requests.Commands;
 using Explore.Application.Features.Organizations.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -55,7 +54,9 @@ public class OrganizationController : EventControllerBase
         "Organization not found",
         "Organization not found.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetOrganizationNotificationPreferenceMatrixQuery, NotificationPreferenceMatrixDto> _notificationPreferences;
+    private readonly ICommandHandler<UpdateOrganizationNotificationPreferenceMatrixCommand, BaseCommandResponse<Guid>> _updateNotificationPreferences;
+    private readonly ICommandHandler<SetOrganizationNotificationPreferenceMuteCommand, BaseCommandResponse<Guid>> _setNotificationMute;
     private readonly ICommandHandler<CreateOrganizationCommand, BaseCommandResponse<Guid>> _createOrganization;
     private readonly ICommandHandler<UpdateOrganizationCommand, BaseCommandResponse<Guid>> _updateOrganization;
     private readonly ICommandHandler<DeleteOrganizationCommand, BaseCommandResponse<Guid>> _deleteOrganization;
@@ -68,7 +69,9 @@ public class OrganizationController : EventControllerBase
     private readonly IResourceAssembler<NotificationPreferenceMatrixDto> _preferenceAssembler;
 
     public OrganizationController(
-        IMediator mediator,
+        IQueryHandler<GetOrganizationNotificationPreferenceMatrixQuery, NotificationPreferenceMatrixDto> notificationPreferences,
+        ICommandHandler<UpdateOrganizationNotificationPreferenceMatrixCommand, BaseCommandResponse<Guid>> updateNotificationPreferences,
+        ICommandHandler<SetOrganizationNotificationPreferenceMuteCommand, BaseCommandResponse<Guid>> setNotificationMute,
         ICommandHandler<CreateOrganizationCommand, BaseCommandResponse<Guid>> createOrganization,
         ICommandHandler<UpdateOrganizationCommand, BaseCommandResponse<Guid>> updateOrganization,
         ICommandHandler<DeleteOrganizationCommand, BaseCommandResponse<Guid>> deleteOrganization,
@@ -80,7 +83,9 @@ public class OrganizationController : EventControllerBase
         IResourceAssembler<OrganizationDto, OrganizationListDto> resourceAssembler,
         IResourceAssembler<NotificationPreferenceMatrixDto> preferenceAssembler)
     {
-        _mediator = mediator;
+        _notificationPreferences = notificationPreferences;
+        _updateNotificationPreferences = updateNotificationPreferences;
+        _setNotificationMute = setNotificationMute;
         _createOrganization = createOrganization;
         _updateOrganization = updateOrganization;
         _deleteOrganization = deleteOrganization;
@@ -199,7 +204,7 @@ public class OrganizationController : EventControllerBase
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var matrix = await _mediator.Send(new GetOrganizationNotificationPreferenceMatrixQuery
+        var matrix = await _notificationPreferences.QueryAsync(new GetOrganizationNotificationPreferenceMatrixQuery
         {
             OrganizationId = id
         }, cancellationToken);
@@ -223,7 +228,7 @@ public class OrganizationController : EventControllerBase
         [FromBody] UpdateNotificationPreferenceMatrixDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new UpdateOrganizationNotificationPreferenceMatrixCommand
+        var response = await _updateNotificationPreferences.ExecuteAsync(new UpdateOrganizationNotificationPreferenceMatrixCommand
         {
             OrganizationId = id,
             Cells = request.Cells
@@ -252,7 +257,7 @@ public class OrganizationController : EventControllerBase
         [FromBody] SetNotificationPreferenceMuteDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new SetOrganizationNotificationPreferenceMuteCommand
+        var response = await _setNotificationMute.ExecuteAsync(new SetOrganizationNotificationPreferenceMuteCommand
         {
             OrganizationId = id,
             IsMuted = request.IsMuted

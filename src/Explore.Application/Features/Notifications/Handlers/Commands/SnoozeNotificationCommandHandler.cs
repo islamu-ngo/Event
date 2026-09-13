@@ -2,11 +2,11 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Notifications.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Notifications.Handlers.Commands;
 
-public class SnoozeNotificationCommandHandler : IRequestHandler<SnoozeNotificationCommand, BaseCommandResponse<Guid>>
+public class SnoozeNotificationCommandHandler : ICommandHandler<SnoozeNotificationCommand, BaseCommandResponse<Guid>>
 {
     private readonly INotificationRepository _notificationRepository;
     private readonly ICurrentUserService _currentUserService;
@@ -19,7 +19,7 @@ public class SnoozeNotificationCommandHandler : IRequestHandler<SnoozeNotificati
         _currentUserService = currentUserService;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(SnoozeNotificationCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(SnoozeNotificationCommand request, CancellationToken cancellationToken)
     {
         var userId = _currentUserService.UserId;
         if (userId == null)

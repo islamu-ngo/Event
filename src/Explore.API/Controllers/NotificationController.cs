@@ -13,7 +13,7 @@ using Explore.Application.Features.Notifications.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Models;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -49,18 +49,60 @@ public class NotificationController : ControllerBase
         "Web Push subscription was not found.",
         "web_push_subscription_not_found");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetUserNotificationsQuery, PaginatedResult<NotificationListDto>> _notifications;
+    private readonly IQueryHandler<GetNotificationByIdQuery, NotificationDto?> _notification;
+    private readonly IQueryHandler<GetUnreadCountQuery, UnreadCountDto> _unreadCount;
+    private readonly IQueryHandler<GetCurrentUserNotificationPreferenceMatrixQuery, NotificationPreferenceMatrixDto> _preferences;
+    private readonly IQueryHandler<GetWebPushPublicConfigurationQuery, WebPushPublicConfiguration> _webPushConfiguration;
+    private readonly IQueryHandler<GetCurrentUserWebPushSubscriptionQuery, WebPushSubscriptionDto?> _webPushSubscription;
+    private readonly ICommandHandler<UpdateCurrentUserNotificationPreferenceMatrixCommand, BaseCommandResponse<Guid>> _updatePreferences;
+    private readonly ICommandHandler<SetCurrentUserNotificationPreferenceMuteCommand, BaseCommandResponse<Guid>> _setMute;
+    private readonly ICommandHandler<SubscribeCurrentUserWebPushSubscriptionCommand, BaseCommandResponse<Guid>> _subscribeWebPush;
+    private readonly ICommandHandler<UnsubscribeCurrentUserWebPushSubscriptionCommand, BaseCommandResponse<Guid>> _unsubscribeWebPush;
+    private readonly ICommandHandler<MarkNotificationAsReadCommand, BaseCommandResponse<Guid>> _markRead;
+    private readonly ICommandHandler<MarkAllNotificationsAsReadCommand, BaseCommandResponse<Guid>> _markAllRead;
+    private readonly ICommandHandler<ArchiveNotificationCommand, BaseCommandResponse<Guid>> _archive;
+    private readonly ICommandHandler<SnoozeNotificationCommand, BaseCommandResponse<Guid>> _snooze;
+    private readonly ICommandHandler<DeleteNotificationCommand, bool> _delete;
     private readonly INotificationRefreshStreamService _notificationRefreshStreamService;
     private readonly IResourceAssembler<NotificationPreferenceMatrixDto> _preferenceAssembler;
     private readonly IResourceAssembler<WebPushSubscriptionDto> _webPushSubscriptionAssembler;
 
     public NotificationController(
-        IMediator mediator,
+        IQueryHandler<GetUserNotificationsQuery, PaginatedResult<NotificationListDto>> notifications,
+        IQueryHandler<GetNotificationByIdQuery, NotificationDto?> notification,
+        IQueryHandler<GetUnreadCountQuery, UnreadCountDto> unreadCount,
+        IQueryHandler<GetCurrentUserNotificationPreferenceMatrixQuery, NotificationPreferenceMatrixDto> preferences,
+        IQueryHandler<GetWebPushPublicConfigurationQuery, WebPushPublicConfiguration> webPushConfiguration,
+        IQueryHandler<GetCurrentUserWebPushSubscriptionQuery, WebPushSubscriptionDto?> webPushSubscription,
+        ICommandHandler<UpdateCurrentUserNotificationPreferenceMatrixCommand, BaseCommandResponse<Guid>> updatePreferences,
+        ICommandHandler<SetCurrentUserNotificationPreferenceMuteCommand, BaseCommandResponse<Guid>> setMute,
+        ICommandHandler<SubscribeCurrentUserWebPushSubscriptionCommand, BaseCommandResponse<Guid>> subscribeWebPush,
+        ICommandHandler<UnsubscribeCurrentUserWebPushSubscriptionCommand, BaseCommandResponse<Guid>> unsubscribeWebPush,
+        ICommandHandler<MarkNotificationAsReadCommand, BaseCommandResponse<Guid>> markRead,
+        ICommandHandler<MarkAllNotificationsAsReadCommand, BaseCommandResponse<Guid>> markAllRead,
+        ICommandHandler<ArchiveNotificationCommand, BaseCommandResponse<Guid>> archive,
+        ICommandHandler<SnoozeNotificationCommand, BaseCommandResponse<Guid>> snooze,
+        ICommandHandler<DeleteNotificationCommand, bool> delete,
         INotificationRefreshStreamService notificationRefreshStreamService,
         IResourceAssembler<NotificationPreferenceMatrixDto> preferenceAssembler,
         IResourceAssembler<WebPushSubscriptionDto> webPushSubscriptionAssembler)
     {
-        _mediator = mediator;
+        _notifications = notifications;
+        _notification = notification;
+        _unreadCount = unreadCount;
+        _preferences = preferences;
+        _webPushConfiguration = webPushConfiguration;
+        _webPushSubscription = webPushSubscription;
+        _updatePreferences = updatePreferences;
+        _setMute = setMute;
+        _subscribeWebPush = subscribeWebPush;
+        _unsubscribeWebPush = unsubscribeWebPush;
+        _markRead = markRead;
+        _markAllRead = markAllRead;
+        _archive = archive;
+        _snooze = snooze;
+        _delete = delete;
         _notificationRefreshStreamService = notificationRefreshStreamService;
         _preferenceAssembler = preferenceAssembler;
         _webPushSubscriptionAssembler = webPushSubscriptionAssembler;
@@ -77,7 +119,7 @@ public class NotificationController : ControllerBase
         [FromQuery] NotificationListQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new GetUserNotificationsRequest
+        var result = await _notifications.QueryAsync(new GetUserNotificationsQuery
         {
             PageNumber = query.PageNumber,
             PageSize = query.PageSize,
@@ -101,7 +143,7 @@ public class NotificationController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<NotificationDto>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var notification = await _mediator.Send(new GetNotificationByIdRequest(id), cancellationToken);
+        var notification = await _notification.QueryAsync(new GetNotificationByIdQuery(id), cancellationToken);
 
         return Ok(notification);
     }
@@ -116,7 +158,7 @@ public class NotificationController : ControllerBase
         [FromQuery] int? notificationScopeId = null,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new GetUnreadCountRequest { NotificationScopeId = notificationScopeId }, cancellationToken);
+        var result = await _unreadCount.QueryAsync(new GetUnreadCountQuery { NotificationScopeId = notificationScopeId }, cancellationToken);
         return Ok(result);
     }
 
@@ -128,7 +170,7 @@ public class NotificationController : ControllerBase
     public async Task<ActionResult<HalResource<NotificationPreferenceMatrixDto>>> GetCurrentUserPreferences(
         CancellationToken cancellationToken = default)
     {
-        var matrix = await _mediator.Send(new GetCurrentUserNotificationPreferenceMatrixQuery(), cancellationToken);
+        var matrix = await _preferences.QueryAsync(new GetCurrentUserNotificationPreferenceMatrixQuery(), cancellationToken);
         var resource = await _preferenceAssembler.ToResource(matrix, HttpContext);
         return Ok(resource);
     }
@@ -143,7 +185,7 @@ public class NotificationController : ControllerBase
         [FromBody] UpdateNotificationPreferenceMatrixDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new UpdateCurrentUserNotificationPreferenceMatrixCommand
+        var response = await _updatePreferences.ExecuteAsync(new UpdateCurrentUserNotificationPreferenceMatrixCommand
         {
             Cells = request.Cells
         }, cancellationToken);
@@ -166,7 +208,7 @@ public class NotificationController : ControllerBase
         [FromBody] SetNotificationPreferenceMuteDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new SetCurrentUserNotificationPreferenceMuteCommand(request.IsMuted), cancellationToken);
+        var response = await _setMute.ExecuteAsync(new SetCurrentUserNotificationPreferenceMuteCommand(request.IsMuted), cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -185,7 +227,7 @@ public class NotificationController : ControllerBase
     public async Task<ActionResult<WebPushPublicConfiguration>> GetWebPushConfiguration(
         CancellationToken cancellationToken = default)
     {
-        var configuration = await _mediator.Send(new GetWebPushPublicConfigurationQuery(), cancellationToken);
+        var configuration = await _webPushConfiguration.QueryAsync(new GetWebPushPublicConfigurationQuery(), cancellationToken);
         return Ok(configuration);
     }
 
@@ -198,7 +240,7 @@ public class NotificationController : ControllerBase
     public async Task<ActionResult<string>> GetVapidPublicKey(
         CancellationToken cancellationToken = default)
     {
-        var configuration = await _mediator.Send(new GetWebPushPublicConfigurationQuery(), cancellationToken);
+        var configuration = await _webPushConfiguration.QueryAsync(new GetWebPushPublicConfigurationQuery(), cancellationToken);
         return Content(configuration.PublicKey, "text/plain");
     }
 
@@ -212,7 +254,7 @@ public class NotificationController : ControllerBase
         [FromQuery] string deviceIdentifier,
         CancellationToken cancellationToken = default)
     {
-        var subscription = await _mediator.Send(new GetCurrentUserWebPushSubscriptionQuery
+        var subscription = await _webPushSubscription.QueryAsync(new GetCurrentUserWebPushSubscriptionQuery
         {
             DeviceIdentifier = deviceIdentifier
         }, cancellationToken);
@@ -237,7 +279,7 @@ public class NotificationController : ControllerBase
         [FromBody] SubscribeCurrentUserWebPushSubscriptionCommand request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(request, cancellationToken);
+        var response = await _subscribeWebPush.ExecuteAsync(request, cancellationToken);
         if (!response.IsSuccess)
         {
             return this.ToCommandValidationProblem(response, WebPushValidationProblem);
@@ -257,7 +299,7 @@ public class NotificationController : ControllerBase
         Guid subscriptionId,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new UnsubscribeCurrentUserWebPushSubscriptionCommand(subscriptionId), cancellationToken);
+        var response = await _unsubscribeWebPush.ExecuteAsync(new UnsubscribeCurrentUserWebPushSubscriptionCommand(subscriptionId), cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -295,7 +337,7 @@ public class NotificationController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> MarkAsRead(Guid id, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new MarkNotificationAsReadCommand(id), cancellationToken);
+        var response = await _markRead.ExecuteAsync(new MarkNotificationAsReadCommand(id), cancellationToken);
 
         return Ok(response);
     }
@@ -308,7 +350,7 @@ public class NotificationController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<BaseCommandResponse<Guid>>> MarkAllAsRead(CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new MarkAllNotificationsAsReadCommand(), cancellationToken);
+        var response = await _markAllRead.ExecuteAsync(new MarkAllNotificationsAsReadCommand(), cancellationToken);
         return Ok(response);
     }
 
@@ -322,7 +364,7 @@ public class NotificationController : ControllerBase
     public async Task<ActionResult<BaseCommandResponse<Guid>>> Archive(
         Guid id, [FromQuery] bool archive = true, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new ArchiveNotificationCommand(id, archive), cancellationToken);
+        var response = await _archive.ExecuteAsync(new ArchiveNotificationCommand(id, archive), cancellationToken);
         if (!response.IsSuccess)
             return this.ToNotFoundProblem(NotificationNotFoundProblem, response.Message);
 
@@ -339,7 +381,7 @@ public class NotificationController : ControllerBase
     public async Task<ActionResult<BaseCommandResponse<Guid>>> Snooze(
         Guid id, [FromQuery] DateTime? snoozedUntil = null, CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new SnoozeNotificationCommand { Id = id, SnoozedUntil = snoozedUntil }, cancellationToken);
+        var response = await _snooze.ExecuteAsync(new SnoozeNotificationCommand { Id = id, SnoozedUntil = snoozedUntil }, cancellationToken);
         if (!response.IsSuccess)
             return this.ToNotFoundProblem(NotificationNotFoundProblem, response.Message);
 
@@ -355,7 +397,7 @@ public class NotificationController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
-        await _mediator.Send(new DeleteNotificationCommand(id), cancellationToken);
+        await _delete.ExecuteAsync(new DeleteNotificationCommand(id), cancellationToken);
 
         return NoContent();
     }

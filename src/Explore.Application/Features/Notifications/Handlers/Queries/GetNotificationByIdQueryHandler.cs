@@ -2,16 +2,17 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Notification;
 using Explore.Application.Features.Notifications.Requests.Queries;
-using MediatR;
+using Explore.Application.Mappings;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Notifications.Handlers.Queries;
 
-public class GetUnreadCountRequestHandler : IRequestHandler<GetUnreadCountRequest, UnreadCountDto>
+public class GetNotificationByIdQueryHandler : IQueryHandler<GetNotificationByIdQuery, NotificationDto?>
 {
     private readonly INotificationRepository _notificationRepository;
     private readonly ICurrentUserService _currentUserService;
 
-    public GetUnreadCountRequestHandler(
+    public GetNotificationByIdQueryHandler(
         INotificationRepository notificationRepository,
         ICurrentUserService currentUserService)
     {
@@ -19,13 +20,16 @@ public class GetUnreadCountRequestHandler : IRequestHandler<GetUnreadCountReques
         _currentUserService = currentUserService;
     }
 
-    public async Task<UnreadCountDto> Handle(GetUnreadCountRequest request, CancellationToken cancellationToken)
+    public async Task<NotificationDto?> QueryAsync(GetNotificationByIdQuery request, CancellationToken cancellationToken)
     {
         var userId = _currentUserService.UserId;
         if (userId == null)
-            return new UnreadCountDto { UnreadCount = 0 };
+            return null;
 
-        var count = await _notificationRepository.GetUnreadCount(userId.Value, request.NotificationScopeId);
-        return new UnreadCountDto { UnreadCount = count };
+        var notification = await _notificationRepository.GetByIdForUser(request.Id, userId.Value);
+        if (notification == null)
+            return null;
+
+        return NotificationMapper.ToDetail(notification);
     }
 }

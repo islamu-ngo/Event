@@ -3,7 +3,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Notification;
 using Explore.Application.Features.Notifications.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Notifications.Handlers.Queries;
 
@@ -14,9 +14,9 @@ public sealed class GetGroupNotificationPreferenceMatrixQueryHandler(
     IOrganizationTenantRepository organizationTenantRepository,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService)
-    : IRequestHandler<GetGroupNotificationPreferenceMatrixQuery, NotificationPreferenceMatrixDto>
+    : IQueryHandler<GetGroupNotificationPreferenceMatrixQuery, NotificationPreferenceMatrixDto>
 {
-    public async Task<NotificationPreferenceMatrixDto> Handle(
+    public async Task<NotificationPreferenceMatrixDto> QueryAsync(
         GetGroupNotificationPreferenceMatrixQuery request,
         CancellationToken cancellationToken)
     {

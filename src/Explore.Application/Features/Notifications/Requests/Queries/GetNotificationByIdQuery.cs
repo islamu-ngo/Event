@@ -3,7 +3,4 @@ using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Notifications.Requests.Queries;
 
-public sealed record GetCurrentUserWebPushSubscriptionQuery : IQuery<WebPushSubscriptionDto?>
-{
-    public required string DeviceIdentifier { get; init; }
-}
+public sealed record GetNotificationByIdQuery(Guid Id = default) : IQuery<NotificationDto?>;

@@ -1,14 +1,14 @@
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Notifications.Requests.Queries;
 using Explore.Application.Models;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Notifications.Handlers.Queries;
 
 public sealed class GetWebPushPublicConfigurationQueryHandler(IWebPushConfigurationProvider provider)
-    : IRequestHandler<GetWebPushPublicConfigurationQuery, WebPushPublicConfiguration>
+    : IQueryHandler<GetWebPushPublicConfigurationQuery, WebPushPublicConfiguration>
 {
-    public Task<WebPushPublicConfiguration> Handle(
+    public Task<WebPushPublicConfiguration> QueryAsync(
         GetWebPushPublicConfigurationQuery request,
         CancellationToken cancellationToken)
     {

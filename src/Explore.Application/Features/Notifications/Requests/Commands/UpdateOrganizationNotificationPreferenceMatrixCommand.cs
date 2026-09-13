@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Notification;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Notifications.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Organization, AuthorizationActions.Update)]
-public sealed record UpdateOrganizationNotificationPreferenceMatrixCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record UpdateOrganizationNotificationPreferenceMatrixCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid OrganizationId { get; init; }
     private IReadOnlyList<UpdateNotificationPreferenceCellDto>? _cells;

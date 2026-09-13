@@ -36,7 +36,7 @@ public class MarkNotificationAsReadCommandHandlerTests
         var command = new MarkNotificationAsReadCommand(notificationId);
 
         // Act
-        var result = await _handler.Handle(command, CancellationToken.None);
+        var result = await _handler.ExecuteAsync(command, CancellationToken.None);
 
         // Assert
         await Assert.That(result.IsSuccess).IsTrue();
@@ -54,7 +54,7 @@ public class MarkNotificationAsReadCommandHandlerTests
         var command = new MarkNotificationAsReadCommand(Guid.NewGuid());
 
         // Act
-        var result = await _handler.Handle(command, CancellationToken.None);
+        var result = await _handler.ExecuteAsync(command, CancellationToken.None);
 
         // Assert
         await Assert.That(result.IsSuccess).IsFalse();
@@ -69,7 +69,7 @@ public class MarkNotificationAsReadCommandHandlerTests
         var command = new MarkNotificationAsReadCommand(Guid.NewGuid());
 
         // Act
-        var result = await _handler.Handle(command, CancellationToken.None);
+        var result = await _handler.ExecuteAsync(command, CancellationToken.None);
 
         // Assert
         await Assert.That(result.IsSuccess).IsFalse();

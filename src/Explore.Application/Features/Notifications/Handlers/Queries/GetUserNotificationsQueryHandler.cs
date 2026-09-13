@@ -4,16 +4,16 @@ using Explore.Application.DTOs.Notification;
 using Explore.Application.Features.Notifications.Requests.Queries;
 using Explore.Application.Mappings;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Notifications.Handlers.Queries;
 
-public class GetUserNotificationsRequestHandler : IRequestHandler<GetUserNotificationsRequest, PaginatedResult<NotificationListDto>>
+public class GetUserNotificationsQueryHandler : IQueryHandler<GetUserNotificationsQuery, PaginatedResult<NotificationListDto>>
 {
     private readonly INotificationRepository _notificationRepository;
     private readonly ICurrentUserService _currentUserService;
 
-    public GetUserNotificationsRequestHandler(
+    public GetUserNotificationsQueryHandler(
         INotificationRepository notificationRepository,
         ICurrentUserService currentUserService)
     {
@@ -21,7 +21,7 @@ public class GetUserNotificationsRequestHandler : IRequestHandler<GetUserNotific
         _currentUserService = currentUserService;
     }
 
-    public async Task<PaginatedResult<NotificationListDto>> Handle(GetUserNotificationsRequest request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<NotificationListDto>> QueryAsync(GetUserNotificationsQuery request, CancellationToken cancellationToken)
     {
         var userId = _currentUserService.UserId;
         if (userId == null)

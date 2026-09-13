@@ -3,7 +3,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Notification;
 using Explore.Application.Features.Notifications.Requests.Queries;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Notifications.Handlers.Queries;
 
@@ -11,9 +11,9 @@ public sealed class GetCurrentUserWebPushSubscriptionQueryHandler(
     IWebPushSubscriptionRepository repository,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService)
-    : IRequestHandler<GetCurrentUserWebPushSubscriptionQuery, WebPushSubscriptionDto?>
+    : IQueryHandler<GetCurrentUserWebPushSubscriptionQuery, WebPushSubscriptionDto?>
 {
-    public async Task<WebPushSubscriptionDto?> Handle(
+    public async Task<WebPushSubscriptionDto?> QueryAsync(
         GetCurrentUserWebPushSubscriptionQuery request,
         CancellationToken cancellationToken)
     {

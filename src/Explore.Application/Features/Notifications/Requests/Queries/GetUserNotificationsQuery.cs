@@ -1,10 +1,10 @@
 using Explore.Application.DTOs.Notification;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Notifications.Requests.Queries;
 
-public sealed record GetUserNotificationsRequest : IRequest<PaginatedResult<NotificationListDto>>
+public sealed record GetUserNotificationsQuery : IQuery<PaginatedResult<NotificationListDto>>
 {
     public int PageNumber { get; init; } = 1;
     public int PageSize { get; init; } = 20;

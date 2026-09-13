@@ -1,8 +1,8 @@
 using Explore.Application.DTOs.Notification;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Notifications.Requests.Queries;
 
-public sealed record GetCurrentUserNotificationPreferenceMatrixQuery : IRequest<NotificationPreferenceMatrixDto>
+public sealed record GetCurrentUserNotificationPreferenceMatrixQuery : IQuery<NotificationPreferenceMatrixDto>
 {
 }

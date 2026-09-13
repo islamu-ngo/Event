@@ -1,6 +1,6 @@
 using Explore.Application.Models;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Notifications.Requests.Queries;
 
-public sealed record GetWebPushPublicConfigurationQuery : IRequest<WebPushPublicConfiguration>;
+public sealed record GetWebPushPublicConfigurationQuery : IQuery<WebPushPublicConfiguration>;

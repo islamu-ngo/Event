@@ -33,7 +33,7 @@ public class MarkAllNotificationsAsReadCommandHandlerTests
         _notificationRepository.MarkAllAsRead(userId, Arg.Any<DateTime>()).Returns(10);
 
         // Act
-        var result = await _handler.Handle(new MarkAllNotificationsAsReadCommand(), CancellationToken.None);
+        var result = await _handler.ExecuteAsync(new MarkAllNotificationsAsReadCommand(), CancellationToken.None);
 
         // Assert
         await Assert.That(result.IsSuccess).IsTrue();
@@ -49,7 +49,7 @@ public class MarkAllNotificationsAsReadCommandHandlerTests
         _notificationRepository.MarkAllAsRead(userId, Arg.Any<DateTime>()).Returns(0);
 
         // Act
-        var result = await _handler.Handle(new MarkAllNotificationsAsReadCommand(), CancellationToken.None);
+        var result = await _handler.ExecuteAsync(new MarkAllNotificationsAsReadCommand(), CancellationToken.None);
 
         // Assert
         await Assert.That(result.IsSuccess).IsTrue();
@@ -63,7 +63,7 @@ public class MarkAllNotificationsAsReadCommandHandlerTests
         _currentUserService.UserId.Returns((Guid?)null);
 
         // Act
-        var result = await _handler.Handle(new MarkAllNotificationsAsReadCommand(), CancellationToken.None);
+        var result = await _handler.ExecuteAsync(new MarkAllNotificationsAsReadCommand(), CancellationToken.None);
 
         // Assert
         await Assert.That(result.IsSuccess).IsFalse();

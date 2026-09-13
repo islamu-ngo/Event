@@ -14,7 +14,6 @@ using Explore.Application.Features.Notifications.Requests.Commands;
 using Explore.Application.Features.Notifications.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -61,7 +60,9 @@ public class GroupController : EventControllerBase
         "Group not found",
         "Group not found.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetGroupNotificationPreferenceMatrixQuery, NotificationPreferenceMatrixDto> _notificationPreferences;
+    private readonly ICommandHandler<UpdateGroupNotificationPreferenceMatrixCommand, BaseCommandResponse<Guid>> _updateNotificationPreferences;
+    private readonly ICommandHandler<SetGroupNotificationPreferenceMuteCommand, BaseCommandResponse<Guid>> _setNotificationMute;
     private readonly ICommandHandler<CreateGroupCommand, BaseCommandResponse<Guid>> _createGroup;
     private readonly ICommandHandler<UpdateGroupCommand, BaseCommandResponse<Guid>> _updateGroup;
     private readonly ICommandHandler<DeleteGroupCommand, BaseCommandResponse<Guid>> _deleteGroup;
@@ -74,7 +75,9 @@ public class GroupController : EventControllerBase
     private readonly IResourceAssembler<NotificationPreferenceMatrixDto> _preferenceAssembler;
 
     public GroupController(
-        IMediator mediator,
+        IQueryHandler<GetGroupNotificationPreferenceMatrixQuery, NotificationPreferenceMatrixDto> notificationPreferences,
+        ICommandHandler<UpdateGroupNotificationPreferenceMatrixCommand, BaseCommandResponse<Guid>> updateNotificationPreferences,
+        ICommandHandler<SetGroupNotificationPreferenceMuteCommand, BaseCommandResponse<Guid>> setNotificationMute,
         ICommandHandler<CreateGroupCommand, BaseCommandResponse<Guid>> createGroup,
         ICommandHandler<UpdateGroupCommand, BaseCommandResponse<Guid>> updateGroup,
         ICommandHandler<DeleteGroupCommand, BaseCommandResponse<Guid>> deleteGroup,
@@ -86,7 +89,9 @@ public class GroupController : EventControllerBase
         IResourceAssembler<GroupDto, GroupListDto> resourceAssembler,
         IResourceAssembler<NotificationPreferenceMatrixDto> preferenceAssembler)
     {
-        _mediator = mediator;
+        _notificationPreferences = notificationPreferences;
+        _updateNotificationPreferences = updateNotificationPreferences;
+        _setNotificationMute = setNotificationMute;
         _createGroup = createGroup;
         _updateGroup = updateGroup;
         _deleteGroup = deleteGroup;
@@ -193,7 +198,7 @@ public class GroupController : EventControllerBase
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var matrix = await _mediator.Send(new GetGroupNotificationPreferenceMatrixQuery
+        var matrix = await _notificationPreferences.QueryAsync(new GetGroupNotificationPreferenceMatrixQuery
         {
             GroupId = id
         }, cancellationToken);
@@ -217,7 +222,7 @@ public class GroupController : EventControllerBase
         [FromBody] UpdateNotificationPreferenceMatrixDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new UpdateGroupNotificationPreferenceMatrixCommand
+        var response = await _updateNotificationPreferences.ExecuteAsync(new UpdateGroupNotificationPreferenceMatrixCommand
         {
             GroupId = id,
             Cells = request.Cells
@@ -246,7 +251,7 @@ public class GroupController : EventControllerBase
         [FromBody] SetNotificationPreferenceMuteDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new SetGroupNotificationPreferenceMuteCommand
+        var response = await _setNotificationMute.ExecuteAsync(new SetGroupNotificationPreferenceMuteCommand
         {
             GroupId = id,
             IsMuted = request.IsMuted

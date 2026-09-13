@@ -10,20 +10,20 @@ using TUnit.Core;
 
 namespace Event.Application.UnitTests.Features.Notifications.Queries;
 
-public class GetNotificationByIdRequestHandlerTests
+public class GetNotificationByIdQueryHandlerTests
 {
     private static readonly Guid UserId = Guid.Parse("01910000-0000-7000-8000-000000000002");
     private static readonly Guid NotificationId = Guid.Parse("01910000-0000-7000-8000-000000000001");
     private readonly INotificationRepository _notificationRepository;
     private readonly ICurrentUserService _currentUserService;
-    private readonly GetNotificationByIdRequestHandler _handler;
+    private readonly GetNotificationByIdQueryHandler _handler;
 
-    public GetNotificationByIdRequestHandlerTests()
+    public GetNotificationByIdQueryHandlerTests()
     {
         _notificationRepository = Substitute.For<INotificationRepository>();
         _currentUserService = Substitute.For<ICurrentUserService>();
 
-        _handler = new GetNotificationByIdRequestHandler(
+        _handler = new GetNotificationByIdQueryHandler(
             _notificationRepository,
             _currentUserService);
     }
@@ -51,10 +51,10 @@ public class GetNotificationByIdRequestHandlerTests
         };
         _notificationRepository.GetByIdForUser(notificationId, userId).Returns(notification);
 
-        var request = new GetNotificationByIdRequest(notificationId);
+        var request = new GetNotificationByIdQuery(notificationId);
 
         // Act
-        var result = await _handler.Handle(request, CancellationToken.None);
+        var result = await _handler.QueryAsync(request, CancellationToken.None);
 
         // Assert
         await Assert.That(result).IsNotNull();
@@ -71,10 +71,10 @@ public class GetNotificationByIdRequestHandlerTests
 
         _notificationRepository.GetByIdForUser(Arg.Any<Guid>(), userId).Returns((Notification?)null);
 
-        var request = new GetNotificationByIdRequest(NotificationId);
+        var request = new GetNotificationByIdQuery(NotificationId);
 
         // Act
-        var result = await _handler.Handle(request, CancellationToken.None);
+        var result = await _handler.QueryAsync(request, CancellationToken.None);
 
         // Assert
         await Assert.That(result).IsNull();
@@ -85,10 +85,10 @@ public class GetNotificationByIdRequestHandlerTests
     {
         // Arrange
         _currentUserService.UserId.Returns((Guid?)null);
-        var request = new GetNotificationByIdRequest(NotificationId);
+        var request = new GetNotificationByIdQuery(NotificationId);
 
         // Act
-        var result = await _handler.Handle(request, CancellationToken.None);
+        var result = await _handler.QueryAsync(request, CancellationToken.None);
 
         // Assert
         await Assert.That(result).IsNull();

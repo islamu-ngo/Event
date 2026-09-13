@@ -3,7 +3,7 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Features.Notifications.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Notifications.Handlers.Commands;
 
@@ -15,9 +15,9 @@ public sealed class UpdateGroupNotificationPreferenceMatrixCommandHandler(
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService)
-    : IRequestHandler<UpdateGroupNotificationPreferenceMatrixCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateGroupNotificationPreferenceMatrixCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UpdateGroupNotificationPreferenceMatrixCommand request,
         CancellationToken cancellationToken)
     {

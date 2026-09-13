@@ -2,15 +2,15 @@ namespace Explore.Application.Features.ConfigurationManifest.Handlers.Commands;
 
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Requests.Commands;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 public sealed class CreateInstanceConfigurationImportSessionCommandHandler(
     ConfigurationImportSessionApplicationService service)
-    : IRequestHandler<
+    : ICommandHandler<
         CreateInstanceConfigurationImportSessionCommand,
         ConfigurationImportSessionCreatedResult>
 {
-    public Task<ConfigurationImportSessionCreatedResult> Handle(
+    public Task<ConfigurationImportSessionCreatedResult> ExecuteAsync(
         CreateInstanceConfigurationImportSessionCommand request,
         CancellationToken cancellationToken) =>
         service.CreateInstanceAsync(request.Artifact, cancellationToken);
@@ -18,11 +18,11 @@ public sealed class CreateInstanceConfigurationImportSessionCommandHandler(
 
 public sealed class CreateTenantConfigurationImportSessionCommandHandler(
     ConfigurationImportSessionApplicationService service)
-    : IRequestHandler<
+    : ICommandHandler<
         CreateTenantConfigurationImportSessionCommand,
         ConfigurationImportSessionCreatedResult>
 {
-    public Task<ConfigurationImportSessionCreatedResult> Handle(
+    public Task<ConfigurationImportSessionCreatedResult> ExecuteAsync(
         CreateTenantConfigurationImportSessionCommand request,
         CancellationToken cancellationToken) =>
         service.CreateTenantAsync(
@@ -33,11 +33,11 @@ public sealed class CreateTenantConfigurationImportSessionCommandHandler(
 
 public sealed class PreviewInstanceConfigurationImportSessionCommandHandler(
     ConfigurationImportSessionApplicationService service)
-    : IRequestHandler<
+    : ICommandHandler<
         PreviewInstanceConfigurationImportSessionCommand,
         ConfigurationImportPreviewResult>
 {
-    public Task<ConfigurationImportPreviewResult> Handle(
+    public Task<ConfigurationImportPreviewResult> ExecuteAsync(
         PreviewInstanceConfigurationImportSessionCommand request,
         CancellationToken cancellationToken) =>
         service.PreviewInstanceAsync(
@@ -49,11 +49,11 @@ public sealed class PreviewInstanceConfigurationImportSessionCommandHandler(
 
 public sealed class PreviewTenantConfigurationImportSessionCommandHandler(
     ConfigurationImportSessionApplicationService service)
-    : IRequestHandler<
+    : ICommandHandler<
         PreviewTenantConfigurationImportSessionCommand,
         ConfigurationImportPreviewResult>
 {
-    public Task<ConfigurationImportPreviewResult> Handle(
+    public Task<ConfigurationImportPreviewResult> ExecuteAsync(
         PreviewTenantConfigurationImportSessionCommand request,
         CancellationToken cancellationToken) =>
         service.PreviewTenantAsync(
@@ -66,9 +66,9 @@ public sealed class PreviewTenantConfigurationImportSessionCommandHandler(
 
 public sealed class CancelInstanceConfigurationImportSessionCommandHandler(
     ConfigurationImportSessionApplicationService service)
-    : IRequestHandler<CancelInstanceConfigurationImportSessionCommand>
+    : ICommandHandler<CancelInstanceConfigurationImportSessionCommand>
 {
-    public async Task Handle(
+    public async Task ExecuteAsync(
         CancelInstanceConfigurationImportSessionCommand request,
         CancellationToken cancellationToken) =>
         await service.CancelInstanceAsync(
@@ -79,9 +79,9 @@ public sealed class CancelInstanceConfigurationImportSessionCommandHandler(
 
 public sealed class CancelTenantConfigurationImportSessionCommandHandler(
     ConfigurationImportSessionApplicationService service)
-    : IRequestHandler<CancelTenantConfigurationImportSessionCommand>
+    : ICommandHandler<CancelTenantConfigurationImportSessionCommand>
 {
-    public async Task Handle(
+    public async Task ExecuteAsync(
         CancelTenantConfigurationImportSessionCommand request,
         CancellationToken cancellationToken) =>
         await service.CancelTenantAsync(

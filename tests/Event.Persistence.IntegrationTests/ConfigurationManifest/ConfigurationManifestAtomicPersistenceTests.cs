@@ -37,7 +37,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
                         new TenantRepository(firstContext)),
                     repository,
                     new ConfigurationManifestFailureRepository(factory));
-                var first = await handler.Handle(
+                var first = await handler.ExecuteAsync(
                     new ApplyConfigurationManifestCommand(source),
                     CancellationToken.None);
                 await Assert.That(first.IsSuccess).IsTrue();
@@ -52,7 +52,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
                         new TenantRepository(secondContext)),
                     repository,
                     new ConfigurationManifestFailureRepository(factory));
-                var second = await handler.Handle(
+                var second = await handler.ExecuteAsync(
                     new ApplyConfigurationManifestCommand(source),
                     CancellationToken.None);
                 await Assert.That(second.IsSuccess).IsTrue();
@@ -150,7 +150,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
                         new TenantRepository(apply)),
                     repository,
                     new ConfigurationManifestFailureRepository(factory));
-                var response = await handler.Handle(
+                var response = await handler.ExecuteAsync(
                     new ApplyConfigurationManifestCommand(
                         ConfigurationManifestApplicationTestSupport.Source("existing", "new")),
                     CancellationToken.None);
@@ -267,7 +267,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
                     new ConfigurationManifestFailureRepository(factory),
                     useRealPolicyBoundary: true);
 
-                var response = await handler.Handle(
+                var response = await handler.ExecuteAsync(
                     new ApplyConfigurationManifestCommand(
                         ConfigurationManifestApplicationTestSupport.GuardedSource("guarded")),
                     CancellationToken.None);
@@ -320,7 +320,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
                     repository,
                     new ConfigurationManifestFailureRepository(factory),
                     effectConsumer: new ThrowingConsumer());
-                await Assert.That(() => handler.Handle(
+                await Assert.That(() => handler.ExecuteAsync(
                         new ApplyConfigurationManifestCommand(source),
                         CancellationToken.None))
                     .Throws<AggregateException>();
@@ -335,7 +335,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
                         new TenantRepository(secondContext)),
                     repository,
                     new ConfigurationManifestFailureRepository(factory));
-                var response = await handler.Handle(
+                var response = await handler.ExecuteAsync(
                     new ApplyConfigurationManifestCommand(source),
                     CancellationToken.None);
                 await Assert.That(response.IsSuccess).IsTrue();
@@ -384,7 +384,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
                     new ThrowingOperationRepository(inner),
                     new ConfigurationManifestFailureRepository(factory));
 
-                var response = await handler.Handle(
+                var response = await handler.ExecuteAsync(
                     new ApplyConfigurationManifestCommand(
                         ConfigurationManifestApplicationTestSupport.Source("rollback")),
                     CancellationToken.None);
@@ -445,7 +445,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
                     new ConfigurationManifestFailureRepository(factory),
                     tenantCreationService: new FailOnSecondTenantCreationService(innerCreation));
 
-                var response = await handler.Handle(
+                var response = await handler.ExecuteAsync(
                     new ApplyConfigurationManifestCommand(
                         ConfigurationManifestApplicationTestSupport.Source("first", "second")),
                     CancellationToken.None);
@@ -492,7 +492,7 @@ public sealed class ConfigurationManifestAtomicPersistenceTests
                 new TenantRepository(context)),
             repository,
             new ConfigurationManifestFailureRepository(factory));
-        var response = await handler.Handle(
+        var response = await handler.ExecuteAsync(
             new ApplyConfigurationManifestCommand(source),
             CancellationToken.None);
         await Assert.That(response.IsSuccess).IsTrue();

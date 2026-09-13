@@ -4,11 +4,11 @@ using System.Collections.Immutable;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Features.ConfigurationManifest.Application;
 using Explore.Application.Features.ConfigurationManifest.Catalog;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 using Explore.Domain;
-using MediatR;
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed class ConfigurationImportPreviewRequest
@@ -75,9 +75,7 @@ internal sealed record ConfigurationImportPreviewPreparation(
 public sealed class ConfigurationImportSessionApplicationService(
     ConfigurationImportSessionManager manager,
     ConfigurationImportArtifactParser parser,
-    IRequestHandler<
-        ExportConfigurationManifestQuery,
-        ConfigurationManifestExportResult> currentStateExporter,
+    ConfigurationManifestCurrentStateReader currentState,
     ITenantRepository tenants,
     TimeProvider timeProvider)
 {
@@ -268,8 +266,8 @@ public sealed class ConfigurationImportSessionApplicationService(
         }
 
         ConfigurationManifestExportResult current =
-            await currentStateExporter.Handle(
-                new ExportConfigurationManifestQuery(targetView),
+            await currentState.ReadAsync(
+                targetView,
                 cancellationToken);
         ConfigurationImportParsedArtifact parsedTarget =
             parser.Parse(current.Utf8Json);

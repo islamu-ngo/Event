@@ -66,7 +66,7 @@ public sealed class ConfigurationManifestCompetingWriterRedTests(
                 mutationLock: inspectedLock);
 
         Task<Explore.Application.Responses.BaseCommandResponse<Guid>>
-            manifestTask = handler.Handle(
+            manifestTask = handler.ExecuteAsync(
                 new ApplyConfigurationManifestCommand(
                     ConfigurationManifestApplicationTestSupport
                         .FullAuthoritySource(
@@ -167,7 +167,7 @@ public sealed class ConfigurationManifestCompetingWriterRedTests(
                 useRealPolicyBoundary: true);
 
         Explore.Application.Responses.BaseCommandResponse<Guid> result =
-            await handler.Handle(
+            await handler.ExecuteAsync(
                 new ApplyConfigurationManifestCommand(
                     ConfigurationManifestApplicationTestSupport
                         .FullAuthoritySource(

@@ -3,14 +3,14 @@ namespace Explore.Application.Features.ConfigurationManifest.Handlers.Queries;
 using System.Collections.Immutable;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 public sealed class GetInstanceConfigurationImportReceiptQueryHandler(
-    ConfigurationImportApplyService service) : IRequestHandler<
+    ConfigurationImportApplyService service) : IQueryHandler<
         GetInstanceConfigurationImportReceiptQuery,
         ConfigurationImportOperationResult>
 {
-    public Task<ConfigurationImportOperationResult> Handle(
+    public Task<ConfigurationImportOperationResult> QueryAsync(
         GetInstanceConfigurationImportReceiptQuery request,
         CancellationToken cancellationToken) =>
         service.GetReceiptAsync(
@@ -20,11 +20,11 @@ public sealed class GetInstanceConfigurationImportReceiptQueryHandler(
 }
 
 public sealed class GetTenantConfigurationImportReceiptQueryHandler(
-    ConfigurationImportApplyService service) : IRequestHandler<
+    ConfigurationImportApplyService service) : IQueryHandler<
         GetTenantConfigurationImportReceiptQuery,
         ConfigurationImportOperationResult>
 {
-    public Task<ConfigurationImportOperationResult> Handle(
+    public Task<ConfigurationImportOperationResult> QueryAsync(
         GetTenantConfigurationImportReceiptQuery request,
         CancellationToken cancellationToken) =>
         service.GetReceiptAsync(
@@ -34,11 +34,11 @@ public sealed class GetTenantConfigurationImportReceiptQueryHandler(
 }
 
 public sealed class ListInstanceConfigurationImportHistoryQueryHandler(
-    ConfigurationImportApplyService service) : IRequestHandler<
+    ConfigurationImportApplyService service) : IQueryHandler<
         ListInstanceConfigurationImportHistoryQuery,
         ImmutableArray<ConfigurationImportOperationResult>>
 {
-    public Task<ImmutableArray<ConfigurationImportOperationResult>> Handle(
+    public Task<ImmutableArray<ConfigurationImportOperationResult>> QueryAsync(
         ListInstanceConfigurationImportHistoryQuery request,
         CancellationToken cancellationToken) =>
         service.ListAsync(
@@ -48,11 +48,11 @@ public sealed class ListInstanceConfigurationImportHistoryQueryHandler(
 }
 
 public sealed class ListTenantConfigurationImportHistoryQueryHandler(
-    ConfigurationImportApplyService service) : IRequestHandler<
+    ConfigurationImportApplyService service) : IQueryHandler<
         ListTenantConfigurationImportHistoryQuery,
         ImmutableArray<ConfigurationImportOperationResult>>
 {
-    public Task<ImmutableArray<ConfigurationImportOperationResult>> Handle(
+    public Task<ImmutableArray<ConfigurationImportOperationResult>> QueryAsync(
         ListTenantConfigurationImportHistoryQuery request,
         CancellationToken cancellationToken) =>
         service.ListAsync(

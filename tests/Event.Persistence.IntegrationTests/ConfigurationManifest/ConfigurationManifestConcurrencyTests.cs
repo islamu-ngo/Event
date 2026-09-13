@@ -62,10 +62,10 @@ public sealed class ConfigurationManifestConcurrencyTests(
         var source = ConfigurationManifestApplicationTestSupport.Source("collision");
 
         var results = await Task.WhenAll(
-            firstHandler.Handle(
+            firstHandler.ExecuteAsync(
                 new ApplyConfigurationManifestCommand(source),
                 CancellationToken.None),
-            secondHandler.Handle(
+            secondHandler.ExecuteAsync(
                 new ApplyConfigurationManifestCommand(source),
                 CancellationToken.None));
 
@@ -172,7 +172,7 @@ public sealed class ConfigurationManifestConcurrencyTests(
             mutationLock: manifestMutationLock);
 
         Task<Explore.Application.Responses.BaseCommandResponse<Guid>> manifestTask =
-            handler.Handle(
+            handler.ExecuteAsync(
                 new ApplyConfigurationManifestCommand(
                     ConfigurationManifestApplicationTestSupport.Source(slug)),
                 CancellationToken.None);
@@ -234,7 +234,7 @@ public sealed class ConfigurationManifestConcurrencyTests(
             new ConfigurationManifestOperationRepository(apply),
             failureRecorder);
 
-        var result = await handler.Handle(
+        var result = await handler.ExecuteAsync(
             new ApplyConfigurationManifestCommand(
                 ConfigurationManifestApplicationTestSupport.PaidPolicySource(
                     new string('d', ConfigurationManifestOperation.DigestLength),
@@ -302,7 +302,7 @@ public sealed class ConfigurationManifestConcurrencyTests(
             new RelationalSettingMutationLock(policyContext, policyUnitOfWork));
 
         Task<Explore.Application.Responses.BaseCommandResponse<Guid>> manifestTask =
-            manifestHandler.Handle(
+            manifestHandler.ExecuteAsync(
                 new ApplyConfigurationManifestCommand(
                     ConfigurationManifestApplicationTestSupport.PaidPolicySource(
                         new string(
@@ -387,7 +387,7 @@ public sealed class ConfigurationManifestConcurrencyTests(
             tenantCreationService: pausingTenantCreation);
 
         Task<Explore.Application.Responses.BaseCommandResponse<Guid>> manifestTask =
-            handler.Handle(
+            handler.ExecuteAsync(
                 new ApplyConfigurationManifestCommand(
                     ConfigurationManifestApplicationTestSupport.Source(
                         "authority-lock-race")),
@@ -499,7 +499,7 @@ public sealed class ConfigurationManifestConcurrencyTests(
         };
 
         var results = await Task.WhenAll(
-            manifestHandler.Handle(
+            manifestHandler.ExecuteAsync(
                 new ApplyConfigurationManifestCommand(
                     ConfigurationManifestApplicationTestSupport.Source("shared")),
                 CancellationToken.None),

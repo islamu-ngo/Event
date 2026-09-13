@@ -716,6 +716,19 @@ administrators import a v1alpha2 `TenantConfigurationPackage` into the tenant
 selected by the authenticated route. Source tenant names and instance metadata
 are provenance only and never select target authority.
 
+Public configuration commands and queries execute through scoped native
+handlers with authorization outside the business implementation. Tenant
+package export and import preview share `ConfigurationManifestCurrentStateReader`
+for trusted current-state reads; they do not call the protected whole-instance
+export query and therefore do not require instance-administrator permission.
+The public whole-instance export query retains its own instance authority.
+
+Bootstrap and the native manifest command share the scoped
+`IConfigurationManifestApplier` implementation, `ConfigurationManifestApplier`.
+Startup uses that trusted application port directly, without resolving a
+concrete native handler or depending on runtime authorization services. The
+applier continues to own ordered locks, serializable writes and effect delivery.
+
 `TenantConfigurationPackageSerializer` retains tenant-only authority and emits
 the canonical `PaidEventPolicyAuthorityMetadata.SovereignLockedFields` omission
 list in both export views. The tenant-package validator requires that same
@@ -993,7 +1006,8 @@ partial instance export.
 | Validation | Envelope, types, sensitivity, cross-policy checks | `src/Explore.Application/Features/ConfigurationManifest/Validation/ConfigurationManifestValidator.cs` |
 | Compilation | Typed plans, deterministic ordering, instance-section digest | `src/Explore.Application/Features/ConfigurationManifest/Compilation/` |
 | Preflight | Existing-tenant disposition, lifecycle, locks, current policy | `src/Explore.Application/Features/ConfigurationManifest/Preflight/ConfigurationManifestPreflight.cs` |
-| Apply | Lock hierarchy, serializable transaction, canonical boundaries, snapshots, receipts, and effect outbox | `src/Explore.Application/Features/ConfigurationManifest/Handlers/Commands/ApplyConfigurationManifestCommandHandler.cs`, `src/Explore.Application/Features/ConfigurationManifest/Importing/ConfigurationImportApplyService.cs` |
+| Apply | Lock hierarchy, serializable transaction, canonical boundaries, snapshots, receipts, and effect outbox | `src/Explore.Application/Features/ConfigurationManifest/Application/ConfigurationManifestApplier.cs`, `src/Explore.Application/Features/ConfigurationManifest/Importing/ConfigurationImportApplyService.cs` |
+| Export state | Shared trusted snapshots beneath separately authorized instance and tenant operations | `src/Explore.Application/Features/ConfigurationManifest/Application/ConfigurationManifestCurrentStateReader.cs` |
 | Persistence | Entity-first repositories, protected artifacts, append-only evidence, isolated failure recorder | `src/Explore.Persistence/Repositories/ConfigurationManifestOperationRepository.cs`, `src/Explore.Persistence/Repositories/ConfigurationImportOperationRepository.cs`, `src/Explore.Persistence/Repositories/ConfigurationImportArtifactStore.cs` |
 | Infrastructure | Options, strict reader/scanner, startup runner | `src/Explore.Infrastructure/ConfigurationManifest/` |
 | Hosts | One-owner post-migration/pre-traffic ordering | `src/Event.MigrationService/Worker.cs`, `src/Event.Standalone/Program.cs`, `src/Explore.AppHost/AppHost.cs` |

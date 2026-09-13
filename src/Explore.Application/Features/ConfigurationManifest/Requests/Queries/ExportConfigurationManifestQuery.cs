@@ -2,7 +2,7 @@ namespace Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 
 using Explore.Application.Authorization;
 using FluentValidation;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 public enum ConfigurationManifestExportView
 {
@@ -13,7 +13,7 @@ public enum ConfigurationManifestExportView
 [AuthorizeResource(ResourceKinds.InstanceSetting, AuthorizationActions.InstanceSettings.View)]
 public sealed record ExportConfigurationManifestQuery(
     ConfigurationManifestExportView View = ConfigurationManifestExportView.Overrides)
-    : IRequest<ConfigurationManifestExportResult>, ISecureRequest
+    : IQuery<ConfigurationManifestExportResult>, ISecureRequest
 {
     public const string ResourceKey = "instance.configuration-manifest.export";
 

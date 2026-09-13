@@ -43,7 +43,7 @@ public sealed class ConfigurationManifestPaidPolicyCeilingTests(
                 new ConfigurationManifestOperationRepository(bootstrap),
                 failureRecorder);
 
-            var applied = await handler.Handle(
+            var applied = await handler.ExecuteAsync(
                 new ApplyConfigurationManifestCommand(
                     ConfigurationManifestApplicationTestSupport.PaidPolicySource(
                         new string('f', ConfigurationManifestOperation.DigestLength),

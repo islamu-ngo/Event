@@ -69,7 +69,7 @@ internal static class ConfigurationManifestApplicationTestSupport
             settingsResolver,
             typedSettingsDocumentResolver,
             effectConsumer is null ? [] : [effectConsumer]);
-        return new ApplyConfigurationManifestCommandHandler(
+        var applier = new ConfigurationManifestApplier(
             preflight,
             lockBoundary,
             unitOfWork,
@@ -95,7 +95,8 @@ internal static class ConfigurationManifestApplicationTestSupport
             new ConfigurationManifestEffectDelivery(
                 new OutboxRepository(context),
                 effectDispatcher),
-            NullLogger<ApplyConfigurationManifestCommandHandler>.Instance);
+            NullLogger<ConfigurationManifestApplier>.Instance);
+        return new ApplyConfigurationManifestCommandHandler(applier);
     }
 
     public static ConfigurationManifestReadResult Source(params string[] slugs)

@@ -2,6 +2,7 @@ namespace Event.Api.IntegrationTests.Features;
 
 using System.Net;
 using System.Net.Http.Headers;
+using System.Collections.Immutable;
 using System.Reflection;
 using System.ComponentModel.DataAnnotations;
 using Event.Api.IntegrationTests.Fixtures;
@@ -19,6 +20,7 @@ using Explore.Application.DTOs.Tenant;
 using ISLAMU.Wire.Contracts.ConfigurationPortability;
 using Explore.Application.Features.ConfigurationManifest.Importing;
 using Explore.Application.Features.ConfigurationManifest.Requests.Commands;
+using Explore.Application.Features.ConfigurationManifest.Requests.Queries;
 using Explore.Application.Hateoas;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics;
@@ -27,7 +29,7 @@ using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.AspNetCore.RateLimiting;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using NSubstitute;
 
 public sealed class ConfigurationImportSessionControllerTests
@@ -230,8 +232,10 @@ public sealed class ConfigurationImportSessionControllerTests
     {
         const string capability = "one-time-capability-sentinel";
         Guid sessionId = Guid.NewGuid();
-        IMediator mediator = Substitute.For<IMediator>();
-        mediator.Send(
+        var createSession = Substitute.For<ICommandHandler<
+            CreateInstanceConfigurationImportSessionCommand,
+            ConfigurationImportSessionCreatedResult>>();
+        createSession.ExecuteAsync(
                 Arg.Any<CreateInstanceConfigurationImportSessionCommand>(),
                 Arg.Any<CancellationToken>())
             .Returns(new ConfigurationImportSessionCreatedResult(
@@ -252,7 +256,18 @@ public sealed class ConfigurationImportSessionControllerTests
                 AvailableSectionKeys: ["instance.settings"]));
         var controller =
             new InstanceConfigurationImportSessionsController(
-                mediator,
+                createSession,
+                Substitute.For<ICommandHandler<PreviewInstanceConfigurationImportSessionCommand,
+                    ConfigurationImportPreviewResult>>(),
+                Substitute.For<ICommandHandler<CancelInstanceConfigurationImportSessionCommand>>(),
+                Substitute.For<ICommandHandler<ApplyInstanceConfigurationImportCommand,
+                    ConfigurationImportOperationResult>>(),
+                Substitute.For<ICommandHandler<CreateInstanceConfigurationRollbackSessionCommand,
+                    ConfigurationImportRollbackSessionCreatedResult>>(),
+                Substitute.For<IQueryHandler<ListInstanceConfigurationImportHistoryQuery,
+                    ImmutableArray<ConfigurationImportOperationResult>>>(),
+                Substitute.For<IQueryHandler<GetInstanceConfigurationImportReceiptQuery,
+                    ConfigurationImportOperationResult>>(),
                 Substitute.For<IAuthorizationProvider>())
             {
                 ControllerContext = new ControllerContext

@@ -3,15 +3,15 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Infrastructure.Geocoding;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Geocoding;
-using Explore.Application.Features.Geocoding.Handlers.Queries;
-using Explore.Application.Features.Geocoding.Requests.Queries;
+using Explore.Application.Features.Geocoding.Handlers.Commands;
+using Explore.Application.Features.Geocoding.Requests.Commands;
 using Explore.Domain.Enums;
 using FluentValidation;
 using NSubstitute;
 
-namespace Event.Application.UnitTests.Features.Locations.Queries;
+namespace Event.Application.UnitTests.Features.Geocoding.Commands;
 
-public sealed class GetAddressSuggestionsQueryHandlerTests
+public sealed class CreateAddressSuggestionsCommandHandlerTests
 {
     private readonly ILocalAddressSuggestionQuery _localQuery =
         Substitute.For<ILocalAddressSuggestionQuery>();
@@ -22,7 +22,7 @@ public sealed class GetAddressSuggestionsQueryHandlerTests
     private readonly IAddressSelectionProtector _selectionProtector =
         Substitute.For<IAddressSelectionProtector>();
 
-    public GetAddressSuggestionsQueryHandlerTests()
+    public CreateAddressSuggestionsCommandHandlerTests()
     {
         _providerGateway.SearchAsync(
                 Arg.Any<AddressGeocoderRequest>(),
@@ -56,7 +56,7 @@ public sealed class GetAddressSuggestionsQueryHandlerTests
             ]);
         var handler = CreateHandler();
         using var cancellation = new CancellationTokenSource();
-        var request = new GetAddressSuggestionsQuery(
+        var request = new CreateAddressSuggestionsCommand(
             tenantId,
             new AddressSuggestionsRequestDto
             {
@@ -66,7 +66,7 @@ public sealed class GetAddressSuggestionsQueryHandlerTests
             });
 
         AddressSuggestionsResponseDto response =
-            await handler.Handle(request, cancellation.Token);
+            await handler.ExecuteAsync(request, cancellation.Token);
 
         await Assert.That(response.ProviderOutcome).IsEqualTo(AddressProviderOutcome.None);
         await Assert.That(response.Suggestions).HasSingleItem();
@@ -81,6 +81,7 @@ public sealed class GetAddressSuggestionsQueryHandlerTests
             .IsEqualTo(LocationAddressVisibilityEnum.OrganizationScoped);
         await _localQuery.Received(1).SearchAsync(
             Arg.Is<LocalAddressSuggestionCriteria>(criteria =>
+                criteria != null &&
                 criteria.TenantId == tenantId
                 && criteria.ActorId == userId
                 && criteria.UserId == userId
@@ -128,7 +129,7 @@ public sealed class GetAddressSuggestionsQueryHandlerTests
                 Arg.Any<AddressSelectionContext>(),
                 Arg.Any<CancellationToken>())
             .Returns(new AddressSelectionToken("opaque-token", expiresAt));
-        var request = new GetAddressSuggestionsQuery(
+        var request = new CreateAddressSuggestionsCommand(
             tenantId,
             new AddressSuggestionsRequestDto
             {
@@ -140,7 +141,7 @@ public sealed class GetAddressSuggestionsQueryHandlerTests
             });
 
         AddressSuggestionsResponseDto response =
-            await CreateHandler().Handle(request, CancellationToken.None);
+            await CreateHandler().ExecuteAsync(request, CancellationToken.None);
 
         await Assert.That(response.ProviderOutcome).IsEqualTo(AddressProviderOutcome.Ready);
         await Assert.That(response.Suggestions).HasSingleItem();
@@ -152,11 +153,13 @@ public sealed class GetAddressSuggestionsQueryHandlerTests
         await Assert.That(suggestion.Attribution).IsEqualTo("Provider attribution");
         await _providerGateway.Received(1).SearchAsync(
             Arg.Is<AddressGeocoderRequest>(outbound =>
+                outbound != null &&
                 outbound.SearchText == "provider hall" && outbound.Limit == 3),
             CancellationToken.None);
         await _selectionProtector.Received(1).ProtectAsync(
             selection,
             Arg.Is<AddressSelectionContext>(context =>
+                context != null &&
                 context.TenantId == tenantId
                 && context.ActorId == userId
                 && context.OrganizationId == organizationId
@@ -202,7 +205,7 @@ public sealed class GetAddressSuggestionsQueryHandlerTests
             .Returns<AddressSelectionToken>(
                 _ => throw new InvalidOperationException("protector unavailable"));
 
-        AddressSuggestionsResponseDto result = await CreateHandler().Handle(
+        AddressSuggestionsResponseDto result = await CreateHandler().ExecuteAsync(
             ValidRequest(tenantId),
             CancellationToken.None);
 
@@ -217,10 +220,10 @@ public sealed class GetAddressSuggestionsQueryHandlerTests
         _tenantContext.TenantId.Returns(Guid.CreateVersion7());
         _userContext.GetRequiredUserId().Returns(Guid.CreateVersion7());
         var handler = CreateHandler();
-        GetAddressSuggestionsQuery request = ValidRequest(Guid.CreateVersion7());
+        CreateAddressSuggestionsCommand request = ValidRequest(Guid.CreateVersion7());
 
         await Assert.ThrowsAsync<ValidationException>(
-            () => handler.Handle(request, CancellationToken.None));
+            () => handler.ExecuteAsync(request, CancellationToken.None));
         await _localQuery.DidNotReceive().SearchAsync(
             Arg.Any<LocalAddressSuggestionCriteria>(),
             Arg.Any<CancellationToken>());
@@ -235,7 +238,7 @@ public sealed class GetAddressSuggestionsQueryHandlerTests
         var handler = CreateHandler();
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => handler.Handle(ValidRequest(tenantId), CancellationToken.None));
+            () => handler.ExecuteAsync(ValidRequest(tenantId), CancellationToken.None));
         await _localQuery.DidNotReceive().SearchAsync(
             Arg.Any<LocalAddressSuggestionCriteria>(),
             Arg.Any<CancellationToken>());
@@ -248,7 +251,7 @@ public sealed class GetAddressSuggestionsQueryHandlerTests
         _tenantContext.TenantId.Returns(tenantId);
         _userContext.GetRequiredUserId().Returns(Guid.CreateVersion7());
         var handler = CreateHandler();
-        var request = new GetAddressSuggestionsQuery(
+        var request = new CreateAddressSuggestionsCommand(
             tenantId,
             new AddressSuggestionsRequestDto
             {
@@ -258,7 +261,7 @@ public sealed class GetAddressSuggestionsQueryHandlerTests
             });
 
         await Assert.ThrowsAsync<ValidationException>(
-            () => handler.Handle(request, CancellationToken.None));
+            () => handler.ExecuteAsync(request, CancellationToken.None));
         await _localQuery.DidNotReceive().SearchAsync(
             Arg.Any<LocalAddressSuggestionCriteria>(),
             Arg.Any<CancellationToken>());
@@ -275,13 +278,13 @@ public sealed class GetAddressSuggestionsQueryHandlerTests
         await cancellation.CancelAsync();
 
         await Assert.ThrowsAsync<OperationCanceledException>(
-            () => handler.Handle(ValidRequest(tenantId), cancellation.Token));
+            () => handler.ExecuteAsync(ValidRequest(tenantId), cancellation.Token));
         await _localQuery.DidNotReceive().SearchAsync(
             Arg.Any<LocalAddressSuggestionCriteria>(),
             Arg.Any<CancellationToken>());
     }
 
-    private GetAddressSuggestionsQueryHandler CreateHandler() =>
+    private CreateAddressSuggestionsCommandHandler CreateHandler() =>
         new(
             _localQuery,
             _providerGateway,
@@ -289,7 +292,7 @@ public sealed class GetAddressSuggestionsQueryHandlerTests
             _tenantContext,
             _userContext);
 
-    private static GetAddressSuggestionsQuery ValidRequest(Guid tenantId) =>
+    private static CreateAddressSuggestionsCommand ValidRequest(Guid tenantId) =>
         new(
             tenantId,
             new AddressSuggestionsRequestDto

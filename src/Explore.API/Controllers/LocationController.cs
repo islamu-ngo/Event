@@ -13,7 +13,6 @@ using Explore.Application.Features.Locations.Requests.Commands;
 using Explore.Application.Features.Locations.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -55,7 +54,7 @@ public class LocationController : EventControllerBase
         "Address approval validation failed",
         "The address could not be approved for tenant reuse.");
 
-    private readonly IMediator _mediator;
+    private readonly ICommandHandler<PromoteLocationAddressCommand, BaseCommandResponse<Guid>> _promoteAddress;
     private readonly ICommandHandler<CreateLocationCommand, BaseCommandResponse<Guid>> _createLocation;
     private readonly ICommandHandler<UpdateLocationCommand, BaseCommandResponse<Guid>> _updateLocation;
     private readonly ICommandHandler<DeleteLocationCommand, bool> _deleteLocation;
@@ -68,7 +67,7 @@ public class LocationController : EventControllerBase
     private readonly IResourceAssembler<LocationDto, LocationListDto> _resourceAssembler;
 
     public LocationController(
-        IMediator mediator,
+        ICommandHandler<PromoteLocationAddressCommand, BaseCommandResponse<Guid>> promoteAddress,
         ICommandHandler<CreateLocationCommand, BaseCommandResponse<Guid>> createLocation,
         ICommandHandler<UpdateLocationCommand, BaseCommandResponse<Guid>> updateLocation,
         ICommandHandler<DeleteLocationCommand, bool> deleteLocation,
@@ -80,7 +79,7 @@ public class LocationController : EventControllerBase
         ITenantContext tenantContext,
         IResourceAssembler<LocationDto, LocationListDto> resourceAssembler)
     {
-        _mediator = mediator;
+        _promoteAddress = promoteAddress;
         _createLocation = createLocation;
         _updateLocation = updateLocation;
         _deleteLocation = deleteLocation;
@@ -342,7 +341,7 @@ public class LocationController : EventControllerBase
                 "If-Match header is required and must contain the current location concurrency stamp.");
         }
 
-        BaseCommandResponse<Guid> response = await _mediator.Send(
+        BaseCommandResponse<Guid> response = await _promoteAddress.ExecuteAsync(
             new PromoteLocationAddressCommand
             {
                 LocationId = id,

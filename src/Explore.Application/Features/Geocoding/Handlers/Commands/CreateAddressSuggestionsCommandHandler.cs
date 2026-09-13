@@ -3,30 +3,30 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Infrastructure.Geocoding;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Geocoding;
-using Explore.Application.Features.Geocoding.Requests.Queries;
+using Explore.Application.Features.Geocoding.Requests.Commands;
 using Explore.Application.Features.Geocoding.Validators;
 using Explore.Domain.Enums;
 using Explore.Domain.ValueObjects;
 using FluentValidation;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
-namespace Explore.Application.Features.Geocoding.Handlers.Queries;
+namespace Explore.Application.Features.Geocoding.Handlers.Commands;
 
-public sealed class GetAddressSuggestionsQueryHandler(
+public sealed class CreateAddressSuggestionsCommandHandler(
     ILocalAddressSuggestionQuery localQuery,
     IAddressSuggestionProviderGateway providerGateway,
     IAddressSelectionProtector selectionProtector,
     ITenantContext tenantContext,
     IUserContext userContext)
-    : IRequestHandler<GetAddressSuggestionsQuery, AddressSuggestionsResponseDto>
+    : ICommandHandler<CreateAddressSuggestionsCommand, AddressSuggestionsResponseDto>
 {
-    public async Task<AddressSuggestionsResponseDto> Handle(
-        GetAddressSuggestionsQuery request,
+    public async Task<AddressSuggestionsResponseDto> ExecuteAsync(
+        CreateAddressSuggestionsCommand request,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var validator = new GetAddressSuggestionsQueryValidator();
+        var validator = new CreateAddressSuggestionsCommandValidator();
         var validation = await validator.ValidateAsync(request, cancellationToken);
         if (!validation.IsValid)
         {

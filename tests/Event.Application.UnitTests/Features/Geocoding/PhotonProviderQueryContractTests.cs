@@ -1,5 +1,5 @@
 using Explore.Application.DTOs.Geocoding;
-using Explore.Application.Features.Geocoding.Handlers.Queries;
+using Explore.Application.Features.Geocoding.Handlers.Commands;
 using TUnit.Assertions.Enums;
 
 namespace Event.Application.UnitTests.Features.Geocoding;
@@ -23,9 +23,9 @@ public sealed class PhotonProviderQueryContractTests
             throwOnError: false);
 
         PhotonApplicationContractAssertions.RequireConstructorDependency(
-            typeof(GetAddressSuggestionsQueryHandler),
+            typeof(CreateAddressSuggestionsCommandHandler),
             gateway,
-            "the query handler must compose local rows with the semantic optional provider gateway");
+            "the suggestion handler must compose local rows with the semantic optional provider gateway");
         await Assert.That(concreteMode).IsNull();
         await Assert.That(search.GetParameters().Any(parameter => parameter.ParameterType.IsEnum))
             .IsFalse();

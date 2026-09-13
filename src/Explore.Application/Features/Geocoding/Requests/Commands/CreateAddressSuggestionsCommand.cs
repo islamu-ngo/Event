@@ -1,14 +1,14 @@
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.Geocoding;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
-namespace Explore.Application.Features.Geocoding.Requests.Queries;
+namespace Explore.Application.Features.Geocoding.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Location, AuthorizationActions.Locations.View)]
-public sealed record GetAddressSuggestionsQuery(
+public sealed record CreateAddressSuggestionsCommand(
     Guid TenantId,
     AddressSuggestionsRequestDto Request)
-    : IRequest<AddressSuggestionsResponseDto>, ISecureRequest
+    : ICommand<AddressSuggestionsResponseDto>, ISecureRequest
 {
     string? ISecureRequest.ResourceId =>
         TenantId == Guid.Empty ? null : TenantId.ToString("D");

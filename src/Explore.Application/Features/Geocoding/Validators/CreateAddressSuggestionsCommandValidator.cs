@@ -1,13 +1,13 @@
 using Explore.Application.Contracts.Persistence;
-using Explore.Application.Features.Geocoding.Requests.Queries;
+using Explore.Application.Features.Geocoding.Requests.Commands;
 using FluentValidation;
 
 namespace Explore.Application.Features.Geocoding.Validators;
 
-public sealed class GetAddressSuggestionsQueryValidator
-    : AbstractValidator<GetAddressSuggestionsQuery>
+public sealed class CreateAddressSuggestionsCommandValidator
+    : AbstractValidator<CreateAddressSuggestionsCommand>
 {
-    public GetAddressSuggestionsQueryValidator()
+    public CreateAddressSuggestionsCommandValidator()
     {
         RuleFor(query => query.TenantId).NotEmpty();
         RuleFor(query => query.Request).NotNull();

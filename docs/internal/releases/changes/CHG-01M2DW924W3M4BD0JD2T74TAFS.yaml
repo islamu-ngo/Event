@@ -1,0 +1,36 @@
+Change-Id: CHG-01M2DW924W3M4BD0JD2T74TAFS
+Title: "Restore tenant-scoped governance reports"
+Type: fix
+Scope: events
+Summary: "Use protected native governance queries, correct filtered paging, and preserve administrator access with committed revocations enforced by authoritative reads."
+Group: custom-property-governance
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Permit only governance view for instance administrators in local policy.
+      Keep trusted ambient-tenant binding, machine scope ceilings and safe-mode
+      restrictions. Already-integrated authoritative reads enforce committed
+      role revocations on subsequent requests without trusting stale claims.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/custom-properties.md#governance-report
+    Disposition: documented
+    Detail: >-
+      Apply recommendation and scope filters before counting and paging.
+      Expose definition metadata and usage aggregates, never collected answers.
+      No schema migration or configuration change is required.

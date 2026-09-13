@@ -24,6 +24,23 @@ Each property definition enforces strict access and privacy controls:
 
 ---
 
+## Governance Report
+
+Instance administrators and authorized tenant administrators can review active
+event and session definitions, usage counts, last-use dates, exposure settings,
+and promotion recommendations. Instance-administrator report access works with
+local authorization as well as Cerbos; a separate tenant-admin grant is not required.
+The report does not include collected answer values. Its tenant must match the
+current tenant context; selecting another tenant does not grant access.
+
+Scope and recommendation filters apply to the complete matching report before
+pagination, so totals and page navigation describe the selected rows. A failed
+read remains an error, not an empty successful report.
+
+Committed administrative role revocations apply to subsequent report requests
+against the authoritative database. They do not cancel a request that was
+already authorized before revocation.
+
 ## Lifecycle: Retirement vs. Hard Purge
 
 1. **Normal Deletion (Retirement)**: Soft-deletes the field definition. Existing event registrations preserve their historical answers for auditability and financial reporting, but no new events can select the retired question.

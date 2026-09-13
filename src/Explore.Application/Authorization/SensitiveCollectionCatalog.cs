@@ -153,7 +153,7 @@ public static class SensitiveCollectionCatalog
                 + "session's target tenant and to nobody else — including other tenants under support."),
 
         new(
-            CollectionName: "GetCustomPropertyGovernanceReportQuery",
+            CollectionName: nameof(Features.CustomPropertyGovernance.Requests.Queries.GetCustomPropertyGovernanceReportQuery),
             ResourceKind: ResourceKinds.CustomPropertyGovernance,
             Action: AuthorizationActions.View,
             Scope: SensitiveCollectionScope.Tenant,

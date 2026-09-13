@@ -6,9 +6,12 @@ using Event.Api.IntegrationTests.Fixtures;
 using Event.Api.IntegrationTests.Seeds;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.StorageObject;
+using Explore.Application.DTOs.OrganizationTenantEvidence;
 using Explore.Application.Features.StorageObjects.Requests.Commands;
 using Explore.Application.Features.StorageObjects.Requests.Queries;
 using Explore.Application.Models.Storage;
@@ -18,6 +21,7 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Settings;
+using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Secrets.Database;
@@ -34,6 +38,110 @@ namespace Event.Api.IntegrationTests.Features;
 public sealed class NativeStorageObjectHttpTests
 {
     private const string Root = "/api/storageobject";
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task OrganizationEvidenceParentUsesOrgAuthorityAndRejectsForeignParticipation(bool alsoTenantAdmin)
+    {
+        await using var factory = await StorageFactory.CreateAsync(useProductionAuthorization: true);
+        Guid userId;
+        Guid organizationId;
+        Guid participationId;
+        Guid foreignOrganizationId = Guid.CreateVersion7();
+        Guid foreignParticipationId = Guid.CreateVersion7();
+        using (var scope = factory.Services.CreateScope())
+        {
+            await Assert.That(scope.ServiceProvider.GetRequiredService<IAuthorizationProvider>())
+                .IsTypeOf<RuntimeAuthorizationProvider>();
+            var db = scope.ServiceProvider.GetRequiredService<ExploreDbContext>();
+            var organization = await TenantScenarioSeed.SeedActiveTenantWithOrganizationPublisherAsync(db);
+            userId = organization.UserId;
+            organizationId = organization.OrganizationId;
+            var participation = await db.OrganizationTenants.SingleAsync(item => item.OrganizationId == organizationId);
+            participation.ApprovalStatusId = (int)ApprovalStatusEnum.Pending;
+            participation.ApprovedAt = null;
+            participationId = participation.Id;
+            if (alsoTenantAdmin)
+            {
+                var membership = await db.TenantUsers.SingleAsync(item => item.UserId == userId);
+                db.TenantUserRoleGrants.Add(new TenantUserRoleGrant
+                {
+                    Id = Guid.CreateVersion7(), TenantId = organization.TenantId, Tenant = null!,
+                    TenantUserId = membership.Id, TenantUser = membership,
+                    RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant
+                });
+            }
+            var foreignOrganization = new Organization
+            {
+                Id = foreignOrganizationId,
+                Pii = new OrganizationPii { OrganizationId = foreignOrganizationId, FullName = "Foreign evidence owner" },
+                ConcurrencyStamp = Guid.CreateVersion7()
+            };
+            var foreignParticipation = new OrganizationTenant
+            {
+                Id = foreignParticipationId, TenantId = factory.OtherTenantId, Tenant = null!,
+                OrganizationId = foreignOrganizationId, Organization = foreignOrganization,
+                ApprovalStatusId = (int)ApprovalStatusEnum.Pending, ApprovalStatus = null!,
+                ConcurrencyStamp = Guid.CreateVersion7()
+            };
+            db.OrganizationTenants.Add(foreignParticipation);
+            db.OrganizationMembers.Add(new OrganizationMember
+            {
+                Id = Guid.CreateVersion7(), TenantId = factory.OtherTenantId, Tenant = null!,
+                OrganizationTenantId = foreignParticipationId, OrganizationTenant = foreignParticipation,
+                UserId = userId, User = null!, RoleId = (int)RoleEnum.OrgAdmin, Role = null!
+            });
+            await db.SaveChangesAsync();
+            await Assert.That(await scope.ServiceProvider.GetRequiredService<IAdminContext>()
+                .IsInstanceAdminAsync(userId)).IsFalse();
+        }
+
+        using var client = Client(factory, userId);
+        var upload = new CreateOrganizationTenantEvidenceUploadSessionDto
+        {
+            FileName = " evidence.pdf ", ContentType = "application/pdf", ExpectedSizeBytes = 5
+        };
+        using var accepted = await client.PostAsJsonAsync(
+            $"/api/organizations/{organizationId}/legitimacy-evidence/upload-session", upload);
+        await Assert.That(accepted.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        var session = (await accepted.Content.ReadFromJsonAsync<BaseCommandResponse<StorageUploadSessionDto>>())!.Id!;
+        await Assert.That(session.UserId).IsEqualTo(userId);
+        await Assert.That(session.TenantId).IsEqualTo(PlatformDefaults.DefaultTenantId);
+        await Assert.That(session.Purpose).IsEqualTo(StorageObjectPurposes.Document);
+        await Assert.That(session.Visibility).IsEqualTo(StorageObjectVisibilities.PrivateOwner);
+        await Assert.That(session.SafeDisplayName).IsEqualTo("evidence.pdf");
+        await Assert.That(session.Status).IsEqualTo(StorageUploadSessionStates.Reserved);
+        await Assert.That(session.TotalReservedBytes).IsEqualTo(5);
+
+        // The same principal has an OrgAdmin membership in the foreign tenant, not in the current scope.
+        using var foreignParent = await client.PostAsJsonAsync(
+            $"/api/organizations/{foreignOrganizationId}/legitimacy-evidence/upload-session", upload);
+        await Assert.That(foreignParent.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+        using var forgedChild = await client.PostAsJsonAsync(Root + "/upload-sessions", new CreateStorageUploadSessionDto
+        {
+            ExpectedSizeBytes = 5, ContentType = "application/pdf", OriginalFileName = "foreign.pdf", Extension = "pdf",
+            Purpose = StorageObjectPurposes.Document, Visibility = StorageObjectVisibilities.PrivateOwner,
+            OwningResourceKind = StorageOwningResourceKinds.OrganizationTenant, OwningResourceId = foreignParticipationId,
+            IdempotencyKey = "foreign-evidence"
+        });
+        await Assert.That(forgedChild.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var persisted = await scope.ServiceProvider.GetRequiredService<IStorageUploadSessionRepository>()
+                .GetActiveByIdAsync(session.Id, default);
+            await Assert.That(persisted!.OwningResourceKind).IsEqualTo(StorageOwningResourceKinds.OrganizationTenant);
+            await Assert.That(persisted.OwningResourceId).IsEqualTo(participationId);
+            var counters = await scope.ServiceProvider.GetRequiredService<IStorageUsageCounterRepository>()
+                .GetByTenantAsync(PlatformDefaults.DefaultTenantId, default);
+            await Assert.That(counters.Single().ReservedBytes).IsEqualTo(5);
+            await Assert.That(await scope.ServiceProvider.GetRequiredService<ExploreDbContext>()
+                .StorageUploadSessions.CountAsync()).IsEqualTo(1);
+        }
+        await Assert.That(factory.WriteCount).IsEqualTo(0);
+        await Assert.That(factory.Objects).IsEmpty();
+        await Assert.That(factory.Signings).IsEmpty();
+    }
 
     [Test]
     public async Task UploadReplayQuotaFinalizeReadUpdateCapabilityAndDeleteKeepTheirEffects()
@@ -237,13 +345,20 @@ public sealed class NativeStorageObjectHttpTests
         public int WriteCount { get; private set; }
         public int DisposedReads { get; private set; }
 
-        public static async Task<StorageFactory> CreateAsync()
+        public static async Task<StorageFactory> CreateAsync(bool useProductionAuthorization = false)
         {
             var factory = new StorageFactory();
-            factory.AuthorizationProviderOverride = new StubAuthorizationProvider
+            if (useProductionAuthorization)
             {
-                CheckPredicate = request => request.ResourceKind == ResourceKinds.StorageObject && request.Action != factory.DeniedAction
-            };
+                factory.AdditionalConfiguration["Authorization:Provider"] = "local";
+            }
+            else
+            {
+                factory.AuthorizationProviderOverride = new StubAuthorizationProvider
+                {
+                    CheckPredicate = request => request.ResourceKind == ResourceKinds.StorageObject && request.Action != factory.DeniedAction
+                };
+            }
             try
             {
                 var options = new DbContextOptionsBuilder<ExploreDbContext>();

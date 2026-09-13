@@ -1,6 +1,6 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.UiShell;
-using MediatR;
 
 namespace Explore.Application.Features.UiShell.Requests.Queries;
 
-public sealed record GetUiShellContextRequest : IRequest<UiShellContextDto>;
+public sealed record GetUiShellContextRequest : IQuery<UiShellContextDto>;

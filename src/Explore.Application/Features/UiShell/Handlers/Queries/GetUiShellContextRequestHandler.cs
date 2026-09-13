@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Ai;
 using Explore.Application.DTOs.UiShell;
@@ -11,7 +12,6 @@ using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.UiShell.Handlers.Queries;
 
@@ -22,7 +22,7 @@ public sealed class GetUiShellContextRequestHandler(
     IAiAssistantActorContextService actorContextService,
     IHierarchicalSettingsResolver settingsResolver,
     IDeploymentModeProvider deploymentModeProvider)
-    : IRequestHandler<GetUiShellContextRequest, UiShellContextDto>
+    : IQueryHandler<GetUiShellContextRequest, UiShellContextDto>
 {
     private static readonly string[] SettingKeys =
     [
@@ -36,7 +36,7 @@ public sealed class GetUiShellContextRequestHandler(
         GovernanceSettingKeys.PublicExperience.PrimaryOrganizationId
     ];
 
-    public async Task<UiShellContextDto> Handle(
+    public async Task<UiShellContextDto> QueryAsync(
         GetUiShellContextRequest request,
         CancellationToken cancellationToken)
     {

@@ -170,6 +170,12 @@ the native decorators to the handler; `IEventSessionStatusRepository.GetById(int
 and `GetAll()` have no token parameter, so database-read interruption is not
 claimed or introduced by this repair.
 
+### Duplicate Session Language Assignments
+
+`CreateEventSessionLanguageCommand` retains session authorization and manual input validation. The repository insert remains arbitrated by the existing unique `(TenantId, EventSessionId, LanguageId)` index, including concurrent requests; there is no check-then-insert substitute for that constraint. `EventSessionLanguageRepository` translates only that exact model-derived index violation through the existing provider-aware constraint classifier into `EventSessionLanguageAlreadyAssignedException`, detaching the rejected assignment. The command maps that exception to its established validation result, and the controller returns HTTP 400 ValidationProblemDetails (`validation_failed`, `errors.program`). Unrelated primary-key, foreign-key and other database failures are not classified as duplicate assignments.
+
+This replaces provider-dependent duplicate-create 500 responses without changing routes, successful 201 payloads, OpenAPI/client shapes or the unique index. No migration or configuration change is required. The inherited repository create signature remains tokenless; this repair does not claim database-write cancellation support. `NativeEventSessionLanguageHttpTests` covers sequential duplicates, two real inserts synchronized before persistence, durable uniqueness, and unrelated constraint failures on canonical SQLite; other provider execution remains part of the workstream matrix.
+
 ### Registration Provider Management Capabilities
 
 The 25 actions under `api/tenants/{tenantId:guid}/events/{eventId:guid}/registration-providers`

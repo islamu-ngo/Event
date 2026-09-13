@@ -1,5 +1,7 @@
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Exceptions;
 using Explore.Domain;
+using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
 
 namespace Explore.Persistence.Repositories;
@@ -11,6 +13,27 @@ public class EventSessionLanguageRepository : GenericRepository<EventSessionLang
     public EventSessionLanguageRepository(ExploreDbContext dbContext) : base(dbContext)
     {
         _dbContext = dbContext;
+    }
+
+    public override async Task<EventSessionLanguage> Create(EventSessionLanguage entity)
+    {
+        try
+        {
+            await _dbContext.AddAsync(entity);
+            await _dbContext.SaveChangesAsync();
+            return entity;
+        }
+        catch (DbUpdateException exception) when (RegistrationUniqueConflictClassifier.IsExpectedConflict(
+            exception,
+            [RelationalConstraintDescriptorResolver.UniqueIndex<EventSessionLanguage>(
+                _dbContext,
+                nameof(EventSessionLanguage.TenantId),
+                nameof(EventSessionLanguage.EventSessionId),
+                nameof(EventSessionLanguage.LanguageId))]))
+        {
+            _dbContext.Entry(entity).State = EntityState.Detached;
+            throw new EventSessionLanguageAlreadyAssignedException(exception);
+        }
     }
 
     public async Task<List<EventSessionLanguage>> GetBySession(Guid eventSessionId, CancellationToken cancellationToken = default)

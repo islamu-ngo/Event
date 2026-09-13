@@ -1,3 +1,9 @@
+using Explore.Application;
+using Event.Application.UnitTests.Operations;
+using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Responses;
+using Microsoft.Extensions.DependencyInjection;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
@@ -54,8 +60,19 @@ public sealed class EventSessionMappingHandlerTests
             stored.Id = 42;
             return stored;
         });
-        var handler = new CreateEventSessionLanguageCommandHandler(repository, sessions, languages, Tenant());
-        var result = await handler.Handle(new CreateEventSessionLanguageCommand
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton(repository);
+        services.AddSingleton(sessions);
+        services.AddSingleton(languages);
+        services.AddSingleton(Tenant());
+        services.AddSingleton<IAuthorizationProvider>(new OperationAuthorizationTests.Policy(
+            AuthorizationDecision.Allow(AuthorizationProviderMetadata.Local)));
+        services.AddNativeOperations([typeof(CreateEventSessionLanguageCommand), typeof(CreateEventSessionLanguageCommandHandler)]);
+        await using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+        await using var scope = provider.CreateAsyncScope();
+        var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<CreateEventSessionLanguageCommand, BaseCommandResponse<int>>>();
+        var result = await handler.ExecuteAsync(new CreateEventSessionLanguageCommand
         {
             EventSessionLanguageDto = new CreateEventSessionLanguageDto { EventSessionId = SessionId, LanguageId = 7 }
         }, CancellationToken.None);
@@ -256,8 +273,16 @@ public sealed class EventSessionMappingHandlerTests
         var sessions = Substitute.For<IEventSessionRepository>();
         var speaker = await new GetEventSessionSpeakerDetailsRequestHandler(speakers)
             .Handle(new GetEventSessionSpeakerDetailsRequest { Id = CreatedId }, CancellationToken.None);
-        var language = await new GetEventSessionLanguageDetailsRequestHandler(languages, sessions)
-            .Handle(new GetEventSessionLanguageDetailsRequest { Id = 7 }, CancellationToken.None);
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton(languages);
+        services.AddSingleton(sessions);
+        services.AddSingleton(Substitute.For<IAuthorizationProvider>());
+        services.AddNativeOperations([typeof(GetEventSessionLanguageDetailsQuery), typeof(GetEventSessionLanguageDetailsQueryHandler)]);
+        await using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+        await using var scope = provider.CreateAsyncScope();
+        var language = await scope.ServiceProvider.GetRequiredService<IQueryHandler<GetEventSessionLanguageDetailsQuery, EventSessionLanguageDto?>>()
+            .QueryAsync(new GetEventSessionLanguageDetailsQuery { Id = 7 }, CancellationToken.None);
         await Assert.That(speaker).IsNull();
         await Assert.That(language).IsNull();
     }

@@ -1,11 +1,11 @@
 using System.Collections.Generic;
 using Explore.Application.DTOs.EventSessionLanguage;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventSessionLanguages.Requests.Queries;
 
-public sealed record GetEventSessionLanguageListRequest : IRequest<PaginatedResult<EventSessionLanguageListDto>>
+public sealed record GetEventSessionLanguageListQuery : IQuery<PaginatedResult<EventSessionLanguageListDto>>
 {
     /// <summary>
     /// Gets or sets the page number (1-based). Defaults to 1.

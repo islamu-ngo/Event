@@ -5,17 +5,17 @@ using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionLanguage;
 using Explore.Application.Features.EventSessionLanguages.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventSessionLanguages.Handlers.Queries;
 
-public class GetLanguagesBySessionRequestHandler :
-    IRequestHandler<GetLanguagesBySessionRequest, List<EventSessionLanguageListDto>>
+public class GetLanguagesBySessionQueryHandler :
+    IQueryHandler<GetLanguagesBySessionQuery, List<EventSessionLanguageListDto>>
 {
     private readonly IEventSessionLanguageRepository _repository;
     private readonly IEventSessionRepository _eventSessionRepository;
 
-    public GetLanguagesBySessionRequestHandler(
+    public GetLanguagesBySessionQueryHandler(
         IEventSessionLanguageRepository repository,
         IEventSessionRepository eventSessionRepository)
     {
@@ -23,7 +23,7 @@ public class GetLanguagesBySessionRequestHandler :
         _eventSessionRepository = eventSessionRepository;
     }
 
-    public async Task<List<EventSessionLanguageListDto>> Handle(GetLanguagesBySessionRequest request, CancellationToken cancellationToken)
+    public async Task<List<EventSessionLanguageListDto>> QueryAsync(GetLanguagesBySessionQuery request, CancellationToken cancellationToken)
     {
         var eventSession = await _eventSessionRepository.GetPublicSessionWithDetailsAsync(
             request.EventSessionId,
@@ -51,13 +51,13 @@ public class GetLanguagesBySessionRequestHandler :
     }
 }
 
-public sealed class GetManagedLanguagesBySessionRequestHandler(
+public sealed class GetManagedLanguagesBySessionQueryHandler(
     IEventSessionLanguageRepository repository,
     IEventSessionRepository eventSessionRepository)
-    : IRequestHandler<GetManagedLanguagesBySessionRequest, List<EventSessionLanguageListDto>>
+    : IQueryHandler<GetManagedLanguagesBySessionQuery, List<EventSessionLanguageListDto>>
 {
-    public async Task<List<EventSessionLanguageListDto>> Handle(
-        GetManagedLanguagesBySessionRequest request,
+    public async Task<List<EventSessionLanguageListDto>> QueryAsync(
+        GetManagedLanguagesBySessionQuery request,
         CancellationToken cancellationToken)
     {
         var eventSession = await eventSessionRepository.GetSessionWithDetails(request.EventSessionId);

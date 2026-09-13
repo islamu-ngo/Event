@@ -1,23 +1,17 @@
-using System.Net;
-using System.Net.Http.Json;
 using System.Reflection;
-using Event.Api.IntegrationTests.Fixtures;
-using Event.Api.IntegrationTests.Helpers;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventSessionLanguage;
 using Explore.Application.Features.EventSessionLanguages.Requests.Commands;
 using Explore.Application.Features.EventSessionLanguages.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Routing;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.AspNetCore.TestHost;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
+using NSubstitute;
 
 namespace Event.Api.IntegrationTests.Features;
 
@@ -26,14 +20,10 @@ public sealed class EventSessionLanguageControllerTests
     [Test]
     public async Task ManagedReadRoute_UsesAuthenticatedViewManagementContract()
     {
-        var action = typeof(EventSessionLanguageController).GetMethod(
-            nameof(EventSessionLanguageController.GetManagedBySession))!;
+        var action = typeof(EventSessionLanguageController).GetMethod(nameof(EventSessionLanguageController.GetManagedBySession))!;
         var route = action.GetCustomAttribute<HttpGetAttribute>()!;
-        var authorization = typeof(GetManagedLanguagesBySessionRequest)
-            .GetCustomAttribute<AuthorizeResourceAttribute>()!;
-
-        await Assert.That(route.Template)
-            .IsEqualTo("management/by-event/{eventId:guid}/by-session/{eventSessionId:guid}");
+        var authorization = typeof(GetManagedLanguagesBySessionQuery).GetCustomAttribute<AuthorizeResourceAttribute>()!;
+        await Assert.That(route.Template).IsEqualTo("management/by-event/{eventId:guid}/by-session/{eventSessionId:guid}");
         await Assert.That(route.Name).IsEqualTo(RouteNames.GetManagedEventSessionLanguages);
         await Assert.That(action.GetCustomAttribute<AuthorizeAttribute>()).IsNotNull();
         await Assert.That(action.GetCustomAttribute<AllowAnonymousAttribute>()).IsNull();
@@ -41,162 +31,69 @@ public sealed class EventSessionLanguageControllerTests
         await Assert.That(authorization.Action).IsEqualTo(AuthorizationActions.Events.ViewManagement);
     }
 
+    // These adapter-only tests retain the command-result mappings, including the not-found
+    // result that normal HTTP authorization rejects before the business handler runs.
+    // NativeEventSessionLanguageHttpTests owns real authorization and durable mutation evidence.
     [Test]
     public async Task Update_WhenIfMatchIsMissing_ReturnsValidationProblemDetails()
     {
-        using var mediator = new EventSessionLanguageMediatorStub(_ => throw new InvalidOperationException("Mediator should not run when If-Match is missing."));
-        await using var factory = CreateFactoryWithMediator(mediator);
-        using var client = factory.CreateClient();
-        using var request = CreateAuthenticatedJsonRequest(
-            HttpMethod.Patch,
-            "/api/eventsessionlanguage/7",
-            CreateUpdateDto());
-
-        var response = await client.SendAsync(request);
-
-        await ProblemDetailsAssertions.AssertProblemDetailsAsync(
-            response,
-            HttpStatusCode.BadRequest,
-            "Program validation failed");
-        using var problem = await ProblemDetailsAssertions.ReadAsJsonAsync(response);
-        var root = problem.RootElement;
-        await Assert.That(root.GetProperty("code").GetString()).IsEqualTo("validation_failed");
-        await Assert.That(root.GetProperty("errors").TryGetProperty("If-Match", out var ifMatchErrors)).IsTrue();
-        await Assert.That(ifMatchErrors.GetArrayLength()).IsEqualTo(1);
-        await Assert.That(mediator.LastRequest).IsNull();
+        var update = new UpdatePort(_ => throw new InvalidOperationException("Dispatch must not run without If-Match."));
+        var result = await Controller(update).Update(7, Input(), null);
+        var problem = (ValidationProblemDetails)((ObjectResult)result.Result!).Value!;
+        await Assert.That(problem.Status).IsEqualTo(400);
+        await Assert.That(problem.Title).IsEqualTo("Program validation failed");
+        await Assert.That(problem.Extensions["code"]).IsEqualTo("validation_failed");
+        await Assert.That(problem.Errors["If-Match"].Length).IsEqualTo(1);
+        await Assert.That(update.LastRequest).IsNull();
     }
 
     [Test]
     public async Task Update_WhenCommandValidationFails_DoesNotProbeBeforeSecuredCommand()
     {
-        using var mediator = new EventSessionLanguageMediatorStub(request => request switch
-        {
-            UpdateEventSessionLanguageCommand => BaseCommandResponse.Validation<int>(
-                ["Language not found."],
-                "Event Session Language update failed."),
-            _ => throw new InvalidOperationException($"Unexpected request: {request.GetType().Name}")
-        });
-        await using var factory = CreateFactoryWithMediator(mediator);
-        using var client = factory.CreateClient();
-        var concurrencyStamp = Guid.NewGuid();
-        using var request = CreateAuthenticatedJsonRequest(
-            HttpMethod.Patch,
-            "/api/eventsessionlanguage/7",
-            CreateUpdateDto(),
-            ifMatch: concurrencyStamp);
-
-        var response = await client.SendAsync(request);
-
-        await ProblemDetailsAssertions.AssertProblemDetailsAsync(
-            response,
-            HttpStatusCode.BadRequest,
-            "Program validation failed");
-
-        var command = mediator.LastRequest as UpdateEventSessionLanguageCommand;
-        await Assert.That(command).IsNotNull();
-        await Assert.That(command!.EventSessionLanguageId).IsEqualTo(7);
-        await Assert.That(command.EventSessionId).IsEqualTo(Guid.Empty);
-        await Assert.That(command.ExpectedConcurrencyStamp).IsEqualTo(concurrencyStamp);
+        var update = new UpdatePort(_ => BaseCommandResponse.Validation<int>(["Language not found."], "Event Session Language update failed."));
+        var stamp = Guid.CreateVersion7();
+        var result = await Controller(update).Update(7, Input(), $"\"{stamp:D}\"");
+        var problem = (ValidationProblemDetails)((ObjectResult)result.Result!).Value!;
+        await Assert.That(problem.Status).IsEqualTo(400);
+        await Assert.That(problem.Title).IsEqualTo("Program validation failed");
+        await Assert.That(update.LastRequest!.EventSessionLanguageId).IsEqualTo(7);
+        await Assert.That(update.LastRequest.EventSessionId).IsEqualTo(Guid.Empty);
+        await Assert.That(update.LastRequest.ExpectedConcurrencyStamp).IsEqualTo(stamp);
     }
 
     [Test]
     public async Task Update_WhenFailureCodeIsNotFound_ReturnsNotFound()
     {
-        using var mediator = new EventSessionLanguageMediatorStub(request => request switch
-        {
-            UpdateEventSessionLanguageCommand => BaseCommandResponse.NotFound<int>(
-                "Event session language not found."),
-            _ => throw new InvalidOperationException($"Unexpected request: {request.GetType().Name}")
-        });
-        await using var factory = CreateFactoryWithMediator(mediator);
-        using var client = factory.CreateClient();
-        using var request = CreateAuthenticatedJsonRequest(
-            HttpMethod.Patch,
-            "/api/eventsessionlanguage/7",
-            CreateUpdateDto(),
-            ifMatch: Guid.NewGuid());
-
-        var response = await client.SendAsync(request);
-
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        var update = new UpdatePort(_ => BaseCommandResponse.NotFound<int>("Event session language not found."));
+        var result = await Controller(update).Update(7, Input(), $"\"{Guid.CreateVersion7():D}\"");
+        await Assert.That(((ObjectResult)result.Result!).StatusCode).IsEqualTo(404);
     }
 
-    private static WebApplicationFactory<Program> CreateFactoryWithMediator(IMediator mediator)
-    {
-        var factory = new AuthenticatedWebApplicationFactory();
-
-        return factory.WithWebHostBuilder(builder =>
-        {
-            builder.ConfigureServices(services =>
-            {
-                services.RemoveAll<IMediator>();
-                services.AddSingleton(mediator);
-            });
-        });
-    }
-
-    private static HttpRequestMessage CreateAuthenticatedJsonRequest<TValue>(
-        HttpMethod method,
-        string url,
-        TValue body,
-        Guid? ifMatch = null)
-    {
-        var request = new HttpRequestMessage(method, url)
-        {
-            Content = JsonContent.Create(body)
-        };
-        request.Headers.Add(TestAuthHandler.AuthHeaderName, TestAuthHandler.CreateAuthHeaderValue(Guid.NewGuid()));
-        if (ifMatch.HasValue)
-        {
-            request.Headers.TryAddWithoutValidation("If-Match", $"\"{ifMatch.Value:D}\"");
-        }
-
-        return request;
-    }
-
-    private static UpdateEventSessionLanguageDto CreateUpdateDto() => new()
+    private static UpdateEventSessionLanguageDto Input() => new()
     {
         Language = new UpdateEventSessionLanguageLanguageDto { LanguageId = 2 }
     };
 
-    private sealed class EventSessionLanguageMediatorStub(Func<object, object> responseFactory) : IMediator, IDisposable
+    private static EventSessionLanguageController Controller(UpdatePort update) => new(
+        Substitute.For<IQueryHandler<GetLanguagesBySessionQuery, List<EventSessionLanguageListDto>>>(),
+        Substitute.For<IQueryHandler<GetManagedLanguagesBySessionQuery, List<EventSessionLanguageListDto>>>(),
+        Substitute.For<IQueryHandler<GetEventSessionLanguageDetailsQuery, EventSessionLanguageDto?>>(),
+        Substitute.For<ICommandHandler<CreateEventSessionLanguageCommand, BaseCommandResponse<int>>>(),
+        update,
+        Substitute.For<ICommandHandler<DeleteEventSessionLanguageCommand, bool>>(),
+        Substitute.For<IResourceAssembler<EventSessionLanguageDto, EventSessionLanguageListDto>>())
     {
-        public object? LastRequest { get; private set; }
+        ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+    };
 
-        public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default)
+    private sealed class UpdatePort(Func<UpdateEventSessionLanguageCommand, BaseCommandResponse<int>> respond)
+        : ICommandHandler<UpdateEventSessionLanguageCommand, BaseCommandResponse<int>>
+    {
+        public UpdateEventSessionLanguageCommand? LastRequest { get; private set; }
+        public Task<BaseCommandResponse<int>> ExecuteAsync(UpdateEventSessionLanguageCommand command, CancellationToken cancellationToken)
         {
-            LastRequest = request;
-            object response = responseFactory(request);
-            return Task.FromResult((TResponse)response);
-        }
-
-        public Task Send<TRequest>(TRequest request, CancellationToken cancellationToken = default)
-            where TRequest : IRequest
-        {
-            LastRequest = request;
-            return Task.CompletedTask;
-        }
-
-        public Task<object?> Send(object request, CancellationToken cancellationToken = default)
-        {
-            LastRequest = request;
-            return Task.FromResult<object?>(responseFactory(request));
-        }
-
-        public Task Publish(object notification, CancellationToken cancellationToken = default) => Task.CompletedTask;
-
-        public Task Publish<TNotification>(TNotification notification, CancellationToken cancellationToken = default)
-            where TNotification : INotification
-            => Task.CompletedTask;
-
-        public IAsyncEnumerable<TResponse> CreateStream<TResponse>(IStreamRequest<TResponse> request, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-
-        public IAsyncEnumerable<object?> CreateStream(object request, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-
-        public void Dispose()
-        {
+            LastRequest = command;
+            return Task.FromResult(respond(command));
         }
     }
 }

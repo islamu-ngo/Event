@@ -96,6 +96,12 @@ or `?api-version=0.1`. Requests without an explicit version default to `0.1`. UR
 * Retryable documented writes use a stable per-operation UUIDv7 `Idempotency-Key`.
 * Operational `/alive`, `/health`, and `/metrics` endpoints are outside generated controller operations.
 
+## Duplicate session language assignments
+
+`POST /api/eventsessionlanguage` returns `400` with the endpoint's existing JSON validation ProblemDetails body, `code: validation_failed`, and an `errors.program` entry when the language is already assigned to that session. Concurrent submissions retain exactly one assignment: the winning create returns `201`, and the duplicate receives the same controlled validation response. A language may still be assigned to a different session. Existing authorization and tenant boundaries apply before mutation.
+
+This corrects previously provider-dependent duplicate-create failures. It needs no database migration, configuration change, or generated client update; the existing unique constraint remains authoritative.
+
 ## Unknown session status IDs
 
 `GET /api/eventsessionstatus/{id}` returns `404` with an

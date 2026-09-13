@@ -4,14 +4,15 @@ using System.Threading.Tasks;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionLanguage.Validators;
+using Explore.Application.Exceptions;
 using Explore.Application.Features.EventSessionLanguages.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventSessionLanguages.Handlers.Commands;
 
-public class CreateEventSessionLanguageCommandHandler : IRequestHandler<CreateEventSessionLanguageCommand, BaseCommandResponse<int>>
+public class CreateEventSessionLanguageCommandHandler : ICommandHandler<CreateEventSessionLanguageCommand, BaseCommandResponse<int>>
 {
     private readonly IEventSessionLanguageRepository _repository;
     private readonly IEventSessionRepository _eventSessionRepository;
@@ -30,7 +31,7 @@ public class CreateEventSessionLanguageCommandHandler : IRequestHandler<CreateEv
         _tenantContext = tenantContext;
     }
 
-    public async Task<BaseCommandResponse<int>> Handle(CreateEventSessionLanguageCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<int>> ExecuteAsync(CreateEventSessionLanguageCommand request, CancellationToken cancellationToken)
     {
         var validator = new CreateEventSessionLanguageDtoValidator(_eventSessionRepository, _languageRepository);
         var validationResult = await validator.ValidateAsync(request.EventSessionLanguageDto, cancellationToken);
@@ -55,7 +56,16 @@ public class CreateEventSessionLanguageCommandHandler : IRequestHandler<CreateEv
         // Set TenantId from the request context
         eventSessionLanguage.TenantId = _tenantContext.TenantId;
 
-        eventSessionLanguage = await _repository.Create(eventSessionLanguage);
+        try
+        {
+            eventSessionLanguage = await _repository.Create(eventSessionLanguage);
+        }
+        catch (EventSessionLanguageAlreadyAssignedException)
+        {
+            return BaseCommandResponse.Validation<int>(
+                ["Language is already assigned to this event session."],
+                "Event Session Language creation failed.");
+        }
 
         return BaseCommandResponse.Success(
             eventSessionLanguage.Id,

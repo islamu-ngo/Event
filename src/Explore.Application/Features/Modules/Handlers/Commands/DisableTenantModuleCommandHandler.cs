@@ -1,14 +1,14 @@
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Modules.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Modules.Handlers.Commands;
 
 public sealed class DisableTenantModuleCommandHandler(IModuleService moduleService)
-    : IRequestHandler<DisableTenantModuleCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<DisableTenantModuleCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         DisableTenantModuleCommand request,
         CancellationToken cancellationToken)
     {

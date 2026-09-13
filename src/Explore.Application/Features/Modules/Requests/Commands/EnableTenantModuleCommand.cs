@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Modules.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Tenant, AuthorizationActions.Update)]
-public sealed record EnableTenantModuleCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record EnableTenantModuleCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public required Guid TenantId { get; init; }
     public required string ModuleKey { get; init; }

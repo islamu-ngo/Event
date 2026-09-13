@@ -7,7 +7,8 @@ using Explore.API.Extensions;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Features.Modules.Requests.Commands;
-using MediatR;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -39,16 +40,19 @@ public class ModuleController : ControllerBase
 
     private readonly IModuleService _moduleService;
     private readonly ITenantContext _tenantContext;
-    private readonly IMediator _mediator;
+    private readonly ICommandHandler<EnableTenantModuleCommand, BaseCommandResponse<Guid>> _enableModule;
+    private readonly ICommandHandler<DisableTenantModuleCommand, BaseCommandResponse<Guid>> _disableModule;
 
     public ModuleController(
         IModuleService moduleService,
         ITenantContext tenantContext,
-        IMediator mediator)
+        ICommandHandler<EnableTenantModuleCommand, BaseCommandResponse<Guid>> enableModule,
+        ICommandHandler<DisableTenantModuleCommand, BaseCommandResponse<Guid>> disableModule)
     {
         _moduleService = moduleService;
         _tenantContext = tenantContext;
-        _mediator = mediator;
+        _enableModule = enableModule;
+        _disableModule = disableModule;
     }
 
     /// <summary>
@@ -157,7 +161,7 @@ public class ModuleController : ControllerBase
         CancellationToken cancellationToken)
     {
         var tenantId = _tenantContext.TenantId;
-        var response = await _mediator.Send(new EnableTenantModuleCommand
+        var response = await _enableModule.ExecuteAsync(new EnableTenantModuleCommand
         {
             TenantId = tenantId,
             ModuleKey = moduleKey
@@ -198,7 +202,7 @@ public class ModuleController : ControllerBase
         CancellationToken cancellationToken)
     {
         var tenantId = _tenantContext.TenantId;
-        var response = await _mediator.Send(new DisableTenantModuleCommand
+        var response = await _disableModule.ExecuteAsync(new DisableTenantModuleCommand
         {
             TenantId = tenantId,
             ModuleKey = moduleKey

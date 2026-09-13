@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
 using Explore.Application.Features.ControlPlane.Plans;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ControlPlane.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.InstanceSetting, AuthorizationActions.InstanceSettings.View)]
 public sealed record ValidateControlPlaneTenantPlanDraftQuery
-    : IRequest<TenantPlanValidationResult>, ISecureRequest
+    : IQuery<TenantPlanValidationResult>, ISecureRequest
 {
     public ValidateControlPlaneTenantPlanDraftQuery(TenantPlanDraft draft)
     {

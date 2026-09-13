@@ -1,13 +1,13 @@
 using Explore.Application.Features.ControlPlane.Plans;
 using Explore.Application.Features.ControlPlane.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ControlPlane.Handlers.Queries;
 
 public sealed class PreviewControlPlaneTenantPlanDiffQueryHandler
-    : IRequestHandler<PreviewControlPlaneTenantPlanDiffQuery, TenantPlanDiffResult>
+    : IQueryHandler<PreviewControlPlaneTenantPlanDiffQuery, TenantPlanDiffResult>
 {
-    public Task<TenantPlanDiffResult> Handle(
+    public Task<TenantPlanDiffResult> QueryAsync(
         PreviewControlPlaneTenantPlanDiffQuery request,
         CancellationToken cancellationToken)
     {

@@ -1,16 +1,16 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.ControlPlane;
 using Explore.Application.Features.ControlPlane.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ControlPlane.Handlers.Queries;
 
 public sealed class GetControlPlaneTenantDetailsQueryHandler(
     ITenantRepository tenantRepository,
     ITenantLifecycleLogRepository lifecycleLogRepository)
-    : IRequestHandler<GetControlPlaneTenantDetailsQuery, ControlPlaneTenantDetailDto?>
+    : IQueryHandler<GetControlPlaneTenantDetailsQuery, ControlPlaneTenantDetailDto?>
 {
-    public async Task<ControlPlaneTenantDetailDto?> Handle(
+    public async Task<ControlPlaneTenantDetailDto?> QueryAsync(
         GetControlPlaneTenantDetailsQuery request,
         CancellationToken cancellationToken)
     {

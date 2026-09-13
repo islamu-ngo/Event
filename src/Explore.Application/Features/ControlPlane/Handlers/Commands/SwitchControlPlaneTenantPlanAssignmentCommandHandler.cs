@@ -3,16 +3,16 @@ using Explore.Application.Features.ControlPlane.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ControlPlane.Handlers.Commands;
 
 public sealed class SwitchControlPlaneTenantPlanAssignmentCommandHandler(
     ITenantPlanRepository tenantPlanRepository,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<SwitchControlPlaneTenantPlanAssignmentCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<SwitchControlPlaneTenantPlanAssignmentCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         SwitchControlPlaneTenantPlanAssignmentCommand request,
         CancellationToken cancellationToken)
     {

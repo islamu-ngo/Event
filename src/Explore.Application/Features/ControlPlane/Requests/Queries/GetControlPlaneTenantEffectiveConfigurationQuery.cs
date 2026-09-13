@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.ControlPlane;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ControlPlane.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.InstanceSetting, AuthorizationActions.InstanceSettings.View)]
 public sealed record GetControlPlaneTenantEffectiveConfigurationQuery
-    : IRequest<ControlPlaneTenantEffectiveConfigurationDto>, ISecureRequest
+    : IQuery<ControlPlaneTenantEffectiveConfigurationDto>, ISecureRequest
 {
     public GetControlPlaneTenantEffectiveConfigurationQuery(Guid tenantId)
     {

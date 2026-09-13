@@ -102,7 +102,7 @@ public sealed class TenantIdentityActivationConcurrencyTests
             Substitute.For<ITypedSettingsDocumentResolver>());
 
         Task<BaseCommandResponse<ControlPlaneTenantLifecycleTransitionDto>> activationTask =
-            activationHandler.Handle(
+            activationHandler.ExecuteAsync(
                 new TransitionControlPlaneTenantLifecycleCommand(
                     tenantId,
                     TenantStatusEnum.Active,

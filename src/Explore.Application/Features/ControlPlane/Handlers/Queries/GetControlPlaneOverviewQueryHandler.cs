@@ -7,7 +7,7 @@ using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.ControlPlane.Requests.Queries;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Configuration;
 
 namespace Explore.Application.Features.ControlPlane.Handlers.Queries;
@@ -22,9 +22,9 @@ public sealed class GetControlPlaneOverviewQueryHandler(
     IInstanceSmtpSettingService smtpSettingService,
     ISecretAuthorityStatusReader secretAuthorityStatusReader,
     IConfiguration configuration)
-    : IRequestHandler<GetControlPlaneOverviewQuery, ControlPlaneOverviewDto>
+    : IQueryHandler<GetControlPlaneOverviewQuery, ControlPlaneOverviewDto>
 {
-    public async Task<ControlPlaneOverviewDto> Handle(
+    public async Task<ControlPlaneOverviewDto> QueryAsync(
         GetControlPlaneOverviewQuery request,
         CancellationToken cancellationToken)
     {

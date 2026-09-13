@@ -4,14 +4,14 @@ using Explore.Application.Features.ControlPlane.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ControlPlane.Handlers.Commands;
 
 public sealed class UpdateControlPlaneTenantPlanVersionDraftCommandHandler(ITenantPlanRepository tenantPlanRepository)
-    : IRequestHandler<UpdateControlPlaneTenantPlanVersionDraftCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateControlPlaneTenantPlanVersionDraftCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UpdateControlPlaneTenantPlanVersionDraftCommand request,
         CancellationToken cancellationToken)
     {

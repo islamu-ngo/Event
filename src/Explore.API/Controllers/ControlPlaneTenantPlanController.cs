@@ -14,7 +14,7 @@ using Explore.Application.Features.ControlPlane.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -38,14 +38,41 @@ namespace Explore.API.Controllers;
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 public sealed class ControlPlaneTenantPlanController : EventControllerBase
 {
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetControlPlaneTenantPlanListQuery, IReadOnlyList<ControlPlaneTenantPlanListItemDto>> _plansQuery;
+    private readonly IQueryHandler<GetControlPlaneTenantPlanDetailQuery, ControlPlaneTenantPlanDetailDto?> _planQuery;
+    private readonly IQueryHandler<ValidateControlPlaneTenantPlanDraftQuery, TenantPlanValidationResult> _validateQuery;
+    private readonly IQueryHandler<PreviewControlPlaneTenantPlanDiffQuery, TenantPlanDiffResult> _diffQuery;
+    private readonly ICommandHandler<CreateControlPlaneTenantPlanDraftCommand, BaseCommandResponse<Guid>> _createDraft;
+    private readonly ICommandHandler<CreateControlPlaneTenantPlanVersionDraftCommand, BaseCommandResponse<Guid>> _createVersion;
+    private readonly ICommandHandler<UpdateControlPlaneTenantPlanVersionDraftCommand, BaseCommandResponse<Guid>> _updateVersion;
+    private readonly ICommandHandler<PublishControlPlaneTenantPlanVersionCommand, BaseCommandResponse<Guid>> _publishVersion;
+    private readonly ICommandHandler<ArchiveControlPlaneTenantPlanVersionCommand, BaseCommandResponse<Guid>> _archiveVersion;
+    private readonly ICommandHandler<CloneControlPlaneTenantPlanCommand, BaseCommandResponse<Guid>> _clonePlan;
     private readonly IResourceAssembler<ControlPlaneTenantPlanDetailDto, ControlPlaneTenantPlanListItemDto> _tenantPlanAssembler;
 
     public ControlPlaneTenantPlanController(
-        IMediator mediator,
+        IQueryHandler<GetControlPlaneTenantPlanListQuery, IReadOnlyList<ControlPlaneTenantPlanListItemDto>> plansQuery,
+        IQueryHandler<GetControlPlaneTenantPlanDetailQuery, ControlPlaneTenantPlanDetailDto?> planQuery,
+        IQueryHandler<ValidateControlPlaneTenantPlanDraftQuery, TenantPlanValidationResult> validateQuery,
+        IQueryHandler<PreviewControlPlaneTenantPlanDiffQuery, TenantPlanDiffResult> diffQuery,
+        ICommandHandler<CreateControlPlaneTenantPlanDraftCommand, BaseCommandResponse<Guid>> createDraft,
+        ICommandHandler<CreateControlPlaneTenantPlanVersionDraftCommand, BaseCommandResponse<Guid>> createVersion,
+        ICommandHandler<UpdateControlPlaneTenantPlanVersionDraftCommand, BaseCommandResponse<Guid>> updateVersion,
+        ICommandHandler<PublishControlPlaneTenantPlanVersionCommand, BaseCommandResponse<Guid>> publishVersion,
+        ICommandHandler<ArchiveControlPlaneTenantPlanVersionCommand, BaseCommandResponse<Guid>> archiveVersion,
+        ICommandHandler<CloneControlPlaneTenantPlanCommand, BaseCommandResponse<Guid>> clonePlan,
         IResourceAssembler<ControlPlaneTenantPlanDetailDto, ControlPlaneTenantPlanListItemDto> tenantPlanAssembler)
     {
-        _mediator = mediator;
+        _plansQuery = plansQuery;
+        _planQuery = planQuery;
+        _validateQuery = validateQuery;
+        _diffQuery = diffQuery;
+        _createDraft = createDraft;
+        _createVersion = createVersion;
+        _updateVersion = updateVersion;
+        _publishVersion = publishVersion;
+        _archiveVersion = archiveVersion;
+        _clonePlan = clonePlan;
         _tenantPlanAssembler = tenantPlanAssembler;
     }
 
@@ -60,7 +87,7 @@ public sealed class ControlPlaneTenantPlanController : EventControllerBase
     public async Task<ActionResult<HalCollectionResource<ControlPlaneTenantPlanListItemDto>>> GetTenantPlans(
         CancellationToken cancellationToken = default)
     {
-        var plans = await _mediator.Send(new GetControlPlaneTenantPlanListQuery(), cancellationToken);
+        var plans = await _plansQuery.QueryAsync(new GetControlPlaneTenantPlanListQuery(), cancellationToken);
         var resource = await _tenantPlanAssembler.ToCollectionResource(plans, RouteNames.GetControlPlaneTenantPlans, HttpContext);
 
         return Ok(resource);
@@ -79,7 +106,7 @@ public sealed class ControlPlaneTenantPlanController : EventControllerBase
         string key,
         CancellationToken cancellationToken = default)
     {
-        var plan = await _mediator.Send(new GetControlPlaneTenantPlanDetailQuery(key), cancellationToken);
+        var plan = await _planQuery.QueryAsync(new GetControlPlaneTenantPlanDetailQuery(key), cancellationToken);
         if (plan is null)
         {
             return NotFound();
@@ -103,7 +130,7 @@ public sealed class ControlPlaneTenantPlanController : EventControllerBase
         [FromBody] TenantPlanDraft draft,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new CreateControlPlaneTenantPlanDraftCommand(draft), cancellationToken);
+        var response = await _createDraft.ExecuteAsync(new CreateControlPlaneTenantPlanDraftCommand(draft), cancellationToken);
 
         return this.MapCommandResponse(response);
     }
@@ -122,7 +149,7 @@ public sealed class ControlPlaneTenantPlanController : EventControllerBase
         [FromBody] TenantPlanDraft draft,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new CreateControlPlaneTenantPlanVersionDraftCommand(key, draft), cancellationToken);
+        var response = await _createVersion.ExecuteAsync(new CreateControlPlaneTenantPlanVersionDraftCommand(key, draft), cancellationToken);
 
         return this.MapCommandResponse(response);
     }
@@ -141,7 +168,7 @@ public sealed class ControlPlaneTenantPlanController : EventControllerBase
         [FromBody] PatchControlPlaneTenantPlanVersionDraftDto update,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(
+        var response = await _updateVersion.ExecuteAsync(
             new UpdateControlPlaneTenantPlanVersionDraftCommand(versionId, update),
             cancellationToken);
 
@@ -162,7 +189,7 @@ public sealed class ControlPlaneTenantPlanController : EventControllerBase
         [FromBody] PublishTenantPlanVersionRequest request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(
+        var response = await _publishVersion.ExecuteAsync(
             new PublishControlPlaneTenantPlanVersionCommand(versionId, request.ExistingTenantPolicy),
             cancellationToken);
 
@@ -182,7 +209,7 @@ public sealed class ControlPlaneTenantPlanController : EventControllerBase
         Guid versionId,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new ArchiveControlPlaneTenantPlanVersionCommand(versionId), cancellationToken);
+        var response = await _archiveVersion.ExecuteAsync(new ArchiveControlPlaneTenantPlanVersionCommand(versionId), cancellationToken);
 
         return this.MapCommandResponse(response);
     }
@@ -201,7 +228,7 @@ public sealed class ControlPlaneTenantPlanController : EventControllerBase
         [FromBody] CloneTenantPlanRequest request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(
+        var response = await _clonePlan.ExecuteAsync(
             new CloneControlPlaneTenantPlanCommand(sourceVersionId, request.Key, request.Name),
             cancellationToken);
 
@@ -220,7 +247,7 @@ public sealed class ControlPlaneTenantPlanController : EventControllerBase
         [FromBody] TenantPlanDraft draft,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new ValidateControlPlaneTenantPlanDraftQuery(draft), cancellationToken);
+        var result = await _validateQuery.QueryAsync(new ValidateControlPlaneTenantPlanDraftQuery(draft), cancellationToken);
 
         return Ok(result);
     }
@@ -237,7 +264,7 @@ public sealed class ControlPlaneTenantPlanController : EventControllerBase
         [FromBody] PreviewTenantPlanDiffRequest request,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(
+        var result = await _diffQuery.QueryAsync(
             new PreviewControlPlaneTenantPlanDiffQuery(request.Current, request.Draft),
             cancellationToken);
 

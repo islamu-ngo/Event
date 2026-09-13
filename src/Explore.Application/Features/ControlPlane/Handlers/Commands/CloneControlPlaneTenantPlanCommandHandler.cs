@@ -4,14 +4,14 @@ using Explore.Application.Features.ControlPlane.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ControlPlane.Handlers.Commands;
 
 public sealed class CloneControlPlaneTenantPlanCommandHandler(ITenantPlanRepository tenantPlanRepository)
-    : IRequestHandler<CloneControlPlaneTenantPlanCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<CloneControlPlaneTenantPlanCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         CloneControlPlaneTenantPlanCommand request,
         CancellationToken cancellationToken)
     {

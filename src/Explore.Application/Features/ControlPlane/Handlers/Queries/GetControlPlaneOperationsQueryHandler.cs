@@ -8,7 +8,7 @@ using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Configuration;
 
 namespace Explore.Application.Features.ControlPlane.Handlers.Queries;
@@ -22,7 +22,7 @@ public sealed class GetControlPlaneOperationsQueryHandler(
     IInstanceStorageSettingService storageSettingService,
     IInstanceSmtpSettingService smtpSettingService,
     IConfiguration configuration)
-    : IRequestHandler<GetControlPlaneOperationsQuery, ControlPlaneOperationsDto>
+    : IQueryHandler<GetControlPlaneOperationsQuery, ControlPlaneOperationsDto>
 {
     private const int GeneralOutboxSampleLimit = 100;
     private const int DefaultProcessingLeaseTimeoutSeconds = 900;
@@ -32,7 +32,7 @@ public sealed class GetControlPlaneOperationsQueryHandler(
     private const int DefaultModerationReportingStuckSyncMinutes = 120;
     private const int DefaultModerationReportingFailedWarningThreshold = 1;
 
-    public async Task<ControlPlaneOperationsDto> Handle(
+    public async Task<ControlPlaneOperationsDto> QueryAsync(
         GetControlPlaneOperationsQuery request,
         CancellationToken cancellationToken)
     {

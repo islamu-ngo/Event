@@ -10,7 +10,7 @@ using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ControlPlane.Handlers.Commands;
 
@@ -22,9 +22,9 @@ public sealed class TransitionControlPlaneTenantLifecycleCommandHandler(
     ISettingMutationLock mutationLock,
     TenantActivationCapacityPolicy capacityPolicy,
     ITenantDirectoryOperatorReadinessEvaluator directoryOperatorReadiness)
-    : IRequestHandler<TransitionControlPlaneTenantLifecycleCommand, BaseCommandResponse<ControlPlaneTenantLifecycleTransitionDto>>
+    : ICommandHandler<TransitionControlPlaneTenantLifecycleCommand, BaseCommandResponse<ControlPlaneTenantLifecycleTransitionDto>>
 {
-    public async Task<BaseCommandResponse<ControlPlaneTenantLifecycleTransitionDto>> Handle(
+    public async Task<BaseCommandResponse<ControlPlaneTenantLifecycleTransitionDto>> ExecuteAsync(
         TransitionControlPlaneTenantLifecycleCommand request,
         CancellationToken cancellationToken)
     {

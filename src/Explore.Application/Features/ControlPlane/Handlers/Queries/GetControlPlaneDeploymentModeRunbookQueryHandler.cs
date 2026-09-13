@@ -3,15 +3,15 @@ using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.ControlPlane;
 using Explore.Application.Features.ControlPlane.Requests.Queries;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ControlPlane.Handlers.Queries;
 
 public sealed class GetControlPlaneDeploymentModeRunbookQueryHandler(
     IDeploymentModeProvider deploymentModeProvider,
-    ITenantRepository tenantRepository) : IRequestHandler<GetControlPlaneDeploymentModeRunbookQuery, ControlPlaneDeploymentModeRunbookDto>
+    ITenantRepository tenantRepository) : IQueryHandler<GetControlPlaneDeploymentModeRunbookQuery, ControlPlaneDeploymentModeRunbookDto>
 {
-    public async Task<ControlPlaneDeploymentModeRunbookDto> Handle(
+    public async Task<ControlPlaneDeploymentModeRunbookDto> QueryAsync(
         GetControlPlaneDeploymentModeRunbookQuery request,
         CancellationToken cancellationToken)
     {

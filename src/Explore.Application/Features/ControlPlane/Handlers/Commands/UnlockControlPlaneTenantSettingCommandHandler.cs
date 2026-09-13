@@ -7,7 +7,7 @@ using Explore.Application.Responses;
 using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Settings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ControlPlane.Handlers.Commands;
 
@@ -21,9 +21,9 @@ public sealed class UnlockControlPlaneTenantSettingCommandHandler(
     IEmailDeliverySettingsWriter emailDeliverySettingsWriter,
     IUnitOfWork unitOfWork,
     IVisitorAccessSettingsWriter visitorSettings)
-    : IRequestHandler<UnlockControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UnlockControlPlaneTenantSettingCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UnlockControlPlaneTenantSettingCommand request,
         CancellationToken cancellationToken)
     {

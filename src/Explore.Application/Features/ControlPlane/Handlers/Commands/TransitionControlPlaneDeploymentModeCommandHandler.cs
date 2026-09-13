@@ -7,7 +7,7 @@ using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ControlPlane.Handlers.Commands;
 
@@ -16,9 +16,9 @@ public sealed class TransitionControlPlaneDeploymentModeCommandHandler(
     ITenantRepository tenantRepository,
     ICurrentUserService currentUserService,
     IDeploymentModeProvider deploymentModeProvider,
-    ISettingMutationLock mutationLock) : IRequestHandler<TransitionControlPlaneDeploymentModeCommand, BaseCommandResponse<ControlPlaneDeploymentModeTransitionDto>>
+    ISettingMutationLock mutationLock) : ICommandHandler<TransitionControlPlaneDeploymentModeCommand, BaseCommandResponse<ControlPlaneDeploymentModeTransitionDto>>
 {
-    public async Task<BaseCommandResponse<ControlPlaneDeploymentModeTransitionDto>> Handle(
+    public async Task<BaseCommandResponse<ControlPlaneDeploymentModeTransitionDto>> ExecuteAsync(
         TransitionControlPlaneDeploymentModeCommand request,
         CancellationToken cancellationToken)
     {

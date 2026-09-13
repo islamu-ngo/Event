@@ -1,6 +1,6 @@
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.ControlPlane.Requests.Commands;
 
@@ -10,7 +10,7 @@ namespace Explore.Application.Features.ControlPlane.Requests.Commands;
 /// </summary>
 [AuthorizeResource(ResourceKinds.InstanceSetting, AuthorizationActions.InstanceSettings.Update)]
 public sealed record UnlockControlPlaneTenantSettingCommand
-    : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+    : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public UnlockControlPlaneTenantSettingCommand(Guid tenantId, string key)
     {

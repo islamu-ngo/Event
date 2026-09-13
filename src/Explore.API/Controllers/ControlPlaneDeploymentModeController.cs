@@ -10,7 +10,7 @@ using Explore.Application.Features.ControlPlane.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -25,7 +25,8 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Admin)]
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 public sealed class ControlPlaneDeploymentModeController(
-    IMediator mediator,
+    IQueryHandler<GetControlPlaneDeploymentModeRunbookQuery, ControlPlaneDeploymentModeRunbookDto> runbookQuery,
+    ICommandHandler<TransitionControlPlaneDeploymentModeCommand, BaseCommandResponse<ControlPlaneDeploymentModeTransitionDto>> transitionMode,
     IResourceAssembler<ControlPlaneDeploymentModeRunbookDto, ControlPlaneDeploymentModeRunbookDto> runbookAssembler)
     : EventControllerBase
 {
@@ -40,7 +41,7 @@ public sealed class ControlPlaneDeploymentModeController(
     public async Task<ActionResult<HalResource<ControlPlaneDeploymentModeRunbookDto>>> GetRunbook(
         CancellationToken cancellationToken = default)
     {
-        var runbook = await mediator.Send(new GetControlPlaneDeploymentModeRunbookQuery(), cancellationToken);
+        var runbook = await runbookQuery.QueryAsync(new GetControlPlaneDeploymentModeRunbookQuery(), cancellationToken);
         var resource = await runbookAssembler.ToResource(runbook, HttpContext);
 
         return Ok(resource);
@@ -67,7 +68,7 @@ public sealed class ControlPlaneDeploymentModeController(
             return BadRequest(BaseCommandResponse.Validation<ControlPlaneDeploymentModeTransitionDto>([message], message));
         }
 
-        var response = await mediator.Send(
+        var response = await transitionMode.ExecuteAsync(
             new TransitionControlPlaneDeploymentModeCommand(targetMode, dto.Reason, dto.ConfirmationText),
             cancellationToken);
 

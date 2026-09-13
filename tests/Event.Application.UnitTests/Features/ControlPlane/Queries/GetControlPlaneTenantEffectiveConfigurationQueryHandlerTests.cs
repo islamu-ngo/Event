@@ -44,7 +44,7 @@ public sealed class GetControlPlaneTenantEffectiveConfigurationQueryHandlerTests
             .Returns(new TenantStorageSettingsDto { TenantId = tenantId });
         var handler = new GetControlPlaneTenantEffectiveConfigurationQueryHandler(resolver, plans, storage);
 
-        ControlPlaneTenantEffectiveConfigurationDto result = await handler.Handle(
+        ControlPlaneTenantEffectiveConfigurationDto result = await handler.QueryAsync(
             new GetControlPlaneTenantEffectiveConfigurationQuery(tenantId),
             CancellationToken.None);
 

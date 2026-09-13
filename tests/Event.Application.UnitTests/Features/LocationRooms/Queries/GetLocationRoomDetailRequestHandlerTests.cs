@@ -8,12 +8,12 @@ namespace Event.Application.UnitTests.Features.LocationRooms.Queries;
 public class GetLocationRoomDetailRequestHandlerTests
 {
     [Test]
-    public async Task Handle_WithExistingRoom_ReturnsDto()
+    public async Task QueryAsync_WithExistingRoom_ReturnsDto()
     {
         var roomId = Guid.Parse("01900000-0000-7000-8000-000000000091");
         var room = RoomQueryStore.Room(roomId, "Main Hall");
         var handler = new GetLocationRoomDetailRequestHandler(new RoomQueryStore(room));
-        var result = await handler.Handle(new GetLocationRoomDetailRequest { Id = roomId }, CancellationToken.None);
+        var result = await handler.QueryAsync(new GetLocationRoomDetailRequest { Id = roomId }, CancellationToken.None);
 
         await Assert.That(result).IsNotNull();
         await Assert.That(result!.Id).IsEqualTo(roomId);
@@ -25,10 +25,10 @@ public class GetLocationRoomDetailRequestHandlerTests
     }
 
     [Test]
-    public async Task Handle_WithNonExistentRoom_ReturnsNull()
+    public async Task QueryAsync_WithNonExistentRoom_ReturnsNull()
     {
         var handler = new GetLocationRoomDetailRequestHandler(new RoomQueryStore());
-        var result = await handler.Handle(new GetLocationRoomDetailRequest
+        var result = await handler.QueryAsync(new GetLocationRoomDetailRequest
         {
             Id = Guid.Parse("01900000-0000-7000-8000-000000000091")
         }, CancellationToken.None);

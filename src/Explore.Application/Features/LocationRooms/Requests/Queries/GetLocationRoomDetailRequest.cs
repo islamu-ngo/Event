@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.LocationRoom;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.LocationRooms.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.LocationRoom, AuthorizationActions.LocationRooms.View)]
-public sealed record GetLocationRoomDetailRequest : IRequest<LocationRoomDto?>, ISecureRequest
+public sealed record GetLocationRoomDetailRequest : IQuery<LocationRoomDto?>, ISecureRequest
 {
     public Guid Id { get; init; }
     public Guid TenantId { get; init; }

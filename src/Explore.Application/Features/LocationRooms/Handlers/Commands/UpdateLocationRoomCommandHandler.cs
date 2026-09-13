@@ -5,11 +5,11 @@ using Explore.Application.Exceptions;
 using Explore.Application.Features.LocationRooms.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.LocationRooms.Handlers.Commands;
 
-public class UpdateLocationRoomCommandHandler : IRequestHandler<UpdateLocationRoomCommand, BaseCommandResponse<Guid>>
+public class UpdateLocationRoomCommandHandler : ICommandHandler<UpdateLocationRoomCommand, BaseCommandResponse<Guid>>
 {
     private readonly ILocationRoomRepository _locationRoomRepository;
     private readonly ILocationRepository _locationRepository;
@@ -25,7 +25,7 @@ public class UpdateLocationRoomCommandHandler : IRequestHandler<UpdateLocationRo
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateLocationRoomCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateLocationRoomCommand request, CancellationToken cancellationToken)
     {
         var validator = new UpdateLocationRoomDtoValidator(_locationRepository);
         var validationResult = await validator.ValidateAsync(request.UpdateLocationRoomDto, cancellationToken);

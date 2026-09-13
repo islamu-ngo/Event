@@ -2,11 +2,11 @@ using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.LocationRoom;
 using Explore.Application.Features.LocationRooms.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.LocationRooms.Handlers.Queries;
 
-public class GetLocationRoomDetailRequestHandler : IRequestHandler<GetLocationRoomDetailRequest, LocationRoomDto?>
+public class GetLocationRoomDetailRequestHandler : IQueryHandler<GetLocationRoomDetailRequest, LocationRoomDto?>
 {
     private readonly ILocationRoomRepository _locationRoomRepository;
 
@@ -16,7 +16,7 @@ public class GetLocationRoomDetailRequestHandler : IRequestHandler<GetLocationRo
         _locationRoomRepository = locationRoomRepository;
     }
 
-    public async Task<LocationRoomDto?> Handle(GetLocationRoomDetailRequest request, CancellationToken cancellationToken)
+    public async Task<LocationRoomDto?> QueryAsync(GetLocationRoomDetailRequest request, CancellationToken cancellationToken)
     {
         var room = await _locationRoomRepository.GetById(request.Id);
         if (room == null)

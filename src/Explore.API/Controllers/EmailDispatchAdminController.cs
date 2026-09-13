@@ -4,6 +4,7 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
 using Explore.API.Hateoas;
 using Explore.API.Models;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EmailDispatch;
 using Explore.Application.Features.EmailDispatch;
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
@@ -28,15 +29,30 @@ namespace Explore.API.Controllers;
 public sealed class EmailDispatchAdminController : EventControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetEmailDispatchStatusQuery, BaseCommandResponse<IReadOnlyList<EmailDispatchStatusDto>>> _statusQuery;
+    private readonly IQueryHandler<GetEmailDispatchProcessorControlQuery, EmailDispatchProcessorControlDto> _controlQuery;
+    private readonly ICommandHandler<ReplayEmailDispatchCommand, BaseCommandResponse<Guid>> _replayCommand;
+    private readonly ICommandHandler<SetEmailDispatchProcessorPauseStateCommand, BaseCommandResponse<Guid>> _pauseCommand;
+    private readonly ICommandHandler<SetEmailDispatchGlobalRateLimitOverrideCommand, BaseCommandResponse<Guid>> _rateLimitCommand;
     private readonly IResourceAssembler<EmailDispatchStatusDto, EmailDispatchStatusDto> _statusAssembler;
     private readonly IResourceAssembler<EmailDispatchProcessorControlDto, EmailDispatchProcessorControlDto> _processorControlAssembler;
 
     public EmailDispatchAdminController(
         IMediator mediator,
+        IQueryHandler<GetEmailDispatchStatusQuery, BaseCommandResponse<IReadOnlyList<EmailDispatchStatusDto>>> statusQuery,
+        IQueryHandler<GetEmailDispatchProcessorControlQuery, EmailDispatchProcessorControlDto> controlQuery,
+        ICommandHandler<ReplayEmailDispatchCommand, BaseCommandResponse<Guid>> replayCommand,
+        ICommandHandler<SetEmailDispatchProcessorPauseStateCommand, BaseCommandResponse<Guid>> pauseCommand,
+        ICommandHandler<SetEmailDispatchGlobalRateLimitOverrideCommand, BaseCommandResponse<Guid>> rateLimitCommand,
         IResourceAssembler<EmailDispatchStatusDto, EmailDispatchStatusDto> statusAssembler,
         IResourceAssembler<EmailDispatchProcessorControlDto, EmailDispatchProcessorControlDto> processorControlAssembler)
     {
         _mediator = mediator;
+        _statusQuery = statusQuery;
+        _controlQuery = controlQuery;
+        _replayCommand = replayCommand;
+        _pauseCommand = pauseCommand;
+        _rateLimitCommand = rateLimitCommand;
         _statusAssembler = statusAssembler;
         _processorControlAssembler = processorControlAssembler;
     }
@@ -55,7 +71,7 @@ public sealed class EmailDispatchAdminController : EventControllerBase
         [FromQuery] EmailDispatchStatusQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(
+        var result = await _statusQuery.QueryAsync(
             new GetEmailDispatchStatusQuery { TenantId = query.TenantId, Limit = query.Limit },
             cancellationToken);
 
@@ -177,7 +193,7 @@ public sealed class EmailDispatchAdminController : EventControllerBase
         Guid outboxId,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(
+        var result = await _replayCommand.ExecuteAsync(
             new ReplayEmailDispatchCommand
             {
                 TenantId = tenantId,
@@ -230,7 +246,7 @@ public sealed class EmailDispatchAdminController : EventControllerBase
     public async Task<ActionResult<HalResource<EmailDispatchProcessorControlDto>>> GetProcessorControl(
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new GetEmailDispatchProcessorControlQuery(), cancellationToken);
+        var result = await _controlQuery.QueryAsync(new GetEmailDispatchProcessorControlQuery(), cancellationToken);
         return Ok(await _processorControlAssembler.ToResource(result, HttpContext));
     }
 
@@ -246,7 +262,7 @@ public sealed class EmailDispatchAdminController : EventControllerBase
         [FromQuery] EmailDispatchProcessorPauseQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new SetEmailDispatchProcessorPauseStateCommand
+        var result = await _pauseCommand.ExecuteAsync(new SetEmailDispatchProcessorPauseStateCommand
         {
             IsPaused = true,
             PauseReason = query.GetNormalizedReason(),
@@ -266,7 +282,7 @@ public sealed class EmailDispatchAdminController : EventControllerBase
     public async Task<ActionResult<BaseCommandResponse<Guid>>> ResumeProcessor(
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new SetEmailDispatchProcessorPauseStateCommand
+        var result = await _pauseCommand.ExecuteAsync(new SetEmailDispatchProcessorPauseStateCommand
         {
             IsPaused = false,
             ChangedBy = CurrentUserId
@@ -286,7 +302,7 @@ public sealed class EmailDispatchAdminController : EventControllerBase
         [FromQuery] EmailDispatchGlobalRateLimitQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new SetEmailDispatchGlobalRateLimitOverrideCommand
+        var result = await _rateLimitCommand.ExecuteAsync(new SetEmailDispatchGlobalRateLimitOverrideCommand
         {
             RateLimitPerMinute = query.RateLimitPerMinute,
             ChangedBy = CurrentUserId
@@ -305,7 +321,7 @@ public sealed class EmailDispatchAdminController : EventControllerBase
     public async Task<ActionResult<BaseCommandResponse<Guid>>> ClearGlobalRateLimitOverride(
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new SetEmailDispatchGlobalRateLimitOverrideCommand
+        var result = await _rateLimitCommand.ExecuteAsync(new SetEmailDispatchGlobalRateLimitOverrideCommand
         {
             RateLimitPerMinute = null,
             ChangedBy = CurrentUserId

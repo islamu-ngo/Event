@@ -1,14 +1,14 @@
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EmailDispatch;
 using Explore.Application.Features.EmailDispatch.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EmailDispatch.Handlers.Queries;
 
 public sealed class GetEmailDispatchProcessorControlQueryHandler(IEmailDispatchOutboxRepository repository)
-    : IRequestHandler<GetEmailDispatchProcessorControlQuery, EmailDispatchProcessorControlDto>
+    : IQueryHandler<GetEmailDispatchProcessorControlQuery, EmailDispatchProcessorControlDto>
 {
-    public async Task<EmailDispatchProcessorControlDto> Handle(
+    public async Task<EmailDispatchProcessorControlDto> QueryAsync(
         GetEmailDispatchProcessorControlQuery request,
         CancellationToken cancellationToken)
     {

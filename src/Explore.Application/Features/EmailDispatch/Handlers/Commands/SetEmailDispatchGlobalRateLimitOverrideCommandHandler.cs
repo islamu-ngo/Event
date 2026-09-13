@@ -2,14 +2,14 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using Explore.Application.Features.EmailDispatch.Validators;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EmailDispatch.Handlers.Commands;
 
 public sealed class SetEmailDispatchGlobalRateLimitOverrideCommandHandler(IEmailDispatchOutboxRepository repository)
-    : IRequestHandler<SetEmailDispatchGlobalRateLimitOverrideCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<SetEmailDispatchGlobalRateLimitOverrideCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         SetEmailDispatchGlobalRateLimitOverrideCommand request,
         CancellationToken cancellationToken)
     {

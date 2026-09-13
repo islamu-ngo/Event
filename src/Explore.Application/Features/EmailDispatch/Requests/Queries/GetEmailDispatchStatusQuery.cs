@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EmailDispatch;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EmailDispatch.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.EmailDispatch, AuthorizationActions.EmailDispatches.View)]
-public sealed record GetEmailDispatchStatusQuery : IRequest<BaseCommandResponse<IReadOnlyList<EmailDispatchStatusDto>>>, ISecureRequest
+public sealed record GetEmailDispatchStatusQuery : IQuery<BaseCommandResponse<IReadOnlyList<EmailDispatchStatusDto>>>, ISecureRequest
 {
     public Guid TenantId { get; init; }
     public int Limit { get; init; } = 50;

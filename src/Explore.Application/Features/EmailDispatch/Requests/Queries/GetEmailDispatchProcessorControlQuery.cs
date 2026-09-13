@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EmailDispatch;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EmailDispatch.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.InstanceSetting, AuthorizationActions.InstanceSettings.View)]
-public sealed record GetEmailDispatchProcessorControlQuery : IRequest<EmailDispatchProcessorControlDto>, ISecureRequest
+public sealed record GetEmailDispatchProcessorControlQuery : IQuery<EmailDispatchProcessorControlDto>, ISecureRequest
 {
     string ISecureRequest.ResourceId => EmailDispatchProcessorControl.SettingKey;
 

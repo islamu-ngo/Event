@@ -13,7 +13,7 @@ public sealed class GetEmailDispatchStatusQueryHandlerTests
     [Test]
     public async Task HandleWhenTenantIdMissingReturnsValidationFailure()
     {
-        var result = await CreateHandler().Handle(
+        var result = await CreateHandler().QueryAsync(
             new GetEmailDispatchStatusQuery { TenantId = Guid.Empty },
             CancellationToken.None);
 
@@ -25,7 +25,7 @@ public sealed class GetEmailDispatchStatusQueryHandlerTests
     [Test]
     public async Task HandleWhenLimitOutOfRangeReturnsValidationFailure()
     {
-        var result = await CreateHandler().Handle(
+        var result = await CreateHandler().QueryAsync(
             new GetEmailDispatchStatusQuery { TenantId = Guid.NewGuid(), Limit = 201 },
             CancellationToken.None);
 
@@ -67,7 +67,7 @@ public sealed class GetEmailDispatchStatusQueryHandlerTests
                 }
             ]);
 
-        var result = await CreateHandler().Handle(
+        var result = await CreateHandler().QueryAsync(
             new GetEmailDispatchStatusQuery { TenantId = tenantId, Limit = 50 },
             CancellationToken.None);
 
@@ -124,7 +124,7 @@ public sealed class GetEmailDispatchStatusQueryHandlerTests
                 }
             ]);
 
-        var result = await CreateHandler().Handle(
+        var result = await CreateHandler().QueryAsync(
             request: new GetEmailDispatchStatusQuery { TenantId = tenantId, Limit = 50 },
             cancellationToken: CancellationToken.None);
 

@@ -6,6 +6,9 @@ using Event.Api.IntegrationTests.Fixtures;
 using Event.Api.IntegrationTests.Helpers;
 using Explore.API.Controllers;
 using Explore.API.Extensions;
+using Explore.API.ExceptionHandling;
+using Explore.Domain;
+using Explore.Domain.Constants;
 using Explore.API.Hateoas;
 using Explore.API.Models;
 using Explore.Application.DTOs.EmailDispatch;
@@ -209,18 +212,11 @@ public sealed class EmailDispatchAdminControllerTests
     [Test]
     public async Task ReplayDispatch_WhenInvalidTransition_ReturnsConflictProblemDetails()
     {
-        var tenantId = Guid.NewGuid();
-        var outboxId = Guid.NewGuid();
-        using var mediator = new EmailDispatchMediatorStub(_ => Failure(
-            "Sent email dispatch rows cannot be replayed.",
-            EmailDispatchFailureCodes.InvalidTransition));
-        using var factory = CreateFactoryWithMediator(mediator);
-        using var client = factory.CreateClient();
-        using var request = CreateAuthenticatedRequest(
-            HttpMethod.Post,
-            $"/api/admin/email-dispatch/tenants/{tenantId}/outbox/{outboxId}/replay");
-
-        var response = await client.SendAsync(request);
+        await using var factory = await NativeEmailDispatchWebApplicationFactory.CreateAsync();
+        var outboxId = await factory.SeedDispatchAsync(EmailDispatchStatus.Sent);
+        using var client = factory.Client();
+        var response = await client.PostAsync(
+            $"/api/admin/email-dispatch/tenants/{PlatformDefaults.DefaultTenantId}/outbox/{outboxId}/replay", null);
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
         await Assert.That(response.Content.Headers.ContentType?.MediaType).IsEqualTo("application/problem+json");
@@ -234,30 +230,24 @@ public sealed class EmailDispatchAdminControllerTests
     }
 
     [Test]
-    public async Task ReplayDispatch_WhenEmailDispatchMisconfigured_ReturnsServiceUnavailableProblemDetails()
+    public async Task EmailDispatchMisconfiguredMappingPreservesServiceUnavailableProblemDetails()
     {
-        var tenantId = Guid.NewGuid();
-        var outboxId = Guid.NewGuid();
-        using var mediator = new EmailDispatchMediatorStub(_ => Failure(
-            "Email dispatch RabbitMQ parking queue is not configured.",
-            EmailDispatchFailureCodes.Misconfigured));
-        using var factory = CreateFactoryWithMediator(mediator);
-        using var client = factory.CreateClient();
-        using var request = CreateAuthenticatedRequest(
-            HttpMethod.Post,
-            $"/api/admin/email-dispatch/tenants/{tenantId}/outbox/{outboxId}/replay");
-
-        var response = await client.SendAsync(request);
-
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.ServiceUnavailable);
-        await Assert.That(response.Content.Headers.ContentType?.MediaType).IsEqualTo("application/problem+json");
-        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        var root = document.RootElement;
-        await Assert.That(root.GetProperty("status").GetInt32()).IsEqualTo((int)HttpStatusCode.ServiceUnavailable);
-        await Assert.That(root.GetProperty("title").GetString()).IsEqualTo("Email dispatch is misconfigured");
-        await Assert.That(root.GetProperty("code").GetString()).IsEqualTo(EmailDispatchFailureCodes.Misconfigured);
-        await Assert.That(root.TryGetProperty("traceId", out _)).IsTrue();
-        await Assert.That(root.TryGetProperty("timestamp", out _)).IsTrue();
+        // Replay only resets durable state; misconfiguration belongs to the shared failure mapper,
+        // not to a fabricated replay-handler response.
+        var controller = new ProblemController
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+        };
+        var result = (ObjectResult)controller.ToEmailDispatchProblem(Failure(
+            "Email dispatch RabbitMQ parking queue is not configured.", EmailDispatchFailureCodes.Misconfigured));
+        var problem = (ProblemDetails)result.Value!;
+        await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status503ServiceUnavailable);
+        await Assert.That(result.ContentTypes).Contains("application/problem+json");
+        await Assert.That(problem.Status).IsEqualTo(StatusCodes.Status503ServiceUnavailable);
+        await Assert.That(problem.Title).IsEqualTo("Email dispatch is misconfigured");
+        await Assert.That(problem.Extensions["code"]).IsEqualTo(EmailDispatchFailureCodes.Misconfigured);
+        await Assert.That(problem.Extensions.ContainsKey("traceId")).IsTrue();
+        await Assert.That(problem.Extensions.ContainsKey("timestamp")).IsTrue();
     }
 
     [Test]
@@ -413,6 +403,8 @@ public sealed class EmailDispatchAdminControllerTests
 
     private static BaseCommandResponse<Guid> Failure(string message, string failureCode) =>
         BaseCommandResponse.Failure<Guid>(failureCode, message, [message]);
+
+    private sealed class ProblemController : ControllerBase;
 
     private sealed class EmailDispatchMediatorStub(Func<object, object> responseFactory) : IMediator, IDisposable
     {

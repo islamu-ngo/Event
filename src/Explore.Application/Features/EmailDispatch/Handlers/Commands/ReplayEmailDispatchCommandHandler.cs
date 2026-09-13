@@ -3,11 +3,11 @@ using Explore.Application.Features.EmailDispatch.Requests.Commands;
 using Explore.Application.Features.EmailDispatch.Validators;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EmailDispatch.Handlers.Commands;
 
-public sealed class ReplayEmailDispatchCommandHandler : IRequestHandler<ReplayEmailDispatchCommand, BaseCommandResponse<Guid>>
+public sealed class ReplayEmailDispatchCommandHandler : ICommandHandler<ReplayEmailDispatchCommand, BaseCommandResponse<Guid>>
 {
     private static readonly HashSet<EmailDispatchStatus> ReplayableStatuses =
     [
@@ -25,7 +25,7 @@ public sealed class ReplayEmailDispatchCommandHandler : IRequestHandler<ReplayEm
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         ReplayEmailDispatchCommand request,
         CancellationToken cancellationToken)
     {

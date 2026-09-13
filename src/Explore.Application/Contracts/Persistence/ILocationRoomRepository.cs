@@ -10,5 +10,16 @@ public interface ILocationRoomRepository : IGenericRepository<LocationRoom, Guid
         IReadOnlyCollection<Guid> ids,
         CancellationToken cancellationToken);
     Task<List<LocationRoom>> GetByLocationAsync(Guid locationId, CancellationToken cancellationToken);
-    Task<bool> HasActiveScheduleReferencesAsync(Guid roomId, CancellationToken cancellationToken);
+    Task<bool> HasScheduleReferencesAsync(Guid roomId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Moves a room and applies its final name within the caller's transaction.
+    /// The caller must save remaining changes to advance concurrency and audit fields.
+    /// </summary>
+    Task MoveToLocationAsync(
+        LocationRoom room,
+        Location location,
+        string name,
+        Guid expectedConcurrencyStamp,
+        CancellationToken cancellationToken);
 }

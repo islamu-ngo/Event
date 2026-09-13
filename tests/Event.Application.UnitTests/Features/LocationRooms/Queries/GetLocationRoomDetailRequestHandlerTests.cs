@@ -64,7 +64,9 @@ internal sealed class RoomQueryStore(params LocationRoom[] rooms) : ILocationRoo
     }
 
     public Task<(IReadOnlyList<LocationRoom> Items, int TotalCount)> GetAllPaged(int pageNumber, int pageSize) => throw new NotSupportedException();
-    public Task<bool> HasActiveScheduleReferencesAsync(Guid roomId, CancellationToken cancellationToken) => throw new NotSupportedException();
+    public Task<bool> HasScheduleReferencesAsync(Guid roomId, CancellationToken cancellationToken) => throw new NotSupportedException();
+    public Task MoveToLocationAsync(LocationRoom room, Location location, string name, Guid expectedConcurrencyStamp,
+        CancellationToken cancellationToken) => throw new NotSupportedException();
     public Task<LocationRoom> Create(LocationRoom entity) => throw new NotSupportedException();
     public Task Update(LocationRoom entity) => throw new NotSupportedException();
     public Task Delete(LocationRoom entity) => throw new NotSupportedException();

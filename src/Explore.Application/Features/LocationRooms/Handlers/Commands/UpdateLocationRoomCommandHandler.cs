@@ -13,13 +13,16 @@ public class UpdateLocationRoomCommandHandler : IRequestHandler<UpdateLocationRo
 {
     private readonly ILocationRoomRepository _locationRoomRepository;
     private readonly ILocationRepository _locationRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
     public UpdateLocationRoomCommandHandler(
         ILocationRoomRepository locationRoomRepository,
-        ILocationRepository locationRepository)
+        ILocationRepository locationRepository,
+        IUnitOfWork unitOfWork)
     {
         _locationRoomRepository = locationRoomRepository;
         _locationRepository = locationRepository;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<BaseCommandResponse<Guid>> Handle(UpdateLocationRoomCommand request, CancellationToken cancellationToken)
@@ -49,6 +52,7 @@ public class UpdateLocationRoomCommandHandler : IRequestHandler<UpdateLocationRo
                 room.Id.ToString());
         }
 
+        Location? targetLocation = null;
         if (request.UpdateLocationRoomDto.Location is not null)
         {
             var parentLocation = await _locationRepository.GetById(request.UpdateLocationRoomDto.Location.LocationId);
@@ -59,35 +63,44 @@ public class UpdateLocationRoomCommandHandler : IRequestHandler<UpdateLocationRo
                     "Location does not belong to the same tenant as the room.");
             }
 
-            if (parentLocation.Id != room.LocationId
-                && await _locationRoomRepository.HasActiveScheduleReferencesAsync(
-                    room.Id,
-                    cancellationToken))
+            if (parentLocation.Id != room.LocationId)
             {
-                return BaseCommandResponse.Validation<Guid>(
-                    ["A room used by an event schedule cannot be moved to another location."],
-                    "A room used by an event schedule cannot be moved to another location.");
+                targetLocation = parentLocation;
             }
         }
 
-        ApplyLocation(room, request.UpdateLocationRoomDto.Location);
-        ApplyName(room, request.UpdateLocationRoomDto.Name);
-        ApplySlug(room, request.UpdateLocationRoomDto.Slug);
-        ApplyDescription(room, request.UpdateLocationRoomDto.Description);
-        ApplyCapacity(room, request.UpdateLocationRoomDto.Capacity);
-        ApplySortOrder(room, request.UpdateLocationRoomDto.SortOrder);
-
-        await _locationRoomRepository.Update(room);
-
-        return BaseCommandResponse.Success(room.Id, "Room updated successfully.");
-    }
-
-    private static void ApplyLocation(LocationRoom room, UpdateLocationRoomLocationDto? group)
-    {
-        if (group is not null)
+        async Task<BaseCommandResponse<Guid>> SaveUpdateAsync(CancellationToken transactionToken)
         {
-            room.LocationId = group.LocationId;
+            if (targetLocation is not null)
+            {
+                if (await _locationRoomRepository.HasScheduleReferencesAsync(room.Id, transactionToken))
+                {
+                    return BaseCommandResponse.Validation<Guid>(
+                        ["A room used by an event schedule cannot be moved to another location."],
+                        "A room used by an event schedule cannot be moved to another location.");
+                }
+
+                await _locationRoomRepository.MoveToLocationAsync(
+                    room,
+                    targetLocation,
+                    request.UpdateLocationRoomDto.Name?.Value ?? room.Name,
+                    request.ExpectedConcurrencyStamp,
+                    transactionToken);
+            }
+
+            ApplyName(room, request.UpdateLocationRoomDto.Name);
+            ApplySlug(room, request.UpdateLocationRoomDto.Slug);
+            ApplyDescription(room, request.UpdateLocationRoomDto.Description);
+            ApplyCapacity(room, request.UpdateLocationRoomDto.Capacity);
+            ApplySortOrder(room, request.UpdateLocationRoomDto.SortOrder);
+
+            await _locationRoomRepository.Update(room);
+            return BaseCommandResponse.Success(room.Id, "Room updated successfully.");
         }
+
+        return targetLocation is null
+            ? await SaveUpdateAsync(cancellationToken)
+            : await _unitOfWork.ExecuteInTransactionAsync(SaveUpdateAsync, cancellationToken);
     }
 
     private static void ApplyName(LocationRoom room, UpdateLocationRoomNameDto? group)

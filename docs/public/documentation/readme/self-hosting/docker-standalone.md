@@ -305,6 +305,6 @@ ISLAMU Event is 100% free and open source. If this standalone deployment powers 
 ## Related Guides & Next Steps
 
 * **[First-Run Administration Guide](../administration-and-branding/admin-guide.md)** — Complete the web onboarding wizard at `/setup`.
-* **[Deployment Tiers & Sizing](deployment-tiers.md)** — Review capacity benchmarks and hardware sizing.
+* **[Deployment Tiers & Sizing](deployment-tiers.md)** — Review capacity guidelines and hardware sizing.
 * **[Docker Compose Runbook](docker-compose.md)** — Scale up to split PostgreSQL and Keycloak containers when ready.
 * **[Troubleshooting & Operational Health](../configuration-and-operations/troubleshooting-and-health.md)** — Fast solutions for setup secret retrieval, TLS issues, and container errors.

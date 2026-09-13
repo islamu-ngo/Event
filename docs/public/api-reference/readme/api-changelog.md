@@ -4,7 +4,7 @@ description: Curated pre-v1 API contract changes and migration expectations.
 
 # API Changelog
 
-The current API version is `0.1`. Before v1, breaking changes are allowed when they simplify the contract or restore architectural invariants. Integrators must pin generated contracts and review changes before every upgrade.
+The draft HTTP API version is `0.1`. In pre-release development before v1, breaking changes are made freely whenever they simplify the contract or restore architectural invariants.
 
 ## Current mainline contract
 

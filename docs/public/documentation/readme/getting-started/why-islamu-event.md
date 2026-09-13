@@ -20,7 +20,7 @@ These capabilities remain strictly bounded:
 
 ---
 
-## Why Self-Hosters Adopt It
+## Core Architectural Principles
 
 * **Deployment Control:** Choose the documented [Docker Standalone](../self-hosting/docker-standalone.md) or [Docker Compose](../self-hosting/docker-compose.md) topology and own your infrastructure.
 * **Fail-Closed Authority:** [Keycloak Authentication](../security-and-identity/authentication.md), the selected [Authorization Provider](../security-and-identity/authorization.md), tenant resolution, and [Secret Providers](../configuration-and-operations/secrets.md) do not silently fall back to weaker paths.
@@ -32,9 +32,9 @@ These capabilities remain strictly bounded:
 
 ## Maturity & Operational Responsibility
 
-The API is version `0.1` and the project is in major version zero. Always pin application and image versions, review release notes before upgrades, and maintain tested restore procedures (see [Backup, Restore & Upgrade](../configuration-and-operations/backup-restore-upgrade.md)).
+ISLAMU Event is in active pre-release development with no official release yet. We are actively squashing bugs and preparing for our initial release. Breaking changes happen freely during this pre-release phase to refine the architecture. Published releases, pre-built container images, and stable upgrade paths will begin with our first release.
 
-Self-hosting transfers operational responsibility to the adopter. You must assess TLS, DNS, identity-provider hardening, authorization policy, secrets, backups, incident response, retention, data residency, accessibility, and provider agreements for your deployment. Product documentation describes implemented behavior; it is not a compliance, security, accessibility, or religious certification.
+Self-hosting transfers operational responsibility to the operator. You must assess TLS, DNS, identity-provider hardening, authorization policy, secrets, backups, incident response, retention, data residency, accessibility, and provider agreements for your deployment. Product documentation describes implemented behavior; it is not a compliance, security, accessibility, or religious certification.
 
 ---
 
@@ -42,5 +42,5 @@ Self-hosting transfers operational responsibility to the adopter. You must asses
 
 * **[5-Minute Quickstart](5-minute-quickstart.md)** — Spin up an evaluation instance locally using Docker.
 * **[Architecture & Request Flows](architecture-and-request-flows.md)** — Trace HTTP requests from Blazor BFF through MediatR to PostgreSQL.
-* **[Deployment Tiers & Sizing](../self-hosting/deployment-tiers.md)** — Review hardware requirements and capacity benchmarks.
+* **[Deployment Tiers & Sizing](../self-hosting/deployment-tiers.md)** — Review hardware requirements and deployment topologies.
 * **[Clean-Room IP & Licensing](../contributing/clean-room-ip-and-licensing.md)** — Understand our open-source IP stewardship and governance.

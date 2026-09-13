@@ -10,7 +10,7 @@ icon: house
 ISLAMU Event is a self-hostable platform for public event discovery, organizer workflows, registration and admission, paid events, administration, notifications, integrations, and selective open-protocol federation.
 
 {% hint style="warning" %}
-**Pre-1.0 software:** the current API version is `0.1`. Pin the exact release you deploy, read the release and API changelogs before upgrading, and prove restore procedures before changing production data.
+**Active Pre-Release Development:** ISLAMU Event has **no official release yet**. We are actively fixing startup bugs and preparing for our very first release soon! Pre-built container images and release tags are not yet published.
 {% endhint %}
 
 ## Who this documentation is for
@@ -60,7 +60,7 @@ These are system contracts, not claims of regulatory compliance or religious cer
 3. Check unsupported capabilities and provider-owned responsibilities against your requirements.
 4. Use the [API Reference](https://islamu.gitbook.io/islamu-event/api-reference/) for protocol and integration decisions.
 5. Keep the [Self-Hoster & Adopter FAQ](https://islamu.gitbook.io/islamu-event/help-center/) available during installation.
-6. Review [Release Notes](https://islamu.gitbook.io/islamu-event/changelog/) before every upgrade.
+6. Follow the [Roadmap](https://sites.plane.so/views/b8b7d9fced694f5a9d9a546e9d40d988) and upcoming release notes as the first version is published.
 
 ## What success looks like
 

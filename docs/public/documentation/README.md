@@ -7,7 +7,7 @@ description: Adopter documentation for evaluation, self-hosting, operations, sec
 This space is the operating manual for organizations evaluating or self-hosting ISLAMU Event. It follows the lifecycle of an adoption decision: understand the system, select a topology, configure authoritative state, secure it, operate it, then add product capabilities and integrations.
 
 > [!WARNING]
-> ISLAMU Event is pre-1.0 and the current API version is `0.1`. Pin exact releases, review change notes before upgrades, and prove backup and restore procedures before production use.
+> **Active Pre-Release Development:** ISLAMU Event has **no official release yet**. We are actively fixing startup bugs and preparing for our very first release soon! Pre-built container images and release tags are not yet published.
 
 ---
 

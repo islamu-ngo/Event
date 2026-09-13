@@ -210,7 +210,7 @@ Because the project is pre-1.0 and in active development, breaking schema change
 
 1. **Review Release Notes**: Check the latest release notes and `API_CHANGELOG.md` for breaking changes or new required environment variables.
 2. **Take Verified Backups**: Capture all selected stores and preserve erasure-authority independence before changing software.
-3. **Select A Compatible Revision**: Pin deployment images and review migration compatibility. The shipped Compose application services are built from source; `pull` alone does not upgrade them:
+3. **Select A Compatible Revision**: Review migration compatibility. The shipped Compose application services are built from source; `pull` alone does not upgrade them:
    ```bash
    docker compose pull
    docker compose build event-migrationservice islamu-event-api islamu-event-ui

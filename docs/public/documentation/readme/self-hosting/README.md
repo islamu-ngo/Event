@@ -6,7 +6,7 @@ description: >-
 
 # Self-Hosting
 
-Select a topology by operational needs, then follow its dedicated runbook. The project is pre-1.0: pin versions and image digests, review release/API changes, and test backup restoration before upgrades.
+Select a topology by operational needs, then follow its dedicated runbook. The project is in active pre-release development with no official release yet: pre-built images and versioned tags will become available upon initial release.
 
 ## Deployment paths
 

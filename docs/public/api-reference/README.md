@@ -4,7 +4,7 @@ description: HAL/REST integration guidance for ISLAMU Event API version 0.1.
 
 # API Reference
 
-ISLAMU Event exposes a versioned HAL/REST API assembled by thin ASP.NET Core controllers over MediatR application requests. The current API version is `0.1` and remains pre-v1: pin generated contracts and review the API changelog before upgrading.
+ISLAMU Event exposes a versioned HAL/REST API assembled by thin ASP.NET Core controllers over MediatR application requests. The draft HTTP API version is `0.1` (pre-v1 specification): breaking changes may occur during active pre-release development as endpoint contracts are refined.
 
 ## Environments
 

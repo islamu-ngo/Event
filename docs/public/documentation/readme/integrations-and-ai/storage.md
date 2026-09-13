@@ -30,6 +30,12 @@ Configured via `STORAGE_PROVIDER` in [Environment Variables](../configuration-an
 
 ---
 
+## Organization Evidence PDF Uploads
+
+With local authorization, an organization administrator can reserve an evidence PDF upload for a pending, active organization participation. Only the account that reserved that tenant-local session can finalize its bytes; tenant-administrator status alone does not transfer ownership. Losing the organization role after reservation does not itself revoke the session. Cancellation, expiry, content validation, quota enforcement and privacy-erasure fences remain authoritative. Retrying a completed upload returns the same stored document without another write.
+
+This repair does not broadly grant storage creation or change the selected authorization provider. Evidence reservation and finalization remain denied with instance or tenant-managed Cerbos until the required typed policies are securely supported; provider outages do not fall back to more permissive local authorization. No new storage credentials or database migration are required.
+
 ## 3. Disaster Recovery & Backup Integrity
 
 Always back up storage bytes concurrently with the primary database snapshot (see [Backup, Restore & Upgrade](../configuration-and-operations/backup-restore-upgrade.md)):

@@ -16,6 +16,4 @@ public sealed record FinalizeStorageUploadSessionCommand : ICommand<BaseCommandR
 
     string? ISecureRequest.ResourceId => UploadSessionId == Guid.Empty ? null : UploadSessionId.ToString();
 
-    IAuthorizationFacts? ISecureRequest.AuthorizationFacts =>
-        new StorageObjectCollectionAuthorizationFacts(TenantId ?? Guid.Empty);
 }

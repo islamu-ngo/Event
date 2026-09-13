@@ -4,6 +4,7 @@ using Explore.Application.Contracts.Webhooks;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.Notifications.Requests.Commands;
 using Explore.Application.Features.Notifications.Requests.Queries;
+using Explore.Application.Features.StorageObjects.Requests.Commands;
 using Explore.Domain;
 
 namespace Explore.Application.Authorization;
@@ -27,7 +28,8 @@ public sealed class AuthorizationResourceContextResolver(
     IWebhookOwnershipScopeResolver? webhookOwnershipScopeResolver = null,
     ITenantContext? tenantContext = null,
     IGroupTenantRepository? groupTenantRepository = null,
-    IOrganizationTenantRepository? organizationTenantRepository = null)
+    IOrganizationTenantRepository? organizationTenantRepository = null,
+    IStorageUploadSessionRepository? storageUploadSessionRepository = null)
 {
     public async Task<AuthorizationContext> ResolveAsync<TRequest>(
         TRequest request,
@@ -65,6 +67,14 @@ public sealed class AuthorizationResourceContextResolver(
         {
             var groupFacts = await ResolveGroupPreferenceFactsAsync(groupId, action, cancellationToken);
             return new AuthorizationContext(groupId.ToString("D"), groupFacts);
+        }
+
+        if (request is FinalizeStorageUploadSessionCommand finalization
+            && resourceKind == ResourceKinds.StorageObject
+            && action == AuthorizationActions.StorageObjects.Create)
+        {
+            return new AuthorizationContext(finalization.UploadSessionId.ToString("D"),
+                await ResolveStorageUploadFinalizationFactsAsync(finalization.UploadSessionId, cancellationToken));
         }
 
         var facts = await ResolveTrustedFactsAsync(resourceKind, resourceId, declaredFacts, cancellationToken);
@@ -285,6 +295,23 @@ public sealed class AuthorizationResourceContextResolver(
             member.OrganizationTenant.OrganizationId,
             member.Id,
             member.UserId);
+    }
+
+    private async Task<IAuthorizationFacts?> ResolveStorageUploadFinalizationFactsAsync(
+        Guid sessionId, CancellationToken cancellationToken)
+    {
+        if (sessionId == Guid.Empty || storageUploadSessionRepository is null || tenantContext is null)
+            return null;
+
+        // Read every lifecycle state without tracking: the handler must re-read under its transaction,
+        // including finalized retries and expired reservations whose quota still needs releasing.
+        var session = await storageUploadSessionRepository.GetForAuthorizationAsync(sessionId, cancellationToken);
+        if (session is null || session.TenantId != tenantContext.TenantId || session.UserId is not { } ownerUserId)
+            return null;
+
+        return new StorageUploadFinalizationFacts(session.Id, session.TenantId, ownerUserId,
+            session.Purpose, session.Visibility, session.OwningResourceKind, session.OwningResourceId,
+            session.ContentType, session.Extension, session.ExpectedSizeBytes);
     }
 
     /// <summary>

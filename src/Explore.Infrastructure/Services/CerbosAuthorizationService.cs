@@ -79,7 +79,8 @@ public class CerbosAuthorizationService : IAuthorizationProvider
         return await ExecuteCheckWithStorageTypedDenyAsync(_client, _settings.GrpcEndpoint, checks, cancellationToken);
     }
 
-    private static bool IsStorageUploadCreateWithTypedFacts(AuthorizationRequest check) =>
+    private static bool IsUnsupportedStorageTypedCheck(AuthorizationRequest check) =>
+        check.Facts is StorageUploadFinalizationFacts ||
         check.ResourceKind == ResourceKinds.StorageObject &&
         check.Action == AuthorizationActions.StorageObjects.Create &&
         check.Facts is StorageUploadIntentFacts;
@@ -127,7 +128,7 @@ public class CerbosAuthorizationService : IAuthorizationProvider
         CancellationToken cancellationToken,
         bool throwOnUnavailable = false)
     {
-        if (!checks.Any(IsStorageUploadCreateWithTypedFacts))
+        if (!checks.Any(IsUnsupportedStorageTypedCheck))
             return await ExecuteCheckAsync(client, endpointLabel, checks, cancellationToken, throwOnUnavailable);
 
         var results = Enumerable.Repeat(
@@ -138,7 +139,7 @@ public class CerbosAuthorizationService : IAuthorizationProvider
 
         for (var index = 0; index < checks.Count; index++)
         {
-            if (IsStorageUploadCreateWithTypedFacts(checks[index]))
+            if (IsUnsupportedStorageTypedCheck(checks[index]))
                 continue;
 
             passthroughIndexes.Add(index);

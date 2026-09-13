@@ -35,7 +35,7 @@ using NSubstitute;
 namespace Event.Api.IntegrationTests.Features;
 
 [NotInParallel("ApiTestFixture")]
-public sealed class NativeStorageObjectHttpTests
+public sealed partial class NativeStorageObjectHttpTests
 {
     private const string Root = "/api/storageobject";
 

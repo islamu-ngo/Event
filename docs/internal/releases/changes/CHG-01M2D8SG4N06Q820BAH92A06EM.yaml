@@ -1,0 +1,38 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M2D8SG4N06Q820BAH92A06EM
+Title: "Allow reservation owners to finalize organization evidence PDFs"
+Type: fix
+Scope: access
+Summary: "Local authorization now derives PDF finalization authority from the persisted tenant-local upload session while retaining state, content, quota and privacy checks and Cerbos fail-closed behavior."
+Group: organization-evidence
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Finalization uses stored reservation ownership and exact private PDF evidence
+      metadata, not caller claims or a new organization-role grant. The selected
+      provider and handler state, content, quota and privacy fences remain authoritative.
+      Instance and BYO Cerbos deny unsupported typed finalization facts before gRPC.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/integrations-and-ai/storage.md
+    Disposition: documented
+    Detail: >-
+      Local authorization supports finalization by the reserving account, including
+      exact retries and accounts whose organization role was subsequently revoked.
+      No new configuration, credentials or database migration is required.

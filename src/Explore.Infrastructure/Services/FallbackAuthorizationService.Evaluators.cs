@@ -834,6 +834,13 @@ public partial class FallbackAuthorizationService
         IAuthorizationFacts? facts,
         CancellationToken cancellationToken)
     {
+        if (facts is StorageUploadFinalizationFacts finalization)
+        {
+            var userId = _adminContext.UserId ?? await _adminContext.ResolveUserIdAsync(cancellationToken);
+            return action == AuthorizationActions.StorageObjects.Create
+                && finalization.MatchesReservationOwner(resourceId, userId, _tenantContext.TenantId);
+        }
+
         if (action == AuthorizationActions.StorageObjects.Create)
             return await CanCreateStorageUploadAsync(resourceId, facts, cancellationToken);
 

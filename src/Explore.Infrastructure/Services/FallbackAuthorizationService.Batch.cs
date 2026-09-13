@@ -472,6 +472,10 @@ public partial class FallbackAuthorizationService
         IDictionary<string, object>? resourceAttributes,
         IAuthorizationFacts? facts)
     {
+        if (facts is StorageUploadFinalizationFacts finalization)
+            return action == AuthorizationActions.StorageObjects.Create
+                && finalization.MatchesReservationOwner(resourceId, profile.UserId, profile.TenantId);
+
         if (action == AuthorizationActions.StorageObjects.Create)
             return CanCreateStorageUploadWithProfile(profile, resourceId, facts);
 

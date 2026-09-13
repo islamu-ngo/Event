@@ -1,0 +1,29 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M2DE5JJNFQWEV63QP2XEEW1D
+Title: "Respect shared custom-property option presentation order"
+Type: fix
+Scope: discovery
+Summary: "Shared definition details and administration option tables respect ascending Sort Order while preserving defaults, option identities and equal-rank order."
+Group: custom-property-option-order
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/CUSTOM_PROPERTIES.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CUSTOM_PROPERTIES.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/internal/CUSTOM_PROPERTIES.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CUSTOM_PROPERTIES.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: schemas/openapi_islamu-event.json
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/custom-properties.md
+    Disposition: documented
+    Detail: "Administration receives options in ascending stored Sort Order. Defaults and identities remain intact, equal ranks preserve relative order, and no data migration or manual repair is needed."

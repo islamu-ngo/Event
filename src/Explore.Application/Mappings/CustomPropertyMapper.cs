@@ -35,7 +35,12 @@ public static partial class CustomPropertyMapper
     [MapperIgnoreSource(nameof(CustomPropertyDefinition.IsDeleted))]
     [MapperIgnoreSource(nameof(CustomPropertyDefinition.DeletedAt))]
     [MapperIgnoreSource(nameof(CustomPropertyDefinition.DeletedBy))]
+    [MapProperty(nameof(CustomPropertyDefinition.Options), nameof(CustomPropertyDefinitionDto.Options), Use = nameof(ToOrderedSharedOptions))]
     public static partial CustomPropertyDefinitionDto ToDetail(CustomPropertyDefinition source);
+
+    // Stable sorting preserves equal-rank order without letting default-option fixup override presentation rank.
+    private static IReadOnlyList<CustomPropertyOptionDto> ToOrderedSharedOptions(IReadOnlyCollection<CustomPropertyOption> options) =>
+        options.OrderBy(option => option.SortOrder).Select(ToOption).ToArray();
 
     [MapperIgnoreSource(nameof(CustomPropertyDefinition.ConcurrencyStamp))]
     [MapperIgnoreSource(nameof(CustomPropertyDefinition.TenantId))]

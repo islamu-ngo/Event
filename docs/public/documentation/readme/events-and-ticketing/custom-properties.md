@@ -44,6 +44,14 @@ When upgrading, replace every older API instance before considering the tenant-i
 
 ---
 
+## Shared Definition Option Order
+
+Shared Organization and Group definition details, including the administration option table, display options in ascending **Sort Order**. A default option stays marked as default but no longer jumps ahead of a lower-ranked option. Equal ranks retain their existing relative order.
+
+This presentation correction does not change option identities, stored ranks, the selected default, or retained inactive options and their historical references. It requires no database migration or manual data repair.
+
+---
+
 ## Related Guides & Next Steps
 
 * **[Modular Event Aspects](modular-event-aspects.md)** — When to use typed relational aspects vs. custom properties.

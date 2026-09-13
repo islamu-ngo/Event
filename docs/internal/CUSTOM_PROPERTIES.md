@@ -343,6 +343,14 @@ Post-commit tag invalidation uses `CancellationToken.None`: disconnecting or can
 
 Application discovery supplies authorization -> performance -> business-handler decoration. Commands retain tenant-update resource protection and manually constructed validators; `UpdateCustomPropertyDefinitionAuthorizationContextEnricher` and its explicit registration continue to replace caller-supplied tenant facts with persisted, ambient-tenant-checked authority. No request keeps a MediatR marker or compatibility alias. The cache/transaction implementation above is preserved independently of dispatch. Real SQLite/native tests retain prior cache and lifecycle assertions and replace the shared purge mediator stub with actual anonymous/member/admin HTTP and audit evidence.
 
+### Shared Definition Option Presentation Order
+
+The shared `CustomPropertyDefinitionDto` projection in `CustomPropertyMapper` stably orders options by ascending `SortOrder` before creating immutable option snapshots. This is an Application presentation rule, not a UI-only correction: native detail callers and HTTP/admin consumers receive the same ordered array. The detail page and option editor render that array directly.
+
+EF identity-resolution fixup can materialize the separately included `DefaultOption` into the backing option collection before a lower-ranked option, despite the repository's ordered include. Sorting at the DTO boundary prevents that materialization order from overriding presentation rank. Equal ranks retain their existing relative order; no new identifier-based tie breaker or default-priority rule is introduced. The default option ID, retained/retired option IDs, active/default flags and stored sort values are unchanged. The repository graph is not mutated, and other custom-property cohorts are not affected.
+
+`DetailOptions_AreAscendingWithStableTiesAndRetainedDefaultAndRetiredIdentities` covers both the protected native detail port and actual HTTP DTO consumed by administration, using real SQLite definitions/options with a default at rank 10, a new option at rank 5 and a retained equal-rank option. The mutation/cache regression also asserts the global returned option order after replacement.
+
 ## Template Provenance And Versioning
 
 Supportability requires stronger provenance than just template identity.

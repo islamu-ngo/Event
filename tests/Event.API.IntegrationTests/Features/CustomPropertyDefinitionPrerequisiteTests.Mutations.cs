@@ -109,7 +109,10 @@ public sealed partial class CustomPropertyDefinitionPrerequisiteTests
             await Assert.That(detail.Options.Single(option => option.Key == "kept").SortOrder).IsEqualTo(10);
             await Assert.That(detail.Options.Single(option => option.Key == "retired").SortOrder).IsEqualTo(20);
             if (mutation == "options")
+            {
                 await Assert.That(detail.Options.Single(option => option.Key == "new").SortOrder).IsEqualTo(5);
+                await Assert.That(detail.Options.Select(option => option.Key).SequenceEqual(["new", "kept", "retired"])).IsTrue();
+            }
         }
         await AssertForeignStillCachedAsync(factory, data);
     }

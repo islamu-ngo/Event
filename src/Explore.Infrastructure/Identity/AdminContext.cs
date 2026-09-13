@@ -166,7 +166,9 @@ public class AdminContext : IAdminContext, IAdminCacheInvalidator
             entry.SlidingExpiration = CacheExpiration;
             var admins = await _tenantAdminRepo.GetByUserId(userId);
             var adminTenantIds = admins
-                .Where(a => a.RoleId == (int)RoleEnum.TenantAdmin)
+                .Where(a => a.RoleId == (int)RoleEnum.TenantAdmin
+                    && a.TenantUser.StatusId == (int)TenantUserStatusEnum.Active
+                    && !a.TenantUser.IsDeleted)
                 .Select(a => a.TenantId)
                 .Distinct()
                 .ToList();

@@ -55,6 +55,10 @@ When `AUTHORIZATION_PROVIDER=local` is set:
 - Automatically enforces multi-tenant boundaries via EF Core global query filters.
 - Fast, lightweight, and requires no external network calls or gRPC configuration.
 
+### Tenant administrator membership eligibility
+
+When tenant administrator authority is resolved, suspended, banned, removed, or deleted memberships do not contribute administrator tenant IDs, even if an unrevoked role grant remains in inventory. This applies to Cerbos principals, user-owned API-key authority, and administrator UI authority responses. Other tenants' active memberships remain independent. Grant inventory and tenant lifecycle behavior are unchanged; no database migration or configuration change is required. This correction does not change existing authority-cache freshness guarantees.
+
 ### Organization evidence actions
 
 Organization administrators can submit and view their organization's legitimacy evidence. Tenant administrators can view and review evidence in their tenant; tenant administration alone does not grant submission, and organization administration alone does not grant review. Accounts with both roles can perform both actions. With Local RBAC, these permission decisions remain the same whether checked individually or together when building HAL links. Clients must continue using server-issued links rather than inferring authority from roles.

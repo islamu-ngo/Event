@@ -17,7 +17,7 @@ public sealed class GetTenantDirectoryOperatorIdentityDocumentQueryHandlerTests
         Substitute.For<ITypedSettingsDocumentResolver>();
 
     [Test]
-    public async Task Handle_MapsTenantDocumentAndCapabilityReadiness()
+    public async Task QueryAsync_MapsTenantDocumentAndCapabilityReadiness()
     {
         Guid revision = Guid.CreateVersion7();
         _tenantContext.TenantId.Returns(_tenantId);
@@ -49,7 +49,7 @@ public sealed class GetTenantDirectoryOperatorIdentityDocumentQueryHandlerTests
             _tenantContext,
             _resolver);
 
-        var result = await handler.Handle(
+        var result = await handler.QueryAsync(
             new GetTenantDirectoryOperatorIdentityDocumentQuery(_tenantId),
             CancellationToken.None);
 
@@ -64,7 +64,7 @@ public sealed class GetTenantDirectoryOperatorIdentityDocumentQueryHandlerTests
     }
 
     [Test]
-    public async Task Handle_MissingDocumentReturnsNullWithoutProvisioning()
+    public async Task QueryAsync_MissingDocumentReturnsNullWithoutProvisioning()
     {
         _tenantContext.TenantId.Returns(_tenantId);
         _resolver.ResolveTenantDocumentAsync<TenantDirectoryOperatorIdentitySettings>(
@@ -76,7 +76,7 @@ public sealed class GetTenantDirectoryOperatorIdentityDocumentQueryHandlerTests
             _tenantContext,
             _resolver);
 
-        var result = await handler.Handle(
+        var result = await handler.QueryAsync(
             new GetTenantDirectoryOperatorIdentityDocumentQuery(_tenantId),
             CancellationToken.None);
 

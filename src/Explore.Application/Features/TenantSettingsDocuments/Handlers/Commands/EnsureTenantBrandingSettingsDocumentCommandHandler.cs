@@ -1,26 +1,26 @@
-namespace Explore.Application.Features.TenantSettingsDocuments.Handlers.Queries;
+namespace Explore.Application.Features.TenantSettingsDocuments.Handlers.Commands;
 
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.TenantSettingsDocuments;
-using Explore.Application.Features.TenantSettingsDocuments.Requests.Queries;
+using Explore.Application.Features.TenantSettingsDocuments.Requests.Commands;
 using Explore.Application.Settings;
 using Explore.Domain.Settings.Documents;
 using Explore.Domain.Settings.Documents.Payloads;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
-public sealed class GetTenantBrandingSettingsDocumentQueryHandler(
+public sealed class EnsureTenantBrandingSettingsDocumentCommandHandler(
     ITenantContext tenantContext,
     ITypedSettingsDocumentResolver typedSettingsDocumentResolver,
     ITenantBrandingSettingsDocumentProvisioningService provisioningService,
     ITenantBrandingSettingsDocumentLockService lockService)
-    : IRequestHandler<GetTenantBrandingSettingsDocumentQuery, TenantBrandingSettingsDocumentDto?>
+    : ICommandHandler<EnsureTenantBrandingSettingsDocumentCommand, TenantBrandingSettingsDocumentDto?>
 {
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
 
-    public async Task<TenantBrandingSettingsDocumentDto?> Handle(
-        GetTenantBrandingSettingsDocumentQuery request,
+    public async Task<TenantBrandingSettingsDocumentDto?> ExecuteAsync(
+        EnsureTenantBrandingSettingsDocumentCommand request,
         CancellationToken cancellationToken)
     {
         var documentKey = SettingsDocumentKeys.Tenant.Branding;

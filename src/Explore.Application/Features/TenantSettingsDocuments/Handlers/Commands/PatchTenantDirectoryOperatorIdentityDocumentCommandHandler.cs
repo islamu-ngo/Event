@@ -15,7 +15,7 @@ using Explore.Domain.Settings.Documents;
 using Explore.Domain.Settings.Documents.Payloads;
 using Explore.Domain.ValueObjects;
 using FluentValidation;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 public sealed class PatchTenantDirectoryOperatorIdentityDocumentCommandHandler(
     ITenantContext tenantContext,
@@ -24,7 +24,7 @@ public sealed class PatchTenantDirectoryOperatorIdentityDocumentCommandHandler(
     ITenantRepository tenantRepository,
     ISettingMutationLock mutationLock,
     ITypedSettingsDocumentResolver typedSettingsDocumentResolver)
-    : IRequestHandler<
+    : ICommandHandler<
         PatchTenantDirectoryOperatorIdentityDocumentCommand,
         BaseCommandResponse<TenantDirectoryOperatorIdentityDocumentDto>>
 {
@@ -34,7 +34,7 @@ public sealed class PatchTenantDirectoryOperatorIdentityDocumentCommandHandler(
     private static readonly JsonSerializerOptions SerializerOptions =
         new(JsonSerializerDefaults.Web);
 
-    public async Task<BaseCommandResponse<TenantDirectoryOperatorIdentityDocumentDto>> Handle(
+    public async Task<BaseCommandResponse<TenantDirectoryOperatorIdentityDocumentDto>> ExecuteAsync(
         PatchTenantDirectoryOperatorIdentityDocumentCommand request,
         CancellationToken cancellationToken)
     {

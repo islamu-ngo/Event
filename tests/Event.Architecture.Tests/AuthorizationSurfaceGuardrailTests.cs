@@ -22,6 +22,10 @@ public sealed class AuthorizationSurfaceGuardrailTests
     private static readonly InventoryEntry[] NamedMediatRExceptions =
     [
         new(
+            "Explore.Application.Features.TenantSettingsDocuments.Requests.Commands.EnsureTenantBrandingSettingsDocumentCommand",
+            "authenticated-ambient-tenant-provisioning",
+            "The existing authenticated branding GET and post-patch reload retain their ambient tenant authority. The no-input command reads or provisions the default non-secret branding row without accepting a tenant target. TenantSettingsDocumentsControllerTests verifies anonymous denial, authenticated-member provisioning, repeated reads, concurrent uniqueness and retry; both patches retain separate persisted tenant grants."),
+        new(
             "Explore.Application.Features.TenantStorageSettings.Requests.Commands.TestTenantStorageProviderCommand",
             "handler-contained-admin",
             "The provider write/delete probe checks persisted administrator authority for the ambient tenant or instance before resolving storage. NativeTenantStorageHttpTests verifies forged grants, wrong-tenant denial without probing, instance grants, safe provider failures and cancellation."),

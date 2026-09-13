@@ -18,11 +18,13 @@ using Explore.Application.Features.TenantSettingsDocuments.Requests.Commands;
 using Explore.Application.Features.TenantSettingsDocuments.Requests.Queries;
 using Explore.Application.Models.Common;
 using Explore.Application.Responses;
+using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Settings.Documents;
 using Explore.Domain.Settings.Documents.Payloads;
+using Explore.Infrastructure.Services;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Secrets.Database;
@@ -34,6 +36,8 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Event.Api.IntegrationTests.Features;
 
@@ -96,6 +100,7 @@ public sealed class TenantSettingsDocumentsControllerTests
         {
             await ProblemAsync(denied, HttpStatusCode.Forbidden);
             await Assert.That(await denied.Content.ReadAsStringAsync()).DoesNotContain("Community Events ASBL");
+            await Assert.That(factory.ResolutionObservation.IdentityReads).IsEqualTo(0);
         }
         // Branding retains its existing authenticated-member read/provision authority.
         var memberBranding = await ReadAsync<TenantBrandingSettingsDocumentDto>(forged, Branding);
@@ -110,6 +115,7 @@ public sealed class TenantSettingsDocumentsControllerTests
             await Assert.That(body.RootElement.GetProperty("_links").TryGetProperty("self", out _)).IsTrue();
             await Assert.That(body.RootElement.GetProperty("_links").TryGetProperty("edit", out _)).IsEqualTo(client == admin);
         }
+        await Assert.That(factory.ResolutionObservation.IdentityReads).IsGreaterThan(0);
         using var put = await admin.PutAsJsonAsync(Root + Branding, new { });
         await Assert.That(put.StatusCode).IsEqualTo(HttpStatusCode.MethodNotAllowed);
     }
@@ -123,7 +129,10 @@ public sealed class TenantSettingsDocumentsControllerTests
         using (var scope = factory.Services.CreateScope())
             await Assert.That(await scope.ServiceProvider.GetRequiredService<ITenantSettingsDocumentRepository>()
                 .GetByTenantAndDocumentKey(PlatformDefaults.DefaultTenantId, SettingsDocumentKeys.Tenant.Branding)).IsNull();
-        var first = await ReadAsync<TenantBrandingSettingsDocumentDto>(client, Branding);
+        using var firstResponse = await client.GetAsync(Root + Branding);
+        await Assert.That(firstResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await AssertHalLinksAsync(firstResponse, Branding);
+        var first = (await firstResponse.Content.ReadFromJsonAsync<TenantBrandingSettingsDocumentDto>())!;
         var second = await ReadAsync<TenantBrandingSettingsDocumentDto>(client, Branding);
         await Assert.That(first.Payload.DisplayName).IsEqualTo(seed.TenantName);
         await Assert.That(first.SourceScopeId).IsEqualTo(PlatformDefaults.DefaultTenantId);
@@ -212,6 +221,7 @@ public sealed class TenantSettingsDocumentsControllerTests
         }))
         {
             await Assert.That(patched.StatusCode).IsEqualTo(HttpStatusCode.OK);
+            await AssertHalLinksAsync(patched, Branding);
             var updated = (await patched.Content.ReadFromJsonAsync<TenantBrandingSettingsDocumentDto>())!;
             await Assert.That(updated.Payload.DisplayName).IsEqualTo("Updated Tenant");
             await Assert.That(updated.ConcurrencyStamp).IsNotEqualTo(branding.ConcurrencyStamp);
@@ -226,6 +236,7 @@ public sealed class TenantSettingsDocumentsControllerTests
         }))
         {
             await Assert.That(cleared.StatusCode).IsEqualTo(HttpStatusCode.OK);
+            await AssertHalLinksAsync(cleared, Branding);
             var updated = (await cleared.Content.ReadFromJsonAsync<TenantBrandingSettingsDocumentDto>())!;
             await Assert.That(updated.Payload.DisplayName).IsNull();
             await Assert.That(updated.Payload.CustomCssUrl).IsEqualTo("https://cdn.example.test/tenant.css");
@@ -242,6 +253,7 @@ public sealed class TenantSettingsDocumentsControllerTests
             LegalLinks = new() { TermsUrl = OptionalUpdate<string?>.Set("https://example.test/terms") }
         });
         await Assert.That(changed.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await AssertHalLinksAsync(changed, Identity);
         var changedIdentity = (await changed.Content.ReadFromJsonAsync<TenantDirectoryOperatorIdentityDocumentDto>())!;
         await Assert.That(changedIdentity.Payload.LegalName).IsEqualTo("Updated Community Events ASBL");
         await Assert.That(changedIdentity.Payload.PublicName).IsEqualTo(identity.Payload.PublicName);
@@ -435,6 +447,19 @@ public sealed class TenantSettingsDocumentsControllerTests
         return (await response.Content.ReadFromJsonAsync<T>())!;
     }
 
+    private static async Task AssertHalLinksAsync(HttpResponseMessage response, string path)
+    {
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var links = body.RootElement.GetProperty("_links");
+        foreach (var (relation, method) in new[] { ("self", "GET"), ("edit", "PATCH") })
+        {
+            var link = links.GetProperty(relation);
+            await Assert.That(new Uri(new Uri("http://localhost"), link.GetProperty("href").GetString()!).AbsolutePath)
+                .IsEqualTo(Root + path);
+            await Assert.That(link.GetProperty("method").GetString()).IsEqualTo(method);
+        }
+    }
+
     private static async Task ProblemAsync(HttpResponseMessage response, HttpStatusCode status)
     {
         await Assert.That(response.StatusCode).IsEqualTo(status).Because(await response.Content.ReadAsStringAsync());
@@ -513,6 +538,7 @@ public sealed class TenantSettingsDocumentsControllerTests
         private readonly string _path = Path.Combine(Path.GetTempPath(), $"native-tenant-documents-{Guid.CreateVersion7():N}.db");
         public CommitFailure CommitBoundary { get; } = new();
         public DocumentSaveBoundary SaveBoundary { get; } = new();
+        public DocumentResolutionObservation ResolutionObservation { get; } = new();
 
         public static async Task<DocumentFactory> CreateAsync()
         {
@@ -549,6 +575,10 @@ public sealed class TenantSettingsDocumentsControllerTests
             {
                 services.RemoveExploreDbContextRegistrations();
                 services.AddDbContextFactory<ExploreDbContext>(ConfigureDatabase);
+                services.RemoveAll<ITypedSettingsDocumentResolver>();
+                services.AddScoped<ITypedSettingsDocumentResolver>(provider => new ObservedDocumentResolver(
+                    new TypedSettingsDocumentResolver(provider.GetRequiredService<ITenantSettingsDocumentRepository>(),
+                        provider.GetRequiredService<IMemoryCache>()), ResolutionObservation));
                 services.AddScoped(provider =>
                 {
                     var db = provider.GetRequiredService<IDbContextFactory<ExploreDbContext>>().CreateDbContext();
@@ -569,6 +599,42 @@ public sealed class TenantSettingsDocumentsControllerTests
             File.Delete(_path + "-wal");
             File.Delete(_path + "-shm");
         }
+    }
+
+    private sealed class DocumentResolutionObservation
+    {
+        private int _identityReads;
+        public int IdentityReads => Volatile.Read(ref _identityReads);
+        public void Observe(string documentKey)
+        {
+            if (documentKey == SettingsDocumentKeys.Tenant.DirectoryOperatorIdentity)
+                Interlocked.Increment(ref _identityReads);
+        }
+    }
+
+    // Observation only: every read and invalidation still reaches the real resolver and repository.
+    private sealed class ObservedDocumentResolver(ITypedSettingsDocumentResolver inner,
+        DocumentResolutionObservation observation) : ITypedSettingsDocumentResolver
+    {
+        public Task<ResolvedSettingsDocument<TPayload>?> ResolveTenantDocumentAsync<TPayload>(
+            SettingsResolutionContext context, string documentKey, CancellationToken cancellationToken = default)
+            where TPayload : notnull
+        {
+            observation.Observe(documentKey);
+            return inner.ResolveTenantDocumentAsync<TPayload>(context, documentKey, cancellationToken);
+        }
+
+        public Task<IReadOnlyList<ResolvedSettingsDocument<TPayload>>> ResolveTenantDocumentsAsync<TPayload>(
+            SettingsResolutionContext context, IEnumerable<string> documentKeys, CancellationToken cancellationToken = default)
+            where TPayload : notnull
+        {
+            string[] keys = documentKeys.ToArray();
+            foreach (string key in keys) observation.Observe(key);
+            return inner.ResolveTenantDocumentsAsync<TPayload>(context, keys, cancellationToken);
+        }
+
+        public void InvalidateTenantDocumentCache(Guid tenantId, string? documentKey = null) =>
+            inner.InvalidateTenantDocumentCache(tenantId, documentKey);
     }
 
     private sealed class CommitFailure : DbTransactionInterceptor

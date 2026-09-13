@@ -37,12 +37,11 @@ public sealed class CreateControlPlaneTenantPlanVersionDraftCommandHandler(ITena
             : plan.Versions.Max(version => version.VersionNumber) + 1;
 
         TenantPlanVersion version = ControlPlaneTenantPlanDraftMapper.ToVersion(
-            plan,
+            plan.Id,
             request.Draft,
             nextVersionNumber,
             TenantPlanStatusEnum.Draft);
 
-        plan.Versions.Add(version);
         await tenantPlanRepository.CreateVersionAsync(version, cancellationToken);
 
         return BaseCommandResponse.Success(version.Id, "Tenant plan version draft created.");

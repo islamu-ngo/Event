@@ -181,7 +181,7 @@ public sealed class TenantPlanRepository(ExploreDbContext dbContext)
 
     public async Task UpdateAssignmentAsync(TenantPlanAssignment assignment, CancellationToken cancellationToken = default)
     {
-        dbContext.TenantPlanAssignments.Update(assignment);
+        dbContext.Entry(assignment).State = EntityState.Modified;
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 }

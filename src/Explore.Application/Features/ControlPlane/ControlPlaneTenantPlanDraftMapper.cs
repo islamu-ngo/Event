@@ -15,12 +15,14 @@ internal static class ControlPlaneTenantPlanDraftMapper
             DisplayName = draft.Name.Trim()
         };
 
-        plan.Versions.Add(ToVersion(plan, draft, versionNumber: 1, TenantPlanStatusEnum.Draft));
+        var version = ToVersion(plan.Id, draft, versionNumber: 1, TenantPlanStatusEnum.Draft);
+        version.TenantPlan = plan;
+        plan.Versions.Add(version);
         return plan;
     }
 
     public static TenantPlanVersion ToVersion(
-        TenantPlan plan,
+        Guid planId,
         TenantPlanDraft draft,
         int versionNumber,
         TenantPlanStatusEnum status)
@@ -28,8 +30,7 @@ internal static class ControlPlaneTenantPlanDraftMapper
         var version = new TenantPlanVersion
         {
             Id = Guid.CreateVersion7(),
-            TenantPlan = plan,
-            TenantPlanId = plan.Id,
+            TenantPlanId = planId,
             VersionNumber = versionNumber,
             TenantPlanStatusId = (int)status,
             PriceAmount = draft.Pricing.Amount,

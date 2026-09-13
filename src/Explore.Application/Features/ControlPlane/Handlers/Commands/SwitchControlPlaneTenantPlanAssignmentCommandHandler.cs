@@ -57,9 +57,7 @@ public sealed class SwitchControlPlaneTenantPlanAssignmentCommandHandler(
             {
                 Id = Guid.CreateVersion7(),
                 TenantId = request.TenantId,
-                TenantPlan = targetVersion.TenantPlan,
                 TenantPlanId = targetVersion.TenantPlanId,
-                TenantPlanVersion = targetVersion,
                 TenantPlanVersionId = targetVersion.Id,
                 TenantPlanAssignmentStatusId = (int)TenantPlanAssignmentStatusEnum.Active,
                 AssignedByUserId = request.AssignedByUserId,

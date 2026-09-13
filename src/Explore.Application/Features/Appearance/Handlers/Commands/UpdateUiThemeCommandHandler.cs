@@ -7,9 +7,9 @@ using Explore.Application.DTOs.Appearance.Validators;
 using Explore.Application.Features.Appearance.Common;
 using Explore.Application.Features.Appearance.Requests.Commands;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
-public class UpdateUiThemeCommandHandler : IRequestHandler<UpdateUiThemeCommand, BaseCommandResponse<Guid>>
+public class UpdateUiThemeCommandHandler : ICommandHandler<UpdateUiThemeCommand, BaseCommandResponse<Guid>>
 {
     private readonly IUiThemeRepository _uiThemeRepository;
     private readonly IAdminContext _adminContext;
@@ -25,7 +25,7 @@ public class UpdateUiThemeCommandHandler : IRequestHandler<UpdateUiThemeCommand,
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateUiThemeCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateUiThemeCommand request, CancellationToken cancellationToken)
     {
         var theme = await _uiThemeRepository.GetById(request.Id);
 

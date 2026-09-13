@@ -5,9 +5,8 @@ using Explore.API.Hateoas;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Appearance;
 using Explore.Application.Features.Appearance.Requests.Commands;
-using Explore.Application.Features.Appearance.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -25,12 +24,14 @@ public class UserAppearanceController : ControllerBase
         "Appearance preference validation failed",
         "Appearance preference update failed.");
 
-    private readonly IMediator _mediator;
+    private readonly ICommandHandler<UpdateCurrentUserAppearancePreferencesCommand, BaseCommandResponse<Guid>> _updatePreferencesCommand;
     private readonly IAppearanceResolutionService _resolutionService;
 
-    public UserAppearanceController(IMediator mediator, IAppearanceResolutionService resolutionService)
+    public UserAppearanceController(
+        ICommandHandler<UpdateCurrentUserAppearancePreferencesCommand, BaseCommandResponse<Guid>> updatePreferencesCommand,
+        IAppearanceResolutionService resolutionService)
     {
-        _mediator = mediator;
+        _updatePreferencesCommand = updatePreferencesCommand;
         _resolutionService = resolutionService;
     }
 
@@ -55,7 +56,7 @@ public class UserAppearanceController : ControllerBase
         [FromBody] UpdateUserAppearancePreferencesDto request,
         CancellationToken cancellationToken = default)
     {
-        var response = await _mediator.Send(new UpdateCurrentUserAppearancePreferencesCommand
+        var response = await _updatePreferencesCommand.ExecuteAsync(new UpdateCurrentUserAppearancePreferencesCommand
         {
             Preferences = request
         }, cancellationToken);

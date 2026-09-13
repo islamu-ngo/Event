@@ -5,9 +5,9 @@ using Explore.Application.DTOs.Appearance;
 using Explore.Application.Features.Appearance.Requests.Queries;
 using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
-public class GetCurrentUserAppearancePreferencesQueryHandler : IRequestHandler<GetCurrentUserAppearancePreferencesQuery, UserAppearancePreferencesDto>
+public class GetCurrentUserAppearancePreferencesQueryHandler : IQueryHandler<GetCurrentUserAppearancePreferencesQuery, UserAppearancePreferencesDto>
 {
     private readonly IHierarchicalSettingsResolver _hierarchicalSettingsResolver;
     private readonly ITenantContext _tenantContext;
@@ -23,7 +23,7 @@ public class GetCurrentUserAppearancePreferencesQueryHandler : IRequestHandler<G
         _currentUserService = currentUserService;
     }
 
-    public async Task<UserAppearancePreferencesDto> Handle(GetCurrentUserAppearancePreferencesQuery request, CancellationToken cancellationToken)
+    public async Task<UserAppearancePreferencesDto> QueryAsync(GetCurrentUserAppearancePreferencesQuery request, CancellationToken cancellationToken)
     {
         var userId = _currentUserService.UserId;
         if (userId == null)

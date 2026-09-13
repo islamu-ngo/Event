@@ -6,9 +6,9 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Appearance;
 using Explore.Application.Features.Appearance.Common;
 using Explore.Application.Features.Appearance.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
-public class GetUiThemeCatalogQueryHandler : IRequestHandler<GetUiThemeCatalogQuery, IReadOnlyList<UiThemeListItemDto>>
+public class GetUiThemeCatalogQueryHandler : IQueryHandler<GetUiThemeCatalogQuery, IReadOnlyList<UiThemeListItemDto>>
 {
     private readonly IUiThemeRepository _uiThemeRepository;
     private readonly ITenantContext _tenantContext;
@@ -24,7 +24,7 @@ public class GetUiThemeCatalogQueryHandler : IRequestHandler<GetUiThemeCatalogQu
         _adminContext = adminContext;
     }
 
-    public async Task<IReadOnlyList<UiThemeListItemDto>> Handle(GetUiThemeCatalogQuery request, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<UiThemeListItemDto>> QueryAsync(GetUiThemeCatalogQuery request, CancellationToken cancellationToken)
     {
         Guid? ownerTenantId = request.IsPlatformCatalog ? null : _tenantContext.TenantId;
 

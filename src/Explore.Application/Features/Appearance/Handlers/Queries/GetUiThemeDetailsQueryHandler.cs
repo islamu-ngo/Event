@@ -5,9 +5,9 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Appearance;
 using Explore.Application.Features.Appearance.Common;
 using Explore.Application.Features.Appearance.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
-public class GetUiThemeDetailsQueryHandler : IRequestHandler<GetUiThemeDetailsQuery, UiThemeDetailsDto?>
+public class GetUiThemeDetailsQueryHandler : IQueryHandler<GetUiThemeDetailsQuery, UiThemeDetailsDto?>
 {
     private readonly IUiThemeRepository _uiThemeRepository;
     private readonly IAdminContext _adminContext;
@@ -20,7 +20,7 @@ public class GetUiThemeDetailsQueryHandler : IRequestHandler<GetUiThemeDetailsQu
         _adminContext = adminContext;
     }
 
-    public async Task<UiThemeDetailsDto?> Handle(GetUiThemeDetailsQuery request, CancellationToken cancellationToken)
+    public async Task<UiThemeDetailsDto?> QueryAsync(GetUiThemeDetailsQuery request, CancellationToken cancellationToken)
     {
         var theme = await _uiThemeRepository.GetById(request.Id);
         if (theme is null)

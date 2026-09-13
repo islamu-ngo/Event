@@ -9,9 +9,9 @@ using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
 using Explore.Domain;
 using Explore.Domain.Constants;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
-public class UpdateCurrentUserAppearancePreferencesCommandHandler : IRequestHandler<UpdateCurrentUserAppearancePreferencesCommand, BaseCommandResponse<Guid>>
+public class UpdateCurrentUserAppearancePreferencesCommandHandler : ICommandHandler<UpdateCurrentUserAppearancePreferencesCommand, BaseCommandResponse<Guid>>
 {
     private readonly IUserPreferenceRepository _userPreferenceRepository;
     private readonly IHierarchicalSettingsResolver _hierarchicalSettingsResolver;
@@ -36,7 +36,7 @@ public class UpdateCurrentUserAppearancePreferencesCommandHandler : IRequestHand
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateCurrentUserAppearancePreferencesCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateCurrentUserAppearancePreferencesCommand request, CancellationToken cancellationToken)
     {
         var userId = _currentUserService.UserId;
         if (userId == null)

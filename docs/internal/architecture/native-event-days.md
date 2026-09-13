@@ -1,0 +1,14 @@
+# EventDays authorization and operation boundary
+
+> **Status:** Implemented parent-authority prerequisite; native dispatch follows separately.
+> **Source anchors:** `EventDayAuthorizationContextEnricher`, `UpdateEventDayDtoValidator`, `EventDayRepository`, `EventDayController`.
+
+Three write requests retain their exact EventDay create/update/delete capability metadata. A feature-owned typed enricher supplies `EventScopedAuthorizationFacts` from entity repositories, verifies both day and parent against the current tenant, and rejects deleted or missing contexts before the existing authorization provider evaluates the capability. Current identity and tenant never originate in the body. Public and managed queries retain their existing separate authorization and publication semantics. No shared policy grants change.
+
+The prerequisite repairs owner writes previously denied with `missing_event_context`. Existing tracked day state determines update/delete authority; a proposed destination cannot replace it. Reparenting is unsupported because `(TenantId, EventId, Id)` is a persisted alternate key used by child relationships. The manually instantiated update validator now rejects different parents with the existing validation400 response instead of allowing EF's key-mutation exception500. No DTO or generated contract changes are required.
+
+`EventDayRepository.Update` translates only `DbUpdateConcurrencyException` into the established `concurrent_update` exception/HTTP409, retaining its inner exception. Other persistence failures propagate. Validation, entity mapping, transaction-owned deletion/catalog checks and post-write cache invalidation remain handler-owned. Image references retain safe public raster eligibility; this feature does not upload, delete or compensate storage bytes. Legacy tokenless repository signatures remain tokenless; the enricher checks cancellation around its parent load without inventing overloads.
+
+Verification uses the actual API TestServer with SQLite, persisted actors/roles/tenants, and real handlers/repositories. Cases cover owner/outsider/anonymous writes, foreign/deleted parents, publication and managed reads, nullable404, immutable parent validation, explicit image clearing, storage lookup failure and cancellation propagation, and a barrier-synchronized dual-PATCH race. The barrier is placed before database writes after both handlers stage the same version; EF chooses one durable winner. Failure injection targets the model-derived storage table in actual database commands, not repository mocks. This evidence is single-provider, not a full provider matrix or full-platform migration claim.
+
+Operator behavior: [Event day management](../../public/features/event-day-management.md).

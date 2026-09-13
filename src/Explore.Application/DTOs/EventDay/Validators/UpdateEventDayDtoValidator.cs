@@ -60,6 +60,13 @@ public class UpdateEventDayDtoValidator : AbstractValidator<UpdateEventDayDto>
         CancellationToken cancellationToken)
     {
         var validationResult = await base.ValidateAsync(dto, cancellationToken);
+        // EventId is part of the persisted day key used by ticket entitlements and sessions.
+        if (dto.Event is { } parent && parent.EventId != currentEventId)
+        {
+            validationResult.Errors.Add(new FluentValidation.Results.ValidationFailure(
+                nameof(UpdateEventDayDto.Event),
+                "An event day cannot be moved to another event."));
+        }
         if (!validationResult.IsValid || dto.LocalDate is null)
         {
             return validationResult;

@@ -24,6 +24,8 @@ using Explore.Application.Features.EventCategories.Authorization;
 using Explore.Application.Features.EventCategories.Requests.Commands;
 using Explore.Application.Features.EventCustomProperties.Authorization;
 using Explore.Application.Features.EventCustomProperties.Requests.Commands;
+using Explore.Application.Features.EventDays.Authorization;
+using Explore.Application.Features.EventDays.Requests.Commands;
 using Explore.Application.Features.EventOrganizerClaims.Authorization;
 using Explore.Application.Features.EventOrganizerClaims.Requests.Commands;
 using Explore.Application.Features.EventReporting;
@@ -128,6 +130,9 @@ public static class ApplicationServicesRegistration
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(PerformanceBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(AuthorizationBehavior<,>));
         services.AddTransient<AuthorizationResourceContextResolver>();
+        services.AddTransient<IAuthorizationContextEnricher<CreateEventDayCommand>, EventDayAuthorizationContextEnricher>();
+        services.AddTransient<IAuthorizationContextEnricher<UpdateEventDayCommand>, EventDayAuthorizationContextEnricher>();
+        services.AddTransient<IAuthorizationContextEnricher<DeleteEventDayCommand>, EventDayAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<UpdateCustomPropertyDefinitionCommand>, UpdateCustomPropertyDefinitionAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<UpdateEventCustomPropertyDefinitionCommand>, UpdateEventCustomPropertyDefinitionAuthorizationContextEnricher>();
         services.AddTransient<IAuthorizationContextEnricher<UpdateEventSessionCustomPropertyDefinitionCommand>, UpdateEventSessionCustomPropertyDefinitionAuthorizationContextEnricher>();

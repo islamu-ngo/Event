@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Exceptions;
 using Explore.Domain;
 using Explore.Persistence.Database;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +13,21 @@ public class EventDayRepository : GenericRepository<EventDay, Guid>, IEventDayRe
     public EventDayRepository(ExploreDbContext dbContext) : base(dbContext)
     {
         _dbContext = dbContext;
+    }
+
+    public override async Task Update(EventDay entity)
+    {
+        try
+        {
+            await base.Update(entity);
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            throw new ConcurrencyConflictException(
+                ConcurrencyConflictException.ConcurrentUpdate,
+                "The event day was modified by another request. Reload and retry.",
+                nameof(EventDay), entity.Id.ToString(), exception);
+        }
     }
 
     public Task<EventDay?> GetByIdForEventAsync(

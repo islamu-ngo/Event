@@ -110,7 +110,7 @@ public sealed class EventSessionMappingHandlerTests
         });
         var cache = Substitute.For<HybridCache>();
         var handler = new CreateEventSessionSpeakerCommandHandler(repository, actors, sessions, Tenant(), cache);
-        var result = await handler.Handle(new CreateEventSessionSpeakerCommand
+        var result = await handler.ExecuteAsync(new CreateEventSessionSpeakerCommand
         {
             SpeakerDto = new CreateEventSessionSpeakerDto { ActorId = CreatedId, EventSessionId = SessionId }
         }, CancellationToken.None);
@@ -271,8 +271,8 @@ public sealed class EventSessionMappingHandlerTests
         var speakers = Substitute.For<IEventSessionSpeakerRepository>();
         var languages = Substitute.For<IEventSessionLanguageRepository>();
         var sessions = Substitute.For<IEventSessionRepository>();
-        var speaker = await new GetEventSessionSpeakerDetailsRequestHandler(speakers)
-            .Handle(new GetEventSessionSpeakerDetailsRequest { Id = CreatedId }, CancellationToken.None);
+        var speaker = await new GetEventSessionSpeakerDetailsQueryHandler(speakers)
+            .QueryAsync(new GetEventSessionSpeakerDetailsQuery { Id = CreatedId }, CancellationToken.None);
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton(languages);

@@ -5,17 +5,17 @@ using System.Threading;
 using System.Threading.Tasks;
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionSpeaker.Validators;
 using Explore.Application.Features.EventSessionSpeakers.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventSessionSpeakers.Handlers.Commands;
 
-public class CreateEventSessionSpeakerCommandHandler : IRequestHandler<CreateEventSessionSpeakerCommand, BaseCommandResponse<Guid>>
+public class CreateEventSessionSpeakerCommandHandler : ICommandHandler<CreateEventSessionSpeakerCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventSessionSpeakerRepository _speakerRepository;
     private readonly IActorRepository _actorRepository;
@@ -37,7 +37,7 @@ public class CreateEventSessionSpeakerCommandHandler : IRequestHandler<CreateEve
         _cache = cache;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateEventSessionSpeakerCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateEventSessionSpeakerCommand request, CancellationToken cancellationToken)
     {
         var validator = new CreateEventSessionSpeakerDtoValidator(_actorRepository, _eventSessionRepository);
         var validationResult = await validator.ValidateAsync(request.SpeakerDto, cancellationToken);

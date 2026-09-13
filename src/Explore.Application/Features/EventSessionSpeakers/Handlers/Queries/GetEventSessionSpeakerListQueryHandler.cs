@@ -2,27 +2,27 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Explore.Application.Mappings;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventSessionSpeaker;
 using Explore.Application.Features.EventSessionSpeakers.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.EventSessionSpeakers.Handlers.Queries;
 
-public class GetEventSessionSpeakerListRequestHandler : IRequestHandler<GetEventSessionSpeakerListRequest, PaginatedResult<EventSessionSpeakerListDto>>
+public class GetEventSessionSpeakerListQueryHandler : IQueryHandler<GetEventSessionSpeakerListQuery, PaginatedResult<EventSessionSpeakerListDto>>
 {
     private readonly IEventSessionSpeakerRepository _speakerRepository;
 
-    public GetEventSessionSpeakerListRequestHandler(
+    public GetEventSessionSpeakerListQueryHandler(
         IEventSessionSpeakerRepository speakerRepository)
     {
         _speakerRepository = speakerRepository;
     }
 
-    public async Task<PaginatedResult<EventSessionSpeakerListDto>> Handle(GetEventSessionSpeakerListRequest request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<EventSessionSpeakerListDto>> QueryAsync(GetEventSessionSpeakerListQuery query, CancellationToken cancellationToken)
     {
-        var (pageNumber, pageSize) = PaginatedResult<EventSessionSpeakerListDto>.NormalizeParameters(request.PageNumber, request.PageSize);
+        var (pageNumber, pageSize) = PaginatedResult<EventSessionSpeakerListDto>.NormalizeParameters(query.PageNumber, query.PageSize);
         var (speakers, totalCount) = await _speakerRepository.GetSpeakersWithDetailsPaged(
             pageNumber,
             pageSize,

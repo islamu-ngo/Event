@@ -3,14 +3,12 @@ using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Hateoas;
-using Explore.Application.DTOs.EventSession;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.EventSessionSpeaker;
-using Explore.Application.Features.EventSessions.Requests.Queries;
 using Explore.Application.Features.EventSessionSpeakers.Requests.Commands;
 using Explore.Application.Features.EventSessionSpeakers.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -45,14 +43,23 @@ public sealed class EventSessionSpeakerController : EventControllerBase
         "Event session speaker validation failed",
         "If-Match header is required and must contain the current event session speaker concurrency stamp.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetSpeakersBySessionQuery, List<EventSessionSpeakerListDto>> _speakersBySessionQuery;
+    private readonly ICommandHandler<CreateEventSessionSpeakerCommand, BaseCommandResponse<Guid>> _createCommand;
+    private readonly ICommandHandler<UpdateEventSessionSpeakerCommand, BaseCommandResponse<Guid>> _updateCommand;
+    private readonly ICommandHandler<DeleteEventSessionSpeakerCommand, bool> _deleteCommand;
     private readonly IResourceAssembler<EventSessionSpeakerDto, EventSessionSpeakerListDto> _assembler;
 
     public EventSessionSpeakerController(
-        IMediator mediator,
+        IQueryHandler<GetSpeakersBySessionQuery, List<EventSessionSpeakerListDto>> speakersBySessionQuery,
+        ICommandHandler<CreateEventSessionSpeakerCommand, BaseCommandResponse<Guid>> createCommand,
+        ICommandHandler<UpdateEventSessionSpeakerCommand, BaseCommandResponse<Guid>> updateCommand,
+        ICommandHandler<DeleteEventSessionSpeakerCommand, bool> deleteCommand,
         IResourceAssembler<EventSessionSpeakerDto, EventSessionSpeakerListDto> assembler)
     {
-        _mediator = mediator;
+        _speakersBySessionQuery = speakersBySessionQuery;
+        _createCommand = createCommand;
+        _updateCommand = updateCommand;
+        _deleteCommand = deleteCommand;
         _assembler = assembler;
     }
 
@@ -69,13 +76,12 @@ public sealed class EventSessionSpeakerController : EventControllerBase
         Guid eventSessionId,
         CancellationToken cancellationToken = default)
     {
-        var context = await GetSessionContextOrNullAsync(eventSessionId, cancellationToken);
-        if (context is null)
+        if (eventSessionId == Guid.Empty)
         {
             return this.ToNotFoundProblem(EventSessionNotFoundProblem);
         }
 
-        var speakers = await _mediator.Send(new GetSpeakersBySessionRequest
+        var speakers = await _speakersBySessionQuery.QueryAsync(new GetSpeakersBySessionQuery
         {
             EventSessionId = eventSessionId
         }, cancellationToken);
@@ -105,19 +111,16 @@ public sealed class EventSessionSpeakerController : EventControllerBase
         [FromBody] CreateEventSessionSpeakerDto speaker,
         CancellationToken cancellationToken = default)
     {
-        var context = await GetSessionContextOrNullAsync(eventSessionId, cancellationToken);
-        if (context is null)
+        if (eventSessionId == Guid.Empty)
         {
             return this.ToNotFoundProblem(EventSessionNotFoundProblem);
         }
 
         speaker = speaker with { EventSessionId = eventSessionId };
 
-        var response = await _mediator.Send(new CreateEventSessionSpeakerCommand
+        var response = await _createCommand.ExecuteAsync(new CreateEventSessionSpeakerCommand
         {
-            SpeakerDto = speaker,
-            EventId = context.EventId,
-            TenantId = context.TenantId
+            SpeakerDto = speaker
         }, cancellationToken);
 
         if (!response.IsSuccess)
@@ -156,7 +159,7 @@ public sealed class EventSessionSpeakerController : EventControllerBase
                 IfMatchValidationProblem.FallbackDetail);
         }
 
-        var response = await _mediator.Send(new UpdateEventSessionSpeakerCommand
+        var response = await _updateCommand.ExecuteAsync(new UpdateEventSessionSpeakerCommand
         {
             EventSessionSpeakerId = id,
             SpeakerDto = speaker,
@@ -187,18 +190,15 @@ public sealed class EventSessionSpeakerController : EventControllerBase
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var context = await GetSessionContextOrNullAsync(eventSessionId, cancellationToken);
-        if (context is null)
+        if (eventSessionId == Guid.Empty)
         {
             return this.ToNotFoundProblem(EventSessionNotFoundProblem);
         }
 
-        var deleted = await _mediator.Send(new DeleteEventSessionSpeakerCommand
+        var deleted = await _deleteCommand.ExecuteAsync(new DeleteEventSessionSpeakerCommand
         {
             Id = id,
-            EventSessionId = eventSessionId,
-            TenantId = context.TenantId,
-            EventId = context.EventId
+            EventSessionId = eventSessionId
         }, cancellationToken);
 
         if (!deleted)
@@ -209,18 +209,4 @@ public sealed class EventSessionSpeakerController : EventControllerBase
         return NoContent();
     }
 
-    private async Task<EventSessionAuthorizationContextDto?> GetSessionContextOrNullAsync(
-        Guid eventSessionId,
-        CancellationToken cancellationToken)
-    {
-        if (eventSessionId == Guid.Empty)
-        {
-            return null;
-        }
-
-        return await _mediator.Send(new GetEventSessionAuthorizationContextRequest
-        {
-            EventSessionId = eventSessionId
-        }, cancellationToken);
-    }
 }

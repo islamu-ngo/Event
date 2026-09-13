@@ -13,6 +13,16 @@ public class EventSessionSpeakerRepository : GenericRepository<EventSessionSpeak
         _dbContext = dbContext;
     }
 
+    public Task<EventSessionSpeaker?> GetWithDetails(
+        Guid id,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.EventSessionSpeakers
+            .AsNoTracking()
+            .Include(speaker => speaker.Actor)
+                .ThenInclude(actor => actor!.Pii)
+            .Include(speaker => speaker.EventSession)
+            .FirstOrDefaultAsync(speaker => speaker.Id == id, cancellationToken);
+
     public async Task<List<EventSessionSpeaker>> GetBySession(
         Guid eventSessionId,
         CancellationToken cancellationToken = default)

@@ -4,6 +4,7 @@ namespace Explore.Application.Contracts.Persistence;
 
 public interface IEventSessionSpeakerRepository : IGenericRepository<EventSessionSpeaker, Guid>
 {
+    Task<EventSessionSpeaker?> GetWithDetails(Guid id, CancellationToken cancellationToken = default);
     Task<List<EventSessionSpeaker>> GetBySession(Guid eventSessionId, CancellationToken cancellationToken = default);
     Task<List<EventSessionSpeaker>> GetByActor(Guid actorId, CancellationToken cancellationToken = default);
     Task<(List<EventSessionSpeaker> Items, int TotalCount)> GetSpeakersWithDetailsPaged(

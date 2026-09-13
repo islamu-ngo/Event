@@ -345,9 +345,13 @@ public sealed partial class NativeStorageObjectHttpTests
         public int WriteCount { get; private set; }
         public int DisposedReads { get; private set; }
 
-        public static async Task<StorageFactory> CreateAsync(bool useProductionAuthorization = false)
+        private Microsoft.EntityFrameworkCore.Diagnostics.DbTransactionInterceptor? _transactionObserver;
+
+        public static async Task<StorageFactory> CreateAsync(
+            bool useProductionAuthorization = false,
+            Microsoft.EntityFrameworkCore.Diagnostics.DbTransactionInterceptor? transactionObserver = null)
         {
-            var factory = new StorageFactory();
+            var factory = new StorageFactory { _transactionObserver = transactionObserver };
             if (useProductionAuthorization)
             {
                 factory.AdditionalConfiguration["Authorization:Provider"] = "local";
@@ -389,6 +393,8 @@ public sealed partial class NativeStorageObjectHttpTests
                 Role = PrimaryDatabaseRole.Runtime, Provider = PrimaryDatabaseProvider.Sqlite, Database = _database
             });
             options.UseSnakeCaseNamingConvention();
+            if (_transactionObserver is not null)
+                options.AddInterceptors(_transactionObserver);
         }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)

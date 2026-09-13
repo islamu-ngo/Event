@@ -6,7 +6,7 @@ using Explore.Application.Features.OrganizationTenantEvidence.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using OrganizationLegitimacyEvidence = Explore.Domain.OrganizationTenantEvidence;
 
 namespace Explore.Application.Features.OrganizationTenantEvidence.Handlers.Commands;
@@ -18,9 +18,9 @@ public sealed class SubmitOrganizationTenantEvidenceCommandHandler(
     IAdminContext adminContext,
     ITenantContext tenantContext,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<SubmitOrganizationTenantEvidenceCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<SubmitOrganizationTenantEvidenceCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         SubmitOrganizationTenantEvidenceCommand request,
         CancellationToken cancellationToken)
     {

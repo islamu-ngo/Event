@@ -9,7 +9,6 @@ using Explore.Application.Features.StorageObjects.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.OrganizationTenantEvidence.Handlers.Commands;
 
@@ -18,9 +17,9 @@ public sealed class CreateOrganizationTenantEvidenceUploadSessionCommandHandler(
     IAdminContext adminContext,
     ITenantContext tenantContext,
     ICommandHandler<CreateStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> createUpload)
-    : IRequestHandler<CreateOrganizationTenantEvidenceUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>>
+    : ICommandHandler<CreateOrganizationTenantEvidenceUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>>
 {
-    public async Task<BaseCommandResponse<StorageUploadSessionDto>> Handle(
+    public async Task<BaseCommandResponse<StorageUploadSessionDto>> ExecuteAsync(
         CreateOrganizationTenantEvidenceUploadSessionCommand request,
         CancellationToken cancellationToken)
     {

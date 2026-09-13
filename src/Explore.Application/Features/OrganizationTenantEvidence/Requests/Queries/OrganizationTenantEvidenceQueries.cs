@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.OrganizationTenantEvidence;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.OrganizationTenantEvidence.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.Organization, AuthorizationActions.Organizations.ViewEvidence)]
 public sealed record GetOrganizationTenantEvidenceRequest(Guid OrganizationId, Guid EvidenceId)
-    : IRequest<OrganizationTenantEvidenceDto?>, ISecureRequest
+    : IQuery<OrganizationTenantEvidenceDto?>, ISecureRequest
 {
     string? ISecureRequest.ResourceId => OrganizationId == Guid.Empty ? null : OrganizationId.ToString();
     IAuthorizationFacts? ISecureRequest.AuthorizationFacts =>
@@ -15,7 +15,7 @@ public sealed record GetOrganizationTenantEvidenceRequest(Guid OrganizationId, G
 
 [AuthorizeResource(ResourceKinds.Organization, AuthorizationActions.Organizations.ViewEvidence)]
 public sealed record GetOrganizationTenantEvidenceCollectionRequest(Guid OrganizationId)
-    : IRequest<IReadOnlyList<OrganizationTenantEvidenceDto>>, ISecureRequest
+    : IQuery<IReadOnlyList<OrganizationTenantEvidenceDto>>, ISecureRequest
 {
     string? ISecureRequest.ResourceId => OrganizationId == Guid.Empty ? null : OrganizationId.ToString();
     IAuthorizationFacts? ISecureRequest.AuthorizationFacts =>

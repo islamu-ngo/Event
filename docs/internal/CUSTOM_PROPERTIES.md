@@ -343,6 +343,10 @@ Post-commit tag invalidation uses `CancellationToken.None`: disconnecting or can
 
 Application discovery supplies authorization -> performance -> business-handler decoration. Commands retain tenant-update resource protection and manually constructed validators; `UpdateCustomPropertyDefinitionAuthorizationContextEnricher` and its explicit registration continue to replace caller-supplied tenant facts with persisted, ambient-tenant-checked authority. No request keeps a MediatR marker or compatibility alias. The cache/transaction implementation above is preserved independently of dispatch. Real SQLite/native tests retain prior cache and lifecycle assertions and replace the shared purge mediator stub with actual anonymous/member/admin HTTP and audit evidence.
 
+### Shared Definition Creation Identity
+
+`CreateCustomPropertyDefinitionCommandHandler` allocates the definition UUIDv7 before constructing option entities. Their foreign keys must reference that server-owned identity, not the empty ID that exists before EF adds a new parent. The repository still saves the parent, options and selected default inside the existing unit-of-work transaction; cache invalidation remains post-commit. The native HTTP creation test checks nonempty distinct option IDs, matching parent foreign keys, the selected default and rollback without publishing a partial definition or evicting a valid cached page.
+
 ### Shared Definition Option Presentation Order
 
 The shared `CustomPropertyDefinitionDto` projection in `CustomPropertyMapper` stably orders options by ascending `SortOrder` before creating immutable option snapshots. This is an Application presentation rule, not a UI-only correction: native detail callers and HTTP/admin consumers receive the same ordered array. The detail page and option editor render that array directly.

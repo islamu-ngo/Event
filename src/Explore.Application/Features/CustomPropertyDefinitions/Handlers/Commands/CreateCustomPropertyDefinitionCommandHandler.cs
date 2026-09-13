@@ -112,6 +112,7 @@ public class CreateCustomPropertyDefinitionCommandHandler : ICommandHandler<Crea
         var dto = request.DefinitionDto;
         var definition = new CustomPropertyDefinition
         {
+            Id = Guid.CreateVersion7(),
             EntityTypeName = dto.EntityTypeName,
             Namespace = governance.NormalizedNamespace,
             Key = governance.NormalizedKey,

@@ -163,6 +163,52 @@ public sealed partial class CustomPropertyDefinitionPrerequisiteTests
     }
 
     [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task NativeCreateWithOptions_PersistsOwnedOptionAndDefaultIdentities(bool failCommit)
+    {
+        await using var factory = new DefinitionFactory();
+        using var client = factory.CreateClient();
+        var data = await SeedAsync(factory);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.AuthHeaderName,
+            TestAuthHandler.CreateTenantAdminHeaderValue(data.UserId, PlatformDefaults.DefaultTenantId));
+        await ListAsync(factory, PlatformDefaults.DefaultTenantId, EntityTypeName.Organization, 1, 1);
+        factory.Commits.Fail = failCommit;
+        using var created = await client.PostAsJsonAsync(Root, CreateDto() with
+        {
+            PropertyType = PropertyType.Option,
+            Options =
+            [
+                new() { Namespace = "tenant.community", Key = "kept", DisplayName = "Kept", Value = "kept", IsDefault = true, IsActive = true, SortOrder = 10 },
+                new() { Namespace = "tenant.community", Key = "new", DisplayName = "New", Value = "new", IsActive = true, SortOrder = 5 }
+            ]
+        });
+        factory.Commits.Fail = false;
+        if (failCommit)
+        {
+            await Assert.That(created.StatusCode).IsEqualTo(HttpStatusCode.InternalServerError);
+            var reads = factory.Reads.Count(PlatformDefaults.DefaultTenantId);
+            await Assert.That((await ListAsync(factory, PlatformDefaults.DefaultTenantId, EntityTypeName.Organization, 1, 1)).TotalCount).IsEqualTo(1);
+            await Assert.That(factory.Reads.Count(PlatformDefaults.DefaultTenantId)).IsEqualTo(reads);
+            using var failedScope = TenantScope(factory, PlatformDefaults.DefaultTenantId);
+            await Assert.That((await failedScope.ServiceProvider.GetRequiredService<ICustomPropertyDefinitionRepository>()
+                .GetDefinitionsWithDetailsPaged(EntityTypeName.Organization, 1, 1)).TotalCount).IsEqualTo(1);
+            return;
+        }
+        await Assert.That(created.StatusCode).IsEqualTo(HttpStatusCode.Created);
+        var id = (await created.Content.ReadFromJsonAsync<BaseCommandResponse<Guid>>())!.Id;
+        using var scope = TenantScope(factory, PlatformDefaults.DefaultTenantId);
+        var detail = await scope.ServiceProvider.GetRequiredService<IQueryHandler<GetCustomPropertyDefinitionDetailsQuery, CustomPropertyDefinitionDto>>()
+            .QueryAsync(new(id), default);
+        await Assert.That(detail.Options.Count).IsEqualTo(2);
+        await Assert.That(detail.Options.Select(option => option.Id).Distinct().Count()).IsEqualTo(2);
+        await Assert.That(detail.Options.All(option => option.Id != Guid.Empty)).IsTrue();
+        await Assert.That(detail.DefaultOptionId).IsEqualTo(detail.Options.Single(option => option.Key == "kept").Id);
+        var graph = await scope.ServiceProvider.GetRequiredService<ICustomPropertyDefinitionRepository>().GetDefinitionWithDetails(id);
+        await Assert.That(graph!.Options.All(option => option.CustomPropertyDefinitionId == id)).IsTrue();
+    }
+
+    [Test]
     public async Task NativeHttp_PreservesHalPagingPatchAffordanceAndMissingConcurrencyFailure()
     {
         await using var factory = new DefinitionFactory();

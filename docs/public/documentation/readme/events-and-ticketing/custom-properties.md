@@ -34,6 +34,8 @@ Each property definition enforces strict access and privacy controls:
 
 ## Shared Organization and Group Definition Lists
 
+New shared option definitions can be saved with their initial choices and selected default in one operation. The server assigns definition and option identities; a failed database commit does not leave a partial definition or refresh cached lists.
+
 Shared definition lists are isolated by the server-resolved tenant, including cached pages. A tenant cannot select another tenant's cached definitions by supplying an ID in the request body or query string.
 
 After a successful create, update, retirement or dependency-free purge, subsequent list reads refresh all affected page sizes and page numbers. Moving a definition between Organization and Group refreshes both lists. Other tenants keep their own cached lists. A failed or rolled-back mutation leaves the committed lists unchanged; no cache-expiry wait is required.

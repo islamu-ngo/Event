@@ -31,6 +31,13 @@ public sealed class EventLocationConfiguration : IEntityTypeConfiguration<EventL
         builder.HasAlternateKey(item => new { item.TenantId, item.Id });
         builder.HasAlternateKey(item => new { item.TenantId, item.EventId, item.Id });
         builder.Property(item => item.ConcurrencyStamp).IsConcurrencyToken();
+        // These columns store UTC instants; providers without timezone metadata lose DateTime.Kind.
+        builder.Property(item => item.CreatedAt).HasConversion(
+            value => value,
+            value => DateTime.SpecifyKind(value, DateTimeKind.Utc));
+        builder.Property(item => item.RevealFullDetailsFromUtc).HasConversion(
+            value => value,
+            value => value.HasValue ? DateTime.SpecifyKind(value.Value, DateTimeKind.Utc) : (DateTime?)null);
 
         builder.HasOne(item => item.Tenant)
             .WithMany()

@@ -124,7 +124,8 @@ public sealed class EventLocationPrivacyMcpContractTests
         var gateway = CreateZeroDisclosureGateway();
         mediator.Send(Arg.Any<GetEventDetailsRequest>(), Arg.Any<CancellationToken>())
             .Returns(CreatePublishedEvent(eventId));
-        mediator.Send(Arg.Any<GetEventProgramSummaryRequest>(), Arg.Any<CancellationToken>())
+        var summaryQuery = Substitute.For<IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?>>();
+        summaryQuery.QueryAsync(Arg.Any<GetEventProgramSummaryRequest>(), Arg.Any<CancellationToken>())
             .Returns(new EventProgramSummaryDto
             {
                 EventId = eventId,
@@ -148,7 +149,7 @@ public sealed class EventLocationPrivacyMcpContractTests
                 ]
             });
 
-        var result = await (await CreateTools(mediator, gateway))
+        var result = await (await CreateTools(mediator, gateway, summaryQuery: summaryQuery))
             .GetPublicEventProgramSummaryAsync(eventId);
 
         await Assert.That(gateway.ReceivedCalls()).Contains(call =>
@@ -306,7 +307,8 @@ public sealed class EventLocationPrivacyMcpContractTests
         IMediator mediator,
         IAiContextGateway gateway,
         IResourceAssembler<EventDto, EventListDto>? eventResourceAssembler = null,
-        IHttpContextAccessor? httpContextAccessor = null)
+        IHttpContextAccessor? httpContextAccessor = null,
+        IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?>? summaryQuery = null)
     {
         var days = Substitute.For<IQueryHandler<GetManagedEventDaysByEventRequest, List<EventDayListDto>>>();
         days.QueryAsync(Arg.Any<GetManagedEventDaysByEventRequest>(), Arg.Any<CancellationToken>())
@@ -314,6 +316,8 @@ public sealed class EventLocationPrivacyMcpContractTests
         var dependencies = new Dictionary<Type, object>
         {
             [typeof(IQueryHandler<GetManagedEventDaysByEventRequest, List<EventDayListDto>>)] = days,
+            [typeof(IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?>)] = summaryQuery
+                ?? Substitute.For<IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?>>(),
             [typeof(IMediator)] = mediator,
             [typeof(IUserContext)] = Substitute.For<IUserContext>(),
             [typeof(ITenantContext)] = Substitute.For<ITenantContext>(),

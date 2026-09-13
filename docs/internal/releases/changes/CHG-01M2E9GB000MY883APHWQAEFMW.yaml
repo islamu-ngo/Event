@@ -1,0 +1,40 @@
+Change-Id: CHG-01M2E9GB000MY883APHWQAEFMW
+Title: "Restore portable program summary reads"
+Type: fix
+Scope: events
+Summary: "Use protected native program queries, order event-scoped agenda results portably and restore approved SQLite venue disclosure through UTC timestamp materialization without weakening disclosure rules."
+Group: event-programs
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Preserve public eligibility, managed event authorization and canonical
+      location disclosure through exact protected native query ports.
+      Restore stored-UTC timestamp Kind when reading EventLocation creation
+      and optional reveal values; writes, ticks, nulls and strict disclosure
+      validation are unchanged. No new grants or visibility rules are introduced.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/api-reference/README.md#event-program-summaries
+    Disposition: documented
+    Detail: >-
+      Public and managed summaries no longer fail on SQLite agenda ordering.
+      Sort the existing complete event-scoped result by priority and absolute
+      start instant without extra rows, schema migration or provider branches.
+      Approved venue fields are restored after SQLite reads; privacy review,
+      private-event boundaries and managed-summary suppression remain enforced.
+      No data rewrite or configuration change is required.

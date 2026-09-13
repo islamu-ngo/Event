@@ -96,6 +96,38 @@ or `?api-version=0.1`. Requests without an explicit version default to `0.1`. UR
 * Retryable documented writes use a stable per-operation UUIDv7 `Idempotency-Key`.
 * Operational `/alive`, `/health`, and `/metrics` endpoints are outside generated controller operations.
 
+## Event program summaries
+
+`GET /api/event/{id}/program-summary` returns the public program with local-day
+groupings and readiness warnings. Hidden, draft, private, deleted, cross-tenant
+or missing events do not become visible through this read. Public venue fields
+remain limited by the event's location disclosure policy.
+
+Authorized organizers use `GET /api/event/{id}/management-program-summary` to
+include draft items and sections. This response is private/no-store and does not
+include physical venue details; use the authorized location-management surface
+for those details. Anonymous management calls return 401, and insufficient
+management authority returns 403.
+
+The MCP `get_public_event_program_summary` tool retains its safe `not_found`
+descriptor and bounded output, including a maximum of 100 program items with
+truncation metadata. The HTTP summary is not truncated to that MCP budget.
+The internal query-dispatch migration changes no routes, response shapes,
+configuration, database schema or generated client.
+
+Public and managed program-summary reads now also work on SQLite instead of
+failing on agenda time ordering. Agenda items retain sort-priority order, then
+chronological start-instant order even when timestamps have different offsets.
+Tenant, publication and deletion boundaries are unchanged. This repair requires
+no database migration or configuration change; PostgreSQL behavior is retained.
+
+SQLite also preserves the UTC meaning of event-location creation and optional
+reveal timestamps when reading stored data. Approved public venue fields are
+therefore no longer incorrectly hidden solely because timestamp timezone
+metadata was lost. Location policy, reveal restrictions and pending privacy
+review still govern disclosure; managed summaries still omit location envelopes.
+No data rewrite, database migration or configuration change is required.
+
 ## Duplicate session language assignments
 
 `POST /api/eventsessionlanguage` returns `400` with the endpoint's existing JSON validation ProblemDetails body, `code: validation_failed`, and an `errors.program` entry when the language is already assigned to that session. Concurrent submissions retain exactly one assignment: the winning create returns `201`, and the duplicate receives the same controlled validation response. A language may still be assigned to a different session. Existing authorization and tenant boundaries apply before mutation.

@@ -6,6 +6,7 @@ using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.API.Models;
 using Explore.API.Services.Calendar;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.EventProgram;
 using Explore.Application.DTOs.EventSession;
@@ -48,14 +49,19 @@ public class EventManagementReadController : EventControllerBase
 
     private readonly IMediator _mediator;
     private readonly IResourceAssembler<EventDto, EventListDto> _resourceAssembler;
-
+    private readonly IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?> _publicProgramSummary;
+    private readonly IQueryHandler<GetManagedEventProgramSummaryRequest, EventProgramSummaryDto?> _managedProgramSummary;
 
     public EventManagementReadController(
         IMediator mediator,
-        IResourceAssembler<EventDto, EventListDto> resourceAssembler)
+        IResourceAssembler<EventDto, EventListDto> resourceAssembler,
+        IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?> publicProgramSummary,
+        IQueryHandler<GetManagedEventProgramSummaryRequest, EventProgramSummaryDto?> managedProgramSummary)
     {
         _mediator = mediator;
         _resourceAssembler = resourceAssembler;
+        _publicProgramSummary = publicProgramSummary;
+        _managedProgramSummary = managedProgramSummary;
     }
 
     /// <summary>
@@ -138,7 +144,7 @@ public class EventManagementReadController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<EventProgramSummaryDto>> GetProgramSummary(Guid id, CancellationToken cancellationToken = default)
     {
-        var summary = await _mediator.Send(new GetEventProgramSummaryRequest(id), cancellationToken);
+        var summary = await _publicProgramSummary.QueryAsync(new GetEventProgramSummaryRequest(id), cancellationToken);
         if (summary is null)
             return this.ToNotFoundProblem(EventNotFoundProblem);
 
@@ -159,7 +165,7 @@ public class EventManagementReadController : EventControllerBase
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var summary = await _mediator.Send(new GetManagedEventProgramSummaryRequest { EventId = id }, cancellationToken);
+        var summary = await _managedProgramSummary.QueryAsync(new GetManagedEventProgramSummaryRequest { EventId = id }, cancellationToken);
         if (summary is null)
             return this.ToNotFoundProblem(EventNotFoundProblem);
 

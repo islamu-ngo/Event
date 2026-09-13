@@ -159,6 +159,61 @@ Three-reader non-URL versioning — clients may use any of the following; all th
    - **Domain-Family Base Classes**: Permitted only when two or more split controllers share an exact, multi-step domain protocol or security check (e.g. `RegistrationOrderControllerBase` for guest vs. authenticated checkout; `InstanceSettingsControllerBase` for setup-secret vs. admin).
    - **Composition Over Inheritance**: Shared mechanics belong in `CommandFailurePolicy`, `IResourceAssembler`, MediatR commands/queries, and extension methods (`ToCommandValidationProblem`, `ToNotFoundProblem`), leaving controller actions explicit, declarative, and independent.
 
+### Event Program Summary Queries
+
+`EventManagementReadController.GetProgramSummary` and `GetManagedProgramSummary`
+inject separate closed `IQueryHandler<..., EventProgramSummaryDto?>` ports. Both
+ports are implemented by `GetEventProgramSummaryRequestHandler` and discovered
+under one scoped owner, with authorization outside performance instrumentation.
+These are pure reads: no transaction, notification, outbox, or mutation is added.
+The managed request retains `Event:ViewManagement`; public eligibility and
+public session/group/agenda repositories remain distinct from managed reads.
+Public location fields come only through `PublicEventLocationProjection` and
+`IEventLocationDisclosureService`. Managed summaries do not project physical
+location details or public location envelopes.
+
+Null still maps to the existing 404 ProblemDetails; authorization may reject a
+missing or inaccessible management target before the query runs. Managed HTTP
+responses retain private/no-store. `EventManagementMcpTools` uses the public
+native summary port after its public-event gate, then applies the AI disclosure
+ceiling and existing bounded descriptor mapping (including the 100-item budget).
+Its grouped management context still uses separate managed session/group/agenda
+queries and the native managed-day port, not the managed summary query.
+
+Grouping, local dates, timezone fallback and warning paths are unchanged. Tokens
+flow through existing token-bearing reads and disclosure calls; inherited
+`GetEventWithDetails` and managed `GetSessionsByEvent` remain tokenless. Full
+in-flight cancellation of those database reads is not claimed. The focused
+`NativeEventProgramHttpTests` exercise the real HTTP and MCP adapters, protected
+ports and repositories on PostgreSQL and SQLite, including positive approved
+venue fields and retained public/managed authority and suppression boundaries.
+
+`EventLocationConfiguration` restores `DateTimeKind.Utc` when materializing only
+`CreatedAt` and nullable `RevealFullDetailsFromUtc`. These columns already store
+UTC instants: the domain factory normalizes creation time, and the policy audit
+rejects non-UTC explicit reveal inputs. The EF converters leave writes and ticks
+unchanged and preserve null reveal times; they do not reinterpret domain input.
+Without this read-side restoration, SQLite materializes `DateTime` as
+`Unspecified`, causing the unchanged strict disclosure evaluator to suppress even
+approved venue names. The evaluator still rejects invalid UTC facts, and pending
+privacy review still suppresses fields after the fix. Real SQLite round-trip and
+HTTP tests cover both null and explicit reveal dates. No global/base-entity time
+convention, policy relaxation, store-type change or migration is introduced.
+
+The task-local agenda ordering prerequisite is repaired in
+`EventAgendaItemRepository.GetByEventAsync` and `GetPublicByEventAsync`.
+Both methods materialize their existing event-filtered, no-tracking lists with
+the supplied cancellation token before sorting by `SortOrder`, then absolute
+`DateTimeOffset` start instant. Tenant, soft-delete and public-eligibility filters
+remain in SQL. These methods already returned the complete event-scoped list;
+client ordering fetches no additional rows and adds no provider-name branch,
+UTC SQL conversion, pagination or equal-key tie-breaker contract. SQLite therefore
+no longer rejects the summary's agenda query with an unsupported ORDER BY.
+Repository tests cover conflicting local-clock/instant order, sort priority,
+unpublished days, deleted items and event/tenant isolation. The original failure
+was a direct summary-path prerequisite, not unrelated suite rot.
+No route, schema, generated-client, configuration or migration change is required.
+
 ### Event Session Status Lookup Absence
 
 `GetEventSessionStatusDetailsQuery` and its native handler/closed controller port

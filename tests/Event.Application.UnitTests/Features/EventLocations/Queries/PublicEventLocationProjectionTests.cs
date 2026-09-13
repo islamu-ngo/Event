@@ -248,7 +248,7 @@ public sealed class PublicEventLocationProjectionTests
             agendaRepository,
             disclosureService);
 
-        var summary = await handler.Handle(
+        var summary = await handler.QueryAsync(
             new GetEventProgramSummaryRequest(eventId),
             CancellationToken.None);
         var groupDto = summary!.Sections.Single().SessionGroups.Single();

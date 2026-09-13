@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Globalization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventProgram;
@@ -8,13 +9,12 @@ using Explore.Application.Features.EventPrograms.Models;
 using Explore.Application.Features.EventPrograms.Requests.Queries;
 using Explore.Application.Services;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.EventPrograms.Handlers.Queries;
 
 public class GetEventProgramSummaryRequestHandler :
-    IRequestHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?>,
-    IRequestHandler<GetManagedEventProgramSummaryRequest, EventProgramSummaryDto?>
+    IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?>,
+    IQueryHandler<GetManagedEventProgramSummaryRequest, EventProgramSummaryDto?>
 {
     private const string UnassignedSectionKey = "unassigned";
     private const int UnassignedSortOrder = int.MaxValue;
@@ -39,10 +39,10 @@ public class GetEventProgramSummaryRequestHandler :
         _disclosureService = disclosureService;
     }
 
-    public async Task<EventProgramSummaryDto?> Handle(GetEventProgramSummaryRequest request, CancellationToken cancellationToken)
+    public async Task<EventProgramSummaryDto?> QueryAsync(GetEventProgramSummaryRequest request, CancellationToken cancellationToken)
         => await BuildSummaryAsync(request.EventId, includeManaged: false, cancellationToken);
 
-    public async Task<EventProgramSummaryDto?> Handle(GetManagedEventProgramSummaryRequest request, CancellationToken cancellationToken)
+    public async Task<EventProgramSummaryDto?> QueryAsync(GetManagedEventProgramSummaryRequest request, CancellationToken cancellationToken)
         => await BuildSummaryAsync(request.EventId, includeManaged: true, cancellationToken);
 
     private async Task<EventProgramSummaryDto?> BuildSummaryAsync(

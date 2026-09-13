@@ -1,0 +1,37 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M2D6RBEDG9RX74XT5TTEBY6V
+Title: "Match organization evidence links to write permissions"
+Type: fix
+Scope: access
+Summary: "Local authorization keeps organization evidence submission and review permissions consistent across individual checks and HAL batches."
+Group: organization-evidence
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/AUTHORIZATION.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Local evidence batches reuse the existing single-request evaluator without
+      widening submission or review authority. Immutable facts, tenant scope,
+      safe-mode denial, and unrelated organization actions remain unchanged.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/security-and-identity/authorization.md
+    Disposition: documented
+    Detail: >-
+      Organization-only administrators are no longer offered evidence review,
+      and tenant-only administrators are not offered evidence submission by
+      local authorization batches. No configuration or data migration is required.

@@ -6,7 +6,8 @@ public interface ITenantSettingsDocumentRepository : IGenericRepository<TenantSe
 {
     /// <summary>
     /// Inserts a missing tenant/key document or returns the concurrent winner without updating it.
-    /// Participates in the caller's transaction; a conflict rolls back only this insert attempt.
+    /// Participates in the caller's transaction; successful conflict recovery rolls back only
+    /// this insert attempt. Failed cleanup preserves the original failure for the owner.
     /// </summary>
     Task<TenantSettingsDocument> CreateIfMissingAsync(
         TenantSettingsDocument document,

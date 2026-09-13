@@ -1,0 +1,28 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M2DA1N2XY7DCHGNNSJ3APS2B
+Title: "Preserve tenant branding failures during transaction cleanup"
+Type: fix
+Scope: self-hosting
+Summary: "Tenant branding initialization retains the original storage failure or cancellation when savepoint cleanup also fails, preserving existing transaction recovery handling."
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/SECURITY_OVERVIEW.md
+    Disposition: not-applicable
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/administration-and-branding/white-labeling.md
+    Disposition: documented
+    Detail: Cleanup failures remain secondary to the original initialization failure; existing transaction-owner recovery remains in control. No migration or configuration change is required.

@@ -40,6 +40,10 @@ Repeated reads do not reset customized branding. Editing still requires the
 existing tenant permissions, governance checks, and current concurrency stamp.
 This initialization does not create a missing tenant or supply legal identity.
 
+If database cleanup also fails during initialization, the original failure is
+preserved for existing recovery handling. Cleanup failure never turns an
+uncertain initialization into a successful response or resets saved branding.
+
 ## Standard Operational Workflow
 
 1. Establish tenant ownership and bind approved domains (see [Custom Domains & SEO](custom-domains-and-seo.md)).

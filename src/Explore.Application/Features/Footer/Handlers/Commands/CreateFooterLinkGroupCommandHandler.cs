@@ -2,16 +2,16 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Footer.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Footer.Handlers.Commands;
 
 public sealed class CreateFooterLinkGroupCommandHandler(
     IFooterLinkGroupRepository footerLinkGroupRepository,
     FooterLinkMutationGuard mutationGuard)
-    : IRequestHandler<CreateFooterLinkGroupCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<CreateFooterLinkGroupCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         CreateFooterLinkGroupCommand request, CancellationToken cancellationToken)
     {
         await mutationGuard.EnsureAllowedAsync(request.TenantId, cancellationToken);

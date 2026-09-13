@@ -35,7 +35,7 @@ public sealed class GetTenantFooterSettingsQueryHandlerTests
             tenantContext,
             deploymentModeProvider);
 
-        var result = await handler.Handle(new GetTenantFooterSettingsQuery(), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetTenantFooterSettingsQuery(), CancellationToken.None);
 
         await Assert.That(result.TenantId).IsEqualTo(tenantId);
         await Assert.That(result.Enabled).IsFalse();
@@ -72,7 +72,7 @@ public sealed class GetTenantFooterSettingsQueryHandlerTests
             tenantContext,
             deploymentModeProvider);
 
-        var result = await handler.Handle(new GetTenantFooterSettingsQuery(), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetTenantFooterSettingsQuery(), CancellationToken.None);
 
         await Assert.That(result.LockTenantLinkGroups).IsFalse();
     }

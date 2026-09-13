@@ -63,7 +63,7 @@ public sealed class FooterMapperTests
         repository.GetWithLinksAsync(GroupId, default).Returns(shape == 0 ? null : group);
         var handler = new GetFooterLinkGroupDetailsQueryHandler(repository, Context());
 
-        await Assert.That(() => handler.Handle(new(GroupId), default)).Throws<NotFoundException>();
+        await Assert.That(async () => await handler.QueryAsync(new(GroupId), default)).Throws<NotFoundException>();
     }
 
     [Test]
@@ -75,9 +75,9 @@ public sealed class FooterMapperTests
         repository.GetByTenantIdAsync(TenantId, default).Returns(new List<TenantFooterLinkGroup> { group });
 
         var detail = await new GetFooterLinkGroupDetailsQueryHandler(repository, Context())
-            .Handle(new(GroupId), default);
+            .QueryAsync(new(GroupId), default);
         var list = await new GetFooterLinkGroupListQueryHandler(repository, Context())
-            .Handle(new(), default);
+            .QueryAsync(new(), default);
 
         await Assert.That(detail.TenantId).IsEqualTo(TenantId);
         await Assert.That(detail.Links.Count).IsEqualTo(2);
@@ -97,7 +97,7 @@ public sealed class FooterMapperTests
             .Returns(new FooterSettingGroup());
 
         var result = await new GetFooterConfigQueryHandler(settings, repository, Context())
-            .Handle(new(), default);
+            .QueryAsync(new(), default);
         links.Clear();
 
         await Assert.That(result.Settings.Enabled).IsTrue();

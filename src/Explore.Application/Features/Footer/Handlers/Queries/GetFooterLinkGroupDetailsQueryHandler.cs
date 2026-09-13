@@ -4,16 +4,16 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Footer;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.Footer.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Footer.Handlers.Queries;
 
 public sealed class GetFooterLinkGroupDetailsQueryHandler(
     IFooterLinkGroupRepository footerLinkGroupRepository,
     ITenantContext tenantContext)
-    : IRequestHandler<GetFooterLinkGroupDetailsQuery, FooterLinkGroupDetailsDto>
+    : IQueryHandler<GetFooterLinkGroupDetailsQuery, FooterLinkGroupDetailsDto>
 {
-    public async Task<FooterLinkGroupDetailsDto> Handle(
+    public async Task<FooterLinkGroupDetailsDto> QueryAsync(
         GetFooterLinkGroupDetailsQuery request, CancellationToken cancellationToken)
     {
         var group = await footerLinkGroupRepository.GetWithLinksAsync(request.GroupId, cancellationToken);

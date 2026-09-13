@@ -4,7 +4,7 @@ using Explore.Application.DTOs.Footer;
 using Explore.Application.Features.Footer.Requests.Queries;
 using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Footer.Handlers.Queries;
 
@@ -12,9 +12,9 @@ public sealed class GetTenantFooterSettingsQueryHandler(
     IHierarchicalSettingsResolver settingsResolver,
     ITenantContext tenantContext,
     IDeploymentModeProvider deploymentModeProvider)
-    : IRequestHandler<GetTenantFooterSettingsQuery, TenantFooterSettingsDto>
+    : IQueryHandler<GetTenantFooterSettingsQuery, TenantFooterSettingsDto>
 {
-    public async Task<TenantFooterSettingsDto> Handle(
+    public async Task<TenantFooterSettingsDto> QueryAsync(
         GetTenantFooterSettingsQuery request,
         CancellationToken cancellationToken)
     {

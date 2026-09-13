@@ -2,7 +2,7 @@ using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.Footer.Requests.Commands;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Footer.Handlers.Commands;
 
@@ -12,9 +12,9 @@ public sealed class DeleteFooterLinkGroupCommandHandler(
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
     FooterLinkMutationGuard mutationGuard)
-    : IRequestHandler<DeleteFooterLinkGroupCommand, bool>
+    : ICommandHandler<DeleteFooterLinkGroupCommand, bool>
 {
-    public async Task<bool> Handle(
+    public async Task<bool> ExecuteAsync(
         DeleteFooterLinkGroupCommand request, CancellationToken cancellationToken)
     {
         await mutationGuard.EnsureAllowedAsync(tenantContext.TenantId, cancellationToken);

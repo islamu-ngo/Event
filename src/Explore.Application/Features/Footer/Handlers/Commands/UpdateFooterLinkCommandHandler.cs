@@ -6,7 +6,7 @@ using Explore.Application.Responses;
 using Explore.Application.Settings;
 using Explore.Domain.Constants;
 using FluentValidation;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Footer.Handlers.Commands;
 
@@ -15,9 +15,9 @@ public sealed class UpdateFooterLinkCommandHandler(
     ITenantContext tenantContext,
     IHierarchicalSettingsResolver settingsResolver,
     FooterLinkMutationGuard mutationGuard)
-    : IRequestHandler<UpdateFooterLinkCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateFooterLinkCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UpdateFooterLinkCommand request, CancellationToken cancellationToken)
     {
         bool requireHttps = await settingsResolver.ResolveAsync<bool>(

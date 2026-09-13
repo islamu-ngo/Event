@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Footer.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Tenant, AuthorizationActions.Update)]
-public sealed record ReorderFooterLinkGroupsCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record ReorderFooterLinkGroupsCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid UserId { get; init; }
     public Guid TenantId { get; init; }

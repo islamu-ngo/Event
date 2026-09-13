@@ -9,7 +9,7 @@ using Explore.Application.Features.Footer.Requests.Commands;
 using Explore.Application.Features.Footer.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -41,16 +41,49 @@ public class FooterController : EventControllerBase
         "Tenant footer settings validation failed",
         "Tenant footer settings patch failed.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetFooterConfigQuery, FooterConfigDto> _configQuery;
+    private readonly IQueryHandler<GetFooterLinkGroupListQuery, List<FooterLinkGroupListDto>> _groupsQuery;
+    private readonly IQueryHandler<GetFooterLinkGroupDetailsQuery, FooterLinkGroupDetailsDto> _groupQuery;
+    private readonly IQueryHandler<GetTenantFooterSettingsQuery, TenantFooterSettingsDto> _settingsQuery;
+    private readonly ICommandHandler<CreateFooterLinkGroupCommand, BaseCommandResponse<Guid>> _createGroup;
+    private readonly ICommandHandler<UpdateFooterLinkGroupCommand, BaseCommandResponse<Guid>> _updateGroup;
+    private readonly ICommandHandler<DeleteFooterLinkGroupCommand, bool> _deleteGroup;
+    private readonly ICommandHandler<ReorderFooterLinkGroupsCommand, BaseCommandResponse<Guid>> _reorderGroups;
+    private readonly ICommandHandler<CreateFooterLinkCommand, BaseCommandResponse<Guid>> _createLink;
+    private readonly ICommandHandler<UpdateFooterLinkCommand, BaseCommandResponse<Guid>> _updateLink;
+    private readonly ICommandHandler<DeleteFooterLinkCommand, bool> _deleteLink;
+    private readonly ICommandHandler<PatchTenantFooterSettingsCommand, BaseCommandResponse<Guid>> _patchSettings;
     private readonly ITenantContext _tenantContext;
     private readonly IResourceAssembler<TenantFooterSettingsDto, TenantFooterSettingsDto> _settingsResourceAssembler;
 
     public FooterController(
-        IMediator mediator,
+        IQueryHandler<GetFooterConfigQuery, FooterConfigDto> configQuery,
+        IQueryHandler<GetFooterLinkGroupListQuery, List<FooterLinkGroupListDto>> groupsQuery,
+        IQueryHandler<GetFooterLinkGroupDetailsQuery, FooterLinkGroupDetailsDto> groupQuery,
+        IQueryHandler<GetTenantFooterSettingsQuery, TenantFooterSettingsDto> settingsQuery,
+        ICommandHandler<CreateFooterLinkGroupCommand, BaseCommandResponse<Guid>> createGroup,
+        ICommandHandler<UpdateFooterLinkGroupCommand, BaseCommandResponse<Guid>> updateGroup,
+        ICommandHandler<DeleteFooterLinkGroupCommand, bool> deleteGroup,
+        ICommandHandler<ReorderFooterLinkGroupsCommand, BaseCommandResponse<Guid>> reorderGroups,
+        ICommandHandler<CreateFooterLinkCommand, BaseCommandResponse<Guid>> createLink,
+        ICommandHandler<UpdateFooterLinkCommand, BaseCommandResponse<Guid>> updateLink,
+        ICommandHandler<DeleteFooterLinkCommand, bool> deleteLink,
+        ICommandHandler<PatchTenantFooterSettingsCommand, BaseCommandResponse<Guid>> patchSettings,
         ITenantContext tenantContext,
         IResourceAssembler<TenantFooterSettingsDto, TenantFooterSettingsDto> settingsResourceAssembler)
     {
-        _mediator = mediator;
+        _configQuery = configQuery;
+        _groupsQuery = groupsQuery;
+        _groupQuery = groupQuery;
+        _settingsQuery = settingsQuery;
+        _createGroup = createGroup;
+        _updateGroup = updateGroup;
+        _deleteGroup = deleteGroup;
+        _reorderGroups = reorderGroups;
+        _createLink = createLink;
+        _updateLink = updateLink;
+        _deleteLink = deleteLink;
+        _patchSettings = patchSettings;
         _tenantContext = tenantContext;
         _settingsResourceAssembler = settingsResourceAssembler;
     }
@@ -63,7 +96,7 @@ public class FooterController : EventControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<FooterConfigDto>> GetConfig(CancellationToken cancellationToken)
     {
-        var result = await _mediator.Send(new GetFooterConfigQuery(), cancellationToken);
+        var result = await _configQuery.QueryAsync(new GetFooterConfigQuery(), cancellationToken);
         return Ok(result);
     }
 
@@ -75,7 +108,7 @@ public class FooterController : EventControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<FooterLinkGroupListDto>>> GetLinkGroups(CancellationToken cancellationToken)
     {
-        var result = await _mediator.Send(new GetFooterLinkGroupListQuery(), cancellationToken);
+        var result = await _groupsQuery.QueryAsync(new GetFooterLinkGroupListQuery(), cancellationToken);
         return Ok(result);
     }
 
@@ -86,7 +119,7 @@ public class FooterController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<FooterLinkGroupDetailsDto>> GetLinkGroupById(Guid id, CancellationToken cancellationToken)
     {
-        var result = await _mediator.Send(new GetFooterLinkGroupDetailsQuery(id), cancellationToken);
+        var result = await _groupQuery.QueryAsync(new GetFooterLinkGroupDetailsQuery(id), cancellationToken);
         return Ok(result);
     }
 
@@ -102,7 +135,7 @@ public class FooterController : EventControllerBase
         {
             return unauthorized;
         }
-        var result = await _mediator.Send(new CreateFooterLinkGroupCommand
+        var result = await _createGroup.ExecuteAsync(new CreateFooterLinkGroupCommand
         {
             UserId = userId,
             TenantId = _tenantContext.TenantId,
@@ -124,7 +157,7 @@ public class FooterController : EventControllerBase
     public async Task<ActionResult<BaseCommandResponse<Guid>>> UpdateLinkGroup(
         Guid id, [FromBody] PatchFooterLinkGroupDto request, CancellationToken cancellationToken)
     {
-        var result = await _mediator.Send(new UpdateFooterLinkGroupCommand
+        var result = await _updateGroup.ExecuteAsync(new UpdateFooterLinkGroupCommand
         {
             TenantId = _tenantContext.TenantId,
             GroupId = id,
@@ -148,7 +181,7 @@ public class FooterController : EventControllerBase
         {
             return unauthorized;
         }
-        var result = await _mediator.Send(new DeleteFooterLinkGroupCommand
+        var result = await _deleteGroup.ExecuteAsync(new DeleteFooterLinkGroupCommand
         {
             UserId = userId,
             TenantId = _tenantContext.TenantId,
@@ -169,7 +202,7 @@ public class FooterController : EventControllerBase
         {
             return unauthorized;
         }
-        var result = await _mediator.Send(new ReorderFooterLinkGroupsCommand
+        var result = await _reorderGroups.ExecuteAsync(new ReorderFooterLinkGroupsCommand
         {
             UserId = userId,
             TenantId = _tenantContext.TenantId,
@@ -196,7 +229,7 @@ public class FooterController : EventControllerBase
         {
             return unauthorized;
         }
-        var result = await _mediator.Send(new CreateFooterLinkCommand
+        var result = await _createLink.ExecuteAsync(new CreateFooterLinkCommand
         {
             UserId = userId,
             TenantId = _tenantContext.TenantId,
@@ -221,7 +254,7 @@ public class FooterController : EventControllerBase
     public async Task<ActionResult<BaseCommandResponse<Guid>>> UpdateLink(
         Guid id, [FromBody] PatchFooterLinkDto request, CancellationToken cancellationToken)
     {
-        var result = await _mediator.Send(new UpdateFooterLinkCommand
+        var result = await _updateLink.ExecuteAsync(new UpdateFooterLinkCommand
         {
             TenantId = _tenantContext.TenantId,
             LinkId = id,
@@ -245,7 +278,7 @@ public class FooterController : EventControllerBase
         {
             return unauthorized;
         }
-        var result = await _mediator.Send(new DeleteFooterLinkCommand
+        var result = await _deleteLink.ExecuteAsync(new DeleteFooterLinkCommand
         {
             UserId = userId,
             TenantId = _tenantContext.TenantId,
@@ -266,7 +299,7 @@ public class FooterController : EventControllerBase
     public async Task<ActionResult<HalResource<TenantFooterSettingsDto>>> GetSettings(
         CancellationToken cancellationToken)
     {
-        var settings = await _mediator.Send(new GetTenantFooterSettingsQuery(), cancellationToken);
+        var settings = await _settingsQuery.QueryAsync(new GetTenantFooterSettingsQuery(), cancellationToken);
         var resource = await _settingsResourceAssembler.ToResource(settings, HttpContext);
         return Ok(resource);
     }
@@ -290,7 +323,7 @@ public class FooterController : EventControllerBase
             return unauthorized;
         }
 
-        var result = await _mediator.Send(new PatchTenantFooterSettingsCommand
+        var result = await _patchSettings.ExecuteAsync(new PatchTenantFooterSettingsCommand
         {
             UserId = userId,
             TenantId = _tenantContext.TenantId,

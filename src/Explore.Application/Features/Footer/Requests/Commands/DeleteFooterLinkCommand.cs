@@ -1,10 +1,10 @@
 using Explore.Application.Authorization;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Footer.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Tenant, AuthorizationActions.Update)]
-public sealed record DeleteFooterLinkCommand : IRequest<bool>, ISecureRequest
+public sealed record DeleteFooterLinkCommand : ICommand<bool>, ISecureRequest
 {
     public Guid UserId { get; init; }
     public Guid TenantId { get; init; }

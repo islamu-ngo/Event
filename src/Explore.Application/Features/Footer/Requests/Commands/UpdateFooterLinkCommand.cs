@@ -2,12 +2,12 @@ using Explore.Application.Authorization;
 using Explore.Application.Responses;
 using Explore.Application.Validation;
 using FluentValidation;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Footer.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Tenant, AuthorizationActions.Update)]
-public sealed record UpdateFooterLinkCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record UpdateFooterLinkCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid TenantId { get; init; }
     public Guid LinkId { get; init; }

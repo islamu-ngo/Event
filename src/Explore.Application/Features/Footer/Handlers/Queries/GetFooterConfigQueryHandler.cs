@@ -5,7 +5,7 @@ using Explore.Application.DTOs.Footer;
 using Explore.Application.Features.Footer.Requests.Queries;
 using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Footer.Handlers.Queries;
 
@@ -13,9 +13,9 @@ public sealed class GetFooterConfigQueryHandler(
     IHierarchicalSettingsResolver settingsResolver,
     IFooterLinkGroupRepository footerLinkGroupRepository,
     ITenantContext tenantContext)
-    : IRequestHandler<GetFooterConfigQuery, FooterConfigDto>
+    : IQueryHandler<GetFooterConfigQuery, FooterConfigDto>
 {
-    public async Task<FooterConfigDto> Handle(
+    public async Task<FooterConfigDto> QueryAsync(
         GetFooterConfigQuery request, CancellationToken cancellationToken)
     {
         var tenantId = tenantContext.TenantId;

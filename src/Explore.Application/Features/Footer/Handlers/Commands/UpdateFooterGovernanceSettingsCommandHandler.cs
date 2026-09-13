@@ -5,16 +5,16 @@ using Explore.Application.Responses;
 using Explore.Application.Settings;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.Footer.Handlers.Commands;
 
 public sealed class UpdateFooterGovernanceSettingsCommandHandler(
     IAdminContext adminContext,
     IHierarchicalSettingsResolver settingsResolver)
-    : IRequestHandler<UpdateFooterGovernanceSettingsCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateFooterGovernanceSettingsCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UpdateFooterGovernanceSettingsCommand request, CancellationToken cancellationToken)
     {
         if (!await adminContext.IsInstanceAdminAsync(request.UserId, cancellationToken))

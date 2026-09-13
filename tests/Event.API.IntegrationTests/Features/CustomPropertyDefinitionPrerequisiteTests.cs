@@ -14,7 +14,7 @@ using Explore.Domain.Enums;
 using Explore.Persistence;
 using Explore.Persistence.Database;
 using Explore.Secrets.Database;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.Sqlite;
@@ -39,8 +39,8 @@ public sealed partial class CustomPropertyDefinitionPrerequisiteTests
         using (var foreign = factory.Services.CreateScope())
         {
             foreign.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(data.ForeignTenantId);
-            var result = await foreign.ServiceProvider.GetRequiredService<IMediator>().Send(
-                new GetCustomPropertyDefinitionListRequest(EntityTypeName.Organization));
+            var result = await foreign.ServiceProvider.GetRequiredService<IQueryHandler<GetCustomPropertyDefinitionListQuery, PaginatedResult<CustomPropertyDefinitionListDto>>>().QueryAsync(
+                new GetCustomPropertyDefinitionListQuery(EntityTypeName.Organization), default);
             await Assert.That(result.Items.Single().Id).IsEqualTo(data.ForeignDefinitionId);
         }
         using (var own = factory.Services.CreateScope())
@@ -80,8 +80,8 @@ public sealed partial class CustomPropertyDefinitionPrerequisiteTests
         scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetTenant(PlatformDefaults.DefaultTenantId);
         var repository = scope.ServiceProvider.GetRequiredService<ICustomPropertyDefinitionRepository>();
         await Assert.That((await repository.GetDefinitionsWithDetailsPaged(EntityTypeName.Organization, 1, 1)).TotalCount).IsEqualTo(2);
-        var result = await scope.ServiceProvider.GetRequiredService<IMediator>().Send(
-            new GetCustomPropertyDefinitionListRequest(EntityTypeName.Organization, 1, 1));
+        var result = await scope.ServiceProvider.GetRequiredService<IQueryHandler<GetCustomPropertyDefinitionListQuery, PaginatedResult<CustomPropertyDefinitionListDto>>>().QueryAsync(
+            new GetCustomPropertyDefinitionListQuery(EntityTypeName.Organization, 1, 1), default);
         await Assert.That(result.TotalCount).IsEqualTo(2);
     }
 

@@ -11,12 +11,12 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Settings.Definitions;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.CustomPropertyDefinitions.Handlers.Commands;
 
-public class UpdateCustomPropertyDefinitionCommandHandler : IRequestHandler<UpdateCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>>
+public class UpdateCustomPropertyDefinitionCommandHandler : ICommandHandler<UpdateCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>>
 {
     private readonly ICustomPropertyDefinitionRepository _customPropertyDefinitionRepository;
     private readonly ICustomPropertyGovernancePolicy _customPropertyGovernancePolicy;
@@ -41,7 +41,7 @@ public class UpdateCustomPropertyDefinitionCommandHandler : IRequestHandler<Upda
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
     {
         if (request.DefinitionId == Guid.Empty || request.ExpectedConcurrencyStamp == Guid.Empty)
         {

@@ -6,18 +6,18 @@ using Explore.Application.DTOs.CustomPropertyDefinition;
 using Explore.Application.Features.CustomPropertyDefinitions.Requests.Queries;
 using Explore.Application.Responses;
 using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.CustomPropertyDefinitions.Handlers.Queries;
 
-public class GetCustomPropertyDefinitionListRequestHandler : IRequestHandler<GetCustomPropertyDefinitionListRequest, PaginatedResult<CustomPropertyDefinitionListDto>>
+public class GetCustomPropertyDefinitionListQueryHandler : IQueryHandler<GetCustomPropertyDefinitionListQuery, PaginatedResult<CustomPropertyDefinitionListDto>>
 {
     private readonly ICustomPropertyDefinitionRepository _customPropertyDefinitionRepository;
     private readonly HybridCache _cache;
     private readonly ITenantContext _tenantContext;
 
-    public GetCustomPropertyDefinitionListRequestHandler(
+    public GetCustomPropertyDefinitionListQueryHandler(
         ICustomPropertyDefinitionRepository customPropertyDefinitionRepository,
         HybridCache cache,
         ITenantContext tenantContext)
@@ -27,7 +27,7 @@ public class GetCustomPropertyDefinitionListRequestHandler : IRequestHandler<Get
         _tenantContext = tenantContext;
     }
 
-    public async Task<PaginatedResult<CustomPropertyDefinitionListDto>> Handle(GetCustomPropertyDefinitionListRequest request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<CustomPropertyDefinitionListDto>> QueryAsync(GetCustomPropertyDefinitionListQuery request, CancellationToken cancellationToken)
     {
         var (pageNumber, pageSize) = PaginatedResult<CustomPropertyDefinitionListDto>.NormalizeParameters(request.PageNumber, request.PageSize);
         var tenantId = _tenantContext.TenantId;

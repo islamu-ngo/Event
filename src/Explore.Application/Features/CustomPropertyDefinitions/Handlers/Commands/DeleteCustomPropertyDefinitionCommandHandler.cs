@@ -1,12 +1,12 @@
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.CustomPropertyDefinitions.Requests.Commands;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.CustomPropertyDefinitions.Handlers.Commands;
 
-public class DeleteCustomPropertyDefinitionCommandHandler : IRequestHandler<DeleteCustomPropertyDefinitionCommand, bool>
+public class DeleteCustomPropertyDefinitionCommandHandler : ICommandHandler<DeleteCustomPropertyDefinitionCommand, bool>
 {
     private readonly ICustomPropertyDefinitionRepository _customPropertyDefinitionRepository;
     private readonly HybridCache _cache;
@@ -22,7 +22,7 @@ public class DeleteCustomPropertyDefinitionCommandHandler : IRequestHandler<Dele
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<bool> Handle(DeleteCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
+    public async Task<bool> ExecuteAsync(DeleteCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
     {
         var definition = await _customPropertyDefinitionRepository.GetDefinitionWithDetails(request.Id);
         if (definition == null)

@@ -8,12 +8,12 @@ using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings.Definitions;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.CustomPropertyDefinitions.Handlers.Commands;
 
-public class CreateCustomPropertyDefinitionCommandHandler : IRequestHandler<CreateCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>>
+public class CreateCustomPropertyDefinitionCommandHandler : ICommandHandler<CreateCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>>
 {
     private readonly ICustomPropertyDefinitionRepository _customPropertyDefinitionRepository;
     private readonly ICustomPropertyGovernancePolicy _customPropertyGovernancePolicy;
@@ -41,7 +41,7 @@ public class CreateCustomPropertyDefinitionCommandHandler : IRequestHandler<Crea
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
     {
         var validator = new CreateCustomPropertyDefinitionDtoValidator();
         var validationResult = await validator.ValidateAsync(request.DefinitionDto, cancellationToken);

@@ -4,21 +4,21 @@ using Explore.Application.DTOs.CustomPropertyDefinition;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.CustomPropertyDefinitions.Requests.Queries;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.CustomPropertyDefinitions.Handlers.Queries;
 
-public class GetCustomPropertyDefinitionDetailsRequestHandler : IRequestHandler<GetCustomPropertyDefinitionDetailsRequest, CustomPropertyDefinitionDto>
+public class GetCustomPropertyDefinitionDetailsQueryHandler : IQueryHandler<GetCustomPropertyDefinitionDetailsQuery, CustomPropertyDefinitionDto>
 {
     private readonly ICustomPropertyDefinitionRepository _customPropertyDefinitionRepository;
 
-    public GetCustomPropertyDefinitionDetailsRequestHandler(
+    public GetCustomPropertyDefinitionDetailsQueryHandler(
         ICustomPropertyDefinitionRepository customPropertyDefinitionRepository)
     {
         _customPropertyDefinitionRepository = customPropertyDefinitionRepository;
     }
 
-    public async Task<CustomPropertyDefinitionDto> Handle(GetCustomPropertyDefinitionDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<CustomPropertyDefinitionDto> QueryAsync(GetCustomPropertyDefinitionDetailsQuery request, CancellationToken cancellationToken)
     {
         var definition = await _customPropertyDefinitionRepository.GetDefinitionWithDetails(request.Id);
         if (definition == null)

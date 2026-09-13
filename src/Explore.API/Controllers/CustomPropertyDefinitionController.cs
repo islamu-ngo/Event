@@ -10,8 +10,7 @@ using Explore.Application.Features.CustomPropertyDefinitions.Requests.Commands;
 using Explore.Application.Features.CustomPropertyDefinitions.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using Explore.Domain.Enums;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -47,14 +46,29 @@ public class CustomPropertyDefinitionController : EventControllerBase
         "Custom property definition not found",
         "Custom property definition not found.");
 
-    private readonly IMediator _mediator;
+    private readonly ICommandHandler<CreateCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>> _create;
+    private readonly ICommandHandler<UpdateCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>> _update;
+    private readonly ICommandHandler<DeleteCustomPropertyDefinitionCommand, bool> _delete;
+    private readonly ICommandHandler<PurgeCustomPropertyDefinitionCommand, BaseCommandResponse<CustomPropertyPurgeResultDto>> _purge;
+    private readonly IQueryHandler<GetCustomPropertyDefinitionDetailsQuery, CustomPropertyDefinitionDto> _detail;
+    private readonly IQueryHandler<GetCustomPropertyDefinitionListQuery, PaginatedResult<CustomPropertyDefinitionListDto>> _list;
     private readonly IResourceAssembler<CustomPropertyDefinitionDto, CustomPropertyDefinitionListDto> _resourceAssembler;
 
     public CustomPropertyDefinitionController(
-        IMediator mediator,
+        ICommandHandler<CreateCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>> create,
+        ICommandHandler<UpdateCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>> update,
+        ICommandHandler<DeleteCustomPropertyDefinitionCommand, bool> delete,
+        ICommandHandler<PurgeCustomPropertyDefinitionCommand, BaseCommandResponse<CustomPropertyPurgeResultDto>> purge,
+        IQueryHandler<GetCustomPropertyDefinitionDetailsQuery, CustomPropertyDefinitionDto> detail,
+        IQueryHandler<GetCustomPropertyDefinitionListQuery, PaginatedResult<CustomPropertyDefinitionListDto>> list,
         IResourceAssembler<CustomPropertyDefinitionDto, CustomPropertyDefinitionListDto> resourceAssembler)
     {
-        _mediator = mediator;
+        _create = create;
+        _update = update;
+        _delete = delete;
+        _purge = purge;
+        _detail = detail;
+        _list = list;
         _resourceAssembler = resourceAssembler;
     }
 
@@ -75,7 +89,7 @@ public class CustomPropertyDefinitionController : EventControllerBase
         [FromQuery] CustomPropertyDefinitionListQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new GetCustomPropertyDefinitionListRequest
+        var result = await _list.QueryAsync(new GetCustomPropertyDefinitionListQuery
         {
             EntityTypeName = query.EntityTypeName,
             PageNumber = query.PageNumber,
@@ -106,7 +120,7 @@ public class CustomPropertyDefinitionController : EventControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<HalResource<CustomPropertyDefinitionDto>>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var definition = await _mediator.Send(new GetCustomPropertyDefinitionDetailsRequest { Id = id }, cancellationToken);
+        var definition = await _detail.QueryAsync(new GetCustomPropertyDefinitionDetailsQuery { Id = id }, cancellationToken);
         if (definition == null)
         {
             return this.ToNotFoundProblem(DefinitionNotFoundProblem);
@@ -136,7 +150,7 @@ public class CustomPropertyDefinitionController : EventControllerBase
             DefinitionDto = customPropertyDefinition
         };
 
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _create.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -183,7 +197,7 @@ public class CustomPropertyDefinitionController : EventControllerBase
             ExpectedConcurrencyStamp = expectedConcurrencyStamp
         };
 
-        var result = await _mediator.Send(command, cancellationToken);
+        var result = await _update.ExecuteAsync(command, cancellationToken);
 
         if (!result.IsSuccess)
         {
@@ -207,7 +221,7 @@ public class CustomPropertyDefinitionController : EventControllerBase
     public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
         var command = new DeleteCustomPropertyDefinitionCommand { Id = id };
-        await _mediator.Send(command, cancellationToken);
+        await _delete.ExecuteAsync(command, cancellationToken);
 
         return NoContent();
     }
@@ -229,7 +243,7 @@ public class CustomPropertyDefinitionController : EventControllerBase
         [FromBody] PurgeCustomPropertyDefinitionDto purgeDto,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new PurgeCustomPropertyDefinitionCommand
+        var result = await _purge.ExecuteAsync(new PurgeCustomPropertyDefinitionCommand
         {
             Id = id,
             Reason = purgeDto.Reason

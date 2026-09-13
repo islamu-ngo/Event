@@ -6,12 +6,12 @@ using Explore.Application.Features.CustomProperties;
 using Explore.Application.Features.CustomPropertyDefinitions.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Telemetry;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.CustomPropertyDefinitions.Handlers.Commands;
 
-public sealed class PurgeCustomPropertyDefinitionCommandHandler : IRequestHandler<PurgeCustomPropertyDefinitionCommand, BaseCommandResponse<CustomPropertyPurgeResultDto>>
+public sealed class PurgeCustomPropertyDefinitionCommandHandler : ICommandHandler<PurgeCustomPropertyDefinitionCommand, BaseCommandResponse<CustomPropertyPurgeResultDto>>
 {
     private readonly ICustomPropertyDefinitionRepository _repository;
     private readonly IAuditLogRepository _auditLogRepository;
@@ -36,7 +36,7 @@ public sealed class PurgeCustomPropertyDefinitionCommandHandler : IRequestHandle
         _metrics = metrics;
     }
 
-    public async Task<BaseCommandResponse<CustomPropertyPurgeResultDto>> Handle(PurgeCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<CustomPropertyPurgeResultDto>> ExecuteAsync(PurgeCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
     {
         var reason = request.Reason.Trim();
         if (string.IsNullOrWhiteSpace(reason))

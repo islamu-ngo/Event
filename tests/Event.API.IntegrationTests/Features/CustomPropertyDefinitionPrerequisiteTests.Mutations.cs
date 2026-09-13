@@ -16,7 +16,7 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Persistence;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -192,7 +192,7 @@ public sealed partial class CustomPropertyDefinitionPrerequisiteTests
         {
             User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", data.Seed.UserId.ToString())], "Test"))
         };
-        var result = await scope.ServiceProvider.GetRequiredService<IMediator>().Send(
+        var result = await scope.ServiceProvider.GetRequiredService<ICommandHandler<CreateCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>>>().ExecuteAsync(
             new CreateCustomPropertyDefinitionCommand { DefinitionDto = CreateDto() }, cancellation.Token);
         await Assert.That(cancellation.IsCancellationRequested).IsTrue();
         await Assert.That(result.IsSuccess).IsTrue();
@@ -351,7 +351,8 @@ public sealed partial class CustomPropertyDefinitionPrerequisiteTests
         DefinitionFactory factory, Guid tenantId, EntityTypeName entityType, int page, int size)
     {
         using var scope = TenantScope(factory, tenantId);
-        return await scope.ServiceProvider.GetRequiredService<IMediator>().Send(new GetCustomPropertyDefinitionListRequest(entityType, page, size));
+        return await scope.ServiceProvider.GetRequiredService<IQueryHandler<GetCustomPropertyDefinitionListQuery, PaginatedResult<CustomPropertyDefinitionListDto>>>()
+            .QueryAsync(new GetCustomPropertyDefinitionListQuery(entityType, page, size), default);
     }
 
     private static async Task WarmAsync(DefinitionFactory factory, MutationData data)

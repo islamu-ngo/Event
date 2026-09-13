@@ -459,7 +459,18 @@ public sealed class RuntimeAuthorizationProvider : IAuthorizationProvider, IAuth
         _localProvider.ActivateSafeMode();
         // A Cerbos-unsupported typed check cannot become a local grant during an outage,
         // including for an instance administrator. Keep other safe-mode exceptions intact.
-        var supportedChecks = checks.Where(check => !CerbosAuthorizationService.IsUnsupportedStorageTypedCheck(check)).ToArray();
+        var supportedChecks = checks.Where(check => !CerbosAuthorizationService.IsUnsupportedStorageTypedCheck(check))
+            // Exact downloads previously reached fallback with tenant-only collection facts.
+            // Do not turn newly resolved creator/visibility facts into an outage-only grant.
+            .Select(check => check is
+                {
+                    ResourceKind: ResourceKinds.StorageObject,
+                    Action: AuthorizationActions.StorageObjects.Download,
+                    Facts: PersistedStorageObjectAuthorizationFacts storage
+                }
+                ? check with { Facts = new StorageObjectCollectionAuthorizationFacts(storage.TenantId) }
+                : check)
+            .ToArray();
         var localDecisions = await _localProvider.AuthorizeBatchAsync(supportedChecks, cancellationToken);
         var results = new AuthorizationDecision[checks.Count];
         int localIndex = 0;

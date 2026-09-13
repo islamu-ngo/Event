@@ -526,6 +526,7 @@ public sealed class ActorFederationMapperTests
         public Task<RegistrationAnswerFile?> GetRegistrationAnswerFileAsync(Guid storageObjectId, Guid tenantId, CancellationToken cancellationToken) => Task.FromResult<RegistrationAnswerFile?>(null);
         public Task<RegistrationOrder?> GetRegistrationContentOrderAsync(StorageObject storageObject, RegistrationAnswerFile? answerFile, CancellationToken cancellationToken) => Task.FromResult<RegistrationOrder?>(null);
         public Task<StorageObject?> GetFileWithDetails(Guid id) => throw new NotSupportedException();
+        public Task<StorageObject?> GetForAuthorizationAsync(Guid id, Guid tenantId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<List<StorageObject>> GetFilesWithDetails() => throw new NotSupportedException();
         public Task<IReadOnlyList<StorageObject>> GetAllForInstanceStorageReportAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<StorageObject>> ListActiveForReconciliationAsync(DateTime createdBeforeUtc, int limit, CancellationToken cancellationToken) => throw new NotSupportedException();

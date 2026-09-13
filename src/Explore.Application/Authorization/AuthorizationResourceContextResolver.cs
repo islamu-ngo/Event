@@ -83,8 +83,11 @@ public sealed class AuthorizationResourceContextResolver(
             && action == AuthorizationActions.StorageObjects.Download)
         {
             var objectId = download.StorageObjectId.ToString("D");
-            return new AuthorizationContext(objectId, tenantContext is null ? null :
-                await ResolveStorageObjectFactsAsync(objectId, declaredFacts: null, cancellationToken));
+            // Do not populate EF's identity map before the awaited policy decision: the content
+            // reader must load current metadata after authorization, not reuse this snapshot.
+            var snapshot = tenantContext is null || storageObjectRepository is null ? null :
+                await storageObjectRepository.GetForAuthorizationAsync(download.StorageObjectId, tenantContext.TenantId, cancellationToken);
+            return new AuthorizationContext(objectId, snapshot is null ? null : CreateStorageObjectFacts(snapshot));
         }
 
         var facts = await ResolveTrustedFactsAsync(resourceKind, resourceId, declaredFacts, cancellationToken);
@@ -351,15 +354,12 @@ public sealed class AuthorizationResourceContextResolver(
         if (!IsInCurrentTenant(storageObject?.TenantId))
             return null;
 
-        return new PersistedStorageObjectAuthorizationFacts(
-            storageObject!.TenantId,
-            storageObject.Id,
-            storageObject.Visibility,
-            storageObject.LifecycleState,
-            storageObject.CreatedBy,
-            storageObject.OwningResourceKind,
-            storageObject.OwningResourceId);
+        return CreateStorageObjectFacts(storageObject!);
     }
+
+    private static PersistedStorageObjectAuthorizationFacts CreateStorageObjectFacts(StorageObject storageObject) =>
+        new(storageObject.TenantId, storageObject.Id, storageObject.Visibility, storageObject.LifecycleState,
+            storageObject.CreatedBy, storageObject.OwningResourceKind, storageObject.OwningResourceId);
 
     /// <summary>
     /// Custom-property projections are tenant-administered but addressed by event or session, so the

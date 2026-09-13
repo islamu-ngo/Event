@@ -1,0 +1,39 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M2DHWD1122VN25Z2KQR8WTYJ
+Title: "Prevent stale and outage-only storage downloads"
+Type: fix
+Scope: access
+Summary: "Exact downloads use untracked tenant-bound authorization snapshots so readers reload metadata after policy evaluation, and BYO failure fallback cannot derive new creator or visibility grants."
+Group: organization-evidence
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Authorization snapshots do not populate EF tracking before an awaited policy
+      decision. Reader metadata remains fresh for subsequent access checks. BYO
+      failure fallback retains tenant-only download authority rather than deriving
+      new grants from creator or visibility facts.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/integrations-and-ai/storage.md
+    Disposition: documented
+    Detail: >-
+      Honor quarantine, deletion, visibility restriction and creator erasure
+      committed during policy evaluation. Instance-admin ownership alone does not
+      confer outage download access; existing tenant/emergency checks remain intact.
+      No new settings, credentials or database migration are required.

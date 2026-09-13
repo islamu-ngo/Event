@@ -20,7 +20,8 @@ public interface ICustomPropertyProjectionDirtyScopeRepository
         int projectionVersion,
         Guid tenantId,
         int batchSize,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        int skip = 0);
 
     Task MarkDrainedAsync(
         IReadOnlyCollection<long> ids,

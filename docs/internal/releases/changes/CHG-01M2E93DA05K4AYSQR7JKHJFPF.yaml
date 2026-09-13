@@ -1,0 +1,29 @@
+Change-Id: CHG-01M2E93DA05K4AYSQR7JKHJFPF
+Title: "Correct event projection administration"
+Type: fix
+Scope: events
+Summary: "Honor pending projection page offsets and return structured event rebuild validation errors while retaining tenant-authorized rebuild and drain operations."
+Group: event-projection-administration
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/CUSTOM_PROPERTIES.md#event-projection-administration
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: Native scoped ports retain persisted tenant authority and exposure ceilings. SQLite HTTP tests prove forged administrator claims and foreign-tenant targets cannot read or mutate projection data.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/events-and-ticketing/custom-properties.md#projection-administration
+    Disposition: documented
+    Detail: Pending-work pages advance through the backlog and event rebuild validation returns the documented ProblemDetails shape. Upgrade normally; no migration or manual repair is required. Failed and cancelled drains retain pending work for retry.

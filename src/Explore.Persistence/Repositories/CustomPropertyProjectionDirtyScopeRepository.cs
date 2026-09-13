@@ -60,7 +60,8 @@ public class CustomPropertyProjectionDirtyScopeRepository : ICustomPropertyProje
         int projectionVersion,
         Guid tenantId,
         int batchSize,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int skip = 0)
     {
         return await _dbContext.CustomPropertyProjectionDirtyScopes
             .AsNoTracking()
@@ -69,6 +70,7 @@ public class CustomPropertyProjectionDirtyScopeRepository : ICustomPropertyProje
                 && e.TenantId == tenantId
                 && e.DrainedAt == null)
             .OrderBy(e => e.Id)
+            .Skip(skip)
             .Take(batchSize)
             .ToListAsync(cancellationToken);
     }

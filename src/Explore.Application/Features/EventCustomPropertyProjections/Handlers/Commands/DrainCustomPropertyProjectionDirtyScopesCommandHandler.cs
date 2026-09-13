@@ -5,12 +5,12 @@ using Explore.Application.DTOs.CustomPropertyProjection.Validators;
 using Explore.Application.Features.EventCustomPropertyProjections.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Telemetry;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventCustomPropertyProjections.Handlers.Commands;
 
 public class DrainCustomPropertyProjectionDirtyScopesCommandHandler
-    : IRequestHandler<DrainCustomPropertyProjectionDirtyScopesCommand, BaseCommandResponse<DrainDirtyScopesResponseDto>>
+    : ICommandHandler<DrainCustomPropertyProjectionDirtyScopesCommand, BaseCommandResponse<DrainDirtyScopesResponseDto>>
 {
     private readonly IEventCustomPropertyProjectionUpdater _eventProjectionUpdater;
     private readonly IEventSessionCustomPropertyProjectionUpdater _sessionProjectionUpdater;
@@ -26,7 +26,7 @@ public class DrainCustomPropertyProjectionDirtyScopesCommandHandler
         _metrics = metrics;
     }
 
-    public async Task<BaseCommandResponse<DrainDirtyScopesResponseDto>> Handle(
+    public async Task<BaseCommandResponse<DrainDirtyScopesResponseDto>> ExecuteAsync(
         DrainCustomPropertyProjectionDirtyScopesCommand request,
         CancellationToken cancellationToken)
     {

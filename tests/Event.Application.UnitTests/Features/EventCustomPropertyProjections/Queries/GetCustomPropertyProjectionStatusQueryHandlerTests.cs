@@ -43,7 +43,7 @@ public sealed class GetCustomPropertyProjectionStatusQueryHandlerTests
             _statusRepository,
             _dirtyScopeRepository);
 
-        var result = await handler.Handle(
+        var result = await handler.QueryAsync(
             new GetEventCustomPropertyProjectionStatusQuery { TenantId = tenantId },
             CancellationToken.None);
 

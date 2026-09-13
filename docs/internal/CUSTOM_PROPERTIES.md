@@ -231,6 +231,38 @@ Lifecycle:
 - projection rebuild tooling must be able to recompute them from source-of-truth rows,
 - projection tables are a read-side optimization, not a business-rule engine.
 
+### Event Projection Administration
+
+The three event projection reads (status, dirty-scope pages and event rows) use
+scoped `IQueryHandler` ports. Tenant rebuild, single-event refresh and dirty-scope
+drain use scoped `ICommandHandler` ports. `CustomPropertyProjectionAdminController`
+constructor-injects all six protected ports; its four session operations still
+use MediatR. Drain deliberately calls either the event or session updater service
+according to the validated projection name, not another operation.
+
+Authorization resolves event ownership from persisted state and requires the
+projection permission for the target tenant. Body/query tenant IDs are targets,
+not evidence of administrator authority. The local provider checks persisted
+tenant-administrator grants and rejects foreign-tenant targets. Projection row
+inspection is an administrator value-bearing surface, unlike the value-free
+governance report. A supplied exposure ceiling narrows rows before mapping;
+omitting it permits the authorized administrator to inspect all exposure levels.
+Status and dirty-scope responses contain operational metadata, not collected values.
+
+Dirty-scope pages apply an ID-ordered database offset before the page limit; reads
+never settle work. Updaters retain transaction/lock ownership: full rebuild drains
+pending work and persists status, single-event refresh does not claim settlement,
+and drain settles only its selected projection. Failed or cancelled drains roll
+back projection replacements and retain pending scopes for retry. This cohort does
+not change provider locking or execution-strategy semantics. SQLite HTTP/registered
+port tests verify committed results, failed-drain rollback and cancellation; they
+do not establish PostgreSQL advisory-lock concurrency guarantees.
+
+Event rebuild validation now uses the existing ProblemDetails factory instead of
+returning a raw command response. Validation remains HTTP 400 and quota exhaustion
+HTTP 422 with quota metadata; successful response and route contracts are unchanged.
+The retained session rebuild failure mapping is outside this cohort.
+
 ## Automation Condition Guardrails
 
 Custom properties may participate in Event lifecycle automation conditions only

@@ -41,6 +41,26 @@ Committed administrative role revocations apply to subsequent report requests
 against the authoritative database. They do not cancel a request that was
 already authorized before revocation.
 
+## Projection Administration
+
+Tenant administrators can inspect event projection status, pending work and
+projected values in the current tenant. Selecting another tenant ID does not grant
+access. Unlike the governance report, projection row inspection includes collected
+values: restrict these responses to authorized administrators. A requested exposure
+ceiling narrows the returned rows; without one, all exposure levels are available
+to the authorized administrator.
+
+Pending-work pages now show distinct, ID-ordered portions of the backlog instead
+of repeating the first page. Reading a page does not process it. A full event
+rebuild refreshes values, drains event work and records its status. Refreshing one
+event does not clear the tenant backlog. Drain processes the selected event or
+session projection only. If a drain fails or is cancelled, pending work remains
+available for retry and its transaction does not leave partially replaced rows.
+
+Invalid event rebuild requests return a structured ProblemDetails error (HTTP 400);
+quota exhaustion remains HTTP 422. Successful responses and routes are unchanged.
+No database migration or manual data repair is required for these corrections.
+
 ## Lifecycle: Retirement vs. Hard Purge
 
 1. **Normal Deletion (Retirement)**: Soft-deletes the field definition. Existing event registrations preserve their historical answers for auditability and financial reporting, but no new events can select the retired question.

@@ -3,12 +3,12 @@ using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Application.Features.EventCustomPropertyProjections.Requests.Queries;
 using Explore.Application.Mappings;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventCustomPropertyProjections.Handlers.Queries;
 
 public class GetEventCustomPropertyProjectionsForEventQueryHandler
-    : IRequestHandler<GetEventCustomPropertyProjectionsForEventQuery, BaseCommandResponse<IReadOnlyList<EventCustomPropertyProjectionDto>>>
+    : IQueryHandler<GetEventCustomPropertyProjectionsForEventQuery, BaseCommandResponse<IReadOnlyList<EventCustomPropertyProjectionDto>>>
 {
     private readonly IEventCustomPropertyProjectionRepository _projectionRepository;
 
@@ -18,7 +18,7 @@ public class GetEventCustomPropertyProjectionsForEventQueryHandler
         _projectionRepository = projectionRepository;
     }
 
-    public async Task<BaseCommandResponse<IReadOnlyList<EventCustomPropertyProjectionDto>>> Handle(
+    public async Task<BaseCommandResponse<IReadOnlyList<EventCustomPropertyProjectionDto>>> QueryAsync(
         GetEventCustomPropertyProjectionsForEventQuery request,
         CancellationToken cancellationToken)
     {

@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.CustomPropertyProjection;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventCustomPropertyProjections.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.CustomPropertyProjection, AuthorizationActions.CustomPropertyProjections.View)]
-public sealed record GetCustomPropertyProjectionDirtyScopesQuery : IRequest<PaginatedResult<ProjectionDirtyScopeDto>>, ISecureRequest
+public sealed record GetCustomPropertyProjectionDirtyScopesQuery : IQuery<PaginatedResult<ProjectionDirtyScopeDto>>, ISecureRequest
 {
     public Guid TenantId { get; init; }
     public string ProjectionName { get; init; } = string.Empty;

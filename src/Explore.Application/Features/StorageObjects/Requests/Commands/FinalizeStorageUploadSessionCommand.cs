@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.StorageObject;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.StorageObjects.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.StorageObject, AuthorizationActions.Create)]
-public sealed record FinalizeStorageUploadSessionCommand : IRequest<BaseCommandResponse<StorageUploadSessionDto>>, ISecureRequest
+public sealed record FinalizeStorageUploadSessionCommand : ICommand<BaseCommandResponse<StorageUploadSessionDto>>, ISecureRequest
 {
     public Guid UploadSessionId { get; init; }
     public required Stream Content { get; init; }

@@ -15,7 +15,7 @@ using Explore.Application.Features.StorageObjects.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Models.Storage;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -40,16 +40,43 @@ public class StorageObjectController : ControllerBase
         "Storage object not found",
         "Storage object not found.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetStorageObjectListRequest, PaginatedResult<StorageObjectListDto>> _list;
+    private readonly IQueryHandler<GetStorageObjectDetailsRequest, StorageObjectDto?> _details;
+    private readonly IQueryHandler<GetStorageObjectContentRequest, StorageObjectContentResult?> _content;
+    private readonly IQueryHandler<GetPublicImageRequest, StorageObjectContentResult?> _publicImage;
+    private readonly ICommandHandler<IssuePresignedDownloadUrlCommand, PresignedDownloadUrlResponseDto?> _issueDownload;
+    private readonly ICommandHandler<CreateStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> _createUpload;
+    private readonly ICommandHandler<FinalizeStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> _finalizeUpload;
+    private readonly ICommandHandler<CancelStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> _cancelUpload;
+    private readonly ICommandHandler<UpdateStorageObjectCommand, BaseCommandResponse<Guid>> _update;
+    private readonly ICommandHandler<DeleteStorageObjectCommand, bool> _delete;
     private readonly ITenantContext _tenantContext;
     private readonly IResourceAssembler<StorageObjectDto, StorageObjectListDto> _resourceAssembler;
 
     public StorageObjectController(
-        IMediator mediator,
+        IQueryHandler<GetStorageObjectListRequest, PaginatedResult<StorageObjectListDto>> list,
+        IQueryHandler<GetStorageObjectDetailsRequest, StorageObjectDto?> details,
+        IQueryHandler<GetStorageObjectContentRequest, StorageObjectContentResult?> content,
+        IQueryHandler<GetPublicImageRequest, StorageObjectContentResult?> publicImage,
+        ICommandHandler<IssuePresignedDownloadUrlCommand, PresignedDownloadUrlResponseDto?> issueDownload,
+        ICommandHandler<CreateStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> createUpload,
+        ICommandHandler<FinalizeStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> finalizeUpload,
+        ICommandHandler<CancelStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> cancelUpload,
+        ICommandHandler<UpdateStorageObjectCommand, BaseCommandResponse<Guid>> update,
+        ICommandHandler<DeleteStorageObjectCommand, bool> delete,
         ITenantContext tenantContext,
         IResourceAssembler<StorageObjectDto, StorageObjectListDto> resourceAssembler)
     {
-        _mediator = mediator;
+        _list = list;
+        _details = details;
+        _content = content;
+        _publicImage = publicImage;
+        _issueDownload = issueDownload;
+        _createUpload = createUpload;
+        _finalizeUpload = finalizeUpload;
+        _cancelUpload = cancelUpload;
+        _update = update;
+        _delete = delete;
         _tenantContext = tenantContext;
         _resourceAssembler = resourceAssembler;
     }
@@ -69,7 +96,7 @@ public class StorageObjectController : ControllerBase
         [FromQuery] PaginationQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var storageObjects = await _mediator.Send(new GetStorageObjectListRequest
+        var storageObjects = await _list.QueryAsync(new GetStorageObjectListRequest
         {
             TenantId = _tenantContext.TenantId,
             PageNumber = query.PageNumber,
@@ -97,7 +124,7 @@ public class StorageObjectController : ControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<HalResource<StorageObjectDto>>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var storageObject = await _mediator.Send(
+        var storageObject = await _details.QueryAsync(
             new GetStorageObjectDetailsRequest
             {
                 Id = id,
@@ -125,7 +152,7 @@ public class StorageObjectController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetContent(Guid id, CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(
+        var result = await _content.QueryAsync(
             new GetStorageObjectContentRequest
             {
                 StorageObjectId = id,
@@ -148,7 +175,7 @@ public class StorageObjectController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetPublicImage(Guid id, CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new GetPublicImageRequest(id), cancellationToken);
+        var result = await _publicImage.QueryAsync(new GetPublicImageRequest(id), cancellationToken);
 
         if (result is null)
         {
@@ -171,7 +198,7 @@ public class StorageObjectController : ControllerBase
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public async Task<ActionResult<PresignedDownloadUrlResponseDto>> GetPresignedDownloadUrl(Guid id, [FromQuery] int expirationMinutes = 60, CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new GetPresignedDownloadUrlRequest
+        var result = await _issueDownload.ExecuteAsync(new IssuePresignedDownloadUrlCommand
         {
             Id = id,
             ExpirationMinutes = expirationMinutes,
@@ -208,7 +235,7 @@ public class StorageObjectController : ControllerBase
             UploadSessionDto = dto,
             TenantId = _tenantContext.TenantId
         };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _createUpload.ExecuteAsync(command, cancellationToken);
 
         return response.IsSuccess ? Ok(response) : this.ToStorageUploadProblem(response);
     }
@@ -251,7 +278,7 @@ public class StorageObjectController : ControllerBase
             ContentLength = Request.ContentLength,
             TenantId = _tenantContext.TenantId
         };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _finalizeUpload.ExecuteAsync(command, cancellationToken);
 
         return response.IsSuccess ? Ok(response) : this.ToStorageUploadProblem(response);
     }
@@ -283,7 +310,7 @@ public class StorageObjectController : ControllerBase
             UploadSessionId = uploadSessionId,
             TenantId = _tenantContext.TenantId
         };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _cancelUpload.ExecuteAsync(command, cancellationToken);
 
         return response.IsSuccess ? Ok(response) : this.ToStorageUploadProblem(response);
     }
@@ -305,7 +332,7 @@ public class StorageObjectController : ControllerBase
             StorageObjectId = id,
             StorageObjectDto = dto
         };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _update.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -327,7 +354,7 @@ public class StorageObjectController : ControllerBase
     public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
         var command = new DeleteStorageObjectCommand { Id = id };
-        await _mediator.Send(command, cancellationToken);
+        await _delete.ExecuteAsync(command, cancellationToken);
 
         return NoContent();
     }

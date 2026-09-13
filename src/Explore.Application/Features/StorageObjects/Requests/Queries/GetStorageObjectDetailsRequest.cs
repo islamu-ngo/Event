@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.StorageObject;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.StorageObjects.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.StorageObject, AuthorizationActions.StorageObjects.View)]
-public sealed record GetStorageObjectDetailsRequest : IRequest<StorageObjectDto?>, ISecureRequest
+public sealed record GetStorageObjectDetailsRequest : IQuery<StorageObjectDto?>, ISecureRequest
 {
     public Guid Id { get; init; }
 

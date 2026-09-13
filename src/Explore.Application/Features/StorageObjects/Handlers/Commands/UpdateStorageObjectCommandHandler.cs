@@ -5,11 +5,11 @@ using Explore.Application.DTOs.StorageObject.Validators;
 using Explore.Application.Features.StorageObjects.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Services;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.StorageObjects.Handlers.Commands;
 
-public class UpdateStorageObjectCommandHandler : IRequestHandler<UpdateStorageObjectCommand, BaseCommandResponse<Guid>>
+public class UpdateStorageObjectCommandHandler : ICommandHandler<UpdateStorageObjectCommand, BaseCommandResponse<Guid>>
 {
     private readonly IStorageObjectRepository _storageObjectRepository;
     private readonly IActorRepository _actorRepository;
@@ -25,7 +25,7 @@ public class UpdateStorageObjectCommandHandler : IRequestHandler<UpdateStorageOb
         _tenantContext = tenantContext;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateStorageObjectCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateStorageObjectCommand request, CancellationToken cancellationToken)
     {
         var entity = await _storageObjectRepository.GetById(request.StorageObjectId);
         if (entity is null || entity.TenantId != _tenantContext.TenantId)

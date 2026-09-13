@@ -1,14 +1,14 @@
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.StorageObject;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
-namespace Explore.Application.Features.StorageObjects.Requests.Queries;
+namespace Explore.Application.Features.StorageObjects.Requests.Commands;
 
 /// <summary>
-/// Query to get a presigned download URL for a storage object by its ID.
+/// Issues a time-limited download capability for a storage object by its ID.
 /// </summary>
 [AuthorizeResource(ResourceKinds.StorageObject, AuthorizationActions.StorageObjects.PresignedDownload)]
-public sealed record GetPresignedDownloadUrlRequest : IRequest<PresignedDownloadUrlResponseDto?>, ISecureRequest
+public sealed record IssuePresignedDownloadUrlCommand : ICommand<PresignedDownloadUrlResponseDto?>, ISecureRequest
 {
     /// <summary>
     /// The ID of the storage object.

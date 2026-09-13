@@ -271,8 +271,8 @@ public sealed class StorageUploadOpenApiContractTests
             "Features",
             "StorageObjects",
             "Handlers",
-            "Queries",
-            "GetPresignedDownloadUrlRequestHandler.cs"));
+            "Commands",
+            "IssuePresignedDownloadUrlCommandHandler.cs"));
         var finalizeHandler = await File.ReadAllTextAsync(Path.Combine(
             repositoryRoot,
             "src",

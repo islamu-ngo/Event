@@ -1,6 +1,7 @@
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.OrganizationTenantEvidence.Validators;
 using Explore.Application.DTOs.StorageObject;
 using Explore.Application.Features.OrganizationTenantEvidence.Requests.Commands;
@@ -16,7 +17,7 @@ public sealed class CreateOrganizationTenantEvidenceUploadSessionCommandHandler(
     IOrganizationTenantRepository organizationTenantRepository,
     IAdminContext adminContext,
     ITenantContext tenantContext,
-    ISender sender)
+    ICommandHandler<CreateStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> createUpload)
     : IRequestHandler<CreateOrganizationTenantEvidenceUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>>
 {
     public async Task<BaseCommandResponse<StorageUploadSessionDto>> Handle(
@@ -49,7 +50,7 @@ public sealed class CreateOrganizationTenantEvidenceUploadSessionCommandHandler(
         }
 
         var fileName = request.Upload.FileName.Trim();
-        return await sender.Send(
+        return await createUpload.ExecuteAsync(
             new CreateStorageUploadSessionCommand
             {
                 TenantId = participation.TenantId,

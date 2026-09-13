@@ -4,11 +4,11 @@ using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.StorageObject;
 using Explore.Application.Features.StorageObjects.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.StorageObjects.Handlers.Queries;
 
-public class GetStorageObjectDetailsRequestHandler : IRequestHandler<GetStorageObjectDetailsRequest, StorageObjectDto?>
+public class GetStorageObjectDetailsRequestHandler : IQueryHandler<GetStorageObjectDetailsRequest, StorageObjectDto?>
 {
     private readonly IStorageObjectRepository _storageObjectRepository;
     private readonly TimeProvider _timeProvider;
@@ -19,7 +19,7 @@ public class GetStorageObjectDetailsRequestHandler : IRequestHandler<GetStorageO
         _timeProvider = timeProvider;
     }
 
-    public async Task<StorageObjectDto?> Handle(GetStorageObjectDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<StorageObjectDto?> QueryAsync(GetStorageObjectDetailsRequest request, CancellationToken cancellationToken)
     {
         var storageObject = await _storageObjectRepository.GetById(request.Id);
         if (storageObject is null) return null;

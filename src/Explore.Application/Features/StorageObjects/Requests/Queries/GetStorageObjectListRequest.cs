@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.StorageObject;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.StorageObjects.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.StorageObject, AuthorizationActions.StorageObjects.View)]
-public sealed record GetStorageObjectListRequest : IRequest<PaginatedResult<StorageObjectListDto>>, ISecureRequest
+public sealed record GetStorageObjectListRequest : IQuery<PaginatedResult<StorageObjectListDto>>, ISecureRequest
 {
     public Guid TenantId { get; init; }
 

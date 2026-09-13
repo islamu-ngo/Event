@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.StorageObject;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.StorageObjects.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.StorageObject, AuthorizationActions.Create)]
-public sealed record CreateStorageUploadSessionCommand : IRequest<BaseCommandResponse<StorageUploadSessionDto>>, ISecureRequest
+public sealed record CreateStorageUploadSessionCommand : ICommand<BaseCommandResponse<StorageUploadSessionDto>>, ISecureRequest
 {
     public required CreateStorageUploadSessionDto UploadSessionDto { get; init; }
     public Guid TenantId { get; init; }

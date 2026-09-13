@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services.Registration;
 using Explore.Application.DTOs.RegistrationProviders;
 using Explore.Application.Features.StorageObjects.Requests.Queries;
@@ -146,7 +147,7 @@ public sealed class QueueManualRegistrationProviderImportCommandHandler(
     IIncomingWebhookMessageRepository messageRepository,
     IIncomingWebhookEffectOutboxRepository effectRepository,
     IRegistrationProviderCallbackReceiptProtector receiptProtector,
-    ISender sender,
+    IQueryHandler<GetStorageObjectContentRequest, StorageObjectContentResult?> storageContent,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider,
     BusinessMetrics? metrics = null)
@@ -179,7 +180,7 @@ public sealed class QueueManualRegistrationProviderImportCommandHandler(
             return Failure(request.BindingId, "registration_provider_manual_import_unsupported", "Manual import is not supported by this provider binding.");
         }
 
-        StorageObjectContentResult? content = await sender.Send(new GetStorageObjectContentRequest
+        StorageObjectContentResult? content = await storageContent.QueryAsync(new GetStorageObjectContentRequest
         {
             StorageObjectId = storageObjectId,
             TenantId = request.TenantId

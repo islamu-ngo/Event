@@ -5,11 +5,11 @@ using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.StorageObject;
 using Explore.Application.Features.StorageObjects.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.StorageObjects.Handlers.Queries;
 
-public class GetStorageObjectListRequestHandler : IRequestHandler<GetStorageObjectListRequest, PaginatedResult<StorageObjectListDto>>
+public class GetStorageObjectListRequestHandler : IQueryHandler<GetStorageObjectListRequest, PaginatedResult<StorageObjectListDto>>
 {
     private readonly IStorageObjectRepository _storageObjectRepository;
     private readonly TimeProvider _timeProvider;
@@ -20,7 +20,7 @@ public class GetStorageObjectListRequestHandler : IRequestHandler<GetStorageObje
         _timeProvider = timeProvider;
     }
 
-    public async Task<PaginatedResult<StorageObjectListDto>> Handle(GetStorageObjectListRequest request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<StorageObjectListDto>> QueryAsync(GetStorageObjectListRequest request, CancellationToken cancellationToken)
     {
         var (pageNumber, pageSize) = PaginatedResult<StorageObjectListDto>.NormalizeParameters(request.PageNumber, request.PageSize);
         var (storageObjects, totalCount) = await _storageObjectRepository.GetFilesWithDetailsPaged(pageNumber, pageSize);

@@ -14,7 +14,7 @@ using Explore.Application.Features.StorageObjects.Requests.Queries;
 using Explore.Application.Models.Storage;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Timeouts;
@@ -29,7 +29,12 @@ namespace Event.Api.IntegrationTests.Features;
 public sealed class StorageUploadSessionControllerTests
 {
     private readonly Guid _tenantId = Guid.CreateVersion7();
-    private readonly IMediator _mediator = Substitute.For<IMediator>();
+    private readonly ICommandHandler<CreateStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> _create = Substitute.For<ICommandHandler<CreateStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>>>();
+    private readonly ICommandHandler<FinalizeStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> _finalize = Substitute.For<ICommandHandler<FinalizeStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>>>();
+    private readonly ICommandHandler<CancelStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> _cancel = Substitute.For<ICommandHandler<CancelStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>>>();
+    private readonly ICommandHandler<IssuePresignedDownloadUrlCommand, PresignedDownloadUrlResponseDto?> _issue = Substitute.For<ICommandHandler<IssuePresignedDownloadUrlCommand, PresignedDownloadUrlResponseDto?>>();
+    private readonly IQueryHandler<GetStorageObjectContentRequest, StorageObjectContentResult?> _content = Substitute.For<IQueryHandler<GetStorageObjectContentRequest, StorageObjectContentResult?>>();
+    private readonly IQueryHandler<GetPublicImageRequest, StorageObjectContentResult?> _publicImage = Substitute.For<IQueryHandler<GetPublicImageRequest, StorageObjectContentResult?>>();
     private readonly ITenantContext _tenantContext = Substitute.For<ITenantContext>();
 
     public StorageUploadSessionControllerTests()
@@ -42,7 +47,7 @@ public sealed class StorageUploadSessionControllerTests
     {
         var dto = CreateDto();
         var response = Success(Guid.CreateVersion7());
-        _mediator.Send(Arg.Any<CreateStorageUploadSessionCommand>(), Arg.Any<CancellationToken>())
+        _create.ExecuteAsync(Arg.Any<CreateStorageUploadSessionCommand>(), Arg.Any<CancellationToken>())
             .Returns(response);
         var controller = CreateController();
 
@@ -51,7 +56,7 @@ public sealed class StorageUploadSessionControllerTests
         var ok = actionResult.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsEqualTo(response);
-        await _mediator.Received(1).Send(
+        await _create.Received(1).ExecuteAsync(
             Arg.Is<CreateStorageUploadSessionCommand>(command =>
                 command.UploadSessionDto == dto &&
                 command.TenantId == _tenantId),
@@ -64,7 +69,7 @@ public sealed class StorageUploadSessionControllerTests
         var sessionId = Guid.CreateVersion7();
         var body = new MemoryStream(Encoding.UTF8.GetBytes("hello"));
         var response = Success(sessionId);
-        _mediator.Send(Arg.Any<FinalizeStorageUploadSessionCommand>(), Arg.Any<CancellationToken>())
+        _finalize.ExecuteAsync(Arg.Any<FinalizeStorageUploadSessionCommand>(), Arg.Any<CancellationToken>())
             .Returns(response);
         var controller = CreateController(body, "text/plain", body.Length);
 
@@ -72,7 +77,7 @@ public sealed class StorageUploadSessionControllerTests
 
         var ok = actionResult.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
-        await _mediator.Received(1).Send(
+        await _finalize.Received(1).ExecuteAsync(
             Arg.Is<FinalizeStorageUploadSessionCommand>(command =>
                 command.UploadSessionId == sessionId &&
                 command.Content == body &&
@@ -87,13 +92,13 @@ public sealed class StorageUploadSessionControllerTests
     {
         var sessionId = Guid.CreateVersion7();
         var body = new MemoryStream(Encoding.UTF8.GetBytes("hello"));
-        _mediator.Send(Arg.Any<FinalizeStorageUploadSessionCommand>(), Arg.Any<CancellationToken>())
+        _finalize.ExecuteAsync(Arg.Any<FinalizeStorageUploadSessionCommand>(), Arg.Any<CancellationToken>())
             .Returns(Success(sessionId));
         var controller = CreateController(body, "application/octet-stream", body.Length);
 
         _ = await controller.UploadSessionContent(sessionId, CancellationToken.None);
 
-        await _mediator.Received(1).Send(
+        await _finalize.Received(1).ExecuteAsync(
             Arg.Is<FinalizeStorageUploadSessionCommand>(command =>
                 command.UploadSessionId == sessionId &&
                 command.Content == body &&
@@ -108,7 +113,7 @@ public sealed class StorageUploadSessionControllerTests
     {
         var sessionId = Guid.CreateVersion7();
         var response = Success(sessionId);
-        _mediator.Send(Arg.Any<CancelStorageUploadSessionCommand>(), Arg.Any<CancellationToken>())
+        _cancel.ExecuteAsync(Arg.Any<CancelStorageUploadSessionCommand>(), Arg.Any<CancellationToken>())
             .Returns(response);
         var controller = CreateController();
 
@@ -116,7 +121,7 @@ public sealed class StorageUploadSessionControllerTests
 
         var ok = actionResult.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
-        await _mediator.Received(1).Send(
+        await _cancel.Received(1).ExecuteAsync(
             Arg.Is<CancelStorageUploadSessionCommand>(command =>
                 command.UploadSessionId == sessionId &&
                 command.TenantId == _tenantId),
@@ -133,7 +138,7 @@ public sealed class StorageUploadSessionControllerTests
             3,
             DateTimeOffset.UtcNow,
             "abc123");
-        _mediator.Send(Arg.Any<GetStorageObjectContentRequest>(), Arg.Any<CancellationToken>())
+        _content.QueryAsync(Arg.Any<GetStorageObjectContentRequest>(), Arg.Any<CancellationToken>())
             .Returns(response);
         var controller = CreateController();
 
@@ -144,7 +149,7 @@ public sealed class StorageUploadSessionControllerTests
         await Assert.That(file!.EnableRangeProcessing).IsTrue();
         await Assert.That(file.ContentType).IsEqualTo("image/png");
         await Assert.That(file.EntityTag?.Tag).IsEqualTo("\"abc123\"");
-        await _mediator.Received(1).Send(
+        await _content.Received(1).QueryAsync(
             Arg.Is<GetStorageObjectContentRequest>(query =>
                 query.StorageObjectId == storageObjectId &&
                 query.TenantId == _tenantId),
@@ -152,7 +157,7 @@ public sealed class StorageUploadSessionControllerTests
     }
 
     [Test]
-    public async Task GetPresignedDownloadUrl_DispatchesQueryWithExpiration()
+    public async Task GetPresignedDownloadUrl_DispatchesCapabilityCommandWithExpiration()
     {
         var storageObjectId = Guid.CreateVersion7();
         var response = new PresignedDownloadUrlResponseDto
@@ -160,7 +165,7 @@ public sealed class StorageUploadSessionControllerTests
             PresignedUrl = "https://storage.example.test/presigned",
             ExpiresInMinutes = 15
         };
-        _mediator.Send(Arg.Any<GetPresignedDownloadUrlRequest>(), Arg.Any<CancellationToken>())
+        _issue.ExecuteAsync(Arg.Any<IssuePresignedDownloadUrlCommand>(), Arg.Any<CancellationToken>())
             .Returns(response);
         var controller = CreateController();
 
@@ -169,8 +174,8 @@ public sealed class StorageUploadSessionControllerTests
         var ok = actionResult.Result as OkObjectResult;
         await Assert.That(ok).IsNotNull();
         await Assert.That(ok!.Value).IsEqualTo(response);
-        await _mediator.Received(1).Send(
-            Arg.Is<GetPresignedDownloadUrlRequest>(query =>
+        await _issue.Received(1).ExecuteAsync(
+            Arg.Is<IssuePresignedDownloadUrlCommand>(query =>
                 query.Id == storageObjectId &&
                 query.TenantId == _tenantId &&
                 query.ExpirationMinutes == 15),
@@ -180,7 +185,7 @@ public sealed class StorageUploadSessionControllerTests
     [Test]
     public async Task GetPresignedDownloadUrl_WhenHandlerReturnsNull_ReturnsNotFound()
     {
-        _mediator.Send(Arg.Any<GetPresignedDownloadUrlRequest>(), Arg.Any<CancellationToken>())
+        _issue.ExecuteAsync(Arg.Any<IssuePresignedDownloadUrlCommand>(), Arg.Any<CancellationToken>())
             .Returns((PresignedDownloadUrlResponseDto?)null);
         var controller = CreateController();
 
@@ -194,7 +199,7 @@ public sealed class StorageUploadSessionControllerTests
     [Test]
     public async Task GetPublicImage_WhenReaderReturnsNull_ReturnsNotFound()
     {
-        _mediator.Send(Arg.Any<GetPublicImageRequest>(), Arg.Any<CancellationToken>())
+        _publicImage.QueryAsync(Arg.Any<GetPublicImageRequest>(), Arg.Any<CancellationToken>())
             .Returns((StorageObjectContentResult?)null);
         var controller = CreateController();
 
@@ -208,7 +213,7 @@ public sealed class StorageUploadSessionControllerTests
     [Test]
     public async Task CreateUploadSession_WhenTooLarge_ReturnsPayloadTooLargeProblemDetails()
     {
-        _mediator.Send(Arg.Any<CreateStorageUploadSessionCommand>(), Arg.Any<CancellationToken>())
+        _create.ExecuteAsync(Arg.Any<CreateStorageUploadSessionCommand>(), Arg.Any<CancellationToken>())
             .Returns(Failure("Upload exceeds the configured per-file limit.", FailureCodes.StorageUploadTooLarge));
         var controller = CreateController();
 
@@ -239,7 +244,7 @@ public sealed class StorageUploadSessionControllerTests
 
         foreach (var testCase in cases)
         {
-            _mediator.Send(Arg.Any<FinalizeStorageUploadSessionCommand>(), Arg.Any<CancellationToken>())
+            _finalize.ExecuteAsync(Arg.Any<FinalizeStorageUploadSessionCommand>(), Arg.Any<CancellationToken>())
                 .Returns(Failure(testCase.Message, testCase.FailureCode));
             var controller = CreateController(new MemoryStream([1]), "text/plain", 1);
 
@@ -261,7 +266,7 @@ public sealed class StorageUploadSessionControllerTests
     public async Task UploadSessionContent_WhenProviderFailureContainsInternalData_ReturnsCanonicalProblemDetails()
     {
         const string unsafeMessage = "S3 SignatureDoesNotMatch at https://storage.internal.example/bucket/tenants/tenant-1/raw-key?X-Amz-Signature=secret";
-        _mediator.Send(Arg.Any<FinalizeStorageUploadSessionCommand>(), Arg.Any<CancellationToken>())
+        _finalize.ExecuteAsync(Arg.Any<FinalizeStorageUploadSessionCommand>(), Arg.Any<CancellationToken>())
             .Returns(Failure(unsafeMessage, FailureCodes.StorageUploadWriteFailed));
         var controller = CreateController(new MemoryStream([1]), "text/plain", 1);
 
@@ -288,7 +293,7 @@ public sealed class StorageUploadSessionControllerTests
     public async Task UploadSessionContent_WhenValidationFailureContainsInternalData_ReturnsCanonicalValidationProblem()
     {
         const string unsafeMessage = "ContentType must equal application/private-tenant-secret; objectKey=tenants/tenant-1/raw-key";
-        _mediator.Send(Arg.Any<FinalizeStorageUploadSessionCommand>(), Arg.Any<CancellationToken>())
+        _finalize.ExecuteAsync(Arg.Any<FinalizeStorageUploadSessionCommand>(), Arg.Any<CancellationToken>())
             .Returns(Failure(unsafeMessage, FailureCodes.StorageUploadContentTypeMismatch));
         var controller = CreateController(new MemoryStream([1]), "text/plain", 1);
 
@@ -399,7 +404,16 @@ public sealed class StorageUploadSessionControllerTests
         httpContext.Request.ContentLength = contentLength;
 
         return new StorageObjectController(
-            _mediator,
+            Substitute.For<IQueryHandler<GetStorageObjectListRequest, PaginatedResult<StorageObjectListDto>>>(),
+            Substitute.For<IQueryHandler<GetStorageObjectDetailsRequest, StorageObjectDto?>>(),
+            _content,
+            _publicImage,
+            _issue,
+            _create,
+            _finalize,
+            _cancel,
+            Substitute.For<ICommandHandler<UpdateStorageObjectCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<ICommandHandler<DeleteStorageObjectCommand, bool>>(),
             _tenantContext,
             Substitute.For<IResourceAssembler<StorageObjectDto, StorageObjectListDto>>())
         {

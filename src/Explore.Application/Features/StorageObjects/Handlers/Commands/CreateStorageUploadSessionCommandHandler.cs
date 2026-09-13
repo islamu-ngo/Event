@@ -10,12 +10,12 @@ using Explore.Application.Telemetry;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using FluentValidation;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.StorageObjects.Handlers.Commands;
 
 public class CreateStorageUploadSessionCommandHandler
-    : IRequestHandler<CreateStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>>
+    : ICommandHandler<CreateStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>>
 {
     private const string PrivacyErasureFencedFailureCode = "privacy_erasure_fenced";
     private static readonly TimeSpan SessionLifetime = TimeSpan.FromMinutes(15);
@@ -49,7 +49,7 @@ public class CreateStorageUploadSessionCommandHandler
         _metrics = metrics;
     }
 
-    public async Task<BaseCommandResponse<StorageUploadSessionDto>> Handle(
+    public async Task<BaseCommandResponse<StorageUploadSessionDto>> ExecuteAsync(
         CreateStorageUploadSessionCommand request,
         CancellationToken cancellationToken)
     {

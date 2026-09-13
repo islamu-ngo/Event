@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.StorageObject;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.StorageObjects.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.StorageObject, AuthorizationActions.Delete)]
-public sealed record CancelStorageUploadSessionCommand : IRequest<BaseCommandResponse<StorageUploadSessionDto>>, ISecureRequest
+public sealed record CancelStorageUploadSessionCommand : ICommand<BaseCommandResponse<StorageUploadSessionDto>>, ISecureRequest
 {
     public Guid UploadSessionId { get; init; }
     public Guid TenantId { get; init; }

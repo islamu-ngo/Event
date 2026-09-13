@@ -5,12 +5,12 @@ using Explore.Application.Features.StorageObjects.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Telemetry;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.StorageObjects.Handlers.Commands;
 
 public class CancelStorageUploadSessionCommandHandler
-    : IRequestHandler<CancelStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>>
+    : ICommandHandler<CancelStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>>
 {
     private readonly IStoragePolicyResolver _storagePolicyResolver;
     private readonly IStorageUploadSessionRepository _uploadSessionRepository;
@@ -38,7 +38,7 @@ public class CancelStorageUploadSessionCommandHandler
         _metrics = metrics;
     }
 
-    public async Task<BaseCommandResponse<StorageUploadSessionDto>> Handle(
+    public async Task<BaseCommandResponse<StorageUploadSessionDto>> ExecuteAsync(
         CancelStorageUploadSessionCommand request,
         CancellationToken cancellationToken)
     {

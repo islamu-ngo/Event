@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Ai;
 using Explore.Application.DTOs.StorageObject;
 using Explore.Application.Features.AiAssistant.Actions;
@@ -22,7 +23,9 @@ public sealed class ConfirmAiProposedActionCommandHandler(
     IActorRepository actorRepository,
     ITenantContext tenantContext,
     ICurrentUserService currentUserService,
-    IMediator mediator) : IRequestHandler<ConfirmAiProposedActionCommand, BaseCommandResponse<Guid>>
+    IMediator mediator,
+    ICommandHandler<CreateStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> createUpload,
+    ICommandHandler<FinalizeStorageUploadSessionCommand, BaseCommandResponse<StorageUploadSessionDto>> finalizeUpload) : IRequestHandler<ConfirmAiProposedActionCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> Handle(
         ConfirmAiProposedActionCommand request,
@@ -173,7 +176,7 @@ public sealed class ConfirmAiProposedActionCommandHandler(
                 "AI event draft image bytes do not match the declared image metadata.");
         }
 
-        var uploadSession = await mediator.Send(new CreateStorageUploadSessionCommand
+        var uploadSession = await createUpload.ExecuteAsync(new CreateStorageUploadSessionCommand
         {
             TenantId = action.TenantId,
             UploadSessionDto = new CreateStorageUploadSessionDto
@@ -197,7 +200,7 @@ public sealed class ConfirmAiProposedActionCommandHandler(
         }
 
         await using var content = new MemoryStream(imageBytes, writable: false);
-        var finalizeResult = await mediator.Send(new FinalizeStorageUploadSessionCommand
+        var finalizeResult = await finalizeUpload.ExecuteAsync(new FinalizeStorageUploadSessionCommand
         {
             UploadSessionId = uploadSession.Id.Id,
             Content = content,

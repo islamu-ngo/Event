@@ -5,32 +5,32 @@ using System.Threading.Tasks;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.StorageObject;
-using Explore.Application.Features.StorageObjects.Requests.Queries;
+using Explore.Application.Features.StorageObjects.Requests.Commands;
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Services.Registration;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Logging;
 
-namespace Explore.Application.Features.StorageObjects.Handlers.Queries;
+namespace Explore.Application.Features.StorageObjects.Handlers.Commands;
 
 /// <summary>
-/// Handler for getting a presigned download URL for a storage object by its ID.
+/// Issues a time-limited download capability after checking storage disclosure eligibility.
 /// </summary>
-public class GetPresignedDownloadUrlRequestHandler : IRequestHandler<GetPresignedDownloadUrlRequest, PresignedDownloadUrlResponseDto?>
+public class IssuePresignedDownloadUrlCommandHandler : ICommandHandler<IssuePresignedDownloadUrlCommand, PresignedDownloadUrlResponseDto?>
 {
     private const int MinimumExpirationMinutes = 1;
     private const int MaximumExpirationMinutes = 60;
     private readonly IStorageObjectRepository _storageObjectRepository;
     private readonly IObjectStorageService _objectStorageService;
     private readonly ICurrentUserService _currentUserService;
-    private readonly ILogger<GetPresignedDownloadUrlRequestHandler> _logger;
+    private readonly ILogger<IssuePresignedDownloadUrlCommandHandler> _logger;
 
-    public GetPresignedDownloadUrlRequestHandler(
+    public IssuePresignedDownloadUrlCommandHandler(
         IStorageObjectRepository storageObjectRepository,
         IObjectStorageService objectStorageService,
         ICurrentUserService currentUserService,
-        ILogger<GetPresignedDownloadUrlRequestHandler> logger)
+        ILogger<IssuePresignedDownloadUrlCommandHandler> logger)
     {
         _storageObjectRepository = storageObjectRepository;
         _objectStorageService = objectStorageService;
@@ -38,7 +38,7 @@ public class GetPresignedDownloadUrlRequestHandler : IRequestHandler<GetPresigne
         _logger = logger;
     }
 
-    public async Task<PresignedDownloadUrlResponseDto?> Handle(GetPresignedDownloadUrlRequest request, CancellationToken cancellationToken)
+    public async Task<PresignedDownloadUrlResponseDto?> ExecuteAsync(IssuePresignedDownloadUrlCommand request, CancellationToken cancellationToken)
     {
         if (request.Id == Guid.Empty)
         {

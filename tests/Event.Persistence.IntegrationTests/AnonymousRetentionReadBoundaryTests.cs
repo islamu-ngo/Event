@@ -2,6 +2,7 @@ using System.Data.Common;
 using System.Security.Cryptography;
 using Event.Persistence.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Admissions;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.StorageObject;
 using Explore.Application.Features.StorageObjects.Requests.Commands;
 using Explore.Application.Features.StorageObjects.Handlers.Commands;
@@ -30,6 +31,25 @@ namespace Event.Persistence.IntegrationTests;
 public sealed class AnonymousRetentionReadBoundaryTests
 {
     private static readonly DateTime Now = new(2026, 9, 8, 12, 0, 0, DateTimeKind.Utc);
+
+    private static async Task<TResult> ExecuteStorageAsync<TCommand, TResult>(
+        EventVisitorCapabilitySqliteFixture fixture, TCommand command) where TCommand : ICommand<TResult>
+    {
+        // These retention scenarios need ordinary storage authority, not a raw-handler bypass.
+        var membership = await fixture.Context.TenantUsers.SingleAsync(item => item.UserId == fixture.UserId);
+        if (!await fixture.Context.TenantUserRoleGrants.AnyAsync(item => item.TenantUserId == membership.Id))
+        {
+            fixture.Context.TenantUserRoleGrants.Add(new TenantUserRoleGrant
+            {
+                Id = Guid.CreateVersion7(), TenantId = fixture.TenantId, Tenant = null!,
+                TenantUserId = membership.Id, TenantUser = membership,
+                RoleId = (int)RoleEnum.TenantAdmin, Role = null!, RoleScopeId = (int)RoleScopeEnum.Tenant
+            });
+            await fixture.Context.SaveChangesAsync();
+        }
+        return await fixture.Services.GetRequiredService<ICommandHandler<TCommand, TResult>>()
+            .ExecuteAsync(command, CancellationToken.None);
+    }
 
     [Test]
     public async Task HistoricalAnonymousParticipantWithoutOriginalBoundHidesHeldContactButKeepsMutationAuthority()
@@ -141,7 +161,7 @@ public sealed class AnonymousRetentionReadBoundaryTests
                 await Assert.That(await reader.ReadToEndAsync()).IsEqualTo("private answer");
             }
             await Assert.That(content is not null).IsEqualTo(allowed);
-            await Assert.That(await fixture.ExecuteAsync<GetPresignedDownloadUrlRequest, PresignedDownloadUrlResponseDto?>(
+            await Assert.That(await ExecuteStorageAsync<IssuePresignedDownloadUrlCommand, PresignedDownloadUrlResponseDto?>(fixture,
                 new() { Id = scope.Storage.Id, ExpirationMinutes = 1 })).IsNull();
             var cleanup = await fixture.Services.GetRequiredService<IRegistrationRetentionCleanupRepository>()
                 .CleanupTenantAsync(fixture.TenantId, clock.Now.UtcDateTime, 10, CancellationToken.None);
@@ -164,7 +184,7 @@ public sealed class AnonymousRetentionReadBoundaryTests
         try
         {
             clock.Now = new DateTimeOffset(source.Deadline);
-            var update = await fixture.ExecuteAsync<UpdateStorageObjectCommand, BaseCommandResponse<Guid>>(new()
+            var update = await ExecuteStorageAsync<UpdateStorageObjectCommand, BaseCommandResponse<Guid>>(fixture, new()
             {
                 StorageObjectId = source.Storage.Id,
                 StorageObjectDto = new()
@@ -252,7 +272,7 @@ public sealed class AnonymousRetentionReadBoundaryTests
             var before = await repository.GetById(scope.Storage.Id);
             string? originalKind = before!.OwningResourceKind;
             Guid? originalId = before.OwningResourceId;
-            var response = await fixture.ExecuteAsync<UpdateStorageObjectCommand, BaseCommandResponse<Guid>>(new()
+            var response = await ExecuteStorageAsync<UpdateStorageObjectCommand, BaseCommandResponse<Guid>>(fixture, new()
             {
                 StorageObjectId = scope.Storage.Id,
                 StorageObjectDto = new()
@@ -292,7 +312,7 @@ public sealed class AnonymousRetentionReadBoundaryTests
                     .SetProperty(item => item.RegistrationContentRetentionUntilUtc, (DateTime?)null));
             fixture.Context.ChangeTracker.Clear();
             Guid targetId = registrationOwned ? scope.Storage.OwningResourceId!.Value : Guid.CreateVersion7();
-            var response = await fixture.ExecuteAsync<UpdateStorageObjectCommand, BaseCommandResponse<Guid>>(new()
+            var response = await ExecuteStorageAsync<UpdateStorageObjectCommand, BaseCommandResponse<Guid>>(fixture, new()
             {
                 StorageObjectId = scope.Storage.Id,
                 StorageObjectDto = new()
@@ -335,7 +355,7 @@ public sealed class AnonymousRetentionReadBoundaryTests
             var storage = await repository.GetById(scope.Storage.Id);
             var handler = new UpdateStorageObjectCommandHandler(repository,
                 fixture.Services.GetRequiredService<IActorRepository>(), new TenantScope(Guid.CreateVersion7()));
-            var response = await handler.Handle(new()
+            var response = await handler.ExecuteAsync(new()
             {
                 StorageObjectId = scope.Storage.Id,
                 StorageObjectDto = new() { Metadata = new() { FullName = "foreign.csv" } }
@@ -481,7 +501,7 @@ public sealed class AnonymousRetentionReadBoundaryTests
             fixture.Context.AddRange(file, release);
             await fixture.Context.SaveChangesAsync();
             fixture.Context.ChangeTracker.Clear();
-            var update = await fixture.ExecuteAsync<UpdateStorageObjectCommand, BaseCommandResponse<Guid>>(new()
+            var update = await ExecuteStorageAsync<UpdateStorageObjectCommand, BaseCommandResponse<Guid>>(fixture, new()
             {
                 StorageObjectId = scope.Storage.Id,
                 StorageObjectDto = new()
@@ -495,7 +515,7 @@ public sealed class AnonymousRetentionReadBoundaryTests
             var content = await reader.OpenAsync(scope.Storage.Id, false, CancellationToken.None);
             await Assert.That(content).IsNotNull();
             await content!.Content.DisposeAsync();
-            await Assert.That(await fixture.ExecuteAsync<GetPresignedDownloadUrlRequest, PresignedDownloadUrlResponseDto?>(
+            await Assert.That(await ExecuteStorageAsync<IssuePresignedDownloadUrlCommand, PresignedDownloadUrlResponseDto?>(fixture,
                 new() { Id = scope.Storage.Id, ExpirationMinutes = 1 })).IsNull();
             clock.Now = new DateTimeOffset(scope.Deadline);
             await Assert.That(await reader.OpenAsync(scope.Storage.Id, false, CancellationToken.None)).IsNull();

@@ -112,11 +112,11 @@ public sealed class ActorFederationMapperTests
                 expectedList[field] = string.Empty;
             }
         }
-        var dto = await detail.Handle(new GetStorageObjectDetailsRequest { Id = Stamp }, default);
+        var dto = await detail.QueryAsync(new GetStorageObjectDetailsRequest { Id = Stamp }, default);
         await AssertContract(dto!, expected);
         await Assert.That(dto!.ContentEligibility.ContentAllowed).IsEqualTo(!registrationOwned);
-        await Assert.That(await detail.Handle(new GetStorageObjectDetailsRequest { Id = OwnerId }, default)).IsNull();
-        var page = await list.Handle(new GetStorageObjectListRequest { PageNumber = -1, PageSize = 500 }, default);
+        await Assert.That(await detail.QueryAsync(new GetStorageObjectDetailsRequest { Id = OwnerId }, default)).IsNull();
+        var page = await list.QueryAsync(new GetStorageObjectListRequest { PageNumber = -1, PageSize = 500 }, default);
         await Assert.That(page.PageNumber).IsEqualTo(1);
         await Assert.That(page.PageSize).IsEqualTo(100);
         await Assert.That(page.TotalCount).IsEqualTo(1);

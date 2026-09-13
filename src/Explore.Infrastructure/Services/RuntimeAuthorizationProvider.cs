@@ -183,8 +183,7 @@ public sealed class RuntimeAuthorizationProvider : IAuthorizationProvider, IAuth
                 "Failed to resolve tenant BYO Cerbos config for batch ({Count} checks). Activating safe mode to avoid local RBAC bypass. FailureType={FailureType}",
                 effectiveChecks.Count,
                 ex.GetType().Name);
-            _localProvider.ActivateSafeMode();
-            evaluatedResults = await _localProvider.AuthorizeBatchAsync(effectiveChecks, cancellationToken);
+            evaluatedResults = await ExecuteSafeModeAsync(effectiveChecks, cancellationToken);
             return supportBoundary.Complete(evaluatedResults);
         }
 
@@ -450,10 +449,27 @@ public sealed class RuntimeAuthorizationProvider : IAuthorizationProvider, IAuth
                 "BYO Cerbos PDP unreachable. Activating safe mode. FailureType={FailureType}",
                 ex.GetType().Name);
 
-            // Never fall back to instance PDP or standard local RBAC; tenant policies might be stricter.
-            _localProvider.ActivateSafeMode();
-            return await _localProvider.AuthorizeBatchAsync(checks, cancellationToken);
+            return await ExecuteSafeModeAsync(checks, cancellationToken);
         }
+    }
+
+    private async Task<IReadOnlyList<AuthorizationDecision>> ExecuteSafeModeAsync(
+        IReadOnlyList<AuthorizationRequest> checks, CancellationToken cancellationToken)
+    {
+        _localProvider.ActivateSafeMode();
+        // A Cerbos-unsupported typed check cannot become a local grant during an outage,
+        // including for an instance administrator. Keep other safe-mode exceptions intact.
+        var supportedChecks = checks.Where(check => !CerbosAuthorizationService.IsUnsupportedStorageTypedCheck(check)).ToArray();
+        var localDecisions = await _localProvider.AuthorizeBatchAsync(supportedChecks, cancellationToken);
+        var results = new AuthorizationDecision[checks.Count];
+        int localIndex = 0;
+        for (int index = 0; index < checks.Count; index++)
+        {
+            results[index] = CerbosAuthorizationService.IsUnsupportedStorageTypedCheck(checks[index])
+                ? AuthorizationDecision.Deny(AuthorizationProviderMetadata.Cerbos)
+                : localDecisions[localIndex++];
+        }
+        return results;
     }
 
     /// <summary>

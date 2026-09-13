@@ -306,7 +306,15 @@ public sealed class AuthorizationResourceContextResolver(
         // Read every lifecycle state without tracking: the handler must re-read under its transaction,
         // including finalized retries and expired reservations whose quota still needs releasing.
         var session = await storageUploadSessionRepository.GetForAuthorizationAsync(sessionId, cancellationToken);
-        if (session is null || session.TenantId != tenantContext.TenantId || session.UserId is not { } ownerUserId)
+        if (session is null || session.TenantId != tenantContext.TenantId)
+            return null;
+
+        // Only OrganizationTenant reservations use the evidence-specific authorization contract.
+        // Non-OrganizationTenant reservations retain their existing Cerbos create policy and handler checks.
+        if (session.OwningResourceKind != StorageOwningResourceKinds.OrganizationTenant)
+            return new StorageObjectCollectionAuthorizationFacts(session.TenantId);
+
+        if (session.UserId is not { } ownerUserId)
             return null;
 
         return new StorageUploadFinalizationFacts(session.Id, session.TenantId, ownerUserId,

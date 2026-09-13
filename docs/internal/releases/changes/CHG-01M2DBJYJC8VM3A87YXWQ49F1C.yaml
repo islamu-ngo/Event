@@ -1,0 +1,37 @@
+# ABOUTME: Public change fragment generated with its collision-resistant commit footer.
+# ABOUTME: Records release impact defaults for review before the owning commit is shared.
+Change-Id: CHG-01M2DBJYJC8VM3A87YXWQ49F1C
+Title: "Bound evidence finalization exceptions and preserve outage denials"
+Type: fix
+Scope: access
+Summary: "Non-OrganizationTenant uploads retain existing Cerbos finalization policy, while unsupported OrganizationTenant checks remain denied during BYO transport and configuration failures even for instance-administrator owners."
+Group: organization-evidence
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/SECURITY-MODEL.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Scope finalization-specific facts to OrganizationTenant reservations and
+      exclude Cerbos-unsupported typed checks from BYO failure fallback, including
+      instance-administrator owners. Unrelated safe-mode exceptions remain intact.
+  Migration:
+    Reference: docs/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/documentation/readme/integrations-and-ai/storage.md
+    Disposition: documented
+    Detail: >-
+      Preserve existing instance and BYO Cerbos create authorization for generic
+      images, documents, attachments and system assets. Generic local finalization
+      remains denied; no new credentials, settings or data migration are required.

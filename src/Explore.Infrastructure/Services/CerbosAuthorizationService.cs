@@ -79,7 +79,7 @@ public class CerbosAuthorizationService : IAuthorizationProvider
         return await ExecuteCheckWithStorageTypedDenyAsync(_client, _settings.GrpcEndpoint, checks, cancellationToken);
     }
 
-    private static bool IsUnsupportedStorageTypedCheck(AuthorizationRequest check) =>
+    internal static bool IsUnsupportedStorageTypedCheck(AuthorizationRequest check) =>
         check.Facts is StorageUploadFinalizationFacts ||
         check.ResourceKind == ResourceKinds.StorageObject &&
         check.Action == AuthorizationActions.StorageObjects.Create &&

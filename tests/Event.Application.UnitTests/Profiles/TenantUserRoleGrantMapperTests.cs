@@ -63,9 +63,9 @@ public sealed class TenantUserRoleGrantMapperTests
         var detailHandler = new GetTenantUserRoleGrantDetailsRequestHandler(repository);
         var listHandler = new GetTenantUserRoleGrantListRequestHandler(repository);
 
-        var detail = await detailHandler.Handle(new() { Id = grant.Id, TenantId = grant.TenantId }, default);
-        var missing = await detailHandler.Handle(new() { Id = Guid.Empty, TenantId = grant.TenantId }, default);
-        var list = await listHandler.Handle(new(), default);
+        var detail = await detailHandler.QueryAsync(new() { Id = grant.Id, TenantId = grant.TenantId }, default);
+        var missing = await detailHandler.QueryAsync(new() { Id = Guid.Empty, TenantId = grant.TenantId }, default);
+        var list = await listHandler.QueryAsync(new(), default);
         grant.Role.FullName = "Changed role";
         grant.Tenant.FullName = "Changed tenant";
         grant.TenantUser.User.FirstName = "Changed user";

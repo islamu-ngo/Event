@@ -1,11 +1,11 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.TenantUserRoleGrants.Requests.Commands;
-using MediatR;
 
 namespace Explore.Application.Features.TenantUserRoleGrants.Handlers.Commands;
 
-public class RevokeTenantUserRoleGrantCommandHandler : IRequestHandler<RevokeTenantUserRoleGrantCommand, bool>
+public class RevokeTenantUserRoleGrantCommandHandler : ICommandHandler<RevokeTenantUserRoleGrantCommand, bool>
 {
     private readonly ITenantUserRoleGrantRepository _tenantUserRoleGrantRepository;
     private readonly ICurrentUserService _currentUserService;
@@ -18,7 +18,7 @@ public class RevokeTenantUserRoleGrantCommandHandler : IRequestHandler<RevokeTen
         _currentUserService = currentUserService;
     }
 
-    public async Task<bool> Handle(RevokeTenantUserRoleGrantCommand request, CancellationToken cancellationToken)
+    public async Task<bool> ExecuteAsync(RevokeTenantUserRoleGrantCommand request, CancellationToken cancellationToken)
     {
         var tenantUserRoleGrant = await _tenantUserRoleGrantRepository.GetById(request.Id);
         if (tenantUserRoleGrant == null || tenantUserRoleGrant.RevokedAt is not null)

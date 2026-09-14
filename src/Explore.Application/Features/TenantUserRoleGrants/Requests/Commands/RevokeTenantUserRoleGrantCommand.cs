@@ -1,10 +1,10 @@
 using Explore.Application.Authorization;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.TenantUserRoleGrants.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.TenantUserRoleGrant, AuthorizationActions.Delete)]
-public sealed record RevokeTenantUserRoleGrantCommand : IRequest<bool>, ISecureRequest
+public sealed record RevokeTenantUserRoleGrantCommand : ICommand<bool>, ISecureRequest
 {
     public Guid Id { get; init; }
 

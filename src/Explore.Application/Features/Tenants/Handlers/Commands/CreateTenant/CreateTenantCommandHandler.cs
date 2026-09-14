@@ -7,15 +7,15 @@ using Explore.Application.Features.Management;
 using Explore.Application.Features.Tenants.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Settings.Documents;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.Tenants.Handlers.Commands.CreateTenant;
 
-public class CreateTenantCommandHandler : IRequestHandler<CreateTenantCommand, BaseCommandResponse<Guid>>
+public class CreateTenantCommandHandler : ICommandHandler<CreateTenantCommand, BaseCommandResponse<Guid>>
 {
     private readonly ITenantRepository _tenantRepository;
     private readonly ITenantUserRoleGrantRepository _tenantUserRoleGrantRepository;
@@ -49,7 +49,7 @@ public class CreateTenantCommandHandler : IRequestHandler<CreateTenantCommand, B
         _capacityPolicy = capacityPolicy;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateTenantCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateTenantCommand request, CancellationToken cancellationToken = default)
     {
         var dto = request.TenantDto;
 

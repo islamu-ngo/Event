@@ -35,7 +35,7 @@ public sealed class TenantNavigationMapperTests
         repository.GetByTenantIdOrderedAsync(TenantId, default).Returns(rows);
         var handler = new GetTenantNavLinksQueryHandler(repository, Context());
 
-        var result = await handler.Handle(new(), default);
+        var result = await handler.QueryAsync(new(), default);
         link.Label = "Changed after projection";
         rows.Clear();
 
@@ -72,7 +72,7 @@ public sealed class TenantNavigationMapperTests
         });
         var handler = new CreateTenantNavLinkCommandHandler(repository, Context(), Settings());
 
-        var result = await handler.Handle(new() { NavigationLinkDto = input }, default);
+        var result = await handler.ExecuteAsync(new() { NavigationLinkDto = input }, default);
 
         await Assert.That(result.IsSuccess).IsTrue();
         await Assert.That(result.Id).IsEqualTo(LinkId);
@@ -103,7 +103,7 @@ public sealed class TenantNavigationMapperTests
         });
         var handler = new CreateTenantNavLinkCommandHandler(repository, Context(), Settings());
 
-        var result = await handler.Handle(new()
+        var result = await handler.ExecuteAsync(new()
         {
             NavigationLinkDto = new() { Label = "Events", Url = url }
         }, default);

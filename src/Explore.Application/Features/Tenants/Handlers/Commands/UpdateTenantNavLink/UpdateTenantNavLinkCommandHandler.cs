@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Tenant.Validators;
@@ -9,7 +10,6 @@ using Explore.Application.Features.Tenants.Requests.Commands.UpdateTenantNavLink
 using Explore.Application.Responses;
 using Explore.Application.Settings;
 using Explore.Domain.Constants;
-using MediatR;
 
 namespace Explore.Application.Features.Tenants.Handlers.Commands.UpdateTenantNavLink;
 
@@ -18,7 +18,7 @@ namespace Explore.Application.Features.Tenants.Handlers.Commands.UpdateTenantNav
 /// Updates an existing navigation link for the current tenant.
 /// Verifies the link belongs to the tenant before updating.
 /// </summary>
-public class UpdateTenantNavLinkCommandHandler : IRequestHandler<UpdateTenantNavLinkCommand, BaseCommandResponse<bool>>
+public class UpdateTenantNavLinkCommandHandler : ICommandHandler<UpdateTenantNavLinkCommand, BaseCommandResponse<bool>>
 {
     private readonly ITenantNavigationLinkRepository _navigationLinkRepository;
     private readonly ITenantContext _tenantContext;
@@ -34,7 +34,7 @@ public class UpdateTenantNavLinkCommandHandler : IRequestHandler<UpdateTenantNav
         _settingsResolver = settingsResolver;
     }
 
-    public async Task<BaseCommandResponse<bool>> Handle(UpdateTenantNavLinkCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<bool>> ExecuteAsync(UpdateTenantNavLinkCommand request, CancellationToken cancellationToken = default)
     {
         // Validate the DTO
         bool requireHttps = await _settingsResolver.ResolveAsync<bool>(

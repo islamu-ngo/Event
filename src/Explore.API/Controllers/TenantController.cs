@@ -6,6 +6,7 @@ using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Tenant;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
 using Explore.Application.Features.Tenants.Requests.Commands;
@@ -15,7 +16,6 @@ using Explore.Application.Features.Tenants.Requests.Commands.ReorderTenantNavLin
 using Explore.Application.Features.Tenants.Requests.Commands.UpdateTenantNavLink;
 using Explore.Application.Features.Tenants.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -61,12 +61,44 @@ public class TenantController : EventControllerBase
         "Tenant navigation link not found",
         "Tenant navigation link not found.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetTenantListRequest, List<TenantListDto>> _getTenantList;
+    private readonly IQueryHandler<GetActiveTenantCountQuery, int> _getActiveTenantCount;
+    private readonly IQueryHandler<GetTenantDetailsRequest, TenantDto?> _getTenantDetails;
+    private readonly ICommandHandler<CreateTenantCommand, BaseCommandResponse<Guid>> _createTenant;
+    private readonly ICommandHandler<UpdateTenantCommand, BaseCommandResponse<Guid>> _updateTenant;
+    private readonly ICommandHandler<DeleteTenantCommand, bool> _deleteTenant;
+    private readonly IQueryHandler<GetTenantNavLinksQuery, List<TenantNavigationLinkDto>> _getTenantNavLinks;
+    private readonly ICommandHandler<CreateTenantNavLinkCommand, BaseCommandResponse<Guid>> _createTenantNavLink;
+    private readonly ICommandHandler<UpdateTenantNavLinkCommand, BaseCommandResponse<bool>> _updateTenantNavLink;
+    private readonly ICommandHandler<DeleteTenantNavLinkCommand, BaseCommandResponse<bool>> _deleteTenantNavLink;
+    private readonly ICommandHandler<ReorderTenantNavLinksCommand, BaseCommandResponse<bool>> _reorderTenantNavLinks;
     private readonly ITenantContext _tenantContext;
 
-    public TenantController(IMediator mediator, ITenantContext tenantContext)
+    public TenantController(
+        IQueryHandler<GetTenantListRequest, List<TenantListDto>> getTenantList,
+        IQueryHandler<GetActiveTenantCountQuery, int> getActiveTenantCount,
+        IQueryHandler<GetTenantDetailsRequest, TenantDto?> getTenantDetails,
+        ICommandHandler<CreateTenantCommand, BaseCommandResponse<Guid>> createTenant,
+        ICommandHandler<UpdateTenantCommand, BaseCommandResponse<Guid>> updateTenant,
+        ICommandHandler<DeleteTenantCommand, bool> deleteTenant,
+        IQueryHandler<GetTenantNavLinksQuery, List<TenantNavigationLinkDto>> getTenantNavLinks,
+        ICommandHandler<CreateTenantNavLinkCommand, BaseCommandResponse<Guid>> createTenantNavLink,
+        ICommandHandler<UpdateTenantNavLinkCommand, BaseCommandResponse<bool>> updateTenantNavLink,
+        ICommandHandler<DeleteTenantNavLinkCommand, BaseCommandResponse<bool>> deleteTenantNavLink,
+        ICommandHandler<ReorderTenantNavLinksCommand, BaseCommandResponse<bool>> reorderTenantNavLinks,
+        ITenantContext tenantContext)
     {
-        _mediator = mediator;
+        _getTenantList = getTenantList;
+        _getActiveTenantCount = getActiveTenantCount;
+        _getTenantDetails = getTenantDetails;
+        _createTenant = createTenant;
+        _updateTenant = updateTenant;
+        _deleteTenant = deleteTenant;
+        _getTenantNavLinks = getTenantNavLinks;
+        _createTenantNavLink = createTenantNavLink;
+        _updateTenantNavLink = updateTenantNavLink;
+        _deleteTenantNavLink = deleteTenantNavLink;
+        _reorderTenantNavLinks = reorderTenantNavLinks;
         _tenantContext = tenantContext;
     }
 
@@ -80,7 +112,7 @@ public class TenantController : EventControllerBase
     [OutputCache(PolicyName = "ListData")]
     public async Task<ActionResult<List<TenantListDto>>> GetAll(CancellationToken cancellationToken = default)
     {
-        var tenants = await _mediator.Send(new GetTenantListRequest(), cancellationToken);
+        var tenants = await _getTenantList.QueryAsync(new GetTenantListRequest(), cancellationToken);
         return Ok(tenants);
     }
 
@@ -93,7 +125,7 @@ public class TenantController : EventControllerBase
     [ProducesResponseType(typeof(int), StatusCodes.Status200OK)]
     public async Task<ActionResult<int>> GetCount(CancellationToken cancellationToken = default)
     {
-        var count = await _mediator.Send(new GetActiveTenantCountQuery(), cancellationToken);
+        var count = await _getActiveTenantCount.QueryAsync(new GetActiveTenantCountQuery(), cancellationToken);
         return Ok(count);
     }
 
@@ -108,7 +140,7 @@ public class TenantController : EventControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<TenantDto>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var tenant = await _mediator.Send(new GetTenantDetailsRequest { Id = id }, cancellationToken);
+        var tenant = await _getTenantDetails.QueryAsync(new GetTenantDetailsRequest { Id = id }, cancellationToken);
 
         return Ok(tenant);
     }
@@ -128,7 +160,7 @@ public class TenantController : EventControllerBase
             TenantDto = dto,
             RequestingUserId = CurrentUserId
         };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _createTenant.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -151,7 +183,7 @@ public class TenantController : EventControllerBase
     public async Task<ActionResult<BaseCommandResponse<Guid>>> Update(Guid id, [FromBody] UpdateTenantDto dto, CancellationToken cancellationToken = default)
     {
         var command = new UpdateTenantCommand { TenantId = id, Update = dto };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _updateTenant.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -174,7 +206,7 @@ public class TenantController : EventControllerBase
     public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
         var command = new DeleteTenantCommand { Id = id };
-        await _mediator.Send(command, cancellationToken);
+        await _deleteTenant.ExecuteAsync(command, cancellationToken);
 
         return NoContent();
     }
@@ -189,7 +221,7 @@ public class TenantController : EventControllerBase
     [OutputCache(PolicyName = "TenantNav")]
     public async Task<ActionResult<List<TenantNavigationLinkDto>>> GetNavigation(CancellationToken cancellationToken = default)
     {
-        var links = await _mediator.Send(new GetTenantNavLinksQuery(), cancellationToken);
+        var links = await _getTenantNavLinks.QueryAsync(new GetTenantNavLinksQuery(), cancellationToken);
         return Ok(links);
     }
 
@@ -207,7 +239,7 @@ public class TenantController : EventControllerBase
         CancellationToken cancellationToken = default)
     {
         var command = new CreateTenantNavLinkCommand { NavigationLinkDto = dto };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _createTenantNavLink.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -241,7 +273,7 @@ public class TenantController : EventControllerBase
             TenantId = _tenantContext.TenantId,
             Update = dto
         };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _updateTenantNavLink.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -270,7 +302,7 @@ public class TenantController : EventControllerBase
         CancellationToken cancellationToken = default)
     {
         var command = new DeleteTenantNavLinkCommand { Id = id };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _deleteTenantNavLink.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
@@ -297,7 +329,7 @@ public class TenantController : EventControllerBase
         CancellationToken cancellationToken = default)
     {
         var command = new ReorderTenantNavLinksCommand { NavigationLinkOrders = orders };
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _reorderTenantNavLinks.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {

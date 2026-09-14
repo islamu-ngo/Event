@@ -1,11 +1,11 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Tenants.Requests.Commands.DeleteTenantNavLink;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Tenants.Handlers.Commands.DeleteTenantNavLink;
 
@@ -14,7 +14,7 @@ namespace Explore.Application.Features.Tenants.Handlers.Commands.DeleteTenantNav
 /// Deletes a navigation link for the current tenant.
 /// Verifies the link belongs to the tenant before deleting.
 /// </summary>
-public class DeleteTenantNavLinkCommandHandler : IRequestHandler<DeleteTenantNavLinkCommand, BaseCommandResponse<bool>>
+public class DeleteTenantNavLinkCommandHandler : ICommandHandler<DeleteTenantNavLinkCommand, BaseCommandResponse<bool>>
 {
     private readonly ITenantNavigationLinkRepository _navigationLinkRepository;
     private readonly ITenantContext _tenantContext;
@@ -27,7 +27,7 @@ public class DeleteTenantNavLinkCommandHandler : IRequestHandler<DeleteTenantNav
         _tenantContext = tenantContext;
     }
 
-    public async Task<BaseCommandResponse<bool>> Handle(DeleteTenantNavLinkCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<bool>> ExecuteAsync(DeleteTenantNavLinkCommand request, CancellationToken cancellationToken = default)
     {
         // Verify the navigation link exists and belongs to the current tenant
         var existingLink = await _navigationLinkRepository.GetByIdAndTenantAsync(

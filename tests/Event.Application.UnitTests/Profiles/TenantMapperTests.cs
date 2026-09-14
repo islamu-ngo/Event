@@ -57,9 +57,9 @@ public sealed class TenantMapperTests
         var detailHandler = new GetTenantDetailsRequestHandler(repository);
         var listHandler = new GetTenantListRequestHandler(repository);
 
-        var detail = await detailHandler.Handle(new(tenant.Id), default);
-        var missing = await detailHandler.Handle(new(Guid.Parse("01990000-0000-7000-8000-000000000099")), default);
-        var list = await listHandler.Handle(new(), default);
+        var detail = await detailHandler.QueryAsync(new(tenant.Id), default);
+        var missing = await detailHandler.QueryAsync(new(Guid.Parse("01990000-0000-7000-8000-000000000099")), default);
+        var list = await listHandler.QueryAsync(new(), default);
         tenant.FullName = "Changed after projection";
         rows.Clear();
 

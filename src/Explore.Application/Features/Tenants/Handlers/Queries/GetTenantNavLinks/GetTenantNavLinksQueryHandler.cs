@@ -1,12 +1,12 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Mappings;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Tenant;
 using Explore.Application.Features.Tenants.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.Tenants.Handlers.Queries;
 
@@ -14,7 +14,7 @@ namespace Explore.Application.Features.Tenants.Handlers.Queries;
 /// Handler for GetTenantNavLinksQuery.
 /// Retrieves all navigation links for the current tenant, ordered by display order.
 /// </summary>
-public class GetTenantNavLinksQueryHandler : IRequestHandler<GetTenantNavLinksQuery, List<TenantNavigationLinkDto>>
+public class GetTenantNavLinksQueryHandler : IQueryHandler<GetTenantNavLinksQuery, List<TenantNavigationLinkDto>>
 {
     private readonly ITenantNavigationLinkRepository _navigationLinkRepository;
     private readonly ITenantContext _tenantContext;
@@ -27,7 +27,7 @@ public class GetTenantNavLinksQueryHandler : IRequestHandler<GetTenantNavLinksQu
         _tenantContext = tenantContext;
     }
 
-    public async Task<List<TenantNavigationLinkDto>> Handle(GetTenantNavLinksQuery request, CancellationToken cancellationToken)
+    public async Task<List<TenantNavigationLinkDto>> QueryAsync(GetTenantNavLinksQuery request, CancellationToken cancellationToken = default)
     {
         // Get all navigation links for the current tenant, ordered by Order property
         var navigationLinks = await _navigationLinkRepository.GetByTenantIdOrderedAsync(

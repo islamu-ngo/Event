@@ -1,12 +1,12 @@
 // Used by the UI to enable/disable single-tenant revert based on tenant count.
 
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.InstanceOnboarding.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.InstanceOnboarding.Handlers.Queries;
 
-public class GetActiveTenantCountQueryHandler : IRequestHandler<GetActiveTenantCountQuery, int>
+public class GetActiveTenantCountQueryHandler : IQueryHandler<GetActiveTenantCountQuery, int>
 {
     private readonly ITenantRepository _tenantRepository;
 
@@ -15,7 +15,7 @@ public class GetActiveTenantCountQueryHandler : IRequestHandler<GetActiveTenantC
         _tenantRepository = tenantRepository;
     }
 
-    public async Task<int> Handle(GetActiveTenantCountQuery request, CancellationToken cancellationToken)
+    public async Task<int> QueryAsync(GetActiveTenantCountQuery request, CancellationToken cancellationToken = default)
     {
         return await _tenantRepository.GetActiveTenantCountAsync();
     }

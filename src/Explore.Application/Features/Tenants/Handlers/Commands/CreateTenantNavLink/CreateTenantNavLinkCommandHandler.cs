@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Tenant.Validators;
@@ -10,7 +11,6 @@ using Explore.Application.Responses;
 using Explore.Application.Settings;
 using Explore.Domain;
 using Explore.Domain.Constants;
-using MediatR;
 
 namespace Explore.Application.Features.Tenants.Handlers.Commands.CreateTenantNavLink;
 
@@ -19,7 +19,7 @@ namespace Explore.Application.Features.Tenants.Handlers.Commands.CreateTenantNav
 /// Creates a new navigation link for the current tenant.
 /// Automatically assigns the next order value.
 /// </summary>
-public class CreateTenantNavLinkCommandHandler : IRequestHandler<CreateTenantNavLinkCommand, BaseCommandResponse<Guid>>
+public class CreateTenantNavLinkCommandHandler : ICommandHandler<CreateTenantNavLinkCommand, BaseCommandResponse<Guid>>
 {
     private readonly ITenantNavigationLinkRepository _navigationLinkRepository;
     private readonly ITenantContext _tenantContext;
@@ -35,7 +35,7 @@ public class CreateTenantNavLinkCommandHandler : IRequestHandler<CreateTenantNav
         _settingsResolver = settingsResolver;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateTenantNavLinkCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateTenantNavLinkCommand request, CancellationToken cancellationToken = default)
     {
         // Validate the DTO
         bool requireHttps = await _settingsResolver.ResolveAsync<bool>(

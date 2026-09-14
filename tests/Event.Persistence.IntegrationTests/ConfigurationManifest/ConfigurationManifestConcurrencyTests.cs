@@ -503,7 +503,7 @@ public sealed class ConfigurationManifestConcurrencyTests(
                 new ApplyConfigurationManifestCommand(
                     ConfigurationManifestApplicationTestSupport.Source("shared")),
                 CancellationToken.None),
-            ordinaryHandler.Handle(ordinaryCommand, CancellationToken.None));
+            ordinaryHandler.ExecuteAsync(ordinaryCommand, CancellationToken.None));
 
         await Assert.That(results[0].IsSuccess).IsTrue();
         await using ExploreDbContext verification = fixture.CreateDbContext();

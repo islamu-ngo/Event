@@ -1,8 +1,8 @@
 using System;
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Tenant;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Tenants.Requests.Commands;
 
@@ -11,7 +11,7 @@ namespace Explore.Application.Features.Tenants.Requests.Commands;
 /// Returns the ID of the created tenant.
 /// </summary>
 [AuthorizeResource(ResourceKinds.Tenant, AuthorizationActions.Create)]
-public sealed record CreateTenantCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record CreateTenantCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     /// <summary>
     /// DTO containing the tenant data to create.

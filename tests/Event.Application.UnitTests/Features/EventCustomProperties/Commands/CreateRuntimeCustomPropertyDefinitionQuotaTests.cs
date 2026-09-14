@@ -33,7 +33,7 @@ public class CreateRuntimeCustomPropertyDefinitionQuotaTests
             Key = "prayer_notes",
             DisplayName = "Prayer Notes"
         };
-        var handler = CreateEventHandler(repository, quotaResolver, tenantId, unitOfWork);
+        var handler = CreateEventHandler(repository, quotaResolver, tenantId, eventId, unitOfWork);
 
         repository.ExistsDefinitionKey(eventId, "tenant.community", "prayer_notes").Returns(false);
         repository.CountDefinitionsForEvent(eventId, Arg.Any<CancellationToken>()).Returns(2);
@@ -49,7 +49,7 @@ public class CreateRuntimeCustomPropertyDefinitionQuotaTests
                 Arg.Any<CancellationToken>())
             .Returns(call => call.Arg<Func<CancellationToken, Task<EventCustomPropertyDefinition>>>().Invoke(CancellationToken.None));
 
-        var result = await handler.Handle(
+        var result = await handler.ExecuteAsync(
             new CreateEventCustomPropertyDefinitionCommand { DefinitionDto = CreateEventDto(eventId) },
             CancellationToken.None);
 
@@ -64,13 +64,13 @@ public class CreateRuntimeCustomPropertyDefinitionQuotaTests
         var eventId = Guid.NewGuid();
         var repository = Substitute.For<IEventCustomPropertyRepository>();
         var quotaResolver = Substitute.For<ICustomPropertyQuotaResolver>();
-        var handler = CreateEventHandler(repository, quotaResolver, tenantId);
+        var handler = CreateEventHandler(repository, quotaResolver, tenantId, eventId);
 
         repository.ExistsDefinitionKey(eventId, "tenant.community", "prayer_notes").Returns(false);
         repository.CountDefinitionsForEvent(eventId, Arg.Any<CancellationToken>()).Returns(3);
         quotaResolver.GetIntAsync(CustomPropertyQuotaSettingDefinitions.MaxDefinitionsPerEvent.Key, tenantId, Arg.Any<CancellationToken>()).Returns(3);
 
-        var result = await handler.Handle(
+        var result = await handler.ExecuteAsync(
             new CreateEventCustomPropertyDefinitionCommand { DefinitionDto = CreateEventDto(eventId) },
             CancellationToken.None);
 
@@ -94,13 +94,13 @@ public class CreateRuntimeCustomPropertyDefinitionQuotaTests
         var eventId = Guid.NewGuid();
         var repository = Substitute.For<IEventCustomPropertyRepository>();
         var quotaResolver = Substitute.For<ICustomPropertyQuotaResolver>();
-        var handler = CreateEventHandler(repository, quotaResolver, tenantId);
+        var handler = CreateEventHandler(repository, quotaResolver, tenantId, eventId);
 
         repository.ExistsDefinitionKey(eventId, "tenant.community", "prayer_notes").Returns(false);
         repository.CountDefinitionsForEvent(eventId, Arg.Any<CancellationToken>()).Returns(4);
         quotaResolver.GetIntAsync(CustomPropertyQuotaSettingDefinitions.MaxDefinitionsPerEvent.Key, tenantId, Arg.Any<CancellationToken>()).Returns(3);
 
-        var result = await handler.Handle(
+        var result = await handler.ExecuteAsync(
             new CreateEventCustomPropertyDefinitionCommand { DefinitionDto = CreateEventDto(eventId) },
             CancellationToken.None);
 
@@ -210,6 +210,7 @@ public class CreateRuntimeCustomPropertyDefinitionQuotaTests
         IEventCustomPropertyRepository repository,
         ICustomPropertyQuotaResolver quotaResolver,
         Guid tenantId,
+        Guid eventId,
         IUnitOfWork? unitOfWork = null)
     {
         var governancePolicy = Substitute.For<ICustomPropertyGovernancePolicy>();
@@ -227,6 +228,13 @@ public class CreateRuntimeCustomPropertyDefinitionQuotaTests
                 NormalizedKey = "prayer_notes",
             });
 
+        var events = Substitute.For<IEventRepository>();
+        events.GetById(eventId).Returns(new Explore.Domain.Event
+        {
+            Id = eventId, TenantId = tenantId, Title = "Owned event", Actor = null!, Tenant = null!,
+            VisibilityType = null!, EventStatus = null!, EventFormat = null!
+        });
+
         return new CreateEventCustomPropertyDefinitionCommandHandler(
             repository,
             governancePolicy,
@@ -234,7 +242,8 @@ public class CreateRuntimeCustomPropertyDefinitionQuotaTests
             tenantContext,
             currentUserService,
             cache,
-            unitOfWork);
+            unitOfWork,
+            events);
     }
 
     private static CreateEventSessionCustomPropertyDefinitionCommandHandler CreateSessionHandler(

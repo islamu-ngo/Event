@@ -9,12 +9,12 @@ using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings.Definitions;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventCustomProperties.Handlers.Commands;
 
-public class UpdateEventCustomPropertyDefinitionCommandHandler : IRequestHandler<UpdateEventCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>>
+public class UpdateEventCustomPropertyDefinitionCommandHandler : ICommandHandler<UpdateEventCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventCustomPropertyRepository _eventCustomPropertyRepository;
     private readonly IEventCustomPropertyProjectionUpdater _projectionUpdater;
@@ -42,7 +42,7 @@ public class UpdateEventCustomPropertyDefinitionCommandHandler : IRequestHandler
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateEventCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateEventCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
     {
         if (request.DefinitionId == Guid.Empty || request.ExpectedConcurrencyStamp == Guid.Empty)
         {
@@ -215,7 +215,9 @@ public class UpdateEventCustomPropertyDefinitionCommandHandler : IRequestHandler
             },
             cancellationToken);
 
-        await InvalidateCaches(definition.EventId, definition.Id, cancellationToken);
+        await _cache.RemoveByTagAsync(
+            EventCustomPropertyCache.ListsByEvent(definition.TenantId, definition.EventId),
+            CancellationToken.None);
 
         return BaseCommandResponse.Success(definition.Id, "Event custom property definition updated successfully.");
     }
@@ -302,11 +304,4 @@ public class UpdateEventCustomPropertyDefinitionCommandHandler : IRequestHandler
             : candidate with { Options = patch.Options.Items! };
     }
 
-    private async Task InvalidateCaches(Guid eventId, Guid definitionId, CancellationToken cancellationToken)
-    {
-        await _cache.RemoveAsync(
-            $"event-custom-properties:list:{eventId}:1:{PaginatedResult<EventCustomPropertyDefinitionListDto>.DefaultPageSize}",
-            cancellationToken);
-        await _cache.RemoveAsync($"event-custom-properties:detail:{definitionId}", cancellationToken);
-    }
 }

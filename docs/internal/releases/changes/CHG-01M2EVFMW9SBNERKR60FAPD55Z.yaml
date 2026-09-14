@@ -1,0 +1,35 @@
+Change-Id: CHG-01M2EVFMW9SBNERKR60FAPD55Z
+Title: "Isolate event custom properties through native operations"
+Type: fix
+Scope: events
+Summary: "Isolate cached event definitions by trusted tenant and preserve transactional values, projections and purge audits through native HTTP and MCP ports."
+Group: event-custom-properties
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/architecture/native-event-custom-properties.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/architecture/native-event-custom-properties.md
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Shared list cache entries use trusted tenant partitions. Foreign event
+      creation is refused; persisted update authority and MCP management gates
+      remain enforced.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/features/event-custom-property-management.md
+    Disposition: documented
+    Detail: >-
+      Replace older API instances. No schema migration or manual cache flush is
+      required. Successful writes refresh affected pages and persist projections.
+      Reload before retrying a request that fails after database commit.

@@ -5,12 +5,12 @@ using Explore.Application.Features.CustomProperties;
 using Explore.Application.Features.EventCustomProperties.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Telemetry;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventCustomProperties.Handlers.Commands;
 
-public sealed class PurgeEventCustomPropertyDefinitionCommandHandler : IRequestHandler<PurgeEventCustomPropertyDefinitionCommand, BaseCommandResponse<CustomPropertyPurgeResultDto>>
+public sealed class PurgeEventCustomPropertyDefinitionCommandHandler : ICommandHandler<PurgeEventCustomPropertyDefinitionCommand, BaseCommandResponse<CustomPropertyPurgeResultDto>>
 {
     private readonly IEventCustomPropertyRepository _repository;
     private readonly IAuditLogRepository _auditLogRepository;
@@ -35,7 +35,7 @@ public sealed class PurgeEventCustomPropertyDefinitionCommandHandler : IRequestH
         _metrics = metrics;
     }
 
-    public async Task<BaseCommandResponse<CustomPropertyPurgeResultDto>> Handle(PurgeEventCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<CustomPropertyPurgeResultDto>> ExecuteAsync(PurgeEventCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
     {
         var reason = request.Reason.Trim();
         if (string.IsNullOrWhiteSpace(reason))
@@ -97,7 +97,7 @@ public sealed class PurgeEventCustomPropertyDefinitionCommandHandler : IRequestH
 
         if (purged)
         {
-            await _cache.RemoveAsync($"event-custom-properties:detail:{request.Id}", cancellationToken);
+            await _cache.RemoveByTagAsync(EventCustomPropertyCache.ListsByTenant(summary.TenantId), CancellationToken.None);
             return BaseCommandResponse.Success(result, "Event custom-property definition purged successfully.");
         }
 

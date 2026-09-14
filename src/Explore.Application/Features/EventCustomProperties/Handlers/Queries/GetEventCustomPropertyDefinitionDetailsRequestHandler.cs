@@ -4,11 +4,11 @@ using Explore.Application.DTOs.EventCustomProperty;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.EventCustomProperties.Requests.Queries;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventCustomProperties.Handlers.Queries;
 
-public class GetEventCustomPropertyDefinitionDetailsRequestHandler : IRequestHandler<GetEventCustomPropertyDefinitionDetailsRequest, EventCustomPropertyDefinitionDto>
+public class GetEventCustomPropertyDefinitionDetailsRequestHandler : IQueryHandler<GetEventCustomPropertyDefinitionDetailsRequest, EventCustomPropertyDefinitionDto>
 {
     private readonly IEventCustomPropertyRepository _eventCustomPropertyRepository;
 
@@ -18,7 +18,7 @@ public class GetEventCustomPropertyDefinitionDetailsRequestHandler : IRequestHan
         _eventCustomPropertyRepository = eventCustomPropertyRepository;
     }
 
-    public async Task<EventCustomPropertyDefinitionDto> Handle(GetEventCustomPropertyDefinitionDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<EventCustomPropertyDefinitionDto> QueryAsync(GetEventCustomPropertyDefinitionDetailsRequest request, CancellationToken cancellationToken)
     {
         var definition = await _eventCustomPropertyRepository.GetDefinitionWithDetails(request.Id);
         if (definition == null)

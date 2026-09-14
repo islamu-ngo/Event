@@ -6,11 +6,11 @@ using Explore.Application.Features.CustomProperties;
 using Explore.Application.Features.EventCustomProperties.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventCustomProperties.Handlers.Commands;
 
-public class SetEventCustomPropertyValueCommandHandler : IRequestHandler<SetEventCustomPropertyValueCommand, BaseCommandResponse<Guid>>
+public class SetEventCustomPropertyValueCommandHandler : ICommandHandler<SetEventCustomPropertyValueCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventCustomPropertyRepository _eventCustomPropertyRepository;
     private readonly IEventCustomPropertyProjectionUpdater _projectionUpdater;
@@ -32,7 +32,7 @@ public class SetEventCustomPropertyValueCommandHandler : IRequestHandler<SetEven
         _currentUserService = currentUserService;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(SetEventCustomPropertyValueCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(SetEventCustomPropertyValueCommand request, CancellationToken cancellationToken)
     {
         var validator = new SetEventCustomPropertyValueDtoValidator();
         var validationResult = await validator.ValidateAsync(request.ValueDto, cancellationToken);

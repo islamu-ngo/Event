@@ -12,6 +12,7 @@ using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Microsoft.Extensions.Caching.Hybrid;
+using NSubstitute;
 
 namespace Event.Application.UnitTests.Features.CustomProperties;
 
@@ -38,10 +39,16 @@ public sealed class CustomPropertyConversionHandlerTests
             """)! with { PropertyType = PropertyType.Text, ExposureLevel = ExposureLevel.OrganizerOnly };
         var store = new EventStore();
         var context = new RequestContext(TenantId, UserId);
+        var events = Substitute.For<IEventRepository>();
+        events.GetById(EventId).Returns(new Explore.Domain.Event
+        {
+            Id = EventId, TenantId = TenantId, Title = "Owned event", Actor = null!, Tenant = null!,
+            VisibilityType = null!, EventStatus = null!, EventFormat = null!
+        });
         var handler = new CreateEventCustomPropertyDefinitionCommandHandler(
             store, new CustomPropertyGovernancePolicy(), new QuotaResolver(), context, context,
-            new InlineCache(), new InlineUnitOfWork());
-        var result = await handler.Handle(new CreateEventCustomPropertyDefinitionCommand { DefinitionDto = input }, CancellationToken.None);
+            new InlineCache(), new InlineUnitOfWork(), events);
+        var result = await handler.ExecuteAsync(new CreateEventCustomPropertyDefinitionCommand { DefinitionDto = input }, CancellationToken.None);
 
         await Assert.That(result.IsSuccess).IsTrue();
         var saved = (await store.GetAllDefinitionsForEvent(EventId)).Single();
@@ -89,7 +96,7 @@ public sealed class CustomPropertyConversionHandlerTests
                 DisplayName = "Updated", Description = OptionalUpdate<string?>.Set(null)
             }
         };
-        var result = await handler.Handle(new UpdateEventCustomPropertyDefinitionCommand
+        var result = await handler.ExecuteAsync(new UpdateEventCustomPropertyDefinitionCommand
         {
             DefinitionId = DefinitionId, ExpectedConcurrencyStamp = Stamp, TenantId = Guid.NewGuid(), DefinitionDto = patch
         }, CancellationToken.None);
@@ -121,7 +128,7 @@ public sealed class CustomPropertyConversionHandlerTests
     {
         var store = new EventStore(CreateDefinition());
         var handler = UpdateHandler(store);
-        await Assert.That(async () => await handler.Handle(new UpdateEventCustomPropertyDefinitionCommand
+        await Assert.That(async () => await handler.ExecuteAsync(new UpdateEventCustomPropertyDefinitionCommand
         {
             DefinitionId = DefinitionId, ExpectedConcurrencyStamp = UserId,
             DefinitionDto = new UpdateEventCustomPropertyDefinitionDto
@@ -156,7 +163,7 @@ public sealed class CustomPropertyConversionHandlerTests
             DateTimeValue = propertyType == PropertyType.DateTime ? new DateTimeOffset(2026, 9, 11, 0, 0, 0, TimeSpan.Zero) : null
         };
         var handler = new SetEventCustomPropertyValueCommandHandler(store, new ProjectionUpdater(), new InlineUnitOfWork(), context, context);
-        var result = await handler.Handle(new SetEventCustomPropertyValueCommand { ValueDto = input }, CancellationToken.None);
+        var result = await handler.ExecuteAsync(new SetEventCustomPropertyValueCommand { ValueDto = input }, CancellationToken.None);
         var saved = (await store.GetValuesForEvent(EventId)).Single();
         await Assert.That(result.IsSuccess).IsTrue();
         await Assert.That(saved.TenantId).IsEqualTo(TenantId);
@@ -177,7 +184,7 @@ public sealed class CustomPropertyConversionHandlerTests
         var store = new EventStore(definition);
         var context = new RequestContext(TenantId, UserId);
         var handler = new SetEventCustomPropertyMultiValuesCommandHandler(store, new ProjectionUpdater(), new QuotaResolver(), context, context, new InlineUnitOfWork());
-        var result = await handler.Handle(new SetEventCustomPropertyMultiValuesCommand
+        var result = await handler.ExecuteAsync(new SetEventCustomPropertyMultiValuesCommand
         {
             DefinitionId = DefinitionId, EventId = EventId,
             Values =
@@ -225,7 +232,7 @@ public sealed class CustomPropertyConversionHandlerTests
     {
         public override ValueTask<T> GetOrCreateAsync<TState, T>(string key, TState state, Func<TState, CancellationToken, ValueTask<T>> factory, HybridCacheEntryOptions? options = null, IEnumerable<string>? tags = null, CancellationToken cancellationToken = default) => factory(state, cancellationToken);
         public override ValueTask RemoveAsync(string key, CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
-        public override ValueTask RemoveByTagAsync(string tag, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public override ValueTask RemoveByTagAsync(string tag, CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
         public override ValueTask SetAsync<T>(string key, T value, HybridCacheEntryOptions? options = null, IEnumerable<string>? tags = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 

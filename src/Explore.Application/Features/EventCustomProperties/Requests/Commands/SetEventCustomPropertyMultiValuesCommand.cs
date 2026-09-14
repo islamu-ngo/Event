@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
 using Explore.Application.DTOs.EventCustomProperty;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventCustomProperties.Requests.Commands;
 
 [AuthorizeResource(ResourceKinds.Tenant, AuthorizationActions.Update)]
-public sealed record SetEventCustomPropertyMultiValuesCommand : IRequest<BaseCommandResponse<Guid>>, ISecureRequest
+public sealed record SetEventCustomPropertyMultiValuesCommand : ICommand<BaseCommandResponse<Guid>>, ISecureRequest
 {
     public Guid DefinitionId { get; init; }
     public Guid EventId { get; init; }

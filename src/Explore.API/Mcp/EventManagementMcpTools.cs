@@ -37,6 +37,7 @@ using Explore.Application.Features.EventTemplateSync.Queries.GetEventTemplateDif
 using Explore.Application.Features.EventTemplateSync.Queries.GetEventTemplateSyncHistory;
 using Explore.Application.Features.RegistrationOrders.Requests.Queries;
 using Explore.Application.Hateoas;
+using Explore.Application.Responses;
 using Explore.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -61,7 +62,9 @@ public sealed class EventManagementMcpTools(
     EventMcpLocationDisclosureGuard locationDisclosureGuard,
     IQueryHandler<GetManagedEventDaysByEventRequest, List<EventDayListDto>> managedEventDays,
     IQueryHandler<GetEventProgramSummaryRequest, EventProgramSummaryDto?> publicProgramSummary,
-    IQueryHandler<GetManagedEventAgendaItemsByEventRequest, List<EventAgendaItemListDto>> managedAgendaItems)
+    IQueryHandler<GetManagedEventAgendaItemsByEventRequest, List<EventAgendaItemListDto>> managedAgendaItems,
+    IQueryHandler<GetEventCustomPropertyDefinitionListRequest, PaginatedResult<EventCustomPropertyDefinitionListDto>> customPropertyDefinitions,
+    IQueryHandler<GetEventCustomPropertyValuesRequest, List<EventCustomPropertyValueDto>> customPropertyValues)
 {
 
     [McpServerTool(
@@ -931,7 +934,7 @@ public sealed class EventManagementMcpTools(
         var (normalizedPageNumber, normalizedPageSize, pageSizeWasClamped) =
             NormalizeManagementPage(pageNumber, pageSize, MaxCustomPropertyDefinitions);
 
-        var definitions = await mediator.Send(
+        var definitions = await customPropertyDefinitions.QueryAsync(
             new GetEventCustomPropertyDefinitionListRequest
             {
                 EventId = eventDto.Id,
@@ -939,7 +942,7 @@ public sealed class EventManagementMcpTools(
                 PageSize = normalizedPageSize
             },
             cancellationToken);
-        var values = await mediator.Send(new GetEventCustomPropertyValuesRequest { EventId = eventDto.Id }, cancellationToken);
+        var values = await customPropertyValues.QueryAsync(new GetEventCustomPropertyValuesRequest { EventId = eventDto.Id }, cancellationToken);
 
         var truncatedFields = new List<string>();
         var returnedValues = values

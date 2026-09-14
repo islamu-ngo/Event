@@ -7,10 +7,8 @@ using Explore.API.Controllers;
 using Explore.API.Hateoas.Policies;
 using Explore.Application.DTOs.CustomPropertyDefinition;
 using Explore.Application.DTOs.Registration;
-using Explore.Application.Features.EventCustomProperties.Requests.Commands;
 using Explore.Application.Features.RegistrationAnswerFiles.Queries;
 using Explore.Application.Hateoas;
-using Explore.Application.Responses;
 using Explore.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -178,11 +176,6 @@ public class CustomPropertyDefinitionControllerTests
 
 public sealed class AdminRoleEndpointParityTests
 {
-    private static readonly string[] PurgeRoutes =
-    [
-        "/api/eventcustomproperty/{0}/purge"
-    ];
-
     [Test]
     public async Task RepeatedAdminRoleEndpoints_AnonymousAndNonAdminCohortsRemainUnauthorizedOrForbidden()
     {
@@ -229,18 +222,6 @@ public sealed class AdminRoleEndpointParityTests
 
     private static IEnumerable<HttpRequestMessage> CreateRequests(string? authHeader)
     {
-        foreach (var route in PurgeRoutes)
-        {
-            var request = new HttpRequestMessage(
-                HttpMethod.Delete,
-                string.Format(System.Globalization.CultureInfo.InvariantCulture, route, Guid.CreateVersion7()))
-            {
-                Content = JsonContent.Create(new { reason = "dependency-free test purge" })
-            };
-            AddAuth(request, authHeader);
-            yield return request;
-        }
-
         var registrationFileRequest = new HttpRequestMessage(
             HttpMethod.Get, $"/api/registration-answer-files/{Guid.CreateVersion7()}");
         AddAuth(registrationFileRequest, authHeader);
@@ -258,11 +239,6 @@ public sealed class AdminRoleEndpointParityTests
     private static WebApplicationFactory<Program> CreateFactory()
     {
         var mediator = Substitute.For<IMediator>();
-        var result = new CustomPropertyPurgeResultDto(
-            Guid.CreateVersion7(), Guid.CreateVersion7(), "test", true, Guid.CreateVersion7(),
-            "dependency-free test purge", 0, 0, 0, 0, 0);
-        var success = BaseCommandResponse.Success(result);
-        mediator.Send(Arg.Any<PurgeEventCustomPropertyDefinitionCommand>(), Arg.Any<CancellationToken>()).Returns(success);
         mediator.Send(Arg.Any<GetRegistrationAnswerFileQuery>(), Arg.Any<CancellationToken>()).Returns(new RegistrationAnswerFileDto(
             Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
             "answer.pdf", "application/pdf", ".pdf", 128, "quarantined", "clean",

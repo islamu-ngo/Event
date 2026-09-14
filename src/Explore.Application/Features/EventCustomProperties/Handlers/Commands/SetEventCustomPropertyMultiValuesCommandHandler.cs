@@ -7,11 +7,11 @@ using Explore.Application.Features.EventCustomProperties.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Settings.Definitions;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventCustomProperties.Handlers.Commands;
 
-public class SetEventCustomPropertyMultiValuesCommandHandler : IRequestHandler<SetEventCustomPropertyMultiValuesCommand, BaseCommandResponse<Guid>>
+public class SetEventCustomPropertyMultiValuesCommandHandler : ICommandHandler<SetEventCustomPropertyMultiValuesCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventCustomPropertyRepository _eventCustomPropertyRepository;
     private readonly IEventCustomPropertyProjectionUpdater _projectionUpdater;
@@ -36,7 +36,7 @@ public class SetEventCustomPropertyMultiValuesCommandHandler : IRequestHandler<S
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(SetEventCustomPropertyMultiValuesCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(SetEventCustomPropertyMultiValuesCommand request, CancellationToken cancellationToken)
     {
         var validator = new SetEventCustomPropertyValueDtoValidator();
         var errors = new List<string>();

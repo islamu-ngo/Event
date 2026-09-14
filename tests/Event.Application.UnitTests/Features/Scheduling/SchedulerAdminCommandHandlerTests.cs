@@ -20,7 +20,7 @@ public sealed class SchedulerAdminCommandHandlerTests
         var operations = OperationsWithScheduler();
         var handler = new PauseSchedulerCommandHandler(operations, Policy(readOnly: true));
 
-        var response = await handler.Handle(ConfirmedPause(), CancellationToken.None);
+        var response = await handler.ExecuteAsync(ConfirmedPause(), CancellationToken.None);
 
         await Assert.That(response.IsSuccess).IsFalse();
         await Assert.That(response.FailureCode).IsEqualTo(FailureCodes.SchedulerReadOnly);
@@ -37,7 +37,7 @@ public sealed class SchedulerAdminCommandHandlerTests
         var operations = OperationsWithScheduler();
         var handler = new PauseSchedulerCommandHandler(operations, Policy(readOnly: false));
 
-        var response = await handler.Handle(new PauseSchedulerCommand(), CancellationToken.None);
+        var response = await handler.ExecuteAsync(new PauseSchedulerCommand(), CancellationToken.None);
 
         await Assert.That(response.IsSuccess).IsFalse();
         await Assert.That(response.FailureCode).IsEqualTo(FailureCodes.SchedulerConfirmationRequired);
@@ -50,7 +50,7 @@ public sealed class SchedulerAdminCommandHandlerTests
         var operations = OperationsWithScheduler();
         var handler = new PauseSchedulerCommandHandler(operations, Policy(readOnly: false));
 
-        var response = await handler.Handle(
+        var response = await handler.ExecuteAsync(
             new PauseSchedulerCommand { ConfirmationText = "some-other-scheduler" },
             CancellationToken.None);
 
@@ -67,7 +67,7 @@ public sealed class SchedulerAdminCommandHandlerTests
         operations.ResumeAllAsync(Arg.Any<CancellationToken>()).Returns(SchedulerOperationResult.Succeeded);
 
         var response = await new ResumeSchedulerCommandHandler(operations, Policy(readOnly: false))
-            .Handle(new ResumeSchedulerCommand(), CancellationToken.None);
+            .ExecuteAsync(new ResumeSchedulerCommand(), CancellationToken.None);
 
         await Assert.That(response.IsSuccess).IsTrue();
     }
@@ -78,7 +78,7 @@ public sealed class SchedulerAdminCommandHandlerTests
         var operations = Substitute.For<ISchedulerOperations>();
         var handler = new TriggerSchedulerJobCommandHandler(operations, Policy(readOnly: true));
 
-        var response = await handler.Handle(
+        var response = await handler.ExecuteAsync(
             new TriggerSchedulerJobCommand { Group = "DEFAULT", Name = "email-dispatch-drain" },
             CancellationToken.None);
 
@@ -97,7 +97,7 @@ public sealed class SchedulerAdminCommandHandlerTests
         operations.PauseAllAsync(Arg.Any<CancellationToken>()).Returns(SchedulerOperationResult.Succeeded);
         var handler = new PauseSchedulerCommandHandler(operations, Policy(readOnly: false));
 
-        var response = await handler.Handle(ConfirmedPause(), CancellationToken.None);
+        var response = await handler.ExecuteAsync(ConfirmedPause(), CancellationToken.None);
 
         await Assert.That(response.IsSuccess).IsTrue();
         await Assert.That(response.FailureCode).IsNull();
@@ -111,7 +111,7 @@ public sealed class SchedulerAdminCommandHandlerTests
         operations.ResumeAllAsync(Arg.Any<CancellationToken>()).Returns(SchedulerOperationResult.Succeeded);
         var handler = new ResumeSchedulerCommandHandler(operations, Policy(readOnly: false));
 
-        var response = await handler.Handle(new ResumeSchedulerCommand(), CancellationToken.None);
+        var response = await handler.ExecuteAsync(new ResumeSchedulerCommand(), CancellationToken.None);
 
         await Assert.That(response.IsSuccess).IsTrue();
         await operations.Received(1).ResumeAllAsync(Arg.Any<CancellationToken>());
@@ -125,7 +125,7 @@ public sealed class SchedulerAdminCommandHandlerTests
             .Returns(SchedulerOperationResult.JobNotFound);
         var handler = new PauseSchedulerJobCommandHandler(operations, Policy(readOnly: false));
 
-        var response = await handler.Handle(
+        var response = await handler.ExecuteAsync(
             new PauseSchedulerJobCommand { Group = "DEFAULT", Name = "ghost-job" },
             CancellationToken.None);
 
@@ -142,7 +142,7 @@ public sealed class SchedulerAdminCommandHandlerTests
             .Returns(SchedulerOperationResult.SchedulerUnavailable);
         var handler = new ResumeSchedulerJobCommandHandler(operations, Policy(readOnly: false));
 
-        var response = await handler.Handle(
+        var response = await handler.ExecuteAsync(
             new ResumeSchedulerJobCommand { Group = "DEFAULT", Name = "idempotency-cleanup" },
             CancellationToken.None);
 
@@ -158,7 +158,7 @@ public sealed class SchedulerAdminCommandHandlerTests
             .Returns(SchedulerOperationResult.Succeeded);
         var handler = new TriggerSchedulerJobCommandHandler(operations, Policy(readOnly: false));
 
-        var response = await handler.Handle(
+        var response = await handler.ExecuteAsync(
             new TriggerSchedulerJobCommand { Group = "DEFAULT", Name = "email-dispatch-drain" },
             CancellationToken.None);
 
@@ -175,7 +175,7 @@ public sealed class SchedulerAdminCommandHandlerTests
             .Returns(SchedulerOperationResult.Succeeded);
         var handler = new ResetSchedulerJobErrorStateCommandHandler(operations, Policy(readOnly: false));
 
-        var response = await handler.Handle(
+        var response = await handler.ExecuteAsync(
             new ResetSchedulerJobErrorStateCommand { Group = "DEFAULT", Name = "webhook-retention-cleanup" },
             CancellationToken.None);
 
@@ -195,7 +195,7 @@ public sealed class SchedulerAdminCommandHandlerTests
             .Returns(SchedulerOperationResult.NotApplicable);
         var handler = new ResetSchedulerJobErrorStateCommandHandler(operations, Policy(readOnly: false));
 
-        var response = await handler.Handle(
+        var response = await handler.ExecuteAsync(
             new ResetSchedulerJobErrorStateCommand { Group = "DEFAULT", Name = "healthy-job" },
             CancellationToken.None);
 
@@ -211,7 +211,7 @@ public sealed class SchedulerAdminCommandHandlerTests
             .Returns(SchedulerOperationResult.Succeeded);
         var handler = new InterruptSchedulerJobCommandHandler(operations, Policy(readOnly: false));
 
-        var response = await handler.Handle(
+        var response = await handler.ExecuteAsync(
             new InterruptSchedulerJobCommand { Group = "DEFAULT", Name = "storage-reconciliation" },
             CancellationToken.None);
 
@@ -226,7 +226,7 @@ public sealed class SchedulerAdminCommandHandlerTests
             .Returns(SchedulerOperationResult.NotApplicable);
         var handler = new InterruptSchedulerJobCommandHandler(operations, Policy(readOnly: false));
 
-        var response = await handler.Handle(
+        var response = await handler.ExecuteAsync(
             new InterruptSchedulerJobCommand { Group = "DEFAULT", Name = "idle-job" },
             CancellationToken.None);
 
@@ -240,9 +240,9 @@ public sealed class SchedulerAdminCommandHandlerTests
         var operations = Substitute.For<ISchedulerOperations>();
 
         var reset = await new ResetSchedulerJobErrorStateCommandHandler(operations, Policy(readOnly: true))
-            .Handle(new ResetSchedulerJobErrorStateCommand { Group = "DEFAULT", Name = "j" }, CancellationToken.None);
+            .ExecuteAsync(new ResetSchedulerJobErrorStateCommand { Group = "DEFAULT", Name = "j" }, CancellationToken.None);
         var interrupt = await new InterruptSchedulerJobCommandHandler(operations, Policy(readOnly: true))
-            .Handle(new InterruptSchedulerJobCommand { Group = "DEFAULT", Name = "j" }, CancellationToken.None);
+            .ExecuteAsync(new InterruptSchedulerJobCommand { Group = "DEFAULT", Name = "j" }, CancellationToken.None);
 
         await Assert.That(reset.FailureCode).IsEqualTo(FailureCodes.SchedulerReadOnly);
         await Assert.That(interrupt.FailureCode).IsEqualTo(FailureCodes.SchedulerReadOnly);

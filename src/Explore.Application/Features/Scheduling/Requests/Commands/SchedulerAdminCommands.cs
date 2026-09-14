@@ -1,6 +1,6 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Scheduling.Requests.Commands;
 
@@ -9,7 +9,7 @@ namespace Explore.Application.Features.Scheduling.Requests.Commands;
 /// update rather than a bespoke permission, so scheduler control follows the same authority as other operator
 /// surfaces instead of introducing a parallel policy that could drift from it.
 /// </summary>
-public abstract record SchedulerAdminCommandBase : IRequest<BaseCommandResponse<string>>, ISecureRequest
+public abstract record SchedulerAdminCommandBase : ICommand<BaseCommandResponse<string>>, ISecureRequest
 {
     public const string SettingKey = "scheduler.admin";
 

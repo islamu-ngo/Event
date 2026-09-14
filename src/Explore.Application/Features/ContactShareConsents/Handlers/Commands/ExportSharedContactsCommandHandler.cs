@@ -7,13 +7,13 @@ using Explore.Application.DTOs.ContactShareConsent;
 using Explore.Application.Features.ContactShareConsents.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.ContactShareConsents.Handlers.Commands;
 
-public class ExportSharedContactsCommandHandler : IRequestHandler<ExportSharedContactsCommand, BaseCommandResponse<SharedContactExportResultDto>>
+public class ExportSharedContactsCommandHandler : ICommandHandler<ExportSharedContactsCommand, BaseCommandResponse<SharedContactExportResultDto>>
 {
     private readonly IEventContactShareConsentRepository _consentRepository;
     private readonly IEventContactShareExportRepository _exportRepository;
@@ -35,8 +35,8 @@ public class ExportSharedContactsCommandHandler : IRequestHandler<ExportSharedCo
         _logger = logger;
     }
 
-    public async Task<BaseCommandResponse<SharedContactExportResultDto>> Handle(
-        ExportSharedContactsCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<SharedContactExportResultDto>> ExecuteAsync(
+        ExportSharedContactsCommand request, CancellationToken cancellationToken = default)
     {
         var format = NormalizeFormat(request.Format);
         if (format is null)

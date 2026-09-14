@@ -1,12 +1,12 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.ContactShareConsent;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.ContactShareConsents.Requests.Queries;
 
 [AuthorizeResource(ResourceKinds.EventContactShareConsent, AuthorizationActions.ViewSharedContacts)]
-public sealed record GetOrganizationSharedContactsQuery : IRequest<PaginatedResult<SharedContactDto>>, ISecureRequest
+public sealed record GetOrganizationSharedContactsQuery : IQuery<PaginatedResult<SharedContactDto>>, ISecureRequest
 {
     public Guid RecipientActorId { get; init; }
     public Guid OrganizationId { get; init; }

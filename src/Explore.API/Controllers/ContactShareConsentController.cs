@@ -3,12 +3,12 @@ using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Models;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.ContactShareConsent;
 using Explore.Application.Features.ContactShareConsents.Requests.Commands;
 using Explore.Application.Features.ContactShareConsents.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -29,18 +29,27 @@ public class ContactShareConsentController : EventControllerBase
         "Contact share export validation failed",
         "Shared contact export failed.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetUserContactShareConsentsQuery, List<UserContactShareConsentDto>> _userConsentsQueryHandler;
+    private readonly ICommandHandler<WithdrawContactShareConsentCommand, BaseCommandResponse<Guid>> _withdrawConsentCommandHandler;
+    private readonly IQueryHandler<GetOrganizationSharedContactsQuery, PaginatedResult<SharedContactDto>> _organizationSharedContactsQueryHandler;
+    private readonly ICommandHandler<ExportSharedContactsCommand, BaseCommandResponse<SharedContactExportResultDto>> _exportSharedContactsCommandHandler;
     private readonly ITenantContext _tenantContext;
     private readonly IContactShareConsentService _consentService;
     private readonly ILogger<ContactShareConsentController> _logger;
 
     public ContactShareConsentController(
-        IMediator mediator,
+        IQueryHandler<GetUserContactShareConsentsQuery, List<UserContactShareConsentDto>> userConsentsQueryHandler,
+        ICommandHandler<WithdrawContactShareConsentCommand, BaseCommandResponse<Guid>> withdrawConsentCommandHandler,
+        IQueryHandler<GetOrganizationSharedContactsQuery, PaginatedResult<SharedContactDto>> organizationSharedContactsQueryHandler,
+        ICommandHandler<ExportSharedContactsCommand, BaseCommandResponse<SharedContactExportResultDto>> exportSharedContactsCommandHandler,
         ITenantContext tenantContext,
         IContactShareConsentService consentService,
         ILogger<ContactShareConsentController> logger)
     {
-        _mediator = mediator;
+        _userConsentsQueryHandler = userConsentsQueryHandler;
+        _withdrawConsentCommandHandler = withdrawConsentCommandHandler;
+        _organizationSharedContactsQueryHandler = organizationSharedContactsQueryHandler;
+        _exportSharedContactsCommandHandler = exportSharedContactsCommandHandler;
         _tenantContext = tenantContext;
         _consentService = consentService;
         _logger = logger;
@@ -58,7 +67,7 @@ public class ContactShareConsentController : EventControllerBase
         if (userId == null)
             return this.ToAuthenticationRequiredProblem();
 
-        var result = await _mediator.Send(new GetUserContactShareConsentsQuery
+        var result = await _userConsentsQueryHandler.QueryAsync(new GetUserContactShareConsentsQuery
         {
             UserId = userId.Value,
             TenantId = _tenantContext.TenantId
@@ -98,7 +107,7 @@ public class ContactShareConsentController : EventControllerBase
         if (userId == null)
             return this.ToAuthenticationRequiredProblem();
 
-        var result = await _mediator.Send(new WithdrawContactShareConsentCommand
+        var result = await _withdrawConsentCommandHandler.ExecuteAsync(new WithdrawContactShareConsentCommand
         {
             ConsentId = id,
             UserId = userId.Value,
@@ -124,7 +133,7 @@ public class ContactShareConsentController : EventControllerBase
         if (organizationId is null)
             return this.ToNotFoundProblem(OrganizationNotFoundProblem);
 
-        var result = await _mediator.Send(new GetOrganizationSharedContactsQuery
+        var result = await _organizationSharedContactsQueryHandler.QueryAsync(new GetOrganizationSharedContactsQuery
         {
             RecipientActorId = recipientActorId,
             OrganizationId = organizationId.Value,
@@ -158,7 +167,7 @@ public class ContactShareConsentController : EventControllerBase
         if (organizationId is null)
             return this.ToNotFoundProblem(OrganizationNotFoundProblem);
 
-        var result = await _mediator.Send(new ExportSharedContactsCommand
+        var result = await _exportSharedContactsCommandHandler.ExecuteAsync(new ExportSharedContactsCommand
         {
             RecipientActorId = recipientActorId,
             OrganizationId = organizationId.Value,

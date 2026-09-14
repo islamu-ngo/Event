@@ -16,6 +16,7 @@ using Explore.Application.Features.Events.Requests.Commands;
 using Explore.Application.Features.Events.Requests.Queries;
 using Explore.Application.Features.EventSessions.Requests.Queries;
 using Explore.Application.Features.Federation.Atproto.Requests.Queries;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
 using Explore.Application.Specifications.Events;
@@ -49,15 +50,21 @@ public class EventController : EventControllerBase
         "Event not found.");
 
     private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetPublicEventDiscoveryRequest, PaginatedResult<EventDiscoveryItemDto>> _getPublicEventDiscovery;
+    private readonly IQueryHandler<GetAtprotoEventSourceQuery, string?> _getAtprotoEventSource;
     private readonly IResourceAssembler<EventDto, EventListDto> _resourceAssembler;
     private readonly IResourceAssembler<EventDiscoveryItemDto> _eventDiscoveryResourceAssembler;
 
     public EventController(
         IMediator mediator,
+        IQueryHandler<GetPublicEventDiscoveryRequest, PaginatedResult<EventDiscoveryItemDto>> getPublicEventDiscovery,
+        IQueryHandler<GetAtprotoEventSourceQuery, string?> getAtprotoEventSource,
         IResourceAssembler<EventDto, EventListDto> resourceAssembler,
         IResourceAssembler<EventDiscoveryItemDto> eventDiscoveryResourceAssembler)
     {
         _mediator = mediator;
+        _getPublicEventDiscovery = getPublicEventDiscovery;
+        _getAtprotoEventSource = getAtprotoEventSource;
         _resourceAssembler = resourceAssembler;
         _eventDiscoveryResourceAssembler = eventDiscoveryResourceAssembler;
     }
@@ -97,7 +104,7 @@ public class EventController : EventControllerBase
                 "The locationIds filter is not available on public event discovery.");
         }
 
-        var result = await _mediator.Send(new GetPublicEventDiscoveryRequest(new GetEventListRequest
+        var result = await _getPublicEventDiscovery.QueryAsync(new GetPublicEventDiscoveryRequest(new GetEventListRequest
         {
             PageNumber = filter.PageNumber,
             PageSize = filter.PageSize,
@@ -168,7 +175,7 @@ public class EventController : EventControllerBase
         Guid atprotoRecordId,
         CancellationToken cancellationToken = default)
     {
-        string? sourceUrl = await _mediator.Send(
+        string? sourceUrl = await _getAtprotoEventSource.QueryAsync(
             new GetAtprotoEventSourceQuery(atprotoRecordId),
             cancellationToken);
         return sourceUrl is null

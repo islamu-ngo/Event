@@ -1,9 +1,9 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Federation.Atproto.Models;
 using Explore.Application.Features.Federation.Atproto.Requests.Commands;
 using Explore.Application.Services.Federation;
-using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Explore.Infrastructure.Services.Federation;
@@ -69,8 +69,8 @@ internal sealed class AtprotoJetstreamRuntimeStore(IServiceScopeFactory scopeFac
         CancellationToken cancellationToken)
     {
         await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
-        bool applied = await scope.ServiceProvider.GetRequiredService<IMediator>()
-            .Send(new ImportAtprotoFederatedEventCommand(request), cancellationToken);
+        bool applied = await scope.ServiceProvider.GetRequiredService<ICommandHandler<ImportAtprotoFederatedEventCommand, bool>>()
+            .ExecuteAsync(new ImportAtprotoFederatedEventCommand(request), cancellationToken);
         if (applied
             && AffectsEventDiscovery(request)
             && scope.ServiceProvider.GetService<IAtprotoDiscoveryCacheInvalidator>() is { } cacheInvalidator)
@@ -86,8 +86,8 @@ internal sealed class AtprotoJetstreamRuntimeStore(IServiceScopeFactory scopeFac
         CancellationToken cancellationToken)
     {
         await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
-        AtprotoPdsRecoveryResult result = await scope.ServiceProvider.GetRequiredService<IMediator>()
-            .Send(command, cancellationToken);
+        AtprotoPdsRecoveryResult result = await scope.ServiceProvider.GetRequiredService<ICommandHandler<ReconcileAtprotoPdsSnapshotsCommand, AtprotoPdsRecoveryResult>>()
+            .ExecuteAsync(command, cancellationToken);
         if (result.Outcome == AtprotoPdsRecoveryOutcome.Completed
             && scope.ServiceProvider.GetService<IAtprotoDiscoveryCacheInvalidator>() is { } cacheInvalidator)
         {

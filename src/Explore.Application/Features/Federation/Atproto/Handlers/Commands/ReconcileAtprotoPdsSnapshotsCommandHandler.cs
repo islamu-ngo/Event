@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Federation.Atproto.Models;
 using Explore.Application.Features.Federation.Atproto.Requests.Commands;
@@ -9,7 +10,6 @@ using Explore.Application.Features.Federation.Atproto.Validators;
 using Explore.Application.Models.Storage;
 using Explore.Application.Services.Federation;
 using FluentValidation;
-using MediatR;
 
 namespace Explore.Application.Features.Federation.Atproto.Handlers.Commands;
 
@@ -21,13 +21,13 @@ public sealed class ReconcileAtprotoPdsSnapshotsCommandHandler(
     IAtprotoPdsSnapshotRepository repository,
     IAtprotoFederationArchiveProbe archiveProbe,
     TimeProvider timeProvider)
-    : IRequestHandler<ReconcileAtprotoPdsSnapshotsCommand, AtprotoPdsRecoveryResult>
+    : ICommandHandler<ReconcileAtprotoPdsSnapshotsCommand, AtprotoPdsRecoveryResult>
 {
     public const int MaximumRecoveryDids = 100;
 
-    public async Task<AtprotoPdsRecoveryResult> Handle(
+    public async Task<AtprotoPdsRecoveryResult> ExecuteAsync(
         ReconcileAtprotoPdsSnapshotsCommand request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         var validator = new ReconcileAtprotoPdsSnapshotsCommandValidator();
         await validator.ValidateAndThrowAsync(request, cancellationToken);

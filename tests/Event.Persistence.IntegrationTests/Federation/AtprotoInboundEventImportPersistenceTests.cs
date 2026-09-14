@@ -514,7 +514,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
         var gateway = new DeterministicStagedThumbnailGateway(staged);
         var handler = new ImportAtprotoFederatedEventCommandHandler(repository, gateway);
 
-        bool applied = await handler.Handle(
+        bool applied = await handler.ExecuteAsync(
             new ImportAtprotoFederatedEventCommand(request),
             CancellationToken.None);
 
@@ -1634,7 +1634,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                 EventProjection: projection);
             var handler = new ImportAtprotoFederatedEventCommandHandler(repository, gateway);
 
-            bool applied = await handler.Handle(
+            bool applied = await handler.ExecuteAsync(
                 new ImportAtprotoFederatedEventCommand(applyRequest),
                 CancellationToken.None);
 
@@ -1752,7 +1752,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                         observedAt));
                 var handler = new ImportAtprotoFederatedEventCommandHandler(repository, gateway);
 
-                bool applied = await handler.Handle(
+                bool applied = await handler.ExecuteAsync(
                     new ImportAtprotoFederatedEventCommand(request),
                     CancellationToken.None);
 
@@ -1843,7 +1843,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                         observedAt));
                 var handler = new ImportAtprotoFederatedEventCommandHandler(repository, gateway);
 
-                bool applied = await handler.Handle(
+                bool applied = await handler.ExecuteAsync(
                     new ImportAtprotoFederatedEventCommand(request),
                     CancellationToken.None);
 
@@ -1941,7 +1941,7 @@ public sealed class AtprotoInboundEventImportPersistenceTests(PostgreSqlContaine
                 EventProjection: projection);
             var handler = new ImportAtprotoFederatedEventCommandHandler(repository, gateway);
 
-            bool applied = await handler.Handle(
+            bool applied = await handler.ExecuteAsync(
                 new ImportAtprotoFederatedEventCommand(applyRequest),
                 CancellationToken.None);
 

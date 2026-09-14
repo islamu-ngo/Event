@@ -1,3 +1,4 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.PublicExperience;
@@ -20,11 +21,11 @@ public sealed class GetPublicEventDiscoveryRequestHandler(
     AtprotoEventGovernanceResolver governanceResolver,
     Explore.Application.Contracts.Infrastructure.ITenantContext tenantContext,
     TimeProvider timeProvider)
-    : IRequestHandler<GetPublicEventDiscoveryRequest, PaginatedResult<EventDiscoveryItemDto>>
+    : IQueryHandler<GetPublicEventDiscoveryRequest, PaginatedResult<EventDiscoveryItemDto>>
 {
-    public async Task<PaginatedResult<EventDiscoveryItemDto>> Handle(
+    public async Task<PaginatedResult<EventDiscoveryItemDto>> QueryAsync(
         GetPublicEventDiscoveryRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         var validator = new GetPublicEventDiscoveryRequestValidator();
         await validator.ValidateAndThrowAsync(request, cancellationToken);

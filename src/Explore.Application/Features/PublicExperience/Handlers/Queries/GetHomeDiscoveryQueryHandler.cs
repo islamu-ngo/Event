@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Event;
 using Explore.Application.DTOs.PublicExperience;
@@ -17,7 +18,7 @@ using Microsoft.Extensions.Logging;
 namespace Explore.Application.Features.PublicExperience.Handlers.Queries;
 
 public sealed partial class GetHomeDiscoveryQueryHandler(
-    IRequestHandler<GetPublicEventDiscoveryRequest, PaginatedResult<EventDiscoveryItemDto>> eventDiscoveryHandler,
+    IQueryHandler<GetPublicEventDiscoveryRequest, PaginatedResult<EventDiscoveryItemDto>> eventDiscoveryHandler,
     IRequestHandler<GetPublicExperienceShellQuery, PublicExperienceShellDto> shellHandler,
     ITenantContext tenantContext,
     IHierarchicalSettingsResolver settingsResolver,
@@ -370,7 +371,7 @@ public sealed partial class GetHomeDiscoveryQueryHandler(
         {
             using var sectionCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             sectionCancellation.CancelAfter(SectionTimeout);
-            var page = await eventDiscoveryHandler.Handle(
+            var page = await eventDiscoveryHandler.QueryAsync(
                 new GetPublicEventDiscoveryRequest(request),
                 sectionCancellation.Token);
             var items = page.Items

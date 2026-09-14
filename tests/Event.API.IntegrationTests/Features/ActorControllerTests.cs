@@ -6,9 +6,11 @@ using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.API.Hateoas;
 using Explore.API.Middleware;
+using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Actor;
 using Explore.Application.Features.Actors.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
+using Explore.Domain;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -184,8 +186,14 @@ public sealed class ActorDidIngressHttpRedTests
     [Test]
     public async Task GetByDid_MalformedAndOversizedScalarInputs_ReturnBoundedProblemBeforeDispatch()
     {
-        var dispatched = new ConcurrentQueue<GetActorByDidRequest>();
-        var mediator = Substitute.For<IMediator>();
+        var dispatched = new ConcurrentQueue<string>();
+        var actorRepo = Substitute.For<IActorRepository>();
+        actorRepo.GetActorByDid(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                dispatched.Enqueue(call.Arg<string>()!);
+                return Task.FromResult<Actor?>(null);
+            });
         var serilogLogs = new CapturingSerilogSink();
         // Keep both captures test-owned so parallel hosts cannot replace their logging pipeline.
         Serilog.ILogger isolatedSerilogLogger = new LoggerConfiguration()
@@ -193,12 +201,6 @@ public sealed class ActorDidIngressHttpRedTests
             .WriteTo.Sink(serilogLogs)
             .CreateLogger();
         using var logs = new CapturingRequestLoggerProvider(isolatedSerilogLogger);
-        mediator.Send(Arg.Any<GetActorByDidRequest>(), Arg.Any<CancellationToken>())
-            .Returns(call =>
-            {
-                dispatched.Enqueue(call.Arg<GetActorByDidRequest>()!);
-                return (ActorDto)null!;
-            });
 
         using ILoggerFactory captureLoggerFactory = LoggerFactory.Create(logging => logging.AddProvider(logs));
         var requestLogger = captureLoggerFactory.CreateLogger<RequestLoggingMiddleware>();
@@ -210,8 +212,8 @@ public sealed class ActorDidIngressHttpRedTests
             {
                 builder.ConfigureTestServices(services =>
                 {
-                    services.RemoveAll<IMediator>();
-                    services.AddSingleton(mediator);
+                    services.RemoveAll<IActorRepository>();
+                    services.AddSingleton(actorRepo);
                 });
             });
         using HttpClient client = factory.CreateClient();
@@ -318,13 +320,13 @@ public sealed class ActorDidIngressHttpRedTests
     public async Task GetByDid_ValidMixedCaseScalar_PreservesExactDispatchAndExistingResponse()
     {
         const string validDid = "did:future:CaseSensitive_Value";
-        var dispatched = new ConcurrentQueue<GetActorByDidRequest>();
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<GetActorByDidRequest>(), Arg.Any<CancellationToken>())
+        var dispatched = new ConcurrentQueue<string>();
+        var actorRepo = Substitute.For<IActorRepository>();
+        actorRepo.GetActorByDid(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(call =>
             {
-                dispatched.Enqueue(call.Arg<GetActorByDidRequest>()!);
-                return (ActorDto)null!;
+                dispatched.Enqueue(call.Arg<string>()!);
+                return Task.FromResult<Actor?>(null);
             });
 
         await using WebApplicationFactory<Program> factory = new AuthenticatedWebApplicationFactory()
@@ -332,8 +334,8 @@ public sealed class ActorDidIngressHttpRedTests
             {
                 builder.ConfigureTestServices(services =>
                 {
-                    services.RemoveAll<IMediator>();
-                    services.AddSingleton(mediator);
+                    services.RemoveAll<IActorRepository>();
+                    services.AddSingleton(actorRepo);
                 });
             });
         using HttpClient client = factory.CreateClient();
@@ -343,7 +345,7 @@ public sealed class ActorDidIngressHttpRedTests
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
         await Assert.That(dispatched).HasSingleItem();
-        await Assert.That(dispatched.Single().Did).IsEqualTo(validDid);
+        await Assert.That(dispatched.Single()).IsEqualTo(validDid);
     }
 
     private sealed class CapturingRequestLoggerProvider(Serilog.ILogger? isolatedSerilogLogger = null) : ILoggerProvider, ISupportExternalScope

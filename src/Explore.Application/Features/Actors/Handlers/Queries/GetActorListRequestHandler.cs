@@ -2,15 +2,15 @@ using Explore.Application.Mappings;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Actor;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Actors.Requests.Queries;
 using Explore.Application.Responses;
 using Explore.Application.Services;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.Actors.Handlers.Queries;
 
-public class GetActorListRequestHandler : IRequestHandler<GetActorListRequest, PaginatedResult<ActorListDto>>
+public class GetActorListRequestHandler : IQueryHandler<GetActorListRequest, PaginatedResult<ActorListDto>>
 {
     private readonly IActorRepository _actorRepository;
     private readonly IObjectStorageService _objectStorageService;
@@ -26,7 +26,7 @@ public class GetActorListRequestHandler : IRequestHandler<GetActorListRequest, P
         _logger = logger;
     }
 
-    public async Task<PaginatedResult<ActorListDto>> Handle(GetActorListRequest request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<ActorListDto>> QueryAsync(GetActorListRequest request, CancellationToken cancellationToken = default)
     {
         var (pageNumber, pageSize) = PaginatedResult<ActorListDto>.NormalizeParameters(request.PageNumber, request.PageSize);
         var (actors, totalCount) = await _actorRepository.GetActorsWithDetailsPaged(

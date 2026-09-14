@@ -7,15 +7,15 @@ using Explore.Application.DTOs.Actor.Validators;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.Actors.Requests.Commands;
 using Explore.Application.Models.Common;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Domain;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Actors.Handlers.Commands;
 
-public class UpdateActorCommandHandler : IRequestHandler<UpdateActorCommand, BaseCommandResponse<Guid>>
+public class UpdateActorCommandHandler : ICommandHandler<UpdateActorCommand, BaseCommandResponse<Guid>>
 {
     private readonly IActorRepository _actorRepository;
     private readonly IActorTypeRepository _actorTypeRepository;
@@ -43,7 +43,7 @@ public class UpdateActorCommandHandler : IRequestHandler<UpdateActorCommand, Bas
         _cache = cache;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateActorCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateActorCommand request, CancellationToken cancellationToken)
     {
         var validator = new UpdateActorDtoValidator(
             _actorTypeRepository,

@@ -2,15 +2,15 @@ using Explore.Application.Mappings;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Actor;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Actors.Requests.Queries;
 using Explore.Application.Services;
 using Explore.Domain;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.Actors.Handlers.Queries;
 
-public class GetActorDetailsRequestHandler : IRequestHandler<GetActorDetailsRequest, ActorDto?>
+public class GetActorDetailsRequestHandler : IQueryHandler<GetActorDetailsRequest, ActorDto?>
 {
     private readonly IActorRepository _actorRepository;
     private readonly ITenantContext _tenantContext;
@@ -26,7 +26,7 @@ public class GetActorDetailsRequestHandler : IRequestHandler<GetActorDetailsRequ
         _logger = logger;
     }
 
-    public async Task<ActorDto?> Handle(GetActorDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<ActorDto?> QueryAsync(GetActorDetailsRequest request, CancellationToken cancellationToken = default)
     {
         var actor = request.TenantId is { } tenantId
             ? await _actorRepository.GetPublicActorProfileByTenantAsync(tenantId, request.Id, cancellationToken)

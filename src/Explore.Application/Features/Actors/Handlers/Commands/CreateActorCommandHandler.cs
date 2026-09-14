@@ -1,15 +1,15 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Actor.Validators;
 using Explore.Application.Features.Actors.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Services;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.Actors.Handlers.Commands;
 
-public class CreateActorCommandHandler : IRequestHandler<CreateActorCommand, BaseCommandResponse<Guid>>
+public class CreateActorCommandHandler : ICommandHandler<CreateActorCommand, BaseCommandResponse<Guid>>
 {
     private readonly IActorRepository _actorRepository;
     private readonly IActorTypeRepository _actorTypeRepository;
@@ -40,7 +40,7 @@ public class CreateActorCommandHandler : IRequestHandler<CreateActorCommand, Bas
         _tenantContext = tenantContext;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateActorCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateActorCommand request, CancellationToken cancellationToken)
     {
         var validator = new CreateActorDtoValidator(
             _actorTypeRepository,

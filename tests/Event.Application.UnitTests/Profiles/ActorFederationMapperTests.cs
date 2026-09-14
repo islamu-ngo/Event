@@ -36,11 +36,11 @@ public sealed class ActorFederationMapperTests
         var detail = new GetActorDetailsRequestHandler(actors, new TenantContext(TenantId), NullLogger<GetActorDetailsRequestHandler>.Instance);
         var byDid = new GetActorByDidRequestHandler(actors, null!, NullLogger<GetActorByDidRequestHandler>.Instance);
         var list = new GetActorListRequestHandler(actors, null!, NullLogger<GetActorListRequestHandler>.Instance);
-        await AssertContract((await detail.Handle(new GetActorDetailsRequest { Id = ActorId }, default))!, ExpectedActor(false));
-        await Assert.That(await detail.Handle(new GetActorDetailsRequest { Id = OwnerId }, default)).IsNull();
-        await AssertContract(await byDid.Handle(new GetActorByDidRequest { Did = "did:plc:first" }, default), ExpectedActor(false));
-        await Assert.That(await byDid.Handle(new GetActorByDidRequest { Did = "did:plc:missing" }, default)).IsNull();
-        var page = await list.Handle(new GetActorListRequest { PageNumber = -1, PageSize = 500 }, default);
+        await AssertContract((await detail.QueryAsync(new GetActorDetailsRequest { Id = ActorId }, default))!, ExpectedActor(false));
+        await Assert.That(await detail.QueryAsync(new GetActorDetailsRequest { Id = OwnerId }, default)).IsNull();
+        await AssertContract(await byDid.QueryAsync(new GetActorByDidRequest { Did = "did:plc:first" }, default), ExpectedActor(false));
+        await Assert.That(await byDid.QueryAsync(new GetActorByDidRequest { Did = "did:plc:missing" }, default)).IsNull();
+        var page = await list.QueryAsync(new GetActorListRequest { PageNumber = -1, PageSize = 500 }, default);
         await Assert.That(page.PageNumber).IsEqualTo(1);
         await Assert.That(page.PageSize).IsEqualTo(100);
         await Assert.That(page.TotalCount).IsEqualTo(2);
@@ -76,17 +76,17 @@ public sealed class ActorFederationMapperTests
         expected["displayName"] = "Tenant display";
         expected["description"] = "Tenant description";
         expected["backgroundColor"] = "red";
-        var dto = await detail.Handle(new GetActorDetailsRequest { Id = ActorId, TenantId = TenantId }, default);
+        var dto = await detail.QueryAsync(new GetActorDetailsRequest { Id = ActorId, TenantId = TenantId }, default);
         await AssertContract(dto!, expected);
         await Assert.That(dto!.TenantId).IsEqualTo(TenantId);
         await Assert.That(dto.IsLocallyDiscoverable).IsTrue();
-        var items = await list.Handle(new GetActorsByTenantRequest { TenantId = TenantId }, default);
+        var items = await list.QueryAsync(new GetActorsByTenantRequest { TenantId = TenantId }, default);
         var expectedList = ExpectedActor(true);
         expectedList["displayName"] = "Tenant display";
         expectedList["backgroundColor"] = "red";
         await AssertContract(items.Single(), expectedList);
-        await Assert.That(await detail.Handle(new GetActorDetailsRequest { Id = ActorId, TenantId = OwnerId }, default)).IsNull();
-        await Assert.That(await list.Handle(new GetActorsByTenantRequest { TenantId = OwnerId }, default)).IsEmpty();
+        await Assert.That(await detail.QueryAsync(new GetActorDetailsRequest { Id = ActorId, TenantId = OwnerId }, default)).IsNull();
+        await Assert.That(await list.QueryAsync(new GetActorsByTenantRequest { TenantId = OwnerId }, default)).IsEmpty();
     }
 
     [Test]
@@ -139,7 +139,7 @@ public sealed class ActorFederationMapperTests
         image.Visibility = StorageObjectVisibilities.PublicImage;
         image.LifecycleState = StorageObjectLifecycleStates.Active;
         var handler = new CreateActorCommandHandler(actors, new ActorTypeStore(), new CustodyTypeStore(), new StorageStore([image]), null!, new UserStore(), null!, new TenantContext(TenantId));
-        var result = await handler.Handle(new CreateActorCommand
+        var result = await handler.ExecuteAsync(new CreateActorCommand
         {
             ActorDto = new CreateActorDto
             {
@@ -157,7 +157,7 @@ public sealed class ActorFederationMapperTests
     {
         var actors = new ActorStore([]);
         var handler = new CreateActorCommandHandler(actors, new ActorTypeStore(), new CustodyTypeStore(), new StorageStore([]), null!, new UserStore(), null!, new TenantContext(TenantId));
-        var result = await handler.Handle(new CreateActorCommand
+        var result = await handler.ExecuteAsync(new CreateActorCommand
         {
             ActorDto = new CreateActorDto
             {

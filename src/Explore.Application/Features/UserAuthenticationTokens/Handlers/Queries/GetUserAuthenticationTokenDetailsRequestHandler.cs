@@ -1,15 +1,15 @@
 using Explore.Application.Mappings;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.UserAuthenticationToken;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.UserAuthenticationTokens.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.UserAuthenticationTokens.Handlers.Queries;
 
-public class GetUserAuthenticationTokenDetailsRequestHandler : IRequestHandler<GetUserAuthenticationTokenDetailsRequest, UserAuthenticationTokenDto?>
+public class GetUserAuthenticationTokenDetailsRequestHandler : IQueryHandler<GetUserAuthenticationTokenDetailsRequest, UserAuthenticationTokenDto?>
 {
     private readonly IUserAuthenticationTokenRepository _userAuthenticationTokenRepository;
     private readonly ICurrentUserService _currentUserService;
@@ -22,7 +22,7 @@ public class GetUserAuthenticationTokenDetailsRequestHandler : IRequestHandler<G
         _currentUserService = currentUserService;
     }
 
-    public async Task<UserAuthenticationTokenDto?> Handle(GetUserAuthenticationTokenDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<UserAuthenticationTokenDto?> QueryAsync(GetUserAuthenticationTokenDetailsRequest request, CancellationToken cancellationToken = default)
     {
         var currentUserId = _currentUserService.UserId
             ?? throw new AuthorizationException(ResourceKinds.User, AuthorizationActions.Users.View);

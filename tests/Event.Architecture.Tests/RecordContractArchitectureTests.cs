@@ -7,6 +7,7 @@ namespace Event.Architecture.Tests
     using System.Text.Json;
     using Explore.API.Controllers;
     using Explore.Application.Authorization;
+    using Explore.Application.Contracts.Operations;
     using Explore.Application.DTOs.CustomPropertyProjection.Validators;
     using Explore.Application.DTOs.RegistrationOrders;
     using Explore.Application.DTOs.RegistrationSubmissions;
@@ -82,7 +83,7 @@ namespace Event.Architecture.Tests
             await Assert.That(IsRecord(genericRecordRequest)).IsTrue();
             await Assert.That(genericRecordRequest.GetInterfaces().Any(contract =>
                 contract.IsGenericType && contract.GetGenericTypeDefinition() == typeof(IRequest<>))).IsTrue();
-            await Assert.That(typeof(IRequest).IsAssignableFrom(nonGenericRecordRequest)).IsTrue();
+            await Assert.That(typeof(ICommand).IsAssignableFrom(nonGenericRecordRequest)).IsTrue();
             await Assert.That(IsRecord(abstractRecordRequest)).IsTrue();
             await Assert.That(IsRecord(inheritedRecordRequest)).IsTrue();
             await Assert.That(inheritedRecordRequest.BaseType!.GetGenericTypeDefinition()).IsEqualTo(abstractRecordRequest);

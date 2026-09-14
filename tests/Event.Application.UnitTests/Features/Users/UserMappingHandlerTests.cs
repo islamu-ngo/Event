@@ -128,15 +128,15 @@ public sealed class UserMappingHandlerTests
         repository.GetUserAuthenticationTokenWithDetailsForUser(token.Id, token.UserId, Arg.Any<CancellationToken>()).Returns(token);
         var detailHandler = new GetUserAuthenticationTokenDetailsRequestHandler(repository, currentUser);
         var listHandler = new GetUserAuthenticationTokenListRequestHandler(repository, currentUser);
-        var detail = await detailHandler.Handle(new GetUserAuthenticationTokenDetailsRequest(token.Id), CancellationToken.None);
-        var list = await listHandler.Handle(new GetUserAuthenticationTokenListRequest(), CancellationToken.None);
+        var detail = await detailHandler.QueryAsync(new GetUserAuthenticationTokenDetailsRequest(token.Id), CancellationToken.None);
+        var list = await listHandler.QueryAsync(new GetUserAuthenticationTokenListRequest(), CancellationToken.None);
         visible.Clear();
         await Assert.That(detail!.Provider).IsEqualTo("atproto");
         await Assert.That(list.Select(item => item.Id).ToArray()).IsEquivalentTo(new[] { second.Id, token.Id });
         await Assert.That(list[0].Id).IsEqualTo(second.Id);
         await Assert.That(list[1].Id).IsEqualTo(token.Id);
         currentUser.UserId.Returns(second.Id);
-        await Assert.That(await detailHandler.Handle(new GetUserAuthenticationTokenDetailsRequest(token.Id), CancellationToken.None)).IsNull();
+        await Assert.That(await detailHandler.QueryAsync(new GetUserAuthenticationTokenDetailsRequest(token.Id), CancellationToken.None)).IsNull();
     }
 
     [Test]
@@ -147,9 +147,9 @@ public sealed class UserMappingHandlerTests
         var repository = Substitute.For<IUserAuthenticationTokenRepository>();
         var detail = new GetUserAuthenticationTokenDetailsRequestHandler(repository, currentUser);
         var list = new GetUserAuthenticationTokenListRequestHandler(repository, currentUser);
-        await Assert.That(async () => await detail.Handle(new GetUserAuthenticationTokenDetailsRequest(), CancellationToken.None))
+        await Assert.That(async () => await detail.QueryAsync(new GetUserAuthenticationTokenDetailsRequest(), CancellationToken.None))
             .Throws<AuthorizationException>();
-        await Assert.That(async () => await list.Handle(new GetUserAuthenticationTokenListRequest(), CancellationToken.None))
+        await Assert.That(async () => await list.QueryAsync(new GetUserAuthenticationTokenListRequest(), CancellationToken.None))
             .Throws<AuthorizationException>();
     }
 

@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.SupportAccess;
@@ -8,7 +9,6 @@ using Explore.Application.Features.SupportAccess.Requests.Queries;
 using Explore.Application.Settings;
 using Explore.Application.Settings.Groups;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.SupportAccess.Handlers.Queries;
 
@@ -17,9 +17,9 @@ public sealed class GetCurrentSupportAccessSessionQueryHandler(
     IAdminContext adminContext,
     IHierarchicalSettingsResolver settingsResolver,
     ISupportAccessSessionRepository sessionRepository)
-    : IRequestHandler<GetCurrentSupportAccessSessionQuery, CurrentSupportAccessSessionDto>
+    : IQueryHandler<GetCurrentSupportAccessSessionQuery, CurrentSupportAccessSessionDto>
 {
-    public async Task<CurrentSupportAccessSessionDto> Handle(
+    public async Task<CurrentSupportAccessSessionDto> QueryAsync(
         GetCurrentSupportAccessSessionQuery request,
         CancellationToken cancellationToken)
     {

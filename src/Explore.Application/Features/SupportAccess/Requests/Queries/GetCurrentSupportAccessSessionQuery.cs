@@ -1,6 +1,6 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.SupportAccess;
-using MediatR;
 
 namespace Explore.Application.Features.SupportAccess.Requests.Queries;
 
-public sealed record GetCurrentSupportAccessSessionQuery : IRequest<CurrentSupportAccessSessionDto>;
+public sealed record GetCurrentSupportAccessSessionQuery : IQuery<CurrentSupportAccessSessionDto>;

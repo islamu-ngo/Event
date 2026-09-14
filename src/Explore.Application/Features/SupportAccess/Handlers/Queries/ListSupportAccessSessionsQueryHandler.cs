@@ -1,16 +1,16 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.SupportAccess;
 using Explore.Application.Features.SupportAccess.Requests.Queries;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.SupportAccess.Handlers.Queries;
 
 public sealed class ListSupportAccessSessionsQueryHandler(
     ISupportAccessSessionRepository sessionRepository)
-    : IRequestHandler<ListSupportAccessSessionsQuery, PaginatedResult<SupportAccessSessionDto>>
+    : IQueryHandler<ListSupportAccessSessionsQuery, PaginatedResult<SupportAccessSessionDto>>
 {
-    public async Task<PaginatedResult<SupportAccessSessionDto>> Handle(
+    public async Task<PaginatedResult<SupportAccessSessionDto>> QueryAsync(
         ListSupportAccessSessionsQuery request,
         CancellationToken cancellationToken)
     {

@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.SupportAccess;
 using Explore.Application.Features.SupportAccess.Requests.Commands;
@@ -10,7 +11,6 @@ using Explore.Application.Settings.Groups;
 using Explore.Application.Telemetry;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.SupportAccess.Handlers.Commands;
@@ -25,9 +25,9 @@ public sealed class StartSupportAccessSessionCommandHandler(
     IUnitOfWork unitOfWork,
     BusinessMetrics metrics,
     ILogger<StartSupportAccessSessionCommandHandler> logger)
-    : IRequestHandler<StartSupportAccessSessionCommand, SupportAccessSessionCommandResponseDto>
+    : ICommandHandler<StartSupportAccessSessionCommand, SupportAccessSessionCommandResponseDto>
 {
-    public async Task<SupportAccessSessionCommandResponseDto> Handle(
+    public async Task<SupportAccessSessionCommandResponseDto> ExecuteAsync(
         StartSupportAccessSessionCommand request,
         CancellationToken cancellationToken)
     {

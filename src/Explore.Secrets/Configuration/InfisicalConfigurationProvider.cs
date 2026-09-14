@@ -191,7 +191,7 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
     /// Self-hosted Infisical often publishes AAAA records that are unreachable;
     /// .NET's Happy Eyeballs prefers IPv6 and blocks until timeout.
     /// </summary>
-    private static SocketsHttpHandler CreateIpv4Handler() => new()
+    internal static SocketsHttpHandler CreateIpv4Handler() => new()
     {
         ConnectTimeout = TimeSpan.FromSeconds(5),
         ConnectCallback = static async (context, cancellationToken) =>
@@ -228,15 +228,16 @@ public sealed class InfisicalConfigurationProvider : ConfigurationProvider, IDis
         },
     };
 
-    private sealed record InfisicalLoginResponse(
+    internal sealed record InfisicalLoginResponse(
         [property: JsonPropertyName("accessToken")] string? AccessToken);
 
-    private sealed record InfisicalListSecretsResponse(
+    internal sealed record InfisicalListSecretsResponse(
         [property: JsonPropertyName("secrets")] List<InfisicalRawSecret>? Secrets);
 
-    private sealed record InfisicalRawSecret(
+    internal sealed record InfisicalRawSecret(
         [property: JsonPropertyName("secretKey")] string? SecretKey,
-        [property: JsonPropertyName("secretValue")] string? SecretValue);
+        [property: JsonPropertyName("secretValue")] string? SecretValue,
+        [property: JsonPropertyName("version")] int? Version = null);
 
     /// <summary>
     /// Converts an Infisical secret key to .NET configuration format.

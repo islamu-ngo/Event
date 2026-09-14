@@ -79,7 +79,7 @@ public static class ConfigurationBuilderExtensions
         return builder.Add(source);
     }
 
-    private static string? ReadBootstrapValue(
+    internal static string? ReadBootstrapValue(
         string name,
         string flatName,
         IConfiguration configuration,

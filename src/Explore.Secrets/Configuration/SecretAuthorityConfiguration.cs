@@ -74,7 +74,7 @@ public static class SecretAuthorityConfiguration
             source.Paths.AddRange(infisicalPaths);
             source.ThrowOnFirstLoadFailure = true;
         }, environmentName);
-        return PreserveProviderSelection(builder.Build(), provider);
+        return PreserveProviderSelection(builder.Build(), provider, bootstrapConfiguration, environmentName);
     }
 
     public static string GetEnvironmentName(IConfiguration configuration) =>
@@ -89,15 +89,36 @@ public static class SecretAuthorityConfiguration
 
     internal static IConfiguration PreserveProviderSelection(
         IConfiguration authority,
-        SecretProviderType provider) =>
-        new ConfigurationBuilder()
+        SecretProviderType provider,
+        IConfiguration? bootstrapConfiguration = null,
+        string? environmentName = null)
+    {
+        var entries = new Dictionary<string, string?>
+        {
+            [$"{SecretProviderOptions.SectionName}:Provider"] = provider.ToString(),
+            ["SECRET_PROVIDER"] = null,
+        };
+
+        if (provider == SecretProviderType.Infisical && bootstrapConfiguration is not null)
+        {
+            string env = environmentName ?? GetEnvironmentName(bootstrapConfiguration);
+            entries[$"{SecretProviderOptions.SectionName}:Infisical:Url"] =
+                ConfigurationBuilderExtensions.ReadBootstrapValue("Url", "INFISICAL_URL", bootstrapConfiguration, env);
+            entries[$"{SecretProviderOptions.SectionName}:Infisical:ProjectId"] =
+                ConfigurationBuilderExtensions.ReadBootstrapValue("ProjectId", "INFISICAL_PROJECT_ID", bootstrapConfiguration, env);
+            entries[$"{SecretProviderOptions.SectionName}:Infisical:ClientId"] =
+                ConfigurationBuilderExtensions.ReadBootstrapValue("ClientId", "INFISICAL_CLIENT_ID", bootstrapConfiguration, env);
+            entries[$"{SecretProviderOptions.SectionName}:Infisical:ClientSecret"] =
+                ConfigurationBuilderExtensions.ReadBootstrapValue("ClientSecret", "INFISICAL_CLIENT_SECRET", bootstrapConfiguration, env);
+            entries[$"{SecretProviderOptions.SectionName}:Infisical:Environment"] =
+                ConfigurationBuilderExtensions.ReadBootstrapValue("Environment", "INFISICAL_ENV", bootstrapConfiguration, env);
+        }
+
+        return new ConfigurationBuilder()
             .AddConfiguration(authority)
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                [$"{SecretProviderOptions.SectionName}:Provider"] = provider.ToString(),
-                ["SECRET_PROVIDER"] = null,
-            })
+            .AddInMemoryCollection(entries)
             .Build();
+    }
 
     internal static void EnsureUserSecretsEnvironment(string environmentName)
     {

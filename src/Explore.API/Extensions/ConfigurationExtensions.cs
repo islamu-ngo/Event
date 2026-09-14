@@ -2,6 +2,7 @@ namespace Explore.API.Extensions;
 
 using Explore.Domain.Constants;
 using Explore.Domain.Secrets;
+using Explore.Secrets.Abstractions;
 using Explore.Secrets.Configuration;
 using Explore.Secrets.Database;
 
@@ -463,6 +464,21 @@ public static class ConfigurationExtensions
             NormalizeBoolean(ReadFirst(config, "USE_COMMERCIAL_LUCKYPENNY", "Licensing:LuckyPenny:Enabled")));
         TrySet(mappedConfig, config, "Licensing:LuckyPenny:LicenseKey",
             ReadFirst(config, "LUCKYPENNY_LICENSE_KEY", "Licensing:LuckyPenny:LicenseKey"));
+
+        // Secret Provider Options
+        var secretProvider = config[$"{SecretProviderOptions.SectionName}:Provider"];
+        if (!string.IsNullOrWhiteSpace(secretProvider))
+        {
+            mappedConfig[$"{SecretProviderOptions.SectionName}:Provider"] = secretProvider;
+            if (string.Equals(secretProvider, nameof(SecretProviderType.Infisical), StringComparison.OrdinalIgnoreCase))
+            {
+                TrySet(mappedConfig, config, $"{SecretProviderOptions.SectionName}:Infisical:Url", config[$"{SecretProviderOptions.SectionName}:Infisical:Url"]);
+                TrySet(mappedConfig, config, $"{SecretProviderOptions.SectionName}:Infisical:ProjectId", config[$"{SecretProviderOptions.SectionName}:Infisical:ProjectId"]);
+                TrySet(mappedConfig, config, $"{SecretProviderOptions.SectionName}:Infisical:ClientId", config[$"{SecretProviderOptions.SectionName}:Infisical:ClientId"]);
+                TrySet(mappedConfig, config, $"{SecretProviderOptions.SectionName}:Infisical:ClientSecret", config[$"{SecretProviderOptions.SectionName}:Infisical:ClientSecret"]);
+                TrySet(mappedConfig, config, $"{SecretProviderOptions.SectionName}:Infisical:Environment", config[$"{SecretProviderOptions.SectionName}:Infisical:Environment"]);
+            }
+        }
 
         configBuilder.AddInMemoryCollection(mappedConfig);
     }

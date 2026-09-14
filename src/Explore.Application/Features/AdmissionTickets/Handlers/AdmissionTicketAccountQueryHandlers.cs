@@ -2,11 +2,11 @@ using System.Collections.Immutable;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.AdmissionTickets;
 using Explore.Application.Features.AdmissionTickets.Requests.Queries;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.AdmissionTickets.Handlers;
 
@@ -15,11 +15,11 @@ public sealed class GetCurrentAdmissionTicketsQueryHandler(
     IAdmissionTicketPresentationResolver presentationResolver,
     ITenantContext tenantContext,
     IUserContext userContext) :
-    IRequestHandler<GetCurrentAdmissionTicketsQuery, IReadOnlyList<AdmissionTicketDto>>
+    IQueryHandler<GetCurrentAdmissionTicketsQuery, IReadOnlyList<AdmissionTicketDto>>
 {
-    public async Task<IReadOnlyList<AdmissionTicketDto>> Handle(
-        GetCurrentAdmissionTicketsQuery request,
-        CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<AdmissionTicketDto>> QueryAsync(
+        GetCurrentAdmissionTicketsQuery query,
+        CancellationToken cancellationToken = default)
     {
         Guid accountUserId = userContext.GetRequiredUserId();
         IReadOnlyList<AdmissionTicket> tickets = await repository.ListCurrentAsync(
@@ -67,16 +67,16 @@ public sealed class GetCurrentAdmissionTicketQueryHandler(
     IAdmissionTicketPresentationResolver presentationResolver,
     ITenantContext tenantContext,
     IUserContext userContext) :
-    IRequestHandler<GetCurrentAdmissionTicketQuery, AdmissionTicketDto>
+    IQueryHandler<GetCurrentAdmissionTicketQuery, AdmissionTicketDto>
 {
-    public async Task<AdmissionTicketDto> Handle(
-        GetCurrentAdmissionTicketQuery request,
-        CancellationToken cancellationToken)
+    public async Task<AdmissionTicketDto> QueryAsync(
+        GetCurrentAdmissionTicketQuery query,
+        CancellationToken cancellationToken = default)
     {
         AdmissionTicket? ticket = await repository.GetOwnedAsync(
             tenantContext.TenantId,
             userContext.GetRequiredUserId(),
-            request.TicketId,
+            query.TicketId,
             cancellationToken);
         if (ticket is null)
         {

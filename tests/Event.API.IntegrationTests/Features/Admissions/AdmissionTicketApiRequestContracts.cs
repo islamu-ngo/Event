@@ -1,4 +1,5 @@
 using System.Reflection;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.RegistrationOrders;
 using MediatR;
 
@@ -78,7 +79,9 @@ internal sealed class AdmissionApiRequestContracts
     {
         Type declaredResponse = requestType.GetInterfaces()
             .Single(contract => contract.IsGenericType
-                                && contract.GetGenericTypeDefinition() == typeof(IRequest<>))
+                                && (contract.GetGenericTypeDefinition() == typeof(IRequest<>)
+                                    || contract.GetGenericTypeDefinition() == typeof(ICommand<>)
+                                    || contract.GetGenericTypeDefinition() == typeof(IQuery<>)))
             .GetGenericArguments()[0];
         if (declaredResponse != responseType)
             throw new InvalidOperationException(
@@ -101,19 +104,19 @@ internal sealed record AdmissionRequestContract(
 
 internal static class CanonicalProbeRequests
 {
-    internal sealed record RequestAdmissionTicketRecoveryCommand(string Email) : IRequest<ProbeResponse>;
+    internal sealed record RequestAdmissionTicketRecoveryCommand(string Email) : ICommand<ProbeResponse>;
     internal sealed record RedeemAdmissionTicketRecoveryCommand(string Capability, string WrongMember)
-        : IRequest<ProbeResponse>;
-    internal sealed record GetCurrentAdmissionTicketsQuery : IRequest<IReadOnlyList<ProbeResponse>>;
+        : ICommand<ProbeResponse>;
+    internal sealed record GetCurrentAdmissionTicketsQuery : IQuery<IReadOnlyList<ProbeResponse>>;
     internal sealed record GetCurrentAdmissionTicketQuery(Guid TicketId, ProbeNestedTicket Nested)
-        : IRequest<ProbeResponse>;
-    internal sealed record ReissueCurrentAdmissionTicketQrCommand(Guid TicketId) : IRequest<ProbeResponse>;
-    internal sealed record ReissueCurrentAdmissionTicketPrintCommand(Guid TicketId) : IRequest<ProbeResponse>;
+        : IQuery<ProbeResponse>;
+    internal sealed record ReissueCurrentAdmissionTicketQrCommand(Guid TicketId) : ICommand<ProbeResponse>;
+    internal sealed record ReissueCurrentAdmissionTicketPrintCommand(Guid TicketId) : ICommand<ProbeResponse>;
 }
 
 internal static class DecoyProbeRequests
 {
-    internal sealed record RedeemAdmissionTicketRecoveryCommand(string Capability) : IRequest<ProbeResponse>;
+    internal sealed record RedeemAdmissionTicketRecoveryCommand(string Capability) : ICommand<ProbeResponse>;
 }
 
 internal sealed record ProbeNestedTicket(Guid TicketId);

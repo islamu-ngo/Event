@@ -1,6 +1,14 @@
 using System.Collections.Concurrent;
 using System.Threading.RateLimiting;
 using Event.Api.IntegrationTests.Fixtures;
+using Explore.Application;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.DTOs.AdmissionTickets;
+using Explore.Application.Features.AdmissionTickets.Handlers;
+using Explore.Application.Features.AdmissionTickets.Handlers.Commands;
+using Explore.Application.Features.AdmissionTickets.Requests.Commands;
+using Explore.Application.Features.AdmissionTickets.Requests.Queries;
+using Explore.Application.Operations;
 using MediatR;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -49,6 +57,46 @@ internal sealed class AdmissionApiFactory : AuthenticatedWebApplicationFactory
             services.AddSingleton<IMediator>(provider => new AdmissionScenarioMediator(
                 provider.GetRequiredService<AdmissionScenarioDispatcher>()));
             services.AddSingleton<ISender>(provider => provider.GetRequiredService<IMediator>());
+
+            var catalog = services.SingleOrDefault(d => d.ServiceType == typeof(NativeOperationCatalog))?.ImplementationInstance as NativeOperationCatalog;
+            Type[] prodHandlers =
+            [
+                typeof(GetCurrentAdmissionTicketsQueryHandler),
+                typeof(GetCurrentAdmissionTicketQueryHandler),
+                typeof(ReissueCurrentAdmissionTicketQrCommandHandler),
+                typeof(ReissueCurrentAdmissionTicketPrintCommandHandler),
+                typeof(RequestAdmissionTicketRecoveryCommandHandler),
+                typeof(RedeemAdmissionTicketRecoveryCommandHandler)
+            ];
+
+            if (catalog is not null)
+            {
+                foreach (var prod in prodHandlers)
+                {
+                    var entries = catalog.Registrations.Where(r => r.Implementation == prod).ToArray();
+                    foreach (var entry in entries)
+                    {
+                        catalog.Registrations.Remove(entry);
+                        services.Remove(entry.PublicDescriptor);
+                        services.Remove(entry.ConcreteDescriptor);
+                    }
+                }
+            }
+
+            services.AddNativeOperations([
+                typeof(GetCurrentAdmissionTicketsQuery),
+                typeof(AdmissionScenarioGetTicketsHandler),
+                typeof(GetCurrentAdmissionTicketQuery),
+                typeof(AdmissionScenarioGetTicketHandler),
+                typeof(ReissueCurrentAdmissionTicketQrCommand),
+                typeof(AdmissionScenarioReissueQrHandler),
+                typeof(ReissueCurrentAdmissionTicketPrintCommand),
+                typeof(AdmissionScenarioReissuePrintHandler),
+                typeof(RequestAdmissionTicketRecoveryCommand),
+                typeof(AdmissionScenarioRequestRecoveryHandler),
+                typeof(RedeemAdmissionTicketRecoveryCommand),
+                typeof(AdmissionScenarioRedeemRecoveryHandler)
+            ]);
             if (enableRecoveryRateLimit)
             {
                 services.PostConfigure<RateLimiterOptions>(options =>
@@ -97,10 +145,64 @@ internal sealed class AdmissionScenarioMediator(AdmissionScenarioDispatcher disp
     public Task Publish<TNotification>(
         TNotification notification,
         CancellationToken cancellationToken = default)
-        where TNotification : INotification => throw Unsupported(notification.GetType().AssemblyQualifiedName);
+        where TNotification : MediatR.INotification => throw Unsupported(notification.GetType().AssemblyQualifiedName);
 
     private static InvalidOperationException Unsupported(string? identity) =>
         new($"Admission API test mediator received unsupported exact type '{identity ?? "<unknown>"}'.");
+}
+
+internal sealed class AdmissionScenarioGetTicketsHandler(AdmissionScenarioDispatcher dispatcher)
+    : IQueryHandler<GetCurrentAdmissionTicketsQuery, IReadOnlyList<AdmissionTicketDto>>
+{
+    public Task<IReadOnlyList<AdmissionTicketDto>> QueryAsync(
+        GetCurrentAdmissionTicketsQuery query,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult((IReadOnlyList<AdmissionTicketDto>)dispatcher.Dispatch(query, typeof(IReadOnlyList<AdmissionTicketDto>))!);
+}
+
+internal sealed class AdmissionScenarioGetTicketHandler(AdmissionScenarioDispatcher dispatcher)
+    : IQueryHandler<GetCurrentAdmissionTicketQuery, AdmissionTicketDto>
+{
+    public Task<AdmissionTicketDto> QueryAsync(
+        GetCurrentAdmissionTicketQuery query,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult((AdmissionTicketDto)dispatcher.Dispatch(query, typeof(AdmissionTicketDto))!);
+}
+
+internal sealed class AdmissionScenarioReissueQrHandler(AdmissionScenarioDispatcher dispatcher)
+    : ICommandHandler<ReissueCurrentAdmissionTicketQrCommand, AdmissionTicketQrDeliveryDto>
+{
+    public Task<AdmissionTicketQrDeliveryDto> ExecuteAsync(
+        ReissueCurrentAdmissionTicketQrCommand command,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult((AdmissionTicketQrDeliveryDto)dispatcher.Dispatch(command, typeof(AdmissionTicketQrDeliveryDto))!);
+}
+
+internal sealed class AdmissionScenarioReissuePrintHandler(AdmissionScenarioDispatcher dispatcher)
+    : ICommandHandler<ReissueCurrentAdmissionTicketPrintCommand, AdmissionTicketPrintDeliveryDto>
+{
+    public Task<AdmissionTicketPrintDeliveryDto> ExecuteAsync(
+        ReissueCurrentAdmissionTicketPrintCommand command,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult((AdmissionTicketPrintDeliveryDto)dispatcher.Dispatch(command, typeof(AdmissionTicketPrintDeliveryDto))!);
+}
+
+internal sealed class AdmissionScenarioRequestRecoveryHandler(AdmissionScenarioDispatcher dispatcher)
+    : ICommandHandler<RequestAdmissionTicketRecoveryCommand, AdmissionTicketRecoveryRequestResultDto>
+{
+    public Task<AdmissionTicketRecoveryRequestResultDto> ExecuteAsync(
+        RequestAdmissionTicketRecoveryCommand command,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult((AdmissionTicketRecoveryRequestResultDto)dispatcher.Dispatch(command, typeof(AdmissionTicketRecoveryRequestResultDto))!);
+}
+
+internal sealed class AdmissionScenarioRedeemRecoveryHandler(AdmissionScenarioDispatcher dispatcher)
+    : ICommandHandler<RedeemAdmissionTicketRecoveryCommand, AdmissionTicketRecoveryConsumeResultDto>
+{
+    public Task<AdmissionTicketRecoveryConsumeResultDto> ExecuteAsync(
+        RedeemAdmissionTicketRecoveryCommand command,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult((AdmissionTicketRecoveryConsumeResultDto)dispatcher.Dispatch(command, typeof(AdmissionTicketRecoveryConsumeResultDto))!);
 }
 
 internal sealed class FixedTimeProvider(DateTime utcNow) : TimeProvider

@@ -4,11 +4,11 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.AdmissionTickets;
 using Explore.Application.Features.AdmissionTickets.Requests.Commands;
 using Explore.Application.Features.AdmissionTickets.Requests.Queries;
 using Explore.Application.Hateoas;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -20,7 +20,11 @@ namespace Explore.API.Controllers;
 [EndpointClassification(EndpointClass.Authenticated)]
 [Route("api/tickets")]
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
-public sealed class AdmissionTicketController(IMediator mediator) : ControllerBase
+public sealed class AdmissionTicketController(
+    IQueryHandler<GetCurrentAdmissionTicketsQuery, IReadOnlyList<AdmissionTicketDto>> getTicketsHandler,
+    IQueryHandler<GetCurrentAdmissionTicketQuery, AdmissionTicketDto> getTicketHandler,
+    ICommandHandler<ReissueCurrentAdmissionTicketQrCommand, AdmissionTicketQrDeliveryDto> reissueQrHandler,
+    ICommandHandler<ReissueCurrentAdmissionTicketPrintCommand, AdmissionTicketPrintDeliveryDto> reissuePrintHandler) : ControllerBase
 {
     private static readonly ApiNotFoundProblemDescriptor TicketNotFound = new(
         "Admission ticket not found",
@@ -36,7 +40,7 @@ public sealed class AdmissionTicketController(IMediator mediator) : ControllerBa
     public async Task<ActionResult<HalCollectionResource<AdmissionTicketDto>>> List(
         CancellationToken cancellationToken)
     {
-        IReadOnlyList<AdmissionTicketDto> tickets = await mediator.Send(
+        IReadOnlyList<AdmissionTicketDto> tickets = await getTicketsHandler.QueryAsync(
             new GetCurrentAdmissionTicketsQuery(),
             cancellationToken);
         HalResource<AdmissionTicketDto>[] resources = tickets.Select(Resource).ToArray();
@@ -62,7 +66,7 @@ public sealed class AdmissionTicketController(IMediator mediator) : ControllerBa
         Guid ticketId,
         CancellationToken cancellationToken)
     {
-        AdmissionTicketDto? ticket = await mediator.Send(
+        AdmissionTicketDto? ticket = await getTicketHandler.QueryAsync(
             new GetCurrentAdmissionTicketQuery(ticketId),
             cancellationToken);
         return ticket is null
@@ -81,7 +85,7 @@ public sealed class AdmissionTicketController(IMediator mediator) : ControllerBa
         Guid ticketId,
         CancellationToken cancellationToken)
     {
-        AdmissionTicketQrDeliveryDto? delivery = await mediator.Send(
+        AdmissionTicketQrDeliveryDto? delivery = await reissueQrHandler.ExecuteAsync(
             new ReissueCurrentAdmissionTicketQrCommand(ticketId),
             cancellationToken);
         return delivery is null
@@ -100,7 +104,7 @@ public sealed class AdmissionTicketController(IMediator mediator) : ControllerBa
         Guid ticketId,
         CancellationToken cancellationToken)
     {
-        AdmissionTicketPrintDeliveryDto? delivery = await mediator.Send(
+        AdmissionTicketPrintDeliveryDto? delivery = await reissuePrintHandler.ExecuteAsync(
             new ReissueCurrentAdmissionTicketPrintCommand(ticketId),
             cancellationToken);
         return delivery is null

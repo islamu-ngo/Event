@@ -1,9 +1,9 @@
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.AdmissionTickets;
 using Explore.Application.Features.AdmissionTickets.Requests.Commands;
 using Explore.Application.Services.Registration;
-using MediatR;
 
 namespace Explore.Application.Features.AdmissionTickets.Handlers.Commands;
 
@@ -11,14 +11,14 @@ public sealed class ReissueCurrentAdmissionTicketQrCommandHandler(
     AdmissionTicketAccountDeliveryService deliveryService,
     IAdmissionTicketPresentationResolver presentationResolver,
     ITenantContext tenantContext) :
-    IRequestHandler<ReissueCurrentAdmissionTicketQrCommand, AdmissionTicketQrDeliveryDto>
+    ICommandHandler<ReissueCurrentAdmissionTicketQrCommand, AdmissionTicketQrDeliveryDto>
 {
-    public async Task<AdmissionTicketQrDeliveryDto> Handle(
-        ReissueCurrentAdmissionTicketQrCommand request,
-        CancellationToken cancellationToken)
+    public async Task<AdmissionTicketQrDeliveryDto> ExecuteAsync(
+        ReissueCurrentAdmissionTicketQrCommand command,
+        CancellationToken cancellationToken = default)
     {
         AdmissionRecoveryTicketDocument? document = await deliveryService.ReissueAsync(
-            request.TicketId,
+            command.TicketId,
             cancellationToken);
         if (document is null)
         {
@@ -39,14 +39,14 @@ public sealed class ReissueCurrentAdmissionTicketPrintCommandHandler(
     AdmissionTicketAccountDeliveryService deliveryService,
     IAdmissionTicketPresentationResolver presentationResolver,
     ITenantContext tenantContext) :
-    IRequestHandler<ReissueCurrentAdmissionTicketPrintCommand, AdmissionTicketPrintDeliveryDto>
+    ICommandHandler<ReissueCurrentAdmissionTicketPrintCommand, AdmissionTicketPrintDeliveryDto>
 {
-    public async Task<AdmissionTicketPrintDeliveryDto> Handle(
-        ReissueCurrentAdmissionTicketPrintCommand request,
-        CancellationToken cancellationToken)
+    public async Task<AdmissionTicketPrintDeliveryDto> ExecuteAsync(
+        ReissueCurrentAdmissionTicketPrintCommand command,
+        CancellationToken cancellationToken = default)
     {
         AdmissionRecoveryTicketDocument? document = await deliveryService.ReissueAsync(
-            request.TicketId,
+            command.TicketId,
             cancellationToken);
         if (document is null)
         {

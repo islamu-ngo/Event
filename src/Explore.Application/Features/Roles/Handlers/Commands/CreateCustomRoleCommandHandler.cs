@@ -1,16 +1,16 @@
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Roles.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.Roles.Handlers.Commands;
 
-public class CreateCustomRoleCommandHandler : IRequestHandler<CreateCustomRoleCommand, BaseCommandResponse<int>>
+public class CreateCustomRoleCommandHandler : ICommandHandler<CreateCustomRoleCommand, BaseCommandResponse<int>>
 {
     private readonly IRoleRepository _roleRepository;
     private readonly ICapabilityCeilingService _capabilityCeiling;
@@ -32,7 +32,7 @@ public class CreateCustomRoleCommandHandler : IRequestHandler<CreateCustomRoleCo
         _logger = logger;
     }
 
-    public async Task<BaseCommandResponse<int>> Handle(CreateCustomRoleCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<int>> ExecuteAsync(CreateCustomRoleCommand request, CancellationToken cancellationToken)
     {
         // Validate name
         if (string.IsNullOrWhiteSpace(request.FullName))

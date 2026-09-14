@@ -1,9 +1,9 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Roles.Requests.Commands;
 
-public sealed record UpdateRolePermissionsCommand : IRequest<BaseCommandResponse<int>>
+public sealed record UpdateRolePermissionsCommand : ICommand<BaseCommandResponse<int>>
 {
     public int RoleId { get; init; }
 

@@ -1,6 +1,6 @@
 using Explore.Application.Authorization;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Responses;
-using MediatR;
 
 namespace Explore.Application.Features.Admissions.Requests.Commands;
 
@@ -17,7 +17,7 @@ public sealed record CompleteParticipantAdmissionCommand(
     Guid RegistrationOrderId,
     Guid RegistrationTicketAssignmentId,
     Guid ParticipantId) :
-    IRequest<BaseCommandResponse<Guid>>,
+    ICommand<BaseCommandResponse<Guid>>,
     IParticipantAdmissionCommand;
 
 [AuthorizeResource(
@@ -28,7 +28,7 @@ public sealed record ApproveParticipantAdmissionCommand(
     Guid RegistrationOrderId,
     Guid RegistrationTicketAssignmentId,
     Guid ParticipantId) :
-    IRequest<BaseCommandResponse<Guid>>,
+    ICommand<BaseCommandResponse<Guid>>,
     IParticipantAdmissionCommand,
     ISecureRequest
 {
@@ -47,7 +47,7 @@ public sealed record RevokeParticipantAdmissionCommand(
     Guid RegistrationOrderId,
     Guid RegistrationTicketAssignmentId,
     Guid ParticipantId) :
-    IRequest<BaseCommandResponse<Guid>>,
+    ICommand<BaseCommandResponse<Guid>>,
     IParticipantAdmissionCommand,
     ISecureRequest
 {

@@ -5,13 +5,13 @@ using Explore.API.Extensions;
 using Explore.API.Filters;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Admissions;
 using Explore.Application.Features.Admissions;
 using Explore.Application.Features.Admissions.Requests.Commands;
 using Explore.Application.Features.Admissions.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -26,7 +26,10 @@ namespace Explore.API.Controllers;
 [ApiController]
 [EndpointClassification(EndpointClass.Public)]
 public sealed class ParticipantReadinessController(
-    IMediator mediator,
+    IQueryHandler<GetParticipantReadinessQuery, ParticipantReadinessDto?> readinessQuery,
+    ICommandHandler<CompleteParticipantAdmissionCommand, BaseCommandResponse<Guid>> completeCommand,
+    ICommandHandler<ApproveParticipantAdmissionCommand, BaseCommandResponse<Guid>> approveCommand,
+    ICommandHandler<RevokeParticipantAdmissionCommand, BaseCommandResponse<Guid>> revokeCommand,
     IResourceAssembler<
         ParticipantReadinessDto,
         ParticipantReadinessDto> assembler) :
@@ -90,7 +93,7 @@ public sealed class ParticipantReadinessController(
             CancellationToken cancellationToken = default)
     {
         ParticipantReadinessDto? readiness =
-            await mediator.Send(
+            await readinessQuery.QueryAsync(
                 Query(
                     eventId,
                     orderId,
@@ -138,7 +141,7 @@ public sealed class ParticipantReadinessController(
             Guid assignmentId,
             CancellationToken cancellationToken = default) =>
         await MapMutationAsync(
-            await mediator.Send(
+            await completeCommand.ExecuteAsync(
                 new CompleteParticipantAdmissionCommand(
                     eventId,
                     orderId,
@@ -184,7 +187,7 @@ public sealed class ParticipantReadinessController(
             Guid assignmentId,
             CancellationToken cancellationToken = default) =>
         await MapMutationAsync(
-            await mediator.Send(
+            await approveCommand.ExecuteAsync(
                 new ApproveParticipantAdmissionCommand(
                     eventId,
                     orderId,
@@ -230,7 +233,7 @@ public sealed class ParticipantReadinessController(
             Guid assignmentId,
             CancellationToken cancellationToken = default) =>
         await MapMutationAsync(
-            await mediator.Send(
+            await revokeCommand.ExecuteAsync(
                 new RevokeParticipantAdmissionCommand(
                     eventId,
                     orderId,
@@ -259,7 +262,7 @@ public sealed class ParticipantReadinessController(
         }
 
         ParticipantReadinessDto? readiness =
-            await mediator.Send(
+            await readinessQuery.QueryAsync(
                 Query(
                     eventId,
                     orderId,

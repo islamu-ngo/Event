@@ -1,5 +1,5 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Admissions;
-using MediatR;
 
 namespace Explore.Application.Features.Admissions.Requests.Queries;
 
@@ -9,4 +9,4 @@ public sealed record GetParticipantReadinessQuery(
     Guid ParticipantId,
     Guid RegistrationTicketAssignmentId,
     string? CapabilityToken) :
-    IRequest<ParticipantReadinessDto?>;
+    IQuery<ParticipantReadinessDto?>;

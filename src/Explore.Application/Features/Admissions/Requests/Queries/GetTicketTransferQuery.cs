@@ -1,5 +1,5 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Admissions;
-using MediatR;
 
 namespace Explore.Application.Features.Admissions.Requests.Queries;
 
@@ -8,4 +8,4 @@ public sealed record GetTicketTransferQuery(
     Guid AdmissionTicketId,
     Guid AdmissionTicketTransferId,
     string? CapabilityToken) :
-    IRequest<TicketTransferDto?>;
+    IQuery<TicketTransferDto?>;

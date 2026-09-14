@@ -1,12 +1,12 @@
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Admissions;
 using Explore.Application.Features.Admissions.Handlers.Commands;
 using Explore.Application.Features.Admissions.Requests.Queries;
 using Explore.Domain;
 using Explore.Domain.ValueObjects;
-using MediatR;
 
 namespace Explore.Application.Features.Admissions.Handlers.Queries;
 
@@ -16,18 +16,18 @@ public sealed class GetTicketTransferQueryHandler(
     ICurrentUserService currentUser,
     IGuestCapabilityTokenService capabilityTokens,
     TimeProvider timeProvider) :
-    IRequestHandler<GetTicketTransferQuery, TicketTransferDto?>
+    IQueryHandler<GetTicketTransferQuery, TicketTransferDto?>
 {
-    public async Task<TicketTransferDto?> Handle(
-        GetTicketTransferQuery request,
-        CancellationToken cancellationToken)
+    public async Task<TicketTransferDto?> QueryAsync(
+        GetTicketTransferQuery query,
+        CancellationToken cancellationToken = default)
     {
         AdmissionTicketTransferAccessContext? access =
             await repository.GetAccessAsync(
                 tenantContext.TenantId,
-                request.EventId,
-                request.AdmissionTicketId,
-                request.AdmissionTicketTransferId,
+                query.EventId,
+                query.AdmissionTicketId,
+                query.AdmissionTicketTransferId,
                 cancellationToken);
         if (access is null)
         {
@@ -38,7 +38,7 @@ public sealed class GetTicketTransferQueryHandler(
             access.Transfer.IsOpen
             && timeProvider.GetUtcNow().UtcDateTime <= access.Transfer.ExpiresAt
             && capabilityTokens.Matches(
-                request.CapabilityToken,
+                query.CapabilityToken,
                 CapabilityTokenHash.Create(access.Transfer.CapabilityDigest));
         Guid? userId = currentUser.UserId;
         bool sourceAuthority = userId.HasValue

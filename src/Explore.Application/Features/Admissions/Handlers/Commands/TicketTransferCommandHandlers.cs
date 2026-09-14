@@ -1,12 +1,12 @@
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Admissions;
 using Explore.Application.Features.Admissions.Requests.Commands;
 using Explore.Domain;
 using Explore.Domain.ValueObjects;
-using MediatR;
 
 namespace Explore.Application.Features.Admissions.Handlers.Commands;
 
@@ -17,13 +17,13 @@ public sealed class OfferTicketTransferCommandHandler(
     IGuestCapabilityTokenService capabilityTokens,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider) :
-    IRequestHandler<
+    ICommandHandler<
         OfferTicketTransferCommand,
         TicketTransferOfferDto?>
 {
-    public async Task<TicketTransferOfferDto?> Handle(
-        OfferTicketTransferCommand request,
-        CancellationToken cancellationToken)
+    public async Task<TicketTransferOfferDto?> ExecuteAsync(
+        OfferTicketTransferCommand command,
+        CancellationToken cancellationToken = default)
     {
         Guid? userId = currentUser.UserId;
         if (!currentUser.IsAuthenticated
@@ -36,8 +36,8 @@ public sealed class OfferTicketTransferCommandHandler(
         AdmissionTicket? ticket =
             await repository.GetTicketAsync(
                 tenantId,
-                request.EventId,
-                request.AdmissionTicketId,
+                command.EventId,
+                command.AdmissionTicketId,
                 cancellationToken);
         if (ticket is null)
         {
@@ -46,13 +46,13 @@ public sealed class OfferTicketTransferCommandHandler(
         RegistrationOrder? order =
             await repository.GetOrderAsync(
                 tenantId,
-                request.EventId,
+                command.EventId,
                 ticket.RegistrationOrderId,
                 cancellationToken);
         DateTime? eventStartsAt =
             await repository.GetEventStartsAtUtcAsync(
                 tenantId,
-                request.EventId,
+                command.EventId,
                 cancellationToken);
         if (order is null
             || !eventStartsAt.HasValue
@@ -71,8 +71,8 @@ public sealed class OfferTicketTransferCommandHandler(
                 token => repository.OfferAsync(
                     new AdmissionTicketTransferOfferRequest(
                         tenantId,
-                        request.EventId,
-                        request.AdmissionTicketId,
+                        command.EventId,
+                        command.AdmissionTicketId,
                         Guid.CreateVersion7(),
                         issued.Hash.Value,
                         eventStartsAt.Value,
@@ -105,18 +105,18 @@ public sealed class AcceptTicketTransferCommandHandler(
     IAdmissionCredentialDigestService credentials,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider) :
-    IRequestHandler<
+    ICommandHandler<
         AcceptTicketTransferCommand,
         TicketTransferAcceptanceDto?>
 {
-    public async Task<TicketTransferAcceptanceDto?> Handle(
-        AcceptTicketTransferCommand request,
-        CancellationToken cancellationToken)
+    public async Task<TicketTransferAcceptanceDto?> ExecuteAsync(
+        AcceptTicketTransferCommand command,
+        CancellationToken cancellationToken = default)
     {
         Guid? userId = currentUser.UserId;
         if (!currentUser.IsAuthenticated
             || !userId.HasValue
-            || request.RecipientParticipantId == Guid.Empty)
+            || command.RecipientParticipantId == Guid.Empty)
         {
             return null;
         }
@@ -125,13 +125,13 @@ public sealed class AcceptTicketTransferCommandHandler(
         AdmissionTicketTransferAccessContext? access =
             await repository.GetAccessAsync(
                 tenantId,
-                request.EventId,
-                request.AdmissionTicketId,
-                request.AdmissionTicketTransferId,
+                command.EventId,
+                command.AdmissionTicketId,
+                command.AdmissionTicketTransferId,
                 cancellationToken);
         if (access is null
             || !capabilityTokens.Matches(
-                request.CapabilityToken,
+                command.CapabilityToken,
                 CapabilityTokenHash.Create(
                     access.Transfer.CapabilityDigest)))
         {
@@ -143,7 +143,7 @@ public sealed class AcceptTicketTransferCommandHandler(
             await credentials.CreateAsync(
                 new AdmissionCredentialCreateRequest(
                     tenantId,
-                    request.AdmissionTicketId,
+                    command.AdmissionTicketId,
                     credentialId,
                     "AdmissionTicket",
                     access.Ticket.CredentialGeneration + 1),
@@ -156,12 +156,12 @@ public sealed class AcceptTicketTransferCommandHandler(
                     repository.ApplyAcceptanceAsync(
                         new AdmissionTicketTransferAcceptanceRequest(
                             tenantId,
-                            request.EventId,
-                            request.AdmissionTicketId,
-                            request.AdmissionTicketTransferId,
+                            command.EventId,
+                            command.AdmissionTicketId,
+                            command.AdmissionTicketTransferId,
                             access.Transfer.CapabilityDigest,
                             access.Ticket.CredentialGeneration,
-                            request.RecipientParticipantId,
+                            command.RecipientParticipantId,
                             userId.Value,
                             RequirementsComplete: true,
                             SubjectConsentRecordId: null,
@@ -200,13 +200,13 @@ public sealed class CancelTicketTransferCommandHandler(
     ICurrentUserService currentUser,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider) :
-    IRequestHandler<
+    ICommandHandler<
         CancelTicketTransferCommand,
         TicketTransferDto?>
 {
-    public async Task<TicketTransferDto?> Handle(
-        CancelTicketTransferCommand request,
-        CancellationToken cancellationToken)
+    public async Task<TicketTransferDto?> ExecuteAsync(
+        CancelTicketTransferCommand command,
+        CancellationToken cancellationToken = default)
     {
         if (!currentUser.IsAuthenticated
             || currentUser.UserId is not { } userId)
@@ -218,9 +218,9 @@ public sealed class CancelTicketTransferCommandHandler(
             await unitOfWork.ExecuteInTransactionAsync(
                 token => repository.CancelAsync(
                     tenantContext.TenantId,
-                    request.EventId,
-                    request.AdmissionTicketId,
-                    request.AdmissionTicketTransferId,
+                    command.EventId,
+                    command.AdmissionTicketId,
+                    command.AdmissionTicketTransferId,
                     userId,
                     timeProvider.GetUtcNow().UtcDateTime,
                     token),
@@ -342,17 +342,17 @@ public sealed class CorrectTicketTransferCommandHandler(
         credentials,
         unitOfWork,
         timeProvider),
-    IRequestHandler<
+    ICommandHandler<
         CorrectTicketTransferCommand,
         TicketTransferAcceptanceDto?>
 {
-    public Task<TicketTransferAcceptanceDto?> Handle(
-        CorrectTicketTransferCommand request,
-        CancellationToken cancellationToken) =>
+    public Task<TicketTransferAcceptanceDto?> ExecuteAsync(
+        CorrectTicketTransferCommand command,
+        CancellationToken cancellationToken = default) =>
         RotateAsync(
-            request.EventId,
-            request.AdmissionTicketId,
-            request.AdmissionTicketTransferId,
+            command.EventId,
+            command.AdmissionTicketId,
+            command.AdmissionTicketTransferId,
             "AdmissionTicketTransferCorrected",
             cancellationToken);
 }
@@ -371,17 +371,17 @@ public sealed class ReissueTransferredTicketCommandHandler(
         credentials,
         unitOfWork,
         timeProvider),
-    IRequestHandler<
+    ICommandHandler<
         ReissueTransferredTicketCommand,
         TicketTransferAcceptanceDto?>
 {
-    public Task<TicketTransferAcceptanceDto?> Handle(
-        ReissueTransferredTicketCommand request,
-        CancellationToken cancellationToken) =>
+    public Task<TicketTransferAcceptanceDto?> ExecuteAsync(
+        ReissueTransferredTicketCommand command,
+        CancellationToken cancellationToken = default) =>
         RotateAsync(
-            request.EventId,
-            request.AdmissionTicketId,
-            request.AdmissionTicketTransferId,
+            command.EventId,
+            command.AdmissionTicketId,
+            command.AdmissionTicketTransferId,
             "AdmissionTicketTransferReissued",
             cancellationToken);
 }

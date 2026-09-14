@@ -41,7 +41,7 @@ public sealed class UserMappingHandlerTests
              "DeletedAt":"2000-01-01T00:00:00Z","DeletedBy":"00000000-0000-0000-0000-000000000099",
              "Actor":{"Id":"00000000-0000-0000-0000-000000000099"}}
             """)!;
-        var result = await handler.Handle(new UpdateUserCommand
+        var result = await handler.ExecuteAsync(new UpdateUserCommand
         { UserId = user.Id, ExpectedConcurrencyStamp = user.ConcurrencyStamp, UpdateUserDto = input }, CancellationToken.None);
         var saved = (await repository.GetById(user.Id))!;
         await Assert.That(result.IsSuccess).IsTrue();
@@ -71,7 +71,7 @@ public sealed class UserMappingHandlerTests
         var user = UserMapperTests.CreateUser();
         var cache = new InlineCache();
         var handler = UpdateHandler(UserRepository(user), cache);
-        await Assert.That(async () => await handler.Handle(new UpdateUserCommand
+        await Assert.That(async () => await handler.ExecuteAsync(new UpdateUserCommand
         {
             UserId = user.Id, ExpectedConcurrencyStamp = Guid.Empty,
             UpdateUserDto = new UpdateUserDto { Names = new UpdateUserNamesDto { FirstName = "Changed", LastName = "Person" } }
@@ -86,7 +86,7 @@ public sealed class UserMappingHandlerTests
     {
         var user = UserMapperTests.CreateUser();
         var cache = new InlineCache();
-        var result = await UpdateHandler(UserRepository(user), cache).Handle(new UpdateUserCommand
+        var result = await UpdateHandler(UserRepository(user), cache).ExecuteAsync(new UpdateUserCommand
         {
             UserId = user.Id, ExpectedConcurrencyStamp = user.ConcurrencyStamp,
             UpdateUserDto = new UpdateUserDto { Names = new UpdateUserNamesDto { FirstName = "", LastName = "Person" } }
@@ -108,7 +108,7 @@ public sealed class UserMappingHandlerTests
         var repository = UserRepository(user);
         var handler = new GetUserRequestHandler(repository, Substitute.For<IObjectStorageService>(),
             NullLogger<GetUserRequestHandler>.Instance, new InlineCache(), Substitute.For<IPrivacyErasureStateRepository>());
-        var result = await handler.Handle(new GetUserRequest(user.Id), CancellationToken.None);
+        var result = await handler.QueryAsync(new GetUserRequest(user.Id), CancellationToken.None);
         await Assert.That(result.Email).IsEqualTo("private@example.invalid");
         await Assert.That(result.ActorHandle).IsEqualTo("first.example.invalid");
         await Assert.That(result.ProfileImageUri).IsEqualTo(expected);

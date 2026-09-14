@@ -42,7 +42,7 @@ public sealed class GetUserRequestHandlerPrivacyErasureTests
             cache,
             stateRepository);
 
-        UserDto result = await handler.Handle(new GetUserRequest { UserId = userId }, CancellationToken.None);
+        UserDto result = await handler.QueryAsync(new GetUserRequest { UserId = userId }, CancellationToken.None);
 
         await Assert.That(result).IsNull();
         await Assert.That(cache.WasRead).IsFalse();
@@ -92,7 +92,7 @@ public sealed class GetUserRequestHandlerPrivacyErasureTests
             cache,
             stateRepository);
 
-        UserDto result = await handler.Handle(new GetUserRequest { UserId = userId }, CancellationToken.None);
+        UserDto result = await handler.QueryAsync(new GetUserRequest { UserId = userId }, CancellationToken.None);
 
         await Assert.That(result).IsNull();
         await Assert.That(cache.RemovedKeys).Contains($"user:detail:{userId}");

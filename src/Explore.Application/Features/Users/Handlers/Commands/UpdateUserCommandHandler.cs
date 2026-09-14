@@ -1,17 +1,17 @@
 using System.Linq;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.User.Validators;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.Users.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Application.Services;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.Users.Handlers.Commands;
 
-public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, BaseCommandResponse<Guid>>
+public class UpdateUserCommandHandler : ICommandHandler<UpdateUserCommand, BaseCommandResponse<Guid>>
 {
     private readonly IUserRepository _userRepository;
     private readonly IActorRepository _actorRepository;
@@ -39,7 +39,7 @@ public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, BaseC
         _cache = cache;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateUserCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateUserCommand request, CancellationToken cancellationToken = default)
     {
         var validator = new UpdateUserDtoValidator();
         var validationResult = await validator.ValidateAsync(request.UpdateUserDto, cancellationToken);

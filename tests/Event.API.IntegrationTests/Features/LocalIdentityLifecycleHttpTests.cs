@@ -5,6 +5,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Event.Api.IntegrationTests.Fixtures;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.User;
 using Explore.Application.Features.Authentication.Local.Handlers.Commands;
 using Explore.Application.Features.Authentication.Local.Models;
@@ -188,7 +189,7 @@ public sealed class LocalIdentityLifecycleHttpTests
         await using var fixture = await LocalIdentityLifecycleHttpFixture.CreateAsync(verified: false, interceptor: failure);
         await using (var scope = fixture.Host.Services.CreateAsyncScope())
         {
-            UserDto cached = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+            UserDto cached = await scope.ServiceProvider.GetRequiredService<IQueryHandler<GetUserRequest, UserDto>>().QueryAsync(
                 new GetUserRequest { UserId = fixture.Binding.LocalSubjectId }, CancellationToken);
             await Assert.That(cached.EmailVerified).IsFalse();
         }
@@ -211,7 +212,7 @@ public sealed class LocalIdentityLifecycleHttpTests
             var repaired = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
                 new ReconcileLocalIdentityLifecycleMirrorCommand(handoff.Operation), CancellationToken);
             await Assert.That(repaired.IsSuccess).IsTrue();
-            UserDto refreshed = await scope.ServiceProvider.GetRequiredService<ISender>().Send(
+            UserDto refreshed = await scope.ServiceProvider.GetRequiredService<IQueryHandler<GetUserRequest, UserDto>>().QueryAsync(
                 new GetUserRequest { UserId = fixture.Binding.LocalSubjectId }, CancellationToken);
             await Assert.That(refreshed.EmailVerified).IsTrue();
         }

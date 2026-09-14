@@ -1,5 +1,6 @@
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Features.Authentication.Local.Handlers.Commands;
 using Explore.Application.Features.Authentication.Local.Requests.Commands;
@@ -18,17 +19,17 @@ public sealed class LocalAuthenticationCommandHandlerTests
     public async Task ReplacementChallengeNeverEntersOrdinaryUserSynchronization()
     {
         var service = Substitute.For<ILocalIdentityAuthService>();
-        var sender = Substitute.For<ISender>();
+        var syncUserCommandHandler = Substitute.For<ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>>();
         var challenge = new LocalIssuedReplacementChallenge(
             token: Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),
             expiresAt: DateTimeOffset.UtcNow.AddMinutes(5));
         service.AuthenticateAsync(Arg.Any<LocalAuthRequestDto>(), Arg.Any<CancellationToken>())
             .Returns(LocalAuthResponseDto.ReplacementRequired(challenge: challenge));
-        sender.Send(Arg.Any<SyncUserCommand>(), Arg.Any<CancellationToken>())
+        syncUserCommandHandler.ExecuteAsync(Arg.Any<SyncUserCommand>(), Arg.Any<CancellationToken>())
             .Returns<Task<BaseCommandResponse<Guid>>>(_ => throw new InvalidOperationException(
                 "A replacement challenge must not synchronize an ordinary user session."));
         var handler = new LocalLoginCommandHandler(authService: service,
-            providerDispatcher: CreateActiveDispatcher(), sender: sender);
+            providerDispatcher: CreateActiveDispatcher(), syncUserCommandHandler: syncUserCommandHandler);
 
         LocalAuthResponseDto response = await handler.Handle(
             new LocalLoginCommand(new LocalAuthRequestDto(Identifier: "admin@example.test", Password: CreateValidPassword())),
@@ -50,11 +51,11 @@ public sealed class LocalAuthenticationCommandHandlerTests
     public async Task InvalidLoginNeverReachesCredentialService()
     {
         var authService = Substitute.For<ILocalIdentityAuthService>();
-        var sender = Substitute.For<ISender>();
+        var syncUserCommandHandler = Substitute.For<ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>>();
         var handler = new LocalLoginCommandHandler(
             authService,
             CreateActiveDispatcher(),
-            sender);
+            syncUserCommandHandler);
 
         LocalAuthResponseDto result = await handler.Handle(
             new LocalLoginCommand(new LocalAuthRequestDto("invalid", string.Empty)),
@@ -70,20 +71,20 @@ public sealed class LocalAuthenticationCommandHandlerTests
     public async Task SuccessfulLoginSynchronizesNormalizedLocalAccountBeforeReturningToken()
     {
         var authService = Substitute.For<ILocalIdentityAuthService>();
-        var sender = Substitute.For<ISender>();
+        var syncUserCommandHandler = Substitute.For<ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>>();
         LocalAuthResponseDto authenticated = CreateAuthenticatedResponse();
         authService.AuthenticateAsync(
                 Arg.Any<LocalAuthRequestDto>(),
                 Arg.Any<CancellationToken>())
             .Returns(authenticated);
-        sender.Send(
+        syncUserCommandHandler.ExecuteAsync(
                 Arg.Any<SyncUserCommand>(),
                 Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Success(UserId));
         var handler = new LocalLoginCommandHandler(
             authService,
             CreateActiveDispatcher(),
-            sender);
+            syncUserCommandHandler);
 
         LocalAuthResponseDto result = await handler.Handle(
             new LocalLoginCommand(new LocalAuthRequestDto(
@@ -92,7 +93,7 @@ public sealed class LocalAuthenticationCommandHandlerTests
             CancellationToken.None);
 
         await Assert.That(result).IsEqualTo(authenticated);
-        await sender.Received().Send(
+        await syncUserCommandHandler.Received().ExecuteAsync(
             Arg.Is<SyncUserCommand>(command =>
                 command != null
                 && command.AccountKey.ProviderKind == AuthenticationProviderKind.Local
@@ -113,7 +114,7 @@ public sealed class LocalAuthenticationCommandHandlerTests
         var handler = new LocalLoginCommandHandler(
             authService,
             dispatcher,
-            Substitute.For<ISender>());
+            Substitute.For<ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>>());
 
         LocalAuthResponseDto result = await handler.Handle(
             new LocalLoginCommand(new LocalAuthRequestDto(
@@ -133,18 +134,18 @@ public sealed class LocalAuthenticationCommandHandlerTests
     public async Task DeniedIssuanceNeverAttemptsDomainSynchronization(LocalAuthFailure failure)
     {
         var authService = Substitute.For<ILocalIdentityAuthService>();
-        var sender = Substitute.For<ISender>();
+        var syncUserCommandHandler = Substitute.For<ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>>();
         authService.AuthenticateAsync(
                 Arg.Any<LocalAuthRequestDto>(),
                 Arg.Any<CancellationToken>())
             .Returns(LocalAuthResponseDto.Failed(failure: failure));
-        sender.Send(Arg.Any<SyncUserCommand>(), Arg.Any<CancellationToken>())
+        syncUserCommandHandler.ExecuteAsync(Arg.Any<SyncUserCommand>(), Arg.Any<CancellationToken>())
             .Returns<Task<BaseCommandResponse<Guid>>>(_ =>
                 throw new InvalidOperationException("Denied issuance must not synchronize a domain user."));
         var handler = new LocalLoginCommandHandler(
             authService,
             CreateActiveDispatcher(),
-            sender);
+            syncUserCommandHandler);
 
         LocalAuthResponseDto result = await handler.Handle(
             new LocalLoginCommand(new LocalAuthRequestDto(Identifier: "admin@example.test", Password: CreateValidPassword())),
@@ -159,12 +160,12 @@ public sealed class LocalAuthenticationCommandHandlerTests
     public async Task SynchronizationFailureDoesNotExposeNewlyIssuedLoginToken()
     {
         var authService = Substitute.For<ILocalIdentityAuthService>();
-        var sender = Substitute.For<ISender>();
+        var syncUserCommandHandler = Substitute.For<ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>>();
         authService.AuthenticateAsync(
                 Arg.Any<LocalAuthRequestDto>(),
                 Arg.Any<CancellationToken>())
             .Returns(CreateAuthenticatedResponse());
-        sender.Send(
+        syncUserCommandHandler.ExecuteAsync(
                 Arg.Any<SyncUserCommand>(),
                 Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Validation<Guid>(
@@ -173,7 +174,7 @@ public sealed class LocalAuthenticationCommandHandlerTests
         var handler = new LocalLoginCommandHandler(
             authService,
             CreateActiveDispatcher(),
-            sender);
+            syncUserCommandHandler);
 
         LocalAuthResponseDto result = await handler.Handle(
             new LocalLoginCommand(new LocalAuthRequestDto(Identifier: "admin@example.test", Password: CreateValidPassword())),

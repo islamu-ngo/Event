@@ -7,9 +7,12 @@ using Explore.API.Controllers;
 using Explore.API.Hateoas;
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.DTOs.Organization;
 using Explore.Application.DTOs.PrivacyErasure;
 using Explore.Application.DTOs.User;
 using Explore.Application.Features.Users.Requests.Commands;
+using Explore.Application.Features.Users.Requests.Queries;
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
@@ -309,14 +312,24 @@ public class UserControllerTests
             "completed",
             "once-revealed-receipt",
             new DateTime(2026, 9, 18, 0, 0, 0, DateTimeKind.Utc));
-        IMediator mediator = Substitute.For<IMediator>();
+        var deleteUserCommandHandler = Substitute.For<ICommandHandler<DeleteUserCommand, PrivacyErasureStartDto>>();
         var resourceAssembler = Substitute.For<IResourceAssembler<UserDto, UserDto>>();
-        mediator.Send(
+        deleteUserCommandHandler.ExecuteAsync(
                 Arg.Is<DeleteUserCommand>(command =>
                     command.UserId == userId && command.IntentId == intentId),
                 Arg.Any<CancellationToken>())
             .Returns(expected);
-        var controller = new UserController(mediator, identity.Query, resourceAssembler)
+        var controller = new UserController(
+            Substitute.For<ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>>>(),
+            Substitute.For<IQueryHandler<GetUserRequest, UserDto>>(),
+            Substitute.For<IQueryHandler<GetAdminAuthorityRequest, AdminAuthorityDto>>(),
+            Substitute.For<IQueryHandler<ResolveUserTenantRedirectionRequest, UserTenantRedirectionDto>>(),
+            Substitute.For<ICommandHandler<UpdateUserLastActiveTenantCommand, bool>>(),
+            Substitute.For<IQueryHandler<GetUserOrganizationsRequest, List<OrganizationListDto>>>(),
+            Substitute.For<ICommandHandler<UpdateUserCommand, BaseCommandResponse<Guid>>>(),
+            deleteUserCommandHandler,
+            identity.Query,
+            resourceAssembler)
         {
             ControllerContext = new ControllerContext
             {

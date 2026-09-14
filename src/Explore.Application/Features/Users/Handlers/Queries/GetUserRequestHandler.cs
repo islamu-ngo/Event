@@ -3,17 +3,17 @@ using System.Threading;
 using System.Threading.Tasks;
 using Explore.Application.Mappings;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.User;
 using Explore.Application.Features.Users.Requests.Queries;
 using Explore.Application.Services;
-using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.Users.Handlers.Queries;
 
-public class GetUserRequestHandler : IRequestHandler<GetUserRequest, UserDto>
+public class GetUserRequestHandler : IQueryHandler<GetUserRequest, UserDto>
 {
     private readonly IUserRepository _userRepository;
     private readonly IObjectStorageService _objectStorageService;
@@ -35,7 +35,7 @@ public class GetUserRequestHandler : IRequestHandler<GetUserRequest, UserDto>
         _privacyErasureStateRepository = privacyErasureStateRepository;
     }
 
-    public async Task<UserDto> Handle(GetUserRequest request, CancellationToken cancellationToken)
+    public async Task<UserDto> QueryAsync(GetUserRequest request, CancellationToken cancellationToken = default)
     {
         if (await _privacyErasureStateRepository.GetBySubjectAsync(request.UserId, cancellationToken) is not null)
         {

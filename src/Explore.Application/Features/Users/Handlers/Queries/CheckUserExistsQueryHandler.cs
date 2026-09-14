@@ -1,10 +1,10 @@
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Features.Users.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.Users.Handlers.Queries;
 
-public class CheckUserExistsQueryHandler : IRequestHandler<CheckUserExistsQuery, bool>
+public class CheckUserExistsQueryHandler : IQueryHandler<CheckUserExistsQuery, bool>
 {
     private readonly IUserRepository _userRepository;
 
@@ -13,7 +13,7 @@ public class CheckUserExistsQueryHandler : IRequestHandler<CheckUserExistsQuery,
         _userRepository = userRepository;
     }
 
-    public async Task<bool> Handle(CheckUserExistsQuery request, CancellationToken cancellationToken)
+    public async Task<bool> QueryAsync(CheckUserExistsQuery request, CancellationToken cancellationToken = default)
     {
         return await _userRepository.ExistsByEmail(request.Email);
     }

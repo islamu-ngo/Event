@@ -1,5 +1,7 @@
 
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
+using Explore.Application.Features.Users.Requests.Commands;
 using Explore.Application.Responses;
 using MediatR;
 using Microsoft.Extensions.Caching.Hybrid;
@@ -11,14 +13,16 @@ public sealed record ReconcileLocalIdentityLifecycleMirrorCommand(
     LocalIdentityLifecyclePointer Operation) : IRequest<BaseCommandResponse<Guid>>;
 
 public sealed class ReconcileLocalIdentityLifecycleMirrorCommandHandler(
-    ILocalIdentityLifecycleStore lifecycle, ISender sender, HybridCache cache)
+    ILocalIdentityLifecycleStore lifecycle,
+    ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>> syncUserCommandHandler,
+    HybridCache cache)
     : IRequestHandler<ReconcileLocalIdentityLifecycleMirrorCommand, BaseCommandResponse<Guid>>
 {
     public async Task<BaseCommandResponse<Guid>> Handle(
         ReconcileLocalIdentityLifecycleMirrorCommand request, CancellationToken cancellationToken)
     {
         bool synchronized = await lifecycle.ExecuteSynchronizationAsync(request.Operation,
-            (current, token) => LocalIdentityLifecycleConsumptionOrchestrator.SynchronizeMirrorAsync(current, sender, token),
+            (current, token) => LocalIdentityLifecycleConsumptionOrchestrator.SynchronizeMirrorAsync(current, syncUserCommandHandler, token),
             cancellationToken);
         if (!synchronized) return BaseCommandResponse.Conflict(id: request.Operation.OperationId);
         await cache.RemoveAsync($"user:detail:{request.Operation.LocalSubjectId}", cancellationToken);

@@ -1,12 +1,13 @@
+using System.Collections.Generic;
 using Explore.Application.Mappings;
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Organization;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.Users.Requests.Queries;
 using Explore.Domain.Enums;
-using MediatR;
 
 namespace Explore.Application.Features.Users.Handlers.Queries;
 
@@ -14,7 +15,7 @@ namespace Explore.Application.Features.Users.Handlers.Queries;
 /// Handler to get all organizations a user is a member of.
 /// Uses the OrganizationMember table to find memberships.
 /// </summary>
-public class GetUserOrganizationsRequestHandler : IRequestHandler<GetUserOrganizationsRequest, List<OrganizationListDto>>
+public class GetUserOrganizationsRequestHandler : IQueryHandler<GetUserOrganizationsRequest, List<OrganizationListDto>>
 {
     private readonly IOrganizationMemberRepository _organizationMemberRepository;
     private readonly ICurrentUserService _currentUserService;
@@ -27,7 +28,7 @@ public class GetUserOrganizationsRequestHandler : IRequestHandler<GetUserOrganiz
         _currentUserService = currentUserService;
     }
 
-    public async Task<List<OrganizationListDto>> Handle(GetUserOrganizationsRequest request, CancellationToken cancellationToken)
+    public async Task<List<OrganizationListDto>> QueryAsync(GetUserOrganizationsRequest request, CancellationToken cancellationToken = default)
     {
         var currentUserId = _currentUserService.UserId
             ?? throw new AuthorizationException(ResourceKinds.OrganizationMember, AuthorizationActions.OrganizationMembers.View);

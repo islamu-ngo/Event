@@ -1,10 +1,12 @@
 using Explore.Application.Authentication;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.Authentication.Local.Models;
 using Explore.Application.Features.Authentication.Local.Validators;
 using Explore.Application.DTOs.User;
 using Explore.Application.Features.Authentication.Local.Requests.Commands;
 using Explore.Application.Features.Users.Requests.Commands;
+using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using MediatR;
@@ -14,7 +16,7 @@ namespace Explore.Application.Features.Authentication.Local.Handlers.Commands;
 public sealed class LocalLoginCommandHandler(
     ILocalIdentityAuthService authService,
     IAuthenticationProviderDispatcher providerDispatcher,
-    ISender sender)
+    ICommandHandler<SyncUserCommand, BaseCommandResponse<Guid>> syncUserCommandHandler)
     : IRequestHandler<LocalLoginCommand, LocalAuthResponseDto>
 {
     public async Task<LocalAuthResponseDto> Handle(
@@ -44,7 +46,7 @@ public sealed class LocalLoginCommandHandler(
             return authentication;
         }
 
-        var synchronization = await sender.Send(
+        var synchronization = await syncUserCommandHandler.ExecuteAsync(
             LocalIdentitySyncCommandFactory.Create(authentication),
             cancellationToken).ConfigureAwait(false);
         return synchronization.IsSuccess

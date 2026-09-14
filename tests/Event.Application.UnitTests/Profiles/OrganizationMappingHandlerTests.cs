@@ -131,10 +131,10 @@ public sealed class OrganizationMappingHandlerTests
         await Assert.That(own.Items.Single().CurrentUserRoleId).IsEqualTo((int)RoleEnum.OrgAdmin);
         await Assert.That((await mine.QueryAsync(new GetMyOrganizationsRequest { UserId = "invalid" }, default)).Items).IsEmpty();
         var userOrganizations = new GetUserOrganizationsRequestHandler(members, new CurrentUser(ActorId));
-        await Assert.That((await userOrganizations.Handle(new GetUserOrganizationsRequest(ActorId), default)).Single().CurrentUserRoleId).IsEqualTo((int)RoleEnum.OrgAdmin);
-        await Assert.That(async () => await userOrganizations.Handle(new GetUserOrganizationsRequest(TenantId), default)).Throws<AuthorizationException>();
+        await Assert.That((await userOrganizations.QueryAsync(new GetUserOrganizationsRequest(ActorId), default)).Single().CurrentUserRoleId).IsEqualTo((int)RoleEnum.OrgAdmin);
+        await Assert.That(async () => await userOrganizations.QueryAsync(new GetUserOrganizationsRequest(TenantId), default)).Throws<AuthorizationException>();
         var anonymous = new GetUserOrganizationsRequestHandler(members, new CurrentUser(null));
-        await Assert.That(async () => await anonymous.Handle(new GetUserOrganizationsRequest(ActorId), default)).Throws<AuthorizationException>();
+        await Assert.That(async () => await anonymous.QueryAsync(new GetUserOrganizationsRequest(ActorId), default)).Throws<AuthorizationException>();
         store.Items.Clear();
         first.Pii.FullName = "Changed after publication";
         await Assert.That(page.Items[1].FullName).IsEqualTo("Community organization");

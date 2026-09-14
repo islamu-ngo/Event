@@ -17,7 +17,11 @@ using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
 using Explore.Domain.Settings.Documents;
+using Explore.Domain.Settings.Documents.Payloads;
+using Explore.Domain.ValueObjects;
+using Explore.Application.Settings;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Explore.Application.Features.InstanceOnboarding.Services;
 
@@ -42,7 +46,9 @@ public sealed class InstanceOnboardingCompletionOperation(
     IJwtAuthorityRefreshNotifier jwtRefreshNotifier,
     ITenantBrandingSettingsDocumentProvisioningService brandingProvisioner,
     ILogger<InstanceOnboardingCompletionOperation> logger,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    IInstanceOperatorIdentityReadinessEvaluator instanceOperatorIdentityReadiness,
+    IOptions<InstanceOperatorIdentityOptions>? operatorIdentityOptions = null)
 {
     public Task<BaseCommandResponse<Guid>> CompleteInteractiveAsync(
         CompleteInstanceOnboardingCommand command,
@@ -156,6 +162,60 @@ public sealed class InstanceOnboardingCompletionOperation(
             if (!exact && (user is not null || actor is not null || login is not null))
                 return new(ConfiguredFailure("local_bootstrap_binding_conflict", "Local bootstrap binding conflicts."),
                     false, admission.DeploymentMode, admission.AuditOperation);
+        }
+
+        if (input.IsConfigured && operatorIdentityOptions?.Value is { } options)
+        {
+            var (configuredIdentity, _) = InstanceOperatorIdentity.TryCreate(options);
+            if (configuredIdentity is not null)
+            {
+                SystemSetting? existingIdentitySetting = await systemSettingRepository.GetByKey(
+                    InstanceOperatorIdentitySettingKeys.OperatorIdentity,
+                    cancellationToken);
+                if (existingIdentitySetting is null)
+                {
+                    var settingsPayload = new InstanceOperatorIdentitySettings
+                    {
+                        OperatorId = configuredIdentity.OperatorId,
+                        PublicName = configuredIdentity.PublicName,
+                        LegalName = configuredIdentity.LegalName,
+                        OperatorKindCode = configuredIdentity.OperatorKindCode,
+                        JurisdictionCountryCode = configuredIdentity.JurisdictionCountryCode,
+                        RegistrationIdentifier = configuredIdentity.RegistrationIdentifier,
+                        PublicContactEmail = configuredIdentity.PublicContactEmail,
+                        WebsiteUrl = configuredIdentity.WebsiteUrl,
+                        LegalNoticeUrl = configuredIdentity.LegalNoticeUrl,
+                        TermsUrl = configuredIdentity.TermsUrl,
+                        PrivacyUrl = configuredIdentity.PrivacyUrl,
+                        IsOfficialInstance = configuredIdentity.IsOfficialInstance,
+                        OfficialOrigin = configuredIdentity.OfficialOrigin,
+                        Revision = Guid.CreateVersion7()
+                    };
+                    var setting = new SystemSetting
+                    {
+                        Id = Guid.CreateVersion7(),
+                        SettingKey = InstanceOperatorIdentitySettingKeys.OperatorIdentity,
+                        Value = JsonSerializer.Serialize(settingsPayload, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                        ValueType = SettingValueType.Json,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    await systemSettingRepository.UpsertInCurrentTransactionAsync(setting, cancellationToken);
+                }
+            }
+        }
+
+        InstanceOperatorIdentityReadinessAssessment identityReadiness =
+            await instanceOperatorIdentityReadiness.EvaluateAsync(cancellationToken);
+        if (!identityReadiness.IsReady)
+        {
+            return new(
+                BaseCommandResponse.Failure<Guid>(
+                    identityReadiness.FailureCode ?? "instance_operator_identity_incomplete",
+                    "Instance operator identity is not ready for onboarding completion.",
+                    identityReadiness.ReasonCodes),
+                false,
+                admission.DeploymentMode,
+                admission.AuditOperation);
         }
 
         CompleteInstanceOnboardingRequest settings = admission.Settings!;

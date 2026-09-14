@@ -13,8 +13,8 @@ ISLAMU Event provides a robust, multi-tenant, and **provider-neutral payment arc
 
 ## Paid Checkout Activation Safety
 
-New paid Checkout is disabled by default and fails closed until startup-bound
-`Instance:OperatorIdentity` is complete and `Payments:CheckoutGovernance`
+New paid Checkout is disabled by default and fails closed until persisted
+`instance.operator_identity` is complete and `Payments:CheckoutGovernance`
 defines complaint, refund, dispute, reconciliation, activation, statement, and
 charge-type operations. The browser first reads exact server-authored facts and
 explicitly acknowledges their SHA-256 revision. The resulting
@@ -127,7 +127,7 @@ operator:
 | Role | Authority source | Paid responsibility represented by the system |
 |---|---|---|
 | Tenant directory operator | `tenant.directory-operator-identity` typed settings document | Public accountability for the tenant directory and its legal/contact links |
-| Instance operator | Startup-bound `Instance:OperatorIdentity` | General platform identity and operator legal/contact links |
+| Instance operator | Persisted `instance.operator_identity` (`IInstanceOperatorIdentityReadinessEvaluator`) | General platform identity and operator legal/contact links |
 | Organizer merchant | Event organizer actor plus connected provider account | Recipient/merchant lineage for the direct charge |
 | Payment operations | `Payments:CheckoutGovernance` | Complaint, refund, dispute, reconciliation, activation, statement, and charge-type operations |
 

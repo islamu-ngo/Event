@@ -44,20 +44,19 @@ public sealed class InstanceOperatorIdentityOptionsTests
     }
 
     [Test]
-    public async Task ApplicationRegistrationBindsIdentityAndValidatesItAtStartup()
+    public async Task ApplicationRegistrationBindsIdentityOptions()
     {
         HostApplicationBuilder builder = Host.CreateApplicationBuilder();
         builder.Configuration.AddInMemoryCollection(CompleteConfiguration());
         builder.Services.ConfigureApplicationServices(builder.Configuration);
         using IHost host = builder.Build();
 
-        host.Services.GetRequiredService<IStartupValidator>().Validate();
-        IInstanceOperatorIdentity identity =
-            host.Services.GetRequiredService<IInstanceOperatorIdentity>();
+        InstanceOperatorIdentityOptions options =
+            host.Services.GetRequiredService<IOptions<InstanceOperatorIdentityOptions>>().Value;
 
-        await Assert.That(identity.PublicName).IsEqualTo("Independent Operator");
-        await Assert.That(identity.LegalName).IsEqualTo("Independent Operator ASBL");
-        await Assert.That(identity.JurisdictionCountryCode).IsEqualTo("BE");
+        await Assert.That(options.PublicName).IsEqualTo("Independent Operator");
+        await Assert.That(options.LegalName).IsEqualTo("Independent Operator ASBL");
+        await Assert.That(options.JurisdictionCountryCode).IsEqualTo("BE");
     }
 
     [Test]

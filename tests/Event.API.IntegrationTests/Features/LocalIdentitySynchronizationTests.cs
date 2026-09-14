@@ -18,6 +18,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace Event.API.IntegrationTests.Features;
 
@@ -538,7 +539,7 @@ public sealed class LocalIdentitySynchronizationTests
         services.RemoveAll<ConfiguredAdministratorBootstrapProvider>();
         services.AddScoped(provider => new ConfiguredAdministratorBootstrapProvider(
             configuration: configuration,
-            instanceOperatorIdentity: provider.GetRequiredService<IInstanceOperatorIdentity>(),
+            operatorIdentityOptions: provider.GetRequiredService<IOptions<InstanceOperatorIdentityOptions>>(),
             bootstrapRepository: provider.GetRequiredService<IInstanceBootstrapStateRepository>()));
     }
 

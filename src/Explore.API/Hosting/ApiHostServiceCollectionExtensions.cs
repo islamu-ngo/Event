@@ -27,6 +27,7 @@ using Explore.Infrastructure.Webhooks;
 using Explore.Persistence;
 using Explore.Secrets.Abstractions;
 using Explore.Secrets.Configuration;
+using Explore.Secrets.Database;
 using Explore.Secrets.Extensions;
 using Explore.ServiceDefaults.Configuration;
 using Explore.ServiceDefaults.HealthChecks;
@@ -101,6 +102,17 @@ public static class ApiHostServiceCollectionExtensions
             enableRefreshService: !isOpenApiGeneration);
         builder.Services.AddHttpContextAccessor();
 
+        if ((builder.Environment.IsEnvironment("Testing") || builder.Environment.IsDevelopment()) &&
+            string.IsNullOrWhiteSpace(builder.Configuration[$"{EmbeddedPrivacyErasureAuthorityOptions.SectionName}:Path"]))
+        {
+            var defaultEmbeddedPath = Path.GetFullPath(
+                Path.Combine(builder.Environment.ContentRootPath, "..", "..", "privacy-erasure-authority-data", "aspire-local", "privacy_erasure_authority.db"));
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [$"{EmbeddedPrivacyErasureAuthorityOptions.SectionName}:Path"] = defaultEmbeddedPath
+            });
+        }
+
         var forwardedHeadersTrust = builder.Configuration
             .GetSection(ForwardedHeadersTrustOptions.SectionName)
             .Get<ForwardedHeadersTrustOptions>() ?? new ForwardedHeadersTrustOptions();
@@ -148,9 +160,7 @@ public static class ApiHostServiceCollectionExtensions
         builder.Services.AddScoped<IManagedEventHealthProbe, ManagedEventHealthProbe>();
         builder.Services.AddRouting(options => options.LowercaseUrls = true);
 
-        builder.Services.ConfigureApplicationServices(
-            builder.Configuration,
-            validateInstanceOperatorIdentityOnStart: !isOpenApiGeneration);
+        builder.Services.ConfigureApplicationServices(builder.Configuration);
         builder.Services.ConfigureInfrastructureServices(builder.Configuration, builder.Environment);
         builder.Services.Configure<CerbosPolicyBootSyncOptions>(
             builder.Configuration.GetSection(CerbosPolicyBootSyncOptions.SectionName));

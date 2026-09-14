@@ -18,6 +18,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Explore.Infrastructure.Tests.Infrastructure;
 
@@ -524,7 +525,7 @@ public sealed class ConfiguredAdministratorBootstrapProviderTests
         IConfigurationRoot configuration = ConfiguredConfiguration();
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(configuration);
-        services.AddSingleton<IInstanceOperatorIdentity>(OperatorIdentity());
+        services.AddSingleton(Options.Create(OperatorIdentityOptions()));
         services.AddScoped<ExploreDbContext>(_ => database.Context);
         services.AddScoped<IInstanceBootstrapStateRepository, InstanceBootstrapStateRepository>();
         services.AddScoped<IUnitOfWork, EfCoreUnitOfWork>();
@@ -544,10 +545,28 @@ public sealed class ConfiguredAdministratorBootstrapProviderTests
         await Assert.That(runner).IsNotNull();
     }
 
+    [Test]
+    public async Task ConfiguredAdministrator_WithoutConfiguredOperatorIdentity_BuildsPendingSnapshotWithoutThrowing()
+    {
+        await using var database = await BootstrapDatabase.CreateAsync();
+        var provider = new ConfiguredAdministratorBootstrapProvider(
+            ConfiguredConfiguration(),
+            Options.Create(new InstanceOperatorIdentityOptions()),
+            database.Repository);
+
+        var snapshot = provider.ReadConfiguration();
+
+        await Assert.That(snapshot.Mode).IsEqualTo(InstanceBootstrapMode.ConfiguredAdministrator);
+        await Assert.That(snapshot.Settings).IsNotNull();
+        await Assert.That(snapshot.Settings!.DirectoryOperatorIdentity).IsNull();
+        await Assert.That(snapshot.ConfigurationFingerprint).IsNotNull();
+        await Assert.That(snapshot.SelectorFingerprint).IsNotNull();
+    }
+
     private static ConfiguredAdministratorBootstrapProvider CreateProvider(
         IInstanceBootstrapStateRepository repository,
         IConfiguration configuration) =>
-        new(configuration, OperatorIdentity(), repository);
+        new(configuration, Options.Create(OperatorIdentityOptions()), repository);
 
     private static async Task AssertReason(
         IInstanceBootstrapStateRepository repository,
@@ -593,23 +612,22 @@ public sealed class ConfiguredAdministratorBootstrapProviderTests
         IEnumerable<KeyValuePair<string, string?>> values) =>
         new ConfigurationBuilder().AddInMemoryCollection(values).Build();
 
-    private static InstanceOperatorIdentity OperatorIdentity() =>
-        InstanceOperatorIdentity.Create(new InstanceOperatorIdentityOptions
-        {
-            OperatorId = Guid.Parse("0198e2a4-5340-7f89-8abc-b8bdf43e0ea8"),
-            PublicName = "Independent Operator",
-            LegalName = "Independent Operator ASBL",
-            IsOfficialInstance = false,
-            OfficialOrigin = "https://example.test",
-            OperatorKindCode = "registered_organization",
-            JurisdictionCountryCode = "BE",
-            RegistrationIdentifier = "BE 0123.456.789",
-            PublicContactEmail = "contact@example.test",
-            WebsiteUrl = "https://example.test",
-            LegalNoticeUrl = "https://example.test/legal",
-            TermsUrl = "https://example.test/terms",
-            PrivacyUrl = "https://example.test/privacy"
-        });
+    private static InstanceOperatorIdentityOptions OperatorIdentityOptions() => new()
+    {
+        OperatorId = Guid.Parse("0198e2a4-5340-7f89-8abc-b8bdf43e0ea8"),
+        PublicName = "Independent Operator",
+        LegalName = "Independent Operator ASBL",
+        IsOfficialInstance = false,
+        OfficialOrigin = "https://example.test",
+        OperatorKindCode = "registered_organization",
+        JurisdictionCountryCode = "BE",
+        RegistrationIdentifier = "BE 0123.456.789",
+        PublicContactEmail = "contact@example.test",
+        WebsiteUrl = "https://example.test",
+        LegalNoticeUrl = "https://example.test/legal",
+        TermsUrl = "https://example.test/terms",
+        PrivacyUrl = "https://example.test/privacy"
+    };
 
     private static string LengthPrefixedSha256(params string[] fields)
     {

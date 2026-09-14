@@ -348,23 +348,25 @@ public sealed class LocalBootstrapConvergenceTests
             _topology == IdentityDatabaseTopology.External ? scope.ServiceProvider.GetRequiredService<ExternalIdentityDbContext>() : Application(scope),
             Application(scope), scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>(), TimeProvider.System);
 
+        private IOptions<InstanceOperatorIdentityOptions> OperatorOptions => Options.Create(new InstanceOperatorIdentityOptions
+        {
+            OperatorId = Subject,
+            PublicName = "Bootstrap Operator",
+            LegalName = "Bootstrap Operator ASBL",
+            OfficialOrigin = "https://example.test",
+            OperatorKindCode = "registered_organization",
+            JurisdictionCountryCode = "BE",
+            RegistrationIdentifier = "BE 0123.456.789",
+            PublicContactEmail = "contact@example.test",
+            WebsiteUrl = "https://example.test",
+            LegalNoticeUrl = "https://example.test/legal",
+            TermsUrl = "https://example.test/terms",
+            PrivacyUrl = "https://example.test/privacy"
+        });
+
         private ConfiguredAdministratorBootstrapProvider BootstrapProvider(AsyncServiceScope scope) => new(
             Configuration,
-            InstanceOperatorIdentity.Create(new InstanceOperatorIdentityOptions
-            {
-                OperatorId = Subject,
-                PublicName = "Bootstrap Operator",
-                LegalName = "Bootstrap Operator ASBL",
-                OfficialOrigin = "https://example.test",
-                OperatorKindCode = "registered_organization",
-                JurisdictionCountryCode = "BE",
-                RegistrationIdentifier = "BE 0123.456.789",
-                PublicContactEmail = "contact@example.test",
-                WebsiteUrl = "https://example.test",
-                LegalNoticeUrl = "https://example.test/legal",
-                TermsUrl = "https://example.test/terms",
-                PrivacyUrl = "https://example.test/privacy"
-            }), new InstanceBootstrapStateRepository(Application(scope)));
+            OperatorOptions, new InstanceBootstrapStateRepository(Application(scope)));
 
         internal async Task PrepareAsync()
         {
@@ -397,20 +399,23 @@ public sealed class LocalBootstrapConvergenceTests
             var cache = scope.ServiceProvider.GetRequiredService<IMemoryCache>();
             var setup = scope.ServiceProvider.GetRequiredService<ISetupSecretProvider>();
             var deployment = scope.ServiceProvider.GetRequiredService<IDeploymentModeProvider>();
+            var systemSettings = new SystemSettingRepository(application, new RelationalSettingMutationLock(application, unitOfWork));
+            var identityEvaluator = new InstanceOperatorIdentityService(systemSettings, bootstrap, unitOfWork);
             var completion = new InstanceOnboardingCompletionOperation(bootstrap, platformRoles, tenantRoles,
                 new TenantUserRepository(application), new RoleRepository(application), new UserRepository(application),
                 new ActorRepository(application), logins, tenants, new TenantCreationService(tenants, documents), documents,
-                new SystemSettingRepository(application, new RelationalSettingMutationLock(application, unitOfWork)),
+                systemSettings,
                 [provider], setup, new InstanceBootstrapAuditLogger(NullLogger<InstanceBootstrapAuditLogger>.Instance),
                 new AdminContext(new HttpContextAccessor(), platformRoles, tenantRoles,
                     new OrganizationMemberRepository(application), new GroupMemberRepository(application), logins, cache,
                     NullLogger<AdminContext>.Instance), deployment, new RuntimeMetadataRefresh(),
                 new TenantBrandingSettingsDocumentProvisioningService(tenants, documents, new TypedSettingsDocumentResolver(documents, cache)),
-                NullLogger<InstanceOnboardingCompletionOperation>.Instance, unitOfWork);
+                NullLogger<InstanceOnboardingCompletionOperation>.Instance, unitOfWork,
+                identityEvaluator, OperatorOptions);
             return new LocalAdministratorBootstrapOperation(bootstrap, provider, Store(scope), Secrets, completion,
                 setup, deployment, unitOfWork, TimeProvider.System,
                 new RuntimeAuthenticationProviderDispatcher(
-                    new SystemSettingRepository(application, new RelationalSettingMutationLock(application, unitOfWork)),
+                    systemSettings,
                     cache, Options.Create(new AuthenticationProviderDeploymentOptions())));
         }
 

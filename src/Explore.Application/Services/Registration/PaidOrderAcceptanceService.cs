@@ -52,7 +52,7 @@ public sealed class PaidOrderAcceptanceService(
     IEventTicketCatalogRepository catalogs,
     IEventRepository events,
     IPaidEventPolicyRepository policies,
-    IInstanceOperatorIdentity instanceOperatorIdentity,
+    IInstanceOperatorIdentityReadinessEvaluator instanceIdentityReadiness,
     IPaidCheckoutGovernance governance,
     ITenantDirectoryOperatorReadinessEvaluator directoryOperatorReadiness,
     IOrganizerPaymentProviderConnectionRepository connections,
@@ -161,6 +161,14 @@ public sealed class PaidOrderAcceptanceService(
         {
             return Failure("payment_acceptance_unavailable", "Complete current payment disclosures are unavailable.");
         }
+
+        InstanceOperatorIdentityReadinessAssessment instanceAssessment =
+            await instanceIdentityReadiness.EvaluateAsync(cancellationToken);
+        if (!instanceAssessment.IsReady || instanceAssessment.Identity is null)
+        {
+            return Failure("instance_operator_identity_unavailable", "Instance operator identity is unavailable for paid commerce.");
+        }
+        InstanceOperatorIdentity instanceOperatorIdentity = instanceAssessment.Identity;
 
         PaidCheckoutTenantDirectoryOperatorDisclosure directoryDisclosure;
         PaidCheckoutOperatorDisclosure operatorDisclosure;

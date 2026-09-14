@@ -15,7 +15,7 @@ public sealed class GetPublicLegalDocumentQueryHandler(
     LegalDocumentRenderingService renderingService,
     ITenantContext tenantContext,
     ITenantDirectoryOperatorReadinessEvaluator tenantIdentityReadiness,
-    IInstanceOperatorIdentity instanceIdentity)
+    IInstanceOperatorIdentityReadinessEvaluator instanceIdentityReadiness)
     : IRequestHandler<
         GetPublicLegalDocumentQuery,
         PublicLegalDocumentQueryResult>
@@ -46,7 +46,7 @@ public sealed class GetPublicLegalDocumentQueryHandler(
 
         IReadOnlyDictionary<string, string>? identities =
             descriptor.Scope == LegalDocumentScope.Instance
-                ? InstanceIdentityValues(instanceIdentity)
+                ? await InstanceIdentityValuesAsync(cancellationToken)
                 : await TenantIdentityValuesAsync(
                     tenantId!.Value,
                     cancellationToken);
@@ -108,6 +108,16 @@ public sealed class GetPublicLegalDocumentQueryHandler(
                 cancellationToken);
         return assessment.IsReady && assessment.Identity is not null
             ? TenantIdentityValues(assessment.Identity)
+            : null;
+    }
+
+    private async Task<IReadOnlyDictionary<string, string>?>
+        InstanceIdentityValuesAsync(CancellationToken cancellationToken)
+    {
+        InstanceOperatorIdentityReadinessAssessment assessment =
+            await instanceIdentityReadiness.EvaluateAsync(cancellationToken);
+        return assessment.IsReady && assessment.Identity is not null
+            ? InstanceIdentityValues(assessment.Identity)
             : null;
     }
 

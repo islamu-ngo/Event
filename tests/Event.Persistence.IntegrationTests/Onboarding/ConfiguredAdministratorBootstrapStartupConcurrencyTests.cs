@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using TUnit.Core;
 
 namespace Event.Persistence.IntegrationTests.Onboarding;
@@ -98,7 +99,7 @@ public sealed class ConfiguredAdministratorBootstrapStartupConcurrencyTests
         var repository = new InstanceBootstrapStateRepository(context);
         var provider = new ConfiguredAdministratorBootstrapProvider(
             configuration,
-            InstanceOperatorIdentity.Create(new InstanceOperatorIdentityOptions
+            Options.Create(new InstanceOperatorIdentityOptions
             {
                 OperatorId = Guid.Parse("01991f00-0000-7000-8000-000000000001"),
                 PublicName = "Concurrent Test Operator",

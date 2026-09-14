@@ -148,6 +148,22 @@ available through management detail. The MCP
 and omits physical location details. No routes, payload shapes, database
 migrations, configuration changes or client regeneration are required.
 
+## Merged public agenda
+
+`GET /api/eventagendaitem/agenda-projection/{eventId}` remains an anonymous public
+read, including for organizers: private, draft, deleted, foreign-tenant or missing
+events return 404 with a JSON ProblemDetails body rather than a management view.
+Only publicly eligible events and schedule entries are included. Unscheduled
+sessions and entries assigned to unpublished days are omitted.
+
+The response merges sessions and agenda items by local date, orders entries by
+local start minute then sort order, and orders day groups by their configured
+sort order then date. Published empty days remain visible. Venue fields follow
+the event's disclosure policy and disappear when privacy review is required;
+physical location and room IDs remain hidden. The internal native-query migration
+changes no route, response shape, permissions, database schema or configuration
+and requires no client regeneration.
+
 ## Duplicate session language assignments
 
 `POST /api/eventsessionlanguage` returns `400` with the endpoint's existing JSON validation ProblemDetails body, `code: validation_failed`, and an `errors.program` entry when the language is already assigned to that session. Concurrent submissions retain exactly one assignment: the winning create returns `201`, and the duplicate receives the same controlled validation response. A language may still be assigned to a different session. Existing authorization and tenant boundaries apply before mutation.

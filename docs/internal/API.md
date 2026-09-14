@@ -220,9 +220,9 @@ The seven `Features/EventAgendaItems` operations use closed native command/query
 ports, discovered under authorization -> performance -> handler composition.
 `EventAgendaItemController` injects all seven; `EventManagementMcpTools` injects
 only the managed agenda-list port alongside its existing native Day/Program
-ports. The separate `Features/Agenda` projection still uses MediatR and reads
-repositories directly. DTO assemblers, routes, response types and generated
-contracts are unchanged.
+ports. The separate `Features/Agenda` projection now uses its own native public
+query port and reads repositories directly, as described below. DTO assemblers,
+routes, response types and generated contracts are unchanged.
 
 `EventAgendaItemAuthorizationContextEnricher` is explicitly registered for the
 three writes. It loads the agenda item's persisted source parent (or create's
@@ -251,6 +251,39 @@ fixture gates actual provider decisions with signals; it never grants authority.
 Inherited tokenless repository methods remain tokenless; full in-flight
 cancellation of those reads is not claimed. No provider matrix or performance
 claim accompanies this slice.
+
+### Native Public Agenda Projection
+
+`GetEventAgendaProjectionRequest` implements only `IQuery<EventAgendaProjectionDto?>`;
+its handler exposes Task-based `QueryAsync`. `EventAgendaItemController` injects
+that exact closed port alongside its seven native agenda-item ports, removing
+its last mediator dependency. Automatic native registration retains authorization
+-> performance -> handler composition. This is a public query, not a management
+grant: the handler checks canonical persisted public eligibility before reading
+published days, public sessions and public agenda items. It has no nested sender.
+
+The existing merge omits sessions missing required schedule projections, groups
+entries by local date, orders entries by local start minute then sort order, and
+orders day groups by day sort order then date. Published empty days remain;
+entry dates without a published day receive an unlabelled group. Timezone remains
+`EventTimeZoneId ?? Timezone`. Physical location and room IDs are redacted;
+public location envelopes come only from the existing batched disclosure service,
+including approved venue fields and renewed privacy-review suppression. The
+portable agenda ordering and UTC venue materialization repairs remain unchanged.
+
+Null retains the controller's existing 404 ProblemDetails mapping. Real SQLite
+HTTP tests observe that error body with `application/json`; this migration does
+not change the shared response policy. `NativeAgendaProjectionHttpTests` proves
+the registered port, complete HTTP/native JSON parity, meaningful merged dates
+and order, approved venue disclosure, private/draft/foreign/deleted/missing denial
+even for an owner, fresh actor-suspension denial and privacy-review tightening.
+In-memory `AgendaProjectionTests` covers input permutation, incomplete sessions,
+published/implicit/empty day behavior and timezone fallback without extracting
+the handler's existing algorithm. Tokens still flow through token-bearing reads
+and disclosure; inherited parent `GetById` remains tokenless. The SQLite command
+interceptor observes real read tokens and cancels at a read boundary without
+sleeping or replacing repositories. No full in-flight cancellation, provider
+matrix, performance, route, schema, client or configuration change is claimed.
 
 ### Event Session Status Lookup Absence
 

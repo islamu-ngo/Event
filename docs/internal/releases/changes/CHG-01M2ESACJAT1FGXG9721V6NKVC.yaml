@@ -1,0 +1,35 @@
+Change-Id: CHG-01M2ESACJAT1FGXG9721V6NKVC
+Title: "Preserve public agendas through native queries"
+Type: refactor
+Scope: events
+Summary: "Move the merged public agenda to its exact native query port while preserving publication, local schedule ordering and venue disclosure."
+Group: event-agenda-projection
+Supersedes: []
+Impacts:
+  Breaking:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Security:
+    Reference: docs/internal/API.md#native-public-agenda-projection
+    Disposition: documented
+    Public-Disclosure: documented
+    Detail: >-
+      Preserve canonical public eligibility, tenant and deletion boundaries,
+      approved venue disclosure and privacy-review suppression. The query remains
+      public and introduces no management grant or authorization policy change.
+  Migration:
+    Reference: docs/internal/RELEASE_RUNBOOK.md
+    Disposition: not-applicable
+  Configuration:
+    Reference: docs/internal/CONFIGURATION.md
+    Disposition: not-applicable
+  OpenAPI:
+    Reference: docs/internal/API_CHANGELOG.md
+    Disposition: not-applicable
+  Operator:
+    Reference: docs/public/api-reference/README.md#merged-public-agenda
+    Disposition: documented
+    Detail: >-
+      The native query migration retains the merged local-day schedule, existing
+      404 JSON ProblemDetails response and anonymous public semantics. No route,
+      payload, generated client, database migration or configuration change.

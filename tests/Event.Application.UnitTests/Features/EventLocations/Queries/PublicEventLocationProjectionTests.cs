@@ -195,7 +195,7 @@ public sealed class PublicEventLocationProjectionTests
             agendaRepository,
             disclosureService);
 
-        var result = await handler.Handle(
+        var result = await handler.QueryAsync(
             new GetEventAgendaProjectionRequest { EventId = eventId },
             CancellationToken.None);
         var entries = result!.Days.Single().Entries;

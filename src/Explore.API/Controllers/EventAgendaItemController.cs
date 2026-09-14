@@ -11,7 +11,6 @@ using Explore.Application.Features.EventAgendaItems.Requests.Commands;
 using Explore.Application.Features.EventAgendaItems.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -48,7 +47,7 @@ public class EventAgendaItemController : EventControllerBase
         "Event agenda projection not found",
         "Event agenda projection not found.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetEventAgendaProjectionRequest, EventAgendaProjectionDto?> _projection;
     private readonly ICommandHandler<CreateEventAgendaItemCommand, BaseCommandResponse<Guid>> _create;
     private readonly ICommandHandler<UpdateEventAgendaItemCommand, BaseCommandResponse<Guid>> _update;
     private readonly ICommandHandler<DeleteEventAgendaItemCommand, BaseCommandResponse<Guid>> _delete;
@@ -60,7 +59,7 @@ public class EventAgendaItemController : EventControllerBase
     private readonly IResourceAssembler<EventAgendaItemDto, EventAgendaItemListDto> _resourceAssembler;
 
     public EventAgendaItemController(
-        IMediator mediator,
+        IQueryHandler<GetEventAgendaProjectionRequest, EventAgendaProjectionDto?> projection,
         ICommandHandler<CreateEventAgendaItemCommand, BaseCommandResponse<Guid>> create,
         ICommandHandler<UpdateEventAgendaItemCommand, BaseCommandResponse<Guid>> update,
         ICommandHandler<DeleteEventAgendaItemCommand, BaseCommandResponse<Guid>> delete,
@@ -71,7 +70,7 @@ public class EventAgendaItemController : EventControllerBase
         ILogger<EventAgendaItemController> logger,
         IResourceAssembler<EventAgendaItemDto, EventAgendaItemListDto> resourceAssembler)
     {
-        _mediator = mediator;
+        _projection = projection;
         _create = create;
         _update = update;
         _delete = delete;
@@ -193,7 +192,7 @@ public class EventAgendaItemController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<EventAgendaProjectionDto>> GetAgendaProjection(Guid eventId, CancellationToken cancellationToken = default)
     {
-        var projection = await _mediator.Send(new GetEventAgendaProjectionRequest { EventId = eventId }, cancellationToken);
+        var projection = await _projection.QueryAsync(new GetEventAgendaProjectionRequest { EventId = eventId }, cancellationToken);
         if (projection == null)
             return this.ToNotFoundProblem(AgendaProjectionNotFoundProblem);
 

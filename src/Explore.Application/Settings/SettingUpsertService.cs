@@ -223,6 +223,8 @@ public class SettingUpsertService
     {
         if (PublicationPolicySettingKeys.All.Contains(settingKey, StringComparer.Ordinal))
             throw new InvalidOperationException($"Guarded publication policy setting '{settingKey}' requires coordinated mutation.");
+        if (InstanceOperatorIdentitySettingKeys.Contains(settingKey))
+            throw new InvalidOperationException($"Guarded instance operator identity setting '{settingKey}' requires the dedicated operator identity management service.");
     }
 
     private async Task<DeferredSettingUpsertResult> UpsertValueCoreAsync(

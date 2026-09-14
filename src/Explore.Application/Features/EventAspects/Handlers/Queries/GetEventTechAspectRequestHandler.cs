@@ -6,13 +6,13 @@ using Explore.Application.Mappings;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.EventAspects;
 using Explore.Application.Features.EventAspects.Requests.Queries;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 /// <summary>
 /// Handler for retrieving the Tech aspect of an event.
 /// </summary>
 public class GetEventTechAspectRequestHandler :
-    IRequestHandler<GetEventTechAspectRequest, EventTechAspectDto?>
+    IQueryHandler<GetEventTechAspectRequest, EventTechAspectDto?>
 {
     private readonly IEventRepository _eventRepository;
     private readonly IEventTechAspectRepository _techAspectRepository;
@@ -25,7 +25,7 @@ public class GetEventTechAspectRequestHandler :
         _techAspectRepository = techAspectRepository;
     }
 
-    public async Task<EventTechAspectDto?> Handle(GetEventTechAspectRequest request, CancellationToken cancellationToken)
+    public async Task<EventTechAspectDto?> QueryAsync(GetEventTechAspectRequest request, CancellationToken cancellationToken)
     {
         var parentEvent = await _eventRepository.GetById(request.EventId);
         if (parentEvent is null || !await _eventRepository.IsPubliclyEligibleAsync(
@@ -52,9 +52,9 @@ public class GetEventTechAspectRequestHandler :
 
 public sealed class GetManagedEventTechAspectRequestHandler(
     IEventTechAspectRepository techAspectRepository)
-    : IRequestHandler<GetManagedEventTechAspectRequest, EventTechAspectDto?>
+    : IQueryHandler<GetManagedEventTechAspectRequest, EventTechAspectDto?>
 {
-    public async Task<EventTechAspectDto?> Handle(
+    public async Task<EventTechAspectDto?> QueryAsync(
         GetManagedEventTechAspectRequest request,
         CancellationToken cancellationToken)
     {

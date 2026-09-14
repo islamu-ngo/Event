@@ -5,7 +5,7 @@ using Explore.Application.DTOs.EventAspects.Validators;
 using Explore.Application.Features.EventAspects.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventAspects.Handlers.Commands;
@@ -16,9 +16,9 @@ public sealed class CreateEventIslamicAspectCommandHandler(
     IMadhabRepository madhabRepository,
     ILanguageRepository languageRepository,
     HybridCache cache)
-    : IRequestHandler<CreateEventIslamicAspectCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<CreateEventIslamicAspectCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         CreateEventIslamicAspectCommand request,
         CancellationToken cancellationToken)
     {
@@ -79,9 +79,9 @@ public sealed class UpdateEventIslamicAspectCommandHandler(
     IMadhabRepository madhabRepository,
     ILanguageRepository languageRepository,
     HybridCache cache)
-    : IRequestHandler<UpdateEventIslamicAspectCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateEventIslamicAspectCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UpdateEventIslamicAspectCommand request,
         CancellationToken cancellationToken)
     {

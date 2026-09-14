@@ -5,7 +5,7 @@ using Explore.Application.DTOs.EventAspects.Validators;
 using Explore.Application.Features.EventAspects.Requests.Commands;
 using Explore.Application.Responses;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventAspects.Handlers.Commands;
@@ -14,9 +14,9 @@ public sealed class CreateEventTechAspectCommandHandler(
     IEventRepository eventRepository,
     IEventTechAspectRepository aspectRepository,
     HybridCache cache)
-    : IRequestHandler<CreateEventTechAspectCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<CreateEventTechAspectCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         CreateEventTechAspectCommand request,
         CancellationToken cancellationToken)
     {
@@ -66,9 +66,9 @@ public sealed class UpdateEventTechAspectCommandHandler(
     IEventRepository eventRepository,
     IEventTechAspectRepository aspectRepository,
     HybridCache cache)
-    : IRequestHandler<UpdateEventTechAspectCommand, BaseCommandResponse<Guid>>
+    : ICommandHandler<UpdateEventTechAspectCommand, BaseCommandResponse<Guid>>
 {
-    public async Task<BaseCommandResponse<Guid>> Handle(
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(
         UpdateEventTechAspectCommand request,
         CancellationToken cancellationToken)
     {

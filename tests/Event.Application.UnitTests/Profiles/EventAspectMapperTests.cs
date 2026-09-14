@@ -37,7 +37,7 @@ public sealed class EventAspectMapperTests
         var handler = new CreateEventIslamicAspectCommandHandler(
             events, aspects, madhabs, languages, provider.GetRequiredService<HybridCache>());
 
-        var result = await handler.Handle(new CreateEventIslamicAspectCommand
+        var result = await handler.ExecuteAsync(new CreateEventIslamicAspectCommand
         {
             EventId = EventId,
             AspectDto = new CreateUpdateIslamicAspectDto
@@ -85,7 +85,7 @@ public sealed class EventAspectMapperTests
         var handler = new CreateEventTechAspectCommandHandler(
             events, aspects, provider.GetRequiredService<HybridCache>());
 
-        var result = await handler.Handle(new CreateEventTechAspectCommand
+        var result = await handler.ExecuteAsync(new CreateEventTechAspectCommand
         {
             EventId = EventId,
             AspectDto = new CreateUpdateTechAspectDto

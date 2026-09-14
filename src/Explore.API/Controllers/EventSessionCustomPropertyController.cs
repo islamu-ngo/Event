@@ -11,7 +11,7 @@ using Explore.Application.Features.EventSessionCustomProperties.Requests.Command
 using Explore.Application.Features.EventSessionCustomProperties.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -29,6 +29,16 @@ namespace Explore.API.Controllers;
 [Produces(HateoasConstants.JsonMediaType, HateoasConstants.HalJsonMediaType)]
 public class EventSessionCustomPropertyController : EventControllerBase
 {
+    private static readonly CommandFailurePolicy DefinitionFailurePolicy = CommandFailurePolicy.ValidatedBy(new(
+        "eventSessionCustomPropertyDefinition",
+        "Event session custom property definition validation failed",
+        "Event session custom property definition creation failed."));
+
+    private static readonly CommandFailurePolicy ValueFailurePolicy = CommandFailurePolicy.ValidatedBy(new(
+        "eventSessionCustomPropertyValue",
+        "Event session custom property value validation failed",
+        "Event session custom property value set failed."));
+
     private static readonly ApiValidationProblemDescriptor UpdateValidationProblem = new(
         "eventSessionCustomPropertyDefinition",
         "Event session custom property definition validation failed",
@@ -47,14 +57,41 @@ public class EventSessionCustomPropertyController : EventControllerBase
         "Event session custom property definition not found",
         "Event session custom property definition not found.");
 
-    private readonly IMediator _mediator;
+    private static readonly CommandFailurePolicy UpdateFailurePolicy = CommandFailurePolicy.ValidatedBy(UpdateValidationProblem)
+        .NotFound(DefinitionNotFoundProblem, FailureCodes.NotFound);
+
+    private readonly IQueryHandler<GetEventSessionCustomPropertyDefinitionListRequest, PaginatedResult<EventSessionCustomPropertyDefinitionListDto>> _list;
+    private readonly IQueryHandler<GetEventSessionCustomPropertyDefinitionDetailsRequest, EventSessionCustomPropertyDefinitionDto> _detail;
+    private readonly IQueryHandler<GetEventSessionCustomPropertyValuesRequest, List<EventSessionCustomPropertyValueDto>> _values;
+    private readonly ICommandHandler<CreateEventSessionCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>> _create;
+    private readonly ICommandHandler<UpdateEventSessionCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>> _update;
+    private readonly ICommandHandler<DeleteEventSessionCustomPropertyDefinitionCommand, bool> _delete;
+    private readonly ICommandHandler<PurgeEventSessionCustomPropertyDefinitionCommand, BaseCommandResponse<CustomPropertyPurgeResultDto>> _purge;
+    private readonly ICommandHandler<SetEventSessionCustomPropertyValueCommand, BaseCommandResponse<Guid>> _setValue;
+    private readonly ICommandHandler<SetEventSessionCustomPropertyMultiValuesCommand, BaseCommandResponse<Guid>> _setMultiValues;
     private readonly IResourceAssembler<EventSessionCustomPropertyDefinitionDto, EventSessionCustomPropertyDefinitionListDto> _resourceAssembler;
 
     public EventSessionCustomPropertyController(
-        IMediator mediator,
+        IQueryHandler<GetEventSessionCustomPropertyDefinitionListRequest, PaginatedResult<EventSessionCustomPropertyDefinitionListDto>> list,
+        IQueryHandler<GetEventSessionCustomPropertyDefinitionDetailsRequest, EventSessionCustomPropertyDefinitionDto> detail,
+        IQueryHandler<GetEventSessionCustomPropertyValuesRequest, List<EventSessionCustomPropertyValueDto>> values,
+        ICommandHandler<CreateEventSessionCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>> create,
+        ICommandHandler<UpdateEventSessionCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>> update,
+        ICommandHandler<DeleteEventSessionCustomPropertyDefinitionCommand, bool> delete,
+        ICommandHandler<PurgeEventSessionCustomPropertyDefinitionCommand, BaseCommandResponse<CustomPropertyPurgeResultDto>> purge,
+        ICommandHandler<SetEventSessionCustomPropertyValueCommand, BaseCommandResponse<Guid>> setValue,
+        ICommandHandler<SetEventSessionCustomPropertyMultiValuesCommand, BaseCommandResponse<Guid>> setMultiValues,
         IResourceAssembler<EventSessionCustomPropertyDefinitionDto, EventSessionCustomPropertyDefinitionListDto> resourceAssembler)
     {
-        _mediator = mediator;
+        _list = list;
+        _detail = detail;
+        _values = values;
+        _create = create;
+        _update = update;
+        _delete = delete;
+        _purge = purge;
+        _setValue = setValue;
+        _setMultiValues = setMultiValues;
         _resourceAssembler = resourceAssembler;
     }
 
@@ -77,7 +114,7 @@ public class EventSessionCustomPropertyController : EventControllerBase
         [FromQuery] EventSessionCustomPropertyDefinitionListQueryRequest query,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new GetEventSessionCustomPropertyDefinitionListRequest
+        var result = await _list.QueryAsync(new GetEventSessionCustomPropertyDefinitionListRequest
         {
             EventSessionId = query.EventSessionId,
             PageNumber = query.PageNumber,
@@ -107,7 +144,7 @@ public class EventSessionCustomPropertyController : EventControllerBase
     [OutputCache(PolicyName = "DetailData")]
     public async Task<ActionResult<HalResource<EventSessionCustomPropertyDefinitionDto>>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var definition = await _mediator.Send(new GetEventSessionCustomPropertyDefinitionDetailsRequest { Id = id }, cancellationToken);
+        var definition = await _detail.QueryAsync(new GetEventSessionCustomPropertyDefinitionDetailsRequest { Id = id }, cancellationToken);
         if (definition == null)
         {
             return this.ToNotFoundProblem(DefinitionNotFoundProblem);
@@ -139,11 +176,13 @@ public class EventSessionCustomPropertyController : EventControllerBase
             DefinitionDto = definition
         };
 
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _create.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
-            return this.ToQuotaProblemOrBadRequest(response);
+            return response.FailureCode == FailureCodes.QuotaExceeded
+                ? this.ToQuotaProblemOrBadRequest(response)
+                : DefinitionFailurePolicy.Map(this, response);
         }
 
         return CreatedAtRoute(
@@ -187,13 +226,13 @@ public class EventSessionCustomPropertyController : EventControllerBase
             ExpectedConcurrencyStamp = expectedConcurrencyStamp
         };
 
-        var result = await _mediator.Send(command, cancellationToken);
+        var result = await _update.ExecuteAsync(command, cancellationToken);
 
         if (!result.IsSuccess)
         {
-            return result.FailureCode == FailureCodes.NotFound
-                ? this.ToNotFoundProblem(DefinitionNotFoundProblem)
-                : this.ToQuotaProblemOrBadRequest(result);
+            return result.FailureCode == FailureCodes.QuotaExceeded
+                ? this.ToQuotaProblemOrBadRequest(result)
+                : UpdateFailurePolicy.Map(this, result);
         }
 
         return Ok(result);
@@ -211,7 +250,7 @@ public class EventSessionCustomPropertyController : EventControllerBase
     public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
         var command = new DeleteEventSessionCustomPropertyDefinitionCommand { Id = id };
-        await _mediator.Send(command, cancellationToken);
+        await _delete.ExecuteAsync(command, cancellationToken);
 
         return NoContent();
     }
@@ -233,7 +272,7 @@ public class EventSessionCustomPropertyController : EventControllerBase
         [FromBody] PurgeCustomPropertyDefinitionDto purgeDto,
         CancellationToken cancellationToken = default)
     {
-        var result = await _mediator.Send(new PurgeEventSessionCustomPropertyDefinitionCommand
+        var result = await _purge.ExecuteAsync(new PurgeEventSessionCustomPropertyDefinitionCommand
         {
             Id = id,
             Reason = purgeDto.Reason
@@ -262,7 +301,7 @@ public class EventSessionCustomPropertyController : EventControllerBase
     public async Task<ActionResult<List<EventSessionCustomPropertyValueDto>>> GetValues(
         [FromQuery] Guid eventSessionId, CancellationToken cancellationToken = default)
     {
-        var values = await _mediator.Send(new GetEventSessionCustomPropertyValuesRequest
+        var values = await _values.QueryAsync(new GetEventSessionCustomPropertyValuesRequest
         {
             EventSessionId = eventSessionId
         }, cancellationToken);
@@ -292,11 +331,13 @@ public class EventSessionCustomPropertyController : EventControllerBase
             ValueDto = valueDto
         };
 
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _setValue.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
-            return this.ToQuotaProblemOrBadRequest(response);
+            return response.FailureCode == FailureCodes.QuotaExceeded
+                ? this.ToQuotaProblemOrBadRequest(response)
+                : ValueFailurePolicy.Map(this, response);
         }
 
         return Ok(response);
@@ -326,11 +367,13 @@ public class EventSessionCustomPropertyController : EventControllerBase
             Values = multiValuesDto.Values
         };
 
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _setMultiValues.ExecuteAsync(command, cancellationToken);
 
         if (!response.IsSuccess)
         {
-            return this.ToQuotaProblemOrBadRequest(response);
+            return response.FailureCode == FailureCodes.QuotaExceeded
+                ? this.ToQuotaProblemOrBadRequest(response)
+                : ValueFailurePolicy.Map(this, response);
         }
 
         return Ok(response);

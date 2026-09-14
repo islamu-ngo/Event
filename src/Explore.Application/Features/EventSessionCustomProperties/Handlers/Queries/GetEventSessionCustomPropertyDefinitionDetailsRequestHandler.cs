@@ -4,11 +4,11 @@ using Explore.Application.DTOs.EventSessionCustomProperty;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.EventSessionCustomProperties.Requests.Queries;
 using Explore.Domain;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventSessionCustomProperties.Handlers.Queries;
 
-public class GetEventSessionCustomPropertyDefinitionDetailsRequestHandler : IRequestHandler<GetEventSessionCustomPropertyDefinitionDetailsRequest, EventSessionCustomPropertyDefinitionDto>
+public class GetEventSessionCustomPropertyDefinitionDetailsRequestHandler : IQueryHandler<GetEventSessionCustomPropertyDefinitionDetailsRequest, EventSessionCustomPropertyDefinitionDto>
 {
     private readonly IEventSessionCustomPropertyRepository _sessionCustomPropertyRepository;
 
@@ -18,7 +18,7 @@ public class GetEventSessionCustomPropertyDefinitionDetailsRequestHandler : IReq
         _sessionCustomPropertyRepository = sessionCustomPropertyRepository;
     }
 
-    public async Task<EventSessionCustomPropertyDefinitionDto> Handle(GetEventSessionCustomPropertyDefinitionDetailsRequest request, CancellationToken cancellationToken)
+    public async Task<EventSessionCustomPropertyDefinitionDto> QueryAsync(GetEventSessionCustomPropertyDefinitionDetailsRequest request, CancellationToken cancellationToken)
     {
         var definition = await _sessionCustomPropertyRepository.GetDefinitionWithDetails(request.Id);
         if (definition == null)

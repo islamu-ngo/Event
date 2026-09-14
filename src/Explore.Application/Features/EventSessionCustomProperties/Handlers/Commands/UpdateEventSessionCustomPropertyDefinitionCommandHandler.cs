@@ -9,12 +9,12 @@ using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings.Definitions;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventSessionCustomProperties.Handlers.Commands;
 
-public class UpdateEventSessionCustomPropertyDefinitionCommandHandler : IRequestHandler<UpdateEventSessionCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>>
+public class UpdateEventSessionCustomPropertyDefinitionCommandHandler : ICommandHandler<UpdateEventSessionCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventSessionCustomPropertyRepository _sessionCustomPropertyRepository;
     private readonly IEventSessionCustomPropertyProjectionUpdater _projectionUpdater;
@@ -42,7 +42,7 @@ public class UpdateEventSessionCustomPropertyDefinitionCommandHandler : IRequest
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(UpdateEventSessionCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(UpdateEventSessionCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
     {
         if (request.DefinitionId == Guid.Empty || request.ExpectedConcurrencyStamp == Guid.Empty)
         {
@@ -215,7 +215,9 @@ public class UpdateEventSessionCustomPropertyDefinitionCommandHandler : IRequest
             },
             cancellationToken);
 
-        await InvalidateCaches(definition.EventSessionId, definition.Id, cancellationToken);
+        await _cache.RemoveByTagAsync(
+            SessionCustomPropertyCache.ListsBySession(definition.TenantId, definition.EventSessionId),
+            CancellationToken.None);
 
         return BaseCommandResponse.Success(definition.Id, "Event session custom property definition updated successfully.");
     }
@@ -302,11 +304,4 @@ public class UpdateEventSessionCustomPropertyDefinitionCommandHandler : IRequest
             : candidate with { Options = patch.Options.Items! };
     }
 
-    private async Task InvalidateCaches(Guid eventSessionId, Guid definitionId, CancellationToken cancellationToken)
-    {
-        await _cache.RemoveAsync(
-            $"session-custom-properties:list:{eventSessionId}:1:{PaginatedResult<EventSessionCustomPropertyDefinitionListDto>.DefaultPageSize}",
-            cancellationToken);
-        await _cache.RemoveAsync($"session-custom-properties:detail:{definitionId}", cancellationToken);
-    }
 }

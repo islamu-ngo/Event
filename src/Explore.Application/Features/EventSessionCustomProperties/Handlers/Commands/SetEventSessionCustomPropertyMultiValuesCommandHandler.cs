@@ -7,11 +7,11 @@ using Explore.Application.Features.EventSessionCustomProperties.Requests.Command
 using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Settings.Definitions;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 
 namespace Explore.Application.Features.EventSessionCustomProperties.Handlers.Commands;
 
-public class SetEventSessionCustomPropertyMultiValuesCommandHandler : IRequestHandler<SetEventSessionCustomPropertyMultiValuesCommand, BaseCommandResponse<Guid>>
+public class SetEventSessionCustomPropertyMultiValuesCommandHandler : ICommandHandler<SetEventSessionCustomPropertyMultiValuesCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventSessionCustomPropertyRepository _sessionCustomPropertyRepository;
     private readonly IEventSessionCustomPropertyProjectionUpdater _projectionUpdater;
@@ -36,7 +36,7 @@ public class SetEventSessionCustomPropertyMultiValuesCommandHandler : IRequestHa
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(SetEventSessionCustomPropertyMultiValuesCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(SetEventSessionCustomPropertyMultiValuesCommand request, CancellationToken cancellationToken)
     {
         var validator = new SetEventSessionCustomPropertyValueDtoValidator();
         var errors = new List<string>();
@@ -110,6 +110,7 @@ public class SetEventSessionCustomPropertyMultiValuesCommandHandler : IRequestHa
         await _unitOfWork.ExecuteInTransactionAsync(
             async ct =>
             {
+                await _projectionUpdater.RemoveForDefinitionAsync(request.DefinitionId, ct);
                 await _sessionCustomPropertyRepository.SetMultiValues(request.DefinitionId, request.EventSessionId, values, ct);
                 await _projectionUpdater.UpdateForDefinitionAsync(request.DefinitionId, ct);
             },

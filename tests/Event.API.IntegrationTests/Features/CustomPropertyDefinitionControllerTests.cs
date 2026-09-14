@@ -8,7 +8,6 @@ using Explore.API.Hateoas.Policies;
 using Explore.Application.DTOs.CustomPropertyDefinition;
 using Explore.Application.DTOs.Registration;
 using Explore.Application.Features.EventCustomProperties.Requests.Commands;
-using Explore.Application.Features.EventSessionCustomProperties.Requests.Commands;
 using Explore.Application.Features.RegistrationAnswerFiles.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
@@ -181,8 +180,7 @@ public sealed class AdminRoleEndpointParityTests
 {
     private static readonly string[] PurgeRoutes =
     [
-        "/api/eventcustomproperty/{0}/purge",
-        "/api/eventsessioncustomproperty/{0}/purge"
+        "/api/eventcustomproperty/{0}/purge"
     ];
 
     [Test]
@@ -265,7 +263,6 @@ public sealed class AdminRoleEndpointParityTests
             "dependency-free test purge", 0, 0, 0, 0, 0);
         var success = BaseCommandResponse.Success(result);
         mediator.Send(Arg.Any<PurgeEventCustomPropertyDefinitionCommand>(), Arg.Any<CancellationToken>()).Returns(success);
-        mediator.Send(Arg.Any<PurgeEventSessionCustomPropertyDefinitionCommand>(), Arg.Any<CancellationToken>()).Returns(success);
         mediator.Send(Arg.Any<GetRegistrationAnswerFileQuery>(), Arg.Any<CancellationToken>()).Returns(new RegistrationAnswerFileDto(
             Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),
             "answer.pdf", "application/pdf", ".pdf", 128, "quarantined", "clean",

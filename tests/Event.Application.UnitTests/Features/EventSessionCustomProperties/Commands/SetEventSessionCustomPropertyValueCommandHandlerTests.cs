@@ -22,7 +22,7 @@ public class SetEventSessionCustomPropertyValueCommandHandlerTests
         repository.GetDefinitionWithDetails(definitionId).Returns(CreateDefinition(definitionId, sessionId, isMulti: false));
         var handler = CreateSut(repository);
 
-        var result = await handler.Handle(
+        var result = await handler.ExecuteAsync(
             CreateCommand(definitionId, sessionId, ordinal: 1, textValue: "Arabic"),
             CancellationToken.None);
 
@@ -52,7 +52,7 @@ public class SetEventSessionCustomPropertyValueCommandHandlerTests
         repository.GetDefinitionWithDetails(definitionId).Returns(definition);
         var handler = CreateSut(repository);
 
-        var result = await handler.Handle(
+        var result = await handler.ExecuteAsync(
             CreateCommand(definitionId, sessionId, ordinal: 1, textValue: " alpha "),
             CancellationToken.None);
 
@@ -85,7 +85,7 @@ public class SetEventSessionCustomPropertyValueCommandHandlerTests
         repository.GetDefinitionWithDetails(definitionId).Returns(definition);
         var handler = CreateSut(repository);
 
-        var result = await handler.Handle(
+        var result = await handler.ExecuteAsync(
             CreateOptionCommand(definitionId, sessionId, optionId),
             CancellationToken.None);
 

@@ -1,4 +1,6 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Authorization;
+using Explore.Application.Exceptions;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.EventSessionCustomProperty.Validators;
@@ -7,12 +9,12 @@ using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Constants;
 using Explore.Domain.Settings.Definitions;
-using MediatR;
+using Explore.Application.Contracts.Operations;
 using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Explore.Application.Features.EventSessionCustomProperties.Handlers.Commands;
 
-public class CreateEventSessionCustomPropertyDefinitionCommandHandler : IRequestHandler<CreateEventSessionCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>>
+public class CreateEventSessionCustomPropertyDefinitionCommandHandler : ICommandHandler<CreateEventSessionCustomPropertyDefinitionCommand, BaseCommandResponse<Guid>>
 {
     private readonly IEventSessionCustomPropertyRepository _sessionCustomPropertyRepository;
     private readonly ICustomPropertyGovernancePolicy _customPropertyGovernancePolicy;
@@ -21,6 +23,7 @@ public class CreateEventSessionCustomPropertyDefinitionCommandHandler : IRequest
     private readonly ICurrentUserService _currentUserService;
     private readonly HybridCache _cache;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IEventSessionRepository _sessionRepository;
 
     public CreateEventSessionCustomPropertyDefinitionCommandHandler(
         IEventSessionCustomPropertyRepository sessionCustomPropertyRepository,
@@ -29,7 +32,8 @@ public class CreateEventSessionCustomPropertyDefinitionCommandHandler : IRequest
         ITenantContext tenantContext,
         ICurrentUserService currentUserService,
         HybridCache cache,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IEventSessionRepository sessionRepository)
     {
         _sessionCustomPropertyRepository = sessionCustomPropertyRepository;
         _customPropertyGovernancePolicy = customPropertyGovernancePolicy;
@@ -38,9 +42,10 @@ public class CreateEventSessionCustomPropertyDefinitionCommandHandler : IRequest
         _currentUserService = currentUserService;
         _cache = cache;
         _unitOfWork = unitOfWork;
+        _sessionRepository = sessionRepository;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CreateEventSessionCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CreateEventSessionCustomPropertyDefinitionCommand request, CancellationToken cancellationToken)
     {
         var validator = new CreateEventSessionCustomPropertyDefinitionDtoValidator();
         var validationResult = await validator.ValidateAsync(request.DefinitionDto, cancellationToken);
@@ -49,6 +54,12 @@ public class CreateEventSessionCustomPropertyDefinitionCommandHandler : IRequest
             return BaseCommandResponse.Validation<Guid>(
                 validationResult.Errors.Select(e => e.ErrorMessage),
                 "Event session custom property definition creation failed.");
+        }
+
+        var session = await _sessionRepository.GetById(request.DefinitionDto.EventSessionId);
+        if (session is null || session.TenantId != _tenantContext.TenantId)
+        {
+            throw new AuthorizationException(ResourceKinds.Tenant, AuthorizationActions.Update);
         }
 
         var governance = _customPropertyGovernancePolicy.EvaluateDefinition(request.DefinitionDto.Namespace, request.DefinitionDto.Key);
@@ -109,6 +120,7 @@ public class CreateEventSessionCustomPropertyDefinitionCommandHandler : IRequest
         var dto = request.DefinitionDto;
         var definition = new EventSessionCustomPropertyDefinition
         {
+            Id = Guid.CreateVersion7(),
             EventSessionId = dto.EventSessionId,
             Namespace = governance.NormalizedNamespace,
             Key = governance.NormalizedKey,
@@ -151,9 +163,9 @@ public class CreateEventSessionCustomPropertyDefinitionCommandHandler : IRequest
             ct => _sessionCustomPropertyRepository.CreateWithOptions(definition, options, defaultOption?.Id, ct),
             cancellationToken);
 
-        await _cache.RemoveAsync(
-            GetListCacheKey(request.DefinitionDto.EventSessionId, 1, PaginatedResult<object>.DefaultPageSize),
-            cancellationToken);
+        await _cache.RemoveByTagAsync(
+            SessionCustomPropertyCache.ListsBySession(definition.TenantId, definition.EventSessionId),
+            CancellationToken.None);
 
         return BaseCommandResponse.Success(definition.Id, "Event session custom property definition created successfully.");
     }
@@ -181,8 +193,4 @@ public class CreateEventSessionCustomPropertyDefinitionCommandHandler : IRequest
             .ToList();
     }
 
-    private static string GetListCacheKey(Guid eventSessionId, int pageNumber, int pageSize)
-    {
-        return $"session-custom-properties:list:{eventSessionId}:{pageNumber}:{pageSize}";
-    }
 }

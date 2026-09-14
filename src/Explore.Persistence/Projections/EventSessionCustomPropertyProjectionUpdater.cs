@@ -61,6 +61,7 @@ public class EventSessionCustomPropertyProjectionUpdater : IEventSessionCustomPr
         }
 
         await UpsertProjectionRowAsync(value, value.Definition, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
         _metrics.RecordInlineUpdate(value.TenantId.ToString(), ProjectionName, "value");
     }
 
@@ -96,6 +97,7 @@ public class EventSessionCustomPropertyProjectionUpdater : IEventSessionCustomPr
             await UpsertProjectionRowAsync(value, definition, cancellationToken);
         }
 
+        await _dbContext.SaveChangesAsync(cancellationToken);
         _metrics.RecordInlineUpdate(definition.TenantId.ToString(), ProjectionName, "definition", values.Count);
     }
 

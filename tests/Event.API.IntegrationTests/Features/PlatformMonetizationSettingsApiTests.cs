@@ -12,6 +12,7 @@ using Explore.Application.Authorization;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.PlatformMonetization;
 using Explore.Application.Features.PlatformMonetization.Requests.Commands;
@@ -49,29 +50,29 @@ public sealed class PlatformMonetizationSettingsApiTests
     [Test]
     public async Task Get_WhenMediatorReturnsSettings_AssemblesHalResource()
     {
-        var mediator = Substitute.For<IMediator>();
+        var getQueryHandler = Substitute.For<IQueryHandler<GetPlatformMonetizationSettingsQuery, PlatformMonetizationSettingsDto>>();
         var assembler = Substitute.For<IResourceAssembler<PlatformMonetizationSettingsDto, PlatformMonetizationSettingsDto>>();
         var settings = CreateSettings();
         var resource = new HalResource<PlatformMonetizationSettingsDto>(settings);
-        mediator.Send(Arg.Any<GetPlatformMonetizationSettingsQuery>(), Arg.Any<CancellationToken>()).Returns(settings);
+        getQueryHandler.QueryAsync(Arg.Any<GetPlatformMonetizationSettingsQuery>(), Arg.Any<CancellationToken>()).Returns(settings);
         assembler.ToResource(settings, Arg.Any<HttpContext>()).Returns(resource);
-        var controller = CreateController(mediator, assembler);
+        var controller = CreateController(getQueryHandler: getQueryHandler, assembler: assembler);
 
         var result = await controller.Get(CancellationToken.None);
 
         await Assert.That(result.Result).IsTypeOf<ObjectResult>();
         await Assert.That(((ObjectResult)result.Result!).Value).IsEqualTo(resource);
-        await mediator.Received(1).Send(Arg.Any<GetPlatformMonetizationSettingsQuery>(), Arg.Any<CancellationToken>());
+        await getQueryHandler.Received(1).QueryAsync(Arg.Any<GetPlatformMonetizationSettingsQuery>(), Arg.Any<CancellationToken>());
         await assembler.Received(1).ToResource(settings, Arg.Any<HttpContext>());
     }
 
     [Test]
     public async Task Update_WhenMediatorSucceeds_DispatchesCompleteReplacementCommand()
     {
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(Arg.Any<UpdatePlatformMonetizationSettingsCommand>(), Arg.Any<CancellationToken>())
+        var updateCommandHandler = Substitute.For<ICommandHandler<UpdatePlatformMonetizationSettingsCommand, BaseCommandResponse<Guid>>>();
+        updateCommandHandler.ExecuteAsync(Arg.Any<UpdatePlatformMonetizationSettingsCommand>(), Arg.Any<CancellationToken>())
             .Returns(BaseCommandResponse.Success(Guid.CreateVersion7()));
-        var controller = CreateController(mediator, Substitute.For<IResourceAssembler<PlatformMonetizationSettingsDto, PlatformMonetizationSettingsDto>>());
+        var controller = CreateController(updateCommandHandler: updateCommandHandler);
         var update = new UpdatePlatformMonetizationSettingsDto
         {
             ExpectedFeeVersion = 1,
@@ -82,7 +83,7 @@ public sealed class PlatformMonetizationSettingsApiTests
         var result = await controller.Update(update, CancellationToken.None);
 
         await Assert.That(result.Result).IsTypeOf<OkObjectResult>();
-        await mediator.Received(1).Send(
+        await updateCommandHandler.Received(1).ExecuteAsync(
             Arg.Is<UpdatePlatformMonetizationSettingsCommand>(command => command.Settings == update),
             Arg.Any<CancellationToken>());
     }
@@ -106,8 +107,12 @@ public sealed class PlatformMonetizationSettingsApiTests
     }
 
     private static PlatformMonetizationSettingsController CreateController(
-        IMediator mediator,
-        IResourceAssembler<PlatformMonetizationSettingsDto, PlatformMonetizationSettingsDto> assembler) => new(mediator, assembler)
+        IQueryHandler<GetPlatformMonetizationSettingsQuery, PlatformMonetizationSettingsDto>? getQueryHandler = null,
+        ICommandHandler<UpdatePlatformMonetizationSettingsCommand, BaseCommandResponse<Guid>>? updateCommandHandler = null,
+        IResourceAssembler<PlatformMonetizationSettingsDto, PlatformMonetizationSettingsDto>? assembler = null) => new(
+            getQueryHandler ?? Substitute.For<IQueryHandler<GetPlatformMonetizationSettingsQuery, PlatformMonetizationSettingsDto>>(),
+            updateCommandHandler ?? Substitute.For<ICommandHandler<UpdatePlatformMonetizationSettingsCommand, BaseCommandResponse<Guid>>>(),
+            assembler ?? Substitute.For<IResourceAssembler<PlatformMonetizationSettingsDto, PlatformMonetizationSettingsDto>>())
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };

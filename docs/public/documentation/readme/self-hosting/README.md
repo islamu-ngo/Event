@@ -51,6 +51,15 @@ for the exact runtime matrix and safe switching procedure.
 
 Kubernetes, Helm, ActivityPub infrastructure, first-party PDS/AppView hosting, and initial `linux/arm64` packaging are not implemented deployment options.
 
+## First-Run Onboarding & Operator Identity
+
+All self-hosted topologies feature a guided first-run web wizard at `/setup`:
+
+1. **Decoupled Startup:** The server process boots cleanly without requiring operator legal identity environment variables up front. Optional `INSTANCE__OPERATORIDENTITY__*` variables can be provided to pre-seed initial defaults, but they are not required to start the container.
+2. **Setup Wizard Configuration (`/setup`):** Operators use the temporary setup secret to select the deployment mode (`SingleTenant` or `MultiTenant`), configure initial administrator credentials, and complete the operator's legal identity (legal name, jurisdiction, contact email, and legal disclosure URLs).
+3. **Fail-Closed Consumer Protections:** Completed instances with missing or incomplete operator identity will start, but will fail closed for consumer-facing legal operations: public legal notices return HTTP 503 (`Unavailable`), and paid ticket checkout activation is blocked until identity requirements are satisfied.
+4. **Post-Launch Maintenance (`/settings/instance`):** Once onboarding completes, the setup wizard locks permanently. Authorized administrators maintain and update operator legal details under **Settings → Instance → Operator Identity** (`/settings/instance?section=operator-identity`).
+
 ## Shared production gate
 
 Every path must define durable state, migrations, identity, authorization, tenant binding, secrets, TLS/DNS, health, backups, restore rehearsal, upgrade, and rollback. Continue with [Configuration & Operations](../configuration-and-operations/) after choosing a topology.

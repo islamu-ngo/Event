@@ -16,7 +16,8 @@ public sealed record InstanceOnboardingStartupStatus(
     long Generation,
     bool IsAuthenticated,
     bool IsCurrentUserInstanceAdmin,
-    string? SelectedDeploymentMode)
+    string? SelectedDeploymentMode,
+    bool RequiresIdentityRepair = false)
 {
     public static InstanceOnboardingStartupStatus Unavailable { get; } = new(
         InstanceOnboardingStartupDisposition.Unavailable,
@@ -24,7 +25,8 @@ public sealed record InstanceOnboardingStartupStatus(
         Generation: 0,
         IsAuthenticated: false,
         IsCurrentUserInstanceAdmin: false,
-        SelectedDeploymentMode: null);
+        SelectedDeploymentMode: null,
+        RequiresIdentityRepair: false);
 }
 
 internal static class InstanceOnboardingStartupStatusAdapter

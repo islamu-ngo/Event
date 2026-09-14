@@ -202,6 +202,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<
             ITenantDirectoryOperatorIdentityAdminService,
             TenantDirectoryOperatorIdentityAdminService>();
+        services.AddScoped<
+            IInstanceOperatorIdentityAdminService,
+            InstanceOperatorIdentityAdminService>();
         services.AddScoped<ITenantStorageSettingsAdminService, TenantStorageSettingsAdminService>();
         services.AddScoped<IEmailDeliveryAdminService, EmailDeliveryAdminService>();
         services.TryAddSingleton(TimeProvider.System);

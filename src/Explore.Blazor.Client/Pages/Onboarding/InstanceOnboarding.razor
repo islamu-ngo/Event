@@ -1,10 +1,12 @@
 @page "/onboarding/instance"
 @using Explore.Blazor.Client.Components.Common
+@using Explore.Blazor.Client.Components.Onboarding
 @using Explore.Blazor.Client.Contracts.Services.Accessibility
 @using Explore.Blazor.Client.Helpers
 @using Explore.Blazor.Client.Models.Responses
 @using Explore.Blazor.Client.Pages.Onboarding.Components
 @using Explore.Blazor.Client.Routing.ControlPlane
+@using Explore.Blazor.Client.Services
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Forms
 @using MudBlazor
@@ -13,6 +15,7 @@
 @attribute [AllowAnonymous]
 @rendermode InteractiveServer
 @inject IInstanceOnboardingService InstanceOnboardingService
+@inject IInstanceOperatorIdentityAdminService OperatorIdentityService
 @inject IUserService UserService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
@@ -192,6 +195,16 @@
                     </div>
                 </section>
 
+                <section id="instance-operator-identity" class="instance-onboarding__section" aria-labelledby="instance-operator-identity-heading">
+                    <InstanceOperatorIdentityEditor @ref="_operatorIdentityEditor"
+                                                    Model="_operatorIdentity"
+                                                    IsSingleTenantMode="IsSingleTenantMode"
+                                                    ShowCopyToDirectoryIdentity="IsSingleTenantMode"
+                                                    AllowIncompleteDraft="true"
+                                                    Disabled="_submitState.IsSubmitting"
+                                                    OnCopyToDirectoryIdentity="HandleCopyToDirectoryIdentity" />
+                </section>
+
                 @if (IsSingleTenantMode)
                 {
                     <fieldset class="instance-onboarding__section">
@@ -344,6 +357,8 @@
     private readonly CancellationTokenSource _lifetimeCancellation = new();
     private readonly SelfHostOnboardingProfileDto _siteProfile = new();
     private readonly TenantDirectoryOperatorIdentityInputDto _directoryOperator = new();
+    private InstanceOperatorIdentityAdminModel _operatorIdentity = new();
+    private InstanceOperatorIdentityEditor? _operatorIdentityEditor;
     private string _localUsername = string.Empty;
     private string _localPassword = string.Empty;
     private string? _localEmail;
@@ -476,6 +491,7 @@
         || _authProviderConfigured != true
         || _authorizationProviderConfigured != true
         || _preflight?.IsReadyToLaunch != true
+        || !_operatorIdentity.IsReady
         || !AllAcknowledgementsChecked
         || _status?.HasHalLink(IsLocalSetup ? "complete-local" : "complete") != true;
 
@@ -672,8 +688,9 @@
             var authenticationTask = InstanceOnboardingService.GetAuthProviderConfiguredStateAsync();
             var authorizationTask = InstanceOnboardingService.GetAuthorizationProviderConfiguredStateAsync();
             var preflightTask = InstanceOnboardingService.GetOnboardingPreflightAsync();
+            var operatorIdentityTask = OperatorIdentityService.GetAsync(_lifetimeCancellation.Token);
 
-            await Task.WhenAll(systemStatusTask, brandingTask, authenticationTask, authorizationTask, preflightTask);
+            await Task.WhenAll(systemStatusTask, brandingTask, authenticationTask, authorizationTask, preflightTask, operatorIdentityTask);
             if (_disposed)
             {
                 return;
@@ -681,6 +698,7 @@
 
             var systemStatus = await systemStatusTask;
             var branding = await brandingTask;
+            _operatorIdentity = await operatorIdentityTask ?? new();
 
             bool wasLocal = IsLocalSetup;
             _status = status;
@@ -775,6 +793,12 @@
         if (_status?.HasHalLink(IsLocalSetup ? "complete-local" : "complete") != true)
         {
             await SetCompletionErrorAsync(T("errors.completion_unavailable", "The server did not expose permission to complete setup. Refresh and try again."));
+            return;
+        }
+
+        if (!_operatorIdentity.IsReady)
+        {
+            await SetCompletionErrorAsync(T("errors.operator_identity_incomplete", "Complete all required instance operator identity fields before launching."));
             return;
         }
 
@@ -888,6 +912,20 @@
         TimeZone = string.IsNullOrWhiteSpace(_siteProfile.TimeZone) ? "UTC" : _siteProfile.TimeZone.Trim(),
         Purpose = NormalizeOptional(_siteProfile.Purpose)
     };
+
+    private void HandleCopyToDirectoryIdentity(InstanceOperatorIdentityAdminModel source)
+    {
+        _directoryOperator.PublicName = source.PublicName;
+        _directoryOperator.LegalName = source.LegalName;
+        _directoryOperator.OperatorKindCode = source.OperatorKindCode;
+        _directoryOperator.JurisdictionCountryCode = source.JurisdictionCountryCode;
+        _directoryOperator.RegistrationIdentifier = source.RegistrationIdentifier;
+        _directoryOperator.PublicContactEmail = source.PublicContactEmail;
+        _directoryOperator.LegalNoticeUrl = source.LegalNoticeUrl;
+        _directoryOperator.TermsUrl = source.TermsUrl;
+        _directoryOperator.PrivacyUrl = source.PrivacyUrl;
+        Snackbar.Add(T("operator.copied_to_directory", "Copied instance operator identity to directory operator."), Severity.Info);
+    }
 
     private async Task CompleteLocalSetupAsync()
     {

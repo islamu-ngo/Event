@@ -127,8 +127,10 @@ or exception text.
 
 ## Legal-Identity Readiness And Repair
 
-- Runtime API/Standalone startup validates `Instance:OperatorIdentity` and
-  stops on incomplete or malformed public operator facts.
+- Runtime API/Standalone hosts decouple process startup from operator identity
+  presence; readiness is evaluated per operation via `IInstanceOperatorIdentityReadinessEvaluator`.
+- Incomplete instance operator identity returns non-cacheable HTTP 503 for
+  instance legal notices and blocks paid commerce activation (`instance_operator_identity_unavailable`).
 - Tenant activation/reactivation evaluates the exact
   `tenant.directory-operator-identity` document for `Activation`.
 - Anonymous settings/shell evaluate `PublicDisclosure`; unavailable identity
@@ -136,10 +138,14 @@ or exception text.
 - Paid publication and Checkout activation evaluate `PaidCommerce` before any
   provider handoff.
 
-Repair the authoritative source: environment configuration for instance
-identity, the tenant identity admin document for directory identity, organizer
-payment onboarding for merchant lineage, or Checkout governance for payment
-operations. Never repair by editing a generated migration/snapshot, inserting a
+Repair the authoritative source: authenticated platform administration at
+`/settings/instance?section=operator-identity` (or direct API `PUT /api/instance-operator-identity`)
+for instance operator identity, the tenant identity admin document for directory identity,
+organizer payment onboarding for merchant lineage, or Checkout governance for payment
+operations. On completed instances requiring identity repair, `StartupRoutingService`
+automatically routes authenticated platform administrators to the instance administration
+settings view to repair identity in-browser without ever reactivating `/setup` or leaking setup secret access.
+Never repair by editing a generated migration/snapshot, inserting a
 branding fallback, or changing historical acceptance evidence. Development
 databases built from the prior unapplied Init migrations must be recreated after
 the five provider catalogs are regenerated.

@@ -722,6 +722,32 @@ public sealed class InstanceAdminSettingsLayoutTests : IDisposable
             .Returns(PaginatedResult<OrganizationListDto>.Empty());
     }
 
+    [Test]
+    public async Task InstanceAdminSettingsLayout_RendersOperatorIdentityNavigation_AndRendersSectionOnClick()
+    {
+        var cut = RenderInstanceAdminSettingsLayout();
+        cut.WaitForState(() => cut.FindAll("[role='option']").Any());
+
+        var operatorIdentityNav = cut.FindAll("[role='option']")
+            .FirstOrDefault(item => item.TextContent.Trim() == "Operator Identity");
+        await Assert.That(operatorIdentityNav).IsNotNull();
+
+        operatorIdentityNav!.Click();
+        cut.WaitForAssertion(() =>
+        {
+            RequireContains(cut.Markup, "Instance operator identity");
+            RequireContains(cut.Markup, "instance-operator-identity-editor");
+        });
+    }
+
+    private static void RequireContains(string actual, string expected)
+    {
+        if (!actual.Contains(expected, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"Expected content to contain '{expected}'.");
+        }
+    }
+
     private IRenderedComponent<InstanceAdminSettingsLayout> RenderAuthProvidersSection()
     {
         IRenderedComponent<InstanceAdminSettingsLayout> cut = RenderInstanceAdminSettingsLayout();

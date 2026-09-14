@@ -1,0 +1,56 @@
+@using Explore.Blazor.Client.Components.Onboarding
+@using Explore.Blazor.Client.Services
+@inject IInstanceOperatorIdentityAdminService IdentityService
+@inject ITranslationService Translation
+
+<div class="instance-operator-identity-section" data-testid="instance-operator-identity-section">
+    @if (_loading)
+    {
+        <MudStack AlignItems="AlignItems.Center" Class="py-12" data-testid="loading-operator-identity">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-4">
+                @Translation.T("operator.loading", "Loading operator identity...")
+            </MudText>
+        </MudStack>
+    }
+    else if (_model is not null)
+    {
+        <InstanceOperatorIdentityEditor Model="_model"
+                                        IsSingleTenantMode="@IsSingleTenantMode"
+                                        ShowCopyToDirectoryIdentity="false"
+                                        ShowSaveButton="true"
+                                        AllowIncompleteDraft="false"
+                                        OnSaved="HandleSaved" />
+    }
+</div>
+
+@code {
+    [Parameter]
+    public bool IsSingleTenantMode { get; set; }
+
+    private InstanceOperatorIdentityAdminModel? _model;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _model = await IdentityService.GetAsync();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void HandleSaved(InstanceOperatorIdentityAdminModel model)
+    {
+        _model = model;
+    }
+}

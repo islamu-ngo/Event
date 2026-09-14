@@ -90,10 +90,13 @@ openssl rand -base64 64
 openssl rand -hex 32
 ```
 
-Set your public URLs and complete the `INSTANCE__OPERATORIDENTITY__*` section.
-Supply `INSTANCE__OPERATORIDENTITY__OFFICIALORIGIN` as an HTTPS origin even when
-the instance is unofficial. Select a supported `OPERATORKINDCODE` matching the
-operator's legal status, such as `unincorporated_association` or
+Set your public URLs. The `INSTANCE__OPERATORIDENTITY__*` section is optional
+during initial deployment; if provided, it pre-seeds the first-run setup wizard.
+You can also configure or update operator legal identity directly in the `/setup`
+wizard or authenticated instance admin settings (`/settings/instance?section=operator-identity`).
+If supplying identity via environment variables, supply `INSTANCE__OPERATORIDENTITY__OFFICIALORIGIN`
+as an HTTPS origin even when the instance is unofficial. Select a supported `OPERATORKINDCODE`
+matching the operator's legal status, such as `unincorporated_association` or
 `registered_organization`; `community` is not accepted.
 Check database runtime/migrator role grants and align Keycloak realm/client values
 with your imported realm. No SMTP configuration is required for Local setup.

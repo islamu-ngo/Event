@@ -119,6 +119,38 @@ public sealed class StartupRoutingServiceTests
     }
 
     [Test]
+    public async Task GetRootDecisionAsync_ReturnsInstanceAdmin_WhenCompletedSingleTenantRequiresIdentityRepair()
+    {
+        var instanceOnboarding = CreateInstanceOnboardingService(Completed(
+            selectedDeploymentMode: "SingleTenant",
+            isAuthenticated: true,
+            isCurrentUserInstanceAdmin: true,
+            requiresIdentityRepair: true));
+        var service = new StartupRoutingService(instanceOnboarding, CreatePublicExperienceService());
+
+        var decision = await service.GetRootDecisionAsync();
+
+        await Assert.That(decision).IsEqualTo(StartupRouteDecision.InstanceAdmin);
+        await Assert.That(decision).IsNotEqualTo(StartupRouteDecision.Setup);
+    }
+
+    [Test]
+    public async Task GetRootDecisionAsync_NeverReturnsSetup_WhenCompletedInstanceHasMissingOrCorruptIdentity()
+    {
+        var instanceOnboarding = CreateInstanceOnboardingService(Completed(
+            selectedDeploymentMode: "SingleTenant",
+            isAuthenticated: false,
+            isCurrentUserInstanceAdmin: false,
+            requiresIdentityRepair: true));
+        var service = new StartupRoutingService(instanceOnboarding, CreatePublicExperienceService());
+
+        var decision = await service.GetRootDecisionAsync();
+
+        await Assert.That(decision).IsNotEqualTo(StartupRouteDecision.Setup);
+        await Assert.That(decision).IsEqualTo(StartupRouteDecision.PublicHome);
+    }
+
+    [Test]
     public async Task GetRootDecisionAsync_ReturnsPublicLanding_FromCachedShellHomeRoute()
     {
         var publicExperience = CreatePublicExperienceService(
@@ -225,13 +257,15 @@ public sealed class StartupRoutingServiceTests
     private static InstanceOnboardingStartupStatus Completed(
         string? selectedDeploymentMode,
         bool isAuthenticated,
-        bool isCurrentUserInstanceAdmin) => new(
+        bool isCurrentUserInstanceAdmin,
+        bool requiresIdentityRepair = false) => new(
         InstanceOnboardingStartupDisposition.Completed,
         Provider: null,
         Generation: 3,
         isAuthenticated,
         isCurrentUserInstanceAdmin,
-        selectedDeploymentMode);
+        selectedDeploymentMode,
+        requiresIdentityRepair);
 
     private static IInstanceOnboardingService CreateInstanceOnboardingService(
         InstanceOnboardingStartupStatus status)

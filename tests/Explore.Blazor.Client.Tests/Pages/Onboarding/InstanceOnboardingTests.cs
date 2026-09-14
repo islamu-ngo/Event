@@ -14,6 +14,7 @@ public class InstanceOnboardingTests : IDisposable
     private readonly IInstanceOnboardingService _instanceOnboardingService;
     private readonly IUserService _userService;
     private readonly IBffAuthApi _bffAuthApi;
+    private readonly IInstanceOperatorIdentityAdminService _operatorIdentityAdminService;
     private string _currentDeploymentMode = "SingleTenant";
 
     public InstanceOnboardingTests()
@@ -35,6 +36,7 @@ public class InstanceOnboardingTests : IDisposable
         });
         _ctx.Services.AddSingleton(httpClientFactory);
         _bffAuthApi = _ctx.Services.GetRequiredService<IBffAuthApi>();
+        _operatorIdentityAdminService = _ctx.Services.GetRequiredService<IInstanceOperatorIdentityAdminService>();
 
         _userService.SyncUserAsync().Returns(new BaseCommandResponseOfGuid { Success = true });
         _userService.GetCurrentUserAsync().Returns(new UserDto
@@ -407,6 +409,43 @@ public class InstanceOnboardingTests : IDisposable
         await Task.WhenAll(firstRefresh, overlappingRefresh);
 
         await AssertAuthoritativeCallCountAsync(2);
+    }
+
+    [Test]
+    public async Task OperatorIdentityIncomplete_DisablesLaunchButton()
+    {
+        _operatorIdentityAdminService.GetAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new InstanceOperatorIdentityAdminModel
+            {
+                Exists = true,
+                CanEdit = true,
+                IsReady = false,
+                ReasonCodes = new List<string> { "instance_operator_identity_missing" }
+            }));
+
+        var cut = RenderForDeploymentMode("SingleTenant");
+
+        Require(FindButton(cut, "Launch instance").HasAttribute("disabled"),
+            "Incomplete operator identity must disable instance launch.");
+        RequireContains(cut.Markup, "Instance operator identity");
+        await Task.CompletedTask;
+    }
+
+    [Test]
+    public async Task SingleTenant_CopyToDirectoryIdentity_PopulatesDirectoryOperatorForm()
+    {
+        var cut = RenderForDeploymentMode("SingleTenant");
+
+        var copyButton = cut.Find("[data-testid='copy-to-directory-identity']");
+        await Assert.That(copyButton).IsNotNull();
+
+        copyButton.Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            var publicNameInput = cut.Find("#operator-public-name");
+            Require(publicNameInput.GetAttribute("value") == "ISLAMU Explore", "Expected public name to be copied.");
+        });
     }
 
     private IRenderedComponent<InstanceOnboarding> RenderForDeploymentMode(

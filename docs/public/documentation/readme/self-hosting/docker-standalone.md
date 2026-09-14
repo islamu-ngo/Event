@@ -83,7 +83,7 @@ AUTHORIZATION_PROVIDER=local
 AUTHENTICATION_LOCAL_JWT_KEY=replace-with-output-from-openssl-rand-base64-64
 IDENTITY_DATABASE_TOPOLOGY=colocated
 
-# Operator Legal Identity (Required for Production startup)
+# Operator Legal Identity (Optional first-run setup pre-seed; can also be configured in /setup)
 # See: ../configuration-and-operations/environment-variables.md#9-operator-legal-identity-production-gate
 INSTANCE__OPERATORIDENTITY__OPERATORID=01912a7e-1234-7000-8000-000000000001
 INSTANCE__OPERATORIDENTITY__PUBLICNAME=Community Events Foundation
@@ -119,8 +119,9 @@ separately and deliberately enable the required processors. Enabling persisted
 email delivery does not start processors disabled here. Do not hide the webhook
 failure by changing readiness results or disabling database/security checks.
 
-Replace the example legal identity, URLs and JWT-key placeholder before starting.
-The operator kind must match your actual legal status; `community` is not an
+Operator legal identity can either be pre-seeded through the environment variables
+above or configured interactively during first-run onboarding at `/setup`. The
+operator kind must match your actual legal status; `community` is not an
 accepted code. The HTTPS `OFFICIALORIGIN` is required even for an unofficial
 instance. For localhost evaluation, use your intended operator HTTPS origin for
 that identity field and `http://localhost:8080` for `PUBLIC_BASE_URL`.
@@ -184,7 +185,8 @@ Once the container is healthy:
    file is not expected. Never paste it into logs or support tickets.
 2. Navigate to `http://localhost:8080/setup` (or `https://events.example.org/setup` behind your reverse proxy).
 3. Validate the secret, choose **Continue Local setup**, and complete the instance
-   details. Enter the initial administrator's username and temporary password;
+   details and operator legal identity (which can be copied directly to the directory
+   operator identity). Enter the initial administrator's username and temporary password;
    credential email is optional. This setup-authorized provisioning does not
    require an existing sign-in or public **Create an account** flow.
 4. Sign in with that temporary credential and complete the required private

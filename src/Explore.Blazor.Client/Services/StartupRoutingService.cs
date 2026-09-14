@@ -52,7 +52,7 @@ public sealed class StartupRoutingService : IStartupRoutingService
 
         if (instanceStatus.IsAuthenticated &&
             instanceStatus.IsCurrentUserInstanceAdmin &&
-            isMultiTenant)
+            (isMultiTenant || instanceStatus.RequiresIdentityRepair))
         {
             return StartupRouteDecision.InstanceAdmin;
         }

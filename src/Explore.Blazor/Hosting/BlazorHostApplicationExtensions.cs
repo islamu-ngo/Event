@@ -32,7 +32,9 @@ public static class BlazorHostApplicationExtensions
                 catch (Exception exception) when (
                     exception is Explore.Blazor.Client.Clients.ApiException
                     or HttpRequestException
-                    or TaskCanceledException)
+                    or TaskCanceledException
+                    or TimeoutException
+                    or OperationCanceledException)
                 {
                     throw new InvalidOperationException(
                         "The split Blazor host cannot start because the Explore API is not ready.",

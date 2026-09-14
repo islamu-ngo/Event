@@ -21,7 +21,7 @@ public sealed class ApiReadinessHealthCheck(IServiceScopeFactory scopeFactory) :
                 "Explore API generated-client probe returned a non-success status code.",
                 data: new Dictionary<string, object> { ["statusCode"] = ex.StatusCode });
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or TimeoutException or OperationCanceledException)
         {
             return HealthCheckResult.Unhealthy("Explore API generated-client probe is unreachable.", ex);
         }

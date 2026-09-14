@@ -38,6 +38,8 @@ public static class BlazorHostServiceCollectionExtensions
 
         if (profile == BlazorHostProfile.Split)
         {
+            builder.Services.AddOptions<ExploreApiReadinessOptions>()
+                .Bind(builder.Configuration.GetSection(ExploreApiReadinessOptions.SectionName));
             builder.Services.AddScoped<IExploreApiReadinessProbe, ExploreApiReadinessProbe>();
             ForwardedHeadersTrustOptions forwardedHeadersTrust = builder.Configuration
                 .GetSection(ForwardedHeadersTrustOptions.SectionName)

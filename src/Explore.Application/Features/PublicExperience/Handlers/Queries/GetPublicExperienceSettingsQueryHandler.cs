@@ -14,12 +14,12 @@ using Explore.Domain.Constants;
 using Explore.Domain.Enums.Analytics;
 using Explore.Domain.Settings.Documents;
 using Explore.Domain.Settings.Documents.Payloads;
+using Explore.Application.Contracts.Operations;
 using Explore.Domain.ValueObjects;
-using MediatR;
 
 namespace Explore.Application.Features.PublicExperience.Handlers.Queries;
 
-public class GetPublicExperienceSettingsQueryHandler : IRequestHandler<GetPublicExperienceSettingsQuery, PublicExperienceSettingsDto>
+public class GetPublicExperienceSettingsQueryHandler : IQueryHandler<GetPublicExperienceSettingsQuery, PublicExperienceSettingsDto>
 {
     private readonly ITenantContext _tenantContext;
     private readonly ISystemSettingRepository _systemSettingRepository;
@@ -71,7 +71,7 @@ public class GetPublicExperienceSettingsQueryHandler : IRequestHandler<GetPublic
         _visitorAccessCapabilityResolver = visitorAccessCapabilityResolver;
     }
 
-    public async Task<PublicExperienceSettingsDto> Handle(GetPublicExperienceSettingsQuery request, CancellationToken cancellationToken)
+    public async Task<PublicExperienceSettingsDto> QueryAsync(GetPublicExperienceSettingsQuery query, CancellationToken cancellationToken)
     {
         var tenantId = _tenantContext.TenantId;
         TenantDirectoryOperatorReadinessAssessment directoryAssessment =

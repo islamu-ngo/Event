@@ -12,20 +12,19 @@ using Explore.Application.Responses;
 using Explore.Application.Settings;
 using Explore.Domain.Constants;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Logging;
 
 namespace Explore.Application.Features.PublicExperience.Handlers.Queries;
 
 public sealed partial class GetHomeDiscoveryQueryHandler(
     IQueryHandler<GetPublicEventDiscoveryRequest, PaginatedResult<EventDiscoveryItemDto>> eventDiscoveryHandler,
-    IRequestHandler<GetPublicExperienceShellQuery, PublicExperienceShellDto> shellHandler,
+    IQueryHandler<GetPublicExperienceShellQuery, PublicExperienceShellDto> shellHandler,
     ITenantContext tenantContext,
     IHierarchicalSettingsResolver settingsResolver,
     ILocationRepository locationRepository,
     TimeProvider timeProvider,
     ILogger<GetHomeDiscoveryQueryHandler> logger)
-    : IRequestHandler<GetHomeDiscoveryQuery, HomeDiscoveryDto>
+    : IQueryHandler<GetHomeDiscoveryQuery, HomeDiscoveryDto>
 {
     private const int HeroLimit = 10;
     private const int UpcomingLimit = 18;
@@ -38,7 +37,7 @@ public sealed partial class GetHomeDiscoveryQueryHandler(
         [(int)EventFormatEnum.Digital, (int)EventFormatEnum.Hybrid];
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public async Task<HomeDiscoveryDto> Handle(
+    public async Task<HomeDiscoveryDto> QueryAsync(
         GetHomeDiscoveryQuery request,
         CancellationToken cancellationToken)
     {
@@ -249,7 +248,7 @@ public sealed partial class GetHomeDiscoveryQueryHandler(
         {
             try
             {
-                var shell = await shellHandler.Handle(new GetPublicExperienceShellQuery(), cancellationToken);
+                var shell = await shellHandler.QueryAsync(new GetPublicExperienceShellQuery(), cancellationToken);
                 if (shell.PrimaryOrganization.ActorId is { } actorId)
                 {
                     spotlightRequest = CreateUpcomingRequest(

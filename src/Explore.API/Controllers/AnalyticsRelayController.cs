@@ -2,9 +2,9 @@ using Asp.Versioning;
 using Explore.API.Attributes;
 using Explore.API.ExceptionHandling;
 using Explore.API.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Analytics;
 using Explore.Application.Features.PublicExperience.Requests.Commands;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -15,7 +15,7 @@ namespace Explore.API.Controllers;
 [Route("api/a/t")]
 [ApiController]
 [EndpointClassification(EndpointClass.Public)]
-public class AnalyticsRelayController(IMediator mediator) : EventControllerBase
+public class AnalyticsRelayController(ICommandHandler<RelayAnalyticsEventCommand, bool> relayHandler) : EventControllerBase
 {
     private static readonly ApiValidationProblemDescriptor RelayValidationProblem = new(
         "analyticsRelay",
@@ -31,7 +31,7 @@ public class AnalyticsRelayController(IMediator mediator) : EventControllerBase
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Relay([FromBody] RelayAnalyticsEventDto payload, CancellationToken cancellationToken)
     {
-        var accepted = await mediator.Send(new RelayAnalyticsEventCommand
+        var accepted = await relayHandler.ExecuteAsync(new RelayAnalyticsEventCommand
         {
             AuthenticatedUserId = CurrentUserId,
             Payload = payload

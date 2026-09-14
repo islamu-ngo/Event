@@ -48,7 +48,7 @@ public class RelayAnalyticsEventCommandHandlerTests
             }
         };
 
-        var result = await handler.Handle(new RelayAnalyticsEventCommand { Payload = payload }, CancellationToken.None);
+        var result = await handler.ExecuteAsync(new RelayAnalyticsEventCommand { Payload = payload }, CancellationToken.None);
 
         await Assert.That(result).IsTrue();
         await analyticsProvider.Received(1).PageViewAsync(

@@ -3,11 +3,11 @@ namespace Event.Api.IntegrationTests.Features;
 using Explore.API.Controllers;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Hateoas;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.DTOs.PublicExperience;
 using Explore.Application.Features.PublicExperience.Requests.Queries;
 using Explore.Application.Hateoas;
-using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using NSubstitute;
@@ -17,8 +17,8 @@ public sealed class PublicExperienceIdentityAvailabilityTests
     [Test]
     public async Task GetSettings_UnavailableIdentityReturnsNonCacheable503Problem()
     {
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(
+        var settingsHandler = Substitute.For<IQueryHandler<GetPublicExperienceSettingsQuery, PublicExperienceSettingsDto>>();
+        settingsHandler.QueryAsync(
                 Arg.Any<GetPublicExperienceSettingsQuery>(),
                 Arg.Any<CancellationToken>())
             .Returns(new PublicExperienceSettingsDto
@@ -26,7 +26,7 @@ public sealed class PublicExperienceIdentityAvailabilityTests
                 IsAvailable = false,
                 UnavailableCode = "tenant_identity_unavailable"
             });
-        PublicExperienceController controller = CreateController(mediator);
+        PublicExperienceController controller = CreateController(settingsHandler: settingsHandler);
 
         ActionResult<PublicExperienceSettingsDto> response =
             await controller.GetSettings(CancellationToken.None);
@@ -43,8 +43,8 @@ public sealed class PublicExperienceIdentityAvailabilityTests
     [Test]
     public async Task GetShell_UnavailableIdentityReturnsNonCacheable503Problem()
     {
-        var mediator = Substitute.For<IMediator>();
-        mediator.Send(
+        var shellHandler = Substitute.For<IQueryHandler<GetPublicExperienceShellQuery, PublicExperienceShellDto>>();
+        shellHandler.QueryAsync(
                 Arg.Any<GetPublicExperienceShellQuery>(),
                 Arg.Any<CancellationToken>())
             .Returns(new PublicExperienceShellDto
@@ -52,7 +52,7 @@ public sealed class PublicExperienceIdentityAvailabilityTests
                 IsAvailable = false,
                 UnavailableCode = "tenant_identity_unavailable"
             });
-        PublicExperienceController controller = CreateController(mediator);
+        PublicExperienceController controller = CreateController(shellHandler: shellHandler);
 
         ActionResult<PublicExperienceShellDto> response =
             await controller.GetShell(CancellationToken.None);
@@ -66,10 +66,15 @@ public sealed class PublicExperienceIdentityAvailabilityTests
             .IsEqualTo("no-store");
     }
 
-    private static PublicExperienceController CreateController(IMediator mediator)
+    private static PublicExperienceController CreateController(
+        IQueryHandler<GetPublicExperienceSettingsQuery, PublicExperienceSettingsDto>? settingsHandler = null,
+        IQueryHandler<GetPublicExperienceShellQuery, PublicExperienceShellDto>? shellHandler = null,
+        IQueryHandler<GetHomeDiscoveryQuery, HomeDiscoveryDto>? homeDiscoveryHandler = null)
     {
         var controller = new PublicExperienceController(
-            mediator,
+            settingsHandler ?? Substitute.For<IQueryHandler<GetPublicExperienceSettingsQuery, PublicExperienceSettingsDto>>(),
+            shellHandler ?? Substitute.For<IQueryHandler<GetPublicExperienceShellQuery, PublicExperienceShellDto>>(),
+            homeDiscoveryHandler ?? Substitute.For<IQueryHandler<GetHomeDiscoveryQuery, HomeDiscoveryDto>>(),
             Substitute.For<ILinkPolicy<EventDiscoveryItemDto>>(),
             Substitute.For<IHateoasLinkGenerator>())
         {

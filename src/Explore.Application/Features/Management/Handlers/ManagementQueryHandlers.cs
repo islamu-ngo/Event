@@ -1,4 +1,5 @@
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Management;
@@ -6,7 +7,6 @@ using Explore.Application.Features.Management.Requests.Queries;
 using Explore.Application.Management;
 using Explore.Domain;
 using Explore.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Options;
 
 namespace Explore.Application.Features.Management.Handlers.Queries;
@@ -16,11 +16,11 @@ public sealed class GetManagementCapabilitiesQueryHandler(
     IInstanceBootstrapStateRepository bootstrapStateRepository,
     IManagedControlPlaneRegistrationRepository registrationRepository,
     ManagedTenantProvisioningCapacityReader tenantProvisioningCapacityReader)
-    : IRequestHandler<GetManagementCapabilitiesQuery, ManagementCapabilitiesDto>
+    : IQueryHandler<GetManagementCapabilitiesQuery, ManagementCapabilitiesDto>
 {
-    public async Task<ManagementCapabilitiesDto> Handle(
+    public async Task<ManagementCapabilitiesDto> QueryAsync(
         GetManagementCapabilitiesQuery request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         if (!options.Value.Enabled)
         {
@@ -66,11 +66,11 @@ public sealed class GetManagedEventInstanceStatusQueryHandler(
     IOptions<ManagedControlPlaneOptions> options,
     IDeploymentModeProvider deploymentModeProvider,
     IManagedControlPlaneRegistrationRepository registrationRepository)
-    : IRequestHandler<GetManagedEventInstanceStatusQuery, ManagedEventInstanceStatusDto?>
+    : IQueryHandler<GetManagedEventInstanceStatusQuery, ManagedEventInstanceStatusDto?>
 {
-    public async Task<ManagedEventInstanceStatusDto?> Handle(
+    public async Task<ManagedEventInstanceStatusDto?> QueryAsync(
         GetManagedEventInstanceStatusQuery request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         if (!options.Value.Enabled)
         {
@@ -99,11 +99,11 @@ public sealed class GetManagedEventInstanceStatusQueryHandler(
 }
 
 public sealed class GetManagementHealthQueryHandler(IManagedEventHealthProbe healthProbe)
-    : IRequestHandler<GetManagementHealthQuery, ManagementHealthDto>
+    : IQueryHandler<GetManagementHealthQuery, ManagementHealthDto>
 {
-    public async Task<ManagementHealthDto> Handle(
+    public async Task<ManagementHealthDto> QueryAsync(
         GetManagementHealthQuery request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         var health = await healthProbe.CheckAsync(cancellationToken);
         return new ManagementHealthDto(health.Status, health.ObservedAt);
@@ -116,11 +116,11 @@ public sealed class GetManagementUpgradePreflightQueryHandler(
     IInstanceBootstrapStateRepository bootstrapStateRepository,
     IManagedControlPlaneRegistrationRepository registrationRepository,
     IManagedEventHealthProbe healthProbe)
-    : IRequestHandler<GetManagementUpgradePreflightQuery, ManagementUpgradePreflightDto>
+    : IQueryHandler<GetManagementUpgradePreflightQuery, ManagementUpgradePreflightDto>
 {
-    public async Task<ManagementUpgradePreflightDto> Handle(
+    public async Task<ManagementUpgradePreflightDto> QueryAsync(
         GetManagementUpgradePreflightQuery request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         var currentVersion = ManagementVersionResolver.EventVersion;
         var targetVersion = request.TargetEventVersion?.Trim() ?? string.Empty;
@@ -187,11 +187,11 @@ public sealed class GetManagementUpgradePostflightQueryHandler(
     IInstanceBootstrapStateRepository bootstrapStateRepository,
     IManagedControlPlaneRegistrationRepository registrationRepository,
     IManagedEventHealthProbe healthProbe)
-    : IRequestHandler<GetManagementUpgradePostflightQuery, ManagementUpgradePostflightDto>
+    : IQueryHandler<GetManagementUpgradePostflightQuery, ManagementUpgradePostflightDto>
 {
-    public async Task<ManagementUpgradePostflightDto> Handle(
+    public async Task<ManagementUpgradePostflightDto> QueryAsync(
         GetManagementUpgradePostflightQuery request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         var currentVersion = ManagementVersionResolver.EventVersion;
         var expectedVersion = request.ExpectedEventVersion?.Trim() ?? string.Empty;

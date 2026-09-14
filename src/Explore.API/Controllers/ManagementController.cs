@@ -6,10 +6,11 @@ using Explore.API.ExceptionHandling;
 using Explore.API.Extensions;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Management;
 using Explore.Application.Features.Management.Requests.Commands;
 using Explore.Application.Features.Management.Requests.Queries;
-using MediatR;
+using Explore.Application.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -22,7 +23,18 @@ namespace Explore.API.Controllers;
 [ApiController]
 [EndpointClassification(EndpointClass.Admin)]
 public sealed class ManagementController(
-    IMediator mediator,
+    IQueryHandler<GetManagementCapabilitiesQuery, ManagementCapabilitiesDto> getManagementCapabilitiesQueryHandler,
+    ICommandHandler<TriggerManagedControlPlaneRegistrationCommand, TriggerManagedRegistrationResultDto> triggerManagedControlPlaneRegistrationCommandHandler,
+    IQueryHandler<GetManagedEventInstanceStatusQuery, ManagedEventInstanceStatusDto?> getManagedEventInstanceStatusQueryHandler,
+    IQueryHandler<GetManagementHealthQuery, ManagementHealthDto> getManagementHealthQueryHandler,
+    IQueryHandler<GetManagementUpgradePreflightQuery, ManagementUpgradePreflightDto> getManagementUpgradePreflightQueryHandler,
+    IQueryHandler<GetManagementUpgradePostflightQuery, ManagementUpgradePostflightDto> getManagementUpgradePostflightQueryHandler,
+    IQueryHandler<GetManagedTenantProvisioningPreflightQuery, ManagementTenantProvisioningPreflightDto> getManagedTenantProvisioningPreflightQueryHandler,
+    ICommandHandler<ScheduleManagedTenantProvisioningCommand, BaseCommandResponse<ManagementTenantProvisioningOperationDto>> scheduleManagedTenantProvisioningCommandHandler,
+    IQueryHandler<GetManagedTenantProvisioningOperationQuery, ManagementTenantProvisioningOperationDto?> getManagedTenantProvisioningOperationQueryHandler,
+    ICommandHandler<CancelManagedTenantProvisioningOperationCommand, BaseCommandResponse<ManagementTenantProvisioningOperationDto>> cancelManagedTenantProvisioningOperationCommandHandler,
+    ICommandHandler<RotateManagedControlPlaneCredentialCommand, bool> rotateManagedControlPlaneCredentialCommandHandler,
+    ICommandHandler<RevokeManagedControlPlaneRegistrationCommand, bool> revokeManagedControlPlaneRegistrationCommandHandler,
     IAdminContext adminContext) : ControllerBase
 {
     [HttpGet("capabilities", Name = RouteNames.GetManagementCapabilities)]
@@ -35,7 +47,7 @@ public sealed class ManagementController(
     public async Task<ActionResult<ManagementCapabilitiesDto>> GetCapabilities(
         CancellationToken cancellationToken = default)
     {
-        var capabilities = await mediator.Send(new GetManagementCapabilitiesQuery(), cancellationToken);
+        var capabilities = await getManagementCapabilitiesQueryHandler.QueryAsync(new GetManagementCapabilitiesQuery(), cancellationToken);
         if (!capabilities.ManagedModeEnabled)
         {
             return NotFound(new ProblemDetails
@@ -69,7 +81,7 @@ public sealed class ManagementController(
                 detail: "Instance administrator authority is required to trigger managed registration.");
         }
 
-        var result = await mediator.Send(
+        var result = await triggerManagedControlPlaneRegistrationCommandHandler.ExecuteAsync(
             new TriggerManagedControlPlaneRegistrationCommand(),
             cancellationToken);
         return result.Success ? Ok(result) : Accepted(result);
@@ -84,7 +96,7 @@ public sealed class ManagementController(
     public async Task<ActionResult<ManagedEventInstanceStatusDto>> GetInstance(
         CancellationToken cancellationToken = default)
     {
-        var status = await mediator.Send(new GetManagedEventInstanceStatusQuery(), cancellationToken);
+        var status = await getManagedEventInstanceStatusQueryHandler.QueryAsync(new GetManagedEventInstanceStatusQuery(), cancellationToken);
         return status is null ? NotFound() : Ok(status);
     }
 
@@ -95,7 +107,7 @@ public sealed class ManagementController(
     public async Task<ActionResult<ManagementVersionDto>> GetVersion(
         CancellationToken cancellationToken = default)
     {
-        var capabilities = await mediator.Send(new GetManagementCapabilitiesQuery(), cancellationToken);
+        var capabilities = await getManagementCapabilitiesQueryHandler.QueryAsync(new GetManagementCapabilitiesQuery(), cancellationToken);
         return Ok(new ManagementVersionDto(capabilities.EventVersion, capabilities.ManagementApiVersion));
     }
 
@@ -106,7 +118,7 @@ public sealed class ManagementController(
     public async Task<ActionResult<ManagementHealthDto>> GetHealth(
         CancellationToken cancellationToken = default)
     {
-        var health = await mediator.Send(new GetManagementHealthQuery(), cancellationToken);
+        var health = await getManagementHealthQueryHandler.QueryAsync(new GetManagementHealthQuery(), cancellationToken);
         return Ok(health);
     }
 
@@ -122,7 +134,7 @@ public sealed class ManagementController(
         [FromBody] ManagementUpgradePreflightRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var result = await mediator.Send(
+        var result = await getManagementUpgradePreflightQueryHandler.QueryAsync(
             new GetManagementUpgradePreflightQuery(
                 request.TargetEventVersion,
                 request.TargetManagementApiVersion),
@@ -142,7 +154,7 @@ public sealed class ManagementController(
         [FromBody] ManagementUpgradePostflightRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var result = await mediator.Send(
+        var result = await getManagementUpgradePostflightQueryHandler.QueryAsync(
             new GetManagementUpgradePostflightQuery(
                 request.ExpectedEventVersion,
                 request.ExpectedManagementApiVersion),
@@ -174,7 +186,7 @@ public sealed class ManagementController(
                 "Managed principal is invalid."));
         }
 
-        ManagementTenantProvisioningPreflightDto result = await mediator.Send(
+        ManagementTenantProvisioningPreflightDto result = await getManagedTenantProvisioningPreflightQueryHandler.QueryAsync(
             new GetManagedTenantProvisioningPreflightQuery(managedInstanceId, request),
             cancellationToken);
         return Ok(result);
@@ -203,7 +215,7 @@ public sealed class ManagementController(
                 "Managed principal is invalid."));
         }
 
-        var result = await mediator.Send(
+        var result = await scheduleManagedTenantProvisioningCommandHandler.ExecuteAsync(
             new ScheduleManagedTenantProvisioningCommand(managedInstanceId, request),
             cancellationToken);
         if (!result.IsSuccess || result.Id is null)
@@ -240,7 +252,7 @@ public sealed class ManagementController(
                 "Managed principal is invalid."));
         }
 
-        ManagementTenantProvisioningOperationDto? operation = await mediator.Send(
+        ManagementTenantProvisioningOperationDto? operation = await getManagedTenantProvisioningOperationQueryHandler.QueryAsync(
             new GetManagedTenantProvisioningOperationQuery(managedInstanceId, operationId),
             cancellationToken);
         return operation is null
@@ -276,7 +288,7 @@ public sealed class ManagementController(
                 "Managed principal is invalid."));
         }
 
-        var result = await mediator.Send(
+        var result = await cancelManagedTenantProvisioningOperationCommandHandler.ExecuteAsync(
             new CancelManagedTenantProvisioningOperationCommand(managedInstanceId, operationId),
             cancellationToken);
         if (result.IsSuccess && result.Id is not null)
@@ -307,7 +319,7 @@ public sealed class ManagementController(
         [FromBody] RotateManagedControlPlaneCredentialRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var rotated = await mediator.Send(
+        var rotated = await rotateManagedControlPlaneCredentialCommandHandler.ExecuteAsync(
             new RotateManagedControlPlaneCredentialCommand(request),
             cancellationToken);
         return rotated ? NoContent() : BadRequest();
@@ -322,7 +334,7 @@ public sealed class ManagementController(
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> RevokeCredential(CancellationToken cancellationToken = default)
     {
-        var revoked = await mediator.Send(
+        var revoked = await revokeManagedControlPlaneRegistrationCommandHandler.ExecuteAsync(
             new RevokeManagedControlPlaneRegistrationCommand(),
             cancellationToken);
         return revoked ? NoContent() : Conflict();

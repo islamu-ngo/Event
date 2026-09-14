@@ -7,12 +7,12 @@ using Explore.Application.Contracts.Secrets;
 using Explore.Application.Contracts.Services;
 using Explore.Application.DTOs.Management;
 using Explore.Application.Features.Management.Requests.Commands;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Management;
 using Explore.Application.Services;
 using Explore.Domain;
 using Explore.Domain.Enums;
 using Explore.Domain.Secrets;
-using MediatR;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -27,11 +27,11 @@ public sealed class TriggerManagedControlPlaneRegistrationCommandHandler(
     IDeploymentModeProvider deploymentModeProvider,
     IManagedControlPlaneRegistrationClient registrationClient,
     ILogger<TriggerManagedControlPlaneRegistrationCommandHandler> logger)
-    : IRequestHandler<TriggerManagedControlPlaneRegistrationCommand, TriggerManagedRegistrationResultDto>
+    : ICommandHandler<TriggerManagedControlPlaneRegistrationCommand, TriggerManagedRegistrationResultDto>
 {
-    public async Task<TriggerManagedRegistrationResultDto> Handle(
+    public async Task<TriggerManagedRegistrationResultDto> ExecuteAsync(
         TriggerManagedControlPlaneRegistrationCommand request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         var settings = options.Value;
         if (!settings.Enabled)

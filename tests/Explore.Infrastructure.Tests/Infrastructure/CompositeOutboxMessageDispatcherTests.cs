@@ -3,6 +3,7 @@ using System.Diagnostics.Metrics;
 using Explore.Application.Caching;
 using Explore.Application.Contracts.Admissions;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Payments;
 using Explore.Application.Contracts.Services;
@@ -340,11 +341,11 @@ public sealed class CompositeOutboxMessageDispatcherTests
     [Test]
     public async Task ReconcileDeadLetterAsync_WithManagedTenantPointer_RoutesTerminalCommand()
     {
-        var mediator = Substitute.For<IMediator>();
+        var reconcileHandler = Substitute.For<ICommandHandler<ReconcileManagedTenantProvisioningDeadLetterCommand, bool>>();
         var dispatcher = CreateDispatcher(
             Substitute.For<IEventPublishedNotificationFanoutService>(),
             Substitute.For<IEventModerationNotificationFanoutService>(),
-            mediator: mediator);
+            reconcileHandler: reconcileHandler);
         Guid operationId = Guid.CreateVersion7();
 
         await dispatcher.ReconcileDeadLetterAsync(new OutboxMessage
@@ -355,7 +356,7 @@ public sealed class CompositeOutboxMessageDispatcherTests
             EventType = ManagedTenantProvisioningOutboxEvents.ProcessRequested
         });
 
-        await mediator.Received(1).Send(
+        await reconcileHandler.Received(1).ExecuteAsync(
             Arg.Is<ReconcileManagedTenantProvisioningDeadLetterCommand>(command =>
                 command.OperationId == operationId),
             Arg.Any<CancellationToken>());
@@ -659,7 +660,8 @@ public sealed class CompositeOutboxMessageDispatcherTests
         IEventPublishedNotificationFanoutService fanoutService,
         IEventModerationNotificationFanoutService moderationFanoutService,
         IReportProviderSyncDispatcher? reportProviderSyncDispatcher = null,
-        IMediator? mediator = null,
+        ICommandHandler<ProcessManagedTenantProvisioningOperationCommand, bool>? processHandler = null,
+        ICommandHandler<ReconcileManagedTenantProvisioningDeadLetterCommand, bool>? reconcileHandler = null,
         INotificationFanoutOccurrenceRepository? occurrenceRepository = null,
         INotificationFanoutRunRepository? runRepository = null,
         IOutboxRepository? outboxRepository = null,
@@ -715,7 +717,8 @@ public sealed class CompositeOutboxMessageDispatcherTests
             admissionEventCancellationService ?? Substitute.For<IAdmissionEventCancellationService>(),
             CreateMetrics(),
             TimeProvider.System,
-            mediator ?? Substitute.For<IMediator>(),
+            processHandler ?? Substitute.For<ICommandHandler<ProcessManagedTenantProvisioningOperationCommand, bool>>(),
+            reconcileHandler ?? Substitute.For<ICommandHandler<ReconcileManagedTenantProvisioningDeadLetterCommand, bool>>(),
             NullLogger<CompositeOutboxMessageDispatcher>.Instance,
             manifestEffectDispatcher
                 ?? Substitute.For<IConfigurationManifestEffectDispatcher>(),

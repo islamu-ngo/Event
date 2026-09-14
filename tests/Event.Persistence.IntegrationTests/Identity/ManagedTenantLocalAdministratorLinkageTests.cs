@@ -314,7 +314,7 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
                 new ManagedControlPlaneRegistrationRepository(app), operations, new ExternalBindingRepository(app), tenants,
                 new OutboxRepository(app), new RelationalSettingMutationLock(app, new EfCoreUnitOfWork(app)),
                 new TenantActivationCapacityPolicy(new InstanceBootstrapStateRepository(app), tenants, operations, _managedOptions), Preflight(scope));
-            var result = await handler.Handle(new ScheduleManagedTenantProvisioningCommand(ManagedInstanceId, Request()), Token);
+            var result = await handler.ExecuteAsync(new ScheduleManagedTenantProvisioningCommand(ManagedInstanceId, Request()), Token);
             await Assert.That(result.IsSuccess).IsTrue();
             return (await operations.GetByIdAsNoTrackingAsync(result.Id!.OperationId, Token))!;
         }
@@ -324,7 +324,7 @@ public sealed class ManagedTenantLocalAdministratorLinkageTests
             await using var scope = Provider.CreateAsyncScope();
             await new ProcessManagedTenantProvisioningOperationCommandHandler(
                 new ManagedTenantProvisioningOperationRepository(Application(scope)), Handler(scope))
-                .Handle(new ProcessManagedTenantProvisioningOperationCommand(operation.Id, operation.CurrentOutboxMessageId), Token);
+                .ExecuteAsync(new ProcessManagedTenantProvisioningOperationCommand(operation.Id, operation.CurrentOutboxMessageId), Token);
         }
 
         internal async Task<string> CredentialSnapshotAsync()

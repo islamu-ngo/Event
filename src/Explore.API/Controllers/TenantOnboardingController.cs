@@ -11,7 +11,6 @@ using Explore.Application.Features.TenantOnboarding.Requests.Commands;
 using Explore.Application.Features.TenantOnboarding.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -35,16 +34,25 @@ public class TenantOnboardingController : EventControllerBase
         "Tenant onboarding validation failed",
         "Tenant onboarding step progress save failed.");
 
-    private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetTenantOnboardingStatusQuery, TenantOnboardingStatusDto> _getTenantOnboardingStatus;
+    private readonly IQueryHandler<GetTenantPolicySettingsQuery, TenantPolicySettingsDto> _getTenantPolicySettings;
+    private readonly ICommandHandler<CompleteTenantOnboardingCommand, BaseCommandResponse<Guid>> _completeTenantOnboarding;
+    private readonly ICommandHandler<SaveTenantOnboardingStepCommand, BaseCommandResponse<Guid>> _saveTenantOnboardingStep;
     private readonly IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> _identityQuery;
     private readonly IResourceAssembler<TenantOnboardingStatusDto, TenantOnboardingStatusDto> _statusAssembler;
 
     public TenantOnboardingController(
-        IMediator mediator,
+        IQueryHandler<GetTenantOnboardingStatusQuery, TenantOnboardingStatusDto> getTenantOnboardingStatus,
+        IQueryHandler<GetTenantPolicySettingsQuery, TenantPolicySettingsDto> getTenantPolicySettings,
+        ICommandHandler<CompleteTenantOnboardingCommand, BaseCommandResponse<Guid>> completeTenantOnboarding,
+        ICommandHandler<SaveTenantOnboardingStepCommand, BaseCommandResponse<Guid>> saveTenantOnboardingStep,
         IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?> identityQuery,
         IResourceAssembler<TenantOnboardingStatusDto, TenantOnboardingStatusDto> statusAssembler)
     {
-        _mediator = mediator;
+        _getTenantOnboardingStatus = getTenantOnboardingStatus;
+        _getTenantPolicySettings = getTenantPolicySettings;
+        _completeTenantOnboarding = completeTenantOnboarding;
+        _saveTenantOnboardingStep = saveTenantOnboardingStep;
         _identityQuery = identityQuery;
         _statusAssembler = statusAssembler;
     }
@@ -60,7 +68,7 @@ public class TenantOnboardingController : EventControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<HalResource<TenantOnboardingStatusDto>>> GetStatus(CancellationToken cancellationToken = default)
     {
-        var status = await _mediator.Send(new GetTenantOnboardingStatusQuery(), cancellationToken);
+        var status = await _getTenantOnboardingStatus.QueryAsync(new GetTenantOnboardingStatusQuery(), cancellationToken);
         var resource = await _statusAssembler.ToResource(status, HttpContext);
         return Ok(resource);
     }
@@ -72,7 +80,7 @@ public class TenantOnboardingController : EventControllerBase
     [ProducesResponseType(typeof(TenantPolicySettingsDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<TenantPolicySettingsDto>> GetSettings(CancellationToken cancellationToken = default)
     {
-        var settings = await _mediator.Send(new GetTenantPolicySettingsQuery(), cancellationToken);
+        var settings = await _getTenantPolicySettings.QueryAsync(new GetTenantPolicySettingsQuery(), cancellationToken);
         return Ok(settings);
     }
 
@@ -95,7 +103,7 @@ public class TenantOnboardingController : EventControllerBase
                 detail: "The authenticated principal could not be resolved to an application user.");
         }
 
-        var response = await _mediator.Send(new CompleteTenantOnboardingCommand
+        var response = await _completeTenantOnboarding.ExecuteAsync(new CompleteTenantOnboardingCommand
         {
             UserId = currentUserId.Value,
             Settings = request.Settings,
@@ -141,7 +149,7 @@ public class TenantOnboardingController : EventControllerBase
             CompletedSteps = dto.CompletedSteps
         };
 
-        var response = await _mediator.Send(command, cancellationToken);
+        var response = await _saveTenantOnboardingStep.ExecuteAsync(command, cancellationToken);
         if (!response.IsSuccess)
         {
             return this.ToCommandValidationProblem(response, SaveStepValidationProblem);

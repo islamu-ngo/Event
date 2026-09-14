@@ -7,7 +7,9 @@ using Explore.API.Extensions;
 using Explore.API.Hateoas;
 using Explore.Application.Contracts.Hateoas;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.DTOs.Ai;
+using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.AiAssistant.Requests.Commands;
 using Explore.Application.Features.AiAssistant.Requests.Queries;
 using Explore.Application.Features.TenantOnboarding.Requests.Queries;
@@ -49,6 +51,7 @@ public sealed class AiAssistantController : ControllerBase
         "AI run not found.");
 
     private readonly IMediator _mediator;
+    private readonly IQueryHandler<GetTenantOnboardingStatusQuery, TenantOnboardingStatusDto> _tenantOnboardingStatus;
     private readonly IHateoasLinkGenerator _linkGenerator;
     private readonly IResourceAssembler<AiConversationDto, AiConversationSummaryDto> _conversationAssembler;
     private readonly IAiAssistantRunQueue _runQueue;
@@ -56,12 +59,14 @@ public sealed class AiAssistantController : ControllerBase
 
     public AiAssistantController(
         IMediator mediator,
+        IQueryHandler<GetTenantOnboardingStatusQuery, TenantOnboardingStatusDto> tenantOnboardingStatus,
         IHateoasLinkGenerator linkGenerator,
         IResourceAssembler<AiConversationDto, AiConversationSummaryDto> conversationAssembler,
         IAiAssistantRunQueue runQueue,
         ITenantContext tenantContext)
     {
         _mediator = mediator;
+        _tenantOnboardingStatus = tenantOnboardingStatus;
         _linkGenerator = linkGenerator;
         _conversationAssembler = conversationAssembler;
         _runQueue = runQueue;
@@ -104,7 +109,7 @@ public sealed class AiAssistantController : ControllerBase
         [FromServices] IOptions<AiProviderSettings> providerOptions,
         CancellationToken cancellationToken = default)
     {
-        var status = await _mediator.Send(new GetTenantOnboardingStatusQuery(), cancellationToken);
+        var status = await _tenantOnboardingStatus.QueryAsync(new GetTenantOnboardingStatusQuery(), cancellationToken);
         if (!status.IsCurrentUserTenantAdministrator && !status.IsCurrentUserPlatformAdministrator)
         {
             return this.ToForbiddenProblem(detail: "Tenant or platform administrator authority is required to discover AI assistant models.");

@@ -1,14 +1,14 @@
 using System.Text.Json;
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.TenantOnboarding.Requests.Queries;
-using MediatR;
 
 namespace Explore.Application.Features.TenantOnboarding.Handlers.Queries;
 
-public class GetTenantOnboardingStatusQueryHandler : IRequestHandler<GetTenantOnboardingStatusQuery, TenantOnboardingStatusDto>
+public class GetTenantOnboardingStatusQueryHandler : IQueryHandler<GetTenantOnboardingStatusQuery, TenantOnboardingStatusDto>
 {
     private readonly ITenantOnboardingStateRepository _tenantOnboardingStateRepository;
     private readonly IAdminContext _adminContext;
@@ -27,7 +27,7 @@ public class GetTenantOnboardingStatusQueryHandler : IRequestHandler<GetTenantOn
         _currentUserService = currentUserService;
     }
 
-    public async Task<TenantOnboardingStatusDto> Handle(GetTenantOnboardingStatusQuery request, CancellationToken cancellationToken)
+    public async Task<TenantOnboardingStatusDto> QueryAsync(GetTenantOnboardingStatusQuery request, CancellationToken cancellationToken = default)
     {
         var tenantId = _tenantContext.TenantId;
         var onboardingState = await _tenantOnboardingStateRepository.GetByTenantId(tenantId);

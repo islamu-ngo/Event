@@ -1,5 +1,6 @@
 using Explore.Application.Contracts.Identity;
 using Explore.Application.Contracts.Infrastructure;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.Contracts.Services;
 using Explore.Application.Exceptions;
@@ -9,11 +10,10 @@ using Explore.Application.Responses;
 using Explore.Domain;
 using Explore.Domain.Settings.Documents;
 using Explore.Domain.ValueObjects;
-using MediatR;
 
 namespace Explore.Application.Features.TenantOnboarding.Handlers.Commands;
 
-public class CompleteTenantOnboardingCommandHandler : IRequestHandler<CompleteTenantOnboardingCommand, BaseCommandResponse<Guid>>
+public class CompleteTenantOnboardingCommandHandler : ICommandHandler<CompleteTenantOnboardingCommand, BaseCommandResponse<Guid>>
 {
     private readonly ITenantContext _tenantContext;
     private readonly ITenantOnboardingStateRepository _tenantOnboardingStateRepository;
@@ -50,7 +50,7 @@ public class CompleteTenantOnboardingCommandHandler : IRequestHandler<CompleteTe
         _notificationHandlers = notificationHandlers;
     }
 
-    public async Task<BaseCommandResponse<Guid>> Handle(CompleteTenantOnboardingCommand request, CancellationToken cancellationToken)
+    public async Task<BaseCommandResponse<Guid>> ExecuteAsync(CompleteTenantOnboardingCommand request, CancellationToken cancellationToken = default)
     {
         var tenantId = _tenantContext.TenantId;
 

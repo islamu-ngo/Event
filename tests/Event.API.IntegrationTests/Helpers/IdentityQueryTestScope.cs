@@ -2,6 +2,7 @@ using Explore.Application;
 using Explore.Application.Contracts.Infrastructure;
 using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
+using Explore.Application.Features.Users.Handlers.Queries;
 using Explore.Application.Features.Users.Requests.Queries;
 using Explore.Persistence;
 using Explore.Persistence.Repositories;
@@ -25,7 +26,7 @@ internal sealed class IdentityQueryTestScope : IDisposable
             options.UseInMemoryDatabase(nameof(IdentityQueryTestScope), new InMemoryDatabaseRoot()));
         services.AddScoped<IUserExternalLoginRepository, UserExternalLoginRepository>();
         services.AddSingleton<IAuthorizationProvider, UnexpectedPolicy>();
-        services.AddNativeOperations();
+        services.AddScoped<IQueryHandler<ResolveCurrentUserIdByIdentityRequest, Guid?>, ResolveCurrentUserIdByIdentityRequestHandler>();
         _provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
         _scope = _provider.CreateScope();
     }

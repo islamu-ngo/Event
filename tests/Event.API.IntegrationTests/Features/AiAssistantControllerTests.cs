@@ -17,6 +17,7 @@ using Explore.Application.DTOs.Ai;
 using Explore.Application.DTOs.Onboarding;
 using Explore.Application.Features.AiAssistant.Requests.Commands;
 using Explore.Application.Features.AiAssistant.Requests.Queries;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Features.TenantOnboarding.Requests.Queries;
 using Explore.Application.Hateoas;
 using Explore.Application.Responses;
@@ -35,6 +36,8 @@ using NSubstitute;
 public sealed class AiAssistantControllerTests
 {
     private readonly IMediator _mediator = Substitute.For<IMediator>();
+    private readonly IQueryHandler<GetTenantOnboardingStatusQuery, TenantOnboardingStatusDto> _tenantOnboardingStatus =
+        Substitute.For<IQueryHandler<GetTenantOnboardingStatusQuery, TenantOnboardingStatusDto>>();
     private readonly IHateoasLinkGenerator _linkGenerator = Substitute.For<IHateoasLinkGenerator>();
     private readonly IResourceAssembler<AiConversationDto, AiConversationSummaryDto> _conversationAssembler =
         Substitute.For<IResourceAssembler<AiConversationDto, AiConversationSummaryDto>>();
@@ -188,7 +191,7 @@ public sealed class AiAssistantControllerTests
             }
             """));
         var httpClientFactory = new StaticHttpClientFactory(new HttpClient(handler));
-        _mediator.Send(Arg.Any<GetTenantOnboardingStatusQuery>(), Arg.Any<CancellationToken>())
+        _tenantOnboardingStatus.QueryAsync(Arg.Any<GetTenantOnboardingStatusQuery>(), Arg.Any<CancellationToken>())
             .Returns(new TenantOnboardingStatusDto
             {
                 IsAuthenticated = true,
@@ -592,7 +595,7 @@ public sealed class AiAssistantControllerTests
 
         _tenantContext.TenantId.Returns(Guid.CreateVersion7());
 
-        return new AiAssistantController(_mediator, _linkGenerator, _conversationAssembler, _runQueue, _tenantContext)
+        return new AiAssistantController(_mediator, _tenantOnboardingStatus, _linkGenerator, _conversationAssembler, _runQueue, _tenantContext)
         {
             ControllerContext = new ControllerContext { HttpContext = httpContext }
         };

@@ -1,11 +1,11 @@
 using Explore.Application.Authorization;
 using Explore.Application.Contracts.Identity;
+using Explore.Application.Contracts.Operations;
 using Explore.Application.Contracts.Persistence;
 using Explore.Application.DTOs.PlatformMonetization;
 using Explore.Application.Exceptions;
 using Explore.Application.Features.PlatformMonetization.Requests.Queries;
 using Explore.Domain;
-using MediatR;
 
 namespace Explore.Application.Features.PlatformMonetization.Handlers.Queries;
 
@@ -13,10 +13,10 @@ public sealed class GetPlatformMonetizationSettingsQueryHandler(
     IAdminContext adminContext,
     IPlatformFeePolicyRepository feePolicies,
     IPlatformContributionSettingRepository contributions)
-    : IRequestHandler<GetPlatformMonetizationSettingsQuery, PlatformMonetizationSettingsDto>
+    : IQueryHandler<GetPlatformMonetizationSettingsQuery, PlatformMonetizationSettingsDto>
 {
-    public async Task<PlatformMonetizationSettingsDto> Handle(
-        GetPlatformMonetizationSettingsQuery request,
+    public async Task<PlatformMonetizationSettingsDto> QueryAsync(
+        GetPlatformMonetizationSettingsQuery query,
         CancellationToken cancellationToken)
     {
         if (!await adminContext.IsInstanceAdminAsync(cancellationToken))
